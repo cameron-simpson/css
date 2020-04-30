@@ -157,6 +157,8 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_checkout(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     if argv:
       revision = argv.pop(0)
@@ -168,6 +170,8 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_last(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     tag = pkg.latest_release_tag()
     if tag is None:
@@ -178,6 +182,8 @@ class CSReleaseCommand(BaseCommand):
   
   @staticmethod
   def cmd_log(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     first = True
     for files, firstline in pkg.log_since():
@@ -205,12 +211,16 @@ class CSReleaseCommand(BaseCommand):
   
   @staticmethod
   def cmd_export(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     path = pkg.export()
     print(path)
   
   @staticmethod
   def cmd_next(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     next_prefix, next_suffix = pkg.next_release_tag().split('-')
     assert next_prefix == pkg.name
@@ -218,6 +228,8 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_pypi(argv, options):
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     # upload latest release to pypi
     tag = pkg.latest_release_tag()
@@ -226,6 +238,8 @@ class CSReleaseCommand(BaseCommand):
   @staticmethod
   def cmd_release(argv, options):
     xit = 0
+    if not argv:
+      raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     vcs = options.vcs
     # issue new release tag
