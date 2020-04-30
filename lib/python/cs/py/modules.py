@@ -11,7 +11,6 @@ from inspect import getmodule
 import os.path
 import sys
 from cs.context import stackattrs
-from cs.logutils import warning
 from cs.pfx import Pfx
 
 DISTINFO = {
@@ -21,7 +20,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context'],
+    'install_requires': ['cs.context', 'cs.pfx'],
 }
 
 def import_module_name(module_name, name, path=None, lock=None):
@@ -118,7 +117,7 @@ def direct_imports(src_filename, module_name=None):
       resolve relative imports against it.
       Otherwise, relative import names are returned unresolved.
 
-      This is a simple minded source parse.
+      This is a very simple minded source parse.
   '''
   subnames = set()
   with Pfx(src_filename):
@@ -135,10 +134,12 @@ def direct_imports(src_filename, module_name=None):
             words = line.split()
             if not words:
               continue
-            if words[0] not in ('from', 'import'):
+            word0 = words[0]
+            if word0 not in ('from', 'import'):
               continue
             if len(words) < 2:
-              warning("missing module name")
+              continue
+            if word0 == 'from' and (len(words) < 4 or words[2] != 'import'):
               continue
             subimport = words[1]
             if module_name and subimport.startswith('.'):
