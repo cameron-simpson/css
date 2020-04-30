@@ -163,7 +163,7 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       revision = argv.pop(0)
     else:
-      revision = pkg.latest_release_tag() or "tip"
+      revision = pkg.latest_release_tag or "tip"
       info("checking out revision %r", revision)
     checkout_dir = pkg.name + '--' + revision
     pkg.checkout(revision, checkout_dir)
@@ -173,7 +173,7 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
-    tag = pkg.latest_release_tag()
+    tag = pkg.latest_release_tag
     if tag is None:
       suffix = "NONE"
     else:
@@ -232,8 +232,11 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
     # upload latest release to pypi
-    tag = pkg.latest_release_tag()
-    pkg.submit_pypi(force=options.force)
+    vcs_tag = pkg.latest_release_tag
+    pypi_version = pkg.latest_release_version
+    pkg.submit_pypi(
+        force=options.force, vcs_tag=vcs_tag, pypi_version=pypi_version
+    )
 
   @staticmethod
   def cmd_release(argv, options):
@@ -394,8 +397,9 @@ class Package:
     '''
     return self.vcs.release_log(self.name)
 
+  @property
   def latest_release_tag(self):
-    ''' Return the latest release tag or `None`.
+    ''' The latest VCS release tag or `None`.
     '''
     tags = self.release_tags()
     if not tags:
@@ -403,7 +407,7 @@ class Package:
     return max(tags)
 
   def latest_release_version(self):
-    vcs_tag = self.lastest_release_tag()
+    vcs_tag = self.lastest_release_tag
     if vcs_tag is None:
       return None
     return vcs_tag.split('-', 1)[1]
@@ -473,7 +477,7 @@ class Package:
         self.latest_pypi_version = latest_version
 
   def export(self):
-    latest_version = self.latest_release_version()
+    latest_version = self.latest_release_version
     pkg_dir = "%s-%s" % (self.name, latest_version)
     print('create %s ...' % (pkg_dir,))
     with Pfx("mkdir(%s)", pkg_dir):
