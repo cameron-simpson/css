@@ -457,8 +457,6 @@ class MailFiler(NS):
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
-            if upd:
-              status("scan...")
             try:
               nmsgs += self.sweep(
                   wmdir, justone=justone, no_remove=no_remove, upd=upd
