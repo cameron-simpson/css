@@ -13,7 +13,7 @@ from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace as NS
-from cs.context import stackattrs
+from cs.context import nullcontext, stackattrs
 from cs.lex import cutprefix
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
@@ -213,9 +213,9 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    setup_logging(cmd)
+    loginfo = setup_logging(cmd)
     # post: argv is list of arguments after the command name
-    usage_format = getattr(self, 'USAGE_FORMAT')
+    usage_format = getattr(self, 'USAGE_FORMAT', None)
     # TODO: is this valid in the case of an already formatted usage string
     if usage_format:
       usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
@@ -224,8 +224,11 @@ class BaseCommand:
     else:
       usage = None
     if options is None:
-      options = NS(cmd=cmd, usage=usage)
-      self.apply_defaults(options)
+      options = NS()
+    options.cmd = cmd
+    options.usage = usage
+    options.loginfo = loginfo
+    self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
@@ -257,12 +260,13 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmd_names))
           )
-        if isinstance(main, BaseCommand):
-
-          def run_main(argv, options):
-            ''' Invoke the run method of an instance of the subcommand class.
-            '''
-            return main().run(argv, options=options, cmd=subcmd)
+        try:
+          main_is_class = issubclass(main, BaseCommand)
+        except TypeError:
+          main_is_class = False
+        if main_is_class:
+          cls = main
+          main = lambda argv, options: cls().run(argv, options=options, cmd=subcmd)
 
           main = run_main
       else:
@@ -274,11 +278,15 @@ class BaseCommand:
               "no main method and no %s* subcommand methods" %
               (subcmd_prefix,)
           )
+      upd_context = options.loginfo.upd
+      if upd_context is None:
+        upd_context = nullcontext()
       with RunState(cmd) as runstate:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
-          with self.run_context(argv, options):
-            with Pfx(subcmd):
-              return main(argv, options)
+          with upd_context:
+            with self.run_context(argv, options):
+              with Pfx(subcmd):
+                return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, options, e, usage):

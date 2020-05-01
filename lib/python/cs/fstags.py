@@ -3,6 +3,9 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
+    Many basic tasks can be performed with the `fstags` commandline utility,
+    documented under the `FSTagsCommand` class below.
+
     Why `fstags`?
     By storing the tags in a separate file we:
     * can store tags without modifying a file
@@ -26,7 +29,7 @@
 
     For example, a media file for a television episode with the pathname
     `/path/to/series-name/season-02/episode-name--s02e03--something.mp4`
-    might obtain the tags:
+    might have the tags:
 
         series_title="Series Full Name"
         season=2
@@ -34,13 +37,31 @@
         episode=3
         episode_title="Full Episode Title"
 
-    from the following `.fstags` entries:
+    obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
       `series-name sf series_title="Series Full Name"`
     * tag file `/path/to/series-name/.fstags`:
       `season-02 season=2`
     * tag file `/path/to/series-name/season-02/.fstags`:
       `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+    ## `fstags` Examples ##
+
+    ### Backing up a media tree too big for the removable drives ###
+
+    Walk the media tree for files tagged for backup to `archive2`:
+
+        find /path/to/media backup=archive2
+
+    Walk the media tree for files not assigned to a backup archive:
+
+        find /path/to/media -backup
+
+    Backup the `archive2` files using `rsync`:
+
+        fstags find --for-rsync /path/to/media backup=archive2 \
+        | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
+
 '''
 
 from collections import defaultdict, namedtuple
@@ -66,7 +87,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.fileutils import findup, shortpath
+from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
@@ -132,7 +153,7 @@ def verbose(msg, *a):
   ifverbose(state.verbose, msg, *a)
 
 class FSTagsCommand(BaseCommand):
-  ''' `fstags` main command line class.
+  ''' `fstags` main command line utility.
   '''
 
   GETOPT_SPEC = ''
@@ -534,7 +555,7 @@ class FSTagsCommand(BaseCommand):
           for srcpath in argv:
             dstpath = joinpath(dirpath, basename(srcpath))
             try:
-              attach(srcpath, dstpath, force=cmd_force)
+              attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
             except (ValueError, OSError) as e:
               print(e, file=sys.stderr)
               xit = 1
@@ -551,7 +572,7 @@ class FSTagsCommand(BaseCommand):
         with fstags:
           srcpath, dstpath = argv
           try:
-            attach(srcpath, dstpath, force=cmd_force)
+            attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
           except (ValueError, OSError) as e:
             print(e, file=sys.stderr)
             xit = 1
@@ -665,7 +686,7 @@ class FSTagsCommand(BaseCommand):
             dstpath = joinpath(dirpath, newbase)
             verbose("-> %s", dstpath)
             try:
-              options.fstags.move(filepath, dstpath)
+              options.fstags.move(filepath, dstpath, crop_ok=True)
             except OSError as e:
               error("-> %s: %s", dstpath, e)
               xit = 1
@@ -1173,24 +1194,26 @@ class FSTags(MultiOpenMixin):
           tagfile.save()
 
   @pfx_method
-  def copy(self, srcpath, dstpath, force=False):
+  def copy(self, srcpath, dstpath, **kw):
     ''' Copy `srcpath` to `dstpath`.
     '''
-    return self.attach_path(shutil.copy2, srcpath, dstpath, force=force)
+    return self.attach_path(shutil.copy2, srcpath, dstpath, **kw)
 
   @pfx_method
-  def link(self, srcpath, dstpath, force=False):
+  def link(self, srcpath, dstpath, **kw):
     ''' Link `srcpath` to `dstpath`.
     '''
-    return self.attach_path(os.link, srcpath, dstpath, force=force)
+    return self.attach_path(os.link, srcpath, dstpath, **kw)
 
   @pfx_method
-  def move(self, srcpath, dstpath, force=False):
+  def move(self, srcpath, dstpath, **kw):
     ''' Move `srcpath` to `dstpath`.
     '''
-    return self.attach_path(shutil.move, srcpath, dstpath, force=force)
+    return self.attach_path(shutil.move, srcpath, dstpath, **kw)
 
-  def attach_path(self, attach, srcpath, dstpath, *, force=False):
+  def attach_path(
+      self, attach, srcpath, dstpath, *, force=False, crop_ok=False
+  ):
     ''' Attach `srcpath` to `dstpath` using the `attach` callable.
 
         Parameters:
@@ -1199,6 +1222,8 @@ class FSTags(MultiOpenMixin):
           such as a copy, link or move
         * `srcpath`: the source filesystem object
         * `dstpath`: the destination filesystem object
+        * `crop_ok`: if true and the OS raises `OSError(ENAMETOOLONG)`
+          attempt to crop the name before the file extension and retry
         * `force`: default `False`.
           If true and the destination exists
           try to remove it before calling `attach`.
@@ -1219,7 +1244,23 @@ class FSTags(MultiOpenMixin):
             os.remove(dstpath)
         else:
           raise ValueError("destination already exists")
-      result = attach(srcpath, dstpath)
+      try:
+        result = attach(srcpath, dstpath)
+      except OSError as e:
+        if e.errno == errno.ENAMETOOLONG and crop_ok:
+          dstdirpath = dirname(dstpath)
+          dstbasename = basename(dstpath)
+          newbasename = crop_name(dstbasename)
+          if newbasename != dstbasename:
+            return self.attach_path(
+                attach,
+                srcpath,
+                joinpath(dstdirpath, newbasename),
+                force=force,
+                crop_ok=False
+            )
+        else:
+          raise
       old_modified = dst_taggedpath.modified
       for tag in src_taggedpath.direct_tags:
         dst_taggedpath.direct_tags.add(tag)
