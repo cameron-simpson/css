@@ -387,7 +387,6 @@ class Upd(SingletonMixin):
         txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
         txts.extend(self.redraw_line_v(''))
         txts.append(txt)
-        txts.append('\n')
         txts.extend(self.redraw_trailing_slots_v(top_slot))
         self._current_slot = 0
       else:
