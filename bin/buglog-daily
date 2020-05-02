@@ -51,7 +51,7 @@ else
 fi
 logdir=$logdir/$daycode
 
-[ -d "$logdir/." ] || mkdir -- "$logdir"
+needdir "$logdir"
 
 printf "%s %s\n" "$hhmm" "$*" >>"$logdir/ALL"
 
