@@ -30,7 +30,7 @@ do
   shift
 done
 
-[ -d "$logdir/." ] || mkdir -- "$logdir" || badopts=1
+needdir "$logdir"
 
 if [ $# = 0 ]
 then
@@ -50,8 +50,6 @@ else
   hhmm=`date "+%H:%M"`
 fi
 logdir=$logdir/$daycode
-
-needdir "$logdir"
 
 printf "%s %s\n" "$hhmm" "$*" >>"$logdir/ALL"
 
