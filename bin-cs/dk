@@ -78,6 +78,14 @@ case "$op" in
       set -x
       exec docker exec -it "$primary_container" $DK_EXEC_PREFIX "$@"
       ;;
+  update)
+      set -ex
+      "$0" down
+      docker-compose $docker_compose_opts -f "$DK_COMPOSE_YML" pull
+      "$0" up setup
+      "$0" up -d
+      exit $?
+      ;;
   up)
       [ $# -gt 0 ] || [ -z "$DK_PRIMARY_SERVICE" ] \
       || set -- --exit-code-from "$DK_PRIMARY_SERVICE" ${1+"$@"}
