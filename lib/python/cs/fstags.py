@@ -3,7 +3,7 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
-    Many basic tasks can be performed with the `fstags` commandline utility,
+    Many basic tasks can be performed with the `fstags` command line utility,
     documented under the `FSTagsCommand` class below.
 
     Why `fstags`?
@@ -96,7 +96,7 @@ from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
-from cs.tagset import TagSet, Tag, TagChoice, TagsOntology
+from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
@@ -150,7 +150,7 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-class FSTagsCommand(BaseCommand):
+class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
@@ -262,23 +262,6 @@ class FSTagsCommand(BaseCommand):
     ''' Set up the default values in `options`.
     '''
     options.fstags = FSTags()
-
-  @staticmethod
-  def parse_tag_choices(argv):
-    ''' Parse a list of tag specifications of the form:
-        * `-`*tag_name*: a negative requirement for *tag_name*
-        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
-          with optional *value*.
-        Return a list of `(arg,choice,Tag)` for each `arg` in `argv`.
-    '''
-    choices = []
-    for arg in argv:
-      with Pfx(arg):
-        choice, offset = TagChoice.parse(arg)
-        if offset < len(arg):
-          raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append(choice)
-    return choices
 
   @staticmethod
   def cmd_autotag(argv, options):
