@@ -132,8 +132,6 @@ LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
 def main(argv=None):
   ''' Command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
   return FSTagsCommand().run(argv)
 
 class _State(threading.local):
