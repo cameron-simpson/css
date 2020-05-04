@@ -232,7 +232,7 @@ class BaseCommand:
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
-      # we do this regardless in order to honour --
+      # we do this regardless in order to honour '--'
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
         self.apply_opts(opts, options)
