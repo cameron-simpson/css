@@ -5,6 +5,7 @@
 
 from contextlib import contextmanager
 import logging
+from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
 import sqlalchemy.sql.functions as func
@@ -185,6 +186,36 @@ def orm_auto_session(method):
   wrapper.__module__ = getattr(method, '__module__', None)
   return wrapper
 
+class BasicTableMixin:
+  ''' Useful methods for most tables.
+  '''
+
+  @classmethod
+  @auto_session
+  def lookup(cls, *, session, **criteria):
+    ''' Return iterable of row entities matching `criteria`.
+    '''
+    return session.query(cls).filter_by(**criteria)
+
+  @classmethod
+  @auto_session
+  def lookup1(cls, *, session, **criteria):
+    ''' Return the row entity matching `criteria`, or `None` if no match.
+    '''
+    return session.query(cls).filter_by(**criteria).one_or_none()
+
+  @classmethod
+  @auto_session
+  def __getitem__(cls, index, *, session):
+    row = cls.lookup1(id=index, session=session)
+    if row is None:
+      raise IndexError("%s: no row with id=%s" % (cls, index,))
+    return row
+
+class HasIdMixin:
+  ''' Include an "id" `Column` as the primary key.
+  '''
+  id = Column(Integer, primary_key=True)
 @require(
     lambda field_name: field_name and not field_name.startswith('.') and
     not field_name.endswith('.') and '..' not in field_name
