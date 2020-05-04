@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import logging
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
+import sqlalchemy.sql.functions as func
 from icontract import require
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
@@ -31,41 +32,41 @@ DISTINFO = {
 }
 
 @require(lambda orm, session: orm is not None or session is not None)
-def with_session(func, *a, orm=None, session=None, **kw):
-  ''' Call `func(*a,session=session,**kw)`, creating a session if required.
-      The function `func` runs within a transaction,
+def with_session(function, *a, orm=None, session=None, **kw):
+  ''' Call `function(*a,session=session,**kw)`, creating a session if required.
+      The function `function` runs within a transaction,
       nested if the session already exists.
 
       This is the inner mechanism of `@auto_session` and
       `ORM.auto_session`.
 
       Parameters:
-      * `func`: the function to call
+      * `function`: the function to call
       * `a`: the positional parameters
       * `orm`: optional ORM class with a `.session()` context manager method
         such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
-      * `kw`: other keyword arguments, passed to `func`
+      * `kw`: other keyword arguments, passed to `function`
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
       a context manager.
 
-      The `session` is also passed to `func` as
+      The `session` is also passed to `function` as
       the keyword parameter `session` to support nested calls.
   '''
   if session:
     # run the function inside a savepoint in the supplied session
     with session.begin_nested():
-      return func(*a, session=session, **kw)
+      return function(*a, session=session, **kw)
   if not orm:
     raise ValueError("no orm supplied from which to make a session")
   with orm.session() as new_session:
-    return func(*a, session=new_session, **kw)
+    return function(*a, session=new_session, **kw)
 
-def auto_session(func):
+def auto_session(function):
   ''' Decorator to run a function in a session if one is not presupplied.
-      The function `func` runs within a transaction,
+      The function `function` runs within a transaction,
       nested if the session already exists.
 
       See `with_session` for details.
@@ -75,11 +76,11 @@ def auto_session(func):
   def wrapper(*a, orm=None, session=None, **kw):
     ''' Prepare a session if one is not supplied.
     '''
-    return with_session(func, *a, orm=orm, session=session, **kw)
+    return with_session(function, *a, orm=orm, session=session, **kw)
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
-  wrapper.__doc__ = func.__doc__
-  wrapper.__module__ = getattr(func, '__module__', None)
+  wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
+  wrapper.__doc__ = function.__doc__
+  wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
 @contextmanager
@@ -96,8 +97,8 @@ def push_log_level(level):
   logger.setLevel(old_level)
 
 @decorator
-def log_level(func, level=None):
-  ''' Decorator to run `func` at the specified logging `level`, default `logging.DEBUG`.
+def log_level(function, level=None):
+  ''' Decorator to run `function` at the specified logging `level`, default `logging.DEBUG`.
   '''
   if level is None:
     level = logging.DEBUG
@@ -106,9 +107,9 @@ def log_level(func, level=None):
     ''' Push the desired log level and run the function.
     '''
     with push_log_level(level):
-      return func(*a, **kw)
+      return function(*a, **kw)
 
-  wrapper.__name__ = "@log_level(%s,%s)" % (func, level)
+  wrapper.__name__ = "@log_level(%s,%s)" % (function, level)
   return wrapper
 
 class ORM(MultiOpenMixin):
