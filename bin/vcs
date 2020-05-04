@@ -18,8 +18,10 @@ set -ue
 cmd=$(basename "$0")
 usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
   -d dir        Working directory, default: .
+  -q            Quiet. Turn off tracing and a lot of command output.
   -t topdir     Top of the VCS tree.
   -V vcs_type   Specify the VCS type to use.
+  -x            Turn on command excution tracing.
                 An empty string asks $cmd to figure this out.
   Commands:
     branch      Report current branch name.
@@ -45,6 +47,8 @@ wd=.
 vcs_top=
 vcs_type=
 trace=command
+hg_q=
+git_q=
 [ -t 2 ] && trace=set-x
 
 badopts=
@@ -53,8 +57,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) wd=$2; shift ;;
+    -q) trace=command hg_q=-q git_q=-q ;;
     -t) vcs_top=$2; shift ;;
     -V) vcs_type=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -146,9 +152,9 @@ case "$op" in
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
       dl,git | download,git)
-                    git fetch --all ${1+"$@"} ;;
+                    git fetch $git_q --all ${1+"$@"} ;;
       dl,hg | download,hg)
-                    hg pull ${1+"$@"} ;;
+                    hg pull $hg_q ${1+"$@"} ;;
       get-branches,git)
                     if [ $# = 0 ]
                     then  remote=origin
