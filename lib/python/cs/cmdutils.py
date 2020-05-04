@@ -143,6 +143,19 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
+  def subcommands(cls):
+    ''' Return a mapping of subcommand names to class attributes
+        for attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
+        by default `'cmd_'`.
+    '''
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    return {
+        cutprefix(attr, prefix): getattr(cls, attr)
+        for attr in cls.__dict__.keys()
+        if attr.startswith(prefix)
+    }
+
+  @classmethod
   def add_usage_to_docstring(cls):
     ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
         with format substitutions.
@@ -237,28 +250,21 @@ class BaseCommand:
       if getopt_spec:
         self.apply_opts(opts, options)
 
-      subcmd_prefix = self.SUBCOMMAND_METHOD_PREFIX
-      subcmd_names = list(
-          map(
-              lambda attr: cutprefix(attr, subcmd_prefix),
-              (attr for attr in dir(self) if attr.startswith(subcmd_prefix))
-          )
-      )
-      if subcmd_names:
-        # look for a subcommand
+      subcmds = self.subcommands()
+      if subcmds:
+        # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
               "missing subcommand, expected one of %r" %
-              (sorted(subcmd_names))
+              (sorted(subcmds.keys()))
           )
         subcmd = argv.pop(0)
-        subcmd_attr = subcmd_prefix + subcmd
         try:
-          main = getattr(self, subcmd_attr)
-        except AttributeError:
+          main = subcmds[subcmd]
+        except KeyError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %r" %
-              (subcmd, sorted(subcmd_names))
+              (subcmd, sorted(subcmds.keys()))
           )
         try:
           main_is_class = issubclass(main, BaseCommand)
