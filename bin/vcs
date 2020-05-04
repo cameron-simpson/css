@@ -25,6 +25,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     branch      Report current branch name.
     branches    Report all branch names.
     diff        Run the VCS diff command.
+    dl, download Download remote changes.
+                Does not update or merge the local checkout.
     glog        Report a graphical change log.
     get-branches [remote [remote-branch-names...]]
                 Fetch all or specified remote branches.
@@ -43,7 +45,7 @@ wd=.
 vcs_top=
 vcs_type=
 trace=command
-##[ -t 2 ] && trace=set-x
+[ -t 2 ] && trace=set-x
 
 badopts=
 
@@ -143,6 +145,10 @@ case "$op" in
       # current diff
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
+      dl,git | download,git)
+                    git fetch --all ${1+"$@"} ;;
+      dl,hg | download,hg)
+                    hg pull ${1+"$@"} ;;
       get-branches,git)
                     if [ $# = 0 ]
                     then  remote=origin
