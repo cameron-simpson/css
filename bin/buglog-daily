@@ -30,8 +30,6 @@ do
   shift
 done
 
-needdir "$logdir"
-
 if [ $# = 0 ]
 then
   echo "$cmd: missing headline" >&2
@@ -49,7 +47,9 @@ else
   daycode=`date "+%Y-%m-%d"`
   hhmm=`date "+%H:%M"`
 fi
+
 logdir=$logdir/$daycode
+needdir "$logdir"
 
 printf "%s %s\n" "$hhmm" "$*" >>"$logdir/ALL"
 
