@@ -272,7 +272,9 @@ class BaseCommand:
           main_is_class = False
         if main_is_class:
           cls = main
-          main = lambda argv, options: cls().run(argv, options=options, cmd=subcmd)
+          main = lambda argv, options: cls().run(
+              argv, options=options, cmd=subcmd
+          )
 
           main = run_main
       else:
