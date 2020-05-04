@@ -94,8 +94,10 @@ def push_log_level(level):
   logger = logging.getLogger('sqlalchemy.engine')
   old_level = logger.level
   logger.setLevel(level)
-  yield logger
-  logger.setLevel(old_level)
+  try:
+    yield logger
+  finally:
+    logger.setLevel(old_level)
 
 @decorator
 def log_level(function, level=None):
