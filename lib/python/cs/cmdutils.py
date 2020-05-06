@@ -14,9 +14,11 @@ from os.path import basename
 import sys
 from types import SimpleNamespace as NS
 from cs.context import nullcontext, stackattrs
-from cs.lex import cutprefix
+from cs.deco import cachedmethod
+from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
+from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
 __version__ = '20200318'
@@ -156,16 +158,76 @@ class BaseCommand:
     }
 
   @classmethod
-  def add_usage_to_docstring(cls):
-    ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
-        with format substitutions.
+  @cachedmethod
+  def usage_text(cls, *, cmd=None, format_mapping=None):
+    ''' Compute the "Usage: message for this class
+        from the top level `USAGE_FORMAT`
+        and the `'Usage:'`-containing docstrings
+        from its `cmd_*` methods.
+
+        This is a cached method because it tries to update the
+        method docstrings after formatting, which is bad if it
+        happens more than once.
     '''
-    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
-    if 'cmd' not in format_kwargs:
-      format_kwargs['cmd'] = cls.__name__
-    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
-        format_kwargs
-    ).replace('\n', '\n    ')
+    if cmd is None:
+      cmd = cls.__name__
+    if format_mapping is None:
+      format_mapping = {}
+    if cmd is not None or 'cmd' not in format_mapping:
+      format_mapping['cmd'] = cls.__name__ if cmd is None else cmd
+    usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+    usage_format_mapping.update(format_mapping)
+    usage_format = getattr(cls, 'USAGE_FORMAT', None)
+    if usage_format is None:
+      return None
+    usage_message = usage_format.format_map(usage_format_mapping)
+    subusages = []
+    for attr, method in sorted(cls.subcommands().items()):
+      with Pfx(attr):
+        subusage = None
+        try:
+          classy = issubclass(method, BaseCommand)
+        except TypeError:
+          classy = False
+        if classy:
+          subusage = method.usage_text(cmd=attr)
+        else:
+          doc = obj_docstring(method)
+          if doc and 'Usage:' in doc:
+            pre_usage, post_usage = doc.split('Usage:', 1)
+            post_usage_parts = post_usage.split('\n\n', 1)
+            post_usage_format = post_usage_parts.pop(0)
+            subusage_format = stripped_dedent(post_usage_format)
+            if subusage_format:
+              mapping = dict(sys.modules[method.__module__].__dict__)
+              mapping.update(cmd=attr)
+              subusage = subusage_format.format_map(mapping)
+              newdoc = pre_usage + subusage + '\n\n'.join(post_usage_parts)
+              try:
+                method.__doc__ = newdoc
+              except AttributeError:
+                # cannot always write to method docstrings
+                pass
+        if subusage:
+          subusages.append(subusage.replace('\n', '\n  '))
+    if subusages:
+      usage_message = '\n'.join(
+          [usage_message, '  Subcommands:'] + [
+              '    ' + subusage.replace('\n', '\n    ')
+              for subusage in subusages
+          ]
+      )
+    return usage_message
+
+  @classmethod
+  def add_usage_to_docstring(cls):
+    ''' Append `cls.usage_text()` to `cls.__doc__`.
+    '''
+    usage_message = cls.usage_text()
+    cls.__doc__ += (
+        '\n\nCommand line usage:\n\n    ' +
+        usage_message.replace('\n', '\n    ')
+    )
 
   def apply_defaults(self, options):
     ''' Stub `apply_defaults` method.
@@ -228,14 +290,7 @@ class BaseCommand:
       cmd = basename(argv.pop(0))
     loginfo = setup_logging(cmd)
     # post: argv is list of arguments after the command name
-    usage_format = getattr(self, 'USAGE_FORMAT', None)
-    # TODO: is this valid in the case of an already formatted usage string
-    if usage_format:
-      usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
-      usage_kwargs['cmd'] = cmd
-      usage = usage_format.format_map(usage_kwargs)
-    else:
-      usage = None
+    usage = self.usage_text(cmd=cmd)
     if options is None:
       options = NS()
     options.cmd = cmd
