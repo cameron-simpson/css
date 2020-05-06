@@ -151,7 +151,7 @@ class BaseCommand:
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
     return {
         cutprefix(attr, prefix): getattr(cls, attr)
-        for attr in cls.__dict__.keys()
+        for attr in cls.__dict__
         if attr.startswith(prefix)
     }
 
@@ -255,8 +255,8 @@ class BaseCommand:
         # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
-              "missing subcommand, expected one of %r" %
-              (sorted(subcmds.keys()))
+              "missing subcommand, expected one of: %s" %
+              (', '.join(sorted(subcmds.keys())),)
           )
         subcmd = argv.pop(0)
         try:
@@ -275,17 +275,12 @@ class BaseCommand:
           main = lambda argv, options: cls().run(
               argv, options=options, cmd=subcmd
           )
-
-          main = run_main
       else:
         subcmd = cmd
         try:
           main = self.main
         except AttributeError:
-          raise GetoptError(
-              "no main method and no %s* subcommand methods" %
-              (subcmd_prefix,)
-          )
+          raise GetoptError("no main method and no subcommand methods")
       upd_context = options.loginfo.upd
       if upd_context is None:
         upd_context = nullcontext()
