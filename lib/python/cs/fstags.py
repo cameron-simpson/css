@@ -440,7 +440,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return self._cmd_mvcpln(options.fstags.link, argv, options)
 
   def cmd_mv(self, argv, options):
-    ''' Usage: {cmd} [-fnv] srcpath dstpath, {cmd} [-fnv] srcpaths... dstdirpath
+    ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
           POSIX mv(1) equivalent, but also copying the tags:
           move files and their tags into targetdir.
           -f  Force: remove destination if it exists.
