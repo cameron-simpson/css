@@ -652,10 +652,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   @classmethod
   def cmd_tag(cls, argv, options):
     ''' Usage: {cmd} {{-|path}} {{tag[=value]|-tag}}...
-        Tag a path with multiple tags.
-        With the form "-tag", remove the tag from the immediate tags.
-        A path named "-" indicates that paths should be read from the
-        standard input.
+          Tag a path with multiple tags.
+          With the form "-tag", remove that tag from the direct tags.
+          A path named "-" indicates that paths should be read from the
+          standard input.
     '''
     badopts = False
     fstags = options.fstags
