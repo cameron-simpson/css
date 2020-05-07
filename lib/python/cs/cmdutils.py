@@ -153,7 +153,7 @@ class BaseCommand:
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
     return {
         cutprefix(attr, prefix): getattr(cls, attr)
-        for attr in cls.__dict__
+        for attr in dir(cls)
         if attr.startswith(prefix)
     }
 
