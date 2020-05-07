@@ -203,11 +203,6 @@ class BaseCommand:
               mapping.update(cmd=attr)
               subusage = subusage_format.format_map(mapping)
               newdoc = pre_usage + subusage + '\n\n'.join(post_usage_parts)
-              try:
-                method.__doc__ = newdoc
-              except AttributeError:
-                # cannot always write to method docstrings
-                pass
         if subusage:
           subusages.append(subusage.replace('\n', '\n  '))
     if subusages:
