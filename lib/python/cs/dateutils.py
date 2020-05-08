@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 
 ''' Convenience functions to do with date and time.
@@ -37,6 +37,8 @@ class tzinfoHHMM(tzinfo):
 
 def isodate(when=None, dashed=True):
   ''' Return a date in ISO8601 YYYY-MM-DD format, or YYYYMMDD if not `dashed`.
+
+      Modern Pythons have a `datetime.isoformat` method, use that.
   '''
   if when is None:
     when = localtime()
@@ -45,23 +47,3 @@ def isodate(when=None, dashed=True):
   else:
     format_s = '%Y%m%d'
   return strftime(format_s, when)
-
-def a2date(s):
-  ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
-  '''
-  return date(*strptime(s, "%Y-%m-%d")[0:3])
-
-def parse_date(datestr):
-  ''' Parse a date specifcation and return a datetime.date, or None for empty strings.
-  '''
-  datestr = datestr.strip()
-  if not datestr:
-    return None
-  try:
-    parsed = strptime(datestr, '%Y-%m-%d')
-  except ValueError:
-    try:
-      parsed = strptime(datestr, '%d %B %Y')
-    except ValueError:
-      parsed = strptime(datestr, '%d/%m/%Y')
-  return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
