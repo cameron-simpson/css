@@ -1,3 +1,4 @@
+move usage strings to subcommand docstrings
 make config-based Stores singletons, make datadirs singletons on the dir realpath
 completed-indirect-block index supporting efficient indirect-block completion code
 blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
