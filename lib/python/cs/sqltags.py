@@ -36,6 +36,7 @@ from sqlalchemy.orm import sessionmaker
 import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.dateutils import UNIXTimeMixin
 from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import crop_name, findup, shortpath
@@ -299,30 +300,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                   entity.discard_tag(tag_choice.tag, session=session)
     return xit
 
-def datetime2unixtime(dt):
-  ''' Convert a `datetime` to a UNIX timestamp.
-
-      *Note*: unlike `datetime.timestamp`,
-      if the `datetime` is naive
-      it is presumed to be in UTC rather than the local timezone.
-  '''
-  if dt.tzinfo is None:
-    dt = dt.replace(tzinfo=timezone.utc)
-  return dt.timestamp()
-
-def unixtime2datetime(unixtime, tz=None):
-  ''' Convert a a UNIX timestamp to a `datetime`.
-
-      *Note*: unlike `datetime.fromtimestamp`,
-      if `tz` is `None` the timezone `datetime.timezone.utc` is used.
-  '''
-  if tz is None:
-    tz = timezone.utc
-  return datetime.fromtimestamp(unixtime, tz=tz)
-
 SQLTagsCommand.add_usage_to_docstring()
 
-class SQLTagsORM(ORM):
+class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
   '''
 
@@ -363,6 +343,7 @@ class SQLTagsORM(ORM):
         Base,
         BasicTableMixin,
         HasIdMixin,
+        UNIXTimeMixin,
     ):
       ''' An entity.
       '''
@@ -387,9 +368,8 @@ class SQLTagsORM(ORM):
       def __str__(self):
         return (
             "%s(when=%s,id=%d,name=%r)" % (
-                type(self).__name__, unixtime2datetime(
-                    self.unixtime
-                ).isoformat(), self.id, self.name
+                type(self).__name__, self.datetime().isoformat(), self.id,
+                self.name
             )
         )
 
@@ -543,30 +523,6 @@ class SQLTagsORM(ORM):
       @require(lambda timestamp: isinstance(timestamp, float))
       def unixtime(self, timestamp):
         self.set_all(timestamp, None, None)
-
-      def as_datettime(self, tz=None):
-        ''' Return `self.unixtime` as a `datetime` with the timezone `tz`.
-
-            *Note*: unlike `datetime.fromtimestamp`,
-            if `tz` is `None` the timezone `datetime.timezone.utc` is used.
-        '''
-        return unixtime2datetime(self.unixtime, tz=tz)
-
-      @property
-      def datetime(self):
-        ''' The `unixtime` as a UTC `datetime`.
-        '''
-        return self.as_datetime()
-
-      @datetime.setter
-      def datetime(self, dt):
-        ''' Set the `unixtime` from a `datetime`.
-
-            *Note*: unlike `datetime.timestamp`,
-            if the `datetime` is naive
-            it is presumed to be in UTC rather than the local timezone.
-        '''
-        self.unixtime = datetime2unixtime(dt)
 
     self.tags = Tags
     self.entities = Entities
