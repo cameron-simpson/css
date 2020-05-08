@@ -325,8 +325,8 @@ class BaseCommand:
           )
         subcmd = argv.pop(0)
         try:
-          main = subcmds[subcmd]
-        except KeyError:
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+        except AttributeError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmds.keys()))
