@@ -153,7 +153,7 @@ class BaseCommand:
     prefix = cls.SUBCOMMAND_METHOD_PREFIX
     return {
         cutprefix(attr, prefix): getattr(cls, attr)
-        for attr in cls.__dict__
+        for attr in dir(cls)
         if attr.startswith(prefix)
     }
 
@@ -184,30 +184,7 @@ class BaseCommand:
     subusages = []
     for attr, method in sorted(cls.subcommands().items()):
       with Pfx(attr):
-        subusage = None
-        try:
-          classy = issubclass(method, BaseCommand)
-        except TypeError:
-          classy = False
-        if classy:
-          subusage = method.usage_text(cmd=attr)
-        else:
-          doc = obj_docstring(method)
-          if doc and 'Usage:' in doc:
-            pre_usage, post_usage = doc.split('Usage:', 1)
-            post_usage_parts = post_usage.split('\n\n', 1)
-            post_usage_format = post_usage_parts.pop(0)
-            subusage_format = stripped_dedent(post_usage_format)
-            if subusage_format:
-              mapping = dict(sys.modules[method.__module__].__dict__)
-              mapping.update(cmd=attr)
-              subusage = subusage_format.format_map(mapping)
-              newdoc = pre_usage + subusage + '\n\n'.join(post_usage_parts)
-              try:
-                method.__doc__ = newdoc
-              except AttributeError:
-                # cannot always write to method docstrings
-                pass
+        subusage = cls.subcommand_usage_text(attr)
         if subusage:
           subusages.append(subusage.replace('\n', '\n  '))
     if subusages:
@@ -218,6 +195,39 @@ class BaseCommand:
           ]
       )
     return usage_message
+
+  @classmethod
+  def subcommand_usage_text(cls, subcmd, fulldoc=False):
+    ''' Return the usage text for a subcommand.
+
+        Parameters:
+        * `subcmd`: the subcommand name
+        * `fulldoc`: if true (default `False`)
+          return the full docstring with the Usage section expanded
+          otherwise just return the Usage section.
+    '''
+    method = cls.subcommands()[subcmd]
+    subusage = None
+    try:
+      classy = issubclass(method, BaseCommand)
+    except TypeError:
+      classy = False
+    if classy:
+      subusage = method.usage_text(cmd=subcmd)
+    else:
+      doc = obj_docstring(method)
+      if doc and 'Usage:' in doc:
+        pre_usage, post_usage = doc.split('Usage:', 1)
+        post_usage_parts = post_usage.split('\n\n', 1)
+        post_usage_format = post_usage_parts.pop(0)
+        subusage_format = stripped_dedent(post_usage_format)
+        if subusage_format:
+          mapping = dict(sys.modules[method.__module__].__dict__)
+          mapping.update(cmd=subcmd)
+          subusage = subusage_format.format_map(mapping)
+          if fulldoc:
+            subusage = pre_usage + subusage + '\n\n'.join(post_usage_parts)
+    return subusage if subusage else None
 
   @classmethod
   def add_usage_to_docstring(cls):
@@ -315,8 +325,8 @@ class BaseCommand:
           )
         subcmd = argv.pop(0)
         try:
-          main = subcmds[subcmd]
-        except KeyError:
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+        except AttributeError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmds.keys()))
@@ -397,3 +407,28 @@ class BaseCommand:
       yield
     finally:
       pass
+
+  @classmethod
+  def cmd_help(cls, argv, options):
+    ''' Usage: {cmd} [subcommand-names...]
+          Print the help for the named subcommands,
+          or for all subcommands if no names are specified.
+    '''
+    subcmds = cls.subcommands()
+    if not argv:
+      argv = sorted(subcmds)
+    xit = 0
+    for subcmd in argv:
+      with Pfx(subcmd):
+        if subcmd not in subcmds:
+          warning("unknown subcommand")
+          xit = 1
+          continue
+        subusage = cls.subcommand_usage_text(subcmd, fulldoc=True)
+        if not subusage:
+          warning("no help")
+          xit = 1
+          continue
+        print(subcmd + ':')
+        print(' ', subusage.replace('\n', '\n    '))
+    return xit
