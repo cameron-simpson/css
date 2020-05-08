@@ -4,11 +4,10 @@
 ''' Convenience functions to do with date and time.
 '''
 
-from datetime import tzinfo, timedelta, date
-from time import localtime, strftime, strptime
+from datetime import datetime, tzinfo, timedelta
+from time import localtime, strftime
 
 class tzinfoHHMM(tzinfo):
-
   ''' tzinfo class based on +HHMM / -HHMM strings.
   '''
 
@@ -20,7 +19,11 @@ class tzinfoHHMM(tzinfo):
       sign = -1
     else:
       raise ValueError(
-          "%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,))
+          "%s: invalid sign '%s', should be '+' or '-'" % (
+              shhmm,
+              sign,
+          )
+      )
     self._tzname = shhmm
     self.sign = sign
     self.hour = hour
@@ -35,6 +38,13 @@ class tzinfoHHMM(tzinfo):
   def tzname(self, dt):
     return self._tzname
 
+try:
+  from datetime import timezone
+except ImportError:
+  UTC = tzinfoHHMM('+0000')
+else:
+  UTC = timezone.utc
+
 def isodate(when=None, dashed=True):
   ''' Return a date in ISO8601 YYYY-MM-DD format, or YYYYMMDD if not `dashed`.
 
@@ -47,3 +57,53 @@ def isodate(when=None, dashed=True):
   else:
     format_s = '%Y%m%d'
   return strftime(format_s, when)
+
+def datetime2unixtime(dt):
+  ''' Convert a `datetime` to a UNIX timestamp.
+
+      *Note*: unlike `datetime.timestamp`,
+      if the `datetime` is naive
+      it is presumed to be in UTC rather than the local timezone.
+  '''
+  if dt.tzinfo is None:
+    dt = dt.replace(tzinfo=UTC)
+  return dt.timestamp()
+
+def unixtime2datetime(unixtime, tz=None):
+  ''' Convert a a UNIX timestamp to a `datetime`.
+
+      *Note*: unlike `datetime.fromtimestamp`,
+      if `tz` is `None` the UTC timezone is used.
+  '''
+  if tz is None:
+    tz = UTC
+  return datetime.fromtimestamp(unixtime, tz=tz)
+
+class UNIXTimeMixin:
+  ''' A mixin for classes with a `.unixtime` attribute,
+      a `float` storing a UNIX timestamp.
+  '''
+
+  def as_datettime(self, tz=None):
+    ''' Return `self.unixtime` as a `datetime` with the timezone `tz`.
+
+        *Note*: unlike `datetime.fromtimestamp`,
+        if `tz` is `None` the UTC timezone is used.
+    '''
+    return unixtime2datetime(self.unixtime, tz=tz)
+
+  @property
+  def datetime(self):
+    ''' The `unixtime` as a UTC `datetime`.
+    '''
+    return self.as_datetime()
+
+  @datetime.setter
+  def datetime(self, dt):
+    ''' Set the `unixtime` from a `datetime`.
+
+        *Note*: unlike `datetime.timestamp`,
+        if the `datetime` is naive
+        it is presumed to be in UTC rather than the local timezone.
+    '''
+    self.unixtime = datetime2unixtime(dt)
