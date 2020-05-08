@@ -1,3 +1,4 @@
+signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
 cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
@@ -14,7 +15,6 @@ cs-release: generate and commit cs/module_README.md files (does markdown have a 
 setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
 cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
 cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
-cs.cmdutils: extract Usage: from cmd_ methods to augument main USAGE
 cs.upd: multiline status area
 logutils: use cs.tty stuff for the status() function
 @strable: treat pathlike things like str?

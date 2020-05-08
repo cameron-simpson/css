@@ -1246,3 +1246,24 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+class TagsCommandMixin:
+  ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
+  '''
+
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse a list of tag specifications of the form:
+        * `-`*tag_name*: a negative requirement for *tag_name*
+        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
+          with optional *value*.
+        Return a list of `TagChoice` for each `arg` in `argv`.
+    '''
+    choices = []
+    for arg in argv:
+      with Pfx(arg):
+        choice, offset = TagChoice.parse(arg)
+        if offset < len(arg):
+          raise ValueError("unparsed: %r" % (arg[offset:],))
+        choices.append(choice)
+    return choices

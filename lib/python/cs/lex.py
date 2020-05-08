@@ -947,6 +947,11 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+def format_escape(s):
+  ''' Escape {} characters in a string to protect them from `str.format`.
+  '''
+  return s.replace('{', '{{').replace('}', '}}')
+
 class FormatAsError(LookupError):
   ''' Subclass of `LookupError` for use by `format_as`.
   '''
