@@ -17,7 +17,8 @@ try:
 except ImportError:
   pread = None
 from os.path import (
-    basename, dirname, isdir, isabs as isabspath, abspath, join as joinpath
+    abspath, basename, dirname, isdir, isabs as isabspath,
+    join as joinpath, splitext
 )
 import shutil
 import stat
@@ -29,7 +30,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
-from cs.lex import as_lines
+from cs.lex import as_lines, cutsuffix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread
@@ -621,6 +622,33 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
   finally:
     with Pfx("remove %r", lockpath):
       os.remove(lockpath)
+
+def crop_name(name, name_max=255, ext=None):
+  ''' Crop a file basename so as not to exceed `name_max` in length.
+      Return the original `name` if it already short enough.
+      Otherwise crop `name` before the file extension
+      to make it short enough.
+
+      Parameters:
+      * `name`: the file basename to crop
+      * `name_max`: optional maximum length, default: `255`
+      * `ext`: optional file extension;
+        the default is to infer the extension with `os.path.splitext`.
+  '''
+  if ext is None:
+    base, ext = splitext(name)
+  else:
+    base = cutsuffix(name, ext)
+    if base is name:
+      base, ext = splitext(name)
+  max_base_len = name_max - len(ext)
+  if max_base_len < 0:
+    raise ValueError(
+        "cannot crop name %r before ext %r to <=%s"
+        % (name, ext, name_max))
+  if len(base) <= max_base_len:
+    return name
+  return base[:max_base_len] + ext
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix

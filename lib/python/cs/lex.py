@@ -905,6 +905,53 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
+def cropped_repr(s, max_length=32, offset=0):
+  ''' If the length of the sequence `s` after `offset (default `0`)
+      exceeds `max_length` (default 32)
+      return the `repr` of the leading 29 characters from `offset`
+      plus `'...'`.
+      Otherwise return the `repr` of `s[offset:]`.
+
+      This is typically used for `str` values.
+  '''
+  if len(s) - offset > max_length:
+    return repr(s[offset:offset+29])+'...'
+  return repr(s[offset:])
+
+def get_ini_clausename(s, offset=0):
+  ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
+      Return `(clausename,new_offset)`.
+  '''
+  if not s.startswith('[', offset):
+    raise ValueError("missing opening '[' at position %d" % (offset,))
+  offset = skipwhite(s, offset + 1)
+  clausename, offset = get_qstr_or_identifier(s, offset)
+  if not clausename:
+    raise ValueError(
+        "missing clausename identifier at position %d" % (offset,)
+    )
+  offset = skipwhite(s, offset)
+  if not s.startswith(']', offset):
+    raise ValueError("missing closing ']' at position %d" % (offset,))
+  return clausename, offset + 1
+
+def get_ini_clause_entryname(s, offset=0):
+  ''' Parse a `[`*clausename*`]`*entryname* string
+      from `s` at `offset` (default `0`).
+      Return `(clausename,new_offset)`.
+  '''
+  clausename, offset = get_ini_clausename(s, offset=offset)
+  offset = skipwhite(s, offset)
+  entryname, offset = get_qstr_or_identifier(s, offset)
+  if not entryname:
+    raise ValueError("missing entryname identifier at position %d" % (offset,))
+  return clausename, entryname, offset
+
+def format_escape(s):
+  ''' Escape {} characters in a string to protect them from `str.format`.
+  '''
+  return s.replace('{', '{{').replace('}', '}}')
+
 class FormatAsError(LookupError):
   ''' Subclass of `LookupError` for use by `format_as`.
   '''
@@ -944,7 +991,9 @@ def format_as(format_s, format_mapping, error_sep=None):
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
-    raise FormatAsError(e.args[0], format_s, format_mapping, error_sep=error_sep)
+    raise FormatAsError(
+        e.args[0], format_s, format_mapping, error_sep=error_sep
+    )
   return formatted
 
 _format_as = format_as

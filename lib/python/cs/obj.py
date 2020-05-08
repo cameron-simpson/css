@@ -15,9 +15,13 @@ Presents:
 from __future__ import print_function
 from copy import copy as copy0
 import sys
+import traceback
+from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
+
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -49,6 +53,24 @@ def flavour(obj):
   if hasattr(obj, '__iter__'):
     return T_SEQ
   return T_SCALAR
+
+class O(SimpleNamespace):
+  ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
+  '''
+
+  callers = set()
+
+  def __init__(self, **kw):
+    frame = traceback.extract_stack(None, 2)[0]
+    caller=(frame[0], frame[1])
+    if caller not in self.callers:
+      self.callers.add(caller)
+      print(
+          "WARNING: %s:%d %s: obsolete use of cs.obj.O, please shift to types.SimpleNamespace."
+          % (frame[0], frame[1], frame[2]),
+          file=sys.stderr
+      )
+    SimpleNamespace.__init__(self, **kw)
 
 def O_merge(o, _conflict=None, _overwrite=False, **kw):
   ''' Merge key:value pairs from a mapping into an object.
@@ -265,6 +287,7 @@ class TrackedClassMixin(object):
 
 def singleton(registry, key, factory, fargs, fkwargs):
   ''' Obtain an object for `key` via `registry` (a mapping of `key`=>`object`.
+      Return `(is_new,instance)`.
 
       If the `key` exists in the registry, return the associated object.
       Otherwise create a new object by calling `factory(*fargs,**fkwargs)`
