@@ -977,7 +977,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     attr_value = self.__dict__.get(attr)
     if attr_value is None:
-      warning("%s: no .%r", self, attr)
+      ##warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
