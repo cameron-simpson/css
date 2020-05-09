@@ -29,7 +29,9 @@ from sqlalchemy import (
     create_engine, event, Index, Column, Integer, Float, String, JSON,
     ForeignKey
 )
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
+from sqlalchemy.sql.expression import or_
+from sqlalchemy.orm import sessionmaker, aliased
 import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -362,6 +364,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   def declare_schema(self):
     ''' Define the database schema / ORM mapping.
     '''
+    orm = self
     Base = self.Base
 
     class Entities(
@@ -426,15 +429,16 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             replacing any existing tag named `name`.
         '''
         tag = Tag(name, value)
+        tags = orm.tags
         if self.id is None:
           max_id_result = session.query(
               func.max(Entities.id).label("max_entity_id")
           ).one_or_none()
           self.id = max_id_result.max_entity_id + 1 if max_id_result else 0
           session.flush()
-        etag = Tags.lookup1(session=session, entity_id=self.id, name=tag.name)
+        etag = tags.lookup1(session=session, entity_id=self.id, name=tag.name)
         if etag is None:
-          etag = Tags(entity_id=self.id, name=tag.name)
+          etag = tags(entity_id=self.id, name=tag.name)
           etag.value = tag.value
           session.add(etag)
         else:
@@ -446,15 +450,17 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             Return the tag row discarded or `None` if no match.
         '''
         tag = Tag(name, value)
-        etag = Tags.lookup1(session=session, entity_id=self.id, name=name)
+        tags = orm.tags
+        etag = tags.lookup1(session=session, entity_id=self.id, name=name)
         if etag is not None:
           if tag.value is None or tag.value == etag.value:
             session.delete(etag)
         return etag
 
-      @auto_session
+      @classmethod
       @pfx_method
-      def with_tags(self, tag_criteria, *, session):
+      @auto_session
+      def with_tags(cls, tag_criteria, *, session):
         ''' Construct a query to yield `Entity` rows
             matching the supplied `tag_criteria`.
 
@@ -470,9 +476,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               if the string commences with a `'-'` (minus)
               a negative test is made
         '''
-        entities = self.entities
-        tags = self.tags
-        query = session.query(entities)
+        entities = orm.entities
+        tags = orm.tags
+        query=session.query(entities).filter_by(name=None)
         for taggy in tag_criteria:
           with Pfx(taggy):
             if isinstance(taggy, str):
@@ -486,9 +492,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               tag_choice = TagChoice(None, True, Tag(name, value))
             choice = tag_choice.choice
             tag = tag_choice.tag
-            tag_column, tag_test_value = tags.value_test(tag.value)
-            match = tags.c.name == tag.name
-            where_condition = None
+            tags_alias = aliased(tags)
+            tag_column, tag_test_value = tags_alias.value_test(tag.value)
+            match = tags_alias.name == tag.name,
+            isouter = False
             if choice:
               # positive test
               if tag_column is None:
@@ -496,20 +503,17 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 pass
               else:
                 # test for presence and value
-                match = match and tag_column == tag_test_value
+                match = *match, tag_column == tag_test_value
             else:
               # negative test
-              where_condition = tags.c.id is None
+              isouter = True
               if tag_column is None:
                 # just test for absence
-                pass
+                match = *match, tags_alias.id is None
               else:
                 # test for absence or incorrect value
-                where_condition = where_condition or tag_column != tag_test_value
-            query = query.join(tags, tags.c.name == tag.name)
-            if where_condition is not None:
-              query = query.where(where_condition)
-            XP("query =", query)
+                match = *match, or_(tags_alias.id is None, tag_column != tag_test_value)
+            query = query.join(tags_alias, isouter=isouter).filter(*match)
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -571,7 +575,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           new_values = None, new_value, None
         self.set_all(*new_values)
 
-      def value_test(self, other_value):
+      @classmethod
+      def value_test(cls, other_value):
         ''' Return `(column,test_value)` for testing `other_value`
             where `column` if the appropriate SQLAlchemy column
             and `test_value` is the comparison value for testing.
@@ -580,15 +585,19 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             will just be `other_value`,
             but for certain types the `test_value` will be:
             * `NoneType`: `None`, and the column will also be `None`
-            * `datetime`: `self.datetime2unixtime(other_value)`
+            * `datetime`: `cls.datetime2unixtime(other_value)`
         '''
         if isinstance(other_value, datetime):
-          return self.c.float_value, self.datetime2unixtime(other_value)
+          return cls.float_value, cls.datetime2unixtime(other_value)
         if isinstance(other_value, float):
-          return self.c.float_value, other_value
+          return cls.float_value, other_value
+        if isinstance(other_value, int):
+          f = float(other_value)
+          if f == other_value:
+            return cls.float_value, f
         if isinstance(other_value, str):
-          return self.c.string_value, other_value
-        return self.c.structured_value, other_value
+          return cls.string_value, other_value
+        return cls.structured_value, other_value
 
       @require(
           lambda float_value: float_value is None or
@@ -628,8 +637,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def unixtime(self, timestamp):
         self.set_all(timestamp, None, None)
 
-    self.tags = Tags()
-    self.entities = Entities()
+    self.tags = Tags
+    self.entities = Entities
 
 class SQLTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
@@ -677,7 +686,8 @@ class SQLTags(MultiOpenMixin):
   def find(self, tag_choices, *, session):
     ''' Find the `Entity` rows matching `tag_choices`.
     '''
-    return list(self.orm.entities.with_tags(tag_choices, session=session))
+    es = self.orm.entities.with_tags(tag_choices, session=session)
+    return list(session.execute(es))
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
