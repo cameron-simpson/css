@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 ''' Simple SQL based tagging
-    and the associated `sqltags` command line script.
+    and the associated `sqltags` command line script,
+    supporting both tagged named objects and tagged timestamped log entries.
 
     Compared to `cs.fstags` and its associated `fstags` command,
     this is oriented towards large numbers of items
