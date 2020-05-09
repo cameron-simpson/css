@@ -173,7 +173,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     with sqltags.orm.session() as session:
       with Upd(sys.stderr) as U:
         U.out("select %s ...", ' '.join(map(str, tag_choices)))
-        entities = sqltags.find(tag_choices, session=session)
+        entities = sqltags.find(tag_choices, session=session, with_tags=True)
       for entity in entities:
         print(entity)
     return xit
@@ -460,7 +460,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       @classmethod
       @pfx_method
       @auto_session
-      def with_tags(cls, tag_criteria, *, session):
+      def by_tags(cls, tag_criteria, *, session, with_tags=False):
         ''' Construct a query to yield `Entity` rows
             matching the supplied `tag_criteria`.
 
@@ -475,10 +475,13 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               of a tag with that name;
               if the string commences with a `'-'` (minus)
               a negative test is made
+
+            If `with_tags` is true (default `False`)
+            add a final RIGHT JOIN to include the associated `Tags` rows.
         '''
         entities = orm.entities
         tags = orm.tags
-        query=session.query(entities).filter_by(name=None)
+        query = session.query(entities).filter_by(name=None)
         for taggy in tag_criteria:
           with Pfx(taggy):
             if isinstance(taggy, str):
@@ -512,8 +515,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 match = *match, tags_alias.id is None
               else:
                 # test for absence or incorrect value
-                match = *match, or_(tags_alias.id is None, tag_column != tag_test_value)
+                match = *match, or_(
+                    tags_alias.id is None, tag_column != tag_test_value
+                )
             query = query.join(tags_alias, isouter=isouter).filter(*match)
+        if with_tags:
+          tags_alias = aliased(tags)
+          query = query.join(
+              tags_alias, isouter=True
+          ).filter(entities.id is not None).add_columns(
+              tags_alias.name, tags_alias.float_value, tags_alias.string_value,
+              tags_alias.structured_value
+          )
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -547,15 +560,43 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           JSON, nullable=True, default=None, comment='tag value in JSON form'
       )
 
+      @staticmethod
+      @require(
+          lambda float_value: float_value is None or
+          isinstance(float_value, float)
+      )
+      @require(
+          lambda string_value: string_value is None or
+          isinstance(string_value, str)
+      )
+      @require(
+          lambda structured_value: structured_value is None or
+          not isinstance(structured_value, (float, str))
+      )
+      @require(
+          lambda float_value, string_value, structured_value: sum(
+              map(
+                  lambda value: value is not None,
+                  [float_value, string_value, structured_value]
+              )
+          ) < 2
+      )
+      def pick_value(float_value, string_value, structured_value):
+        ''' Chose amongst the values available.
+        '''
+        if float_value is None:
+          if string_value is None:
+            return structured_value
+          return string_value
+        return float_value
+
       @property
       def value(self):
         ''' Return the value for this `Tag`.
         '''
-        if self.float_value is None:
-          if self.string_value is None:
-            return self.structured_value
-          return self.string_value
-        return self.float_value
+        return self.pick_value(
+            self.float_value, self.string_value, self.structured_value
+        )
 
       @value.setter
       def value(self, new_value):
@@ -640,6 +681,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
+class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags')):
+  ''' An entity record with its `Tag`s.
+  '''
+
 class SQLTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
@@ -683,11 +728,31 @@ class SQLTags(MultiOpenMixin):
     return entities.lookup1(name=index, session=session)
 
   @orm_auto_session
-  def find(self, tag_choices, *, session):
+  def find(self, tag_choices, *, session, with_tags=False):
     ''' Find the `Entity` rows matching `tag_choices`.
     '''
-    es = self.orm.entities.with_tags(tag_choices, session=session)
-    return list(session.execute(es))
+    query = self.orm.entities.by_tags(
+        tag_choices, session=session, with_tags=with_tags
+    )
+    results = session.execute(query)
+    if with_tags:
+      # entities and tag information which must be merged
+      entity_map = {}
+      for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
+          tag_string_value, tag_structured_value) in results:
+        e = entity_map.get(entity_id)
+        if not e:
+          e = entity_map[entity_id] = TaggedEntity(
+              entity_id, entity_name, unixtime, TagSet()
+          )
+        value = self.orm.tags.pick_value(
+            tag_float_value, tag_string_value, tag_structured_value
+        )
+        e.tags.add(tag_name, value)
+      yield from entity_map.values()
+    else:
+      for entity_id, entity_name, unixtime in results:
+        yield TaggedEntity(entity_id, entity_name, unixtime, TagSet())
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
