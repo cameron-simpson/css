@@ -775,6 +775,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r", s[offset:])
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
