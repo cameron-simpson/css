@@ -693,6 +693,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             * `NoneType`: `None`, and the column will also be `None`
             * `datetime`: `cls.datetime2unixtime(other_value)`
         '''
+        if other_value is None:
+          return None, None
         if isinstance(other_value, datetime):
           return cls.float_value, cls.datetime2unixtime(other_value)
         if isinstance(other_value, float):
