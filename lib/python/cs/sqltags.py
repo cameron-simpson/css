@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from getopt import getopt, GetoptError
 import os
-from os.path import basename
+from os.path import basename, expanduser
 import re
 import sys
 import threading
@@ -68,7 +68,7 @@ CATEGORIES_PREFIX_re = re.compile(
 )
 
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
-DBURL_DEFAULT = '~/.sqltags.sqlite'
+DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
 FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isotime} {headline} {tags}'
 
@@ -106,15 +106,24 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   #   Import CSV data.
   # init
   #   Initialise the database.
-  # search [-o output_format] criteria...
-  #   Print selected items according to output_format.
-  USAGE_FORMAT = '''Usage: {cmd} -f db_url subcommand [...]'''
+
+  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
+  -f db_url SQLAlchemy database URL or filename.
+            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
+
+  USAGE_KEYWORDS = {
+      'DBURL_DEFAULT': DBURL_DEFAULT,
+      'DBURL_ENVVAR': DBURL_ENVVAR,
+  }
 
   @staticmethod
   def apply_defaults(options):
     ''' Set up the default values in `options`.
     '''
-    options.db_url = None
+    db_url = os.environ.get(DBURL_ENVVAR)
+    if db_url is None:
+      db_url = expanduser(DBURL_DEFAULT)
+    options.db_url = db_url
     options.sqltags = None
 
   @staticmethod
@@ -127,8 +136,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           options.db_url = val
         else:
           raise RuntimeError("unhandled option")
-    if options.db_url is None:
-      raise GetoptError("no -f db_url option supplied")
 
   @staticmethod
   @contextmanager
