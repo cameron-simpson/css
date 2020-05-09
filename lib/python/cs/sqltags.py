@@ -566,7 +566,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             isouter = False
             if choice:
               # positive test
-              if tag_column is None:
+              if tag_test_value is None:
                 # just test for presence
                 pass
               else:
