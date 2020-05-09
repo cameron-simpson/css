@@ -438,10 +438,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         tag = Tag(name, value)
         tags = orm.tags
         if self.id is None:
-          max_id_result = session.query(
-              func.max(Entities.id).label("max_entity_id")
-          ).one_or_none()
-          self.id = max_id_result.max_entity_id + 1 if max_id_result else 0
+          # obtain the id value from the database
+          session.add(self)
           session.flush()
         etag = tags.lookup1(session=session, entity_id=self.id, name=tag.name)
         if etag is None:
