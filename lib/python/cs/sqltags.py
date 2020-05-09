@@ -70,7 +70,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/.sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{date|isoformat} {headline} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isotime} {headline} {tags}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -175,7 +175,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         U.out("select %s ...", ' '.join(map(str, tag_choices)))
         entities = sqltags.find(tag_choices, session=session, with_tags=True)
       for entity in entities:
-        print(entity)
+        with Pfx(entity):
+          try:
+            output = entity.format_as(output_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
     return xit
 
   @classmethod
@@ -785,7 +792,7 @@ class SQLTags(MultiOpenMixin):
       # entities and tag information which must be merged
       entity_map = {}
       for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
-          tag_string_value, tag_structured_value) in results:
+           tag_string_value, tag_structured_value) in results:
         e = entity_map.get(entity_id)
         if not e:
           e = entity_map[entity_id] = TaggedEntity(
@@ -794,7 +801,8 @@ class SQLTags(MultiOpenMixin):
         value = self.orm.tags.pick_value(
             tag_float_value, tag_string_value, tag_structured_value
         )
-        e.tags.add(tag_name, value)
+        if tag_name is not None:
+          e.tags.add(tag_name, value)
       yield from entity_map.values()
     else:
       for entity_id, entity_name, unixtime in results:
