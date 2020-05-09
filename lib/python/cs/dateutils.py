@@ -84,7 +84,7 @@ class UNIXTimeMixin:
       a `float` storing a UNIX timestamp.
   '''
 
-  def as_datettime(self, tz=None):
+  def as_datetime(self, tz=None):
     ''' Return `self.unixtime` as a `datetime` with the timezone `tz`.
 
         *Note*: unlike `datetime.fromtimestamp`,
