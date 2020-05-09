@@ -15,45 +15,35 @@
 from collections import namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
-from datetime import datetime, timezone
-import errno
+from datetime import datetime
 from getopt import getopt, GetoptError
-import json
 import os
 from os.path import basename
 import re
-import shutil
 import sys
 import threading
-from threading import Lock, RLock
+from threading import RLock
 import time
 from icontract import require
 from sqlalchemy import (
-    create_engine, event, Index, Column, DateTime, Integer, Float, String,
-    LargeBinary, JSON, Enum, ForeignKey
+    create_engine, event, Index, Column, Integer, Float, String, JSON,
+    ForeignKey
 )
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import fmtdoc
 from cs.edit import edit_strings
-from cs.fileutils import crop_name, findup, shortpath
-from cs.lex import (
-    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
-    FormatAsError
-)
-from cs.logutils import error, warning, info, ifverbose
-from cs.obj import SingletonMixin
+from cs.lex import FormatableMixin, FormatAsError
+from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, auto_session, orm_auto_session, json_column, BasicTableMixin,
-    HasIdMixin
+    ORM, auto_session, orm_auto_session, BasicTableMixin, HasIdMixin
 )
-from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
-from cs.threads import locked, locked_property
+from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin
+from cs.threads import locked
 from cs.upd import Upd
 
 DISTINFO = {
@@ -162,8 +152,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     sqltags = options.sqltags
     badopts = False
-    use_direct_tags = False
-    as_rsync_includes = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
     options, argv = getopt(argv, 'o:')
     for option, value in options:
