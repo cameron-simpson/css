@@ -466,11 +466,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       @auto_session
       @pfx_method
-      def with_tags(self, tags, *, session):
+      def with_tags(self, tag_criteria, *, session):
         ''' Construct a query to yield `Entity` rows
-            matching the supplied `tags`.
+            matching the supplied `tag_criteria`.
 
-            The `tags` should be an interable
+            The `tag_criteria` should be an interable
             yielding any of the following types:
             * `TagChoice`: used as a positive or negative test
             * `Tag`: an object with a `.name` and `.value`
@@ -482,10 +482,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               if the string commences with a `'-'` (minus)
               a negative test is made
         '''
-        entities_rel = type(self)
-        tags_rel = Tags
-        query = session.query(entities_rel)
-        for taggy in tags:
+        entities = self.entities
+        tags = self.tags
+        query = session.query(entities)
+        for taggy in tag_criteria:
           with Pfx(taggy):
             if isinstance(taggy, str):
               tag_choice = TagChoice.from_str(taggy)
@@ -498,8 +498,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               tag_choice = TagChoice(None, True, Tag(name, value))
             choice = tag_choice.choice
             tag = tag_choice.tag
-            tag_column, tag_test_value = tags_rel.value_test(tag.value)
-            match = tags_rel.c.name == tag.name
+            tag_column, tag_test_value = tags.value_test(tag.value)
+            match = tags.c.name == tag.name
             where_condition = None
             if choice:
               # positive test
@@ -511,14 +511,14 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 match = match and tag_column == tag_test_value
             else:
               # negative test
-              where_condition = tags_rel.c.id is None
+              where_condition = tags.c.id is None
               if tag_column is None:
                 # just test for absence
                 pass
               else:
                 # test for absence or incorrect value
                 where_condition = where_condition or tag_column != tag_test_value
-            query=query.join(tags_rel, tags_rel.c.name == tag.name)
+            query = query.join(tags, tags.c.name == tag.name)
             if where_condition is not None:
               query = query.where(where_condition)
             XP("query =", query)
