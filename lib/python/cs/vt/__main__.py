@@ -97,27 +97,6 @@ class VTCmd(BaseCommand):
     -h hashclass Hashclass for Stores.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
-  Subcommands:
-    cat filerefs...
-    config
-    dump {{datafile.vtd|index.gdbm|index.lmdb}}
-    fsck object...
-    import [-oW] path {{-|archive.vt}}
-    init
-    ls [-R] dirrefs...
-    mount [-a] [-o {{append_only,readonly}}] [-r] {{Dir|config-clause|archive.vt}} [mountpoint [subpath]]
-      -a  All dates. Implies readonly.
-      -o options
-          Mount options:
-            append_only Files may not be truncated or overwritten.
-            readonly    Read only; data may not be modified.
-      -r  Readonly, the same as "-o readonly".
-    pack path
-    pullfrom other-store [objects...]
-    pushto other-store objects...
-    serve [{{DEFAULT|-|/path/to/socket|host:port}} [name:storespec]...]
-    test blockify file
-    unpack archive.vt
 '''
 
   def __init__(self):
@@ -299,7 +278,8 @@ class VTCmd(BaseCommand):
       dump_debug_threads()
 
   def cmd_profile(self, options, argv):
-    ''' Wrapper to profile other subcommands and report.
+    ''' Usage: {cmd} other-vt-subcommand [args...]
+          Wrapper to profile other subcommands and report.
     '''
     try:
       import cProfile as profile
@@ -319,17 +299,19 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_cat(argv, options):
-    ''' Concatentate the contents of the supplied filerefs to stdout.
+    ''' Usage: {cmd} filerefs...
+          Concatentate the contents of the supplied filerefs to stdout.
     '''
     if not argv:
       raise GetoptError("missing filerefs")
-    for path in argv:
-      cat(path)
+    for fileref in argv:
+      cat(fileref)
     return 0
 
   @staticmethod
   def cmd_config(args, options):
-    ''' Recite the configuration.
+    ''' Usage: {cmd}
+          Recite the configuration.
     '''
     if args:
       raise GetoptError("extra arguments: %r" % (args,))
@@ -338,10 +320,11 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_dump(args, options):
-    ''' Dump various file types.
+    ''' Usage: {cmd} objects...
+          Dump various objects.
     '''
     if not args:
-      raise GetoptError("missing filerefs")
+      raise GetoptError("missing objects")
     hashclass = DEFAULT_HASHCLASS
     one_line = True
     _, columns = ttysize(1)
@@ -378,7 +361,8 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_fsck(args, options):
-    ''' Data structure inspection/repair.
+    ''' Usage: {cmd} objects...
+          Data structure inspection/repair.
     '''
     if not args:
       raise GetoptError("missing fsck objects")
@@ -410,13 +394,15 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_httpd(args, options):
-    ''' Run the HTTP daemon.
+    ''' Usage: {cmd} [httpd-args...]
+          Run the HTTP daemon.
     '''
     httpd_main([options.cmd + ': ' + 'httpd'] + args)
 
   @staticmethod
   def cmd_import(args, options):
-    ''' Import paths into the Store, print top Dirent for each.
+    ''' Usage: {cmd} [-oW] srcpath {{-|special}}
+          Import paths into the Store, print top Dirent for each.
 
         TODO: hook into vt.merge.
     '''
@@ -494,7 +480,8 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_init(args, options):
-    ''' Install a default config and initialise the configured datadir Stores.
+    ''' Usage: {cmd}
+          Install a default config and initialise the configured datadir Stores.
     '''
     xit = 0
     if args:
@@ -532,7 +519,8 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_ls(args, options):
-    ''' Do a directory listing of the specified I<dirrefs>.
+    ''' Usage: {cmd} [-R] dirrefs...
+          Do a directory listing of the specified dirrefs.
     '''
     recurse = False
     if args and args[0] == "-R":
@@ -553,8 +541,12 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_mount(args, options):
-    ''' Mount the specified special on the specified mountpoint directory.
-        Requires FUSE support.
+    ''' Usage: {cmd} [-ar] [-o options] special [mountpoint]
+          Mount the specified special on the specified mountpoint directory.
+          Requires FUSE support.
+          -a            Mount all dates.
+          -o options    Mount options: append, readonly.
+          -r            Read only, synonym for "-o readonly".
     '''
     try:
       from .fuse import mount, umount
@@ -723,8 +715,9 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_pack(args, options):
-    ''' Replace the _path_ with an archive file _path_`.vt`
-        referring to the stored content of _path_.
+    ''' Usage: {cmd} ospath
+          Replace the ospath with an archive file ospath.vt
+          referring to the stored content of path.
     '''
     if not args:
       raise GetoptError("missing path")
@@ -822,9 +815,8 @@ class VTCmd(BaseCommand):
       return xit
 
   def cmd_pullfrom(self, args, options):
-    ''' Pull missing content from other Stores.
-
-        Usage: pullfrom other_store objects...
+    ''' Usage: {cmd} other_store [objects...]
+          Pull missing content from other Stores.
     '''
     if not args:
       raise GetoptError("missing other_store")
@@ -845,10 +837,9 @@ class VTCmd(BaseCommand):
     return self._push(options, srcS, dstS, pushables)
 
   def cmd_pushto(self, args, options):
-    ''' Push something to a secondary Store,
-        such that the secondary store has all the required Blocks.
-
-        Usage: pushto other_store objects...
+    ''' Usage: {cmd} other_store [objects...]
+          Push something to a secondary Store,
+          such that the secondary store has all the required Blocks.
     '''
     if not args:
       raise GetoptError("missing other_store")
@@ -870,14 +861,12 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_serve(args, options):
-    ''' Start a service daemon listening on a TCP port
-        or on a UNIX domain socket or on stdin/stdout.
-
-        Usage: serve [{DEFAULT|-|/path/to/socket|[host]:port} [name:storespec]...]
-
-        With no `name:storespec` arguments the default Store is served,
-        otherwise the named Stores are exported with the first being
-        served initially.
+    ''' Usage: serve [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
+          Start a service daemon listening on a TCP port
+          or on a UNIX domain socket or on stdin/stdout.
+          With no `name:storespec` arguments the default Store is served,
+          otherwise the named Stores are exported with the first being
+          served initially.
     '''
     if args:
       address = args.pop(0)
@@ -968,7 +957,9 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_test(args, options):
-    ''' Test various facilites.
+    ''' Usage: {cmd} subtest [subtestargs...]
+          Test various facilites.
+          blockify filenames... Blockify the contents of the filenames.
     '''
     if not args:
       raise GetoptError("missing test subcommand")
@@ -994,7 +985,8 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_unpack(args, options):
-    ''' Unpack the archive file _archive_`.vt` as _archive_.
+    ''' Usage: {cmd} arpath
+          Unpack the archive file _archive_`.vt` as _archive_.
     '''
     if not args:
       raise GetoptError("missing archive name")
