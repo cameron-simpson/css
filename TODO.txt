@@ -1,3 +1,4 @@
+TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
 signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes

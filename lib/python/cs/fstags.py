@@ -235,9 +235,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   @classmethod
   def cmd_find(cls, argv, options):
-    ''' Usage: {cmd} [--for-rsync] path {{tag[=value]|-tag}}...
+    ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
-          -d          Treat directories like files (do not recurse).
           --direct    Use direct tags instead of all tags.
           --for-rsync Instead of listing matching paths, emit a
                       sequence of rsync(1) patterns suitable for use with
