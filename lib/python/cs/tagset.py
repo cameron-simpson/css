@@ -1272,8 +1272,5 @@ class TagsCommandMixin:
     choices = []
     for arg in argv:
       with Pfx(arg):
-        choice, offset = TagChoice.parse(arg)
-        if offset < len(arg):
-          raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append(choice)
+        choices.append(TagChoice.from_str(arg))
     return choices
