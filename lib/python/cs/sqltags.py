@@ -35,7 +35,7 @@ from sqlalchemy.orm import sessionmaker, aliased
 import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.dateutils import UNIXTimeMixin, unixtime2datetime
+from cs.dateutils import UNIXTimeMixin, datetime2unixtime, unixtime2datetime
 from cs.edit import edit_strings
 from cs.lex import FormatableMixin, FormatAsError
 from cs.logutils import error, warning, ifverbose
@@ -196,14 +196,23 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   def cmd_log(cls, argv, options):
     ''' Record a log entry.
 
-        Usage: {cmd} [-c category,...] [-d when] {{-|headline}} [tags...]
+        Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
           Record entries into the database.
           If headline is '-', read headlines from standard input.
+          -c categories
+            Specify the categories for this log entry.
+            The default is to recognise a leading CAT,CAT,...: prefix.
+          -d when
+            Use when, an ISO8601 date, as the log entry timestamp.
+          -D strptime
+            Read the time from the start of the headline
+            according to the provided strptime specification.
     '''
     categories = None
     dt = None
+    strptime_format = None
     badopts = False
-    opts, argv = getopt(argv, 'c:d:', '')
+    opts, argv = getopt(argv, 'c:d:D:', '')
     for opt, val in opts:
       with Pfx(opt if val is None else f"{opt} {val!r}"):
         if opt == '-c':
@@ -217,8 +226,24 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           if dt.tzinfo is None:
             # create a nonnaive datetime in the local zone
             dt = dt.astimezone()
+        elif opt == '-D':
+          strptime_format = val
         else:
           raise RuntimeError("unhandled option")
+    if dt is not None and strptime_format is not None:
+      warning("-d and -D are mutually exclusive")
+      badopts = True
+    if strptime_format is not None:
+      with Pfx("strptime format %r", strptime_format):
+        if '%' not in strptime_format:
+          warning("no time fields!")
+          badopts = True
+        else:
+          # normalise the format and count the words
+          strptime_format = strptime_format.strip()
+          strptime_words = strptime_format.split()
+          strptime_nwords = len(strptime_words)
+          ostrptime_format = ' '.join(strptime_words)
     if not argv:
       argv = ['-']
       if sys.stdin.isatty():
@@ -230,9 +255,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         if not log_tag.choice:
           warning("negative tag choice")
           badopts = True
-    unixtime = time.time() if dt is None else dt.timestamp()
     if badopts:
       raise GetoptError("bad invocation")
+    xit = 0
     sqltags = options.sqltags
     orm = sqltags.orm
     with orm.session() as session:
@@ -240,6 +265,33 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                                         '-' else (cmdline_headline,)):
         with Pfx(lineno):
           headline = headline.rstrip('\n')
+          unixtime = None
+          if strptime_format:
+            with Pfx("strptime %r", strptime_format):
+              headparts = headline.split(None, strptime_nwords)
+              if len(headparts) < strptime_nwords:
+                warning(
+                    "not enough fields in headline, using current time: %r",
+                    headline
+                )
+                xit = 1
+              else:
+                strptime_text = ' '.join(headparts[:strptime_nwords])
+                try:
+                  strptime_dt = datetime.strptime(
+                      strptime_text, strptime_format
+                  )
+                except ValueError as e:
+                  warning(
+                      "cannot parse %r, using current time: %s", strptime_text,
+                      e
+                  )
+                  xit = 1
+                else:
+                  unixtime = datetime2unixtime(strptime_dt)
+                  headline = ' '.join(headparts[strptime_nwords:])
+          if unixtime is None:
+            unixtime = time.time() if dt is None else dt.timestamp()
           if categories is None:
             # infer categories from leading "FOO,BAH:" text
             m = CATEGORIES_PREFIX_re.match(headline)
@@ -262,6 +314,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           session.add(entity)
           session.flush()
           print(entity, entity.tags(session=session))
+    return xit
 
   @staticmethod
   def cmd_ns(argv, options):
