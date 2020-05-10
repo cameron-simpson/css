@@ -268,6 +268,7 @@ class BaseCommand:
             return main().run(argv, options=options, cmd=subcmd)
 
           main = run_main
+        subcmd_context = Pfx(subcmd)
       else:
         subcmd = cmd
         try:
@@ -277,6 +278,7 @@ class BaseCommand:
               "no main method and no %s* subcommand methods" %
               (subcmd_prefix,)
           )
+        subcmd_context = nullcontext()
       upd_context = options.loginfo.upd
       if upd_context is None:
         upd_context = nullcontext()
@@ -284,7 +286,7 @@ class BaseCommand:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
           with upd_context:
             with self.run_context(argv, options):
-              with Pfx(subcmd):
+              with subcmd_context:
                 return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
