@@ -31,7 +31,7 @@ when=
 categories=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-B bugsystems] [-n] headline < description
+usage="Usage: $cmd [-B bugsystems] [-n] [CATEGORY,...:] headline < description
   -B bugsystems Space separated list of bugsystems to consider.
                 Default from \$BUGSYSTEMS or \`bugsystems\`:
                 $BUGSYSTEMS
