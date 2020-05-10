@@ -1,3 +1,4 @@
+premptively take id=0 as the root entity with metadata about the db as a whole
 TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
