@@ -140,8 +140,8 @@ def logging_wrapper(log_call, stacklevel_increment=1):
 def cachedmethod(
     method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
-  ''' Decorator to cache the result of a method and keep a revision
-      counter for changes.
+  ''' Decorator to cache the result of an instance or class method
+      and keep a revision counter for changes.
 
       The cached values are stored on the instance (`self`).
       The revision counter supports the `@revised` decorator.

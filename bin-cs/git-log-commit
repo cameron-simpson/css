@@ -14,6 +14,6 @@ git log -r '@^..@' \
   | {
     read -r headline
     wdbase=$( basename "$(pwd)" )
-    buglog -- "$wdbase $revision: $headline" </dev/null
+    buglog -- "$wdbase $headline [$revision]" </dev/null
   }
 }
