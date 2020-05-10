@@ -30,7 +30,7 @@ iftsdir=
 cmd=`basename "$0"`
 usage="Usage: $cmd [-?] [-c config] [-d when] [-T tsdir] category log-line...
   -?    If the target timesheet directory is missing, just exit with a
-        non-zero status. Normally a usage error is emitted for catgeories
+        non-zero status. Normally a usage error is emitted for categories
         with no timesheet directory.
   -c config
         Specify the timesheet configuration file.
