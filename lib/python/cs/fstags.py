@@ -1430,14 +1430,18 @@ class TagFile(SingletonMixin):
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
-      with open(filepath, 'w') as f:
-        for name, tags in name_tags:
-          if not tags:
-            continue
-          f.write(cls.tags_line(name, tags))
-          f.write('\n')
-      for _, tags in name_tags:
-        tags.modified = False
+      try:
+        with open(filepath, 'w') as f:
+          for name, tags in name_tags:
+            if not tags:
+              continue
+            f.write(cls.tags_line(name, tags))
+            f.write('\n')
+      except OSError as e:
+        error("save fails: %s", e)
+      else:
+        for _, tags in name_tags:
+          tags.modified = False
 
   def save(self):
     ''' Save the tag map to the tag file.
