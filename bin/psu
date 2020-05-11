@@ -1,31 +1,36 @@
-#!/bin/sh -ue
+#!/bin/sh
+
+set -ue
 
 : ${OS:=`uname -s|tr '[A-Z]' '[a-z]'`}
 : ${USER:=`whoami`}
 
 user=$USER
 ptopts=
+gaopts=
+[ -t 1 ] && gaopts=-C
 
 while [ $# -gt 0 ]
 do
   case $1 in
-    +?*)
-      ptopts="$ptopts $1" ;;
-    [a-zA-Z0-9_.]*)
-      user=$1 ;;
-    *)break ;;
+    +?*)    ptopts="$ptopts $1" ;;
+    *)      break ;;
   esac
   shift
 done
 
 case $OS in
     *bsd)
-	exec pt ww -U "$user" ${1+"$@"} ;;
+	exec pt ww -U "$user" $ptopts ;;
     sunos|ultrix|domainos)
-    	exec ps xww${1+"$@"} ;;
+    	exec ps xww ;;
     linux)
-	exec pt $ptopts w x ${1+"$@"} ;;
+	exec pt $ptopts w x ;;
     # sysv
-    *)	exec pt $ptopts "-u$user" ${1+"$@"} ;;
+    *)	exec pt $ptopts "-u$user" ;;
 esac \
+| if [ $# = 0 ]
+  then  cat
+  else  grepall -H -i $gaopts "$@"
+  fi \
 | entilde

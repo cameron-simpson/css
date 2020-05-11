@@ -3,7 +3,7 @@
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
 
-    Many basic tasks can be performed with the `fstags` commandline utility,
+    Many basic tasks can be performed with the `fstags` command line utility,
     documented under the `FSTagsCommand` class below.
 
     Why `fstags`?
@@ -96,7 +96,7 @@ from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
-from cs.tagset import TagSet, Tag, TagChoice, TagsOntology
+from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
@@ -132,8 +132,6 @@ LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
 def main(argv=None):
   ''' Command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
   return FSTagsCommand().run(argv)
 
 class _State(threading.local):
@@ -152,113 +150,12 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-class FSTagsCommand(BaseCommand):
+class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
   GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]
-  Subcommands:
-    autotag paths...
-        Tag paths based on rules from the rc file.
-    cp [-fnv] srcpath dstpath
-    cp [-fnv] srcpaths... dstdirpath
-        Copy files and their tags into targetdir.
-        -f  Force: remove destination if it exists.
-        -i  Interactive: fail if the destination exists.
-        -n  No remove: fail if the destination exists.
-        -v  Verbose: show copied files.
-    edit [-d] [path]
-        Edit the direct tagsets of path, default: '.'
-        If path is a directory, provide the tags of its entries.
-        Otherwise edit just the tags for path.
-        -d          Treat directories like files: edit just its tags.
-    find [--for-rsync] path {{tag[=value]|-tag}}...
-        List files from path matching all the constraints.
-        -d          Treat directories like files (do not recurse).
-        --direct    Use direct tags instead of all tags.
-        --for-rsync Instead of listing matching paths, emit a
-                    sequence of rsync(1) patterns suitable for use with
-                    --include-from in order to do a selective rsync of the
-                    matched paths.
-        -o output_format
-                    Use output_format as a Python format string to lay out
-                    the listing.
-                    Default: ''' + FIND_OUTPUT_FORMAT_DEFAULT.replace(
-      '{', '{{'
-  ).replace('}', '}}') + '''
-    json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
-        Apply JSON data to path.
-        A path named "-" indicates that paths should be read from
-        the standard input.
-        The JSON tag data come from the file "tags.json"; the name
-        "-" indicates that the JSON data should be read from the
-        standard input.
-    ln [-fnv] srcpath dstpath
-    ln [-fnv] srcpaths... dstdirpath
-        Link files and their tags into targetdir.
-        -f  Force: remove destination if it exists.
-        -i  Interactive: fail if the destination exists.
-        -n  No remove: fail if the destination exists.
-        -v  Verbose: show linked files.
-    ls [-d] [--direct] [-o output_format] [paths...]
-        List files from paths and their tags.
-        -d          Treat directories like files, do not recurse.
-        --direct    List direct tags instead of all tags.
-        -o output_format
-                    Use output_format as a Python format string to lay out
-                    the listing.
-                    Default: ''' + LS_OUTPUT_FORMAT_DEFAULT.replace(
-      '{', '{{'
-  ).replace(
-      '}', '}}'
-  ) + '''
-    mv [-fnv] srcpath dstpath
-    mv [-fnv] srcpaths... dstdirpath
-        Move files and their tags into targetdir.
-        -f  Force: remove destination if it exists.
-        -i  Interactive: fail if the destination exists.
-        -n  No remove: fail if the destination exists.
-        -v  Verbose: show moved files.
-    ns [-d] [--direct] [paths...]
-        Report on the available primary namespace fields for formatting.
-        Note that because the namespace used for formatting has
-        inferred field names there are also unshown secondary field
-        names available in format strings.
-        -d          Treat directories like files, do not recurse.
-        --direct    List direct tags instead of all tags.
-    ont
-        Locate the ontology.
-    ont tags tag[=value]...
-        Query ontology information for the specified tags.
-    rename -n newbasename_format paths...
-        Rename paths according to a format string.
-        -n newbasename_format
-            Use newbasename_format as a Python format string to
-            compute the new basename for each path.
-    scrub paths...
-        Remove all tags for missing paths.
-        If a path is a directory, scrub the immediate paths in the directory.
-    tag {{-|path}} {{tag[=value]|-tag}}...
-        Associate tags with a path.
-        With the form "-tag", remove the tag from the immediate tags.
-        A path named "-" indicates that paths should be read from the
-        standard input.
-    tagfile tagfile_path tag tag_name {{tag[=value]|-tag}}...
-        Directly modify tag_name within the tag file tagfile_path.
-    tagpaths {{tag[=value]|-tag}} {{-|paths...}}
-        Associate a tag with multiple paths.
-        With the form "-tag", remove the tag from the immediate tags.
-        A single path named "-" indicates that paths should be read
-        from the standard input.
-    test [--direct] path {{tag[=value]|-tag}}...
-        Test whether the path matches all the constraints.
-        --direct    Use direct tags instead of all tags.
-    xattr_import {{-|paths...}}
-        Import tag information from extended attributes.
-    xattr_export {{-|paths...}}
-        Update extended attributes from tags.
-  '''
+  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]'''
 
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
@@ -266,25 +163,9 @@ class FSTagsCommand(BaseCommand):
     options.fstags = FSTags()
 
   @staticmethod
-  def parse_tag_choices(argv):
-    ''' Parse a list of tag specifications of the form:
-        * `-`*tag_name*: a negative requirement for *tag_name*
-        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
-          with optional *value*.
-        Return a list of `(arg,choice,Tag)` for each `arg` in `argv`.
-    '''
-    choices = []
-    for arg in argv:
-      with Pfx(arg):
-        choice, offset = TagChoice.parse(arg)
-        if offset < len(arg):
-          raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append(choice)
-    return choices
-
-  @staticmethod
   def cmd_autotag(argv, options):
-    ''' Tag paths based on rules from the rc file.
+    ''' Usage: {cmd} paths...
+          Tag paths based on rules from the rc file.
     '''
     fstags = options.fstags
     if not argv:
@@ -322,9 +203,11 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_edit(argv, options):
-    ''' Edit filenames and tags in a directory or the direct tags of a file.
-
-        Usage: edit [-d] [path]
+    ''' Usage: {cmd} [-d] [path]
+          Edit the direct tagsets of path, default: '.'
+          If path is a directory, provide the tags of its entries.
+          Otherwise edit just the tags for path.
+          -d          Treat directories like files: edit just its tags.
     '''
     fstags = options.fstags
     directories_like_files = False
@@ -352,7 +235,17 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_find(cls, argv, options):
-    ''' Find paths matching tag criteria.
+    ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
+          List files from path matching all the constraints.
+          --direct    Use direct tags instead of all tags.
+          --for-rsync Instead of listing matching paths, emit a
+                      sequence of rsync(1) patterns suitable for use with
+                      --include-from in order to do a selective rsync of the
+                      matched paths.
+          -o output_format
+                      Use output_format as a Python format string to lay out
+                      the listing.
+                      Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
     fstags = options.fstags
     badopts = False
@@ -413,7 +306,13 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_json_import(cls, argv, options):
-    ''' Import tags for `path` from `tags.json`.
+    ''' Usage: json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
+          Apply JSON data to path.
+          A path named "-" indicates that paths should be read from
+          the standard input.
+          The JSON tag data come from the file "tags.json"; the name
+          "-" indicates that the JSON data should be read from the
+          standard input.
     '''
     fstags = options.fstags
     tag_prefix = None
@@ -475,7 +374,14 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_ls(argv, options):
-    ''' List paths and their tags.
+    ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
+        List files from paths and their tags.
+        -d          Treat directories like files, do not recurse.
+        --direct    List direct tags instead of all tags.
+        -o output_format
+                    Use output_format as a Python format string to lay out
+                    the listing.
+                    Default: {LS_OUTPUT_FORMAT_DEFAULT}
     '''
     fstags = options.fstags
     directories_like_files = False
@@ -511,17 +417,35 @@ class FSTagsCommand(BaseCommand):
     return xit
 
   def cmd_cp(self, argv, options):
-    ''' POSIX cp(1) equivalent, but also copying the tags.
+    ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
+          POSIX cp(1) equivalent, but also copying tags:
+          copy files and their tags into targetdir.
+          -f  Force: remove destination if it exists.
+          -i  Interactive: fail if the destination exists.
+          -n  No remove: fail if the destination exists.
+          -v  Verbose: show copied files.
     '''
     return self._cmd_mvcpln(options.fstags.copy, argv, options)
 
   def cmd_ln(self, argv, options):
-    ''' POSIX ln(1) equivalent, but also copying the tags.
+    ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
+          POSIX ln(1) equivalent, but also copying the tags:
+          link files and their tags into targetdir.
+          -f  Force: remove destination if it exists.
+          -i  Interactive: fail if the destination exists.
+          -n  No remove: fail if the destination exists.
+          -v  Verbose: show linked files.
     '''
     return self._cmd_mvcpln(options.fstags.link, argv, options)
 
   def cmd_mv(self, argv, options):
-    ''' POSIX mv(1) equivalent, but also copying the tags.
+    ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
+          POSIX mv(1) equivalent, but also copying the tags:
+          move files and their tags into targetdir.
+          -f  Force: remove destination if it exists.
+          -i  Interactive: fail if the destination exists.
+          -n  No remove: fail if the destination exists.
+          -v  Verbose: show moved files.
     '''
     return self._cmd_mvcpln(options.fstags.move, argv, options)
 
@@ -583,7 +507,13 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_ns(argv, options):
-    ''' List paths and their namespace primary values.
+    ''' Usage: {cmd} [-d] [--direct] [paths...]
+          Report on the available primary namespace fields for formatting.
+          Note that because the namespace used for formatting has
+          inferred field names there are also unshown secondary field
+          names available in format strings.
+          -d          Treat directories like files, do not recurse.
+          --direct    List direct tags instead of all tags.
     '''
     fstags = options.fstags
     directories_like_files = False
@@ -613,6 +543,12 @@ class FSTagsCommand(BaseCommand):
   @staticmethod
   def cmd_ont(argv, options):
     ''' Ontology operations.
+
+        Usage: {cmd} [subcommand [args...]]
+          With no arguments, locate the ontology.
+          Subcommands:
+            tags tag[=value]...
+              Query ontology information for the specified tags.
     '''
     ont = options.fstags.ontology('.')
     if not argv:
@@ -636,7 +572,11 @@ class FSTagsCommand(BaseCommand):
 
   @staticmethod
   def cmd_rename(argv, options):
-    ''' Rename paths based on a format string.
+    ''' Usage: {cmd} -n newbasename_format paths...
+          Rename paths according to a format string.
+          -n newbasename_format
+              Use newbasename_format as a Python format string to
+              compute the new basename for each path.
     '''
     xit = 0
     fstags = options.fstags
@@ -696,7 +636,9 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_scrub(cls, argv, options):
-    ''' Scrub paths.
+    ''' Usage: {cmd} paths...
+          Remove all tags for missing paths.
+          If a path is a directory, scrub the immediate paths in the directory.
     '''
     fstags = options.fstags
     if not argv:
@@ -708,7 +650,11 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_tag(cls, argv, options):
-    ''' Tag a path with multiple tags.
+    ''' Usage: {cmd} {{-|path}} {{tag[=value]|-tag}}...
+          Tag a path with multiple tags.
+          With the form "-tag", remove that tag from the direct tags.
+          A path named "-" indicates that paths should be read from the
+          standard input.
     '''
     badopts = False
     fstags = options.fstags
@@ -734,9 +680,10 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_tagfile(cls, argv, options):
-    ''' Usage: tagfile tagfile_path [subcommand ...]
+    ''' Usage: {cmd} tagfile_path [subcommand ...]
           Subcommands:
-            tag tagset_name tag_choices...
+            tag tagset_name {{tag[=value]|-tag}}...
+              Directly modify tag_name within the tag file tagfile_path.
     '''
     fstags = options.fstags
     try:
@@ -783,7 +730,11 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_tagpaths(cls, argv, options):
-    ''' Tag multiple paths with a single tag.
+    ''' Usage: {cmd} {{tag[=value]|-tag}} {{-|paths...}}
+        Tag multiple paths.
+        With the form "-tag", remove the tag from the immediate tags.
+        A single path named "-" indicates that paths should be read
+        from the standard input.
     '''
     badopts = False
     fstags = options.fstags
@@ -810,7 +761,9 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_test(cls, argv, options):
-    ''' Find paths matching tag criteria.
+    ''' Usage: {cmd} [--direct] path {{tag[=value]|-tag}}...
+          Test whether the path matches all the constraints.
+          --direct    Use direct tags instead of all tags.
     '''
     fstags = options.fstags
     badopts = False
@@ -845,7 +798,8 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_xattr_export(cls, argv, options):
-    ''' Update extended attributes from fstags.
+    ''' Usage: {cmd} {{-|paths...}}
+          Import tag information from extended attributes.
     '''
     fstags = options.fstags
     if not argv:
@@ -858,7 +812,8 @@ class FSTagsCommand(BaseCommand):
 
   @classmethod
   def cmd_xattr_import(cls, argv, options):
-    ''' Update fstags from extended attributes.
+    ''' Usage: {cmd} {{-|paths...}}
+          Update extended attributes from tags.
     '''
     fstags = options.fstags
     if not argv:

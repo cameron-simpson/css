@@ -775,6 +775,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r", s[offset:])
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
@@ -967,7 +977,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     attr_value = self.__dict__.get(attr)
     if attr_value is None:
-      warning("%s: no .%r", self, attr)
+      ##warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
@@ -1246,3 +1256,21 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+class TagsCommandMixin:
+  ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
+  '''
+
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse a list of tag specifications of the form:
+        * `-`*tag_name*: a negative requirement for *tag_name*
+        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
+          with optional *value*.
+        Return a list of `TagChoice` for each `arg` in `argv`.
+    '''
+    choices = []
+    for arg in argv:
+      with Pfx(arg):
+        choices.append(TagChoice.from_str(arg))
+    return choices

@@ -66,8 +66,8 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    loginfo, with_log, debug, status, STATUS, info, track, warning, error,
-    exception, LogTime
+    with_log, debug, status, STATUS, info, track, warning, error, exception,
+    LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
@@ -81,7 +81,6 @@ from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
-from cs.upd import Upd
 
 DISTINFO = {
     'description':
@@ -112,7 +111,6 @@ DISTINFO = {
         'cs.rfc2047',
         'cs.seq',
         'cs.threads',
-        'cs.upd',
     ],
     'entry_points': {
         'console_scripts': [
@@ -188,6 +186,7 @@ class MailFilerCommand(BaseCommand):
     ''' Run commands at STATUS logging level (or lower if already lower).
     '''
     with super().run_context(argv, options):
+      loginfo = options.loginfo
       with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
         yield
 
@@ -224,10 +223,13 @@ class MailFilerCommand(BaseCommand):
       raise GetoptError("invalid arguments")
     if not mdirpaths:
       mdirpaths = None
-    with Upd(sys.stderr) as U:
-      return self.mailfiler(options).monitor(
-          mdirpaths, delay=delay, justone=justone, no_remove=no_remove, upd=U
-      )
+    return self.mailfiler(options).monitor(
+        mdirpaths,
+        delay=delay,
+        justone=justone,
+        no_remove=no_remove,
+        upd=options.loginfo.upd
+    )
 
   def cmd_save(self, argv, options):
     ''' Usage: save targets < message
@@ -455,8 +457,6 @@ class MailFiler(NS):
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
-            if upd:
-              status("scan...")
             try:
               nmsgs += self.sweep(
                   wmdir, justone=justone, no_remove=no_remove, upd=upd
@@ -1681,8 +1681,8 @@ class Target_Substitution(NS):
 
   def __str__(self):
     return (
-        ','.join(self.header_names) + ':s/' + str(self.subst_re) + '/' +
-        self.subst_replacement
+        ','.join(self.header_names) + ':s/' + str(self.subst_re.pattern) +
+        '/' + self.subst_replacement
     )
 
   def apply(self, filer):
@@ -1857,6 +1857,12 @@ class _Condition(NS):
     self.flags = flags
     self.header_names = header_names
 
+  def __str__(self):
+    return (
+        ('!' if self.flags.invert else '') + ','.join(self.header_names) +
+        ':' + self.tests_str()
+    )
+
   def match(self, filer):
     ''' Test this condition against all the relevant headers.
     '''
@@ -1881,6 +1887,9 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
+  def tests_str(self):
+    return self.regexptxt
+
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
     '''
@@ -1895,6 +1904,9 @@ class Condition_AddressMatch(_Condition):
   def __init__(self, flags, header_names, addrkeys):
     _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple(k for k in addrkeys if len(k) > 0)
+
+  def tests_str(self):
+    return '|'.join(self.addrkeys)
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1913,6 +1925,9 @@ class Condition_InGroups(_Condition):
   def __init__(self, flags, header_names, group_names):
     _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
+
+  def tests_str(self):
+    return '(' + '|'.join(self.group_names) + ')'
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1989,6 +2004,9 @@ class Condition_HeaderFunction(_Condition):
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
+  def tests_str(self):
+    return '%s(%s)' % (self.funcname, self.test_string)
+
   def test_value(self, filer, header_name, header_value):
     ''' Test the header value against to test function.
     '''
@@ -2033,7 +2051,7 @@ class Rule:
     self.label = ''
 
   def __str__(self):
-    return "%s:%d: %r %r" % (
+    return "%s:%d: %s %s" % (
         shortpath(self.filename), self.lineno,
         ','.join(map(str, self.targets)), ', '.join(map(str, self.conditions))
     )
