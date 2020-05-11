@@ -1,3 +1,4 @@
+cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
 TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
 signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
