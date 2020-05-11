@@ -782,7 +782,7 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     '''
     tag_choice, offset = cls.parse(s)
     if offset != len(s):
-      raise ValueError("unparsed TagChoice specification: %r", s[offset:])
+      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
     return tag_choice
 
 class ExtendedNamespace(SimpleNamespace):
