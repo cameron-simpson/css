@@ -43,7 +43,7 @@ from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, auto_session, orm_auto_session, BasicTableMixin, HasIdMixin
+    ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin, HasIdMixin
 )
 from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin
 from cs.threads import locked
@@ -424,6 +424,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     ''' Stub shutdown.
     '''
 
+  @orm_method
   def define_schema(self):
     ''' Instantiate the schema.
     '''
@@ -436,6 +437,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     '''
     return self.make_metanode()
 
+  @orm_method
   @auto_session
   def make_metanode(self, *, session):
     ''' Return the metadata node, creating it if missing.
@@ -451,6 +453,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       session.add(entity)
     return entity
 
+  @orm_method
   @auto_session
   def get_metanode(self, *, session):
     ''' Return the metanode, the `Entities` row with `id`=`0`.
