@@ -244,7 +244,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           strptime_format = strptime_format.strip()
           strptime_words = strptime_format.split()
           strptime_nwords = len(strptime_words)
-          ostrptime_format = ' '.join(strptime_words)
+          strptime_format = ' '.join(strptime_words)
     if not argv:
       argv = ['-']
       if sys.stdin.isatty():
