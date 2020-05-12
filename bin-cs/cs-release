@@ -119,31 +119,33 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_check(argv, options):
-    pkg = options.packages[argv.pop(0)]
-    verbose = options.verbose
-    xit = 1   # presume failure
-    if not pkg.check_basic(quiet=not verbose):
-      status = 'FLAWED'
-    elif not pkg.check_uptodate(quiet=not verbose):
-      status = 'RELEASE OUT OF DATE'
-    elif not pkg.check_release_uptodate(quiet=not verbose):
-      status = 'NEEDS NEW RELEASE'
-    else:
-      rel_tag = pkg.latest_release_tag()
-      if rel_tag is None:
-        status = 'NEVER RELEASED'
-      else:
-        rel_pfx, rel_suffix = rel_tag.split('-', 1)
-        upload_suffix = pkg.latest_pypi_version
-        if rel_suffix != upload_suffix:
-          status = (
-              'RELEASE:%s DOES NOT MATCH UPLOAD:%s' %
-              (rel_suffix, upload_suffix)
-          )
-        else:
-          status = 'OK'
-          xit = 0
-    print(pkg.name, status)
+    ''' Usage: {cmd} pkg_name...
+          Perform sanity checks on the names packages.
+    '''
+    if not argv:
+      raise GetoptError("missing package names")
+    xit = 0
+    with Upd(sys.stderr) as U:
+      for pkg_name in argv:
+        with Pfx(pkg_name):
+          status("...")
+          pkg = options.modules[pkg_name]
+          problems = pkg.problems()
+          status('')
+          if problems:
+            xit = 1
+            for problem in problems:
+              if isinstance(problem, str):
+                warning(problem)
+              else:
+                for subpkg, subproblems in sorted(problem.items()):
+                  warning(
+                      "%s: %s", subpkg, ', '.join(
+                          subproblem
+                          if isinstance(subproblem, str) else repr(subproblem)
+                          for subproblem in subproblems
+                      )
+                  )
     return xit
 
   @staticmethod
