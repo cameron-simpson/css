@@ -428,6 +428,39 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     ''' Instantiate the schema.
     '''
     self.meta.create_all()
+    self.make_metanode()
+
+  @property
+  def metanode(self):
+    ''' The metadata node, creating it if missing.
+    '''
+    return self.make_metanode()
+
+  @auto_session
+  def make_metanode(self, *, session):
+    ''' Return the metadata node, creating it if missing.
+    '''
+    entity = self.get_metanode(session=session)
+    if entity is None:
+      entity = self.entities(id=0, unixtime=time.time())
+      entity.add_tag(
+          'headline',
+          "%s node 0: the metanode." % (type(self).__name__,),
+          session=session
+      )
+      session.add(entity)
+    return entity
+
+  @auto_session
+  def get_metanode(self, *, session):
+    ''' Return the metanode, the `Entities` row with `id`=`0`.
+        Returns `None` if the node does not exist.
+
+        Accessing the property `.metanode` always returns the metanode entity,
+        creating it if necessary.
+        Note that it is not associated with any session.
+    '''
+    return self.entities.lookup1(id=0, session=session)
 
   def declare_schema(self):
     ''' Define the database schema / ORM mapping.
