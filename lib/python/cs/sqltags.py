@@ -412,8 +412,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     meta = self.meta = self.Base.metadata
     meta.bind = engine
     self.declare_schema()
-    self.define_schema()
     self.Session = sessionmaker(bind=engine)
+    self.define_schema()
 
   def startup(self):
     ''' Startup: define the tables if not present.
