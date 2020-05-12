@@ -279,13 +279,17 @@ class BasicTableMixin:
   def __getitem__(cls, index, *, session):
     row = cls.lookup1(id=index, session=session)
     if row is None:
-      raise IndexError("%s: no row with id=%s" % (cls, index,))
+      raise IndexError("%s: no row with id=%s" % (
+          cls,
+          index,
+      ))
     return row
 
 class HasIdMixin:
   ''' Include an "id" `Column` as the primary key.
   '''
   id = Column(Integer, primary_key=True)
+
 @require(
     lambda field_name: field_name and not field_name.startswith('.') and
     not field_name.endswith('.') and '..' not in field_name
