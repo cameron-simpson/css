@@ -34,7 +34,6 @@ DISTINFO = {
     ],
 }
 
-@require(lambda orm, session: orm is not None or session is not None)
 # TODO: have a cs.threads.ThreadState superclass with __call__ etc
 class _State(thread_local):
   ''' Shared per-thread state.
@@ -68,6 +67,8 @@ def with_session(function, *a, orm=None, session=None, **kw):
   ''' Call `function(*a,session=session,**kw)`, creating a session if required.
       The function `function` runs within a transaction,
       nested if the session already exists.
+      If a new session is created
+      it is set as the default session in the shared state.
 
       This is the inner mechanism of `@auto_session` and
       `ORM.auto_session`.
@@ -87,14 +88,28 @@ def with_session(function, *a, orm=None, session=None, **kw):
       The `session` is also passed to `function` as
       the keyword parameter `session` to support nested calls.
   '''
-  if session:
-    # run the function inside a savepoint in the supplied session
-    with session.begin_nested():
-      return function(*a, session=session, **kw)
-  if not orm:
-    raise ValueError("no orm supplied from which to make a session")
+  # use the shared state session if no session is supplied
+  if session is None:
+    session = _state.session
+  # we have a session, run the function inside a nested transaction
+  if session is not None:
+    with _state(session=session):
+      # run the function inside a savepoint in the supplied session
+      with session.begin_nested():
+        return function(*a, session=session, **kw)
+  # no session, we need to create one
+  if orm is None:
+    # use the shared state ORM if no orm is supplied
+    orm = _state.orm
+    if orm is None:
+      raise ValueError(
+          "no orm supplied from which to make a session,"
+          " and no shared state orm"
+      )
+  # create a new session and run the function within it
   with orm.session() as new_session:
-    return function(*a, session=new_session, **kw)
+    with _state(orm=orm, session=new_session):
+      return function(*a, session=new_session, **kw)
 
 def auto_session(function):
   ''' Decorator to run a function in a session if one is not presupplied.
