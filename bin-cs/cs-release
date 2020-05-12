@@ -71,20 +71,11 @@ re_RELEASE_TAG = re.compile(
 class CSReleaseCommand(BaseCommand):
 
   GETOPT_SPEC = 'fqv'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] cs.module [op]
+  USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
           will not prevent them.
       -q  Quiet. Not verbose.
       -v  Verbose.
-    Supported ops:
-      check       Check simple things about a module's DISTINFO map.
-      export      Export a setup.py ready package tree.
-      last        Report last release issued.
-      log         Changelog from last release to now.
-      ls          List latest release prefixes.
-      next        Generate a new release number.
-      pypi        Upload latest release to PyPI.
-      release     Issue a new release tag with change summary.
   '''
 
   @classmethod
@@ -157,6 +148,9 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_checkout(argv, options):
+    ''' Usage: {cmd} pkg_name [revision]
+          Check out the named package.
+    '''
     if not argv:
       raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
@@ -165,11 +159,16 @@ class CSReleaseCommand(BaseCommand):
     else:
       revision = pkg.latest_release_tag or "tip"
       info("checking out revision %r", revision)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     checkout_dir = pkg.name + '--' + revision
     pkg.checkout(revision, checkout_dir)
 
   @staticmethod
   def cmd_last(argv, options):
+    ''' Usage: {cmd} pkg_names...
+          Print the latest release tags for the names packages.
+    '''
     if not argv:
       raise GetoptError("missing package name")
     pkg = options.packages[argv.pop(0)]
@@ -199,6 +198,9 @@ class CSReleaseCommand(BaseCommand):
   
   @staticmethod
   def cmd_ls(argv, options):
+    ''' Usage: {cmd}
+          List package names and their latst PyPI releases.
+    '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     tagsets = options.pkg_tagsets
@@ -211,40 +213,62 @@ class CSReleaseCommand(BaseCommand):
   
   @staticmethod
   def cmd_export(argv, options):
+    ''' Usage: export pkg_name
+          Export the package contents.
+    '''
     if not argv:
       raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    pkg = options.modules[pkg_name]
     path = pkg.export()
     print(path)
   
   @staticmethod
   def cmd_next(argv, options):
+    ''' Usage: next pkg_names...
+          Print package names and their next release tag.
+    '''
     if not argv:
-      raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
-    next_prefix, next_suffix = pkg.next_release_tag().split('-')
-    assert next_prefix == pkg.name
-    print(pkg.name, next_suffix)
+      raise GetoptError("missing package names")
+    for pkg_name in argv:
+      with Pfx(pkg_name):
+        pkg = options.modules[pkg_name]
+        # TODO: fix prefix/suffix stuff
+        next_prefix, next_suffix = pkg.next_release_tag().split('-')
+        assert next_prefix == pkg.name
+        print(pkg.name, next_suffix)
 
   @staticmethod
   def cmd_pypi(argv, options):
+    ''' Usage: {cmd} pkg_names...
+          Push the named packages to PyPI.
+    '''
     if not argv:
-      raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
-    # upload latest release to pypi
-    vcs_tag = pkg.latest_release_tag
-    pypi_version = pkg.latest_release_version
-    pkg.submit_pypi(
-        force=options.force, vcs_tag=vcs_tag, pypi_version=pypi_version
-    )
+      raise GetoptError("missing package names")
+    for pkg_name in argv:
+      with Pfx(pkg_name):
+        pkg = options.modules[pkg_name]
+        # upload latest release to pypi
+        vcs_tag = pkg.latest_release_tag
+        pypi_version = pkg.latest_release_version
+        pkg.submit_pypi(
+            force=options.force, vcs_tag=vcs_tag, pypi_version=pypi_version
+        )
 
   @staticmethod
   def cmd_release(argv, options):
-    xit = 0
+    ''' Usage: {cmd} pkg_name
+          Issue a new release for the named package.
+    '''
     if not argv:
       raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     vcs = options.vcs
+    xit = 0
     # issue new release tag
     print("new release for %s ..." % (pkg.name,))
     outstanding = list(pkg.uncommitted_paths())
