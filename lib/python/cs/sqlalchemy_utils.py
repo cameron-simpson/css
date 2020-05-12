@@ -119,9 +119,13 @@ def auto_session(function):
       See `with_session` for details.
   '''
 
-  @require(lambda orm, session: orm is not None or session is not None)
   def wrapper(*a, orm=None, session=None, **kw):
-    ''' Prepare a session if one is not supplied.
+    ''' Call the function with a session.
+
+        If no session is supplied
+        and the shared per-thread state does not have an active session,
+        prepare a new session for the function
+        using `with_session()`.
     '''
     return with_session(function, *a, orm=orm, session=session, **kw)
 
