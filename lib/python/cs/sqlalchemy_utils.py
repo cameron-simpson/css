@@ -54,6 +54,16 @@ class _State(thread_local):
 
 _state = _State()
 
+def with_orm(function, *a, orm=None, **kw):
+  ''' Call `function` with the supplied `orm` in the shared state.
+  '''
+  if orm is None:
+    orm = _state.orm
+    if orm is None:
+      raise RuntimeError("no ORM supplied and no _state.orm")
+  with _state(orm=orm):
+    return function(*a, orm=orm, **kw)
+
 def with_session(function, *a, orm=None, session=None, **kw):
   ''' Call `function(*a,session=session,**kw)`, creating a session if required.
       The function `function` runs within a transaction,
