@@ -1,10 +1,20 @@
+incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?
+cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
+TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
+signature based @cached properties, with revision numbers as fallback mode
+replace use of sys.hexversion with sys.version.major etc
+cs.rfc2047: command line mode with filter-text and rename-filename modes
+cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
+cs.upd: some kind of ANSI escape support so that we can mbed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
+cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
+mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
+BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
 resolve bin/maildb vs bin-cs/cs-maildb
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
 setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
 cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
-cs.cmdutils: extract Usage: from cmd_ methods to augument main USAGE
 cs.upd: multiline status area
 logutils: use cs.tty stuff for the status() function
 @strable: treat pathlike things like str?
@@ -12,14 +22,12 @@ logutils: use cs.tty stuff for the status() function
 RunState flow diagram: pending->running->cancelled-stopped and triggers?
 cs.app.flags: make a FlagOSDir mapping class to implement the fs based flags, accept any mapping for the Flags class, move the normalisation the the Flags class otherwise a raw mapping impl might fail if moved to the fs
 Pfx: do not insert umark: if umark is empty, supports "" and None
-implement cs.lex cutprefix and cutsuffix, push to PyPI after testing in PM stuff
-make most cs.obj methods functions, try to drop O class
 mutt-highlight: match markers at start or end of lines
 readline: fix spelling, detab, apply set -ue, use read -r line as fallback
 cs.excutils_tests: special logging setup to discard error messages - the successful test suite is very noisy
 @decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
 @decorator: maybe support @deco(callable,*a,**kw)?
-@mapattr class decorator to map .foo to .bah.this.that... with get/set support
+@mapattr class decorator to map .foo to .bah.this.that... with get/set support (why? use case?)
 cs.deco: @decorator: does not seem to propagate __doc__ to wrapper functions from inner function - needs debugging
 man pages not included in PyPI packages, for example cs.app.mailfiler
 cs.app.megacli: after fixup, copy to megacli_legacy as py2, upgrade megacli to python 3, update module docstrings to explain and reference
@@ -37,7 +45,7 @@ iso14496: parser for mdat section - how to know the audio/video format?
 cs.flags: put a lock around all accesses
 SvcD to subclass RunStateMixin?
 Results to inherit from RunStateMixin?
-SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
+SvcD/Portfwd: is there some unlocked dict access or something to trigger the segfault?
 SvcD/Portfwd: cleanup mode polling pid files to kill former processes
 take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
 cs.resources: finish subopen proxy support

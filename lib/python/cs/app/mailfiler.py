@@ -32,6 +32,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from email import message_from_file
@@ -52,6 +53,7 @@ from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
+from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
@@ -64,7 +66,8 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, info, warning, error, exception, LogTime
+    with_log, debug, status, STATUS, info, track, warning, error, exception,
+    LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
@@ -128,6 +131,8 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
+  if 'DEBUG' not in os.environ:
+    os.environ['DEBUG'] = 'INFO'
   return MailFilerCommand().run(argv, options=NS(stdin=stdin))
 
 class MailFilerCommand(BaseCommand):
@@ -176,9 +181,19 @@ class MailFilerCommand(BaseCommand):
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
+  @contextmanager
+  def run_context(self, argv, options):
+    ''' Run commands at STATUS logging level (or lower if already lower).
+    '''
+    with super().run_context(argv, options):
+      loginfo = options.loginfo
+      with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
+        yield
+
   def cmd_monitor(self, argv, options):
     ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
     '''
+    warning("test warning")
     justone = False
     delay = None
     no_remove = False
@@ -209,7 +224,11 @@ class MailFilerCommand(BaseCommand):
     if not mdirpaths:
       mdirpaths = None
     return self.mailfiler(options).monitor(
-        mdirpaths, delay=delay, justone=justone, no_remove=no_remove
+        mdirpaths,
+        delay=delay,
+        justone=justone,
+        no_remove=no_remove,
+        upd=options.loginfo.upd
     )
 
   def cmd_save(self, argv, options):
@@ -348,7 +367,7 @@ class MailFiler(NS):
     ''' The email address database.
     '''
     path = self.maildb_path
-    info("MailFiler: reload maildb %s", shortpath(path))
+    track("MailFiler: reload maildb %s", shortpath(path))
     return MailDB(path, readonly=False)
 
   @property
@@ -416,7 +435,9 @@ class MailFiler(NS):
       )
     return wmdir
 
-  def monitor(self, folders, delay=None, justone=False, no_remove=False):
+  def monitor(
+      self, folders, *, delay=None, justone=False, no_remove=False, upd=None
+  ):
     ''' Monitor the specified `folders`, a list of folder spcifications.
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
@@ -426,24 +447,35 @@ class MailFiler(NS):
     debug("msgiddb_path=%r", self.msgiddb_path)
     debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
+    idle = 0
     try:
       while True:
         these_folders = folders
         if not these_folders:
           these_folders = op_cfg.get('folders', '').split()
+        nmsgs = 0
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
             try:
-              self.sweep(wmdir, justone=justone, no_remove=no_remove)
+              nmsgs += self.sweep(
+                  wmdir, justone=justone, no_remove=no_remove, upd=upd
+              )
             except KeyboardInterrupt:
               raise
             except Exception as e:
               exception("exception during sweep: %s", e)
+        if nmsgs > 0:
+          idle = 0
         if delay is None:
           break
-        debug("sleep %ds", delay)
+        if upd:
+          if idle > 0:
+            status("sleep %ds; idle %ds", delay, idle)
+          else:
+            status("sleep %ds", delay)
         sleep(delay)
+        idle += delay
     except KeyboardInterrupt:
       watchers = self._maildir_watchers
       with self._lock:
@@ -467,8 +499,12 @@ class MailFiler(NS):
         self.logdir, '%s.log' % (os.path.basename(folder_path))
     )
 
-  def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
+  def sweep(
+      self, wmdir, *, justone=False, no_remove=False, logfile=None, upd=None
+  ):
     ''' Scan a WatchedMaildir for messages to filter.
+        Return the number of messages processed.
+
         Update the set of lurkers with any keys not removed to prevent
         filtering on subsequent calls.
         If `justone`, return after filing the first message.
@@ -481,6 +517,8 @@ class MailFiler(NS):
       skipped = 0
       with LogTime("all keys") as all_keys_time:
         for key in list(wmdir.keys(flush=True)):
+          if upd:
+            status(key)
           if key in wmdir.lurking:
             info("skip lurking key %r", key)
             skipped += 1
@@ -513,6 +551,7 @@ class MailFiler(NS):
             "filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped,
             all_keys_time.elapsed
         )
+    return nmsgs
 
   def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.
@@ -1642,8 +1681,8 @@ class Target_Substitution(NS):
 
   def __str__(self):
     return (
-        ','.join(self.header_names) + ':s/' + str(self.subst_re) + '/' +
-        self.subst_replacement
+        ','.join(self.header_names) + ':s/' + str(self.subst_re.pattern) +
+        '/' + self.subst_replacement
     )
 
   def apply(self, filer):
@@ -1818,6 +1857,12 @@ class _Condition(NS):
     self.flags = flags
     self.header_names = header_names
 
+  def __str__(self):
+    return (
+        ('!' if self.flags.invert else '') + ','.join(self.header_names) +
+        ':' + self.tests_str()
+    )
+
   def match(self, filer):
     ''' Test this condition against all the relevant headers.
     '''
@@ -1842,6 +1887,9 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
+  def tests_str(self):
+    return self.regexptxt
+
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
     '''
@@ -1856,6 +1904,9 @@ class Condition_AddressMatch(_Condition):
   def __init__(self, flags, header_names, addrkeys):
     _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple(k for k in addrkeys if len(k) > 0)
+
+  def tests_str(self):
+    return '|'.join(self.addrkeys)
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1874,6 +1925,9 @@ class Condition_InGroups(_Condition):
   def __init__(self, flags, header_names, group_names):
     _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
+
+  def tests_str(self):
+    return '(' + '|'.join(self.group_names) + ')'
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1950,6 +2004,9 @@ class Condition_HeaderFunction(_Condition):
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
+  def tests_str(self):
+    return '%s(%s)' % (self.funcname, self.test_string)
+
   def test_value(self, filer, header_name, header_value):
     ''' Test the header value against to test function.
     '''
@@ -1994,7 +2051,7 @@ class Rule:
     self.label = ''
 
   def __str__(self):
-    return "%s:%d: %r %r" % (
+    return "%s:%d: %s %s" % (
         shortpath(self.filename), self.lineno,
         ','.join(map(str, self.targets)), ', '.join(map(str, self.conditions))
     )

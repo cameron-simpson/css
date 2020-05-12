@@ -29,7 +29,7 @@
       This mapping also contains entries for the metadata
       for specific type values.
 
-    Here's a simple example with some `Tags` and a `TagSet`.
+    Here's a simple example with some `Tag`s and a `TagSet`.
 
         >>> tags = TagSet()
         >>> # add a "bare" Tag named 'blue' with no value
@@ -80,8 +80,8 @@ from types import SimpleNamespace
 from icontract import require
 from cs.edit import edit as edit_lines
 from cs.lex import (
-    cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
-    skipwhite, lc_, titleify_lc, FormatableMixin
+    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
@@ -496,7 +496,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -775,6 +775,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
@@ -838,7 +848,7 @@ class ExtendedNamespace(SimpleNamespace):
 
   def __getattr__(self, attr):
     ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        contaiining a `Tag` for the attribute with a placeholder string.
+        containing a `Tag` for the attribute with a placeholder string.
     '''
     if attr and attr[0].isalpha():
       # no such attribute, create a placeholder `Tag`
@@ -919,7 +929,7 @@ class TagSetNamespace(ExtendedNamespace):
                     None, subpath
                 )
               ns = subns
-            ns._tag = tag
+          ns._tag = tag
     return ns0
 
   @pfx_method
@@ -952,6 +962,26 @@ class TagSetNamespace(ExtendedNamespace):
         return member_metadata.ns()
     return super().__getitem__(key)
 
+  def _tag_value(self):
+    ''' Fetch the value if this node's `Tag`, or `None`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is None:
+      warning("%s: no ._tag", self)
+      return None
+    return tag.value
+
+  def _attr_tag_value(self, attr):
+    ''' Fetch the value of the `Tag` at `attr` (a namespace with a `._tag`).
+        Returns `None` if required attributes are not present.
+    '''
+    attr_value = self.__dict__.get(attr)
+    if attr_value is None:
+      ##warning("%s: no .%r", self, attr)
+      return None
+    return attr_value._tag_value()
+
+  @pfx_method
   def __getattr__(self, attr):
     ''' Look up an indirect node attribute,
         whose value is inferred from another.
@@ -1016,27 +1046,28 @@ class TagSetNamespace(ExtendedNamespace):
       # attr vs attr_lc
       title_attr = cutsuffix(attr, '_lc')
       if title_attr is not attr:
-        value = getns(title_attr)
-        if value is not None:
-          return lc_(value)
+        title_value = self._attr_tag_value(title_attr)
+        if title_value is not None:
+          value_lc = lc_(title_value)
+          return value_lc
       else:
-        value = getns(attr + '_lc')
-        if value is not None:
+        attr_lc_value = getns(attr + '_lc')
+        if attr_lc_value is not None:
           return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
         if single_attr is not attr:
-          value = getns(single_attr)
-          if value is not None:
-            return [value]
+          single_value = self._attr_tag_value(single_attr)
+          if single_value is not None:
+            return [single_value]
       # singular from plural
       for pl_suffix in 's', 'es':
         plural_attr = attr + pl_suffix
-        value = getns(plural_attr)
-        if value is None:
+        plural_value = self._attr_tag_value(plural_attr)
+        if plural_value is None:
           continue
-        value0 = value[0]
+        value0 = plural_value[0]
         return value0
       return super().__getattr__(attr)
 
@@ -1225,3 +1256,21 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+class TagsCommandMixin:
+  ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
+  '''
+
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse a list of tag specifications of the form:
+        * `-`*tag_name*: a negative requirement for *tag_name*
+        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
+          with optional *value*.
+        Return a list of `TagChoice` for each `arg` in `argv`.
+    '''
+    choices = []
+    for arg in argv:
+      with Pfx(arg):
+        choices.append(TagChoice.from_str(arg))
+    return choices

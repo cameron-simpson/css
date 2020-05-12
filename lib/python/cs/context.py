@@ -4,6 +4,14 @@
 '''
 
 from contextlib import contextmanager
+try:
+  from contextlib import nullcontext
+except ImportError:
+  @contextmanager
+  def nullcontext():
+    ''' A simple `nullcontext` for older Pythons
+    '''
+    yield None
 
 __version__ = '20200228.1'
 

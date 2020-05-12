@@ -47,7 +47,7 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
-from cs.deco import decorator
+from cs.deco import decorator, logging_wrapper
 from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
@@ -398,12 +398,14 @@ class Pfx(object):
   exit = __exit__
 
   # Logger methods
+  @logging_wrapper
   def exception(self, msg, *args):
     ''' Log an exception message to this Pfx's loggers.
     '''
     for L in self.loggers:
       L.exception(msg, *args)
 
+  @logging_wrapper
   def log(self, level, msg, *args, **kwargs):
     ''' Log a message at an arbitrary log level to this Pfx's loggers.
     '''
@@ -418,26 +420,31 @@ class Pfx(object):
             file=sys.stderr
         )
 
+  @logging_wrapper
   def debug(self, msg, *args, **kwargs):
     ''' Emit a debug log message.
     '''
     self.log(logging.DEBUG, msg, *args, **kwargs)
 
+  @logging_wrapper
   def info(self, msg, *args, **kwargs):
     ''' Emit an info log message.
     '''
     self.log(logging.INFO, msg, *args, **kwargs)
 
+  @logging_wrapper
   def warning(self, msg, *args, **kwargs):
     ''' Emit a warning log message.
     '''
     self.log(logging.WARNING, msg, *args, **kwargs)
 
+  @logging_wrapper
   def error(self, msg, *args, **kwargs):
     ''' Emit an error log message.
     '''
     self.log(logging.ERROR, msg, *args, **kwargs)
 
+  @logging_wrapper
   def critical(self, msg, *args, **kwargs):
     ''' Emit a critical log message.
     '''

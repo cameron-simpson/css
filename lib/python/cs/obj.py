@@ -337,12 +337,12 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              def _singleton_init(self, foo, bah=3):
-                 ... normal __init__ stuff here ...
-
               @classmethod
               def _singleton_key(cls, foo, bah=3):
                   return foo, bah
+
+              def _singleton_init(self, foo, bah=3):
+                 ... normal __init__ stuff here ...
   '''
 
   # This lock is used to control setup of the per-class registry.
