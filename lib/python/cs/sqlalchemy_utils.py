@@ -220,6 +220,24 @@ class ORM(MultiOpenMixin):
     wrapper.__module__ = getattr(method, '__module__', None)
     return wrapper
 
+  @staticmethod
+  def orm_method(method):
+    ''' Decorator for ORM subclass methods
+        to set the shared state `orm` to `self`.
+    '''
+
+    def wrapper(self, *a, **kw):
+      ''' Call `method` with its ORM as the shared state `orm`.
+      '''
+      with _state(orm=self):
+        return method(self, *a, **kw)
+
+    wrapper.__name__ = method.__name__
+    wrapper.__doc__ = method.__doc__
+    return wrapper
+
+orm_method = ORM.orm_method
+
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
