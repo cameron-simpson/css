@@ -5,11 +5,13 @@
 
 from contextlib import contextmanager
 import logging
+from threading import local as thread_local
 from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
 import sqlalchemy.sql.functions as func
 from icontract import require
+from cs.context import stackattrs
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
@@ -33,6 +35,25 @@ DISTINFO = {
 }
 
 @require(lambda orm, session: orm is not None or session is not None)
+# TODO: have a cs.threads.ThreadState superclass with __call__ etc
+class _State(thread_local):
+  ''' Shared per-thread state.
+  '''
+
+  def __init__(self):
+    self.orm = None
+    self.session = None
+
+  @contextmanager
+  def __call__(self, **kw):
+    ''' Calling the shared state returns a context manager
+        pushing the supplied keyword arguments as state attribute values.
+    '''
+    with stackattrs(self, **kw):
+      yield
+
+_state = _State()
+
 def with_session(function, *a, orm=None, session=None, **kw):
   ''' Call `function(*a,session=session,**kw)`, creating a session if required.
       The function `function` runs within a transaction,
