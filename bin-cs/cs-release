@@ -347,13 +347,17 @@ def release_prefixes(vcs):
   return tagpfxs
 
 def clean_release_entry(entry):
-  lines = entry.strip().split('\n')
-  return '\n'.join(
-      [
-          line for line in lines if line and line != 'Summary:'
-          and not line.startswith('Release information for ')
-      ]
+  lines = filter(
+      lambda line: (
+          line and line != 'Summary:' and not line.
+          startswith('Release information for ')
+      ),
+      entry.strip().split('\n')
   )
+  if len(lines) > 1:
+    # Multiple lines become a MarkDown bullet list.
+    lines = ['* ' + line for line in lines]
+  return '\n'.join(lines)
 
 def pypipkg(pkgname, vcs, pypi_url=None):
   ''' Return a `PyPI_Package` for `pkgname`.
