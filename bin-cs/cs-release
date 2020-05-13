@@ -730,6 +730,7 @@ class Module(object):
       hg_argv.extend(['--', dirpath])
       return self.vcs.hg_cmd(*hg_argv)
 
+  @pfx_method(use_str=True)
   def log_since(self, tag=None):
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
@@ -751,7 +752,7 @@ class Module(object):
     '''
     return self.vcs.uncommitted(set(self.paths()))
 
-  @pfx_method
+  @pfx_method(use_str=True)
   def patch__version__(self, version):
     version_line = '__version__ = ' + repr(version) + '\n'
     toppath = self.toppath
