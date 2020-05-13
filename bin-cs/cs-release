@@ -97,8 +97,6 @@ class CSReleaseCommand(BaseCommand):
     options.last_values = LastValues()
     options.modules = Modules()
     options.modules.options = options
-    options.packages=Packages()
-    options.packages.options = options
 
   @staticmethod
   def apply_opts(opts, options):
@@ -155,7 +153,7 @@ class CSReleaseCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
+    pkg = options.modules[argv.pop(0)]
     if argv:
       revision = argv.pop(0)
     else:
@@ -173,13 +171,13 @@ class CSReleaseCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
     tag = pkg.latest_release_tag
     if tag is None:
       suffix = "NONE"
     else:
       prefix, suffix = tag.split('-', 1)
     print(pkg.name, suffix)
+        pkg = options.modules[pkg_name]
 
   @staticmethod
   def cmd_log(argv, options):
@@ -274,6 +272,7 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = options.modules[pkg_name]
     vcs = options.vcs
     xit = 0
     # issue new release tag
@@ -385,8 +384,6 @@ def pypipkg(pkgname, vcs, pypi_url=None):
       postamble_md=postamble_md
   )
 
-class Packages(defaultdict):
-  ''' An autopopulating dict of pkg_name->Package.
 def ask(message, fin=None, fout=None):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
   '''
@@ -412,28 +409,118 @@ def pipefrom(*argv, **kw):
         P.returncode,
     ))
 
+class Modules(defaultdict):
+  ''' An autopopulating dict of mod_name->Module.
   '''
 
-  def __missing__(self, pkg_name):
-    P = Package(pkg_name, self.options)
-    self[pkg_name] = P
-    return P
+  def __missing__(self, mod_name):
+    assert isinstance(mod_name, str), "mod_name=%r" % (mod_name,)
+    M = Module(mod_name, self.options)
+    self[mod_name] = M
+    return M
 
-class Package:
-  ''' Facilities to work with a package.
+class Module(object):
+  ''' Metadata about a Python module.
   '''
 
+  @pfx_method(use_str=True)
   def __init__(self, name, options):
-    if name.endswith('_tests'):
-      raise ValueError("Package(%r): unexpected _tests package" % (name,))
     self.name = name
-    self.options = options  # shared state
-    self.vcs = options.vcs  # convenience
-    self.modules = options.modules  # convenience
-    self.packages = options.packages  # convenience
+    self._module = None
+    self.options = options
+    self._distinfo = None
+    self._checking = False
+    self._module_problems = None
+
+  @prop
+  def modules(self):
+    ''' The modules from `self.options`.
+    '''
+    return self.options.modules
+
+  @prop
+  def vcs(self):
+    ''' The VCS from `self.options`.
+    '''
+    return self.options.vcs
+
+  @prop
+  def module(self):
+    ''' The Module for this package name.
+    '''
+    M = self._module
+    if M is None:
+      with Pfx("import %r", self.name):
+        try:
+          M = importlib.import_module(self.name)
+        except ImportError as e:
+          warning("ImportError: %s", e)
+          M = None
+        except SyntaxError as e:
+          warning("SyntaxError: %s", e)
+          M = None
+      self._module = M
+    return M
 
   def __str__(self):
     return "%s[%r]" % (type(self).__name__, self.name)
+
+  @pfx_method(use_str=True)
+  def isthirdparty(self):
+    return '/site-packages/' in getattr(self, '__file__', '')
+
+  @pfx_method(use_str=True)
+  def isstdlib(self):
+    ''' Test if this module exists in the stdlib.
+    '''
+    if self.name.startswith(MODULE_PREFIX):
+      return False
+    if self.isthirdparty():
+      return False
+    return True
+
+  @prop
+  @cachedmethod
+  @pfx_method(use_str=True)
+  def package_name(self):
+    ''' The name of the package containing this module,
+        or `None` if this is not inside a package.
+    '''
+    M = self.module
+    if M is None:
+      error("self.module is None")
+      return None
+    tested_name = cutsuffix(self.name, '_tests')
+    if tested_name is not self.name:
+      # foo_tests is considers part of foo
+      return self.modules[tested_name].package_name
+    try:
+      pkg_name = M.__package__
+    except AttributeError:
+      warning("self.module has no __package__: %r", sorted(dir(M)))
+      return None
+    return pkg_name
+
+  @prop
+  @pfx_method(use_str=True)
+  def package(self):
+    name = self.package_name
+    if name is None:
+      raise ValueError("self.package_name is None")
+    return self.modules[name]
+
+  @prop
+  def in_package(self):
+    ''' Is this module part of a package?
+    '''
+    return self.package_name != self.name
+
+  @prop
+  def is_package(self):
+    ''' Is this module a package?
+    '''
+    pkg_name = self.package_name
+    return pkg_name is not None and pkg_name == self.name
 
   @property
   def pkg_tags(self):
@@ -566,12 +653,6 @@ class Package:
       return joinpath(basepath, '__init__.py')
     return basepath + '.py'
 
-  @prop
-  def module(self):
-    ''' The Module for this package name.
-    '''
-    return self.modules[self.name]
-
   def paths(self):
     ''' Yield the paths associated with this package.
 
@@ -663,230 +744,6 @@ class Package:
           self.name + ': set __version__ to ' + repr(version), toppath
       )
 
-  @cachedmethod
-  def check_basic(self, quiet=False):
-    ''' Basic package checks.
-    '''
-    ok = True
-    with Pfx('paths'):
-      paths = list(self.paths())
-      if not paths:
-        quiet or warning("no files")
-        ok = False
-    return ok
-
-  @cachedmethod
-  def check_imports(self, quiet=False):
-    ''' Check that this package's imported modules are ok.
-    '''
-    ok = True
-    M = self.module
-    for subM in M.imported_modules():
-      with Pfx(subM):
-        if not subM.check(silent=quiet):
-          quiet or warning("module NOT OK")
-          ok = False
-    return ok
-
-  @cachedmethod
-  def check_release_uptodate(self, quiet=False):
-    ''' Check that this package is released.
-        * basic correctness
-        * there are no commits since the latest release
-        * there are no uncommited changes awaiting commit
-        * all the required modules are up to date
-    '''
-    ok = True
-    paths = list(self.paths())
-    if not self.check_basic(quiet=quiet):
-      ok = False
-    unreleased_logs = list(self.log_since())
-    if unreleased_logs:
-      quiet or warning("unreleased commits")
-      ok = False
-    changed_paths = [
-        changed_path for changed_path in self.vcs.uncommitted()
-        if changed_path in paths
-    ]
-    if changed_paths:
-      quiet or warning("%d modified files", len(changed_paths))
-      ok = False
-    with Pfx("out of date requirements"):
-      checked_packages = set()
-      import_names = sorted(self.module.imported_names)
-      for import_name in sorted(self.module.imported_names):
-        with Pfx(import_name):
-          if import_name == self.name:
-            ##info("SKIP self %r", import_name)
-            continue
-          if not import_name.startswith(MODULE_PREFIX):
-            ##info("SKIP non-cs %r", import_name)
-            continue
-          M = self.modules[import_name]
-          subpkg = M.package
-          if subpkg in checked_packages:
-            info("skipping, package %s already checked", subpkg.name)
-            continue
-          checked_packages.add(subpkg)
-          if not subpkg.check_uptodate(quiet=False):
-            quiet or warning("release not up to date")
-            ok = False
-      self.check_imports(quiet=quiet)
-    return ok
-
-  @cachedmethod
-  def check_uptodate(self, quiet=False):
-    ''' Check that this package has is up to date:
-        * there are no commits since the latest release
-        * there are no uncommited changes awaiting commit
-        * all the required modules are up to date
-    '''
-    ok = True
-    paths = list(self.paths())
-    with Pfx("unreleased logs"):
-      tag = self.latest_release_tag() or "0"
-      unreleased_logs = list(self.log_since(tag))
-      if unreleased_logs:
-        quiet or warning(
-            "%d unreleased commits since revision %s", len(unreleased_logs),
-            tag
-        )
-        ok = False
-    with Pfx("uncommitted changes"):
-      changed_paths = [
-          changed_path for changed_path in self.vcs.uncommitted()
-          if changed_path in paths
-      ]
-      if changed_paths:
-        quiet or warning("%d modified files", len(changed_paths))
-        ok = False
-    return ok
-
-def ask(message):
-  ''' Prompt with yes/no question, return true if response is "y" or "yes".
-  '''
-  print(message, end='? ')
-  sys.stdout.flush()
-  response = sys.stdin.readline().rstrip().lower()
-  return response in ('y', 'yes')
-
-@contextmanager
-def pipefrom(*argv, **kw):
-  ''' Context manager returning the standard output of a command.
-  '''
-  P = cs.psutils.pipefrom(argv, trace=False, **kw)
-  yield P.stdout
-  if P.wait() != 0:
-    pipecmd = ' '.join(argv)
-    raise ValueError("%s: exit status %d" % (
-        pipecmd,
-        P.returncode,
-    ))
-
-class Modules(defaultdict):
-  ''' An autopopulating dict of mod_name->Module.
-  '''
-
-  def __missing__(self, mod_name):
-    M = Module(mod_name, self.options)
-    self[mod_name] = M
-    return M
-
-class Module(object):
-  ''' Metadata about a Python module.
-  '''
-
-  def __init__(self, name, options):
-    self.name = name
-    self.options = options
-    self.modules = options.modules
-    self.packages = options.packages
-    self._distinfo = None
-    self._checking = False
-    self._check_status = None
-    try:
-      self.module = importlib.import_module(name)
-    except ImportError as e:
-      warning("ImportError: %s", e)
-      self.module = None
-      self.check_status = True
-    except SyntaxError as e:
-      warning("SyntaxError: %s", e)
-      self.module = None
-      self.check_status = False
-
-  def __str__(self):
-    return "%s[%r]" % (type(self).__name__, self.name)
-
-  @prop
-  @cachedmethod
-  def package_name(self):
-    ''' The name of the package containing this module,
-        or None if this is not inside a package.
-    '''
-    M = self.module
-    if M is None:
-      error("%r.package_name: self.module is None", self.name)
-      return None
-    if M.__file__.endswith('_tests.py'):
-      mainname = self.name[:-6]
-      X(
-          "%r: test suite, get package name from modules[%r]", M.__file__,
-          mainname
-      )
-      return self.modules[mainname].package_name
-    try:
-      pkg_name = M.__package__
-    except AttributeError:
-      X(
-          "%r.package_name: self.module has no __package__: %r", self.name,
-          sorted(dir(M))
-      )
-      return None
-    # Probe for zero length __init__.py file.
-    # If empty then this module is just a module,
-    # otherwise it really is part of a package.
-    init_py = joinpath(dirname(M.__file__), '__init__.py')
-    try:
-      S = os.stat(init_py)
-    except OSError as e:
-      if e.errno == errno.ENOENT:
-        warning(
-            "%s: M.__package__=%r but no %r", M.__file__, M.__package__,
-            init_py
-        )
-        return None
-      raise
-    else:
-      if S.st_size == 0:
-        # empty __init__.py, not a package for release purposes
-        return None
-    return pkg_name
-
-  @prop
-  def package(self):
-    name = self.package_name
-    if name is None:
-      name = self.name
-      if name.endswith('_tests'):
-        name = name[:-6]
-    if self.name != name:
-      X("%s.package => packages[%r]", self, name)
-    return self.packages[name]
-
-  @prop
-  def in_package(self):
-    ''' Is this module part of a package?
-    '''
-    return self.package_name is not None
-
-  @prop
-  def is_package(self):
-    ''' Is this module a package?
-    '''
-    pkg_name = self.package_name
-    return pkg_name is not None and pkg_name == self.name
-
   @prop
   def dirpath(self):
     M = self.module
@@ -895,23 +752,6 @@ class Module(object):
     if not self.is_package:
       return None
     return os.path.dirname(M.__file__)
-
-  def paths(self):
-    ''' Generator yield the .py filenames comprising this package.
-    '''
-    M = self.module
-    if M is None:
-      warning("paths: no module found")
-      return
-    filename = self.module.__file__
-    if not self.is_package:
-      yield filename
-    else:
-      moddir = os.path.dirname(filename)
-      for dirpath, dirnames, filenames in os.walk(moddir):
-        for filename in filenames:
-          if filename.endswith('.py'):
-            yield joinpath(dirpath, filename)
 
   @prop
   def DISTINFO(self):
@@ -952,72 +792,87 @@ class Module(object):
     '''
     return self.DISTINFO.get('install_requires')
 
-  def check(self, silent=False):
-    ''' Sanity check this module.
-    '''
-    if self._check_status is not None:
-      return self._check_status
-    if not self._checking:
-      self._checking = True
-      self._check_status = self._check(silent)
-      self._checking = False
-    return self._check_status
+  @pfx_method(use_str=True)
+  def problems(self):
+    ''' Sanity check of this module.
 
-  def _check(self, silent):
-    distinfo = self.module.DISTINFO
-    if not distinfo:
-      return False
-    ok = True
-    install_requires = self.requires
-    if install_requires is None:
-      silent or error("missing DISTINFO[install_requires]")
-      ok = False
-      install_requires = distinfo.get('requires')
-      if install_requires is None:
-        install_requires = ()
-      else:
-        silent or warning(
-            "working off DISTINFO[requires]=%r", install_requires
-        )
-    install_requires = set(install_requires)
+        This is a list of problems,
+        each of which is either a string
+        or a mapping of required package name to its problems.
+    '''
+    problems = self._module_problems
+    if problems is not None:
+      return problems
+    problems = self._module_problems = []
+    subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
       pkg_prefix = None
     else:
       pkg_prefix = pkg_name + '.'
-    # check imports against install_requires
-    for name in sorted(self.imported_names):
-      if not name.startswith(MODULE_PREFIX):
-        M = self.modules[name]
-        Mpath = getattr(M.module, '__file__', None)
-        if Mpath and '/site-ackages/' in Mpath:
-          silent or warning(
-              "third party import %r not mentioned in install_requires", name
-          )
-          ok = False
+    M = self.module
+    import_names = []
+    for import_name in direct_imports(M.__file__, self.name):
+      if self.modules[import_name].isstdlib():
         continue
-      if name.endswith('_tests'):
-        # tests are part of another package: ignore
+      if import_name.endswith('_tests'):
         continue
-      if name == pkg_name:
+      if import_name == pkg_name:
         # tests usually import the package - this is not a dependency
         continue
-      if pkg_prefix and name.startswith(pkg_prefix):
+      if pkg_prefix and import_name.startswith(pkg_prefix):
         # package components are not a dependency
         continue
-      if name not in install_requires:
-        silent or warning("import %r not mentioned in install_requires", name)
-        ok = False
-        continue
-      M = self.modules[name]
-      if not M.check(silent):
-        ok = False
-        continue
-    for name in sorted(install_requires):
-      if name not in self.imported_names:
-        silent or warning("requirement %r not imported", name)
-        ok = False
-    return ok
+      import_names.append(import_name)
+    import_names = sorted(set(import_names))
+    # check the DISTINFO
+    distinfo = getattr(M, 'DISTINFO', None)
+    if not distinfo:
+      problems.append("missing DISTINFO")
+    else:
+      distinfo_requires = distinfo.get('install_requires')
+      if distinfo_requires is None:
+        problems.append("missing DISTINFO[install_requires]")
+      else:
+        if sorted(distinfo_requires) != import_names:
+          problems.append(
+              "DISTINFO[install_requires=%r] != direct_imports=%r" %
+              (distinfo_requires, sorted(import_names))
+          )
+        for import_name in import_names:
+          if not import_name.startswith(MODULE_PREFIX):
+            continue
+          import_problems = self.modules[import_name].problems()
+          if import_problems:
+            subproblems[import_name] = import_problems
+    for required_name in sorted(self.requires):
+      if required_name not in self.imported_names:
+        problems.append("requirement %r not imported" % (required_name,))
+    # check that this package has files
+    if not self.paths():
+      problems.append("no files")
+    # check for unrelease commit logs
+    unreleased_logs = list(self.package.log_since())
+    if unreleased_logs:
+      if len(unreleased_logs) == 1:
+        problems.append("1 unrelease commit: %s" % (unreleased_logs[0],))
+      else:
+        problems.append(
+            "%d unreleased commits: %s, ..." %
+            (len(unreleased_logs), unreleased_logs[0])
+        )
+    # check for uncommited changes
+    paths = self.paths()
+    changed_paths = [
+        changed_path for changed_path in self.vcs.uncommitted()
+        if changed_path in paths
+    ]
+    if changed_paths:
+      problems.append("%d modified files", len(changed_paths))
+    # append submodule problems if present
+    if subproblems:
+      problems.append(subproblems)
+    return problems
 
   @prop
   @cachedmethod
