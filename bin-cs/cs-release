@@ -381,6 +381,18 @@ def pypipkg(pkgname, vcs, pypi_url=None):
 
 class Packages(defaultdict):
   ''' An autopopulating dict of pkg_name->Package.
+def ask(message, fin=None, fout=None):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  if fin is None:
+    fin = sys.stdin
+  if fout is None:
+    fout = sys.stderr
+  print(message, end='? ', file=fout)
+  fout.flush()
+  response = fin.readline().rstrip().lower()
+  return response in ('y', 'yes')
+
   '''
 
   def __missing__(self, pkg_name):
