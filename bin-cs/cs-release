@@ -170,14 +170,16 @@ class CSReleaseCommand(BaseCommand):
           Print the latest release tags for the names packages.
     '''
     if not argv:
-      raise GetoptError("missing package name")
-    tag = pkg.latest_release_tag
-    if tag is None:
-      suffix = "NONE"
-    else:
-      prefix, suffix = tag.split('-', 1)
-    print(pkg.name, suffix)
+      raise GetoptError("missing package names")
+    for pkg_name in argv:
+      with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
+        tag = pkg.latest_release_tag
+        if tag is None:
+          suffix = "NONE"
+        else:
+          prefix, suffix = tag.split('-', 1)
+        print(pkg.name, suffix)
 
   @staticmethod
   def cmd_log(argv, options):
