@@ -603,12 +603,31 @@ class Module(object):
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
     self.pkg_tags.save()
 
-  def submit_pypi(self, force=False):
-    return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
-
-  def _submit_pypi(self, pypi_flavour, pypi_url, force=False):
+  def submit_pypi(
+      self,
+      pypi_flavour='pypi',
+      pypi_url=URL_PYPI_PROD,
+      force=False,
+      vcs_tag=None,
+      pypi_version=None
+  ):
     ''' Submit the latest release of this package to PyPI.
+
+        Parameters:
+        * `pypi_flavour`: the PyPI instance to use, default `'pypi'`
+        * `pypi_url`: the PyPI base URL to use, default `URL_PYPI_PROD`
+        * `force`: optional force setting, defauult `False`.
+          If true, do the upload even if the up to date checks fail.
+        * `vcs_tag`: the VCS release tag to use for the upload,
+          default from `self.latest_release_tag`
+        * `pypi_version`: the PyPI version to upload as,
+          default from `self.latest_release_version`
     '''
+    if vcs_tag is None:
+      vcs_tag = self.latest_release_tag
+    vcs_version = self.tag_version(vcs_tag)
+    if pypi_version is None:
+      pypi_version = vcs_version
     if not self.check_uptodate():
       warning("check fails")
       if force:
@@ -616,15 +635,19 @@ class Module(object):
       else:
         return
     with Pfx(pypi_flavour):
-      latest_version = self.latest_release_version()
-      pypi_version = self.latest_pypi_version
-      if latest_version == pypi_version:
-        info("already released %r", pypi_version)
+      with self.checkout(vcs_tag) as checkout_path:
+        self.prepare_package(checkout_path)
+      if vcs_tag == self.latest_release_tag:
+        latest_version = self.latest_release_version
+        latest_pypi_version = self.latest_pypi_version
+      if latest_version == latest_pypi_version:
+        info("already released %r", latest_pypi_version)
         if force:
           warning("submitting anyway")
         else:
           return
-      with Pfx("%s->%r", repr(pypi_version) if pypi_version else '',
+      with Pfx("%s->%r",
+               repr(latest_pypi_version) if latest_pypi_version else '',
                latest_version):
         PKG = pypipkg(self.name, self.vcs)
         PKG.upload()
