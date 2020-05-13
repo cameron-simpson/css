@@ -659,6 +659,7 @@ class Module(object):
       return joinpath(basepath, '__init__.py')
     return basepath + '.py'
 
+  @cachedmethod
   def paths(self):
     ''' Yield the paths associated with this package.
 
@@ -666,6 +667,7 @@ class Module(object):
         of some revision because "hg archive" complains if globs
         match no paths, and aborts.
     '''
+    pathlist = []
     basepath = self.basepath
     if isdirpath(basepath):
       for subpath, dirnames, filenames in os.walk(basepath):
@@ -674,7 +676,7 @@ class Module(object):
           continue
         for filename in sorted(filenames):
           if not (filename.endswith('.pyc') or filename.endswith('.o')):
-            yield joinpath(subpath, filename)
+            pathlist.append(joinpath(subpath, filename))
     else:
       base = self.basename
       updir = dirname(basepath)
@@ -685,9 +687,10 @@ class Module(object):
             and not (filename.endswith('.pyc') or filename.endswith('.o'))
             and isfilepath(filepath)):
           if isfilepath(filepath):
-            yield filepath
+            pathlist.append(filepath)
           else:
             info("ignore %r, not a file", filepath)
+    return pathlist
 
   def checkout(self, revision, dirpath):
     ''' Check out the specified `revision` to the directory `dirpath`.
