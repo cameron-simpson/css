@@ -393,6 +393,19 @@ def ask(message, fin=None, fout=None):
   response = fin.readline().rstrip().lower()
   return response in ('y', 'yes')
 
+@contextmanager
+def pipefrom(*argv, **kw):
+  ''' Context manager returning the standard output file object of a command.
+  '''
+  P = cs.psutils.pipefrom(argv, trace=False, **kw)
+  yield P.stdout
+  if P.wait() != 0:
+    pipecmd = ' '.join(argv)
+    raise ValueError("%s: exit status %d" % (
+        pipecmd,
+        P.returncode,
+    ))
+
   '''
 
   def __missing__(self, pkg_name):
