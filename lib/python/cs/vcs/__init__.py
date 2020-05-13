@@ -7,6 +7,7 @@
 '''
 
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from contextlib import contextmanager
 from subprocess import check_call
 import sys
@@ -15,6 +16,8 @@ from cs.fileutils import findup
 from cs.logutils import debug, warning
 from cs.pfx import pfx_method
 from cs.psutils import pipefrom
+
+ReleaseLogEntry = namedtuple('ReleaseLogEntry', 'tag entry')
 
 @contextmanager
 def pipef(*argv, **kw):

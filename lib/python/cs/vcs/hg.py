@@ -4,7 +4,7 @@
 '''
 
 from cs.pfx import Pfx
-from . import VCS
+from . import VCS, ReleaseLogEntry
 
 class VCS_Hg(VCS):
   ''' Mercurial implementation of cs.vcs.VCS.
@@ -89,4 +89,4 @@ class VCS_Hg(VCS):
     tag_prefix = package_name + '-'
     for tag in sorted(filter(lambda tag: tag.startswith(tag_prefix),
                              self.tags()), reverse=True):
-      yield tag, self.log_entry(tag)
+      yield ReleaseLogEntry(tag, self.log_entry(tag))
