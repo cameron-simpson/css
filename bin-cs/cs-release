@@ -601,6 +601,7 @@ class Module(object):
   @latest_pypi_version.setter
   def latest_pypi_version(self, new_suffix):
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
+    self.pkg_tags.save()
 
   def submit_pypi(self, force=False):
     return self._submit_pypi('pypi', URL_PYPI_PROD, force=force)
