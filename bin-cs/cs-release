@@ -183,9 +183,15 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_log(argv, options):
+    ''' Usage: {cmd} pkg_name
+          Print the commit log since the latest release.
+    '''
     if not argv:
       raise GetoptError("missing package name")
-    pkg = options.packages[argv.pop(0)]
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    pkg = options.modules[pkg_name]
     first = True
     for files, firstline in pkg.log_since():
       if first:
