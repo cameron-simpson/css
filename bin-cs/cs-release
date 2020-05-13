@@ -158,11 +158,12 @@ class CSReleaseCommand(BaseCommand):
       revision = argv.pop(0)
     else:
       revision = pkg.latest_release_tag or "tip"
-      info("checking out revision %r", revision)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    info("checking out revision %r", revision)
     checkout_dir = pkg.name + '--' + revision
     pkg.checkout(revision, checkout_dir)
+    print(checkout_dir)
 
   @staticmethod
   def cmd_last(argv, options):
