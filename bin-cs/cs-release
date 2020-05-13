@@ -10,7 +10,6 @@
 from __future__ import print_function
 from collections import defaultdict
 from contextlib import contextmanager
-import errno
 from getopt import GetoptError
 import importlib
 import os
@@ -24,22 +23,26 @@ from os.path import (
     exists as pathexists,
 )
 import re
-from subprocess import check_call
 import sys
-from types import SimpleNamespace as NS
+from tempfile import TemporaryDirectory
 from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
+from cs.distinfo import (
+    URL_PYPI_PROD, PyPI_Package, tag_version as vcstag_version,
+    version_tag as version_vcstag
+)
 from cs.fstags import TagFile
-from cs.lex import cutprefix
-from cs.logutils import setup_logging, error, warning, info
-from cs.pfx import Pfx, pfx_method
+from cs.lex import cutsuffix
+from cs.logutils import error, warning, info, status
+from cs.pfx import Pfx, pfx_method, XP
 import cs.psutils
 from cs.py.func import prop
 from cs.py.modules import direct_imports
+from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
+
 from cs.x import X
 
 def main(argv=None, cmd=None):
@@ -123,7 +126,7 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package names")
     xit = 0
-    with Upd(sys.stderr) as U:
+    with Upd(sys.stderr):
       for pkg_name in argv:
         with Pfx(pkg_name):
           status("...")
