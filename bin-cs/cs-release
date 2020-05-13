@@ -95,7 +95,7 @@ class CSReleaseCommand(BaseCommand):
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
     options.last_values = LastValues()
-    options.modules=Modules()
+    options.modules = Modules()
     options.modules.options = options
     options.packages=Packages()
     options.packages.options = options
@@ -180,7 +180,7 @@ class CSReleaseCommand(BaseCommand):
     else:
       prefix, suffix = tag.split('-', 1)
     print(pkg.name, suffix)
-  
+
   @staticmethod
   def cmd_log(argv, options):
     if not argv:
@@ -192,12 +192,11 @@ class CSReleaseCommand(BaseCommand):
         print(pkg.name)
         first = False
       files = [
-          filename[11:]
-          if filename.startswith('lib/python/') else filename
+          filename[11:] if filename.startswith('lib/python/') else filename
           for filename in files
       ]
       print(' ', ' '.join(files) + ':', firstline)
-  
+
   @staticmethod
   def cmd_ls(argv, options):
     ''' Usage: {cmd}
@@ -212,7 +211,7 @@ class CSReleaseCommand(BaseCommand):
         if pypi_release is not None:
           print(pkg_name, pypi_release)
     return 0
-  
+
   @staticmethod
   def cmd_export(argv, options):
     ''' Usage: export pkg_name
@@ -226,7 +225,7 @@ class CSReleaseCommand(BaseCommand):
     pkg = options.modules[pkg_name]
     path = pkg.export()
     print(path)
-  
+
   @staticmethod
   def cmd_next(argv, options):
     ''' Usage: next pkg_names...
@@ -278,9 +277,7 @@ class CSReleaseCommand(BaseCommand):
       print("uncommitted changes exist for these files:")
       for path in sorted(outstanding):
         print(' ', path)
-      error(
-          "Aborting release; please commit or shelve/stash these changes."
-      )
+      error("Aborting release; please commit or shelve/stash these changes.")
       return 1
     changes = list(pkg.log_since())
     if not changes:
@@ -321,8 +318,7 @@ class CSReleaseCommand(BaseCommand):
         vcs.add_files(summary_filename, changes_filename)
         vcs.commit(
             'Release information for %s.\nSummary:\n%s' %
-            (next_tag, release_message), summary_filename,
-            changes_filename
+            (next_tag, release_message), summary_filename, changes_filename
         )
         vcs.tag(next_tag)
     return xit
