@@ -172,10 +172,38 @@ def main(argv):
 
   return xit
 
-def pathify(package_name):
-  ''' Translate foo.bar.zot into foo/bar/zot.
+class ParsedTag(namedtuple('ParsedTag', 'name version')):
+  ''' A parsed version of one of my release tags,
+      which have the form *package_name*`-`*version*.
   '''
-  return package_name.replace('.', os.path.sep)
+
+  @classmethod
+  def from_vcs_tag(cls, vcs_tag):
+    ''' Create a new `ParsedTag` from a VCS tag.
+    '''
+    name, version = vcs_tag.split('-', 1)
+    return cls(name, version)
+
+  @property
+  def vcs_tag(self):
+    ''' The VCS tag for this `(name,version)` pair.
+    '''
+    return self.name + '-' + self.version
+
+def version_tag(name, version):
+  ''' Compose a VCS tag from a package name and its version number.
+  '''
+  return ParsedTag(name, version).vcs_tag
+
+def tag_name(vcs_tag):
+  ''' Extract the name part from a tag.
+  '''
+  return ParsedTag.from_vcs_tag(vcs_tag).name
+
+def tag_version(vcs_tag):
+  ''' Extract the version number from a tag.
+  '''
+  return ParsedTag.from_vcs_tag(vcs_tag).version
 
 def needdir(dirpath):
   ''' Create the directory `dirpath` if missing.
@@ -230,7 +258,9 @@ def test_is_package(libdir, package_name):
       error("neither %s/ nor %s exist", package_dir, package_py)
   return is_pkg
 
-class PackageInstance(NS):
+class PyPI_Package(NS):
+  ''' Operations for a package at PyPI.
+  '''
 
   def __init__(self, package, version, vcs=None):
     ##if vcs is None:
