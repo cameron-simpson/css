@@ -743,7 +743,7 @@ def tmpdirn(tmp=None):
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
-def find(path, select=None, sorted=True):
+def find(path, select=None, sort_names=True):
   ''' Walk a directory tree `path`
       yielding selected paths.
 
@@ -757,7 +757,7 @@ def find(path, select=None, sorted=True):
     else:
       dirnames[:] = []
       continue
-    if sorted:
+    if sort_names:
       dirnames[:] = sorted(dirnames)
       filenames[:] = sorted(filenames)
     for filename in filenames:
