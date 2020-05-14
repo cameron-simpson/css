@@ -58,10 +58,13 @@ class VCS_Hg(VCS):
     '''
     self._cmd('commit', '-m', message, '--', *paths)
 
-  def uncommitted(self):
+  def uncommitted(self, paths=None):
     ''' Generator yielding uncommited but tracked paths.
     '''
-    with self._pipefrom('status') as f:
+    status_argv = ['status']
+    if paths:
+      status_argv.extend(paths)
+    with self._pipefrom(*status_argv) as f:
       for line in f:
         s, path = line.rstrip().split(' ', 1)
         if s != '?':
