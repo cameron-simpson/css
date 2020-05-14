@@ -831,7 +831,7 @@ class Module(object):
   def requires(self):
     ''' Return other nonstdlib packages required by this module.
     '''
-    return self.DISTINFO.get('install_requires')
+    return self.DISTINFO.get('install_requires', [])
 
   @pfx_method(use_str=True)
   def problems(self):
