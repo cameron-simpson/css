@@ -7,6 +7,7 @@
 '''
 
 from __future__ import print_function
+from collections import namedtuple
 from functools import partial
 from getopt import getopt, GetoptError
 from glob import glob
@@ -25,9 +26,7 @@ from tempfile import mkdtemp
 from types import SimpleNamespace as NS
 from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
-from cs.py.doc import module_doc
 from cs.sh import quotestr as shq, quote as shqv
-from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
 URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
@@ -67,6 +66,8 @@ USAGE = '''Usage: %s [-n pypi-pkgname] [-v pypi_version] pkgname[@tag] op [op-ar
     upload      Upload the package source distribution.'''
 
 def main(argv):
+  ''' Main command line programme.
+  '''
   cmd = basename(argv.pop(0))
   usage = USAGE % (cmd, URL_PYPI_TEST, URL_PYPI_PROD)
   setup_logging(cmd)
@@ -74,7 +75,6 @@ def main(argv):
   badopts = False
 
   package_name = None
-  vcs_tag = None
   pypi_package_name = None
   pypi_version = None
   pypi_url = None
@@ -103,7 +103,7 @@ def main(argv):
   else:
     package_name = argv.pop(0)
     try:
-      package_name, vcs_tag = package_name.split('@', 1)
+      package_name, _ = package_name.split('@', 1)
     except ValueError:
       pass
 
@@ -347,9 +347,6 @@ class PyPI_Package(NS):
   def _prep_distinfo(self):
     ''' Compute the distutils info for this package.
     '''
-    global DISTINFO_DEFAULTS
-    global DISTINFO_CLASSIFICATION
-
     dinfo = dict(self.defaults)
     module = importlib.import_module(self.package_name)
     dinfo.update(module.DISTINFO)
@@ -373,11 +370,12 @@ class PyPI_Package(NS):
         dinfo['classifiers'].append(classifier_value)
 
     # derive some stuff from the classifiers
+    license_type = None
     for classifier in dinfo['classifiers']:
       parts = classifier.split(' :: ')
       topic = parts[0]
       if topic == 'License':
-        license = parts[-1]
+        license_type = parts[-1]
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
@@ -388,7 +386,7 @@ class PyPI_Package(NS):
       dinfo['py_modules'] = [self.package_name]
 
     for kw, value in (
-        ('license', license),
+        ('license', license_type),
         ('name', self.pypi_package_name),
         ('version', self.pypi_package_version),
     ):
@@ -418,7 +416,7 @@ class PyPI_Package(NS):
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
 
-        If `pkg_dir` is not supplied, create a temporary directory.
+        If `pkg_dir` is not specified, create a temporary directory.
     '''
     if pkg_dir is None:
       pkg_dir = mkdtemp(prefix='pkg--' + self.pypi_package_name + '--', dir='.')
@@ -433,7 +431,7 @@ class PyPI_Package(NS):
         with Pfx(subpath):
           prefix, ext = splitext(subpath)
           if ext == '.md':
-            prefix2, ext2 = splitext(prefix)
+            _, ext2 = splitext(prefix)
             if len(ext2) == 2 and ext2[-1].isdigit():
               # md2man manual entry
               mdsrc = joinpath(pkg_dir, subpath)
@@ -449,7 +447,7 @@ class PyPI_Package(NS):
               mfp.write('include ' + prefix + '\n')
           elif ext == '.c':
             mfp.write('include ' + subpath + '\n')
-      # create README.rst
+      # create README.md
       readme_path = joinpath(pkg_dir, 'README.md')
       with open(readme_path, 'w') as fp:
         print(distinfo['description'], file=fp)
@@ -465,9 +463,13 @@ class PyPI_Package(NS):
     return pkg_dir
 
   def checkout(self):
+    ''' Return a fresh checkout of the package.
+    '''
     return PyPI_PackageCheckout(self)
 
   def upload(self):
+    ''' Upload: make a checkout, prepare the distribution, twine upload.
+    '''
     with self.checkout() as pkg_co:
       pkg_co.prepare_dist()
       pkg_co.upload()
@@ -537,12 +539,12 @@ class PyPI_Package(NS):
       # packages - all .py and .md files in directory
       # warning about unexpected other files
       libprefix = libdir + os.path.sep
-      for dirpath, dirnames, filenames in os.walk(joinpath(libdir,
+      for dirpath, _, filenames in os.walk(joinpath(libdir,
                                                            package_subpath)):
         for filename in filenames:
           if filename.startswith('.'):
             continue
-          prefix, ext = splitext(filename)
+          _, ext = splitext(filename)
           if ext == '.pyc':
             continue
           if ext in ('.py', '.md', '.c'):
@@ -575,6 +577,8 @@ class PyPI_PackageCheckout(NS):
 
   @property
   def pypi_url(self):
+    ''' The PyPI URL from the parent package.
+    '''
     return self.package_instance.pypi_url
 
   def inpkg(self, shcmd):
@@ -599,9 +603,13 @@ class PyPI_PackageCheckout(NS):
     return self.inpkg_argv(['python3', 'setup.py'] + list(argv))
 
   def prepare_dist(self):
+    ''' Run "setup.py check sdist".
+    '''
     self.setup_py('check', 'sdist')
 
   def upload(self):
+    ''' Upload the package to PyPI using twine.
+    '''
     upload_files = [
         joinpath('dist', basename(distpath))
         for distpath in glob(joinpath(self.pkg_dir, 'dist/*'))
