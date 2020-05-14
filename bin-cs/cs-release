@@ -138,6 +138,11 @@ class CSReleaseCommand(BaseCommand):
             for problem in problems:
               if isinstance(problem, str):
                 warning(problem)
+              elif isinstance(problem, list):
+                label, *values = problem
+                warning("%s:", label)
+                for subproblem in values:
+                  warning("  %s", subproblem)
               else:
                 for subpkg, subproblems in sorted(problem.items()):
                   warning(
