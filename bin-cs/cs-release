@@ -807,8 +807,8 @@ class Module(object):
             D = M.DISTINFO
           except AttributeError:
             pkg_name = self.package_name
-            if pkg_name == self.name:
-              warning("missing")
+            if pkg_name is None or pkg_name == self.name:
+              warning("missing DISTINFO")
             else:
               # look in the package
               P = self.modules[pkg_name]
