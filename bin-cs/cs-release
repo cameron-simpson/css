@@ -332,6 +332,11 @@ class CSReleaseCommand(BaseCommand):
             (next_tag, release_message), summary_filename, changes_filename
         )
         vcs.tag(next_tag)
+        pkg.patch__version__(tag_version + '-post')
+        vcs.commit(
+            '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
+            % (pkg.name, tag_version + '-post')
+        )
     return xit
 
 def release_tags(vcs):
