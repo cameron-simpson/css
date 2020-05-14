@@ -753,7 +753,7 @@ class Module(object):
     ''' Generator yielding paths relevant to this package
         with uncommitted changes.
     '''
-    return self.vcs.uncommitted(set(self.paths()))
+    return self.vcs.uncommitted(self.paths())
 
   @pfx_method(use_str=True)
   def patch__version__(self, version):
