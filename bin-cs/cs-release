@@ -436,6 +436,8 @@ class Module(object):
     self._checking = False
     self._module_problems = None
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.name)
   @prop
   def modules(self):
     ''' The modules from `self.options`.
