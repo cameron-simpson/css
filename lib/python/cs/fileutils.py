@@ -743,6 +743,32 @@ def tmpdirn(tmp=None):
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
+def find(path, select=None, sorted=True):
+  ''' Walk a directory tree `path`
+      yielding selected paths.
+
+      Note: not selecting a directory prunes all its descendants.
+  '''
+  if select is None:
+    select = lambda _: True
+  for dirpath, dirnames, filenames in os.walk(path):
+    if select(dirpath):
+      yield dirpath
+    else:
+      dirnames[:] = []
+      continue
+    if sorted:
+      dirnames[:] = sorted(dirnames)
+      filenames[:] = sorted(filenames)
+    for filename in filenames:
+      filepath = joinpath(dirpath, filename)
+      if select(filepath):
+        yield filepath
+    dirnames[:] = [
+        dirname for dirname in dirnames
+        if select(joinpath(dirpath, dirname))
+    ]
+
 def findup(path, test, first=False):
   ''' Test the pathname `abspath(path)` and each of its ancestors
       against the callable `test`,
