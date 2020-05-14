@@ -893,15 +893,9 @@ class Module(object):
     if not self.paths():
       problems.append("no files")
     # check for unrelease commit logs
-    unreleased_logs = list(self.package.log_since())
+    unreleased_logs = list(self.log_since())
     if unreleased_logs:
-      if len(unreleased_logs) == 1:
-        problems.append("1 unrelease commit: %s" % (unreleased_logs[0],))
-      else:
-        problems.append(
-            "%d unreleased commits: %s, ..." %
-            (len(unreleased_logs), unreleased_logs[0])
-        )
+      problems.append(['unreleased commits']+unreleased_logs)
     # check for uncommited changes
     paths = self.paths()
     changed_paths = [
