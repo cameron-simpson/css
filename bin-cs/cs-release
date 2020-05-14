@@ -635,7 +635,7 @@ class Module(object):
     '''
     if vcs_tag is None:
       vcs_tag = self.latest_release_vcstag
-    vcs_version = self.tag_version(vcs_tag)
+    vcs_version = vcstag_version(vcs_tag)
     if pypi_version is None:
       pypi_version = vcs_version
     if not self.check_uptodate():
