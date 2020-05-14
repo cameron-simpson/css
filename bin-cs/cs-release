@@ -247,10 +247,8 @@ class CSReleaseCommand(BaseCommand):
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
-        # TODO: fix prefix/suffix stuff
-        next_prefix, next_suffix = pkg.next_release_tag().split('-')
-        assert next_prefix == pkg.name
-        print(pkg.name, next_suffix)
+        next_version = pkg.next_release_version()
+        print(pkg.name, next_version)
 
   @staticmethod
   def cmd_pypi(argv, options):
