@@ -604,6 +604,10 @@ class Module(object):
     '''
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
     self.pkg_tags.save()
+    self.vcs.commit(
+        '%s: %s: set %s=%s' %
+        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version)
+    )
 
   def compute_doc(self):
     ''' Compute the components of the documentation.
