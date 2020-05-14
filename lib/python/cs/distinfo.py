@@ -290,8 +290,6 @@ class PyPI_Package(NS):
       pypi_package_name=None,
       pypi_package_version=None,
       defaults=None,
-      preamble_md='',
-      postamble_md='',
   ):
     ''' Initialise: save package_name and its name in PyPI.
     '''
@@ -317,7 +315,7 @@ class PyPI_Package(NS):
     self._pypi_package_version = pypi_package_version
     self.defaults = defaults
     self.libdir = LIBDIR
-    self._prep_distinfo(preamble_md, postamble_md)
+    self._prep_distinfo()
 
   @property
   def package_name(self):
@@ -341,7 +339,7 @@ class PyPI_Package(NS):
   def vcs_tag(self):
     return self.package_instance.vcs_tag
 
-  def _prep_distinfo(self, preamble_md, postamble_md):
+  def _prep_distinfo(self):
     ''' Compute the distutils info for this package.
     '''
     global DISTINFO_DEFAULTS
@@ -350,30 +348,13 @@ class PyPI_Package(NS):
     dinfo = dict(self.defaults)
     module = importlib.import_module(self.package_name)
     dinfo.update(module.DISTINFO)
-    full_doc = module_doc(module)
-    try:
-      doc_head, _ = full_doc.split('\n\n', 1)
-    except ValueError:
-      doc_head = full_doc
 
-    # fill in some missing info if it can be inferred
-    for field in 'description', 'long_description', 'include_package_data':
-      if field in dinfo:
-        continue
-      if field == 'description':
-        if doc_head:
-          dinfo[field] = doc_head.replace('\n', ' ')
-      elif field == 'long_description':
-        long_desc = full_doc
-        if preamble_md:
-          long_desc = preamble_md.rstrip() + '\n\n' + long_desc
-        if postamble_md:
-          long_desc = long_desc.rstrip() + '\n\n' + postamble_md
-        dinfo[field] = long_desc
-        if 'long_description_content_type' not in dinfo:
-          dinfo['long_description_content_type'] = 'text/markdown'
-      elif field == 'include_package_data':
-        dinfo[field] = True
+    if ('long_description' in dinfo
+        and 'long_description_content_type' not in dinfo):
+      dinfo['long_description_content_type'] = 'text/markdown'
+
+    if 'include_package_data' not in dinfo:
+      dinfo['include_package_data'] = True
 
     dinfo['package_dir'] = {'': self.libdir}
 
