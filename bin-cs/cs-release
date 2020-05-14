@@ -42,6 +42,7 @@ from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
+from icontract import require
 
 from cs.x import X
 
@@ -604,6 +605,9 @@ class Module(object):
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
     self.pkg_tags.save()
 
+  @require(lambda pypi_flavour: isinstance(pypi_flavour, str))
+  @require(lambda pypi_url: isinstance(pypi_url, str))
+  @require(lambda force: force is True or force is False)
   def submit_pypi(
       self,
       pypi_flavour='pypi',
