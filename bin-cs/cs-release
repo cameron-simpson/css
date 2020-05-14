@@ -201,16 +201,12 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r", argv)
     pkg = options.modules[pkg_name]
-    first = True
     for files, firstline in pkg.log_since():
-      if first:
-        print(pkg.name)
-        first = False
       files = [
           filename[11:] if filename.startswith('lib/python/') else filename
           for filename in files
       ]
-      print(' ', ' '.join(files) + ':', firstline)
+      print(' '.join(files) + ':', firstline)
 
   @staticmethod
   def cmd_ls(argv, options):
