@@ -204,6 +204,11 @@ def cmdstdout(argv):
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
   return output
 
+def pathify(package_name):
+  ''' Translate foo.bar.zot into foo/bar/zot.
+  '''
+  return package_name.replace('.', os.path.sep)
+
 def test_is_package(libdir, package_name):
   ''' Test whether `package_name` is a package (a directory with a __init__.py file).
       Do some sanity checks and complain loudly.
