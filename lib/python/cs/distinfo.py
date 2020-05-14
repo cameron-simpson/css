@@ -283,67 +283,6 @@ class PackageInstance(NS):
     runcmd(hgargv)
     return included
 
-class PyPI_Package(NS):
-  ''' Operations for a package at PyPI.
-  '''
-
-  def __init__(
-      self,
-      pypi_url,
-      package_name,
-      package_version,
-      pypi_package_name=None,
-      pypi_package_version=None,
-      defaults=None,
-  ):
-    ''' Initialise: save package_name and its name in PyPI.
-    '''
-    if defaults is None:
-      defaults = {}
-    if 'author' not in defaults:
-      try:
-        author_name = os.environ['NAME']
-      except KeyError:
-        pass
-      else:
-        defaults['author'] = author_name
-    if 'author_email' not in defaults:
-      try:
-        author_email = os.environ['EMAIL']
-      except KeyError:
-        pass
-      else:
-        defaults['author_email'] = author_email
-    self.pypi_url = pypi_url
-    self.package_instance = PackageInstance(package_name, package_version)
-    self._pypi_package_name = pypi_package_name
-    self._pypi_package_version = pypi_package_version
-    self.defaults = defaults
-    self.libdir = LIBDIR
-    self._prep_distinfo()
-
-  @property
-  def package_name(self):
-    return self.package_instance.name
-
-  @property
-  def pypi_package_name(self):
-    name = self._pypi_package_name
-    if name is None:
-      name = self.package_name
-    return name
-
-  @property
-  def pypi_package_version(self):
-    version = self._pypi_package_version
-    if version is None:
-      version = self.package_instance.version
-    return version
-
-  @property
-  def vcs_tag(self):
-    return self.package_instance.vcs_tag
-
   def _prep_distinfo(self):
     ''' Compute the distutils info for this package.
     '''
