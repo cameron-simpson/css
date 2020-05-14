@@ -269,6 +269,20 @@ class CSReleaseCommand(BaseCommand):
         )
 
   @staticmethod
+  def cmd_readme(argv, options):
+    ''' Usage: {cmd} pkg_name
+          Print out the package long_description.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = options.modules[pkg_name]
+    docs = pkg.compute_doc()
+    print(docs.long_description)
+
+  @staticmethod
   def cmd_release(argv, options):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
@@ -357,12 +371,14 @@ def release_prefixes(vcs):
   return tagpfxs
 
 def clean_release_entry(entry):
-  lines = filter(
-      lambda line: (
-          line and line != 'Summary:' and not line.
-          startswith('Release information for ')
-      ),
-      entry.strip().split('\n')
+  lines = list(
+      filter(
+          lambda line: (
+              line and line != 'Summary:' and not line.
+              startswith('Release information for ')
+          ),
+          entry.strip().split('\n')
+      )
   )
   if len(lines) > 1:
     # Multiple lines become a MarkDown bullet list.
@@ -609,6 +625,59 @@ class Module(object):
   def latest_pypi_version(self, new_suffix):
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
     self.pkg_tags.save()
+
+  def compute_doc(self):
+    ''' Compute the components of the documentation.
+    '''
+    vcs = self.vcs
+    # break out the release log and format it
+    release_log = list(vcs.release_log(self.name))
+    release_vcs_tag, release_entry = release_log[0]
+    package_release_version = vcstag_version(release_vcs_tag)
+    release_entry = clean_release_entry(release_entry)
+    preamble_md = f'*Latest release {package_release_version}*:\n{release_entry}'
+    postamble_parts = []
+    for vcs_tag, entry in release_log:
+      release_number = vcs_tag.split('-', 1)[1]
+      release_entry = clean_release_entry(entry)
+      postamble_parts.append(f'*Release {release_number}*:\n{release_entry}')
+    # split the module documentation after the opening paragraph
+    full_doc = module_doc(self.module)
+    try:
+      doc_head, doc_tail = full_doc.split('\n\n', 1)
+    except ValueError:
+      doc_head = full_doc
+      doc_tail = ''
+    # compute some distinfo stuff
+    description = doc_head.replace('\n', ' ')
+    long_description = '\n\n'.join(
+        [
+            doc_head,
+            preamble_md.rstrip(), doc_tail, '# Release Log\n\n',
+            *postamble_parts
+        ]
+    )
+    return SimpleNamespace(
+        module_doc=full_doc,
+        description=description,
+        long_description=long_description,
+        release_paragraphs=postamble_parts,
+    )
+
+  def _pypipkg(self, pypi_url):
+    ''' Return a `PyPI_Package` for this module.
+    '''
+    docs = self.compute_doc()
+    base_distinfo = dict(DISTINFO_DEFAULTS)
+    base_distinfo.update(
+        description=docs.description, long_description=docs.long_description
+    )
+    return PyPI_Package(
+        pypi_url,
+        self.name,
+        package_release_version,
+        defaults=base_distinfo,
+    )
 
   @require(lambda pypi_flavour: isinstance(pypi_flavour, str))
   @require(lambda pypi_url: isinstance(pypi_url, str))
