@@ -25,13 +25,14 @@ from os.path import (
 import re
 import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
 from cs.distinfo import (
-    URL_PYPI_PROD, PyPI_Package, tag_version as vcstag_version,
-    version_tag as version_vcstag
+    URL_PYPI_PROD, PyPI_Package, tag_version as vcstag_version, version_tag as
+    version_vcstag
 )
 from cs.fstags import TagFile
 from cs.lex import cutsuffix
@@ -436,6 +437,7 @@ class Module(object):
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
+
   @prop
   def modules(self):
     ''' The modules from `self.options`.
@@ -465,9 +467,6 @@ class Module(object):
           M = None
       self._module = M
     return M
-
-  def __str__(self):
-    return "%s[%r]" % (type(self).__name__, self.name)
 
   @pfx_method(use_str=True)
   def isthirdparty(self):
@@ -595,11 +594,15 @@ class Module(object):
 
   @property
   def latest_pypi_version(self):
+    ''' The last PyPI version.
+    '''
     return self.pkg_tags.get(TAG_PYPI_RELEASE)
 
   @latest_pypi_version.setter
-  def latest_pypi_version(self, new_suffix):
-    self.pkg_tags.set(TAG_PYPI_RELEASE, new_suffix)
+  def latest_pypi_version(self, new_version):
+    ''' Update the last PyPI version.
+    '''
+    self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
     self.pkg_tags.save()
 
   def compute_doc(self):
@@ -949,7 +952,7 @@ class Module(object):
     # check for unrelease commit logs
     unreleased_logs = list(self.log_since())
     if unreleased_logs:
-      problems.append(['unreleased commits']+unreleased_logs)
+      problems.append(['unreleased commits'] + unreleased_logs)
     # check for uncommited changes
     paths = self.paths()
     changed_paths = [
