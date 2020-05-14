@@ -777,9 +777,10 @@ class Module(object):
         if distinfo_index is None:
           raise ValueError("no __version__ line and no DISTINFO line")
         lines[distinfo_index:distinfo_index] = version_line, '\n'
-      with open(toppath, 'w') as tf:
-        for line in lines:
-          tf.write(line)
+      with Pfx("rewrite %r", toppath):
+        with open(toppath, 'w') as tf:
+          for line in lines:
+            tf.write(line)
       self.vcs.commit(
           self.name + ': set __version__ to ' + repr(version), toppath
       )
