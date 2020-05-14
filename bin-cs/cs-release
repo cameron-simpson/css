@@ -38,6 +38,7 @@ from cs.lex import cutsuffix
 from cs.logutils import error, warning, info, status
 from cs.pfx import Pfx, pfx_method, XP
 import cs.psutils
+from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.upd import Upd
@@ -385,31 +386,6 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def pypipkg(pkgname, vcs, pypi_url=None):
-  ''' Return a `PyPI_Package` for `pkgname`.
-  '''
-  if pypi_url is None:
-    pypi_url = URL_PYPI_PROD
-  release_log = list(vcs.release_log(pkgname))
-  release_vcs_tag, release_entry = release_log[0]
-  package_release_version = vcstag_version(release_vcs_tag)
-  release_entry = clean_release_entry(release_entry)
-  preamble_md = f'*Latest release {package_release_version}*:\n{release_entry}'
-  postamble_parts = []
-  for vcs_tag, entry in release_log:
-    release_number = vcs_tag.split('-', 1)[1]
-    release_entry = clean_release_entry(entry)
-    postamble_parts.append(f'*Release {release_number}*:\n{release_entry}')
-  postamble_md = '\n\n# Release Log\n\n' + '\n\n'.join(postamble_parts)
-  return PyPI_Package(
-      pypi_url,
-      pkgname,
-      package_release_version,
-      defaults=dict(DISTINFO_DEFAULTS),
-      preamble_md=preamble_md,
-      postamble_md=postamble_md
-  )
-
 def ask(message, fin=None, fout=None):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
   '''
@@ -728,7 +704,7 @@ class Module(object):
       with Pfx("%s->%r",
                repr(latest_pypi_version) if latest_pypi_version else '',
                latest_version):
-        PKG = pypipkg(self.name, self.vcs)
+        PKG = self._pypipkg(URL_PYPI_PROD)
         PKG.upload()
         self.latest_pypi_version = latest_version
 
@@ -738,7 +714,7 @@ class Module(object):
     print('create %s ...' % (pkg_dir,))
     with Pfx("mkdir(%s)", pkg_dir):
       os.mkdir(pkg_dir)
-    PKG = pypipkg(self.name, self.vcs)
+    PKG = self._pypipkg(URL_PYPI_PROD)
     PKG.make_package(pkg_dir)
     return pkg_dir
 
