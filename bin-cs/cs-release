@@ -165,7 +165,7 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       revision = argv.pop(0)
     else:
-      revision = pkg.latest_release_tag or "tip"
+      revision = pkg.latest_release_vcstag or "tip"
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     info("checking out revision %r", revision)
@@ -183,7 +183,7 @@ class CSReleaseCommand(BaseCommand):
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
-        tag = pkg.latest_release_tag
+        tag = pkg.latest_release_vcstag
         if tag is None:
           suffix = "NONE"
         else:
@@ -267,7 +267,7 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         # upload latest release to pypi
-        vcs_tag = pkg.latest_release_tag
+        vcs_tag = pkg.latest_release_vcstag
         pypi_version = pkg.latest_release_version
         pkg.submit_pypi(
             force=options.force, vcs_tag=vcs_tag, pypi_version=pypi_version
@@ -555,7 +555,7 @@ class Module(object):
     return self.vcs.release_log(self.name)
 
   @property
-  def latest_release_tag(self):
+  def latest_release_vcstag(self):
     ''' The latest VCS release tag or `None`.
     '''
     tags = self.release_tags()
@@ -564,7 +564,7 @@ class Module(object):
     return max(tags)
 
   def latest_release_version(self):
-    vcs_tag = self.latest_release_tag
+    vcs_tag = self.latest_release_vcstag
     if vcs_tag is None:
       return None
     return vcs_tag.split('-', 1)[1]
@@ -572,11 +572,11 @@ class Module(object):
   def next_release_version(self):
     ''' Compute the next release version.
     '''
-    vcs_tag = self.latest_release_tag()
+    vcs_tag = self.latest_release_vcstag
     today = isodate(dashed=False)
     if vcs_tag:
       with Pfx(vcs_tag):
-        current_version = self.tag_version(vcs_tag)
+        current_version = vcstag_version(vcs_tag)
         if current_version == today:
           next_version = today + '.1'
         elif current_version < today:
@@ -624,12 +624,12 @@ class Module(object):
         * `force`: optional force setting, defauult `False`.
           If true, do the upload even if the up to date checks fail.
         * `vcs_tag`: the VCS release tag to use for the upload,
-          default from `self.latest_release_tag`
+          default from `self.latest_release_vcstag`
         * `pypi_version`: the PyPI version to upload as,
           default from `self.latest_release_version`
     '''
     if vcs_tag is None:
-      vcs_tag = self.latest_release_tag
+      vcs_tag = self.latest_release_vcstag
     vcs_version = self.tag_version(vcs_tag)
     if pypi_version is None:
       pypi_version = vcs_version
@@ -642,7 +642,7 @@ class Module(object):
     with Pfx(pypi_flavour):
       with self.checkout(vcs_tag) as checkout_path:
         self.prepare_package(checkout_path)
-      if vcs_tag == self.latest_release_tag:
+      if vcs_tag == self.latest_release_vcstag:
         latest_version = self.latest_release_version
         latest_pypi_version = self.latest_pypi_version
       if latest_version == latest_pypi_version:
@@ -736,20 +736,22 @@ class Module(object):
       return self.vcs.hg_cmd(*hg_argv)
 
   @pfx_method(use_str=True)
-  def log_since(self, tag=None):
+  def log_since(self, vcstag=None):
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
     '''
-    with Pfx("log_since"):
-      if tag is None:
-        tag = self.latest_release_tag()
-        if tag is None:
-          tag = "0"
-          warning(f"no release tags, starting from revision {tag}")
-      paths = list(self.paths())
-      for files, firstline in self.vcs.log_since(tag, paths):
-        files = [filename for filename in files if filename in paths]
-        yield files, firstline
+    if vcstag is None:
+      vcstag = self.latest_release_vcstag
+      if vcstag is None:
+        vcstag = "0"
+        warning(f"no release tags, starting from revision {vcstag}")
+    paths = self.paths()
+    return (
+        ([filename
+          for filename in files
+          if filename in paths], firstline)
+        for files, firstline in self.vcs.log_since(vcstag, paths)
+    )
 
   def uncommitted_paths(self):
     ''' Generator yielding paths relevant to this package
