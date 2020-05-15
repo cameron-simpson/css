@@ -24,6 +24,7 @@ from os.path import (
 )
 from pprint import pprint
 import re
+import shutil
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -179,13 +180,12 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       revision = argv.pop(0)
     else:
-      revision = pkg.latest_release_vcstag or "tip"
+      revision = pkg.latest_release_vcstag() or "tip"
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    info("checking out revision %r", revision)
     checkout_dir = pkg.name + '--' + revision
-    pkg.checkout(revision, checkout_dir)
-    print(checkout_dir)
+    with pkg.checkout(revision, checkout_dir, persist=True) as checkout_dir:
+      print(checkout_dir)
 
   @staticmethod
   def cmd_distinfo(argv, options):
@@ -249,20 +249,6 @@ class CSReleaseCommand(BaseCommand):
         if pypi_release is not None:
           print(pkg_name, pypi_release)
     return 0
-
-  @staticmethod
-  def cmd_export(argv, options):
-    ''' Usage: export pkg_name
-          Export the package contents.
-    '''
-    if not argv:
-      raise GetoptError("missing package name")
-    pkg_name = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments: %r", argv)
-    pkg = options.modules[pkg_name]
-    path = pkg.export()
-    print(path)
 
   @staticmethod
   def cmd_next(argv, options):
@@ -893,16 +879,34 @@ class Module(object):
             info("ignore %r, not a file", filepath)
     return pathlist
 
-  def checkout(self, revision, dirpath):
-    ''' Check out the specified `revision` to the directory `dirpath`.
+  @contextmanager
+  def checkout(self, vcs_revision, dirpath, exists=False, persist=False):
+    ''' Check out the specified `vcs_revision` to the directory `dirpath`.
     '''
-    with Pfx("checkout %r ==> %r", revision, dirpath):
-      if pathexists(dirpath):
-        raise ValueError("already exists")
-      hg_argv = ['archive', '-r', revision]
+    if dirpath is None:
+      with TemporaryDirectory(prefix=self.name + '--' + vcs_revision + '--'
+                              ) as tmpdirpath:
+        with self.checkout(vcs_revision, tmpdirpath, exists=True,
+                           persist=persist) as dirpath:
+          yield dirpath
+      return
+    with Pfx("checkout %r ==> %r", vcs_revision, dirpath):
+      if exists:
+        if not isdirpath(dirpath):
+          raise ValueError("already exists")
+      else:
+        with Pfx("mkdir(%r)", dirpath):
+          os.mkdir(dirpath)
+      hg_argv = ['archive', '-r', vcs_revision]
       hg_argv.extend(self.vcs.hg_include(self.paths()))
       hg_argv.extend(['--', dirpath])
-      return self.vcs.hg_cmd(*hg_argv)
+      self.vcs.hg_cmd(*hg_argv)
+    try:
+      yield dirpath
+    finally:
+      if not persist:
+        with Pfx("rmtree(%r)", dirpath):
+          shutil.rmtree(dirpath)
 
   @pfx_method(use_str=True)
   def log_since(self, vcstag=None):
