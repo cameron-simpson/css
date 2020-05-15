@@ -655,6 +655,7 @@ class Module(object):
     base_distinfo.update(
         description=docs.description, long_description=docs.long_description
     )
+    package_release_version = self.latest_release_version()
     return PyPI_Package(
         pypi_url,
         self.name,
@@ -716,7 +717,7 @@ class Module(object):
         self.latest_pypi_version = latest_version
 
   def export(self):
-    latest_version = self.latest_release_version
+    latest_version = self.latest_release_version()
     pkg_dir = "%s-%s" % (self.name, latest_version)
     print('create %s ...' % (pkg_dir,))
     with Pfx("mkdir(%s)", pkg_dir):
