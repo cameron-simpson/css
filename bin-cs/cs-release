@@ -22,6 +22,7 @@ from os.path import (
     join as joinpath,
     exists as pathexists,
 )
+from pprint import pprint
 import re
 import sys
 from tempfile import TemporaryDirectory
@@ -52,6 +53,16 @@ def main(argv=None, cmd=None):
   ''' Main command line.
   '''
   return CSReleaseCommand().run(argv, cmd=cmd)
+
+DISTINFO_CLASSIFICATION = {
+    "Programming Language": "Python",
+    "Development Status": "4 - Beta",
+    "Intended Audience": "Developers",
+    "Operating System": "OS Independent",
+    "Topic": "Software Development :: Libraries :: Python Modules",
+    "License":
+    "OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+}
 
 # the top level TagFile containing package state information
 PKG_TAGS = 'pkg_tags'
@@ -175,6 +186,19 @@ class CSReleaseCommand(BaseCommand):
     checkout_dir = pkg.name + '--' + revision
     pkg.checkout(revision, checkout_dir)
     print(checkout_dir)
+
+  @staticmethod
+  def cmd_distinfo(argv, options):
+    ''' Usage: {cmd} pkg_name
+          Print out the package distinfo mapping.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = options.modules[pkg_name]
+    pprint(pkg.compute_distinfo())
 
   @staticmethod
   def cmd_last(argv, options):
@@ -646,6 +670,93 @@ class Module(object):
         long_description=long_description,
         release_paragraphs=postamble_parts,
     )
+
+  def compute_distinfo(
+      self,
+      pypi_package_name=None,
+      pypi_package_version=None,
+  ):
+    ''' Compute the distutils info mapping for this package.
+    '''
+    if pypi_package_name is None:
+      pypi_package_name = self.name
+    if pypi_package_version is None:
+      pypi_package_version = self.latest_release_version()
+    dinfo = dict(DISTINFO_DEFAULTS)
+    docs = self.compute_doc()
+    dinfo.update(
+        description=docs.description, long_description=docs.long_description
+    )
+    dinfo.update(self.module.DISTINFO)
+
+    for field in ('author', 'author_email', 'long_description_content_type',
+                  'package_dir'):
+      with Pfx("%r", field):
+        if field in dinfo:
+          continue
+        compute_field = {
+            'author': lambda: os.environ['NAME'],
+            'author_email': lambda: os.environ['EMAIL'],
+            'include_package_data': lambda: True,
+            'long_description_content_type': lambda: 'text/markdown',
+            'package_dir': lambda: {
+                '': PYLIBTOP
+            },
+        }[field]
+        dinfo[field] = compute_field()
+
+    classifiers = dinfo['classifiers']
+    for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items(
+    ):
+      classifier_prefix = classifier_topic + " ::"
+      classifier_value = classifier_topic + " :: " + classifier_subsection
+      if not any(classifier.startswith(classifier_prefix)
+                 for classifier in classifiers):
+        dinfo['classifiers'].append(classifier_value)
+
+    # derive some stuff from the classifiers
+    license_type = None
+    for classifier in dinfo['classifiers']:
+      parts = classifier.split(' :: ')
+      topic = parts[0]
+      if topic == 'License':
+        license_type = parts[-1]
+
+    if self.is_package:
+      # stash the package in a top level directory of that name
+      ## dinfo['package_dir'] = {package_name: package_name}
+      dinfo['packages'] = [self.name]
+    else:
+      dinfo['py_modules'] = [self.name]
+
+    for kw, value in (
+        ('license', license_type),
+        ('name', pypi_package_name),
+        ('version', pypi_package_version),
+    ):
+      if value is None:
+        warning("_prep: no value for %r", kw)
+      else:
+        with Pfx(kw):
+          if kw in dinfo:
+            if dinfo[kw] != value:
+              info("publishing %s instead of %s", value, dinfo[kw])
+          else:
+            dinfo[kw] = value
+
+    self.distinfo = dinfo
+    for kw in (
+        'name',
+        'description',
+        'author',
+        'author_email',
+        'version',
+        'license',
+        'url',
+    ):
+      if kw not in dinfo:
+        error('no %r in distinfo', kw)
+    return dinfo
 
   def _pypipkg(self, pypi_url):
     ''' Return a `PyPI_Package` for this module.
