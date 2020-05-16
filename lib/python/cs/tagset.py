@@ -3,8 +3,14 @@
 ''' Tags and sets of tags
     with __format__ support and optional ontology information.
 
-    Note: see `cs.fstags` for support for applying these to filesystem objects
+    See `cs.fstags` for support for applying these to filesystem objects
     such as directories and files.
+
+    See `cs.sqltags` for support for databases of entities with tags,
+    not directly associated with filesystem objects.
+    This is suited to both log entries (entities with no "name")
+    and large collections of named entities;
+    both accept `Tag`s and can be seached on that basis.
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
@@ -87,6 +93,8 @@ from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
+
+from cs.x import X
 
 __version__ = '20200318'
 
