@@ -43,7 +43,7 @@ from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
-from icontract import require
+from icontract import require, ensure
 
 from cs.x import X
 
@@ -262,8 +262,7 @@ class CSReleaseCommand(BaseCommand):
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
-        next_version = pkg.next_release_version()
-        print(pkg.name, next_version)
+        print(pkg.name, pkg.next().version)
 
   @staticmethod
   def cmd_pypi(argv, options):
@@ -413,6 +412,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       next_seq = 1
     version = today + '.' + str(next_seq)
     return type(self)(self.name, version)
+
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
   '''
@@ -561,11 +561,11 @@ class Module(object):
     '''
     M = self.module
     if M is None:
-      error("self.module is None")
+      warning("self.module is None")
       return None
     tested_name = cutsuffix(self.name, '_tests')
     if tested_name is not self.name:
-      # foo_tests is considers part of foo
+      # foo_tests is considered part of foo
       return self.modules[tested_name].package_name
     try:
       pkg_name = M.__package__
@@ -659,7 +659,6 @@ class Module(object):
   def compute_doc(self):
     ''' Compute the components of the documentation.
     '''
-    vcs = self.vcs
     # break out the release log and format it
     releases = list(self.release_log())
     release_tag, release_entry = releases[0]
@@ -797,6 +796,7 @@ class Module(object):
         defaults=base_distinfo,
     )
 
+  @pfx_method(use_str=True)
   @require(lambda pypi_flavour: isinstance(pypi_flavour, str))
   @require(lambda pypi_url: isinstance(pypi_url, str))
   @require(lambda force: force is True or force is False)
@@ -842,11 +842,10 @@ class Module(object):
       else:
         raise ValueError("already released PyPI version %r" % (pypi_version,))
     if not self.check_uptodate():
-      warning("check fails")
       if force:
-        warning("submitting anyway")
+        warning("up to date check FAILS, but submitting anyway")
       else:
-        return
+        raise ValueError("not up to date")
     with Pfx(pypi_flavour):
       with self.checkout(release.vcstag) as checkout_path:
         self.prepare_package(checkout_path)
