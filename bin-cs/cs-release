@@ -929,13 +929,6 @@ class Module(object):
   def checkout(self, vcs_revision, dirpath, exists=False, persist=False):
     ''' Check out the specified `vcs_revision` to the directory `dirpath`.
     '''
-    if dirpath is None:
-      with TemporaryDirectory(prefix=self.name + '--' + vcs_revision + '--'
-                              ) as tmpdirpath:
-        with self.checkout(vcs_revision, tmpdirpath, exists=True,
-                           persist=persist) as dirpath:
-          yield dirpath
-      return
     with Pfx("checkout %r ==> %r", vcs_revision, dirpath):
       if exists:
         if not isdirpath(dirpath):
