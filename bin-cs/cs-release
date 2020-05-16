@@ -32,10 +32,7 @@ from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.distinfo import (
-    URL_PYPI_PROD, PyPI_Package, tag_version as vcstag_version, version_tag as
-    version_vcstag
-)
+from cs.distinfo import PyPI_Package
 from cs.fstags import TagFile
 from cs.lex import cutsuffix
 from cs.logutils import error, warning, info, status
@@ -49,6 +46,12 @@ from cs.vcs.hg import VCS_Hg
 from icontract import require
 
 from cs.x import X
+
+URL_PYPI_PROD = 'https://pypi.python.org/pypi'
+URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
+
+# published URL
+URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 
 def main(argv=None, cmd=None):
   ''' Main command line.
@@ -365,6 +368,52 @@ class CSReleaseCommand(BaseCommand):
         )
     return xit
 
+class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
+  ''' A parsed version of one of my release tags,
+      which have the form *package_name*`-`*version*.
+  '''
+
+  @classmethod
+  def from_vcstag(cls, vcstag):
+    ''' Create a new `ReleaseTag` from a VCS tag.
+    '''
+    name, version = vcstag.split('-', 1)
+    return cls(name, version)
+
+  @classmethod
+  def today(cls, name):
+    ''' Basic release tag for today, without any `.`n suffix.
+    '''
+    return cls(name, isodate(dashed=False))
+
+  @property
+  def vcstag(self):
+    ''' The VCS tag for this `(name,version)` pair.
+    '''
+    return self.name + '-' + self.version
+
+  @ensure(lambda result: isinstance(result, ReleaseTag))
+  @ensure(
+      lambda result: result.version == isodate(dashed=False) or result.version.
+      startswith(isodate(dashed=False) + '.')
+  )
+  @ensure(
+      lambda self, result: self.version < result.version
+  )
+  def next(self):
+    ''' Compute the next `ReleaseTag` after the current one.
+    '''
+    today = type(self).today(self.name)
+    if self.version < today.version:
+      return today
+    current_version = self.version
+    if '.' in current_version:
+      datepart, seqpart = current_version.split('.', 1)
+      next_seq = int(seqpart) + 1
+    else:
+      next_seq = 1
+    version = today + '.' + str(next_seq)
+    return type(self)(self.name, version)
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
   '''
