@@ -572,6 +572,10 @@ class Module(object):
     except AttributeError:
       warning("self.module has no __package__: %r", sorted(dir(M)))
       return None
+    if self.ismine() and not pkg_name.startswith(MODULE_PREFIX):
+      # top level modules tend to be in the notional "cs" package,
+      # but they're just modules
+      return None
     return pkg_name
 
   @prop
