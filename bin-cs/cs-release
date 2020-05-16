@@ -527,14 +527,26 @@ class Module(object):
     return M
 
   @pfx_method(use_str=True)
+  def ismine(self):
+    ''' Test whether this is one of my modules.
+    '''
+    return self.name.startswith(MODULE_PREFIX)
+
+  @pfx_method(use_str=True)
   def isthirdparty(self):
-    return '/site-packages/' in getattr(self, '__file__', '')
+    ''' Test whether this is a third party module.
+    '''
+    M = self.module
+    if M is None:
+      warning("self.module is None")
+      return False
+    return '/site-packages/' in getattr(M, '__file__', '')
 
   @pfx_method(use_str=True)
   def isstdlib(self):
     ''' Test if this module exists in the stdlib.
     '''
-    if self.name.startswith(MODULE_PREFIX):
+    if self.ismine():
       return False
     if self.isthirdparty():
       return False
