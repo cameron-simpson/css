@@ -1,0 +1,5 @@
+New FSTagsConfig class which parses the .fstagsrc as a .ini file; related adjustments.
+New HasFSTagsMixin presenting a settable .fstags property with a shared default.
+New xattr_import and xattr_export subcommands, remove implicit xattr access/update from other operations.
+New TagSet.__len__ returning the number of tags.
+Add "-" support for stdin to "tag" and "tagpaths" subcommands.

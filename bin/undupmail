@@ -5,7 +5,7 @@
 # Items without message-ids we work on the References: line, so you
 # only get to keep one reply.
 # Items with neither do an MD5 checksum of the body.
-#	- Cameron Simpson <cs@zip.com.au> 14jul99
+#	- Cameron Simpson <cs@cskk.id.au> 14jul99
 #
 
 use strict qw(vars);

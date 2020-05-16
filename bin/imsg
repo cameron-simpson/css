@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Tell Messages app to send some text to someone.
 # Not reliable.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function

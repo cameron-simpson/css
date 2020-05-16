@@ -2,7 +2,7 @@
 #
 # Take a folder name and return the file path to it.
 # Yanked from "+" for use there and in filemailitem.
-#	- Cameron Simpson <cs@zip.com.au> 08jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 08jul2004
 #
 
 cmd=$0

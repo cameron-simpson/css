@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.fileutils.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function, absolute_import
@@ -23,20 +23,24 @@ from .timeutils import TimeoutError, sleep
 from .x import X
 
 class TestFileProperty(object):
+
   def __init__(self):
-    self._test1_path = 'testfileprop1'
+    self._test1__filename = 'testfileprop1'
     self._test1_lock = Lock()
-    self._test2_path = 'testfileprop2'
+    self._test2__filename = 'testfileprop2'
     self._test2_lock = Lock()
+
   def write1(self, data):
-    with open(self._test1_path, "w") as fp:
+    with open(self._test1__filename, "w") as fp:
       fp.write(data)
+
   def write2(self, data):
-    with open(self._test2_path, "w") as fp:
+    with open(self._test2__filename, "w") as fp:
       fp.write(data)
+
   @file_property
-  def test1(self, path):
-    with open(path) as fp:
+  def test1(self, filename):
+    with open(filename) as fp:
       data = fp.read()
     ##D("test1 loads \"%s\" => %s", path, data)
     return data
@@ -44,14 +48,17 @@ class TestFileProperty(object):
 class TestFilesProperty(object):
   ''' Tests for watching multiple files.
   '''
+
   def __init__(self):
-    self._test1_paths = ('testfileprop1',)
+    self._test1__filenames = ('testfileprop1',)
     self._test1_lock = Lock()
+
   def write1(self, data):
-    with open(self._test1_paths[0], "w") as fp:
+    with open(self._test1s[0], "w") as fp:
       fp.write(data)
+
   def write2(self, data):
-    with open(self._test2_paths[0], "w") as fp:
+    with open(self._test2s[0], "w") as fp:
       fp.write(data)
 
   ##@files_property
@@ -77,13 +84,13 @@ class Test_Misc(unittest.TestCase):
     self.filesprop = None
 
   def tearDown(self):
-    tidyup = [ self.proppath, self.lockpath ]
+    tidyup = [self.proppath, self.lockpath]
     if self.fileprop:
-      tidyup.append(self.fileprop._test1_path)
-      tidyup.append(self.fileprop._test2_path)
+      tidyup.append(self.fileprop._test1__filename)
+      tidyup.append(self.fileprop._test2__filename)
     if self.filesprop:
-      tidyup.extend(self.filesprop._test1_paths)
-      tidyup.extend(self.filesprop._test2_paths)
+      tidyup.extend(self.filesprop._test1s)
+      tidyup.extend(self.filesprop._test2s)
     for path in tidyup:
       try:
         os.remove(path)
@@ -103,9 +110,12 @@ class Test_Misc(unittest.TestCase):
           t1data = t1fp.read()
         with open(T2.name) as t2fp:
           t2data = t2fp.read()
-        self.assertEqual( t1data, data, "bad data in %s" % (T1.name,) )
-        self.assertEqual( t2data, data, "bad data in %s" % (T2.name,) )
-        self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
+        self.assertEqual(t1data, data, "bad data in %s" % (T1.name,))
+        self.assertEqual(t2data, data, "bad data in %s" % (T2.name,))
+        self.assertTrue(
+            compare(T1.name, T2.name),
+            "mismatched data in %s and %s" % (T1.name, T2.name)
+        )
 
   def test_rewrite(self):
     olddata = "old data\n"
@@ -115,11 +125,11 @@ class Test_Misc(unittest.TestCase):
       T1.flush()
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      self.assertEqual(t1data, olddata, "bad old data in %s" % (T1.name,))
       rewrite(T1.name, StringIO(newdata), mode='w')
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+      self.assertEqual(t1data, newdata, "bad new data in %s" % (T1.name,))
 
   def test_rewrite_cmgr(self):
     olddata = "old data\n"
@@ -129,151 +139,48 @@ class Test_Misc(unittest.TestCase):
       T1.flush()
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      self.assertEqual(t1data, olddata, "bad old data in %s" % (T1.name,))
       with rewrite_cmgr(T1.name) as tfp:
         tfp.write(newdata)
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+      self.assertEqual(t1data, newdata, "bad new data in %s" % (T1.name,))
 
   def test_file_property_00(self):
     PC = self.fileprop = TestFileProperty()
-    self.assertTrue(not os.path.exists(PC._test1_path))
+    self.assertTrue(not os.path.exists(PC._test1__filename))
     data1 = PC.test1
     self.assertTrue(data1 is None)
     PC.write1("data1 value 1")
-    self.assertTrue(os.path.exists(PC._test1_path))
-    data1 = PC.test1
-    # too soon after last poll
-    self.assertTrue(data1 is None)
+    self.assertTrue(os.path.exists(PC._test1__filename))
     sleep(1.1)
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1")
     # NB: data value changes length because the file timestamp might not
     # due to 1s resolution in stat structures
     PC.write1("data1 value 1b")
-    self.assertTrue(os.path.exists(PC._test1_path))
+    self.assertTrue(os.path.exists(PC._test1__filename))
     data1 = PC.test1
     # too soon after last poll
     self.assertEqual(data1, "data1 value 1")
     sleep(1)
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1b")
-    os.remove(PC._test1_path)
-    self.assertTrue(not os.path.exists(PC._test1_path))
+    os.remove(PC._test1__filename)
+    self.assertTrue(not os.path.exists(PC._test1__filename))
     data1 = PC.test1
     # too soon to poll
     self.assertEqual(data1, "data1 value 1b")
     sleep(1)
-    # poll should fail and keep cached value
+    # poll should return None
     data1 = PC.test1
-    self.assertEqual(data1, "data1 value 1b")
+    self.assertEqual(data1, None)
     PC.write1("data1 value 1bc")
-    self.assertTrue(os.path.exists(PC._test1_path))
-    data1 = PC.test1
-    # too soon to poll
-    self.assertEqual(data1, "data1 value 1b")
+    self.assertTrue(os.path.exists(PC._test1__filename))
     sleep(1)
     # poll should succeed and load new value
     data1 = PC.test1
     self.assertEqual(data1, "data1 value 1bc")
-
-  def test_make_file_property_01(self):
-    PC = self.fileprop = TestFileProperty()
-    self.assertTrue(not os.path.exists(PC._test2_path))
-    data2 = PC.test2
-    self.assertTrue(data2 is None)
-    PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2_path))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.1)
-    data2 = PC.test2
-    # still soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.2)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1")
-    PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2_path))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.1)
-    data2 = PC.test2
-    # still too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.3)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2_path)
-    self.assertTrue(not os.path.exists(PC._test2_path))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should fail and keep cached value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2_path))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should succeed and load new value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1bc")
-
-  def test_make_files_property_01(self):
-    PC = self.filesprop = TestFilesProperty()
-    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
-    with self.assertRaises(IOError) as cmgr:
-      data2 = PC.test2
-    self.assertEqual(cmgr.exception.errno, errno.ENOENT)
-    PC.write2("data2 value 1")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.1)
-    data2 = PC.test2
-    # still soon after last poll
-    self.assertTrue(data2 is None)
-    sleep(0.2)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1")
-    PC.write2("data2 value 1b")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
-    data2 = PC.test2
-    # too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.1)
-    data2 = PC.test2
-    # still too soon after last poll
-    self.assertEqual(data2, "data2 value 1")
-    sleep(0.3)
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    os.remove(PC._test2_paths[0])
-    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should fail and keep cached value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1b")
-    PC.write2("data2 value 1bc")
-    self.assertTrue(os.path.exists(PC._test2_paths[0]))
-    data2 = PC.test2
-    # too soon to poll
-    self.assertEqual(data2, "data2 value 1b")
-    sleep(0.3)
-    # poll should succeed and load new value
-    data2 = PC.test2
-    self.assertEqual(data2, "data2 value 1bc")
 
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.
@@ -285,31 +192,31 @@ class Test_Misc(unittest.TestCase):
   def test_Pathname_01_attrs(self):
     home = '/a/b'
     maildir = '/a/b/mail'
-    prefixes = ( ( '$MAILDIR/', '+' ), ( '$HOME/', '~/') )
-    environ = { 'HOME': home, 'MAILDIR': maildir }
+    prefixes = (('$MAILDIR/', '+'), ('$HOME/', '~/'))
+    environ = {'HOME': home, 'MAILDIR': maildir}
     for path, shortpath in (
-          ( "a",                "a" ),
-          ( "a/b",              "a/b" ),
-          ( "a/b/c",            "a/b/c" ),
-          ( "/a/b/c",           "~/c" ),
-          ( "/a/b/mail",        "~/mail" ),
-          ( "/a/b/mail/folder", "+folder" ),
-        ):
+        ("a", "a"),
+        ("a/b", "a/b"),
+        ("a/b/c", "a/b/c"),
+        ("/a/b/c", "~/c"),
+        ("/a/b/mail", "~/mail"),
+        ("/a/b/mail/folder", "+folder"),
+    ):
       P = Pathname(path)
       self._eq(P.dirname, os.path.dirname(path), "%r.dirname" % (path,))
       self._eq(P.basename, os.path.basename(path), "%r.basename" % (path,))
       self._eq(P.abs, os.path.abspath(path), "%r.abs" % (path,))
       self._eq(P.isabs, os.path.isabs(path), "%r.isabs" % (path,))
-      self._eq(P.shorten(environ=environ, prefixes=prefixes),
-                       shortpath,
-                       "%r.shorten(environ=%r, prefixes=%r)"
-                         % (path, environ, prefixes))
+      self._eq(
+          P.shorten(environ=environ, prefixes=prefixes), shortpath,
+          "%r.shorten(environ=%r, prefixes=%r)" % (path, environ, prefixes)
+      )
       for spec, expected in (
-                            ("{!r}", repr(P)),
-                            ("{.basename}", os.path.basename(path)),
-                            ("{.dirname}", os.path.dirname(path)),
-                            ("{.abs}", os.path.abspath(path)),
-                          ):
+          ("{!r}", repr(P)),
+          ("{.basename}", os.path.basename(path)),
+          ("{.dirname}", os.path.dirname(path)),
+          ("{.abs}", os.path.abspath(path)),
+      ):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
 class Test_BackedFile(unittest.TestCase, BackedFile_TestMethods):

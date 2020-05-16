@@ -2,7 +2,7 @@
 #
 # Convert a blank-line separated list of records to a ring-style
 # leading-non-white delimited list.
-#	- Cameron Simpson <cs@zip.com.au> 29jul96
+#	- Cameron Simpson <cs@cskk.id.au> 29jul96
 #
 
 $first=1;

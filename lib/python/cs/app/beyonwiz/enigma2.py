@@ -1,21 +1,39 @@
 #!/usr/bin/python
 #
 # Classes for modern Beyonwiz T2, T3 etc.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
+
+''' Beyonwiz Enigma2 support, their modern recording format.
+'''
 
 import errno
 from collections import namedtuple
 import datetime
 import os.path
+import struct
 from cs.logutils import warning
 from cs.pfx import Pfx
+from cs.py3 import datetime_fromisoformat
 from cs.threads import locked_property
 from cs.x import X
 from . import _Recording, RecordingMetaData
 
 class Enigma2MetaData(RecordingMetaData):
-  pass
+  ''' Metadata for an Enigma2 recording.
+  '''
+
+  def __init__(self, raw):
+    RecordingMetaData.__init__(self, raw)
+    raw_meta = raw['meta']
+    raw_file = raw['file']
+    self.series_name = raw_meta['title']
+    self.description = raw_meta['description']
+    self.start_unixtime = raw_meta['start_unixtime']
+    channel = raw_file['channel']
+    if channel:
+      self.source_name = channel
+    self.tags.update(raw_meta['tags'])
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -31,11 +49,13 @@ class Enigma2(_Recording):
     self.cutpath = tspath + '.cuts'
 
   def read_meta(self):
+    ''' Read the .meta file and return the contents as a dict.
+    '''
     path = self.metapath
     data = {
         'pathname': path,
         'tags': set(),
-      }
+    }
     with Pfx("meta %r", path):
       try:
         with open(path) as metafp:
@@ -51,39 +71,25 @@ class Enigma2(_Recording):
           warning("cannot open: %s", e)
         else:
           raise
-    return Enigma2MetaData(**data)
+    return data
 
   @locked_property
   def metadata(self):
-    ''' Return the meta information from a recording's .meta associated file.
+    ''' The metadata associated with this recording.
     '''
-    M = self.read_meta()
-    mdata = M._asdict()
-    fdata = self.filename_metadata()
-    data = {
-        'channel': fdata['channel'],
-        'title': M.title,
-        'episode': None,
-        'description': M.description,
-        'start_unixtime': M.start_unixtime,
-        'tags': set(),
-        'sources': {
-          'filename': fdata,
-          'meta': mdata,
+    return Enigma2MetaData(
+        {
+            'meta': self.read_meta(),
+            'file': self.filename_metadata(),
         }
-      }
-    return Enigma2MetaData(**data)
-  
-  @property
-  def start_dt_iso(self):
-    return self.metadata.start_dt_iso
+    )
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.
     '''
     path = self.tspath
     fmeta = {'pathname': path}
-    base, ext = os.path.splitext(os.path.basename(path))
+    base, _ = os.path.splitext(os.path.basename(path))
     fields = base.split(' - ', 2)
     if len(fields) != 3:
       warning('cannot parse into "time - channel - program": %r', base)
@@ -92,15 +98,17 @@ class Enigma2(_Recording):
       fmeta['channel'] = channel
       fmeta['title'] = title
       time_fields = time_field.split()
-      if ( len(time_fields) != 2
-        or not all(_.isdigit() for _ in time_fields)
-        or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
-         ):
+      if (len(time_fields) != 2 or not all(_.isdigit() for _ in time_fields)
+          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
-        fmeta['datetime'] = datetime.datetime.strptime(ymd + hhmm, '%Y%m%d%H%M')
-        fmeta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+        isodate = (
+            ymd[:4] + '-' + ymd[4:6] + '-' + ymd[6:8] + 'T' + hhmm[:2] + ':' +
+            hhmm[2:4] + ':00'
+        )
+        fmeta['datetime'] = datetime_fromisoformat(isodate)
+        fmeta['start_time'] = ':'.join((hhmm[:2], hhmm[2:4]))
     return fmeta
 
   def _parse_path(self):
@@ -129,8 +137,10 @@ class Enigma2(_Recording):
             if not data:
               break
             if len(data) < 16:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), apfp.tell() - len(data))
+              warning(
+                  "incomplete read (%d bytes) at offset %d", len(data),
+                  apfp.tell() - len(data)
+              )
               break
             pts, offset = struct.unpack('>QQ', data)
             apdata.append(Enigma2.APInfo(pts, offset))
@@ -142,6 +152,8 @@ class Enigma2(_Recording):
       return apdata
 
   def read_cuts(self):
+    ''' Read the edit cuts and return a list of `Enigma2.CutInfo`s.
+    '''
     path = self.cutpath
     cuts = []
     with Pfx("read_cuts %r", path):
@@ -152,8 +164,10 @@ class Enigma2(_Recording):
             if not data:
               break
             if len(data) < 12:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), cutfp.tell() - len(data))
+              warning(
+                  "incomplete read (%d bytes) at offset %d", len(data),
+                  cutfp.tell() - len(data)
+              )
               break
             pts, cut_type = struct.unpack('>QL', data)
             cuts.append(Enigma2.CutInfo(pts, cut_type))
@@ -173,6 +187,6 @@ class Enigma2(_Recording):
       with open(self.tspath, 'rb') as tsfp:
         while True:
           chunk = tsfp.read(bufsize)
-          if len(chunk) == 0:
+          if not chunk:
             break
           yield chunk

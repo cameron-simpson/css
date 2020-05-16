@@ -1,0 +1,2 @@
+lib/python/cs/queues_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/queues.py: cs.queues: _QueueIterator: do MultiOpenMixin.__init__ so that __str__ is functional

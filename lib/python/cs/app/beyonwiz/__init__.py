@@ -1,41 +1,61 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-''' Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
-    structures and to access Beyonwiz devices via the net. Also support for
-    newer Beyonwiz devices running Enigma and their recording format.
+r'''
+Beyonwiz PVR and TVWiz recording utilities.
+
+Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
+structures and to access Beyonwiz devices via the net. Also support for
+newer Beyonwiz devices running Enigma and their recording format.
 '''
 
-DISTINFO = {
-    'description': "Beyonwiz PVR and TVWiz recording utilities",
-    'keywords': ["python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.app.ffmpeg', 'cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
-    'entry_points': {
-      'console_scripts': [
-          'beyonwiz = cs.app.beyonwiz:main',
-          ],
-    },
-}
-
+from abc import ABC, abstractmethod
 import datetime
 import errno
 import json
 import os.path
+import re
 from threading import Lock
 from types import SimpleNamespace as NS
-from cs.app.ffmpeg import multiconvert as ffmconvert, \
-                          MetaData as FFmpegMetaData, \
-                          ConversionSource as FFSource
+from cs.app.ffmpeg import (
+    multiconvert as ffmconvert,
+    MetaData as FFmpegMetaData,
+    ConversionSource as FFSource,
+)
+from cs.deco import strable
+from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
-from cs.pfx import Pfx
-from cs.x import X
+from cs.mediainfo import EpisodeInfo
+from cs.pfx import Pfx, pfx_method
+from cs.py.func import prop
+from cs.tagset import Tag
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'requires': [
+        'cs.app.ffmpeg',
+        'cs.deco',
+        'cs.fstags',
+        'cs.logutils',
+        'cs.mediainfo',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.tagset',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'beyonwiz = cs.app.beyonwiz:main',
+        ],
+    },
+}
 
 # UNUSED
 def trailing_nul(bs):
-  # strip trailing NULs
+  ''' Strip trailing `NUL`s
+  '''
   bs = bs.rstrip(b'\x00')
   # locate preceeding NUL padded area
   start = bs.rfind(b'\x00')
@@ -46,6 +66,9 @@ def trailing_nul(bs):
   return start, bs[start:]
 
 class MetaJSONEncoder(json.JSONEncoder):
+  ''' `json.JSONEncoder` sublass with handlers for `set` and `datetime`.
+  '''
+
   def default(self, o):
     if isinstance(o, set):
       return sorted(o)
@@ -57,13 +80,44 @@ class RecordingMetaData(NS):
   ''' Base class for recording metadata.
   '''
 
-  def _asdict(self):
+  @pfx_method
+  def __init__(self, raw):
+    self.raw = raw
+    self.episodeinfo = EpisodeInfo()
+    self.tags = set()
+
+  def __getattr__(self, attr):
+    try:
+      return self.raw[attr]
+    except KeyError:
+      raise AttributeError(attr)
+
+  def as_dict(self):
+    ''' Return the metadata as a `dict`.
+    '''
     d = dict(self.__dict__)
     d["start_dt_iso"] = self.start_dt_iso
     return d
 
-  def _asjson(self, indent=None):
+  def as_json(self, indent=None):
+    ''' Return the metadat as JSON.
+    '''
     return MetaJSONEncoder(indent=indent).encode(self._asdict())
+
+  @pfx_method
+  def as_tags(self, prefix=None):
+    ''' Generator yielding the metadata as `Tag`s.
+    '''
+    yield from (Tag.with_prefix(tag, None, prefix=prefix) for tag in self.tags)
+    yield from self.episodeinfo.as_tags(prefix=prefix)
+    for rawkey, rawvalue in self.raw.items():
+      try:
+        value_items = rawvalue.items
+      except AttributeError:
+        yield Tag.with_prefix(rawkey, rawvalue, prefix=prefix)
+      else:
+        for field, value in value_items():
+          yield Tag.with_prefix(rawkey + '.' + field, value, prefix=prefix)
 
   @property
   def start_dt(self):
@@ -88,56 +142,72 @@ def Recording(path):
     return Enigma2(path)
   raise ValueError("don't know how to open recording %r" % (path,))
 
-class _Recording(object):
+class _Recording(ABC, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
-  def __init__(self, path):
+  PATH_FIELDS = (
+      'series_name', 'episode_info_part', 'episode_name', 'tags_part',
+      'source_name', 'start_dt_iso', 'description'
+  )
+
+  def __init__(self, path, fstags=None):
+    self._fstags = fstags
     self.path = path
     self._lock = Lock()
 
+  def __getattr__(self, attr):
+    if attr in (
+        'description',
+        'episodeinfo',
+        'series_name',
+        'source_name',
+        'start_dt',
+        'start_dt_iso',
+        'start_unixtime',
+        'tags',
+        'title',
+    ):
+      return getattr(self.metadata, attr)
+    raise AttributeError(attr)
+
+  @abstractmethod
+  def data(self):
+    ''' Stub method for the raw video data method.
+    '''
+    raise NotImplementedError('data')
+
+  @strable(open_func=lambda filename: open(filename, 'wb'))
   def copyto(self, output):
     ''' Transcribe the uncropped content to a file named by output.
         Requires the .data() generator method to yield video data chunks.
     '''
-    if type(output) is str:
-      outpath = output
-      with open(outpath, "wb") as output:
-        self.copyto(output)
-    else:
-      for buf in self.data():
-        output.write(buf)
+    for buf in self.data():
+      output.write(buf)
 
-  def path_parts(self):
-    ''' The 3 components contributing to the .convertpath() method.
-        The middle component may be trimmed to fit into a legal filename.
+  @prop
+  def tags_part(self):
+    ''' A filename component representing the metadata tags.
     '''
-    M = self.metadata
-    title = '--'.join([M.title, str(M.episode)]) if M.episode else M.title
-    return ( title,
-             '-'.join(sorted(M.tags)),
-             M.channel
-           )
+    return '+'.join(self.tags)
 
-  def convertpath(self, outext):
-    ''' Generate the output filename
+  @prop
+  def episode_info_part(self):
+    ''' A filename component representing the episode info.
     '''
-    left, middle, right = self.path_parts()
-    # fixed length of the path
-    fixed_len = len(left) \
-              + len(right) \
-              + len(self.metadata.start_dt_iso) \
-              + len(outext) \
-              + 7
-    filename = '--'.join( (left,
-                           middle,
-                           right,
-                           self.start_dt_iso,
-                           self.metadata.description ) ) \
-               .lower() \
-               .replace('/', '|') \
-               .replace(' ', '-') \
-               .replace('----', '--')
+    return str(self.metadata.episodeinfo)
+
+  def converted_path(self, outext):
+    ''' Generate the output filename with parts separated by '--'.
+    '''
+    parts = []
+    for field in self.PATH_FIELDS:
+      part = getattr(self, field, None)
+      if part:
+        part = str(part).lower().replace('/', '|').replace(' ', '-')
+        part = re.sub('--+', '-', part)
+        parts.append(part)
+    filename = '--'.join(parts)
     filename = filename[:250 - (len(outext) + 1)]
     filename += '.' + outext
     return filename
@@ -150,32 +220,35 @@ class _Recording(object):
     '''
     pfx, ext = os.path.splitext(path)
     for i in range(max_n):
-      path2 = "%s--%d%s" % (pfx, i+1, ext)
+      path2 = "%s--%d%s" % (pfx, i + 1, ext)
       if not os.path.exists(path2):
         return path2
-    raise ValueError("no available --0..--%d variations: %r", max_n-1, path)
+    raise ValueError(
+        "no available --0..--%d variations: %r" % (max_n - 1, path)
+    )
 
-  def convert(self,
-              dstpath, dstfmt='mp4', max_n=None,
-              timespans=(),
-              do_copyto=False):
+  def convert(
+      self, dstpath, dstfmt='mp4', max_n=None, timespans=(), extra_opts=None
+  ):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if not timespans:
-      timespans = ( (None, None), )
+      timespans = ((None, None),)
     srcfmt = 'mpegts'
+    do_copyto = hasattr(self, 'data')
     if do_copyto:
       srcpath = None
       if len(timespans) > 1:
-        raise ValueError("%d timespans but do_copyto is true"
-                         % (len(timespans,)))
+        raise ValueError(
+            "%d timespans but do_copyto is true" % (len(timespans,))
+        )
     else:
       srcpath = self.path
       # stop path looking like a URL
       if not os.path.isabs(srcpath):
         srcpath = os.path.join('.', srcpath)
     if dstpath is None:
-      dstpath = self.convertpath(outext=dstfmt)
+      dstpath = self.converted_path(outext=dstfmt)
     # stop path looking like a URL
     if not os.path.isabs(dstpath):
       dstpath = os.path.join('.', dstpath)
@@ -192,50 +265,63 @@ class _Recording(object):
             ok = True
         else:
           error("file exists")
-      if ok:
-        if os.path.exists(dstpath):
-          raise ValueError("dstpath exists")
-        if dstfmt is None:
-          _, ext = os.path.splitext(dstpath)
-          if not ext:
-            raise ValueError("can't infer output format from dstpath, no extension")
-          dstfmt = ext[1:]
-        ffmeta = self.ffmpeg_metadata(dstfmt)
-        sources = []
-        for timespan in timespans:
-          sources.append(FFSource(srcpath, srcfmt, timespan[0], timespan[1]))
-        P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
-        info("running %r", ffargv)
-        if do_copyto:
-          # feed .copyto data to FFmpeg
-          try:
-            self.copyto(P.stdin)
-          except OSError as e:
-            if e.errno == errno.EPIPE:
-              warning("broken pipe writing to ffmpeg")
-          P.stdin.close()
-        xit = P.wait()
-        if xit == 0:
-          ok = True
-        else:
-          warning("ffmpeg failed, exit status %d", xit)
-          ok = False
+      if not ok:
         return ok
+      if os.path.exists(dstpath):
+        raise ValueError("dstpath exists")
+      if dstfmt is None:
+        _, ext = os.path.splitext(dstpath)
+        if not ext:
+          raise ValueError(
+              "can't infer output format from dstpath, no extension"
+          )
+        dstfmt = ext[1:]
+      fstags = self.fstags
+      with fstags:
+        fstags[dstpath].update(self.metadata.as_tags(prefix='beyonwiz'))
+      ffmeta = self.ffmpeg_metadata(dstfmt)
+      sources = []
+      for start_s, end_s in timespans:
+        sources.append(FFSource(srcpath, srcfmt, start_s, end_s))
+      P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
+      info("running %r", ffargv)
+      if do_copyto:
+        # feed .copyto data to FFmpeg
+        try:
+          self.copyto(P.stdin)
+        except OSError as e:
+          if e.errno == errno.EPIPE:
+            warning("broken pipe writing to ffmpeg")
+            ok = False
+          else:
+            raise
+        P.stdin.close()
+      xit = P.wait()
+      if xit == 0:
+        ok = True
+      else:
+        warning("ffmpeg failed, exit status %d", xit)
+        ok = False
+      return ok
 
   def ffmpeg_metadata(self, dstfmt='mp4'):
+    ''' Return a new `FFmpegMetaData` containing our metadata.
+    '''
     M = self.metadata
     comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
               % (self.path, M.start_dt_iso)
     if M.tags:
       comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
-    return FFmpegMetaData(dstfmt,
-                          title=( '%s: %s' % (M.title, M.episode)
-                                  if M.episode
-                                  else M.title
-                                ),
-                          show=M.title,
-                          episode_id=M.episode,
-                          synopsis=M.description,
-                          network=M.channel,
-                          comment=comment,
-                         )
+    episode_marker = str(M.episodeinfo)
+    return FFmpegMetaData(
+        dstfmt,
+        title=(
+            '%s: %s' % (M.series_name, episode_marker)
+            if episode_marker else M.series_name
+        ),
+        show=M.series_name,
+        episode_id=episode_marker,
+        synopsis=M.description,
+        network=M.source_name,
+        comment=comment,
+    )

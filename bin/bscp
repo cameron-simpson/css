@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Put files to the named accounts in parallel.
-#	- Cameron Simpson <cs@zip.com.au> 05mar2004
+#	- Cameron Simpson <cs@cskk.id.au> 05mar2004
 #
 
 cmd=`basename "$0"`

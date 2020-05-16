@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convenience wrapper for jira-cli.
-#   - Cameron Simpson <cs@zip.com.au> 18nov2016
+#   - Cameron Simpson <cs@cskk.id.au> 18nov2016
 #
 
 set -ue

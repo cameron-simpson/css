@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # List the contents of maildir folders in mbox format.
-#       - Cameron Simpson <cs@zip.com.au> 09nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 09nov2006
 #
 
 import sys

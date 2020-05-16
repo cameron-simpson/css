@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Clean out empty directories.
-#	- Cameron Simpson <cs@zip.com.au> 10apr2000
+#	- Cameron Simpson <cs@cskk.id.au> 10apr2000
 #
 
 [ $# = 0 ] && set .

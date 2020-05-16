@@ -1,41 +1,66 @@
 #!/bin/sh
 #
 # For each target, move aside and issue an async rm.
-#	- Cameron Simpson <cs@zip.com.au> 19jul1998
+#	- Cameron Simpson <cs@cskk.id.au> 19jul1998
 #
 
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [rm-opts...] paths"
+
 rmopts=
-while :
-do  case $1 in
-	--)	shift; break ;;
-	-?*)	rmopts="$rmopts $1" ;;
-	*)	break ;;
-    esac
-    shift
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --) shift; break ;;
+    -?*)rmopts="$rmopts $1" ;;
+    *)  break ;;
+  esac
+  shift
 done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing paths" >&2
+  badopts=1
+else
+  for arg
+  do
+    [ -e "$arg" ] || {
+      echo "$cmd: missing path: $arg" >&2
+      badopts=1
+    }
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
 
 n=0
 for arg
-do  case $arg in
-	*/*)	d=`dirname "$arg"` ;;
-	*)	d=. ;;
-    esac
-    case $arg in
-	/*)	orig=$arg ;;
-	*)	orig=./$arg ;;
-    esac
-    aside=$d/.frm.$$.$n
+do
+  case $arg in
+    */*)d=`dirname "$arg"` ;;
+    *)  d=. ;;
+  esac
+  case $arg in
+    /*) orig=$arg ;;
+    *)  orig=./$arg ;;
+  esac
+  aside=$d/.frm.$$.$n
 
-    n=`expr $n + 1`
-    if mv -i "$orig" "$aside"
-    then
-	# removed "lock bgrm" - fails if no access to lockdir
-	rm $rmopts "$aside" &
-    else
-	xit=$?
-    fi
+  n=`expr $n + 1`
+  if mv -i "$orig" "$aside"
+  then
+    # removed "lock bgrm" - fails if no access to lockdir
+    rm $rmopts "$aside" &
+  else
+    xit=$?
+  fi
 done
 
 exit $xit

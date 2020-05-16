@@ -1,20 +1,28 @@
 #!/bin/sh
 #
-# Convenience wrapper for iTerm2 opterations.
-#       - Cameron Simpson <cs@zip.com.au> 26apr2014
+# Convenience wrapper for some iTerm2 operations.
+#       - Cameron Simpson <cs@cskk.id.au> 26apr2014
 #
 
 set -ue
 
 trace=
+base64=/usr/bin/base64
 
 cmd=$0
 usage="Usage: $cmd [-x] op [op-args...]
   Ops:
-    badge-forma format...
+    badge-format format...
+        Specify the badge format string.
+    colour scheme
+        Switch colour schemes: green, white, black
+    fg  Bring terminal to the foreground, steal focus.
+    img imgfiles...
+        Display the imgfiles inline in the terminal.
     open command [args...]
         Open new terminal window runnong command.
     setvar varname value...
+        Set the uservar varname to value...
     switch-profile profile name...
         Change the current tty's profile to 'profile name...'"
 
@@ -48,7 +56,25 @@ else
         badopts=1
       fi
       ;;
-    colour)
+    bgimg)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing imagepath" >&2
+        badopts=1
+      else
+        imgpath=$1
+        shift
+        [ -s "$imgpath" ] || {
+          echo "$cmd: $op: not a file: $imgpath" >&2
+          badopts=1
+        }
+        [ $# = 0 ] || {
+          echo "$cmd: $op: extra arguments after imgpath: $*" >&2
+          badopts=1
+        }
+      fi
+      ;;
+    colour | color)
       if [ $# = 0 ]
       then
         echo "$cmd: $op: missing scheme" >&2
@@ -65,16 +91,14 @@ else
                     ;;
         esac
       fi
-      [ $badopts ] || {
-        tee /dev/tty <<X | osascript -
-          tell application iTerm2
-            -- tell current session
-              -- set foreground color to {$fg, 0}
-              -- set background color to {$bg, 0}
-            -- end tell
-          end tell
-X
-      }
+      ;;
+    fg);;
+    img)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing imgfiles" >&2
+        badopts=1
+      fi
       ;;
     open)
       if [ $# = 0 ]
@@ -110,10 +134,71 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# tmux requires unrecognized OSC sequences to be wrapped with DCS tmux;
+# <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
+# only accepts ESC backslash for ST. We use TERM instead of TMUX because TERM
+# gets passed through ssh.
+function print_osc() {
+  case "$TERM" in
+    screen*)  printf "\e33Ptmux;\e\e]" ;;
+    *)        printf "\e33]" ;;
+  esac
+}
+
+# More of the tmux workaround described above.
+function print_st() {
+  case "$TERM" in
+    screen*)    printf "\a\e\\" ;;
+    *)          printf "\a" ;;
+  esac
+}
+
+function l33t() {
+  printf "\e]1337;%s\a" "$*"
+}
+
 case "$op" in
   badge-format)
-    format64=$( printf '%s' "$*" | base64 )
-    printf '\e]1337;SetBadgeFormat=%s\a' "$format64"
+    format64=$( printf '%s' "$*" | $base64 )
+    l33t "SetBadgeFormat=$format64"
+    ;;
+  bgimg)
+    case "$imgpath" in
+      /*) ;; *) imgpath=$(pwd)/$imgpath ;;
+    esac
+    imgpath64=$( printf '%s' "$imgpath" | $base64 )
+    l33t "SetBackgroundImageFile=$imgpath64"
+    ;;
+  colour | color )
+    tee /dev/tty <<X | osascript -
+      tell application iTerm2
+        -- tell current session
+          -- set foreground color to {$fg, 0}
+          -- set background color to {$bg, 0}
+        -- end tell
+      end tell
+X
+    ;;
+  fg)
+    l33t "StealFocus"
+    ;;
+  img)
+    xit=0
+    for imgfile
+    do
+      [ -s "$imgfile" ] || {
+        echo "$cmd: not a file: $imgfile" >&2
+        xit=1
+        continue
+      }
+      echo "$imgfile"
+      imgcontent=$( $base64 <"$imgfile" )
+      print_osc
+      printf "1337;File=inline=1:$imgcontent"
+      print_st
+      echo
+    done
+    exit $xit
     ;;
   open)
     shcmd=$( shqstr "$@" )
@@ -140,8 +225,8 @@ case "$op" in
   setvar)
     varname=$1
     shift
-    value64=$( printf '%s' "$*" | base64 )
-    printf '\e]1337;SetUserVar=%s\a' "$value64"
+    value64=$( printf '%s' "$*" | $base64 )
+    l33t "SetUserVar=$varname=$value64"
     ;;
 
   switch-profile)

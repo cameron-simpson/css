@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Convert pndx output to HTML.
-#	- Cameron Simpson <cs@zip.com.au> 06may97
+#	- Cameron Simpson <cs@cskk.id.au> 06may97
 #
 
 print "<TABLE>\n";

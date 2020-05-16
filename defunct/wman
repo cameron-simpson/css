@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Use Mosaic to bring up a manual page.
-#	- Cameron Simpson, cs@zip.com.au, 22jun94
+#	- Cameron Simpson, cs@cskk.id.au, 22jun94
 #
 
 exec urlshow -n "http://www.cse.unsw.edu.au/scripts/man?$*"

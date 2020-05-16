@@ -2,7 +2,7 @@
 #
 # Encode data in quoted=-printable format..
 # Very quick'n'dirty. Should really stream for large input.
-#	- Cameron Simpson <cs@zip.com.au> 27aug2001
+#	- Cameron Simpson <cs@cskk.id.au> 27aug2001
 #
 
 use strict qw(vars);

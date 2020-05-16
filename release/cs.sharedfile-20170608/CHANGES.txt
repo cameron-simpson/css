@@ -1,0 +1,3 @@
+  lib/python/cs/sharedfile.py: cs.sharedfile: move cs.fileutils.{lockfile,Shared*} into this
+  lib/python/cs/sharedfile.py: cs.sharedfile: add missing import
+  lib/python/cs/sharedfile.py: cs.sharedfiles: add DISTINFO

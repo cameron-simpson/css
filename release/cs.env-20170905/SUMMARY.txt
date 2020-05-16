@@ -1,0 +1,1 @@
+Add LOGDIR, VARRUN, FLAGDIR wrappers for new get_standard_var function to provide standard policy variables.

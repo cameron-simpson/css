@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Generate a passwd-style encryption for the input.
-#	- Cameron Simpson <cs@zip.com.au> 07mar97
+#	- Cameron Simpson <cs@cskk.id.au> 07mar97
 #
 
 $charset='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./';

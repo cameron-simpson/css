@@ -1,0 +1,2 @@
+Replace obsolete O class with a new subclass of SimpleNamespace which issues a warning.
+New singleton() generic factory function and SingletonMixin mixin class for making singleton classes.

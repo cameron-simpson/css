@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience stuff for SQLAlchemy.
-#       - Cameron Simpson <cs@zip.com.au> 02mar2013
+#       - Cameron Simpson <cs@cskk.id.au> 02mar2013
 #
 
 from __future__ import print_function
@@ -12,11 +12,11 @@ from getopt import GetoptError
 import shlex
 from sqlalchemy import MetaData, create_engine
 from threading import RLock
+from types import SimpleNamespace as NS
 from cs.logutils import setup_logging, D, error
 from cs.pfx import Pfx
 from cs.seq import the
 from cs.threads import locked_property
-from cs.obj import O
 
 usage = '''Usage: %s dburl [op [args...]]
   dburl SQLAlchemy compatible database URL.
@@ -76,7 +76,7 @@ def main(argv):
 
   return xit
 
-class SQLA(O):
+class SQLA(NS):
 
   def __init__(self, dburl):
     self.dburl = dburl
@@ -108,7 +108,7 @@ class SQLA(O):
 
   @locked_property
   def t(self):
-    ts = O()
+    ts = NS()
     for tbl in self.tables:
       setattr(ts, tbl.name, tbl)
     return ts

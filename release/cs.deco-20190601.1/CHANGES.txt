@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @strable: fix the example in the docstring

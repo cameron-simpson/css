@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Snapshot my cvs archive.	- Cameron Simpson <cs@zip.com.au> 18may1997
+# Snapshot my cvs archive.	- Cameron Simpson <cs@cskk.id.au> 18may1997
 #
 
 save=$HOME/private/backup/cvs/$daycode.tar.gz

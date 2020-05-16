@@ -1,0 +1,6 @@
+  lib/python/cs/README-fileutils.rst: README-fileutils.rst: drop lockfile and SharedAppend*, now in README-sharedfile.rst
+  lib/python/cs/fileutils.py: resolve merge from default
+  lib/python/cs/fileutils.py: merge default ==> pypi
+  lib/python/cs/fileutils.py: rename cs.asynchron to cs.result
+  lib/python/cs/fileutils.py: cs.fileutils: bump DEFAULT_READSIZE from 8KiB to 18KiB
+  lib/python/cs/fileutils.py: cs.fileutils: clean some lint

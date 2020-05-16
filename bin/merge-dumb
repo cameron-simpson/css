@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Dumbly merge two related files.
 #
@@ -7,7 +7,7 @@
 # synched using systems like my hgbox script.
 # The motivating case on my part is timesheet files, where lines are
 # inserted independently on multiple hosts and merged at synch time.
-#       - Cameron Simpson <cs@zip.com.au> 08jun2011
+#       - Cameron Simpson <cs@cskk.id.au> 08jun2011
 # 
 
 from difflib import SequenceMatcher

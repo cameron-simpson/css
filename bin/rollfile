@@ -2,7 +2,7 @@
 #
 # Roll a file sideways to file.1 etc.
 # Understands both uncompressed and gzipped backups.
-#	- Cameron Simpson <cs@zip.com.au> 25nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 25nov2003
 #
 
 keep=9

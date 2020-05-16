@@ -1,0 +1,1 @@
+Pfx.__exit__: apply the prefix to all the standard attributes where present, improves some message behaviour for some exception types.

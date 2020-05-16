@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Pull from another checkout, merge its tip with ours even across a branch.
-#   - Cameron Simpson <cs@zip.com.au> 08sep2014
+#   - Cameron Simpson <cs@cskk.id.au> 08sep2014
 #
 
 set -ue
@@ -62,14 +62,24 @@ fi
 
 checkout=$( pwd )
 branch=$( hg branch )
+rev=$( hg identify -i -r "$branch" )
 obranch=$( incd "$ocheckout" hg branch )
-incd "$ocheckout" hg out "$checkout" | grep '^summary'
+if [ "x$branch" = "x$obranch" ]
+then  orev=$( incd "$ocheckout" hg identify -i -r tip )
+else  orev=$obranch
+fi
+$trace hg pull "$ocheckout"
+merges=$( $trace hg log --template '{desc|firstline}\n' -r "$orev%$rev" )
+[ -n "$merges" ] || {
+  echo "$cmd: no inbound changes from $ocheckout, aborting" >&2
+  exit 1
+}
+printf '%s\n' "$merges"
 echo
 echo "from $ocheckout"
-echo "merging $obranch ==> $branch"
+echo "merging $orev ==> $branch"
 
-if [ -z "$hadmsg" ]
-then
+[ $hadmsg ] || {
   if [ -t 0 -a -t 1 ]
   then
     msg=$( readline "merge description> " ) || exit 1
@@ -77,13 +87,23 @@ then
     echo "$cmd: merge description is mandatory (may be an empty -m option)" >&2
     exit 2
   fi
+}
+
+unclean=$( hg status -nmard )
+if [ -n "$unclean" ]
+then
+  shelf=$cmd-$( date +%Y%m%d%H%M%S )-$$
+  $trace hg shelve -n "$shelf"
 fi
 
-$trace hg fetch "$ocheckout"
-if [ "x$branch" != "x$obranch" ]
-then
-  $trace hg merge "$obranch"
-  comsg="merge $obranch ==> $branch"
-  [ -z "$msg" ] || comsg="$comsg: $msg"
-  $trace hg commit -m "$comsg"
-fi
+$trace hg merge "$orev" || {
+  echo "$cmd: merge from $orev failed" >&2
+  hg resolve -l >&2
+  exit 1
+}
+
+comsg="merge $obranch ==> $branch"
+[ -z "$msg" ] || comsg="$comsg: $msg"
+$trace hg commit -m "$comsg"
+
+[ -z "$unclean" ] || $trace hg unshelve "$shelf"

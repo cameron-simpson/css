@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # An object containing flags. Inherited from, not a base class.
-#	- Cameron Simpson <cs@zip.com.au> 26aug97
+#	- Cameron Simpson <cs@cskk.id.au> 26aug97
 #
 
 use strict qw(vars);

@@ -1,0 +1,1 @@
+new function get_decimal_or_float_value to read a decimal or basic float

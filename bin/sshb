@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Ssh in batchmode.
-#	- Cameron Simpson <cs@zip.com.au> 26mar2003
+#	- Cameron Simpson <cs@cskk.id.au> 26mar2003
 #
 set -ue
 : ${SSH:=ssh}

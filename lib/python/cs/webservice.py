@@ -2,7 +2,7 @@
 #
 # Convenience routines for web services.
 # Requires ZSI. I'm using Suds these days instead.
-#       - Cameron Simpson <cs@zip.com.au> 25mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 25mar2008
 #
 
 from __future__ import print_function

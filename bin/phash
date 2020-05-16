@@ -2,7 +2,7 @@
 #
 # Set or report data from a persistent object.
 # Based on the old user script.
-#	- Cameron Simpson <cs@zip.com.au> 10apr97
+#	- Cameron Simpson <cs@cskk.id.au> 10apr97
 #
 
 use strict qw(vars);

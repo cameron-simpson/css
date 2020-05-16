@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # URL related utility functions and classes.
-#       - Cameron Simpson <cs@zip.com.au> 26dec2011
+#       - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
 from __future__ import with_statement, print_function
@@ -57,7 +57,6 @@ from cs.excutils import logexc
 safe_property = property
 from cs.lex import parseUC_sAttr
 from cs.logutils import debug, error, warning, exception, D
-from cs.obj import O
 from cs.pfx import Pfx, pfx_iter
 from cs.py3 import ustr, unicode
 from cs.rfc2616 import datetime_from_http_date

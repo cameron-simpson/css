@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Gather ssh host keys using ssh-keyscan(1) and incorporate into system tables.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2003
 #
 
 : ${TMPDIR:=/tmp}

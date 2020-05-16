@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # A backend made from a mapping.
-#       - Cameron Simpson <cs@zip.com.au> 25may2012
+#       - Cameron Simpson <cs@cskk.id.au> 25may2012
 #
 
 import sys

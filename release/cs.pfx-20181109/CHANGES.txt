@@ -1,0 +1,10 @@
+  lib/python/cs/pfx.py: merge default ==> venti
+  lib/python/cs/pfx.py: cs.pfx: some lint
+  lib/python/cs/pfx.py: cs.pfx: some lint
+  lib/python/cs/pfx.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/pfx.py: cs.pfx: new decorator @gen to manage Pfx state across generator iterations
+  lib/python/cs/pfx.py: cs.pfx: bugfix logging fallback print() call; clean some lint
+  lib/python/cs/pfx.py: cs.pfx: Pfx.umask: catch message format errors, emit report and change the format
+  lib/python/cs/pfx.py: cs.pfx: Pfx.__exit: emit a warning to stderr if we fail to prefix an exception
+  lib/python/cs/pfx.py: cs.pfx: docstring updates
+  lib/python/cs/pfx.py: cs.pfx: clean some lint, add some docstrings

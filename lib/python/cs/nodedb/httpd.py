@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Basic web browser interface to a NodeDB.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import urllib
