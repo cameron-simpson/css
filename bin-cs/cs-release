@@ -642,6 +642,11 @@ class Module(object):
     '''
     return self.options.pkg_tagsets[self.name]
 
+  def save_pkg_tags(self):
+    ''' Sync the package `Tag`s `TagFile`.
+    '''
+    self.options.pkg_tagsets.save()
+
   @cachedmethod
   def release_tags(self):
     ''' Return the `ReleaseTag`s for this package.
@@ -693,7 +698,7 @@ class Module(object):
     ''' Update the last PyPI version.
     '''
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
-    self.pkg_tags.save()
+    self.save_pkg_tags()
     self.vcs.commit(
         '%s: %s: set %s=%s' %
         (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version)
