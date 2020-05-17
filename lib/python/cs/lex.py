@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
 r'''
-Lexical analysis functions, tokenisers, transcribers.
-
-An arbitrary assortment of lexical and tokenisation functions useful
+Lexical analysis functions, tokenisers, transcribers:
+an arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
 There are also some transcription function for producing text
 from various objects, such as `hexify` and `unctrl`.

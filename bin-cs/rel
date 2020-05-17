@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Trite convenience wrapper for cs-release.
+# - Cameron Simpson <cs@cskk.id.au> 10apr2020
+#
+
+set -x
+exec cs-release release ${1+"$@"}

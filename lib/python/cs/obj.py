@@ -21,7 +21,7 @@ from threading import Lock
 from weakref import WeakValueDictionary
 from cs.py3 import StringTypes
 
-__version__ = '20200318'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
