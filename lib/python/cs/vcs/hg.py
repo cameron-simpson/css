@@ -32,7 +32,7 @@ class VCS_Hg(VCS):
     '''
     if revision is None:
       revision = 'tip'
-    self._cmd('tag', '-r', revision, '--', tag_name)
+    self.cmd('tag', '-r', revision, '--', tag_name)
 
   def log_since(self, tag, paths):
     ''' Generator yielding `(commit_files,commit_firstline)`
@@ -51,12 +51,12 @@ class VCS_Hg(VCS):
   def add_files(self, *paths):
     ''' Add the specified paths to the repository.
     '''
-    self._cmd('add', *paths)
+    self.cmd('add', *paths)
 
   def commit(self, message, *paths):
     ''' Commit the specified `paths` with the specified `message`.
     '''
-    self._cmd('commit', '-m', message, '--', *paths)
+    self.cmd('commit', '-m', message, '--', *paths)
 
   def uncommitted(self, paths=None):
     ''' Generator yielding uncommited but tracked paths.
