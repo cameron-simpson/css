@@ -4,7 +4,7 @@ r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
-There are also some transcription function for producing text
+There are also some transcription functions for producing text
 from various objects, such as `hexify` and `unctrl`.
 
 Generally the get_* functions accept a source string and an offset
