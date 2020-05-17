@@ -33,7 +33,7 @@ from subprocess import Popen
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from icontract import require, ensure
+from icontract import ensure
 from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
@@ -304,7 +304,7 @@ class CSReleaseCommand(BaseCommand):
         pkg = options.modules[pkg_name]
         release = pkg.latest
         vcstag = release.vcstag
-        with TemporaryDirectory(prefix=vcstag+'-') as pkg_dir:
+        with TemporaryDirectory(prefix=vcstag + '-') as pkg_dir:
           with Pfx(pkg_dir):
             with pkg.checkout(vcstag, pkg_dir, exists=True, persist=True):
               pkg.prepare_package(pkg_dir)
@@ -338,7 +338,6 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     pkg = options.modules[pkg_name]
     vcs = options.vcs
-    xit = 0
     # issue new release tag
     print("new release for %s ..." % (pkg.name,))
     outstanding = list(pkg.uncommitted_paths())
