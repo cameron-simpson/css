@@ -695,8 +695,7 @@ class Module(object):
     self.save_pkg_tags()
     self.vcs.commit(
         '%s: %s: set %s=%s' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version),
-        PKG_TAGS
+        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
     )
 
   def compute_doc(self):
@@ -1176,7 +1175,7 @@ class Module(object):
         if changed_path in paths
     ]
     if changed_paths:
-      problems.append("%d modified files", len(changed_paths))
+      problems.append("%d modified files" % (len(changed_paths),))
     # append submodule problems if present
     if subproblems:
       problems.append(subproblems)
