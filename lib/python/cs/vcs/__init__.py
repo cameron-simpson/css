@@ -23,7 +23,7 @@ ReleaseLogEntry = namedtuple('ReleaseLogEntry', 'tag entry')
 def pipef(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  print('+', repr(argv), file=sys.stderr)
+  debug("+ %r |", argv)
   P = pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:
@@ -49,8 +49,9 @@ class VCS(ABC):
     return pipef(self.COMMAND_NAME, *vcscmd_args)
 
   def _cmd(self, *vcscmd_args):
-    print(self.COMMAND_NAME, *vcscmd_args, file=sys.stderr)
-    check_call([self.COMMAND_NAME] + list(vcscmd_args))
+    argv = [self.COMMAND_NAME] + list(vcscmd_args)
+    debug("+ %r", argv)
+    check_call(argv)
 
   @pfx_method
   def get_topdir(self, path=None):
