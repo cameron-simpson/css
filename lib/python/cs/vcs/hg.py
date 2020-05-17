@@ -3,6 +3,7 @@
 ''' Mercurial support for the cs.vcs package.
 '''
 
+from cs.deco import cachedmethod
 from cs.pfx import Pfx
 from . import VCS, ReleaseLogEntry
 
@@ -27,11 +28,12 @@ class VCS_Hg(VCS):
       rev_hash = f.readline().rstrip()
     return rev_hash
 
+  @cachedmethod
   def tags(self):
-    ''' Generator yielding the current tags.
+    ''' Return the list of tags.
     '''
     with self._pipefrom('tags') as f:
-      yield from map(lambda line: line.split(None, 1)[0], f)
+      return list(map(lambda line: line.split(None, 1)[0], f))
 
   def tag(self, tag_name, revision=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
@@ -66,17 +68,20 @@ class VCS_Hg(VCS):
       raise ValueError("no paths supplied for commit")
     self.hg_cmd('commit', '-m', message, '--', *paths)
 
+  @cachedmethod
   def uncommitted(self, paths=None):
-    ''' Generator yielding uncommited but tracked paths.
+    ''' Return a list of the uncommited but tracked paths.
     '''
     status_argv = ['status']
     if paths:
       status_argv.extend(paths)
+    paths = []
     with self._pipefrom(*status_argv) as f:
       for line in f:
         s, path = line.rstrip().split(' ', 1)
         if s != '?':
-          yield path
+          paths.append(path)
+    return paths
 
   @staticmethod
   def hg_include(paths):
