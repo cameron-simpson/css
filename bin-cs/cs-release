@@ -10,6 +10,7 @@
 from __future__ import print_function
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from functools import partial
 from getopt import GetoptError
 import importlib
 import os
@@ -17,14 +18,16 @@ import os.path
 from os.path import (
     basename,
     dirname,
+    exists as pathexists,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
-    exists as pathexists,
+    splitext,
 )
-from pprint import pprint
+from pprint import pprint, pformat
 import re
 import shutil
+from subprocess import Popen
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -190,7 +193,7 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    with pkg.checkout(vcstag, checkout_dir, persist=True) as checkout_dir:
+    with pkg.checkout(vcstag, checkout_dir, persist=True):
       print(checkout_dir)
 
   @staticmethod
@@ -263,6 +266,29 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         print(pkg.name, pkg.next().version)
+
+  @staticmethod
+  def cmd_package(argv, options):
+    ''' Usage: package pkg_name [version]
+          Export the package contents as a prepared package.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    pkg = options.modules[pkg_name]
+    if argv:
+      version = argv.pop(0)
+    else:
+      version = pkg.latest.version
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    release = ReleaseTag(pkg_name, version)
+    vcstag = release.vcstag
+    checkout_dir = vcstag
+    XP("vcstag=%r, checkout_dir=%r",vcstag,checkout_dir)
+    with pkg.checkout(vcstag, checkout_dir, persist=True):
+      pkg.prepare_package(checkout_dir)
+      print(checkout_dir)
 
   @staticmethod
   def cmd_pypi(argv, options):
@@ -412,6 +438,14 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       next_seq = 1
     version = today + '.' + str(next_seq)
     return type(self)(self.name, version)
+
+def runcmd(argv, **kw):
+  ''' Run command.
+  '''
+  P = Popen(argv, **kw)
+  xit = P.wait()
+  if xit != 0:
+    raise ValueError("command failed, exit code %d: %r" % (xit, argv))
 
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
@@ -900,6 +934,7 @@ class Module(object):
     return basepath + '.py'
 
   @cachedmethod
+  @pfx_method
   def paths(self):
     ''' Yield the paths associated with this package.
 
@@ -953,6 +988,88 @@ class Module(object):
       if not persist:
         with Pfx("rmtree(%r)", dirpath):
           shutil.rmtree(dirpath)
+
+
+  @pfx_method
+  def prepare_package(self, pkg_dir):
+    ''' Prepare an existing package checkout as a package for upload or install.
+
+        This writes the `'MANIFEST.in'`, `'README.md'` and `'setup.py'` files.
+    '''
+    distinfo = self.compute_distinfo()
+
+    # write MANIFEST.in
+    manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
+    with open(manifest_path, "w") as mf:
+      # TODO: support extra files
+      subpaths = self.paths()
+      for subpath in subpaths:
+        with Pfx(subpath):
+          prefix, ext = splitext(subpath)
+          if ext == '.md':
+            _, ext2 = splitext(prefix)
+            if len(ext2) == 2 and ext2[-1].isdigit():
+              # md2man manual entry
+              mdsrc = joinpath(pkg_dir, subpath)
+              mddst = joinpath(pkg_dir, prefix)
+              if pathexists(mddst):
+                error("not converting because %r already exists", mddst)
+              else:
+                info("create %s", mddst)
+                with Pfx(mddst):
+                  with open(mddst, 'w') as mddstf:
+                    runcmd(['md2man-roff', mdsrc], stdout=mddstf)
+              mf.write('include ' + subpath + '\n')
+              mf.write('include ' + prefix + '\n')
+          elif ext == '.c':
+            mf.write('include ' + subpath + '\n')
+      # create README.md
+      readme_path = joinpath(pkg_dir, 'README.md')
+      with open(readme_path, 'w') as rf:
+        print(
+            distinfo.get('long_description', '') or distinfo['description'],
+            file=rf
+        )
+
+    # final step: write setup.py with information gathered earlier
+    setup_path = joinpath(pkg_dir, 'setup.py')
+    with Pfx(setup_path):
+      ok = True
+      with open(setup_path, "w") as sf:
+        out = partial(print, file=sf)
+        out("#!/usr/bin/env python")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
+        out("setup(")
+        # mandatory fields, in preferred order
+        written = set()
+        for kw in (
+            'name',
+            'author',
+            'author_email',
+            'version',
+            'url',
+            'description',
+            'long_description',
+        ):
+          try:
+            kv = distinfo[kw]
+          except KeyError:
+            warning("missing distinfo[%r]", kw)
+            ok = False
+          else:
+            if kw in( 'description','long_description') and isinstance(kv, str):
+              out("  %s =" % (kw,))
+              out("   ", pformat(kv).replace('\n', '    \n') + ',')
+            else:
+              out("  %s = %r," % (kw, distinfo[kw]))
+            written.add(kw)
+        for kw, kv in sorted(distinfo.items()):
+          if kw not in written:
+            out("  %s = %r," % (kw, kv))
+        out(")")
+      if not ok:
+        raise ValueError("could not construct valid setup.py file")
 
   @pfx_method(use_str=True)
   def log_since(self, vcstag=None):
