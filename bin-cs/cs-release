@@ -38,7 +38,6 @@ from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.distinfo import PyPI_Package
 from cs.fstags import TagFile
 from cs.lex import cutsuffix
 from cs.logutils import error, warning, info, status
@@ -834,77 +833,6 @@ class Module(object):
         warning('no %r in distinfo', kw)
 
     return dinfo
-
-  def _pypipkg(self, pypi_url):
-    ''' Return a `PyPI_Package` for this module.
-    '''
-    distinfo = self.compute_distinfo()
-    package_release_version = self.latest_release_version()
-    return PyPI_Package(
-        pypi_url,
-        self.name,
-        package_release_version,
-        defaults=distinfo,
-    )
-
-  @pfx_method(use_str=True)
-  @require(lambda pypi_flavour: isinstance(pypi_flavour, str))
-  @require(lambda pypi_url: isinstance(pypi_url, str))
-  @require(lambda force: force is True or force is False)
-  def submit_pypi(
-      self,
-      pypi_flavour='pypi',
-      pypi_url=URL_PYPI_PROD,
-      force=False,
-      release=None,
-      pypi_package_name=None,
-      pypi_version=None,
-  ):
-    ''' Submit the latest release of this package to PyPI.
-
-        Parameters:
-        * `pypi_flavour`: the PyPI instance to use, default `'pypi'`
-        * `pypi_url`: the PyPI base URL to use, default `URL_PYPI_PROD`
-        * `force`: optional force setting, default `False`.
-          If true, do the upload even if the up to date checks fail.
-        * `release`: the VCS release tag to use for the upload,
-          default: `self.latest`
-        * `pypi_package_name`: the PyPI package name to use,
-          default: `release.name`
-        * `pypi_version`: the PyPI version to upload as,
-          default: `release.version`
-    '''
-    if release is None:
-      release = self.latest
-    elif isinstance(release, str):
-      release = ReleaseTag.from_vcstag(release)
-    if release.name != self.name:
-      raise ValueError(
-          "VCS tag %r is not for our Module %r" % (release, self.name)
-      )
-    if pypi_package_name is None:
-      pypi_package_name = release.name
-    if pypi_version is None:
-      pypi_version = release.version
-    latest_pypi_version = self.latest_pypi_version
-    if pypi_version == self.latest_pypi_version:
-      if force:
-        warning("already released %r, resubmitting anyway", pypi_version)
-      else:
-        raise ValueError("already released PyPI version %r" % (pypi_version,))
-    if not self.check_uptodate():
-      if force:
-        warning("up to date check FAILS, but submitting anyway")
-      else:
-        raise ValueError("not up to date")
-    with Pfx(pypi_flavour):
-      with self.checkout(release.vcstag) as checkout_path:
-        self.prepare_package(checkout_path)
-        with Pfx("PyPI: replace %r with %r", latest_pypi_version,
-                 pypi_version):
-          PKG = self._pypipkg(URL_PYPI_PROD)
-          PKG.upload()
-          self.latest_pypi_version = pypi_version
 
   @prop
   def basename(self):
