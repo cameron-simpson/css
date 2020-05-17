@@ -18,7 +18,7 @@ from stat import S_ISREG
 import sys
 from cs.py3 import pread
 
-__version__ = '20200328'
+__version__ = '20200517'
 
 DISTINFO = {
     'keywords': ["python3"],
