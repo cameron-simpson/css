@@ -297,18 +297,20 @@ def OBSOLETE(func, suggestion=None):
     return func(*args, **kwargs)
 
   funcname = getattr(func, '__name__', str(func))
+  funcdoc = getattr(func, '__doc__', None) or ''
+  doc = "OBSOLETE FUNCTION " + funcname
+  if suggestion:
+    doc += ' - please use ' + suggestion
   wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = (
-      "OBSOLETE FUNCTION %r:\n\n" % (funcname,) +
-      (getattr(func, '__doc__', None) or '')
-  )
+  wrapped.__doc__ = funcdoc
   return wrapped
 
-@OBSOLETE
-def cached(method):
+
+@OBSOLETE(suggestion='cachedmethod')
+def cached(*a, **kw):
   ''' Former name for @cachedmethod.
   '''
-  return cachedmethod(method)
+  return cachedmethod(*a, **kw)
 
 def contextual(func):
   ''' Wrap a simple function as a context manager.
