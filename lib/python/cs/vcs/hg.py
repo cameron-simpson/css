@@ -96,7 +96,6 @@ class VCS_Hg(VCS):
         for the release tags starting with `tag_prefix`
         in reverse tag order (most recent first).
     '''
-    X("%s.release_log(tag_prefix=%r)",self,tag_prefix)
     for tag in sorted(filter(lambda tag: tag.startswith(tag_prefix),
                              self.tags()), reverse=True):
       yield ReleaseLogEntry(tag, self.log_entry(tag))

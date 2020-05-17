@@ -47,7 +47,7 @@ import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
-from cs.sh import quotestr as shq, quote as shqv
+from cs.sh import quotestr as shq, quotecmd as shqv
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
 
@@ -305,13 +305,12 @@ class CSReleaseCommand(BaseCommand):
         pkg = options.modules[pkg_name]
         release = pkg.latest
         vcstag = release.vcstag
-        with TemporaryDirectory(prefix=vcstag) as T:
-          pkg_dir = T.name
+        with TemporaryDirectory(prefix=vcstag+'-') as pkg_dir:
           with Pfx(pkg_dir):
-            with pkg.checkout(vcstag, pkg_dir):
+            with pkg.checkout(vcstag, pkg_dir, exists=True, persist=True):
               pkg.prepare_package(pkg_dir)
-              pkg.prepare_dist()
-              pkg.upload_dist()
+              pkg.prepare_dist(pkg_dir)
+              pkg.upload_dist(pkg_dir)
 
   @staticmethod
   def cmd_readme(argv, options):
@@ -437,7 +436,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       next_seq = int(seqpart) + 1
     else:
       next_seq = 1
-    version = today + '.' + str(next_seq)
+    version = today.version + '.' + str(next_seq)
     return type(self)(self.name, version)
 
 def runcmd(argv, **kw):
@@ -451,6 +450,7 @@ def runcmd(argv, **kw):
 def cd_shcmd(wd, shcmd):
   ''' Run a command supplied as a sh(1) command string.
   '''
+  XP("shcmd=%r",shcmd)
   qpkg_dir = shq(wd)
   xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
   if xit != 0:
@@ -1068,6 +1068,8 @@ class Module(object):
   def prepare_dist(self, pkg_dir):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
+    shcmd= shqv(['python3', 'setup.py', 'check', 'sdist'])
+    XP("shcmd=%r",shcmd)
     cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check', 'sdist']))
 
   @pfx_method
@@ -1076,7 +1078,7 @@ class Module(object):
     '''
     distfiles = [
         relpath(fullpath, pkg_dir)
-        for fullpath in glob(joinpath(self.pkg_dir, 'dist/*'))
+        for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
     ]
     cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
 
