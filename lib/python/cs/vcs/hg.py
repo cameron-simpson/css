@@ -14,6 +14,12 @@ class VCS_Hg(VCS):
 
   TOPDIR_MARKER_ENTRY = '.hg'
 
+  def hg_cmd(*argv):
+    ''' Make sure external users know they're calling a backend
+        specific command line.
+    '''
+    return self.hg_cmd(*argv)
+
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
     '''
@@ -32,7 +38,7 @@ class VCS_Hg(VCS):
     '''
     if revision is None:
       revision = 'tip'
-    self.cmd('tag', '-r', revision, '--', tag_name)
+    self.hg_cmd('tag', '-r', revision, '--', tag_name)
 
   def log_since(self, tag, paths):
     ''' Generator yielding `(commit_files,commit_firstline)`
@@ -51,12 +57,12 @@ class VCS_Hg(VCS):
   def add_files(self, *paths):
     ''' Add the specified paths to the repository.
     '''
-    self.cmd('add', *paths)
+    self.hg_cmd('add', *paths)
 
   def commit(self, message, *paths):
     ''' Commit the specified `paths` with the specified `message`.
     '''
-    self.cmd('commit', '-m', message, '--', *paths)
+    self.hg_cmd('commit', '-m', message, '--', *paths)
 
   def uncommitted(self, paths=None):
     ''' Generator yielding uncommited but tracked paths.

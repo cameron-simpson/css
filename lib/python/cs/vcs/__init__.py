@@ -47,7 +47,7 @@ class VCS(ABC):
     '''
     return pipef(self.COMMAND_NAME, *vcscmd_args)
 
-  def cmd(self, *vcscmd_args):
+  def _cmd(self, *vcscmd_args):
     print(self.COMMAND_NAME, *vcscmd_args, file=sys.stderr)
     check_call([self.COMMAND_NAME] + list(vcscmd_args))
 
