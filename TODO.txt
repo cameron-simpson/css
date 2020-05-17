@@ -1,3 +1,4 @@
+cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
 cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
 import the examples in the module docstring
 cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111cda5f0>
