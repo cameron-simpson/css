@@ -697,6 +697,7 @@ class Module(object):
         release_paragraphs=postamble_parts,
     )
 
+  @pfx_method
   def compute_distinfo(
       self,
       pypi_package_name=None,
@@ -708,6 +709,8 @@ class Module(object):
       pypi_package_name = self.name
     if pypi_package_version is None:
       pypi_package_version = self.latest.version
+
+    # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
     docs = self.compute_doc()
     dinfo.update(
@@ -715,6 +718,7 @@ class Module(object):
     )
     dinfo.update(self.module.DISTINFO)
 
+    # fill in default fields
     for field in ('author', 'author_email', 'long_description_content_type',
                   'package_dir'):
       with Pfx("%r", field):
@@ -731,6 +735,7 @@ class Module(object):
         }[field]
         dinfo[field] = compute_field()
 
+    # fill in default classifications
     classifiers = dinfo['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items(
     ):
@@ -755,13 +760,14 @@ class Module(object):
     else:
       dinfo['py_modules'] = [self.name]
 
+    # fill in missing but expected fields
     for kw, value in (
         ('license', license_type),
         ('name', pypi_package_name),
         ('version', pypi_package_version),
     ):
       if value is None:
-        warning("_prep: no value for %r", kw)
+        warning("no value for %r", kw)
       else:
         with Pfx(kw):
           if kw in dinfo:
@@ -770,7 +776,7 @@ class Module(object):
           else:
             dinfo[kw] = value
 
-    self.distinfo = dinfo
+    # check for required fields
     for kw in (
         'name',
         'description',
@@ -781,7 +787,8 @@ class Module(object):
         'url',
     ):
       if kw not in dinfo:
-        error('no %r in distinfo', kw)
+        warning('no %r in distinfo', kw)
+
     return dinfo
 
   def _pypipkg(self, pypi_url):
