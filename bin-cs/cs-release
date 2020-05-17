@@ -311,6 +311,7 @@ class CSReleaseCommand(BaseCommand):
               pkg.prepare_package(pkg_dir)
               pkg.prepare_dist(pkg_dir)
               pkg.upload_dist(pkg_dir)
+              pkg.latest_pypi_version = release.version
 
   @staticmethod
   def cmd_readme(argv, options):
