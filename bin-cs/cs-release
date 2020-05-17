@@ -287,7 +287,6 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    XP("vcstag=%r, checkout_dir=%r", vcstag, checkout_dir)
     with pkg.checkout(vcstag, checkout_dir, persist=True):
       pkg.prepare_package(checkout_dir)
       print(checkout_dir)
@@ -450,7 +449,6 @@ def runcmd(argv, **kw):
 def cd_shcmd(wd, shcmd):
   ''' Run a command supplied as a sh(1) command string.
   '''
-  XP("shcmd=%r",shcmd)
   qpkg_dir = shq(wd)
   xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
   if xit != 0:
@@ -921,7 +919,6 @@ class Module(object):
 
         This writes the `'MANIFEST.in'`, `'README.md'` and `'setup.py'` files.
     '''
-    XP("pkg_dir=%r", pkg_dir)
     distinfo = self.compute_distinfo()
 
     # write MANIFEST.in
@@ -931,7 +928,6 @@ class Module(object):
       subpaths = self.paths()
       for subpath in subpaths:
         with Pfx(subpath):
-          XP("MANIFEST: subpath = %r", subpath)
           prefix, ext = splitext(subpath)
           if ext == '.md':
             _, ext2 = splitext(prefix)
@@ -1003,8 +999,6 @@ class Module(object):
   def prepare_dist(self, pkg_dir):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
-    shcmd= shqv(['python3', 'setup.py', 'check', 'sdist'])
-    XP("shcmd=%r",shcmd)
     cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check', 'sdist']))
 
   @pfx_method
@@ -1030,7 +1024,6 @@ class Module(object):
       else:
         vcstag = self.latest.vcstag
     paths = self.paths()
-    XP("paths=%r", paths)
     return (
         ([filename
           for filename in files
