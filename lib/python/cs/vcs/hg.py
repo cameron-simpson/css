@@ -62,6 +62,8 @@ class VCS_Hg(VCS):
   def commit(self, message, *paths):
     ''' Commit the specified `paths` with the specified `message`.
     '''
+    if not paths:
+      raise ValueError("no paths supplied for commit")
     self.hg_cmd('commit', '-m', message, '--', *paths)
 
   def uncommitted(self, paths=None):
