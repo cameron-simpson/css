@@ -386,7 +386,7 @@ class CSReleaseCommand(BaseCommand):
     vcs.tag(next_vcstag)
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
-        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
+        '[IGNORE] %s: bump __version__ to %s to avoid misleading value for future unreleased changes'
         % (pkg.name, next_release.version + '-post'), versioned_filename
     )
 
@@ -1009,9 +1009,14 @@ class Module(object):
     cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
 
   @pfx_method(use_str=True)
-  def log_since(self, vcstag=None):
+  def log_since(self, vcstag=None, ignored=False):
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
+
+        Parameters:
+        * `vcstag`: the reference revision, default `self.latest`
+        * `ignored`: if true (default `False`) include log entries
+          containing the string `'IGNORE'` in the description
     '''
     if vcstag is None:
       latest = self.latest
@@ -1026,6 +1031,7 @@ class Module(object):
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
+        if ignored or 'IGNORE' not in firstline
     )
 
   def uncommitted_paths(self):
