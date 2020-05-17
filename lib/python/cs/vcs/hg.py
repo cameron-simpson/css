@@ -14,11 +14,11 @@ class VCS_Hg(VCS):
 
   TOPDIR_MARKER_ENTRY = '.hg'
 
-  def hg_cmd(*argv):
+  def hg_cmd(self, *argv):
     ''' Make sure external users know they're calling a backend
         specific command line.
     '''
-    return self.hg_cmd(*argv)
+    return self._cmd(*argv)
 
   def resolve_revision(self, rev_spec):
     ''' Resolve a revision specification to the commit hash (a `str`).
@@ -91,11 +91,11 @@ class VCS_Hg(VCS):
                         '--') as piped:
       return ''.join(piped)
 
-  def release_log(self, package_name):
-    ''' Generator yeilding `(tag,log_entry)` for the release tags
-        of `package_name` in reverse tag order (most recent first).
+  def release_log(self, tag_prefix):
+    ''' Generator yielding `ReleaseLogEntry` instances
+        for the release tags starting with `tag_prefix`
+        in reverse tag order (most recent first).
     '''
-    tag_prefix = package_name + '-'
     for tag in sorted(filter(lambda tag: tag.startswith(tag_prefix),
                              self.tags()), reverse=True):
       yield ReleaseLogEntry(tag, self.log_entry(tag))

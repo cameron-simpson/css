@@ -56,21 +56,17 @@ class VCS(ABC):
     ''' Locate the top of the repository from `path` (default `'.'`).
         Return the directory realpath or `None`.
     '''
+
     def testfunc(testpath):
       probe_path = joinpath(testpath, self.TOPDIR_MARKER_ENTRY)
       debug("probe %r", probe_path)
       return existspath(probe_path)
+
     path0 = path
     if path is None:
       path = '.'
     path = realpath(path)
-    topdirpath = next(
-        findup(
-            path,
-            testfunc,
-            first=True
-        )
-    )
+    topdirpath = next(findup(path, testfunc, first=True))
     if topdirpath is None:
       warning("no top dir found from %r (originally %r)", path, path0)
     return topdirpath

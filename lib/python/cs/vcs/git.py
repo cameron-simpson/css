@@ -6,7 +6,7 @@ from cs.psutils import pipefrom
 from . import VCS
 
 from cs.x import X
-X("__file__ = %r",__file__)
+X("__file__ = %r", __file__)
 
 class VCS_Git(VCS):
 
