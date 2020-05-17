@@ -28,12 +28,6 @@ from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.sh import quotestr as shq, quote as shqv
 
-URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
-
-# published URL
-URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
-
 # local directory where the files live
 LIBDIR = 'lib/python'
 
@@ -172,39 +166,6 @@ def main(argv):
 
   return xit
 
-class ParsedTag(namedtuple('ParsedTag', 'name version')):
-  ''' A parsed version of one of my release tags,
-      which have the form *package_name*`-`*version*.
-  '''
-
-  @classmethod
-  def from_vcs_tag(cls, vcs_tag):
-    ''' Create a new `ParsedTag` from a VCS tag.
-    '''
-    name, version = vcs_tag.split('-', 1)
-    return cls(name, version)
-
-  @property
-  def vcs_tag(self):
-    ''' The VCS tag for this `(name,version)` pair.
-    '''
-    return self.name + '-' + self.version
-
-def version_tag(name, version):
-  ''' Compose a VCS tag from a package name and its version number.
-  '''
-  return ParsedTag(name, version).vcs_tag
-
-def tag_name(vcs_tag):
-  ''' Extract the name part from a tag.
-  '''
-  return ParsedTag.from_vcs_tag(vcs_tag).name
-
-def tag_version(vcs_tag):
-  ''' Extract the version number from a tag.
-  '''
-  return ParsedTag.from_vcs_tag(vcs_tag).version
-
 def needdir(dirpath):
   ''' Create the directory `dirpath` if missing.
   '''
@@ -262,22 +223,51 @@ class PyPI_Package(NS):
   ''' Operations for a package at PyPI.
   '''
 
-  def __init__(self, package, version, vcs=None):
-    ##if vcs is None:
-    ##  vcs = VCS_Hg()
-    self.package = package
-    self.version = version
-    ##self.vcs = vcs
-
-  @property
-  def name(self):
-    return self.package.name
+  def __init__(
+      self,
+      pypi_url,
+      package_name,
+      package_version,
+      pypi_package_name=None,
+      pypi_package_version=None,
+      defaults=None,
+  ):
+    ''' Initialise: save package_name and its name in PyPI.
+    '''
+    if pypi_package_name is None:
+      pypi_package_name = package_name
+    if pypi_package_version is None:
+      pypi_package_version = package_version
+    if defaults is None:
+      defaults = {}
+    if 'author' not in defaults:
+      try:
+        author_name = os.environ['NAME']
+      except KeyError:
+        pass
+      else:
+        defaults['author'] = author_name
+    if 'author_email' not in defaults:
+      try:
+        author_email = os.environ['EMAIL']
+      except KeyError:
+        pass
+      else:
+        defaults['author_email'] = author_email
+    self.pypi_url = pypi_url
+    self.package_name = package_name
+    self.package_version = package_version
+    self.pypi_package_name = pypi_package_name
+    self.pypi_package_version = pypi_package_version
+    self.defaults = defaults
+    self.libdir = LIBDIR
+    self._prep_distinfo()
 
   @property
   def vcs_tag(self):
     ''' The tag used in the VCS for this version of the package.
     '''
-    return self.name + '-' + self.version
+    return self.package_name + '-' + self.package_version
 
   def copyin(self, dstdir):
     ''' Write the contents of this release into `dstdir`.
@@ -313,7 +303,7 @@ class PyPI_Package(NS):
     runcmd(hgargv)
     return included
 
-  def _prep_distinfo(self):
+  def compute_distinfo(self):
     ''' Compute the distutils info for this package.
     '''
     dinfo = dict(self.defaults)
@@ -382,18 +372,15 @@ class PyPI_Package(NS):
       if kw not in dinfo:
         error('no %r in distinfo', kw)
 
-  def make_package(self, pkg_dir=None):
-    ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
+  def prepare_package(self, pkg_dir):
+    ''' Prepare an existing package checkout as a package for upload or install.
 
-        If `pkg_dir` is not specified, create a temporary directory.
+        This writes the `'MANIFEST.in'`, `'README.md'` and `'setup.py'` files.
     '''
-    if pkg_dir is None:
-      pkg_dir = mkdtemp(prefix='pkg--' + self.pypi_package_name + '--', dir='.')
-
-    distinfo = self.distinfo
+    distinfo = self.compute_distinfo()
 
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
-    with open(manifest_path, "w") as mfp:
+    with open(manifest_path, "w") as mf:
       # TODO: support extra files
       subpaths = self.copyin(pkg_dir)
       for subpath in subpaths:
@@ -412,24 +399,58 @@ class PyPI_Package(NS):
                 with Pfx(mddst):
                   with open(mddst, 'w') as mddstf:
                     runcmd(['md2man-roff', mdsrc], stdout=mddstf)
-              mfp.write('include ' + subpath + '\n')
-              mfp.write('include ' + prefix + '\n')
+              mf.write('include ' + subpath + '\n')
+              mf.write('include ' + prefix + '\n')
           elif ext == '.c':
-            mfp.write('include ' + subpath + '\n')
+            mf.write('include ' + subpath + '\n')
       # create README.md
       readme_path = joinpath(pkg_dir, 'README.md')
-      with open(readme_path, 'w') as fp:
-        print(distinfo['description'], file=fp)
-        print('', file=fp)
-        long_desc = distinfo.get('long_description', '')
-        if long_desc:
-          print(file=fp)
-          print(long_desc, file=fp)
+      with open(readme_path, 'w') as rf:
+        print(
+            distinfo.get('long_description', '') or distinfo['description'],
+            file=rf
+        )
 
     # final step: write setup.py with information gathered earlier
-    self.write_setup(joinpath(pkg_dir, 'setup.py'))
-
-    return pkg_dir
+    setup_path = joinpath(pkg_dir, 'setup.py')
+    with Pfx(setup_path):
+      ok = True
+      with open(setup_path, "w") as sf:
+        distinfo = self.distinfo
+        out = partial(print, file=sf)
+        out("#!/usr/bin/env python")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
+        out("setup(")
+        # mandatory fields, in preferred order
+        written = set()
+        for kw in (
+            'name',
+            'author',
+            'author_email',
+            'version',
+            'url',
+            'description',
+            'long_description',
+        ):
+          try:
+            kv = distinfo[kw]
+          except KeyError:
+            warning("missing distinfo[%r]", kw)
+            ok = False
+          else:
+            if kw in( 'description','long_description') and isinstance(kv, str):
+              out("  %s =")
+              out("   ", pformat(kv).replace('\n', '    \n') + ',')
+            else:
+              out("  %s = %r," % (kw, distinfo[kw]))
+            written.add(kw)
+        for kw, kv in sorted(distinfo.items()):
+          if kw not in written:
+            out("  %s = %r," % (kw, kv))
+        out(")")
+      if not ok:
+        raise ValueError("could not construct valid setup.py file")
 
   def checkout(self):
     ''' Return a fresh checkout of the package.
@@ -442,41 +463,6 @@ class PyPI_Package(NS):
     with self.checkout() as pkg_co:
       pkg_co.prepare_dist()
       pkg_co.upload()
-
-  def write_setup(self, setup_path):
-    ''' Transcribe a setup.py file.
-    '''
-    with Pfx("write_setup(%r)", setup_path):
-      ok = True
-      with open(setup_path, "w") as setup:
-        distinfo = self.distinfo
-        out = partial(print, file=setup)
-        out("#!/usr/bin/env python")
-        ##out("from distutils.core import setup")
-        out("from setuptools import setup")
-        out("setup(")
-        # mandatory fields, in preferred order
-        written = set()
-        for kw in (
-            'name',
-            'description',
-            'author',
-            'author_email',
-            'version',
-            'url',
-        ):
-          if kw in distinfo:
-            out("  %s = %r," % (kw, distinfo[kw]))
-            written.add(kw)
-          else:
-            warning("missing distinfo[%r]", kw)
-            ok = False
-        for kw in sorted(distinfo.keys()):
-          if kw not in written:
-            out("  %s = %r," % (kw, distinfo[kw]))
-        out(")")
-      if not ok:
-        raise ValueError("could not construct valid setup.py file")
 
   def is_package(self, package_name):
     ''' Test if the `package_name` is a package or just a file.
