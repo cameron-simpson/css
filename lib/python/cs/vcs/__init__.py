@@ -23,6 +23,7 @@ ReleaseLogEntry = namedtuple('ReleaseLogEntry', 'tag entry')
 def pipef(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
+  print('+', repr(argv), file=sys.stderr)
   P = pipefrom(argv, **kw)
   yield P.stdout
   if P.wait() != 0:

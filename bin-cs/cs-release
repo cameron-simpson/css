@@ -12,6 +12,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 from getopt import GetoptError
+from glob import glob
 import importlib
 import os
 import os.path
@@ -22,6 +23,7 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
+    relpath,
     splitext,
 )
 from pprint import pprint, pformat
@@ -31,6 +33,7 @@ from subprocess import Popen
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from icontract import require, ensure
 from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
@@ -44,11 +47,9 @@ import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
+from cs.sh import quotestr as shq, quote as shqv
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
-from icontract import require, ensure
-
-from cs.x import X
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
 URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
@@ -93,6 +94,8 @@ re_RELEASE_TAG = re.compile(
 )
 
 class CSReleaseCommand(BaseCommand):
+  ''' The `cs-release` command line implementation.
+  '''
 
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
@@ -220,7 +223,7 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         latest = pkg.latest
-        print(pkg.name, latest.version if latest else "NONE" )
+        print(pkg.name, latest.version if latest else "NONE")
 
   @staticmethod
   def cmd_log(argv, options):
@@ -285,7 +288,7 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    XP("vcstag=%r, checkout_dir=%r",vcstag,checkout_dir)
+    XP("vcstag=%r, checkout_dir=%r", vcstag, checkout_dir)
     with pkg.checkout(vcstag, checkout_dir, persist=True):
       pkg.prepare_package(checkout_dir)
       print(checkout_dir)
@@ -300,12 +303,15 @@ class CSReleaseCommand(BaseCommand):
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
-        # upload latest release to pypi
-        vcstag = pkg.latest_release_vcstag
-        pypi_version = pkg.latest_release_version
-        pkg.submit_pypi(
-            force=options.force, vcstag=vcstag, pypi_version=pypi_version
-        )
+        release = pkg.latest
+        vcstag = release.vcstag
+        with TemporaryDirectory(prefix=vcstag) as T:
+          pkg_dir = T.name
+          with Pfx(pkg_dir):
+            with pkg.checkout(vcstag, pkg_dir):
+              pkg.prepare_package(pkg_dir)
+              pkg.prepare_dist()
+              pkg.upload_dist()
 
   @staticmethod
   def cmd_readme(argv, options):
@@ -358,39 +364,36 @@ class CSReleaseCommand(BaseCommand):
       release_message = dotfp.read().rstrip()
     if not release_message:
       error("empty release message, not making new release")
-      xit = 1
-    else:
-      next_tag = pkg.next_release_tag()
-      _, tag_version = next_tag.split('-')
-      if not ask("Confirm new release for %r as %r" % (pkg.name, next_tag)):
-        error("aborting release at user request")
-        xit = 1
-      else:
-        rel_dir = joinpath('release', next_tag)
-        with Pfx("mkdir(%s)", rel_dir):
-          os.mkdir(rel_dir)
-        summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
-        with Pfx(summary_filename):
-          with open(summary_filename, 'w') as sfp:
-            print(release_message, file=sfp)
-        changes_filename = joinpath(rel_dir, 'CHANGES.txt')
-        with Pfx(changes_filename):
-          with open(changes_filename, 'w') as cfp:
-            for files, firstline in changes:
-              print(' '.join(files) + ': ' + firstline, file=cfp)
-        pkg.patch__version__(tag_version)
-        vcs.add_files(summary_filename, changes_filename)
-        vcs.commit(
-            'Release information for %s.\nSummary:\n%s' %
-            (next_tag, release_message), summary_filename, changes_filename
-        )
-        vcs.tag(next_tag)
-        pkg.patch__version__(tag_version + '-post')
-        vcs.commit(
-            '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
-            % (pkg.name, tag_version + '-post')
-        )
-    return xit
+      return 1
+    next_release = pkg.latest.next()
+    next_vcstag = next_release.vcstag
+    if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
+      error("aborting release at user request")
+      return 1
+    rel_dir = joinpath('release', next_vcstag)
+    with Pfx("mkdir(%s)", rel_dir):
+      os.mkdir(rel_dir)
+    summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
+    with Pfx(summary_filename):
+      with open(summary_filename, 'w') as sfp:
+        print(release_message, file=sfp)
+    changes_filename = joinpath(rel_dir, 'CHANGES.txt')
+    with Pfx(changes_filename):
+      with open(changes_filename, 'w') as cfp:
+        for files, firstline in changes:
+          print(' '.join(files) + ': ' + firstline, file=cfp)
+    pkg.patch__version__(next_release.version)
+    vcs.add_files(summary_filename, changes_filename)
+    vcs.commit(
+        'Release information for %s.\nSummary:\n%s' %
+        (next_vcstag, release_message), summary_filename, changes_filename
+    )
+    vcs.tag(next_vcstag)
+    pkg.patch__version__(next_release.version + '-post')
+    vcs.commit(
+        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
+        % (pkg.name, next_release.version + '-post')
+    )
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
@@ -421,9 +424,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       lambda result: result.version == isodate(dashed=False) or result.version.
       startswith(isodate(dashed=False) + '.')
   )
-  @ensure(
-      lambda self, result: self.version < result.version
-  )
+  @ensure(lambda self, result: self.version < result.version)
   def next(self):
     ''' Compute the next `ReleaseTag` after the current one.
     '''
@@ -432,7 +433,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       return today
     current_version = self.version
     if '.' in current_version:
-      datepart, seqpart = current_version.split('.', 1)
+      _, seqpart = current_version.split('.', 1)
       next_seq = int(seqpart) + 1
     else:
       next_seq = 1
@@ -447,6 +448,14 @@ def runcmd(argv, **kw):
   if xit != 0:
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
 
+def cd_shcmd(wd, shcmd):
+  ''' Run a command supplied as a sh(1) command string.
+  '''
+  qpkg_dir = shq(wd)
+  xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
+  if xit != 0:
+    raise ValueError("command failed, exit status %d: %r" % (xit, shcmd))
+
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
   '''
@@ -456,6 +465,8 @@ def release_tags(vcs):
       yield tag
 
 def clean_release_entry(entry):
+  '''Turn a VCS release log entry into some MarkDown.
+  '''
   lines = list(
       filter(
           lambda line: (
@@ -637,8 +648,10 @@ class Module(object):
     myname = self.name
     return list(
         filter(
-            lambda tag: tag.name == myname,
-            (ReleaseTag.from_vcstag(vcstag) for vcstag in release_tags(self.vcs))
+            lambda tag: tag.name == myname, (
+                ReleaseTag.from_vcstag(vcstag)
+                for vcstag in release_tags(self.vcs)
+            )
         )
     )
 
@@ -648,12 +661,12 @@ class Module(object):
     '''
     return (
         (ReleaseTag.from_vcstag(vcstag), entry)
-        for vcstag, entry in self.vcs.release_log(self.name)
+        for vcstag, entry in self.vcs.release_log(self.name + '-')
     )
 
   @property
-  @ensure(lambda result: isinstance(result, ReleaseTag))
-  @ensure(lambda self, result: result.name == self.name)
+  @ensure(lambda result: result is None or isinstance(result, ReleaseTag))
+  @ensure(lambda self, result: result is None or result.name == self.name)
   def latest(self):
     ''' The `ReleaseTag` of the latest release of this `Module`.
     '''
@@ -887,16 +900,6 @@ class Module(object):
           PKG.upload()
           self.latest_pypi_version = pypi_version
 
-  def export(self):
-    latest_version = self.latest_release_version()
-    pkg_dir = "%s-%s" % (self.name, latest_version)
-    print('create %s ...' % (pkg_dir,))
-    with Pfx("mkdir(%s)", pkg_dir):
-      os.mkdir(pkg_dir)
-    PKG = self._pypipkg(URL_PYPI_PROD)
-    PKG.make_package(pkg_dir)
-    return pkg_dir
-
   @prop
   def basename(self):
     ''' The last component of the package name.
@@ -921,7 +924,7 @@ class Module(object):
     return basepath + '.py'
 
   @cachedmethod
-  @pfx_method
+  @pfx_method(use_str=True)
   def paths(self):
     ''' Yield the paths associated with this package.
 
@@ -944,14 +947,15 @@ class Module(object):
       updir = dirname(basepath)
       for filename in sorted(os.listdir(updir)):
         filepath = joinpath(updir, filename)
-        if ((filename.startswith(base + '.')
-             or filename.startswith(base + '_'))
-            and not (filename.endswith('.pyc') or filename.endswith('.o'))
-            and isfilepath(filepath)):
-          if isfilepath(filepath):
-            pathlist.append(filepath)
-          else:
-            info("ignore %r, not a file", filepath)
+        if filename.startswith((base + '.', base + '_')):
+          if (not (filename.endswith('.pyc') or filename.endswith('.o'))
+              and isfilepath(filepath)):
+            if isfilepath(filepath):
+              pathlist.append(filepath)
+            else:
+              info("ignore %r, not a file", filepath)
+    if not pathlist:
+      raise ValueError("no paths for %s" % (self,))
     return pathlist
 
   @contextmanager
@@ -976,13 +980,13 @@ class Module(object):
         with Pfx("rmtree(%r)", dirpath):
           shutil.rmtree(dirpath)
 
-
   @pfx_method
   def prepare_package(self, pkg_dir):
     ''' Prepare an existing package checkout as a package for upload or install.
 
         This writes the `'MANIFEST.in'`, `'README.md'` and `'setup.py'` files.
     '''
+    XP("pkg_dir=%r", pkg_dir)
     distinfo = self.compute_distinfo()
 
     # write MANIFEST.in
@@ -992,6 +996,7 @@ class Module(object):
       subpaths = self.paths()
       for subpath in subpaths:
         with Pfx(subpath):
+          XP("MANIFEST: subpath = %r", subpath)
           prefix, ext = splitext(subpath)
           if ext == '.md':
             _, ext2 = splitext(prefix)
@@ -1045,7 +1050,8 @@ class Module(object):
             warning("missing distinfo[%r]", kw)
             ok = False
           else:
-            if kw in( 'description','long_description') and isinstance(kv, str):
+            if kw in ('description', 'long_description') and isinstance(kv,
+                                                                        str):
               out("  %s =" % (kw,))
               out("   ", pformat(kv).replace('\n', '    \n') + ',')
             else:
@@ -1058,17 +1064,36 @@ class Module(object):
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
+  @pfx_method
+  def prepare_dist(self, pkg_dir):
+    ''' Run "setup.py check sdist", making files in dist/.
+    '''
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check', 'sdist']))
+
+  @pfx_method
+  def upload_dist(self, pkg_dir):
+    ''' Upload the package to PyPI using twine.
+    '''
+    distfiles = [
+        relpath(fullpath, pkg_dir)
+        for fullpath in glob(joinpath(self.pkg_dir, 'dist/*'))
+    ]
+    cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
+
   @pfx_method(use_str=True)
   def log_since(self, vcstag=None):
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
     '''
     if vcstag is None:
-      vcstag = self.latest.vcstag
-      if vcstag is None:
+      latest = self.latest
+      if latest is None:
         vcstag = "0"
         warning(f"no release tags, starting from revision {vcstag}")
+      else:
+        vcstag = self.latest.vcstag
     paths = self.paths()
+    XP("paths=%r", paths)
     return (
         ([filename
           for filename in files
@@ -1113,16 +1138,9 @@ class Module(object):
       )
 
   @prop
-  def dirpath(self):
-    M = self.module
-    if M is None:
-      return None
-    if not self.is_package:
-      return None
-    return os.path.dirname(M.__file__)
-
-  @prop
   def DISTINFO(self):
+    ''' The `DISTINFO` from `self.module`.
+    '''
     D = self._distinfo
     if D is None:
       with Pfx("%s.DISTINFO", self.name):
