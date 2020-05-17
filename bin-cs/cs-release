@@ -380,17 +380,18 @@ class CSReleaseCommand(BaseCommand):
       with open(changes_filename, 'w') as cfp:
         for files, firstline in changes:
           print(' '.join(files) + ': ' + firstline, file=cfp)
-    pkg.patch__version__(next_release.version)
+    versioned_filename = pkg.patch__version__(next_release.version)
     vcs.add_files(summary_filename, changes_filename)
     vcs.commit(
         'Release information for %s.\nSummary:\n%s' %
-        (next_vcstag, release_message), summary_filename, changes_filename
+        (next_vcstag, release_message), summary_filename, changes_filename,
+        versioned_filename
     )
     vcs.tag(next_vcstag)
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
         '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
-        % (pkg.name, next_release.version + '-post')
+        % (pkg.name, next_release.version + '-post'), versioned_filename
     )
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
@@ -699,7 +700,8 @@ class Module(object):
     self.save_pkg_tags()
     self.vcs.commit(
         '%s: %s: set %s=%s' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version)
+        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version),
+        PKG_TAGS
     )
 
   def compute_doc(self):
@@ -1044,6 +1046,9 @@ class Module(object):
 
   @pfx_method(use_str=True)
   def patch__version__(self, version):
+    ''' Patch the `__version__` module attribute.
+        Does not commit the change.
+    '''
     version_line = '__version__ = ' + repr(version) + '\n'
     toppath = self.toppath
     with Pfx(toppath):
@@ -1068,9 +1073,7 @@ class Module(object):
         with open(toppath, 'w') as tf:
           for line in lines:
             tf.write(line)
-      self.vcs.commit(
-          self.name + ': set __version__ to ' + repr(version), toppath
-      )
+    return toppath
 
   @prop
   def DISTINFO(self):
