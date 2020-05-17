@@ -455,15 +455,6 @@ def release_tags(vcs):
     if m:
       yield tag
 
-def release_prefixes(vcs):
-  ''' Return a set of the existing release prefixes.
-  '''
-  tagpfxs = set()
-  for tag in release_tags(vcs):
-    tagpfx, _ = tag.split('-', 1)
-    tagpfxs.add(tagpfx)
-  return tagpfxs
-
 def clean_release_entry(entry):
   lines = list(
       filter(
@@ -828,17 +819,13 @@ class Module(object):
   def _pypipkg(self, pypi_url):
     ''' Return a `PyPI_Package` for this module.
     '''
-    docs = self.compute_doc()
-    base_distinfo = dict(DISTINFO_DEFAULTS)
-    base_distinfo.update(
-        description=docs.description, long_description=docs.long_description
-    )
+    distinfo = self.compute_distinfo()
     package_release_version = self.latest_release_version()
     return PyPI_Package(
         pypi_url,
         self.name,
         package_release_version,
-        defaults=base_distinfo,
+        defaults=distinfo,
     )
 
   @pfx_method(use_str=True)
