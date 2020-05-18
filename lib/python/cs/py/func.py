@@ -15,7 +15,7 @@ import sys
 from functools import partial
 from cs.py3 import unicode, raise_from
 
-__version__ = '20200518'
+__version__ = '20200518-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
