@@ -316,7 +316,7 @@ class BaseCommand:
         self.apply_opts(opts, options)
 
       subcmds = self.subcommands()
-      if subcmds:
+      if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
