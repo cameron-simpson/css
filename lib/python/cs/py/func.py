@@ -15,6 +15,8 @@ import sys
 from functools import partial
 from cs.py3 import unicode, raise_from
 
+__version__ = '20200518'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
