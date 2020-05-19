@@ -195,7 +195,7 @@ def setup_logging(
     ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
-  if main_log.encoding is None:
+  if getattr(main_log, 'encoding', None) is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
   if trace_mode is None:
