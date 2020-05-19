@@ -316,7 +316,7 @@ class BaseCommand:
         self.apply_opts(opts, options)
 
       subcmds = self.subcommands()
-      if subcmds:
+      if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
@@ -331,6 +331,7 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmds.keys()))
           )
+        subcmd_context = Pfx(subcmd)
         try:
           main_is_class = issubclass(main, BaseCommand)
         except TypeError:
@@ -346,6 +347,7 @@ class BaseCommand:
           main = self.main
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")
+        subcmd_context = nullcontext()
       upd_context = options.loginfo.upd
       if upd_context is None:
         upd_context = nullcontext()
@@ -353,7 +355,7 @@ class BaseCommand:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
           with upd_context:
             with self.run_context(argv, options):
-              with Pfx(subcmd):
+              with subcmd_context:
                 return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
