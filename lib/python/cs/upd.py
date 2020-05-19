@@ -359,7 +359,7 @@ class Upd(SingletonMixin):
 
         This uses one of two methods:
         * insert above:
-          insert a line above the tip status line and write the message there.
+          insert a line above the top status line and write the message there.
         * redraw:
           clear the top slot, write txt and a newline,
           redraw all the slots below.
@@ -558,6 +558,14 @@ class UpdProxy(object):
         "%s(upd=%s,index=%d:%r)" %
         (type(self).__name__, self.upd, self.index, self.text)
     )
+
+  def __call__(self, msg, *a):
+    ''' Calling the proxy sets its `.text` property
+        in the form used by other messages: `(msg,*a)`
+    '''
+    if a:
+      msg = msg % a
+    self.text = msg
 
   @property
   def text(self):
