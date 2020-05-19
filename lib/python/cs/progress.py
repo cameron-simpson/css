@@ -545,11 +545,26 @@ class OverProgress(BaseProgress):
     '''
     return 0
 
+  def _overmax(self, fnP):
+    ''' Return the maximum of the non-`None` values
+        computed from the subsidiary `Progress`es.
+        Return the maximum, or `None` if there are no non-`None` values.
+    '''
+    maximum = None
+    for value in filter(fnP, self.subprogresses):
+      if value is not None:
+        maximum = value if maximum is None else max(maximum, value)
+    return maximum
+
   def _oversum(self, fnP):
-    return sum(
-        value for value in (fnP(P) for P in self.subprogresses)
-        if value is not None
-    )
+    ''' Sum non-`None` values computed from the subsidiary `Progress`es.
+        Return the sum, or `None` if there are no non-`None` values.
+    '''
+    summed = None
+    for value in map(fnP, self.subprogresses):
+      if value is not None:
+        summed = value if summed is None else summed + value
+    return summed
 
   @property
   def position(self):
@@ -563,6 +578,15 @@ class OverProgress(BaseProgress):
     ''' The `total` is the sum of the subsidiary totals.
     '''
     return self._oversum(lambda P: P.total)
+
+  @property
+  def throughput(self):
+    ''' The `throughput` is the sum of the subsidiary throughputs.
+    '''
+    return self._oversum(lambda P: P.throughput)
+
+  def throughput_recent(self, time_window):
+    return self._oversum(lambda P: P.throughput_recent(time_window))
 
 if __name__ == '__main__':
   from cs.debug import selftest
