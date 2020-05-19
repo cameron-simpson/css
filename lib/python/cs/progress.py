@@ -130,10 +130,10 @@ class BaseProgress(object):
 
   @property
   def throughput(self):
-    ''' The overall throughput: `self.thoughput_overall()`.
+    ''' The overall throughput: `self.throughput_overall()`.
 
         By comparison,
-        the `Progress.throughput` property is `self.thoughput_recent`
+        the `Progress.throughput` property is `self.throughput_recent`
         if the `throughput_window` is not `None`,
         otherwise it falls back to `throughput_overall`.
     '''
@@ -224,13 +224,13 @@ class Progress(BaseProgress):
 
           >>> P = Progress(name="example")
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=0,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0)]
+          Progress(name='example',start=0,position=0,start_time=...,throughput_window=None,total=None):[CheckPoint(time=..., position=0)]
           >>> P.advance(5)
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+          Progress(name='example',start=0,position=5,start_time=...,throughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
           >>> P.total = 100
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+          Progress(name='example',start=0,position=5,start_time=...,throughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
 
       A Progress instance has an attribute ``notify_update`` which
       is a set of callables. Whenever the position is updated, each
@@ -297,7 +297,7 @@ class Progress(BaseProgress):
     self.notify_update = set()
 
   def __repr__(self):
-    return "%s(name=%r,start=%s,position=%s,start_time=%s,thoughput_window=%s,total=%s):%r" \
+    return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
         % (
             type(self).__name__, self.name,
             self.start, self.position, self.start_time,
@@ -433,7 +433,7 @@ class Progress(BaseProgress):
 
         If `self.throughput_window` is not `None`,
         calls `self.throughput_recent(throughput_window)`.
-        Otherwise call `self.thoughput_overall()`.
+        Otherwise call `self.throughput_overall()`.
     '''
     throughput_window = self.throughput_window
     if throughput_window is None:
@@ -481,7 +481,7 @@ class Progress(BaseProgress):
     return rate
 
 class OverProgress(BaseProgress):
-  ''' A `Progress`-like class computed from a set of subsidiary `Process`es.
+  ''' A `Progress`-like class computed from a set of subsidiary `Progress`es.
 
       Example:
 
