@@ -6,7 +6,7 @@
 import abc
 import importlib
 from inspect import (getcomments, getmodule, isfunction, isclass, signature)
-from cs.lex import stripped_dedent
+from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
@@ -92,7 +92,10 @@ def obj_docstring(obj):
   '''
   docstring = getattr(obj, '__doc__', None)
   if docstring is None:
-    docstring = getcomments(obj)
-    if docstring is None:
-      docstring = ''
+    docstring = '\n'.join(
+        map(
+            lambda line: cutprefix(line, '# '), (getcomments(obj)
+                                                 or '').rstrip().split('\n')
+        )
+    )
   return stripped_dedent(docstring)

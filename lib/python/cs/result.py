@@ -277,10 +277,7 @@ class Result(object):
         and transitions to "running".
     '''
     return bg_thread(
-        self.call,
-        name="<%s>.bg(func=%s,...)" % (self, func),
-        args=[func] + list(a),
-        kwargs=kw
+        self.call, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
   @require(
@@ -414,7 +411,8 @@ class Result(object):
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
   '''
-  R = Result()
+  _name = kw.pop('_name', None)
+  R = Result(name=_name)
   R.bg(func, *a, **kw)
   return R
 
