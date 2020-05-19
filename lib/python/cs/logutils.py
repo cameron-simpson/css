@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200519'
+__version__ = '20200519-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
