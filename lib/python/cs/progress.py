@@ -586,7 +586,15 @@ class OverProgress(BaseProgress):
     return self._oversum(lambda P: P.throughput)
 
   def throughput_recent(self, time_window):
+    ''' The `throughput_recent` is the sum of the subsidiary throughput_recentss.
+    '''
     return self._oversum(lambda P: P.throughput_recent(time_window))
+
+  @property
+  def eta(self):
+    ''' The `eta` is the maximum of the subsidiary etas.
+    '''
+    return self._overmax(lambda P: P.eta)
 
 if __name__ == '__main__':
   from cs.debug import selftest
