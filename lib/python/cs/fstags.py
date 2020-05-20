@@ -849,6 +849,12 @@ class FSTags(MultiOpenMixin):
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
     '''
+    self.sync()
+
+  @locked
+  def sync(self):
+    ''' Flush modified tag files.
+    '''
     for tagfile in self._tagfiles.values():
       try:
         tagfile.save()
