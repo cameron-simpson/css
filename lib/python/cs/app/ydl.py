@@ -146,6 +146,11 @@ class YDL:
       tag_name = FSTAGS_PREFIX + '.' + key
       tagged_path.direct_tags.add(Tag(tag_name, value))
     self.fstags.sync()
+    if upd:
+      upd.nl(output_path)
+      proxy.delete()
+    else:
+      print(output_path, flush=True)
     return self
 
   def update_progress(self, ydl_progress):
