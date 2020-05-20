@@ -18,7 +18,7 @@ __version__ = '20200129.3'
 
 DISTINFO = {
     'description':
-    "A progress tracker with methods for throughput, ETA and update notification",
+    "A progress tracker with methods for throughput, ETA and update notification. Also a progress meter composed from other progress meters.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
