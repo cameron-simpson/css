@@ -16,7 +16,7 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
-DEFAULT_OUTPUT_FILENAME_TEMPLATE = '%(title)s--%(uploader)s@youtube--%(upload_date)s--%(resolution)s--id=%(id)s.%(ext)s'
+DEFAULT_OUTPUT_FILENAME_TEMPLATE = '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s--id=%(id)s.%(ext)s'
 
 def main(argv=None, cmd=None):
   ''' Main command line.
