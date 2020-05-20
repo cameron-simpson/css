@@ -1,3 +1,4 @@
+pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
 cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
 cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
 import the examples in the module docstring
