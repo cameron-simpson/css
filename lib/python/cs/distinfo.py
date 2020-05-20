@@ -547,20 +547,18 @@ class Module(object):
     return self.options.vcs
 
   @prop
+  @pfx_method(use_str=True)
   def module(self):
     ''' The Module for this package name.
     '''
     M = self._module
     if M is None:
-      with Pfx("import %r", self.name):
+      with Pfx("importlib.import_module(%r)", self.name):
         try:
           M = importlib.import_module(self.name)
-        except ImportError as e:
-          warning("ImportError: %s", e)
-          M = None
-        except SyntaxError as e:
-          warning("SyntaxError: %s", e)
-          M = None
+        except (ImportError, SyntaxError) as e:
+          error("import fails: %s", e)
+          raise
       self._module = M
     return M
 
@@ -598,9 +596,6 @@ class Module(object):
         or `None` if this is not inside a package.
     '''
     M = self.module
-    if M is None:
-      warning("self.module is None")
-      return None
     tested_name = cutsuffix(self.name, '_tests')
     if tested_name is not self.name:
       # foo_tests is considered part of foo
