@@ -7,7 +7,6 @@
 from getopt import GetoptError
 import logging
 import sys
-import time
 from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
 from cs.logutils import warning
@@ -56,9 +55,6 @@ class YDLCommand(BaseCommand):
             )
         )
 
-    time.sleep(4)
-    warning(dir(ydl.ydl))
-    warning(repr(ydl.ydl._ies))
     with FSTags() as fstags:
       Rs = []
       for url in argv:
