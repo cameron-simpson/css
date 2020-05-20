@@ -11,12 +11,16 @@ import time
 from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
 from cs.logutils import warning
+from cs.fstags import FSTags
 from cs.pfx import Pfx
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
+from cs.tagset import Tag
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s--id=%(id)s.%(ext)s'
+
+FSTAGS_PREFIX = 'youtube_dl'
 
 def main(argv=None, cmd=None):
   ''' Main command line.
@@ -52,28 +56,29 @@ class YDLCommand(BaseCommand):
             )
         )
 
-    Rs = []
-    for url in argv:
-      with Pfx(url):
-        Y = YDL(url, upd=options.loginfo.upd, tick=update0)
-        all_progress.add(Y.progress)
-        Rs.append(Y.bg())
-        nfetches += 1
-        update0()
-    for R in report(Rs):
-      with Pfx(R.name):
-        nfetches -= 1
-        update0()
-        ydl = R()
     time.sleep(4)
     warning(dir(ydl.ydl))
     warning(repr(ydl.ydl._ies))
+    with FSTags() as fstags:
+      Rs = []
+      for url in argv:
+        with Pfx(url):
+          Y = YDL(url, fstags=fstags, upd=options.loginfo.upd, tick=update0)
+          all_progress.add(Y.progress)
+          Rs.append(Y.bg())
+          nfetches += 1
+          update0()
+      for R in report(Rs):
+        with Pfx(R.name):
+          nfetches -= 1
+          update0()
+          R()
 
 class YDL:
   ''' Manager for a download process.
   '''
 
-  def __init__(self, url, *, upd=None, tick=None, **kw_opts):
+  def __init__(self, url, *, fstags, upd=None, tick=None, **kw_opts):
     ydl_opts = {
         'progress_hooks': [self.update_progress],
         'format': DEFAULT_OUTPUT_FORMAT,
@@ -89,6 +94,7 @@ class YDL:
     if kw_opts:
       ydl_opts.update(kw_opts)
     self.url = url
+    self.fstags = fstags
     self.tick = tick
     self.upd = upd
     self.ydl_opts = ydl_opts
@@ -115,6 +121,7 @@ class YDL:
     progress = self.progress
     proxy = self.proxy
     url = self.url
+    ydl = self.ydl
 
     if proxy:
       proxy(url + ' ...')
@@ -127,6 +134,13 @@ class YDL:
           progress.elapsed_time
       )
     self.tick()
+    ie_result = ydl.extract_info(url, download=False, process=True)
+    output_path = ydl.prepare_filename(ie_result)
+    tagged_path = self.fstags[output_path]
+    for key, value in ie_result.items():
+      tag_name = FSTAGS_PREFIX + '.' + key
+      tagged_path.direct_tags.add(Tag(tag_name, value))
+    self.fstags.sync()
     return self
 
   def update_progress(self, ydl_progress):
