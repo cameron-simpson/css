@@ -59,7 +59,13 @@ class YDLCommand(BaseCommand):
       Rs = []
       for url in argv:
         with Pfx(url):
-          Y = YDL(url, fstags=fstags, upd=options.loginfo.upd, tick=update0)
+          Y = YDL(
+              url,
+              fstags=fstags,
+              upd=options.loginfo.upd,
+              tick=update0,
+              logger=options.loginfo.logger
+          )
           all_progress.add(Y.progress)
           Rs.append(Y.bg())
           nfetches += 1

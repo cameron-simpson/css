@@ -285,6 +285,7 @@ def setup_logging(
           setattr(M, funcpart, _ftrace(F))
 
   loginfo = NS(
+      logger=root_logger,
       level=level,
       trace_level=trace_level,
       flags=flags,
