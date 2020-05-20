@@ -167,9 +167,16 @@ class CSReleaseCommand(BaseCommand):
                 for subpkg, subproblems in sorted(problem.items()):
                   warning(
                       "%s: %s", subpkg, ', '.join(
-                          subproblem
-                          if isinstance(subproblem, str) else repr(subproblem)
-                          for subproblem in subproblems
+                          subproblem if isinstance(subproblem, str) else (
+                              (
+                                  (
+                                      subproblem[0] if len(subproblem) ==
+                                      1 else "%s: %d items" %
+                                      (subproblem[0], len(subproblem) - 1)
+                                  )
+                              ) if isinstance(subproblem, list) else
+                              repr(subproblem)
+                          ) for subproblem in subproblems
                       )
                   )
     return xit
