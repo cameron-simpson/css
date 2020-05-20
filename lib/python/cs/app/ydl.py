@@ -9,8 +9,8 @@ import logging
 import sys
 from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
-from cs.logutils import warning
 from cs.fstags import FSTags
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
@@ -118,12 +118,13 @@ class YDL:
     proxy = self.proxy
     url = self.url
     ydl = self.ydl
+    upd = self.upd
 
     if proxy:
       proxy(url + ' ...')
 
-    with self.ydl:
-      self.ydl.download([url])
+    with ydl:
+      ydl.download([url])
     if proxy:
       proxy(
           "%s complete: %d bytes in %ds", url, progress.total,
