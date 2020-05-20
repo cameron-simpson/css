@@ -141,7 +141,7 @@ class YDL:
       ydl.download([url])
     if proxy:
       proxy(
-          "%s complete: %d bytes in %ds", url, progress.total,
+          "%s: %d bytes in %ds, saving metadata ...", url, progress.total,
           progress.elapsed_time
       )
     self.tick()
