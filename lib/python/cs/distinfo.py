@@ -386,7 +386,7 @@ class CSReleaseCommand(BaseCommand):
     vcs.tag(next_vcstag)
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
-        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes'
+        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
         % (pkg.name, next_release.version + '-post'), versioned_filename
     )
 
@@ -694,7 +694,7 @@ class Module(object):
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
     self.save_pkg_tags()
     self.vcs.commit(
-        '%s: %s: set %s=%s' %
+        '%s: %s: set %s=%s [IGNORE]' %
         (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version),
         PKG_TAGS
     )
