@@ -111,6 +111,14 @@ class YDL:
       result = self.result = bg_result(self.run, _name=self.url)
     return result
 
+  @property
+  def output_filename(self):
+    ''' The target output filename.
+    '''
+    ydl = self.ydl
+    ie_result = ydl.extract_info(self.url, download=False, process=True)
+    return ydl.prepare_filename(ie_result)
+
   def run(self):
     ''' Run the download.
     '''
