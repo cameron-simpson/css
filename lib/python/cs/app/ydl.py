@@ -2,10 +2,10 @@
 
 ''' Convenient command line and library wrapper for youtube-dl.
 
-    The youtube-dl tool and associated youtube_dl Python module
-    is a very useful kit for downloading media from various websites.
+    The `youtube-dl` tool and associated `youtube_dl` Python module
+    are very useful for downloading media from various websites.
     However, as an end user who almost never streams because of my
-    soggy internet link, fetching several items is quite serial and
+    soggy internet link, I find fetching several items is quite serial and
     visually noisy.
 
     This module provides a command line tool `ydl` which:
