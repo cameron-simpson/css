@@ -17,6 +17,8 @@ from cs.obj import Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
+__version__ = '20200521'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
