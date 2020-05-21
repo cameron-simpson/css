@@ -605,6 +605,9 @@ class Module(object):
     except AttributeError:
       warning("self.module has no __package__: %r", sorted(dir(M)))
       return None
+    if pkg_name != self.name and hasattr(M, 'DISTINFO'):
+      # standalone module like cs.py.modules (within cs.py)
+      return None
     if self.ismine() and not pkg_name.startswith(MODULE_PREFIX):
       # top level modules tend to be in the notional "cs" package,
       # but they're just modules
