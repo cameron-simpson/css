@@ -1,7 +1,30 @@
 #!/usr/bin/env python3
 
-''' Convenience wrapper for youtube-dl.
-    - Cameron Simpson <cs@cskk.id.au> 25apr2020
+''' Convenience command line and library wrapper for youtube-dl.
+
+    The youtube-dl tool and associated youtube_dl Python module
+    is a very useful kit for downloading media from various websites.
+    However, as an end user who almost never streams because of my
+    soggy internet link, fetching several items is quite serial and
+    visually noisy.
+
+    This module provides a command line tool `ydl` which:
+    - runs multiple downloads in parallel with progress bars
+    - prints the downloaded filename as each completes
+
+    Interactively, I keep this shell function:
+
+        ydl(){
+          ( set -ue
+            dldir=${DL:-$HOME/dl}/v
+            [ -d "$dldir" ] || set-x mkdir "$dldir"
+            cd "$dldir"
+            command ydl ${1+"$@"}
+          )
+        }
+
+    which runs the downloader in my preferred download area
+    without tedious manual `cd`ing.
 '''
 
 from getopt import GetoptError
@@ -15,6 +38,34 @@ from cs.pfx import Pfx
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Operating System :: POSIX",
+        "Operating System :: Unix",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Topic :: Internet",
+        "Topic :: System :: Networking",
+        "Topic :: Utilities",
+    ],
+    'install_requires': [
+        'youtube_dl',
+        'cs.cmdutils',
+        'cs.fstags',
+        'cs.logutils',
+        'cs.result',
+        'cs.tagset',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'ydl = cs.app.ydl:main',
+        ],
+    },
+}
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
