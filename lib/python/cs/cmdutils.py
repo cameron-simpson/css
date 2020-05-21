@@ -21,7 +21,7 @@ from cs.pfx import Pfx, XP
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200521-post'
+__version__ = '20200521.1'
 
 DISTINFO = {
     'description':

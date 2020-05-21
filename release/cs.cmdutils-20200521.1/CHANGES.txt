@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: Release information for cs.cmdutils-20200521.
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix DISTINFO.install_requires
