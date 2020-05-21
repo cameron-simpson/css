@@ -94,7 +94,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-__version__ = '20200521-post'
+__version__ = '20200521.1'
 
 DISTINFO = {
     'keywords': ["python3"],
