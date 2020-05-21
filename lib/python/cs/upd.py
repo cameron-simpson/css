@@ -180,17 +180,25 @@ class Upd(SingletonMixin):
       return s
 
   @staticmethod
+  def normalise(txt):
+    ''' Normalise `txt` for display,
+        currently implemented as:
+        `unctrl(txt.rstrip())`.
+    '''
+    return unctrl(txt.rstrip())
+
+  @staticmethod
   def adjust_text_v(oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
-        We normalise `newtxt` as `unctrl(newtxt.rstrip())`.
+        We normalise `newtxt` as using `self.normalise`.
         `oldtxt` is presumed to be already normalised.
     '''
     # normalise text
     if not raw_text:
-      newtxt = unctrl(newtxt.rstrip())
+      newtxt = self.normalise(newtxt)
     # crop for terminal width
     newlen = len(newtxt)
     if newlen >= columns:
@@ -336,7 +344,7 @@ class Upd(SingletonMixin):
     if a:
       txt = txt % a
     if not raw_text:
-      txt = unctrl(txt.rstrip())
+      txt = self.normalise(txt)
     backend = self._backend
     with self._lock:
       oldtxt = self._slot_text[slot]
