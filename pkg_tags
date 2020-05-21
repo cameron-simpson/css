@@ -8,6 +8,7 @@ cs.app.mklinks pypi.release=20171228
 cs.app.portfwd pypi.release=20190602
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release=20190729
+cs.app.ydl pypi.release="20200521"
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release=20200229
 cs.buffer pypi.release="20200517"
