@@ -17,7 +17,9 @@ from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
-DEFAULT_OUTPUT_FILENAME_TEMPLATE = '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s--id=%(id)s.%(ext)s'
+DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
+    '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s' \
+    '--id=%(id)s.%(ext)s'
 
 FSTAGS_PREFIX = 'youtube_dl'
 
@@ -112,7 +114,6 @@ class YDL:
     self.upd = upd
     self.ydl_opts = ydl_opts
     self.ydl = YoutubeDL(ydl_opts)
-    self.proxy = None
     self.proxy = upd.insert(1) if upd else None
     self.result = None
     self.progress = Progress(name=url)
@@ -152,11 +153,11 @@ class YDL:
       ydl.download([url])
     if proxy:
       total_bytes = progress.total
-      report = (
+      dl_report = (
           "elapsed %ds" %
           (progress.elapsed_time if total_bytes is None else progress.total)
       )
-      proxy("%s, saving metadata ...", report)
+      proxy("%s, saving metadata ...", dl_report)
     self.tick()
     ie_result = ydl.extract_info(url, download=False, process=True)
     output_path = ydl.prepare_filename(ie_result)
@@ -179,8 +180,6 @@ class YDL:
     '''
     progress = self.progress
     proxy = self.proxy
-    url = self.url
-    upd = self.upd
     progress.total = ydl_progress['total_bytes']
     progress.position = ydl_progress['downloaded_bytes']
     if proxy:
