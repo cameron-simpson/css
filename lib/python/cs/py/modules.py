@@ -13,6 +13,8 @@ import sys
 from cs.context import stackattrs
 from cs.pfx import Pfx
 
+__version__ = '20200521'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
