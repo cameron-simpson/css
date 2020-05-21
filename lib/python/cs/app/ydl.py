@@ -53,12 +53,12 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'youtube_dl',
         'cs.cmdutils',
         'cs.fstags',
         'cs.logutils',
         'cs.result',
         'cs.tagset',
+        'youtube_dl',
     ],
     'entry_points': {
         'console_scripts': [
