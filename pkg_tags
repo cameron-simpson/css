@@ -44,6 +44,7 @@ cs.pipeline pypi.release=20191007.1
 cs.predicate pypi.release=20190221
 cs.progress pypi.release="20200520"
 cs.psutils pypi.release=20190101
+cs.py.doc pypi.release="20200521"
 cs.py.func pypi.release="20200518"
 cs.py.modules pypi.release="20200521"
 cs.py.stack pypi.release=20190812
