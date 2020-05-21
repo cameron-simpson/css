@@ -100,7 +100,7 @@ from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200229'
+__version__ = '20200521'
 
 DISTINFO = {
     'keywords': ["python3"],
