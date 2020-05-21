@@ -117,7 +117,7 @@ class YDL:
     self.result = None
     self.progress = Progress(name=url)
     if self.proxy:
-      self.proxy(url + ':')
+      self.proxy.prefix = url + ' '
 
   def bg(self):
     ''' Return the `Result` for this download,
@@ -146,15 +146,17 @@ class YDL:
     upd = self.upd
 
     if proxy:
-      proxy(url + ' ...')
+      proxy('...')
 
     with ydl:
       ydl.download([url])
     if proxy:
-      proxy(
-          "%s: %d bytes in %ds, saving metadata ...", url, progress.total,
-          progress.elapsed_time
+      total_bytes = progress.total
+      report = (
+          "elapsed %ds" %
+          (progress.elapsed_time if total_bytes is None else progress.total)
       )
+      proxy("%s, saving metadata ...", report)
     self.tick()
     ie_result = ydl.extract_info(url, download=False, process=True)
     output_path = ydl.prepare_filename(ie_result)
@@ -182,11 +184,8 @@ class YDL:
     progress.total = ydl_progress['total_bytes']
     progress.position = ydl_progress['downloaded_bytes']
     if proxy:
-      proxy(
-          progress.status(
-              url + ': ' + ydl_progress['filename'][:24], upd.columns - 1
-          )
-      )
+      filepart = ydl_progress['filename'][:24]
+      proxy(progress.status(filepart, proxy.width))
     self.tick()
 
   @staticmethod
