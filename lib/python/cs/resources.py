@@ -18,8 +18,6 @@ from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
 DISTINFO = {
-    'description':
-    "resourcing related classes and functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -248,7 +246,7 @@ class MultiOpenMixin(object):
 class _SubOpen(Proxy):
   ''' A single use proxy for another object with its own independent .closed attribute.
 
-      The target use case is MultiOpenMixins which return independent
+      The target use case is `MultiOpenMixin`s which return independent
       closables from their .open method.
   '''
 
@@ -346,7 +344,7 @@ class RunState(object):
       should stop (`.cancel`)
       and has stopped (`.stop`).
 
-      A `RunState` can be used a a context manager, with the enter
+      A `RunState` can be used as a context manager, with the enter
       and exit methods calling `.start` and `.stop` respectively.
       Note that if the suite raises an exception
       then the exit method also calls `.cancel` before the call to `.stop`.
