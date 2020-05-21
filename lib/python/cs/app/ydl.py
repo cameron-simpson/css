@@ -81,6 +81,16 @@ class YDL:
   '''
 
   def __init__(self, url, *, fstags, upd=None, tick=None, **kw_opts):
+    ''' Initialise the manager.
+
+        Parameters:
+        * `url`: the URL to download
+        * `fstags`: mandatory keyword argument, a `cs.fstags.FSTags` instance
+        * `upd`: optional `cs.upd.Upd` instance for progress reporting
+        * `tick`: optional callback to indicate state change
+        * `kw_opts`: other keyword arguments are used to initialise
+          the options for the underlying `YoutubeDL` instance
+    '''
     ydl_opts = {
         'progress_hooks': [self.update_progress],
         'format': DEFAULT_OUTPUT_FORMAT,
