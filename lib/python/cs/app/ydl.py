@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Convenience command line and library wrapper for youtube-dl.
+''' Convenient command line and library wrapper for youtube-dl.
 
     The youtube-dl tool and associated youtube_dl Python module
     is a very useful kit for downloading media from various websites.
@@ -80,7 +80,7 @@ def main(argv=None, cmd=None):
   return YDLCommand().run(argv, cmd=cmd)
 
 class YDLCommand(BaseCommand):
-  ''' Command line implementation.
+  ''' `ydl` command line implementation.
   '''
 
   USAGE_FORMAT = '''Usage: {cmd} URLs...'''
