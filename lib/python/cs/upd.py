@@ -600,6 +600,18 @@ class UpdProxy(object):
         txt = txt[overflow:]
       self.upd[index] = txt
 
+  @property
+  def width(self):
+    ''' The available space for text after `self.prefix`.
+
+        This is available width for uncropped text,
+        intended support presizing messages such as progress bars.
+        Setting the text to something linger will the rightmost
+        portion of the text which fits.
+    '''
+    prefix = self.prefix
+    return self.upd.columns - 1 - (len(prefix) if prefix else 0)
+
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
