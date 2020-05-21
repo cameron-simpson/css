@@ -1,7 +1,30 @@
 #!/usr/bin/env python3
 
-''' Convenience wrapper for youtube-dl.
-    - Cameron Simpson <cs@cskk.id.au> 25apr2020
+''' Convenience command line and library wrapper for youtube-dl.
+
+    The youtube-dl tool and associated youtube_dl Python module
+    is a very useful kit for downloading media from various websites.
+    However, as an end user who almost never streams because of my
+    soggy internet link, fetching several items is quite serial and
+    visually noisy.
+
+    This module provides a command line tool `ydl` which:
+    - runs multiple downloads in parallel with progress bars
+    - prints the downloaded filename as each completes
+
+    Interactively, I keep this shell function:
+
+        ydl(){
+          ( set -ue
+            dldir=${DL:-$HOME/dl}/v
+            [ -d "$dldir" ] || set-x mkdir "$dldir"
+            cd "$dldir"
+            command ydl ${1+"$@"}
+          )
+        }
+
+    which runs the downloader in my preferred download area
+    without tedious manual `cd`ing.
 '''
 
 from getopt import GetoptError
@@ -16,8 +39,38 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 4 - Beta",
+        "Environment :: Console",
+        "Operating System :: POSIX",
+        "Operating System :: Unix",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Topic :: Internet",
+        "Topic :: System :: Networking",
+        "Topic :: Utilities",
+    ],
+    'install_requires': [
+        'youtube_dl',
+        'cs.cmdutils',
+        'cs.fstags',
+        'cs.logutils',
+        'cs.result',
+        'cs.tagset',
+    ],
+    'entry_points': {
+        'console_scripts': [
+            'ydl = cs.app.ydl:main',
+        ],
+    },
+}
+
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
-DEFAULT_OUTPUT_FILENAME_TEMPLATE = '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s--id=%(id)s.%(ext)s'
+DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
+    '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s' \
+    '--id=%(id)s.%(ext)s'
 
 FSTAGS_PREFIX = 'youtube_dl'
 
@@ -81,14 +134,25 @@ class YDL:
   '''
 
   def __init__(self, url, *, fstags, upd=None, tick=None, **kw_opts):
+    ''' Initialise the manager.
+
+        Parameters:
+        * `url`: the URL to download
+        * `fstags`: mandatory keyword argument, a `cs.fstags.FSTags` instance
+        * `upd`: optional `cs.upd.Upd` instance for progress reporting
+        * `tick`: optional callback to indicate state change
+        * `kw_opts`: other keyword arguments are used to initialise
+          the options for the underlying `YoutubeDL` instance
+    '''
     ydl_opts = {
         'progress_hooks': [self.update_progress],
         'format': DEFAULT_OUTPUT_FORMAT,
         'logger': logging.getLogger(),
         'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
         ##'skip_download': True,
-        'writeinfojson': True,
-        'cachedir': False,
+        'writeinfojson': False,
+        'updatetime': False,
+        ##'cachedir': False,
         'process_info': [self.process_info]
     }
     if tick is None:
@@ -101,12 +165,11 @@ class YDL:
     self.upd = upd
     self.ydl_opts = ydl_opts
     self.ydl = YoutubeDL(ydl_opts)
-    self.proxy = None
     self.proxy = upd.insert(1) if upd else None
     self.result = None
     self.progress = Progress(name=url)
     if self.proxy:
-      self.proxy(url + ':')
+      self.proxy.prefix = url + ' '
 
   def bg(self):
     ''' Return the `Result` for this download,
@@ -135,15 +198,17 @@ class YDL:
     upd = self.upd
 
     if proxy:
-      proxy(url + ' ...')
+      proxy('...')
 
     with ydl:
       ydl.download([url])
     if proxy:
-      proxy(
-          "%s complete: %d bytes in %ds", url, progress.total,
-          progress.elapsed_time
+      total_bytes = progress.total
+      dl_report = (
+          "elapsed %ds" %
+          (progress.elapsed_time if total_bytes is None else progress.total)
       )
+      proxy("%s, saving metadata ...", dl_report)
     self.tick()
     ie_result = ydl.extract_info(url, download=False, process=True)
     output_path = ydl.prepare_filename(ie_result)
@@ -166,16 +231,11 @@ class YDL:
     '''
     progress = self.progress
     proxy = self.proxy
-    url = self.url
-    upd = self.upd
     progress.total = ydl_progress['total_bytes']
     progress.position = ydl_progress['downloaded_bytes']
     if proxy:
-      proxy(
-          progress.status(
-              url + ': ' + ydl_progress['filename'][:24], upd.columns - 1
-          )
-      )
+      filepart = ydl_progress['filename'][:24]
+      proxy(progress.status(filepart, proxy.width))
     self.tick()
 
   @staticmethod
