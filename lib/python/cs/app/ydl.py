@@ -87,8 +87,9 @@ class YDL:
         'logger': logging.getLogger(),
         'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
         ##'skip_download': True,
-        'writeinfojson': True,
-        'cachedir': False,
+        'writeinfojson': False,
+        'updatetime': False,
+        ##'cachedir': False,
         'process_info': [self.process_info]
     }
     if tick is None:
