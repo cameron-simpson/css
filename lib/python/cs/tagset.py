@@ -96,7 +96,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
 from cs.x import X
 
-__version__ = '20200521'
+__version__ = '20200521-post'
 
 DISTINFO = {
     'keywords': ["python3"],
