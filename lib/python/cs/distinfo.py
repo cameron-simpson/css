@@ -366,7 +366,8 @@ class CSReleaseCommand(BaseCommand):
     if not release_message:
       error("empty release message, not making new release")
       return 1
-    next_release = pkg.latest.next()
+    latest = pkg.latest
+    next_release = pkg.latest.next() if pkg.latest else ReleaseTag.today(pkg.name)
     next_vcstag = next_release.vcstag
     if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
       error("aborting release at user request")
