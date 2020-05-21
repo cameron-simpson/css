@@ -554,12 +554,14 @@ class UpdProxy(object):
 
   __slots__ = {
       'upd': 'The parent Upd instance.',
-      'index': 'The index of this slot within the parent Upd.'
+      'index': 'The index of this slot within the parent Upd.',
+      'prefix': 'The fixed leading prefix for this slot, default "".',
   }
 
   def __init__(self, upd, index):
     self.upd = upd
     self.index = index
+    self.prefix = ''
 
   def __str__(self):
     return (
@@ -585,9 +587,17 @@ class UpdProxy(object):
   @text.setter
   def text(self, txt):
     ''' Set the text of the status line.
+
+        If the length of `self.prefix+txt` exceeds the available display
+        width then the leftmost text is cropped to fit.
     '''
     index = self.index
+    upd = self.upd
     if index is not None:
+      txt = upd.normalise(self.prefix + txt)
+      overflow = len(txt) - upd.columns + 1
+      if overflow > 0:
+        txt = txt[overflow:]
       self.upd[index] = txt
 
   def delete(self):
