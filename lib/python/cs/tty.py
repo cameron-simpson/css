@@ -15,6 +15,8 @@ from subprocess import Popen, PIPE
 import sys
 from cs.gimmicks import warning
 
+__version__ = '20200521'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
