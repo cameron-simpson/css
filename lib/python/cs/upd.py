@@ -565,7 +565,7 @@ class UpdProxy(object):
 
   def __str__(self):
     return (
-        "%s(upd=%s,index=%d:%r)" %
+        "%s(upd=%s,index=%s:%r)" %
         (type(self).__name__, self.upd, self.index, self.text)
     )
 
