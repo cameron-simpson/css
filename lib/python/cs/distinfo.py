@@ -162,7 +162,12 @@ class CSReleaseCommand(BaseCommand):
                 label, *values = problem
                 warning("%s:", label)
                 for subproblem in values:
-                  warning("  %s", subproblem)
+                  warning(
+                      "  %s", ', '.join(
+                          map(str, subproblem) if
+                          isinstance(subproblem, (list, tuple)) else subproblem
+                      )
+                  )
               else:
                 for subpkg, subproblems in sorted(problem.items()):
                   warning(
@@ -171,10 +176,19 @@ class CSReleaseCommand(BaseCommand):
                               (
                                   (
                                       subproblem[0] if len(subproblem) ==
-                                      1 else "%s: %d items" %
+                                      1 else "%s (%d)" %
                                       (subproblem[0], len(subproblem) - 1)
                                   )
-                              ) if isinstance(subproblem, list) else
+                              ) if isinstance(subproblem, list) else (
+                                  "{" + ", ".join(
+                                      "%s: %d %s" % (
+                                          subsubkey, len(subsubproblems),
+                                          "problem" if len(subsubproblems) ==
+                                          1 else "problems"
+                                      ) for subsubkey, subsubproblems in
+                                      sorted(subproblem.items())
+                                  ) + "}"
+                              ) if hasattr(subproblem, 'items') else
                               repr(subproblem)
                           ) for subproblem in subproblems
                       )
@@ -367,7 +381,9 @@ class CSReleaseCommand(BaseCommand):
       error("empty release message, not making new release")
       return 1
     latest = pkg.latest
-    next_release = pkg.latest.next() if pkg.latest else ReleaseTag.today(pkg.name)
+    next_release = pkg.latest.next() if pkg.latest else ReleaseTag.today(
+        pkg.name
+    )
     next_vcstag = next_release.vcstag
     if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
       error("aborting release at user request")
@@ -702,8 +718,7 @@ class Module(object):
     pkg_tags_filename = self.save_pkg_tags()
     self.vcs.commit(
         '%s: %s: set %s=%s [IGNORE]' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version),
-        PKG_TAGS
+        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
     )
 
   def compute_doc(self):
