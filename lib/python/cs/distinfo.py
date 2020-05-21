@@ -707,15 +707,17 @@ class Module(object):
     '''
     # break out the release log and format it
     releases = list(self.release_log())
-    release_tag, release_entry = releases[0]
-    release_entry = clean_release_entry(release_entry)
-    preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
+    preamble_md = None
     postamble_parts = []
-    for release_tag, release_entry in releases:
+    if releases:
+      release_tag, release_entry = releases[0]
       release_entry = clean_release_entry(release_entry)
-      postamble_parts.append(
-          f'*Release {release_tag.version}*:\n{release_entry}'
-      )
+      preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
+      for release_tag, release_entry in releases:
+        release_entry = clean_release_entry(release_entry)
+        postamble_parts.append(
+            f'*Release {release_tag.version}*:\n{release_entry}'
+        )
     # split the module documentation after the opening paragraph
     full_doc = module_doc(self.module)
     try:
@@ -725,13 +727,16 @@ class Module(object):
       doc_tail = ''
     # compute some distinfo stuff
     description = doc_head.replace('\n', ' ')
-    long_description = '\n\n'.join(
-        [
-            doc_head,
-            preamble_md.rstrip(), doc_tail, '# Release Log\n\n',
-            *postamble_parts
-        ]
-    )
+    if preamble_md:
+      long_description = '\n\n'.join(
+          [
+              doc_head,
+              preamble_md.rstrip(), doc_tail, '# Release Log\n\n',
+              *postamble_parts
+          ]
+      )
+    else:
+      long_description = full_doc
     return SimpleNamespace(
         module_doc=full_doc,
         description=description,
