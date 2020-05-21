@@ -22,6 +22,8 @@ from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
+__version__ = '20200521'
+
 DISTINFO = {
     'description':
     "threading and communication/synchronisation conveniences",
