@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends.
+Result and friends: various classable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -65,17 +65,16 @@ from cs.seq import seq
 from cs.threads import bg as bg_thread
 
 DISTINFO = {
-    'description':
-    "Result and friends: callable objects which will receive a value"
-    " at a later point in time.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.threads', 'icontract'],
+    'install_requires': [
+        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
+        'cs.threads', 'icontract'
+    ],
 }
 
 class ResultState(Enum):
