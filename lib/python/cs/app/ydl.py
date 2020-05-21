@@ -39,7 +39,7 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 
-__version__ = '20200521'
+__version__ = '20200521-post'
 
 DISTINFO = {
     'keywords': ["python3"],
