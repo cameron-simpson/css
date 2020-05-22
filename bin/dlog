@@ -16,6 +16,7 @@ echo=:
 [ -t 2 ] && echo=eecho
 
 : ${LOGDIR:=$HOME/var/log}
+: ${DLOG_SQLTAGS:=${SQLTAGS_DBURL:-$HOME/var/sqltags.sqlite}}
 
 when=${DLOG_WHEN:-}
 
@@ -90,7 +91,7 @@ echo "$ts $dlog_cats: $headline" >>"$logname"
   ( set --
     [ -z "$dlog_cats" ] || set -- -c "$dlog_cats"
     [ -z "$when" ] || set -- -d "$when"
-    $trace sqltags -f "$HOME/var/sqltags.sqlite" log "$@" -- "$headline"
+    $trace sqltags -f "$DLOG_SQLTAGS" log "$@" -- "$headline"
   ) &
   $trace buglog-daily "$dlog_cats: $headline" &
   for category in `printf "%s\n" "$dlog_cats" | tr , ' '`
