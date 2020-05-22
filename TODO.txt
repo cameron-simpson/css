@@ -1,3 +1,4 @@
+cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
 can putacc be recoded to use fstags --for-rsync efficiently?
 ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
 treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
