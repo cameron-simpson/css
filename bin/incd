@@ -39,9 +39,9 @@ fi
 
 if [ -n "$target" ]
 then
-  if hostpart=$( expr "x$target" : 'x\([a-z][a-z0-9_@]*[a-z]\):.*' )
+  if hostpart=$( expr "x$target" : 'x\([a-z][-a-z0-9_@]*[a-z0-9]\):.*' )
   then
-    dir=$(       expr "x$target" : 'x[a-z][a-z0-9_@]*[a-z]:\(.*\)' )
+    dir=$(       expr "x$target" : 'x[a-z][-a-z0-9_@]*[a-z0-9]:\(.*\)' )
     if [ $# = 0 ]
     then
       sshopts=-t
