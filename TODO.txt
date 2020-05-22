@@ -1,3 +1,4 @@
+rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
 cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
 can putacc be recoded to use fstags --for-rsync efficiently?
 ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
