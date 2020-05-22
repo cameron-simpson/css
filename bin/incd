@@ -67,13 +67,12 @@ then
     [ -d "$parent/." ] && dir=$parent
 fi
 
-# update the latest tag
-if [ $set_latest ]
-then  $trace fstags tag . "$fstags_latest=\"$target\""
-fi
-
 if [ -n "$hostpart" ]
 then
+  # update the latest tag
+  if [ $set_latest ]
+  then  $trace fstags tag . "$fstags_latest=\"$target\""
+  fi
   qdir=$( shqstr "$dir" )
   exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
 else
