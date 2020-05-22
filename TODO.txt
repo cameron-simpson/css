@@ -1,3 +1,4 @@
+ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
 treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
 pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
 cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
