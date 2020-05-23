@@ -100,7 +100,7 @@ from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200229'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -112,9 +112,9 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'cs.upd', 'icontract'
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
+        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
 
@@ -213,7 +213,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     directories_like_files = False
     xit = 0
     options, argv = getopt(argv, 'd')
-    for option, value in options:
+    for option, _ in options:
       with Pfx(option):
         if option == '-d':
           directories_like_files = True
@@ -235,9 +235,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   @classmethod
   def cmd_find(cls, argv, options):
-    ''' Usage: {cmd} [--for-rsync] path {{tag[=value]|-tag}}...
+    ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
-          -d          Treat directories like files (do not recurse).
           --direct    Use direct tags instead of all tags.
           --for-rsync Instead of listing matching paths, emit a
                       sequence of rsync(1) patterns suitable for use with
@@ -686,7 +685,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             tag tagset_name {{tag[=value]|-tag}}...
               Directly modify tag_name within the tag file tagfile_path.
     '''
-    fstags = options.fstags
     try:
       tagfilepath = argv.pop(0)
     except IndexError:
@@ -714,9 +712,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             if badopts:
               raise GetoptError("bad arguments")
             with stackattrs(state, verbose=True):
-              with fstags:
-                path = abspath(tagfilepath)
-                tagfile = fstags._tagfile(path)
+              with TagFile(tagfilepath) as tagfile:
                 tags = tagfile[tagset_name]
                 for choice in tag_choices:
                   with Pfx(choice.spec):
@@ -852,6 +848,12 @@ class FSTags(MultiOpenMixin):
 
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
+    '''
+    self.sync()
+
+  @locked
+  def sync(self):
+    ''' Flush modified tag files.
     '''
     for tagfile in self._tagfiles.values():
       try:
@@ -1090,7 +1092,7 @@ class FSTags(MultiOpenMixin):
     changed = edit_strings(lines)
     for old_line, new_line in changed:
       with stackattrs(state, verbose=False):
-        old_name, old_tags = tagfile.parse_tags_line(old_line)
+        old_name, _ = tagfile.parse_tags_line(old_line)
         new_name, new_tags = tagfile.parse_tags_line(new_line)
       with Pfx(old_name):
         tags = tagsets[old_name]
@@ -1282,6 +1284,51 @@ class TagFile(SingletonMixin):
         type(self).__name__, self.filepath, self.find_parent
     )
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, exc_traceback):
+    ''' Save the tagsets if modified.
+        Do not save if there's an exception pending.
+    '''
+    if exc_type is None:
+      self.save()
+
+  # Mapping mathods, proxying through to .tagsets.
+  def keys(self):
+    ''' `tagsets.keys`
+    '''
+    ks = self.tagsets.keys()
+    return ks
+
+  def values(self):
+    ''' `tagsets.values`
+    '''
+    return self.tagsets.values()
+
+  def items(self):
+    ''' `tagsets.items`
+    '''
+    return self.tagsets.items()
+
+  def __getitem__(self, name):
+    ''' Return the `TagSet` associated with `name`.
+    '''
+    with Pfx("%s.__getitem__[%r]", self, name):
+      tagfile = self
+      while tagfile is not None:
+        if name in tagfile.tagsets:
+          break
+        tagfile = tagfile.parent if tagfile.find_parent else None
+      if tagfile is None:
+        # not available in parents, use self
+        # this will autocreate an empty TagSet in self
+        tagfile = self
+      return tagfile.tagsets[name]
+
+  def __delitem__(self, name):
+    del self.tagsets[name]
+
   def __getattr__(self, attr):
     if attr == 'parent':
       # locate parent TagFile
@@ -1307,32 +1354,19 @@ class TagFile(SingletonMixin):
       return parent
     raise AttributeError(attr)
 
-  def __getitem__(self, name):
-    ''' Return the `TagSet` associated with `name`.
-    '''
-    with Pfx("%s.__getitem__[%r]", self, name):
-      tagfile = self
-      while tagfile is not None:
-        if name in tagfile.tagsets:
-          break
-        tagfile = tagfile.parent if tagfile.find_parent else None
-      if tagfile is None:
-        # not available in parents, use self
-        # this will autocreate an empty TagSet in self
-        tagfile = self
-      return tagfile.tagsets[name]
-
   @locked_property
   @pfx_method
   def tagsets(self):
     ''' The tag map from the tag file,
         a mapping of name=>`TagSet`.
+
+        This is loaded on demand.
     '''
     return self.load_tagsets(self.filepath, self.ontology)
 
   @property
   def names(self):
-    ''' The names from this `TagFile`.
+    ''' The names from this `TagFile` as a list.
     '''
     return list(self.tagsets.keys())
 
@@ -1431,25 +1465,32 @@ class TagFile(SingletonMixin):
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
-      with open(filepath, 'w') as f:
-        for name, tags in name_tags:
-          if not tags:
-            continue
-          f.write(cls.tags_line(name, tags))
-          f.write('\n')
-      for _, tags in name_tags:
-        tags.modified = False
+      try:
+        with open(filepath, 'w') as f:
+          for name, tags in name_tags:
+            if not tags:
+              continue
+            f.write(cls.tags_line(name, tags))
+            f.write('\n')
+      except OSError as e:
+        error("save fails: %s", e)
+      else:
+        for _, tags in name_tags:
+          tags.modified = False
 
   def save(self):
     ''' Save the tag map to the tag file.
     '''
-    if getattr(self, '_tagsets', None) is None:
+    tagsets = getattr(self, '_tagsets', None)
+    if tagsets is None:
       # TagSets never loaded
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, self._tagsets.values())):
+      if any(map(lambda tagset: tagset.modified, tagsets.values())):
         # modified TagSets
         self.save_tagsets(self.filepath, self.tagsets)
+        for tagset in tagsets.values():
+          tagset.modified = False
     if self.find_parent:
       parent = self.parent
       if parent:

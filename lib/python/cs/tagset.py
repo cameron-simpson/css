@@ -3,8 +3,14 @@
 ''' Tags and sets of tags
     with __format__ support and optional ontology information.
 
-    Note: see `cs.fstags` for support for applying these to filesystem objects
+    See `cs.fstags` for support for applying these to filesystem objects
     such as directories and files.
+
+    See `cs.sqltags` for support for databases of entities with tags,
+    not directly associated with filesystem objects.
+    This is suited to both log entries (entities with no "name")
+    and large collections of named entities;
+    both accept `Tag`s and can be seached on that basis.
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
@@ -88,7 +94,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-__version__ = '20200318'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -102,6 +108,8 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py3',
+        'icontract',
     ],
 }
 
@@ -775,6 +783,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
@@ -967,7 +985,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     attr_value = self.__dict__.get(attr)
     if attr_value is None:
-      warning("%s: no .%r", self, attr)
+      ##warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
@@ -1262,8 +1280,5 @@ class TagsCommandMixin:
     choices = []
     for arg in argv:
       with Pfx(arg):
-        choice, offset = TagChoice.parse(arg)
-        if offset < len(arg):
-          raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append(choice)
+        choices.append(TagChoice.from_str(arg))
     return choices

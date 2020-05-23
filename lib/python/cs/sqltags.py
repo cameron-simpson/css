@@ -15,44 +15,37 @@
 from collections import namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
-from datetime import datetime, timezone
-import errno
+from datetime import datetime
 from getopt import getopt, GetoptError
-import json
 import os
 from os.path import basename
 import re
-import shutil
 import sys
 import threading
-from threading import Lock, RLock
+from threading import RLock
 import time
 from icontract import require
 from sqlalchemy import (
-    create_engine, event, Index, Column, DateTime, Integer, Float, String,
-    LargeBinary, JSON, Enum, ForeignKey
+    create_engine, event, Index, Column, Integer, Float, String, JSON,
+    ForeignKey
 )
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import select
+from sqlalchemy.sql.expression import or_
+from sqlalchemy.orm import sessionmaker, aliased
 import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import fmtdoc
+from cs.dateutils import UNIXTimeMixin, unixtime2datetime
 from cs.edit import edit_strings
-from cs.fileutils import crop_name, findup, shortpath
-from cs.lex import (
-    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
-    FormatAsError
-)
-from cs.logutils import error, warning, info, ifverbose
-from cs.obj import SingletonMixin
+from cs.lex import FormatableMixin, FormatAsError
+from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, auto_session, orm_auto_session, json_column, BasicTableMixin,
-    HasIdMixin
+    ORM, auto_session, orm_auto_session, BasicTableMixin, HasIdMixin
 )
-from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
-from cs.threads import locked, locked_property
+from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin
+from cs.threads import locked
 from cs.upd import Upd
 
 DISTINFO = {
@@ -77,7 +70,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/.sqltags.sqlite'
 
-SEARCH_OUTPUT_FORMAT_DEFAULT = '{date|isoformat} {headline} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isotime} {headline} {tags}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -149,6 +142,48 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     with stackattrs(options, sqltags=sqltags):
       with sqltags:
         yield
+
+  @classmethod
+  def cmd_find(cls, argv, options):
+    ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
+          List files from path matching all the constraints.
+          -o output_format
+                      Use output_format as a Python format string to lay out
+                      the listing.
+                      Default: {FIND_OUTPUT_FORMAT_DEFAULT}
+    '''
+    sqltags = options.sqltags
+    badopts = False
+    output_format = FIND_OUTPUT_FORMAT_DEFAULT
+    options, argv = getopt(argv, 'o:')
+    for option, value in options:
+      with Pfx(option):
+        if option == '-o':
+          output_format = sqltags.resolve_format_string(value)
+        else:
+          raise RuntimeError("unsupported option")
+    try:
+      tag_choices = cls.parse_tag_choices(argv)
+    except ValueError as e:
+      warning("bad tag specifications: %s", e)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    xit = 0
+    with sqltags.orm.session() as session:
+      with Upd(sys.stderr) as U:
+        U.out("select %s ...", ' '.join(map(str, tag_choices)))
+        entities = sqltags.find(tag_choices, session=session, with_tags=True)
+      for entity in entities:
+        with Pfx(entity):
+          try:
+            output = entity.format_as(output_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
+    return xit
 
   @classmethod
   def cmd_log(cls, argv, options):
@@ -299,30 +334,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                   entity.discard_tag(tag_choice.tag, session=session)
     return xit
 
-def datetime2unixtime(dt):
-  ''' Convert a `datetime` to a UNIX timestamp.
-
-      *Note*: unlike `datetime.timestamp`,
-      if the `datetime` is naive
-      it is presumed to be in UTC rather than the local timezone.
-  '''
-  if dt.tzinfo is None:
-    dt = dt.replace(tzinfo=timezone.utc)
-  return dt.timestamp()
-
-def unixtime2datetime(unixtime, tz=None):
-  ''' Convert a a UNIX timestamp to a `datetime`.
-
-      *Note*: unlike `datetime.fromtimestamp`,
-      if `tz` is `None` the timezone `datetime.timezone.utc` is used.
-  '''
-  if tz is None:
-    tz = timezone.utc
-  return datetime.fromtimestamp(unixtime, tz=tz)
-
 SQLTagsCommand.add_usage_to_docstring()
 
-class SQLTagsORM(ORM):
+class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
   '''
 
@@ -357,12 +371,14 @@ class SQLTagsORM(ORM):
   def declare_schema(self):
     ''' Define the database schema / ORM mapping.
     '''
+    orm = self
     Base = self.Base
 
     class Entities(
         Base,
         BasicTableMixin,
         HasIdMixin,
+        UNIXTimeMixin,
     ):
       ''' An entity.
       '''
@@ -387,9 +403,8 @@ class SQLTagsORM(ORM):
       def __str__(self):
         return (
             "%s(when=%s,id=%d,name=%r)" % (
-                type(self).__name__, unixtime2datetime(
-                    self.unixtime
-                ).isoformat(), self.id, self.name
+                type(self).__name__, self.datetime.isoformat(), self.id,
+                self.name
             )
         )
 
@@ -421,15 +436,16 @@ class SQLTagsORM(ORM):
             replacing any existing tag named `name`.
         '''
         tag = Tag(name, value)
+        tags = orm.tags
         if self.id is None:
           max_id_result = session.query(
               func.max(Entities.id).label("max_entity_id")
           ).one_or_none()
           self.id = max_id_result.max_entity_id + 1 if max_id_result else 0
           session.flush()
-        etag = Tags.lookup1(session=session, entity_id=self.id, name=tag.name)
+        etag = tags.lookup1(session=session, entity_id=self.id, name=tag.name)
         if etag is None:
-          etag = Tags(entity_id=self.id, name=tag.name)
+          etag = tags(entity_id=self.id, name=tag.name)
           etag.value = tag.value
           session.add(etag)
         else:
@@ -441,11 +457,84 @@ class SQLTagsORM(ORM):
             Return the tag row discarded or `None` if no match.
         '''
         tag = Tag(name, value)
-        etag = Tags.lookup1(session=session, entity_id=self.id, name=name)
+        tags = orm.tags
+        etag = tags.lookup1(session=session, entity_id=self.id, name=name)
         if etag is not None:
           if tag.value is None or tag.value == etag.value:
             session.delete(etag)
         return etag
+
+      @classmethod
+      @pfx_method
+      @auto_session
+      def by_tags(cls, tag_criteria, *, session, with_tags=False):
+        ''' Construct a query to yield `Entity` rows
+            matching the supplied `tag_criteria`.
+
+            The `tag_criteria` should be an interable
+            yielding any of the following types:
+            * `TagChoice`: used as a positive or negative test
+            * `Tag`: an object with a `.name` and `.value`
+              is equivalent to a positive `TagChoice`
+            * `(name,value)`: a 2 element sequence
+              is equivalent to a positive `TagChoice`
+            * `str`: a string tests for the presence
+              of a tag with that name;
+              if the string commences with a `'-'` (minus)
+              a negative test is made
+
+            If `with_tags` is true (default `False`)
+            add a final RIGHT JOIN to include the associated `Tags` rows.
+        '''
+        entities = orm.entities
+        tags = orm.tags
+        query = session.query(entities).filter_by(name=None)
+        for taggy in tag_criteria:
+          with Pfx(taggy):
+            if isinstance(taggy, str):
+              tag_choice = TagChoice.from_str(taggy)
+            elif hasattr(taggy, 'choice'):
+              tag_choice = taggy
+            elif hasattr(taggy, 'name'):
+              tag_choice = TagChoice(None, True, taggy)
+            else:
+              name, value = taggy
+              tag_choice = TagChoice(None, True, Tag(name, value))
+            choice = tag_choice.choice
+            tag = tag_choice.tag
+            tags_alias = aliased(tags)
+            tag_column, tag_test_value = tags_alias.value_test(tag.value)
+            match = tags_alias.name == tag.name,
+            isouter = False
+            if choice:
+              # positive test
+              if tag_column is None:
+                # just test for presence
+                pass
+              else:
+                # test for presence and value
+                match = *match, tag_column == tag_test_value
+            else:
+              # negative test
+              isouter = True
+              if tag_column is None:
+                # just test for absence
+                match = *match, tags_alias.id is None
+              else:
+                # test for absence or incorrect value
+                match = *match, or_(
+                    tags_alias.id is None, tag_column != tag_test_value
+                )
+            query = query.join(tags_alias, isouter=isouter).filter(*match)
+        if with_tags:
+          tags_alias = aliased(tags)
+          query = query.join(
+              tags_alias, isouter=True
+          ).filter(entities.id is not None).add_columns(
+              tags_alias.name, tags_alias.float_value, tags_alias.string_value,
+              tags_alias.structured_value
+          )
+        return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
       ''' The table of tags associated with entities.
@@ -478,15 +567,43 @@ class SQLTagsORM(ORM):
           JSON, nullable=True, default=None, comment='tag value in JSON form'
       )
 
+      @staticmethod
+      @require(
+          lambda float_value: float_value is None or
+          isinstance(float_value, float)
+      )
+      @require(
+          lambda string_value: string_value is None or
+          isinstance(string_value, str)
+      )
+      @require(
+          lambda structured_value: structured_value is None or
+          not isinstance(structured_value, (float, str))
+      )
+      @require(
+          lambda float_value, string_value, structured_value: sum(
+              map(
+                  lambda value: value is not None,
+                  [float_value, string_value, structured_value]
+              )
+          ) < 2
+      )
+      def pick_value(float_value, string_value, structured_value):
+        ''' Chose amongst the values available.
+        '''
+        if float_value is None:
+          if string_value is None:
+            return structured_value
+          return string_value
+        return float_value
+
       @property
       def value(self):
         ''' Return the value for this `Tag`.
         '''
-        if self.float_value is None:
-          if self.string_value is None:
-            return self.structured_value
-          return self.string_value
-        return self.float_value
+        return self.pick_value(
+            self.float_value, self.string_value, self.structured_value
+        )
 
       @value.setter
       def value(self, new_value):
@@ -505,6 +622,30 @@ class SQLTagsORM(ORM):
         elif isinstance(new_value, str):
           new_values = None, new_value, None
         self.set_all(*new_values)
+
+      @classmethod
+      def value_test(cls, other_value):
+        ''' Return `(column,test_value)` for testing `other_value`
+            where `column` if the appropriate SQLAlchemy column
+            and `test_value` is the comparison value for testing.
+
+            For most `other_value`s the `test_value`
+            will just be `other_value`,
+            but for certain types the `test_value` will be:
+            * `NoneType`: `None`, and the column will also be `None`
+            * `datetime`: `cls.datetime2unixtime(other_value)`
+        '''
+        if isinstance(other_value, datetime):
+          return cls.float_value, cls.datetime2unixtime(other_value)
+        if isinstance(other_value, float):
+          return cls.float_value, other_value
+        if isinstance(other_value, int):
+          f = float(other_value)
+          if f == other_value:
+            return cls.float_value, f
+        if isinstance(other_value, str):
+          return cls.string_value, other_value
+        return cls.structured_value, other_value
 
       @require(
           lambda float_value: float_value is None or
@@ -544,32 +685,58 @@ class SQLTagsORM(ORM):
       def unixtime(self, timestamp):
         self.set_all(timestamp, None, None)
 
-      def as_datettime(self, tz=None):
-        ''' Return `self.unixtime` as a `datetime` with the timezone `tz`.
-
-            *Note*: unlike `datetime.fromtimestamp`,
-            if `tz` is `None` the timezone `datetime.timezone.utc` is used.
-        '''
-        return unixtime2datetime(self.unixtime, tz=tz)
-
-      @property
-      def datetime(self):
-        ''' The `unixtime` as a UTC `datetime`.
-        '''
-        return self.as_datetime()
-
-      @datetime.setter
-      def datetime(self, dt):
-        ''' Set the `unixtime` from a `datetime`.
-
-            *Note*: unlike `datetime.timestamp`,
-            if the `datetime` is naive
-            it is presumed to be in UTC rather than the local timezone.
-        '''
-        self.unixtime = datetime2unixtime(dt)
-
     self.tags = Tags
     self.entities = Entities
+
+class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
+                   FormatableMixin):
+  ''' An entity record with its `Tag`s.
+  '''
+
+  def format_tagset(self):
+    ''' Compute a `TagSet` from the tags
+        with additional derived tags.
+
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        via the `TagSet`'s `.format_kwargs()` method.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = TagSet()
+    kwtags.update(self.tags)
+    kwtags.add('entity.id', self.id)
+    if self.name is not None:
+      kwtags.add('entity.name', self.name)
+    kwtags.add('entity.unixtime', self.unixtime)
+    dt = unixtime2datetime(self.unixtime)
+    kwtags.add('entity.datetime', dt)
+    kwtags.add('entity.isotime', dt.isoformat())
+    return kwtags
+
+  def format_kwargs(self):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = self.format_tagset()
+    kwtags['tags'] = str(kwtags)
+    # convert the TagSet to an ExtendedNamespace
+    kwargs = kwtags.format_kwargs()
+    return kwargs
 
 class SQLTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
@@ -612,6 +779,34 @@ class SQLTags(MultiOpenMixin):
     if isinstance(index, int):
       return entities.lookup1(id=index, session=session)
     return entities.lookup1(name=index, session=session)
+
+  @orm_auto_session
+  def find(self, tag_choices, *, session, with_tags=False):
+    ''' Find the `Entity` rows matching `tag_choices`.
+    '''
+    query = self.orm.entities.by_tags(
+        tag_choices, session=session, with_tags=with_tags
+    )
+    results = session.execute(query)
+    if with_tags:
+      # entities and tag information which must be merged
+      entity_map = {}
+      for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
+           tag_string_value, tag_structured_value) in results:
+        e = entity_map.get(entity_id)
+        if not e:
+          e = entity_map[entity_id] = TaggedEntity(
+              entity_id, entity_name, unixtime, TagSet()
+          )
+        value = self.orm.tags.pick_value(
+            tag_float_value, tag_string_value, tag_structured_value
+        )
+        if tag_name is not None:
+          e.tags.add(tag_name, value)
+      yield from entity_map.values()
+    else:
+      for entity_id, entity_name, unixtime in results:
+        yield TaggedEntity(entity_id, entity_name, unixtime, TagSet())
 
 if __name__ == '__main__':
   sys.argv[0] = basename(sys.argv[0])
