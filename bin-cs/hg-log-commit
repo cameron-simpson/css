@@ -12,5 +12,5 @@ hg log -r "$revision" --template='{desc}\n' --limit 1 \
 | \
 { read -r headline
   wdbase=$( basename "$(pwd)" )
-  buglog -- "$wdbase $revision: $headline" </dev/null
+  buglog -- "$wdbase $headline [$revision]" </dev/null
 }

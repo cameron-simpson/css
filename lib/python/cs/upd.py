@@ -33,7 +33,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20200229'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -182,17 +182,25 @@ class Upd(SingletonMixin):
       return s
 
   @staticmethod
+  def normalise(txt):
+    ''' Normalise `txt` for display,
+        currently implemented as:
+        `unctrl(txt.rstrip())`.
+    '''
+    return unctrl(txt.rstrip())
+
+  @staticmethod
   def adjust_text_v(oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
-        We normalise `newtxt` as `unctrl(newtxt.rstrip())`.
+        We normalise `newtxt` as using `self.normalise`.
         `oldtxt` is presumed to be already normalised.
     '''
     # normalise text
     if not raw_text:
-      newtxt = unctrl(newtxt.rstrip())
+      newtxt = self.normalise(newtxt)
     # crop for terminal width
     newlen = len(newtxt)
     if newlen >= columns:
@@ -338,7 +346,7 @@ class Upd(SingletonMixin):
     if a:
       txt = txt % a
     if not raw_text:
-      txt = unctrl(txt.rstrip())
+      txt = self.normalise(txt)
     backend = self._backend
     with self._lock:
       oldtxt = self._slot_text[slot]
@@ -361,7 +369,7 @@ class Upd(SingletonMixin):
 
         This uses one of two methods:
         * insert above:
-          insert a line above the tip status line and write the message there.
+          insert a line above the top status line and write the message there.
         * redraw:
           clear the top slot, write txt and a newline,
           redraw all the slots below.
@@ -389,7 +397,6 @@ class Upd(SingletonMixin):
         txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
         txts.extend(self.redraw_line_v(''))
         txts.append(txt)
-        txts.append('\n')
         txts.extend(self.redraw_trailing_slots_v(top_slot))
         self._current_slot = 0
       else:
@@ -549,18 +556,28 @@ class UpdProxy(object):
 
   __slots__ = {
       'upd': 'The parent Upd instance.',
-      'index': 'The index of this slot within the parent Upd.'
+      'index': 'The index of this slot within the parent Upd.',
+      'prefix': 'The fixed leading prefix for this slot, default "".',
   }
 
   def __init__(self, upd, index):
     self.upd = upd
     self.index = index
+    self.prefix = ''
 
   def __str__(self):
     return (
-        "%s(upd=%s,index=%d:%r)" %
+        "%s(upd=%s,index=%s:%r)" %
         (type(self).__name__, self.upd, self.index, self.text)
     )
+
+  def __call__(self, msg, *a):
+    ''' Calling the proxy sets its `.text` property
+        in the form used by other messages: `(msg,*a)`
+    '''
+    if a:
+      msg = msg % a
+    self.text = msg
 
   @property
   def text(self):
@@ -572,10 +589,30 @@ class UpdProxy(object):
   @text.setter
   def text(self, txt):
     ''' Set the text of the status line.
+
+        If the length of `self.prefix+txt` exceeds the available display
+        width then the leftmost text is cropped to fit.
     '''
     index = self.index
+    upd = self.upd
     if index is not None:
+      txt = upd.normalise(self.prefix + txt)
+      overflow = len(txt) - upd.columns + 1
+      if overflow > 0:
+        txt = txt[overflow:]
       self.upd[index] = txt
+
+  @property
+  def width(self):
+    ''' The available space for text after `self.prefix`.
+
+        This is available width for uncropped text,
+        intended support presizing messages such as progress bars.
+        Setting the text to something linger will the rightmost
+        portion of the text which fits.
+    '''
+    prefix = self.prefix
+    return self.upd.columns - 1 - (len(prefix) if prefix else 0)
 
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.

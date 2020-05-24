@@ -78,6 +78,19 @@ case "$op" in
       set -x
       exec docker exec -it "$primary_container" $DK_EXEC_PREFIX "$@"
       ;;
+  logs)
+      set -x
+      [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
+      ;;
+  update)
+      set -ex
+      "$0" down
+      docker volume rm "${base}_var"
+      "$0" pull
+      "$0" build
+      "$0" up setup
+      exit $?
+      ;;
   up)
       [ $# -gt 0 ] || [ -z "$DK_PRIMARY_SERVICE" ] \
       || set -- --exit-code-from "$DK_PRIMARY_SERVICE" ${1+"$@"}

@@ -22,7 +22,7 @@ DISTINFO = {
 
 _logging_functions = {}
 
-# Pull logging functions from cs.logutils is available, otherwise logging.
+# Pull logging functions from cs.logutils if available, otherwise logging.
 # This defers the cs.logutils import, breaking circular imports.
 def _logging_stub(func_name, *a, **kw):
   try:

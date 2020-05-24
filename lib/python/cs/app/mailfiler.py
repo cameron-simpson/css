@@ -147,19 +147,7 @@ class MailFilerCommand(BaseCommand):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from
           Maildir names.
-          Default: {DEFAULT_RULES_PATTERN}
-  Subcommands:
-    {cmd} monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
-      Monitor Maildirs for new messages and file them.
-      -1  File at most 1 message per Maildir.
-      -d delay
-          Delay between runs in seconds.
-          Default is to make only one run over the Maildirs.
-      -n  No remove. Keep filed messages in the origin Maildir.
-    {cmd} save target[,target...] <message
-      Save a message from standard input to the specified targets.
-    {cmd} report <message
-      Report various things about a message from standard input.'''
+          Default: {DEFAULT_RULES_PATTERN}'''
 
   def apply_defaults(self, options):
     ''' Set up default options.
@@ -191,7 +179,13 @@ class MailFilerCommand(BaseCommand):
         yield
 
   def cmd_monitor(self, argv, options):
-    ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
+    ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
+          Monitor Maildirs for new messages and file them.
+          -1  File at most 1 message per Maildir.
+          -d delay
+              Delay between runs in seconds.
+              Default is to make only one run over the Maildirs.
+          -n  No remove. Keep filed messages in the origin Maildir.
     '''
     warning("test warning")
     justone = False
@@ -232,7 +226,8 @@ class MailFilerCommand(BaseCommand):
     )
 
   def cmd_save(self, argv, options):
-    ''' Usage: save targets < message
+    ''' Usage: {cmd} target[,target...] <message
+          Save a message from standard input to the specified targets.
 
         Save message to the `targets`,
         a single command line argument of the form
@@ -256,9 +251,8 @@ class MailFilerCommand(BaseCommand):
     return self.mailfiler(options).save(targets, message_fp)
 
   def cmd_report(self, argv, options):
-    ''' Usage: report < message
-
-        Report of the processing of `message`.
+    ''' Usage: {cmd} <message
+          Report various things about a message from standard input.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
@@ -457,8 +451,6 @@ class MailFiler(NS):
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
           with Pfx("%s", wmdir.shortname):
-            if upd:
-              status("scan...")
             try:
               nmsgs += self.sweep(
                   wmdir, justone=justone, no_remove=no_remove, upd=upd
@@ -1683,8 +1675,8 @@ class Target_Substitution(NS):
 
   def __str__(self):
     return (
-        ','.join(self.header_names) + ':s/' + str(self.subst_re) + '/' +
-        self.subst_replacement
+        ','.join(self.header_names) + ':s/' + str(self.subst_re.pattern) +
+        '/' + self.subst_replacement
     )
 
   def apply(self, filer):
@@ -1859,6 +1851,12 @@ class _Condition(NS):
     self.flags = flags
     self.header_names = header_names
 
+  def __str__(self):
+    return (
+        ('!' if self.flags.invert else '') + ','.join(self.header_names) +
+        ':' + self.tests_str()
+    )
+
   def match(self, filer):
     ''' Test this condition against all the relevant headers.
     '''
@@ -1883,6 +1881,9 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
+  def tests_str(self):
+    return self.regexptxt
+
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
     '''
@@ -1897,6 +1898,9 @@ class Condition_AddressMatch(_Condition):
   def __init__(self, flags, header_names, addrkeys):
     _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple(k for k in addrkeys if len(k) > 0)
+
+  def tests_str(self):
+    return '|'.join(self.addrkeys)
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1915,6 +1919,9 @@ class Condition_InGroups(_Condition):
   def __init__(self, flags, header_names, group_names):
     _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
+
+  def tests_str(self):
+    return '(' + '|'.join(self.group_names) + ')'
 
   def test_value(self, filer, header_name, header_value):
     ''' Test this condition against a header value.
@@ -1991,6 +1998,9 @@ class Condition_HeaderFunction(_Condition):
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
+  def tests_str(self):
+    return '%s(%s)' % (self.funcname, self.test_string)
+
   def test_value(self, filer, header_name, header_value):
     ''' Test the header value against to test function.
     '''
@@ -2035,7 +2045,7 @@ class Rule:
     self.label = ''
 
   def __str__(self):
-    return "%s:%d: %r %r" % (
+    return "%s:%d: %s %s" % (
         shortpath(self.filename), self.lineno,
         ','.join(map(str, self.targets)), ', '.join(map(str, self.conditions))
     )
