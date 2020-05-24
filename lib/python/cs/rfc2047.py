@@ -15,7 +15,7 @@ from cs.gimmicks import warning
 from cs.pfx import Pfx
 from cs.py3 import unicode
 
-__version__ = '20200524'
+__version__ = '20200524-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
