@@ -4,7 +4,7 @@ r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
-There are also some transcription function for producing text
+There are also some transcription functions for producing text
 from various objects, such as `hexify` and `unctrl`.
 
 Generally the get_* functions accept a source string and an offset
@@ -21,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200318'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

@@ -162,14 +162,35 @@ class CSReleaseCommand(BaseCommand):
                 label, *values = problem
                 warning("%s:", label)
                 for subproblem in values:
-                  warning("  %s", subproblem)
+                  warning(
+                      "  %s", ', '.join(
+                          map(str, subproblem) if
+                          isinstance(subproblem, (list, tuple)) else subproblem
+                      )
+                  )
               else:
                 for subpkg, subproblems in sorted(problem.items()):
                   warning(
                       "%s: %s", subpkg, ', '.join(
-                          subproblem
-                          if isinstance(subproblem, str) else repr(subproblem)
-                          for subproblem in subproblems
+                          subproblem if isinstance(subproblem, str) else (
+                              (
+                                  (
+                                      subproblem[0] if len(subproblem) ==
+                                      1 else "%s (%d)" %
+                                      (subproblem[0], len(subproblem) - 1)
+                                  )
+                              ) if isinstance(subproblem, list) else (
+                                  "{" + ", ".join(
+                                      "%s: %d %s" % (
+                                          subsubkey, len(subsubproblems),
+                                          "problem" if len(subsubproblems) ==
+                                          1 else "problems"
+                                      ) for subsubkey, subsubproblems in
+                                      sorted(subproblem.items())
+                                  ) + "}"
+                              ) if hasattr(subproblem, 'items') else
+                              repr(subproblem)
+                          ) for subproblem in subproblems
                       )
                   )
     return xit
@@ -359,7 +380,10 @@ class CSReleaseCommand(BaseCommand):
     if not release_message:
       error("empty release message, not making new release")
       return 1
-    next_release = pkg.latest.next()
+    latest = pkg.latest
+    next_release = pkg.latest.next() if pkg.latest else ReleaseTag.today(
+        pkg.name
+    )
     next_vcstag = next_release.vcstag
     if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
       error("aborting release at user request")
@@ -383,7 +407,7 @@ class CSReleaseCommand(BaseCommand):
         (next_vcstag, release_message), summary_filename, changes_filename,
         versioned_filename
     )
-    vcs.tag(next_vcstag)
+    vcs.tag(next_vcstag, message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag))
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
         '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
@@ -540,20 +564,18 @@ class Module(object):
     return self.options.vcs
 
   @prop
+  @pfx_method(use_str=True)
   def module(self):
     ''' The Module for this package name.
     '''
     M = self._module
     if M is None:
-      with Pfx("import %r", self.name):
+      with Pfx("importlib.import_module(%r)", self.name):
         try:
           M = importlib.import_module(self.name)
-        except ImportError as e:
-          warning("ImportError: %s", e)
-          M = None
-        except SyntaxError as e:
-          warning("SyntaxError: %s", e)
-          M = None
+        except (ImportError, SyntaxError) as e:
+          error("import fails: %s", e)
+          raise
       self._module = M
     return M
 
@@ -591,9 +613,6 @@ class Module(object):
         or `None` if this is not inside a package.
     '''
     M = self.module
-    if M is None:
-      warning("self.module is None")
-      return None
     tested_name = cutsuffix(self.name, '_tests')
     if tested_name is not self.name:
       # foo_tests is considered part of foo
@@ -602,6 +621,9 @@ class Module(object):
       pkg_name = M.__package__
     except AttributeError:
       warning("self.module has no __package__: %r", sorted(dir(M)))
+      return None
+    if pkg_name != self.name and hasattr(M, 'DISTINFO'):
+      # standalone module like cs.py.modules (within cs.py)
       return None
     if self.ismine() and not pkg_name.startswith(MODULE_PREFIX):
       # top level modules tend to be in the notional "cs" package,
@@ -637,9 +659,10 @@ class Module(object):
     return self.options.pkg_tagsets[self.name]
 
   def save_pkg_tags(self):
-    ''' Sync the package `Tag`s `TagFile`.
+    ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
     self.options.pkg_tagsets.save()
+    return self.options.pkg_tagsets.filepath
 
   @cachedmethod
   def release_tags(self):
@@ -692,11 +715,10 @@ class Module(object):
     ''' Update the last PyPI version.
     '''
     self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
-    self.save_pkg_tags()
+    pkg_tags_filename = self.save_pkg_tags()
     self.vcs.commit(
         '%s: %s: set %s=%s [IGNORE]' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version),
-        PKG_TAGS
+        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
     )
 
   def compute_doc(self):
@@ -704,15 +726,17 @@ class Module(object):
     '''
     # break out the release log and format it
     releases = list(self.release_log())
-    release_tag, release_entry = releases[0]
-    release_entry = clean_release_entry(release_entry)
-    preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
+    preamble_md = None
     postamble_parts = []
-    for release_tag, release_entry in releases:
+    if releases:
+      release_tag, release_entry = releases[0]
       release_entry = clean_release_entry(release_entry)
-      postamble_parts.append(
-          f'*Release {release_tag.version}*:\n{release_entry}'
-      )
+      preamble_md = f'*Latest release {release_tag.version}*:\n{release_entry}'
+      for release_tag, release_entry in releases:
+        release_entry = clean_release_entry(release_entry)
+        postamble_parts.append(
+            f'*Release {release_tag.version}*:\n{release_entry}'
+        )
     # split the module documentation after the opening paragraph
     full_doc = module_doc(self.module)
     try:
@@ -722,13 +746,16 @@ class Module(object):
       doc_tail = ''
     # compute some distinfo stuff
     description = doc_head.replace('\n', ' ')
-    long_description = '\n\n'.join(
-        [
-            doc_head,
-            preamble_md.rstrip(), doc_tail, '# Release Log\n\n',
-            *postamble_parts
-        ]
-    )
+    if preamble_md:
+      long_description = '\n\n'.join(
+          [
+              doc_head,
+              preamble_md.rstrip(), doc_tail, '# Release Log\n\n',
+              *postamble_parts
+          ]
+      )
+    else:
+      long_description = full_doc
     return SimpleNamespace(
         module_doc=full_doc,
         description=description,
@@ -1009,9 +1036,14 @@ class Module(object):
     cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
 
   @pfx_method(use_str=True)
-  def log_since(self, vcstag=None):
+  def log_since(self, vcstag=None, ignored=False):
     ''' Generator yielding (files, line) tuples
         for log lines since the last release for the supplied `prefix`.
+
+        Parameters:
+        * `vcstag`: the reference revision, default `self.latest`
+        * `ignored`: if true (default `False`) include log entries
+          containing the string `'IGNORE'` in the description
     '''
     if vcstag is None:
       latest = self.latest
@@ -1026,6 +1058,7 @@ class Module(object):
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
+        if ignored or 'IGNORE' not in firstline
     )
 
   def uncommitted_paths(self):
@@ -1176,7 +1209,7 @@ class Module(object):
         if changed_path in paths
     ]
     if changed_paths:
-      problems.append("%d modified files", len(changed_paths))
+      problems.append("%d modified files" % (len(changed_paths),))
     # append submodule problems if present
     if subproblems:
       problems.append(subproblems)

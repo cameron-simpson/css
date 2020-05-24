@@ -39,9 +39,9 @@ fi
 
 if [ -n "$target" ]
 then
-  if hostpart=$( expr "x$target" : 'x\([a-z][a-z0-9_@]*[a-z]\):.*' )
+  if hostpart=$( expr "x$target" : 'x\([a-z][-a-z0-9_@]*[a-z0-9]\):.*' )
   then
-    dir=$(       expr "x$target" : 'x[a-z][a-z0-9_@]*[a-z]:\(.*\)' )
+    dir=$(       expr "x$target" : 'x[a-z][-a-z0-9_@]*[a-z0-9]:\(.*\)' )
     if [ $# = 0 ]
     then
       sshopts=-t
@@ -67,13 +67,12 @@ then
     [ -d "$parent/." ] && dir=$parent
 fi
 
-# update the latest tag
-if [ $set_latest ]
-then  $trace fstags tag . "$fstags_latest=\"$target\""
-fi
-
 if [ -n "$hostpart" ]
 then
+  # update the latest tag
+  if [ $set_latest ]
+  then  $trace fstags tag . "$fstags_latest=\"$target\""
+  fi
   qdir=$( shqstr "$dir" )
   exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
 else

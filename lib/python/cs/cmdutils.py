@@ -21,7 +21,7 @@ from cs.pfx import Pfx, XP
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200318'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'description':
@@ -32,7 +32,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.resources'],
+    'install_requires': [
+        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
+        'cs.py.doc', 'cs.resources'
+    ],
 }
 
 def docmd(dofunc):
@@ -316,7 +319,7 @@ class BaseCommand:
         self.apply_opts(opts, options)
 
       subcmds = self.subcommands()
-      if subcmds:
+      if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
@@ -331,6 +334,7 @@ class BaseCommand:
               "%s: unrecognised subcommand, expected one of: %r" %
               (subcmd, sorted(subcmds.keys()))
           )
+        subcmd_context = Pfx(subcmd)
         try:
           main_is_class = issubclass(main, BaseCommand)
         except TypeError:
@@ -346,6 +350,7 @@ class BaseCommand:
           main = self.main
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")
+        subcmd_context = nullcontext()
       upd_context = options.loginfo.upd
       if upd_context is None:
         upd_context = nullcontext()
@@ -353,7 +358,7 @@ class BaseCommand:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
           with upd_context:
             with self.run_context(argv, options):
-              with Pfx(subcmd):
+              with subcmd_context:
                 return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')

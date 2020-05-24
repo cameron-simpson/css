@@ -1,0 +1,5 @@
+lib/python/cs/result.py: cs.result: mypy related changes
+lib/python/cs/result.py: cs.result: docstring tweak
+lib/python/cs/result.py: cherrypick vt ==> default: cs.result: OnDemandResult: bugfixes and improvements
+lib/python/cs/result.py: cs.result: Result.bg: accept optional _name parameter to specify the Result.name; autoformat
+lib/python/cs/result.py: cs.result: update docstring and DISTINFO

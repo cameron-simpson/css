@@ -1,3 +1,14 @@
+rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
+cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
+can putacc be recoded to use fstags --for-rsync efficiently?
+ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
+treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
+pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
+cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
+cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
+import the examples in the module docstring
+cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111cda5f0>
+incd: only save target for remote targets
 incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?
 cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
 TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave

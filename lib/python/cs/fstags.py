@@ -100,7 +100,7 @@ from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200229'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -112,9 +112,9 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'cs.upd', 'icontract'
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
+        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
 
@@ -848,6 +848,12 @@ class FSTags(MultiOpenMixin):
 
   def shutdown(self):
     ''' Save any modified tag files on shutdown.
+    '''
+    self.sync()
+
+  @locked
+  def sync(self):
+    ''' Flush modified tag files.
     '''
     for tagfile in self._tagfiles.values():
       try:
