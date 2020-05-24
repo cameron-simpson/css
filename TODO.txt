@@ -1,3 +1,4 @@
+new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?
 rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
