@@ -1,3 +1,4 @@
+dlog: accept tags (leading tag=value words)?
 rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
 cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
 can putacc be recoded to use fstags --for-rsync efficiently?
