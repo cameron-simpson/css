@@ -407,7 +407,7 @@ class CSReleaseCommand(BaseCommand):
         (next_vcstag, release_message), summary_filename, changes_filename,
         versioned_filename
     )
-    vcs.tag(next_vcstag)
+    vcs.tag(next_vcstag, message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag))
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
         '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
