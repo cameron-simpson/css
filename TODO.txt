@@ -1,3 +1,4 @@
+BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
 new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?
