@@ -181,11 +181,11 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     with sqltags.orm.session() as session:
       with Upd(sys.stderr) as U:
         U.out("select %s ...", ' '.join(map(str, tag_choices)))
-        entities = sqltags.find(tag_choices, session=session, with_tags=True)
-      for entity in entities:
-        with Pfx(entity):
+        tagged_entities = sqltags.find(tag_choices, session=session, with_tags=True)
+      for te in tagged_entities:
+        with Pfx(te):
           try:
-            output = entity.format_as(output_format, error_sep='\n  ')
+            output = te.format_as(output_format, error_sep='\n  ')
           except FormatAsError as e:
             error(str(e))
             xit = 1
