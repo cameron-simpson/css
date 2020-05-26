@@ -16,6 +16,7 @@
 from collections import namedtuple
 from configparser import ConfigParser
 from contextlib import contextmanager
+import csv
 from datetime import datetime
 from getopt import getopt, GetoptError
 import os
@@ -43,9 +44,10 @@ from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin, HasIdMixin
+    ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
+    HasIdMixin
 )
-from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin
+from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin, TaggedEntity
 from cs.threads import locked
 from cs.upd import Upd
 
