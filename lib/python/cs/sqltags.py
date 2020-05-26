@@ -154,7 +154,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
-          List files from path matching all the constraints.
+          List entities matching all the constraints.
           -o output_format
                       Use output_format as a Python format string to lay out
                       the listing.
@@ -499,8 +499,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       def __str__(self):
         return (
-            "%s(when=%s,id=%d,name=%r)" % (
-                type(self).__name__, self.datetime.isoformat(), self.id,
+            "%s:%s(when=%s,name=%r)" % (
+                type(self).__name__, self.id, self.datetime.isoformat(),
                 self.name
             )
         )
@@ -566,7 +566,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         ''' Construct a query to yield `Entity` rows
             matching the supplied `tag_criteria`.
 
-            The `tag_criteria` should be an interable
+            The `tag_criteria` should be an iterable
             yielding any of the following types:
             * `TagChoice`: used as a positive or negative test
             * `Tag`: an object with a `.name` and `.value`
