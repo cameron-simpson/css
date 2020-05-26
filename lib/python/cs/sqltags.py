@@ -829,7 +829,12 @@ class SQLTags(MultiOpenMixin):
 
   @orm_auto_session
   def find(self, tag_choices, *, session, with_tags=False):
-    ''' Find the `Entity` rows matching `tag_choices`.
+    ''' Generator yielding `TaggedEntity` instances
+        for the the `Entity` rows matching `tag_choices`.
+
+        If `with_tags` is true,
+        the `tags` attribute will be the `Entity`'s `TagSet`
+        otherwise it will be an empty `TagSet` (i.e. not `None`).
     '''
     query = self.orm.entities.by_tags(
         tag_choices, session=session, with_tags=with_tags
@@ -843,7 +848,10 @@ class SQLTags(MultiOpenMixin):
         e = entity_map.get(entity_id)
         if not e:
           e = entity_map[entity_id] = TaggedEntity(
-              entity_id, entity_name, unixtime, TagSet()
+              id=entity_id,
+              name=entity_name,
+              unixtime=unixtime,
+              tags=TagSet()
           )
         value = self.orm.tags.pick_value(
             tag_float_value, tag_string_value, tag_structured_value
@@ -853,7 +861,12 @@ class SQLTags(MultiOpenMixin):
       yield from entity_map.values()
     else:
       for entity_id, entity_name, unixtime in results:
-        yield TaggedEntity(entity_id, entity_name, unixtime, TagSet())
+        yield TaggedEntity(
+            id=entity_id,
+            name=entity_name,
+            unixtime=unixtime,
+            tags=TagSet()
+        )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
