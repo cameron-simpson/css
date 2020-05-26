@@ -785,56 +785,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
-class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
-                   FormatableMixin):
-  ''' An entity record with its `Tag`s.
-  '''
-
-  def format_tagset(self):
-    ''' Compute a `TagSet` from the tags
-        with additional derived tags.
-
-        This can be converted into an `ExtendedNamespace`
-        suitable for use with `str.format_map`
-        via the `TagSet`'s `.format_kwargs()` method.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `entity.id`: the id of the entity database record
-        * `entity.name`: the name of the entity database record, if not `None`
-        * `entity.unixtime`: the UNIX timestamp of the entity database record
-        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
-    '''
-    kwtags = TagSet()
-    kwtags.update(self.tags)
-    kwtags.add('entity.id', self.id)
-    if self.name is not None:
-      kwtags.add('entity.name', self.name)
-    kwtags.add('entity.unixtime', self.unixtime)
-    dt = unixtime2datetime(self.unixtime)
-    kwtags.add('entity.datetime', dt)
-    kwtags.add('entity.isotime', dt.isoformat())
-    return kwtags
-
-  def format_kwargs(self):
-    ''' Format arguments suitable for `str.format_map`.
-
-        This returns an `ExtendedNamespace` from `TagSet.ns()`
-        for a computed `TagSet`.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `entity.id`: the id of the entity database record
-        * `entity.name`: the name of the entity database record, if not `None`
-        * `entity.unixtime`: the UNIX timestamp of the entity database record
-        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
-    '''
-    kwtags = self.format_tagset()
-    kwtags['tags'] = str(kwtags)
-    # convert the TagSet to an ExtendedNamespace
-    kwargs = kwtags.format_kwargs()
-    return kwargs
-
 class SQLTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
