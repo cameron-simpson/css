@@ -84,6 +84,7 @@ from json import JSONEncoder, JSONDecoder
 import re
 from types import SimpleNamespace
 from icontract import require
+from cs.dateutils import unixtime2datetime
 from cs.edit import edit as edit_lines
 from cs.lex import (
     cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -103,6 +104,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
@@ -1299,7 +1301,7 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
   '''
 
   @classmethod
-  def from_csvrow(csvrow):
+  def from_csvrow(cls, csvrow):
     ''' Construc a `TaggedEntity` from a CSV row like that from
         `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
     '''
@@ -1315,7 +1317,8 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
     ''' This `TaggedEntity` as a list useful to a `csv.writer`.
         The inverse of `from_csvrow`.
     '''
-    return [self.unixtime, self.id, self.name] + [str(tag) for tag in self.tags]
+    return [self.unixtime, self.id, self.name
+            ] + [str(tag) for tag in self.tags]
 
   def format_tagset(self):
     ''' Compute a `TagSet` from the tags
