@@ -152,6 +152,37 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         yield
 
   @classmethod
+  def cmd_export(cls, argv, options):
+    ''' Usage: {cmd} {{tag[=value]|-tag}}...
+          Export entities matching all the constraints.
+          The output format is CSV data with the following columns:
+          * unixtime: the entity unixtime, a float
+          * id: the entity database row id, an integer
+          * name: the entity name
+          * tags: a column per `Tag`
+    '''
+    sqltags = options.sqltags
+    badopts = False
+    try:
+      tag_choices = cls.parse_tag_choices(argv)
+    except ValueError as e:
+      warning("bad tag specifications: %s", e)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    xit = 0
+    csvw = csv.writer(sys.stdout)
+    with sqltags.orm.session() as session:
+      with Upd(sys.stderr) as U:
+        U.out("select %s ...", ' '.join(map(str, tag_choices)))
+        tagged_entities = sqltags.find(
+            tag_choices, session=session, with_tags=True
+        )
+      for te in tagged_entities:
+        with Pfx(te):
+          csvw.writerow(te.csvrow)
+
+  @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
           List entities matching all the constraints.
