@@ -14,11 +14,11 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
-__version__ = '20200129.3'
+__version__ = '20200520-post'
 
 DISTINFO = {
     'description':
-    "A progress tracker with methods for throughput, ETA and update notification",
+    "A progress tracker with methods for throughput, ETA and update notification. Also a progress meter composed from other progress meters.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",

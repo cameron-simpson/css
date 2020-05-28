@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-''' Convenience command line and library wrapper for youtube-dl.
+''' Convenient command line and library wrapper for youtube-dl.
 
-    The youtube-dl tool and associated youtube_dl Python module
-    is a very useful kit for downloading media from various websites.
+    The `youtube-dl` tool and associated `youtube_dl` Python module
+    are very useful for downloading media from various websites.
     However, as an end user who almost never streams because of my
-    soggy internet link, fetching several items is quite serial and
+    soggy internet link, I find fetching several items is quite serial and
     visually noisy.
 
     This module provides a command line tool `ydl` which:
@@ -39,6 +39,8 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 
+__version__ = '20200521-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -53,12 +55,12 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'youtube_dl',
         'cs.cmdutils',
         'cs.fstags',
         'cs.logutils',
         'cs.result',
         'cs.tagset',
+        'youtube_dl',
     ],
     'entry_points': {
         'console_scripts': [
@@ -80,7 +82,7 @@ def main(argv=None, cmd=None):
   return YDLCommand().run(argv, cmd=cmd)
 
 class YDLCommand(BaseCommand):
-  ''' Command line implementation.
+  ''' `ydl` command line implementation.
   '''
 
   USAGE_FORMAT = '''Usage: {cmd} URLs...'''

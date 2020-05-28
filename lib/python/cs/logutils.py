@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200518-post'
+__version__ = '20200521-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -195,7 +195,7 @@ def setup_logging(
     ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
-  if main_log.encoding is None:
+  if getattr(main_log, 'encoding', None) is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
   if trace_mode is None:

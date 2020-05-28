@@ -94,9 +94,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-from cs.x import X
-
-__version__ = '20200318'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -110,6 +108,8 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py3',
+        'icontract',
     ],
 }
 

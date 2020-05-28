@@ -21,7 +21,7 @@ from cs.pfx import Pfx, XP
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200318'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'description':
@@ -32,7 +32,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.resources'],
+    'install_requires': [
+        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
+        'cs.py.doc', 'cs.resources'
+    ],
 }
 
 def docmd(dofunc):
