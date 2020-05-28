@@ -525,7 +525,7 @@ class Upd(SingletonMixin):
           txts.append(dl1)
         else:
           # clear the bottom lone
-          txts.extend(self.redraw_line_v, '')
+          txts.extend(self.redraw_line_v(''))
         # move up and to the end of that slot
         txts.append(cuu1)
         txts.append('\r')
