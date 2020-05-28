@@ -21,6 +21,7 @@ from __future__ import with_statement
 import atexit
 from contextlib import contextmanager
 import os
+import sys
 from threading import RLock
 from cs.gimmicks import warning
 from cs.lex import unctrl
@@ -59,14 +60,19 @@ atexit.register(cleanupAtExit)
 
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
+
+      The default backend is `sys.stderr`.
   '''
 
   @classmethod
-  def _singleton_key(cls, backend, columns=None):
+  def _singleton_key(cls, backend=None, columns=None):
+    if backend is None:
+      backend = sys.stderr
     return id(backend)
 
-  def _singleton_init(self, backend, columns=None):
-    assert backend is not None
+  def _singleton_init(self, backend=None, columns=None):
+    if backend is None:
+      backend = sys.stderr
     if columns is None:
       columns = 80
       if backend.isatty():
@@ -553,7 +559,7 @@ class UpdProxy(object):
 
       An `UpdProxy` is also a context manager which self deletes on exit:
 
-          U = Upd(sys.stderr)
+          U = Upd()
           ....
           with U.insert(1, 'hello!') as proxy:
               .... set proxy.text as needed ...
