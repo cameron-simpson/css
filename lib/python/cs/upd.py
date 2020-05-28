@@ -550,6 +550,14 @@ class UpdProxy(object):
       instantiated by `Upd.insert`.
 
       The status line can be accessed and set via the `.text` property.
+
+      An `UpdProxy` is also a context manager which self deletes on exit:
+
+          U = Upd(sys.stderr)
+          ....
+          with U.insert(1, 'hello!') as proxy:
+              .... set proxy.text as needed ...
+          # proxy now removed
   '''
 
   __slots__ = {
@@ -576,6 +584,12 @@ class UpdProxy(object):
     if a:
       msg = msg % a
     self.text = msg
+
+  def __enter__(self):
+    pass
+
+  def __exit__(self):
+    self.delete()
 
   @property
   def text(self):
