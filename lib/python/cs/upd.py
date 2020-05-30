@@ -21,6 +21,7 @@ from __future__ import with_statement
 import atexit
 from contextlib import contextmanager
 import os
+import sys
 from threading import RLock
 from cs.gimmicks import warning
 from cs.lex import unctrl
@@ -59,14 +60,19 @@ atexit.register(cleanupAtExit)
 
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
+
+      The default backend is `sys.stderr`.
   '''
 
   @classmethod
-  def _singleton_key(cls, backend, columns=None):
+  def _singleton_key(cls, backend=None, columns=None):
+    if backend is None:
+      backend = sys.stderr
     return id(backend)
 
-  def _singleton_init(self, backend, columns=None):
-    assert backend is not None
+  def _singleton_init(self, backend=None, columns=None):
+    if backend is None:
+      backend = sys.stderr
     if columns is None:
       columns = 80
       if backend.isatty():
@@ -187,8 +193,8 @@ class Upd(SingletonMixin):
     '''
     return unctrl(txt.rstrip())
 
-  @staticmethod
-  def adjust_text_v(oldtxt, newtxt, columns, raw_text=False):
+  @classmethod
+  def adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
@@ -198,7 +204,7 @@ class Upd(SingletonMixin):
     '''
     # normalise text
     if not raw_text:
-      newtxt = self.normalise(newtxt)
+      newtxt = cls.normalise(newtxt)
     # crop for terminal width
     newlen = len(newtxt)
     if newlen >= columns:
@@ -519,7 +525,7 @@ class Upd(SingletonMixin):
           txts.append(dl1)
         else:
           # clear the bottom lone
-          txts.extend(self.redraw_line_v, '')
+          txts.extend(self.redraw_line_v(''))
         # move up and to the end of that slot
         txts.append(cuu1)
         txts.append('\r')
@@ -550,6 +556,14 @@ class UpdProxy(object):
       instantiated by `Upd.insert`.
 
       The status line can be accessed and set via the `.text` property.
+
+      An `UpdProxy` is also a context manager which self deletes on exit:
+
+          U = Upd()
+          ....
+          with U.insert(1, 'hello!') as proxy:
+              .... set proxy.text as needed ...
+          # proxy now removed
   '''
 
   __slots__ = {
@@ -576,6 +590,12 @@ class UpdProxy(object):
     if a:
       msg = msg % a
     self.text = msg
+
+  def __enter__(self):
+    pass
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    self.delete()
 
   @property
   def text(self):
