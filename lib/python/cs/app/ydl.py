@@ -38,6 +38,7 @@ from cs.pfx import Pfx
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
+from cs.upd import UpdProxy
 
 __version__ = '20200521-post'
 
@@ -60,6 +61,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.result',
         'cs.tagset',
+        'cs.upd',
         'youtube_dl',
     ],
     'entry_points': {
@@ -146,32 +148,17 @@ class YDL:
         * `kw_opts`: other keyword arguments are used to initialise
           the options for the underlying `YoutubeDL` instance
     '''
-    ydl_opts = {
-        'progress_hooks': [self.update_progress],
-        'format': DEFAULT_OUTPUT_FORMAT,
-        'logger': logging.getLogger(),
-        'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
-        ##'skip_download': True,
-        'writeinfojson': False,
-        'updatetime': False,
-        ##'cachedir': False,
-        'process_info': [self.process_info]
-    }
     if tick is None:
       tick = lambda: None
-    if kw_opts:
-      ydl_opts.update(kw_opts)
     self.url = url
     self.fstags = fstags
     self.tick = tick
     self.upd = upd
-    self.ydl_opts = ydl_opts
-    self.ydl = YoutubeDL(ydl_opts)
-    self.proxy = upd.insert(1) if upd else None
-    self.result = None
+    self.proxy = None
+    self.kw_opts = kw_opts
+    self.ydl = None
     self.progress = Progress(name=url)
-    if self.proxy:
-      self.proxy.prefix = url + ' '
+    self.result = None
 
   def bg(self):
     ''' Return the `Result` for this download,
@@ -193,25 +180,41 @@ class YDL:
   def run(self):
     ''' Run the download.
     '''
-    progress = self.progress
-    proxy = self.proxy
     url = self.url
-    ydl = self.ydl
+    progress = self.progress
     upd = self.upd
+    proxy = self.proxy = upd.insert(1) if upd else UpdProxy(None, None)
+    proxy.prefix = url + ' '
 
-    if proxy:
-      proxy('...')
+    ydl_opts = {
+        'progress_hooks': [self.update_progress],
+        'format': DEFAULT_OUTPUT_FORMAT,
+        'logger': logging.getLogger(),
+        'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
+        ##'skip_download': True,
+        'writeinfojson': False,
+        'updatetime': False,
+        ##'cachedir': False,
+        'process_info': [self.process_info]
+    }
+    if self.kw_opts:
+      ydl_opts.update(self.kw_opts)
+    ydl = self.ydl = YoutubeDL(ydl_opts)
+
+    proxy('...')
+    self.tick()
 
     with ydl:
       ydl.download([url])
-    if proxy:
-      total_bytes = progress.total
-      dl_report = (
-          "elapsed %ds" %
-          (progress.elapsed_time if total_bytes is None else progress.total)
-      )
-      proxy("%s, saving metadata ...", dl_report)
+
+    total_bytes = progress.total
+    dl_report = (
+        "elapsed %ds" %
+        (progress.elapsed_time if total_bytes is None else progress.total)
+    )
+    proxy("%s, saving metadata ...", dl_report)
     self.tick()
+
     ie_result = ydl.extract_info(url, download=False, process=True)
     output_path = ydl.prepare_filename(ie_result)
     tagged_path = self.fstags[output_path]
@@ -235,9 +238,8 @@ class YDL:
     proxy = self.proxy
     progress.total = ydl_progress['total_bytes']
     progress.position = ydl_progress['downloaded_bytes']
-    if proxy:
-      filepart = ydl_progress['filename'][:24]
-      proxy(progress.status(filepart, proxy.width))
+    filepart = ydl_progress['filename'][:24]
+    proxy(progress.status(filepart, proxy.width))
     self.tick()
 
   @staticmethod
