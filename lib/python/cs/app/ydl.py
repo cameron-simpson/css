@@ -121,9 +121,9 @@ class YDLCommand(BaseCommand):
               fstags=fstags,
               upd=options.loginfo.upd,
               tick=update0,
+              over_progress=all_progress,
               logger=options.loginfo.logger
           )
-          all_progress.add(Y.progress)
           Rs.append(Y.bg())
           nfetches += 1
           update0()
@@ -137,7 +137,16 @@ class YDL:
   ''' Manager for a download process.
   '''
 
-  def __init__(self, url, *, fstags, upd=None, tick=None, **kw_opts):
+  def __init__(
+      self,
+      url,
+      *,
+      fstags,
+      upd=None,
+      tick=None,
+      over_progress=None,
+      **kw_opts
+  ):
     ''' Initialise the manager.
 
         Parameters:
@@ -145,6 +154,7 @@ class YDL:
         * `fstags`: mandatory keyword argument, a `cs.fstags.FSTags` instance
         * `upd`: optional `cs.upd.Upd` instance for progress reporting
         * `tick`: optional callback to indicate state change
+        * `over_progress`: an `OverProgress` to which to add each new `Progress` instance
         * `kw_opts`: other keyword arguments are used to initialise
           the options for the underlying `YoutubeDL` instance
     '''
@@ -157,7 +167,9 @@ class YDL:
     self.proxy = None
     self.kw_opts = kw_opts
     self.ydl = None
-    self.progress = Progress(name=url)
+    self.filename = None
+    self.over_progress = over_progress
+    self.progresses = {}
     self.result = None
 
   def bg(self):
@@ -181,7 +193,6 @@ class YDL:
     ''' Run the download.
     '''
     url = self.url
-    progress = self.progress
     upd = self.upd
     proxy = self.proxy = upd.insert(1) if upd else UpdProxy(None, None)
     proxy.prefix = url + ' '
@@ -229,12 +240,23 @@ class YDL:
 
         Updates the relevant status lines.
     '''
-    progress = self.progress
-    proxy = self.proxy
-    progress.total = ydl_progress['total_bytes']
-    progress.position = ydl_progress['downloaded_bytes']
-    filepart = ydl_progress['filename'][:24]
-    proxy(progress.status(filepart, proxy.width))
+    filename = self.filename = ydl_progress['filename']
+    progress = self.progresses.get(filename)
+    if progress is None:
+      progress = self.progresses[filename] = Progress(
+          name=self.url + ':' + filename, total=ydl_progress['total_bytes']
+      )
+      if self.over_progress is not None:
+        self.over_progress.add(progress)
+    try:
+      progress.position = ydl_progress['downloaded_bytes']
+    except KeyError:
+      warning("no downloaded_bytes: %r", ydl_progress)
+    status = progress.status(
+        filename if len(filename) <= 24 else '...' + filename[-21:],
+        self.proxy.width
+    )
+    self.proxy(status)
     self.tick()
 
   @staticmethod
