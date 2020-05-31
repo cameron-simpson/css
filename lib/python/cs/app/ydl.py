@@ -251,7 +251,7 @@ class YDL:
     try:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
-      warning("no downloaded_bytes: %r", ydl_progress)
+      pass
     status = progress.status(
         filename if len(filename) <= 24 else '...' + filename[-21:],
         self.proxy.width
