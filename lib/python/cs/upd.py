@@ -91,6 +91,9 @@ class Upd(SingletonMixin):
     global instances
     instances.append(self)
 
+  def __str__(self):
+    return "%s(backend=%s)" % (type(self).__name__, self._backend)
+
   ############################################################
   # Sequence methods.
   #
@@ -436,6 +439,15 @@ class Upd(SingletonMixin):
       finally:
         self.out(old, slot=slot)
 
+  def selfcheck(self):
+    with self._lock:
+      assert len(self._slot_text) == len(self._proxies)
+      assert len(self._slot_text) > 0
+      for i, proxy in enumerate(self._proxies):
+        assert proxy.upd is self
+        assert proxy.index == i
+    return True
+
   def insert(self, index, txt=''):
     ''' Insert a new status line at `index`.
 
@@ -611,14 +623,16 @@ class UpdProxy(object):
         If the length of `self.prefix+txt` exceeds the available display
         width then the leftmost text is cropped to fit.
     '''
-    index = self.index
     upd = self.upd
-    if index is not None:
-      txt = upd.normalise(self.prefix + txt)
-      overflow = len(txt) - upd.columns + 1
-      if overflow > 0:
-        txt = txt[overflow:]
-      self.upd[index] = txt
+    if upd is not None:
+      with upd._lock:
+        index = self.index
+        if index is not None:
+          txt = upd.normalise(self.prefix + txt)
+          overflow = len(txt) - upd.columns + 1
+          if overflow > 0:
+            txt = txt[overflow:]
+          self.upd[index] = txt
 
   @property
   def width(self):

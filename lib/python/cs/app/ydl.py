@@ -30,8 +30,10 @@
 from getopt import GetoptError
 import logging
 import sys
+from threading import RLock
 from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
+from cs.excutils import logexc
 from cs.fstags import FSTags
 from cs.logutils import warning, LogTime
 from cs.pfx import Pfx
@@ -97,41 +99,82 @@ class YDLCommand(BaseCommand):
       raise GetoptError("missing URLs")
 
     upd = options.loginfo.upd
-    proxy0 = upd.proxy(0) if upd else None
-    all_progress = OverProgress()
-    nfetches = 0
+    with FSTags() as fstags:
+      over_ydl = OverYDL(upd=upd, fstags=fstags, logger=options.loginfo.logger)
+      over_ydl.queue_urls(argv)
+      for R in over_ydl.report():
+        upd.nl("COMPLETED R=%s", R)
 
+class OverYDL:
+
+  def __init__(self, *, upd=None, fstags=None, all_progress=None, logger=None):
+    if all_progress is None:
+      all_progress = OverProgress()
+    if logger is None:
+      logger = logging.getLogger()
+    self.upd = upd
+    self.fstags = fstags
+    self.proxy0 = upd.proxy(0) if upd else None
+    self.all_progress = OverProgress()
+    self.logger = logger
+    self.Rs = []
+    self.nfetches = 0
+    self._lock = RLock()
+
+    @logexc
     def update0():
+      nfetches = self.nfetches
       if nfetches == 0:
-        proxy0("Idle.")
+        self.proxy0("Idle.")
       else:
-        proxy0(
-            all_progress.status(
-                "%d %s" % (nfetches, "fetch" if nfetches == 1 else "fetches"),
+        self.proxy0(
+            self.all_progress.status(
+                "upd:%d %d %s" %
+                (len(upd), nfetches, "fetch" if nfetches == 1 else "fetches"),
                 upd.columns - 1
             )
         )
 
-    with FSTags() as fstags:
-      Rs = []
-      for url in argv:
-        with Pfx(url):
-          Y = YDL(
-              url,
-              fstags=fstags,
-              upd=options.loginfo.upd,
-              tick=update0,
-              over_progress=all_progress,
-              logger=options.loginfo.logger
-          )
-          Rs.append(Y.bg())
-          nfetches += 1
-          update0()
-      for R in report(Rs):
-        with Pfx(R.name):
-          nfetches -= 1
-          update0()
-          R()
+    self.update0 = update0
+
+  def report(self, Rs=None):
+    if Rs is None:
+      Rs = list(self.Rs)
+    return report(Rs)
+
+  def queue_urls(self, urls):
+    ''' Process the iterable `urls`.
+
+        A background `YDL` is dispatched for each url.
+        The associated `Result` is appended to `self.Rs`
+        and the list of `Result`s from this call is returned.
+    '''
+    Rs = []
+    for url in urls:
+      with Pfx(url):
+        Y = YDL(
+            url,
+            fstags=self.fstags,
+            upd=self.upd,
+            tick=self.update0,
+            over_progress=self.all_progress,
+            logger=self.logger,
+        )
+        R = Y.bg()
+
+        @logexc
+        def on_completion(YR):
+          with self._lock:
+            self.nfetches -= 1
+          self.update0()
+
+        Rs.append(R)
+        with self._lock:
+          self.Rs.append(R)
+          self.nfetches += 1
+        self.update0()
+        R.notify(on_completion)
+    return Rs
 
 class YDL:
   ''' Manager for a download process.
@@ -178,7 +221,9 @@ class YDL:
     '''
     result = self.result
     if result is None:
-      result = self.result = bg_result(self.run, _name=self.url)
+      result = self.result = bg_result(
+          self.run, _name="%s.run(%r)" % (type(self).__name__, self.url)
+      )
     return result
 
   @property
@@ -189,6 +234,7 @@ class YDL:
     ie_result = ydl.extract_info(self.url, download=False, process=True)
     return ydl.prepare_filename(ie_result)
 
+  @logexc
   def run(self):
     ''' Run the download.
     '''
@@ -235,6 +281,7 @@ class YDL:
       print(output_path, flush=True)
     return self
 
+  @logexc
   def update_progress(self, ydl_progress):
     ''' Update progress hook called by youtube_dl.
 
