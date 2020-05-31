@@ -164,7 +164,6 @@ class OverYDL:
 
         @logexc
         def on_completion(YR):
-          warning("COMPLETION RESULT %s", YR)
           with self._lock:
             self.nfetches -= 1
           self.update0()
