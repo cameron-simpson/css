@@ -33,7 +33,7 @@ import sys
 from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags
-from cs.logutils import warning
+from cs.logutils import warning, LogTime
 from cs.pfx import Pfx
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
@@ -204,15 +204,10 @@ class YDL:
     proxy('...')
     self.tick()
 
-    with ydl:
-      ydl.download([url])
-
-    total_bytes = progress.total
-    dl_report = (
-        "elapsed %ds" %
-        (progress.elapsed_time if total_bytes is None else progress.total)
-    )
-    proxy("%s, saving metadata ...", dl_report)
+    with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
+      with ydl:
+        ydl.download([url])
+    proxy("elapsed %ds, saving metadata ...", LT.elapsed)
     self.tick()
 
     ie_result = ydl.extract_info(url, download=False, process=True)
