@@ -91,6 +91,9 @@ class Upd(SingletonMixin):
     global instances
     instances.append(self)
 
+  def __str__(self):
+    return "%s(backend=%s)" % (type(self).__name__, self._backend)
+
   ############################################################
   # Sequence methods.
   #
