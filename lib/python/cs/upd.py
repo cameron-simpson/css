@@ -439,6 +439,15 @@ class Upd(SingletonMixin):
       finally:
         self.out(old, slot=slot)
 
+  def selfcheck(self):
+    with self._lock:
+      assert len(self._slot_text) == len(self._proxies)
+      assert len(self._slot_text) > 0
+      for i, proxy in enumerate(self._proxies):
+        assert proxy.upd is self
+        assert proxy.index == i
+    return True
+
   def insert(self, index, txt=''):
     ''' Insert a new status line at `index`.
 
