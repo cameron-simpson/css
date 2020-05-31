@@ -614,14 +614,16 @@ class UpdProxy(object):
         If the length of `self.prefix+txt` exceeds the available display
         width then the leftmost text is cropped to fit.
     '''
-    index = self.index
     upd = self.upd
-    if index is not None:
-      txt = upd.normalise(self.prefix + txt)
-      overflow = len(txt) - upd.columns + 1
-      if overflow > 0:
-        txt = txt[overflow:]
-      self.upd[index] = txt
+    if upd is not None:
+      with upd._lock:
+        index = self.index
+        if index is not None:
+          txt = upd.normalise(self.prefix + txt)
+          overflow = len(txt) - upd.columns + 1
+          if overflow > 0:
+            txt = txt[overflow:]
+          self.upd[index] = txt
 
   @property
   def width(self):
