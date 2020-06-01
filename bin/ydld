@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Run ydl in daemon mode, tailing a submission file.
+# - Cameron Simpson <cs@cskk.id.au> 01may2020
+#
+
+set -ue
+
+cmd=$0
+dldir=${DL:-$HOME/dl}/v
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  exit 2
+}
+
+[ -d "$dldir" ] || set-x mkdir "$dldir"
+cd "$dldir"
+>>.ydld-queue
+tail -F .ydld-queue | ydl ${1+"$@"} - &
+echo $! >.ydld.pid
+wait
