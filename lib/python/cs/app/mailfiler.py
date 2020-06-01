@@ -149,7 +149,8 @@ class MailFilerCommand(BaseCommand):
           Maildir names.
           Default: {DEFAULT_RULES_PATTERN}'''
 
-  def apply_defaults(self, options):
+  @staticmethod
+  def apply_defaults(options):
     ''' Set up default options.
     '''
     options.stdin = getattr(options, 'stdin', None) or sys.stdin
