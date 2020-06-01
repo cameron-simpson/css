@@ -36,7 +36,7 @@ from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
 from cs.logutils import warning, LogTime
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
@@ -89,7 +89,25 @@ class YDLCommand(BaseCommand):
   ''' `ydl` command line implementation.
   '''
 
-  USAGE_FORMAT = '''Usage: {cmd} URLs...'''
+  GETOPT_SPEC = 'f'
+  USAGE_FORMAT = '''Usage: {cmd} [-f] URLs...
+    -f  Force download - do not use the cache.'''
+
+  @staticmethod
+  def apply_defaults(options):
+    ''' Initial defaults options.
+    '''
+    options.ydl_opts = dict(logger=options.loginfo.logger)
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Command line main switches.
+    '''
+    for opt, val in opts:
+      if opt == '-f':
+        options.ydl_opts.update(cachedir=False)
+      else:
+        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
   @staticmethod
   def main(argv, options):
@@ -100,23 +118,30 @@ class YDLCommand(BaseCommand):
 
     upd = options.loginfo.upd
     with FSTags() as fstags:
-      over_ydl = OverYDL(upd=upd, fstags=fstags, logger=options.loginfo.logger)
-      over_ydl.queue_urls(argv)
+      over_ydl = OverYDL(upd=upd, fstags=fstags, ydl_opts=options.ydl_opts)
+      over_ydl.queue_iter(argv)
       for R in over_ydl.report():
         upd.nl("COMPLETED R=%s", R)
 
 class OverYDL:
+  ''' A manager for multiple `YDL` instances.
+  '''
 
-  def __init__(self, *, upd=None, fstags=None, all_progress=None, logger=None):
+  def __init__(
+      self,
+      *,
+      upd=None,
+      fstags=None,
+      all_progress=None,
+      ydl_opts=None,
+  ):
     if all_progress is None:
       all_progress = OverProgress()
-    if logger is None:
-      logger = logging.getLogger()
     self.upd = upd
-    self.fstags = fstags
     self.proxy0 = upd.proxy(0) if upd else None
+    self.fstags = fstags
     self.all_progress = OverProgress()
-    self.logger = logger
+    self.ydl_opts = ydl_opts
     self.Rs = []
     self.nfetches = 0
     self._lock = RLock()
@@ -138,43 +163,47 @@ class OverYDL:
     self.update0 = update0
 
   def report(self, Rs=None):
+    ''' Wrapper returning `cs.result.report(.Rs)`.
+        `Rs` defaults to `list(self.Rs`, the accumulated `Result`s..
+    '''
     if Rs is None:
       Rs = list(self.Rs)
     return report(Rs)
 
-  def queue_urls(self, urls):
-    ''' Process the iterable `urls`.
-
-        A background `YDL` is dispatched for each url.
-        The associated `Result` is appended to `self.Rs`
-        and the list of `Result`s from this call is returned.
+  def queue_iter(self, urls):
+    ''' Queue the URLs of the iterable `urls`,
+        essentially a convenience wrapper for the `queue` method.
+        Returns a list of the `Result`s for each queued URL.
     '''
-    Rs = []
-    for url in urls:
-      with Pfx(url):
-        Y = YDL(
-            url,
-            fstags=self.fstags,
-            upd=self.upd,
-            tick=self.update0,
-            over_progress=self.all_progress,
-            logger=self.logger,
-        )
-        R = Y.bg()
+    return list(map(self.queue, urls))
 
-        @logexc
-        def on_completion(YR):
-          with self._lock:
-            self.nfetches -= 1
-          self.update0()
+  @pfx_method
+  def queue(self, url):
+    ''' Queue a fetch of `url` and return a `Result`.
+      '''
+    with Pfx(url):
+      Y = YDL(
+          url,
+          fstags=self.fstags,
+          upd=self.upd,
+          tick=self.update0,
+          over_progress=self.all_progress,
+          **self.ydl_opts,
+      )
+      R = Y.bg()
 
-        Rs.append(R)
+      @logexc
+      def on_completion(_):
         with self._lock:
-          self.Rs.append(R)
-          self.nfetches += 1
+          self.nfetches -= 1
         self.update0()
-        R.notify(on_completion)
-    return Rs
+
+      with self._lock:
+        self.Rs.append(R)
+        self.nfetches += 1
+      self.update0()
+      R.notify(on_completion)
+      return R
 
 class YDL:
   ''' Manager for a download process.
@@ -251,7 +280,7 @@ class YDL:
         ##'skip_download': True,
         'writeinfojson': False,
         'updatetime': False,
-        ##'cachedir': False,
+        'cachedir': False,
         'process_info': [self.process_info]
     }
     if self.kw_opts:
