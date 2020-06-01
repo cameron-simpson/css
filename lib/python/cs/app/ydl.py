@@ -115,11 +115,19 @@ class YDLCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing URLs")
-
     upd = options.loginfo.upd
     with FSTags() as fstags:
       over_ydl = OverYDL(upd=upd, fstags=fstags, ydl_opts=options.ydl_opts)
-      over_ydl.queue_iter(argv)
+      for url in argv:
+        if url == '-':
+          with Pfx('stdin'):
+            for lineno, line in enumerate(sys.stdin, 1):
+              with Pfx(lineno):
+                url = line.rstrip()
+                with Pfx("URL %r", url):
+                  over_ydl.queue(url)
+        else:
+          over_ydl.queue_iter(argv)
       for R in over_ydl.report():
         upd.nl("COMPLETED R=%s", R)
 
