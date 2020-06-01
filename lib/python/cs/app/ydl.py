@@ -154,8 +154,7 @@ class OverYDL:
       else:
         self.proxy0(
             self.all_progress.status(
-                "upd:%d %d %s" %
-                (len(upd), nfetches, "fetch" if nfetches == 1 else "fetches"),
+                "%d %s" % (nfetches, "fetch" if nfetches == 1 else "fetches"),
                 upd.columns - 1
             )
         )
@@ -280,7 +279,6 @@ class YDL:
         ##'skip_download': True,
         'writeinfojson': False,
         'updatetime': False,
-        'cachedir': False,
         'process_info': [self.process_info]
     }
     if self.kw_opts:
