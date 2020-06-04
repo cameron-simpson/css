@@ -1,3 +1,4 @@
+newlines in macro definitions seem to survive, leading to newlines in commmand
 fstags: [xattr] section with xattr=tag equivalences, move rules to [autotag] section
 fstags: mirror tags to xattrs:x-fstags?
 fstags: autotag: use pathtags.add
