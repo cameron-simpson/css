@@ -475,7 +475,10 @@ case "$op" in
     fi
     set -x
     tmrc \
-    | while read -r session_name shcmd
+    | \
+    {
+      matched=
+      while read -r session_name shcmd
       do
         if [ $# -gt 0 ]
         then
@@ -486,12 +489,20 @@ case "$op" in
               ;;
           esac
         fi
+        matched=1
         do_tmux has-session -t "$session_name" 2>/dev/null \
         || (
           set -x
           do_tmux new-session -d -s "$session_name" "set -x; $shcmd"
-        )
+        ) \
+        || xit=1
       done
+      [ $matched ] || {
+        echo "$cmd: $op: no sessions matched" >&2
+        xit=1
+      }
+    exit $xit
+    }
     ;;
   use-session)
     # no tmux? use scr
