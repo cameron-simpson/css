@@ -477,6 +477,7 @@ case "$op" in
     tmrc \
     | \
     {
+      xit=0
       matched=
       while read -r session_name shcmd
       do
@@ -501,7 +502,7 @@ case "$op" in
         echo "$cmd: $op: no sessions matched" >&2
         xit=1
       }
-    exit $xit
+      exit $xit
     }
     ;;
   use-session)
