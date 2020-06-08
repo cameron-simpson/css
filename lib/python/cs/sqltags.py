@@ -20,7 +20,7 @@ import csv
 from datetime import datetime
 from getopt import getopt, GetoptError
 import os
-from os.path import basename, expanduser
+from os.path import abspath, basename, expanduser, exists as existspath
 import re
 import sys
 import threading
@@ -39,8 +39,9 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime, unixtime2datetime
 from cs.edit import edit_strings
-from cs.lex import FormatableMixin, FormatAsError
-from cs.logutils import error, warning, ifverbose
+from cs.fileutils import makelockfile
+from cs.lex import FormatableMixin, FormatAsError, cutprefix
+from cs.logutils import error, warning, ifverbose, info
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -89,7 +90,7 @@ class _State(threading.local):
     for k, v in kw.items():
       setattr(self, k, v)
 
-state = _State(verbose=False)
+state = _State(verbose=sys.stderr.isatty())
 
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
@@ -146,8 +147,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     db_url = options.db_url
-    if '://' not in db_url and db_url.endswith('.sqlite'):
-      db_url = 'sqlite:///' + db_url
     sqltags = SQLTags(db_url)
     with stackattrs(options, sqltags=sqltags):
       with sqltags:
@@ -225,6 +224,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             continue
           print(output)
     return xit
+
+  @classmethod
+  def cmd_init(cls, argv, options):
+    ''' Usage: {cmd}
+          Initialise the database.
+          This includes defining the schema and making the root metanode.
+    '''
+    options.sqltags.orm.define_schema()
 
   @classmethod
   def cmd_log(cls, argv, options):
@@ -436,7 +443,16 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
   def __init__(self, *, db_url):
     super().__init__()
+    db_path = cutprefix(db_url, 'sqlite://')
+    if db_path is db_url:
+      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
+        db_path = abspath(db_url)
+        db_url = 'sqlite:///' + db_url
+      else:
+        db_path = None
     self.db_url = db_url
+    self.db_path = db_path
+    self._lockfilepath = None
     engine = self.engine = create_engine(
         db_url,
         case_sensitive=True,
@@ -446,20 +462,28 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     meta.bind = engine
     self.declare_schema()
     self.Session = sessionmaker(bind=engine)
-    self.define_schema()
+    if db_path is not None and not existspath(db_path):
+      with Pfx("init %r", db_path):
+        self.define_schema()
+        verbose('created database')
 
   def startup(self):
     ''' Startup: define the tables if not present.
     '''
-    self.define_schema()
+    if self.db_path:
+      self._lockfilepath = makelockfile(self.db_path)
 
   def shutdown(self):
     ''' Stub shutdown.
     '''
+    if self._lockfilepath is not None:
+      with Pfx("remove(%r)", self._lockfilepath):
+        os.remove(self._lockfilepath)
+      self._lockfilepath = None
 
   @orm_method
   def define_schema(self):
-    ''' Instantiate the schema.
+    ''' Instantiate the schema and define the root metanode.
     '''
     self.meta.create_all()
     self.make_metanode()
