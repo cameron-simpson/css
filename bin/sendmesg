@@ -83,7 +83,7 @@ def main(argv):
         stdin=PIPE,
         close_fds=True
     )
-    P.stdin.write(msgtxt)
+    P.stdin.write(msgtxt.encode())
     P.stdin.close()
     P.wait()
 
