@@ -1302,7 +1302,7 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
 
   @classmethod
   def from_csvrow(cls, csvrow):
-    ''' Construc a `TaggedEntity` from a CSV row like that from
+    ''' Construct a `TaggedEntity` from a CSV row like that from
         `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
     '''
     te_unixtime, te_id, te_name = csvrow[:3]
