@@ -134,7 +134,9 @@ class Upd(SingletonMixin):
                   (isinstance(exc_val.code, int) and exc_val.code == 0)))):
       # move to the bottom and emit a newline
       txts = self.move_to_slot_v(self._current_slot, 0)
-      txts.append('\n')
+      if slots[0]:
+        # preserve the last status line if not empty
+        txts.append('\n')
       self._backend.write(''.join(txts))
       self._backend.flush()
     else:
