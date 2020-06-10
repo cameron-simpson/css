@@ -1,0 +1,4 @@
+lib/python/cs/obj.py: merge default ==> mailfiler
+lib/python/cs/obj.py: cs.obj: singleton: clarify (is_new,instance) return value in docstring
+lib/python/cs/obj.py: cs.obj: SingletonMixin: tweak docstring example
+lib/python/cs/obj.py: cs.obj: SingletonMixin: present _singleton_key before _singleton_init

@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200229'
+__version__ = '20200521-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -195,7 +195,7 @@ def setup_logging(
     ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
-  if main_log.encoding is None:
+  if getattr(main_log, 'encoding', None) is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
   if trace_mode is None:
@@ -285,6 +285,7 @@ def setup_logging(
           setattr(M, funcpart, _ftrace(F))
 
   loginfo = NS(
+      logger=root_logger,
       level=level,
       trace_level=trace_level,
       flags=flags,
@@ -661,6 +662,7 @@ class LogTime(object):
     self.warning_threshold = warning_threshold
     self.warning_level = warning_level
     self.start = None
+    self.end = None
     self.elapsed = None
 
   def __enter__(self):
@@ -668,8 +670,8 @@ class LogTime(object):
     return self
 
   def __exit__(self, *_):
-    now = time.time()
-    elapsed = now - self.start
+    now = self.end = time.time()
+    elapsed = self.elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
       level = self.level
       if self.warning_threshold is not None and elapsed >= self.warning_threshold:
@@ -678,7 +680,6 @@ class LogTime(object):
       if self.tag_args:
         tag = tag % self.tag_args
       log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
-    self.elapsed = elapsed
     return False
 
 class UpdHandler(StreamHandler):

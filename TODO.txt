@@ -1,3 +1,24 @@
+cs.upd: rate per proxy, bisect to update counter, autotune?
+incd: remote tmux session to be per target dir
+haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
+cs.upd: UpdProxy: make into context manage with null enter and self-delete on exit
+BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
+new cs.dlog module and bin-cs/dlog command doing what the shell script does now
+dlog: commit logs - tags the commit hash and branch
+dlog: accept tags (leading tag=value words)?
+rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
+cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
+can putacc be recoded to use fstags --for-rsync efficiently?
+ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
+treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
+pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
+cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
+cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
+import the examples in the module docstring
+cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111cda5f0>
+incd: only save target for remote targets
+incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?
+cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
 TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
 signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
@@ -10,11 +31,8 @@ BaseCommand: accept dict for initial options, some way to honour this during app
 media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
 resolve bin/maildb vs bin-cs/cs-maildb
-upgrade the distinfo stuff with a mode to emit all the docstrings so that a modul automatic README.md describes everything
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
-cs-release: generate and commit cs/module_README.md files (does markdown have a comment syntax?) so I can point to them as the module homepage
 setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
-cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
 cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
 cs.upd: multiline status area
 logutils: use cs.tty stuff for the status() function
@@ -26,7 +44,6 @@ Pfx: do not insert umark: if umark is empty, supports "" and None
 mutt-highlight: match markers at start or end of lines
 readline: fix spelling, detab, apply set -ue, use read -r line as fallback
 cs.excutils_tests: special logging setup to discard error messages - the successful test suite is very noisy
-distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose
 @decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
 @decorator: maybe support @deco(callable,*a,**kw)?
 @mapattr class decorator to map .foo to .bah.this.that... with get/set support (why? use case?)
@@ -40,7 +57,6 @@ rc/shell/fn-vcs: move repeated-commit check into hg() and git() functions
 replace cs.env.envsub with os.path.expandvars
 portfwd: changes to match svcd changes
 svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
-make cs.distinfo just do a Package class, split out PyPI stuff into cs.app.pypi.PyPI(PKG, base urls...)
 drop lib/python/cs/testdata/cs.mailutils/maildir, too big
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
 mappings: named tuple rows: omit columns with empty names - common in spreadsheet exports and breaks namedtuples

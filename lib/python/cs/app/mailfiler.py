@@ -147,21 +147,10 @@ class MailFilerCommand(BaseCommand):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from
           Maildir names.
-          Default: {DEFAULT_RULES_PATTERN}
-  Subcommands:
-    {cmd} monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
-      Monitor Maildirs for new messages and file them.
-      -1  File at most 1 message per Maildir.
-      -d delay
-          Delay between runs in seconds.
-          Default is to make only one run over the Maildirs.
-      -n  No remove. Keep filed messages in the origin Maildir.
-    {cmd} save target[,target...] <message
-      Save a message from standard input to the specified targets.
-    {cmd} report <message
-      Report various things about a message from standard input.'''
+          Default: {DEFAULT_RULES_PATTERN}'''
 
-  def apply_defaults(self, options):
+  @staticmethod
+  def apply_defaults(options):
     ''' Set up default options.
     '''
     options.stdin = getattr(options, 'stdin', None) or sys.stdin
@@ -191,7 +180,13 @@ class MailFilerCommand(BaseCommand):
         yield
 
   def cmd_monitor(self, argv, options):
-    ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
+    ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
+          Monitor Maildirs for new messages and file them.
+          -1  File at most 1 message per Maildir.
+          -d delay
+              Delay between runs in seconds.
+              Default is to make only one run over the Maildirs.
+          -n  No remove. Keep filed messages in the origin Maildir.
     '''
     warning("test warning")
     justone = False
@@ -232,7 +227,8 @@ class MailFilerCommand(BaseCommand):
     )
 
   def cmd_save(self, argv, options):
-    ''' Usage: save targets < message
+    ''' Usage: {cmd} target[,target...] <message
+          Save a message from standard input to the specified targets.
 
         Save message to the `targets`,
         a single command line argument of the form
@@ -256,9 +252,8 @@ class MailFilerCommand(BaseCommand):
     return self.mailfiler(options).save(targets, message_fp)
 
   def cmd_report(self, argv, options):
-    ''' Usage: report < message
-
-        Report of the processing of `message`.
+    ''' Usage: {cmd} <message
+          Report various things about a message from standard input.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))

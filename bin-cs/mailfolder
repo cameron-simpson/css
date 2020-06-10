@@ -112,6 +112,7 @@ set -- mutt -f "$maildir" \
 
 if [ $use_tmux ]
 then
+  unset TMUX
   session=MUTT_${foldername}_$(date '+%Y-%m-%d-%H%M%S')
   set -- tm "$session" "$@"
 fi
