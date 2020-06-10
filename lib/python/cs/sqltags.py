@@ -195,8 +195,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     sqltags = options.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'o:')
-    for option, value in options:
+    opts, argv = getopt(argv, 'o:')
+    for option, value in opts:
       with Pfx(option):
         if option == '-o':
           output_format = sqltags.resolve_format_string(value)
