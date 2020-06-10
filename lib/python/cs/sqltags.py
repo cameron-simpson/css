@@ -925,5 +925,36 @@ class SQLTags(MultiOpenMixin):
             tags=TagSet()
         )
 
+  @orm_auto_session
+  def import_csv_file(self, f, *, session, update_mode=False):
+    ''' Import CSV data from the file `f`.
+
+        If `update_mode` is true
+        named records which already exist will update from the data,
+        otherwise the conflict will raise a `ValueError`.
+    '''
+    csvr = csv.reader(f)
+    orm = self.orm
+    for csvrow in csvr:
+      with Pfx(csvr.line_num):
+        te = TaggedEntity.from_csvrow(csvrow)
+        self.add_tagged_entity(te)
+
+  def add_tagged_entity(self, te, *, update_mode=False):
+    ''' Add the `TaggedEntity` `te`.
+
+        If `update_mode` is true
+        named records which already exist will update from `te`,
+        otherwise the conflict will raise a `ValueError`.
+    '''
+    e = self[te.name] if te.name else None
+    if e and not update_mode:
+      raise ValueError("entity named %r already exists" % (te.name,))
+    if e is None:
+      e = self.orm.entities(name=te.name or None, unixtime=te.unixtime)
+    for tag in te.tags:
+      with Pfx(tag):
+        e.add_tag(tag)
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
