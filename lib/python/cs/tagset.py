@@ -475,12 +475,13 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
-    if post_offset < len(s):
-      raise ValueError(
-          "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
-      )
-    return tag
+    with Pfx("%s.from_string(%r[%d:],...)", cls.__name__, s, offset):
+      tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
+      if post_offset < len(s):
+        raise ValueError(
+            "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
+        )
+      return tag
 
   @staticmethod
   def is_valid_name(name):
@@ -1305,12 +1306,14 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
     ''' Construct a `TaggedEntity` from a CSV row like that from
         `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
     '''
-    te_unixtime, te_id, te_name = csvrow[:3]
-    tags = TagSet()
-    for csv_value in csvrow[3:]:
-      tag = Tag.from_string(csv_value)
-      tags.add(tag)
-    return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
+    with Pfx("%s.from_csvrow", cls.__name__):
+      te_unixtime, te_id, te_name = csvrow[:3]
+      tags = TagSet()
+      for i, csv_value in enumerate(csvrow[3:], 3):
+        with Pfx("field %d %r", i, csv_value):
+          tag = Tag.from_string(csv_value)
+          tags.add(tag)
+      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
 
   @property
   def csvrow(self):
