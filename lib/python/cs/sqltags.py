@@ -225,6 +225,42 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           print(output)
     return xit
 
+  @staticmethod
+  def cmd_import(argv, options):
+    ''' Usage: {cmd} [{{-u|--update}} {{-|srcpath}}...
+          Import CSV data in the format emitted by "export".
+          Each argument is a file path or "-", indicating standard input.
+          -u, --update  If a named entity already exists then update its tags.
+                        Otherwise this will be seen as a conflict
+                        and the import aborted.
+
+        TODO: should this be a transaction so that an import is all or nothing?
+    '''
+    sqltags = options.sqltags
+    badopts = False
+    update_mode = False
+    opts, argv = getopt(argv, 'u')
+    for option, value in opts:
+      with Pfx(option):
+        if option == '-u' or option == '--update':
+          update_mode = True
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      warning("missing srcpaths")
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    for srcpath in argv:
+      with sqltags.orm.session():
+        if srcpath == '-':
+          with Pfx("stdin"):
+            sqltags.import_csv_file(sys.stdin, update_mode=update_mode)
+        else:
+          with Pfx(srcpath):
+            with open(srcpath) as f:
+              sqltags.import_csv_file(f, update_mode=update_mode)
+
   @classmethod
   def cmd_init(cls, argv, options):
     ''' Usage: {cmd}
