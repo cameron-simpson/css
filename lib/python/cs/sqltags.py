@@ -213,7 +213,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     with sqltags.orm.session() as session:
       with Upd(sys.stderr) as U:
         U.out("select %s ...", ' '.join(map(str, tag_choices)))
-        tagged_entities = sqltags.find(tag_choices, session=session, with_tags=True)
+        tagged_entities = sqltags.find(
+            tag_choices, session=session, with_tags=True
+        )
       for te in tagged_entities:
         with Pfx(te):
           try:
@@ -941,10 +943,7 @@ class SQLTags(MultiOpenMixin):
         e = entity_map.get(entity_id)
         if not e:
           e = entity_map[entity_id] = TaggedEntity(
-              id=entity_id,
-              name=entity_name,
-              unixtime=unixtime,
-              tags=TagSet()
+              id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
           )
         value = self.orm.tags.pick_value(
             tag_float_value, tag_string_value, tag_structured_value
@@ -955,10 +954,7 @@ class SQLTags(MultiOpenMixin):
     else:
       for entity_id, entity_name, unixtime in results:
         yield TaggedEntity(
-            id=entity_id,
-            name=entity_name,
-            unixtime=unixtime,
-            tags=TagSet()
+            id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
         )
 
   @orm_auto_session
