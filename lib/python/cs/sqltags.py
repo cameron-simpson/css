@@ -471,7 +471,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     ''' Startup: define the tables if not present.
     '''
     if self.db_path:
-      self._lockfilepath = makelockfile(self.db_path)
+      self._lockfilepath = makelockfile(self.db_path, poll_interval=0.2)
 
   def shutdown(self):
     ''' Stub shutdown.
