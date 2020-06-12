@@ -182,7 +182,7 @@ class BaseProgress(object):
 
   def status(self, label, width):
     ''' A progress string of the form:
-        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+        *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
     ratio = self.ratio
     remaining = self.remaining_time
