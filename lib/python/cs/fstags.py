@@ -238,8 +238,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   @classmethod
   def cmd_export(cls, argv, options):
-    ''' Usage: {cmd} [--direct] path {{tag[=value]|-tag}}...
+    ''' Usage: {cmd} [-a] [--direct] path {{tag[=value]|-tag}}...
           Export tags for files from path matching all the constraints.
+          -a        Export all paths, not just those with tags.
+          --direct  Export the direct tags instead of the computed tags.
           The output is in the same CSV format as that from "sqltags export",
           with the following columns:
           * unixtime: the file's st_mtime from os.stat.
@@ -249,14 +251,17 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     fstags = options.fstags
     badopts = False
+    all_paths = False
     use_direct_tags = False
-    options, argv = getopt(argv, '', longopts=['direct'])
+    options, argv = getopt(argv, 'a', longopts=['direct'])
     for option, value in options:
       with Pfx(option):
-        if option == '--direct':
+        if option == '-a':
+          all_paths = true
+        elif option == '--direct':
           use_direct_tags = True
         else:
-          raise RuntimeError("unsupported option")
+          raise RuntimeError("unimplemented option")
     if not argv:
       warning("missing path")
       badopts = True
@@ -274,7 +279,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
       te = fstags[filepath].as_TaggedEntity(indirect=not use_direct_tags)
-      csvw.writerow(te.csvrow)
+      if all_paths or te.tags:
+        csvw.writerow(te.csvrow)
     return xit
 
   @classmethod
