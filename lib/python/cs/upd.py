@@ -58,6 +58,13 @@ def cleanupAtExit():
 
 atexit.register(cleanupAtExit)
 
+# A couple of convenience functions.
+
+def out(msg, *a, **outkw):
+  ''' Update the status line of the default `Upd` instance.
+      Parameters are as for `Upd.out()`.
+  '''
+  return Upd().out(msg, *a, **outkw)
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
