@@ -427,6 +427,52 @@ class Upd(SingletonMixin):
       self._backend.flush()
 
   @contextmanager
+  def above(self, need_newline=False):
+    ''' Move to the top line of the display, clear it, yield, redraw below.
+
+        This context manager is for use when interleaving _another_
+        stream with the `Upd` display;
+        if you just want to write lines above the display
+        for the same backend use `Upd.nl`.
+
+        The usual situation for `Upd.above`
+        is interleaving `sys.stdout` and `sys.stderr`,
+        which are often attached to the same terminal.
+
+        Note that the caller's output should be flushed
+        before exiting the suite
+        so that the output is completed before the `Upd` resumes.
+
+        Example:
+
+            U = Upd()   # default sys.stderr Upd
+            ......
+            with U.above():
+                print('some message for stdout ...', flush=True)
+    '''
+    # go to the top slot, overwrite it and then rewrite the slots below
+    backend = self._backend
+    slots = self._slot_text
+    txts = []
+    top_slot = len(slots) - 1
+    txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+    txts.extend(self.redraw_line_v(''))
+    backend.write(''.join(txts))
+    backend.flush()
+    self._current_slot = top_slot
+    yield
+    txts = []
+    if need_newline:
+      clr_eol = self.ti_str('el')
+      if clr_eol:
+        txts.append(clr_eol)
+        txts.append('\v\r')
+    txts.extend(self.redraw_trailing_slots_v(top_slot, skip_first_vt=True))
+    backend.write(''.join(txts))
+    backend.flush()
+    self._current_slot = 0
+
+  @contextmanager
   def without(self, temp_state='', slot=0):
     ''' Context manager to clear the status line around a suite.
         Returns the status line text as it was outside the suite.
