@@ -68,5 +68,4 @@ def main(argv=None):
   return xit
 
 if __name__ == '__main__':
-  sys.stderr.flush()
   sys.exit(main([default_cmd] + sys.argv[1:]))
