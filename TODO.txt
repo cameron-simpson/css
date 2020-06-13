@@ -1,3 +1,4 @@
+cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
 cs.upd: ansi_mode to accept coloured message strings - requires an ansi_ln function in cs.tty
 cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
 cs.progress: control over status display - units etc
