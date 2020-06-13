@@ -5,7 +5,10 @@
 
 import abc
 import importlib
-from inspect import (getcomments, getmodule, isfunction, isclass, signature)
+from inspect import (
+    getcomments, getmodule, isclass, isfunction, ismethod, signature
+)
+from itertools import chain
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -33,6 +36,7 @@ def module_doc(
     *,
     sort_key=lambda item: item[0].lower(),
     filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
+    method_names=None,
 ):
   ''' Fetch the docstrings from a module and assemble a MarkDown document.
 
@@ -78,12 +82,36 @@ def module_doc(
         if mro_names:
           classname_etc += '(' + ','.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
-        init_method = obj.__dict__.get('__init__', None)
-        if init_method:
-          init_doc = obj_docstring(init_method)
-          if init_doc:
-            msig = signature(init_method)
-            obj_doc += f'\n\n### Method `{Mname}.__init__{msig}`\n\n{init_doc}'
+        direct_attrs = dict(obj.__dict__)
+        for attr_name in method_names or chain(
+            # constructor and initialiser
+            ('__new__', '__init__'),
+            # "constants"
+            sorted(filter(lambda name: name and name[0].isupper(),
+                          direct_attrs)),
+            # dunder methods
+            sorted(filter(is_dunder, direct_attrs)),
+            # remaining attributes
+            sorted(direct_attrs),
+        ):
+          if not method_names:
+            # prune some boring names
+            if attr_name in ('__doc__', '__module__'):
+              continue
+            # prune private names which are not dunder names
+            if attr_name.startswith('_') and is_dunder(attr_name):
+              continue
+          if attr_name in direct_attrs:
+            attr = direct_attrs.pop(attr_name)
+            attr_doc = obj_docstring(attr)
+            if not attr_doc:
+              continue
+            # Class.name is a function, not a (bound?) method
+            if ismethod(attr) or isfunction(attr):
+              method_sig = signature(attr)
+              obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
+            else:
+              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)
