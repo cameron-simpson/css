@@ -4,7 +4,8 @@
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
 
-''' A progress tracker with methods for throughput, ETA and update notification.
+''' A progress tracker with methods for throughput, ETA and update notification;
+    also a compound progress meter composed from other progress meters.
 '''
 
 from collections import namedtuple
@@ -14,11 +15,9 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
-__version__ = '20200520-post'
+__version__ = '20200613-post'
 
 DISTINFO = {
-    'description':
-    "A progress tracker with methods for throughput, ETA and update notification. Also a progress meter composed from other progress meters.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -38,7 +37,15 @@ class BaseProgress(object):
       (the basis of `time.time()`).
   '''
 
-  def __init__(self, name=None, start_time=None):
+  def __init__(self, name=None, start_time=None, units_scale=None):
+    ''' Initialise a progress instance.
+
+        Parameters:
+        * `name`: optional name
+        * `start_time`: options UNIX epoch start time, default from `time.time()`
+        * `units_scale`: a scale for use with `cs.units.transcribe`,
+          default `BINARY_BYTES_SCALE`
+    '''
     now = time.time()
     if name is None:
       name = '-'.join((type(self).__name__, str(seq())))
@@ -46,8 +53,11 @@ class BaseProgress(object):
       start_time = now
     elif start_time > now:
       raise ValueError("start_time(%s) > now(%s)" % (start_time, now))
+    if units_scale is None:
+      units_scale = BINARY_BYTES_SCALE
     self.name = name
     self.start_time = start_time
+    self.units_scale = units_scale
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -180,9 +190,61 @@ class BaseProgress(object):
         transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
     )
 
+  def arrow(self, width, no_padding=False):
+    ''' Construct a progress arrow representing completion
+        to fit in the specified `width`.
+    '''
+    if width < 1:
+      return ''
+    ratio = self.ratio
+    if ratio is None or ratio <= 0:
+      arrow = ''
+    elif ratio < 1.0:
+      arrow_len = width * ratio
+      if arrow_len < 1:
+        arrow = '>'
+      else:
+        arrow = '=' * int(arrow_len - 1) + '>'
+    else:
+      arrow = '=' * width
+    if not no_padding:
+      arrow += ' ' * (width - len(arrow))
+    return arrow
+
+  def format_counter(self, value, scale=None, max_parts=2):
+    ''' Format `value` accoridng to `scale` and `max_parts`
+        using `cs.units.transcribe`.
+    '''
+    if scale is None:
+      scale = self.units_scale
+    if scale is None:
+      return str(value)
+    return transcribe(value, scale, max_parts=max_parts)
+
+  def text_pos_of_total(
+      self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
+  ):
+    ''' Return a "position/total" style progress string.
+
+        Parameters:
+        * `fmt`: format string interpolating `pos_text` and `total_text`.
+          Default: `"{pos_text}/{total_text}"`
+        * `fmt_pos`: formatting function for `self.position`,
+          default `self.format_counter`
+        * `fmt_total`: formatting function for `self.total`,
+          default from `fmt_pos`
+    '''
+    if fmt_pos is None:
+      fmt_pos = self.format_counter
+    if fmt_total is None:
+      fmt_total = fmt_pos
+    pos_text = fmt_pos(self.position)
+    total_text = fmt_pos(self.total)
+    return fmt.format(pos_text=pos_text, total_text=total_text)
+
   def status(self, label, width):
     ''' A progress string of the form:
-        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+        *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
     ratio = self.ratio
     remaining = self.remaining_time
@@ -193,7 +255,7 @@ class BaseProgress(object):
         return label + ': ETA unknown'
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
-    left = (label + ': ' + self.count_of_total_bytes_text() + ' ')
+    left = (label + ': ' + self.text_pos_of_total() + ' ')
     if remaining is None:
       right = 'ETA unknown'
     else:
@@ -202,17 +264,7 @@ class BaseProgress(object):
     if arrow_width < 1:
       # no roow for an arrow
       return label + ':' + right
-    if ratio <= 0:
-      arrow = ''
-    elif ratio < 1.0:
-      arrow_len = arrow_width * ratio
-      if arrow_len < 1:
-        arrow = '>'
-      else:
-        arrow = '=' * int(arrow_len - 1) + '>'
-    else:
-      arrow = '=' * arrow_width
-    arrow_field = arrow + ' ' * (arrow_width - len(arrow))
+    arrow_field = self.arrow(arrow_width)
     return left + arrow_field + right
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
@@ -265,6 +317,7 @@ class Progress(BaseProgress):
       start_time=None,
       throughput_window=None,
       total=None,
+      units_scale=None,
   ):
     ''' Initialise the Progesss object.
 
@@ -278,7 +331,9 @@ class Progress(BaseProgress):
           default None.
         * `total`: expected completion value, default None.
     '''
-    BaseProgress.__init__(self, name=name, start_time=start_time)
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     if position is None:
       position = 0
     if start is None:
@@ -515,8 +570,12 @@ class OverProgress(BaseProgress):
 
   '''
 
-  def __init__(self, subprogresses=None, name=None, start_time=None):
-    BaseProgress.__init__(self, name=name, start_time=start_time)
+  def __init__(
+      self, subprogresses=None, name=None, start_time=None, units_scale=None
+  ):
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     self.subprogresses = set()
     if subprogresses:
       for P in subprogresses:

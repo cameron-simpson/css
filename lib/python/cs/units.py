@@ -11,10 +11,13 @@ Presupplied scales:
 * `DECIMAL_BYTES_SCALE`: Decimal units of (B)ytes, KB, MB, GB etc.
 * `DECIMAL_SCALE`: Unit suffixes K, M, G etc.
 * `TIME_SCALE`: Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
+* `UNSCALED_SCALE`: no units
 '''
 
 from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
+
+__version__ = '20200613-post'
 
 DISTINFO = {
     'description': "unit suffixes for nonnegative integers; parsing and transcription",
@@ -26,6 +29,8 @@ DISTINFO = {
     ],
     'install_requires': ['cs.lex'],
 }
+
+UNSCALED_SCALE = ( ( 0, '' ), )
 
 TIME_SCALE = (
     ( 60, 's' ),

@@ -21,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200517-post'
+__version__ = '20200613-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -907,14 +907,14 @@ def cutsuffix(s, suffix):
 def cropped_repr(s, max_length=32, offset=0):
   ''' If the length of the sequence `s` after `offset (default `0`)
       exceeds `max_length` (default 32)
-      return the `repr` of the leading 29 characters from `offset`
+      return the `repr` of the leading `max_length-3` characters from `offset`
       plus `'...'`.
       Otherwise return the `repr` of `s[offset:]`.
 
       This is typically used for `str` values.
   '''
   if len(s) - offset > max_length:
-    return repr(s[offset:offset+29])+'...'
+    return repr(s[offset:offset + max_length - 3]) + '...'
   return repr(s[offset:])
 
 def get_ini_clausename(s, offset=0):
