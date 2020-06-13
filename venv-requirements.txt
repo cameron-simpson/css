@@ -1,0 +1,11 @@
+wheel
+pip
+enum34
+icontract
+lmdb
+mypy
+sqlalchemy
+pylint
+pyflakes
+pycodestyle
+twine
