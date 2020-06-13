@@ -28,7 +28,7 @@ DISTINFO = {
     'install_requires': ['cs.lex'],
 }
 
-UNSCALED_SCALE = ( ( 0, '' ) )
+UNSCALED_SCALE = ( ( 0, '' ), )
 
 TIME_SCALE = (
     ( 60, 's' ),
