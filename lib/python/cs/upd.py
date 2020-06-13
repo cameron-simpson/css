@@ -87,6 +87,17 @@ def print(*a, **kw):
   with upd.above(need_newline=not end.endswith('\n')):
     builtin_print(*a, **kw)
 
+def nl(msg, *a, **kw):
+  ''' Write `msg` to `file` (default `sys.stdout`),
+      without interfering with the `Upd` instance.
+      This is a thin shim for `Upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if 'file' not in kw:
+    kw['file'] = sys.stderr
+  print(msg, **kw)
+
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
