@@ -741,7 +741,7 @@ class Module(object):
             f'*Release {release_tag.version}*:\n{release_entry}'
         )
     # split the module documentation after the opening paragraph
-    full_doc = module_doc(self.module)
+    full_doc = module_doc(self.module, method_names=('__new__', '__init__'))
     try:
       doc_head, doc_tail = full_doc.split('\n\n', 1)
     except ValueError:
