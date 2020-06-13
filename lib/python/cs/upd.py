@@ -108,7 +108,7 @@ def print(*a, **kw):
       * `upd`: the `Upd` instance to use, default `Upd()`
 
       Programmes intregrating `cs.upd` with use of the builtin `print`
-      function should use this as import time:
+      function should use this at import time:
 
           from cs.upd import print
   '''
