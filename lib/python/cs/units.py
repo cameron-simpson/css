@@ -17,6 +17,8 @@ Presupplied scales:
 from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
 
+__version__ = '20200613'
+
 DISTINFO = {
     'description': "unit suffixes for nonnegative integers; parsing and transcription",
     'keywords': ["python2", "python3"],
