@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Trite convenience wrapper for cs-release.
+# - Cameron Simpson <cs@cskk.id.au> 10apr2020
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [module op]"
+
+module=
+
+if [ $# = 0 ]
+then
+  set -- ls
+else
+  case "$1" in
+    cs.*)
+      module=$1; shift
+      ;;
+  esac
+  if [ $# = 0 ]
+  then
+    set -- check
+  fi
+  [ -z "$module" ] || set -- "$@" "$module"
+fi
+
+set -x
+exec cs-release "$@"

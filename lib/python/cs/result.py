@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends.
+Result and friends: various classable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -28,8 +28,8 @@ Trite example::
   R = Result(name="my demo")
 
   Thread 1:
+    # this blocks until the Result is ready
     value = R()
-    # blocks...
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 
@@ -53,29 +53,30 @@ You can also collect multiple Results in completion order using the report() fun
 try:
   from enum import Enum
 except ImportError:
-  from enum34 import Enum # type: ignore
-from functools import partial
+  from enum34 import Enum  # type: ignore
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from icontract import require
 from cs.logutils import exception, error, warning, debug
 from cs.pfx import Pfx
+from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
+__version__ = '20200521-post'
+
 DISTINFO = {
-    'description':
-    "Result and friends: callable objects which will receive a value"
-    " at a later point in time.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.threads', 'icontract'],
+    'install_requires': [
+        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
+        'cs.threads', 'icontract'
+    ],
 }
 
 class ResultState(Enum):
@@ -115,7 +116,7 @@ class Result(object):
         * `result`: if not `None`, prefill the `.result` property.
     '''
     if lock is None:
-      lock = Lock()
+      lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
@@ -277,10 +278,7 @@ class Result(object):
         and transitions to "running".
     '''
     return bg_thread(
-        self.call,
-        name="<%s>.bg(func=%s,...)" % (self, func),
-        args=[func] + list(a),
-        kwargs=kw
+        self.call, name=self.name, args=[func] + list(a), kwargs=kw
     )
 
   @require(
@@ -414,7 +412,8 @@ class Result(object):
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
   '''
-  R = Result()
+  _name = kw.pop('_name', None)
+  R = Result(name=_name)
   R.bg(func, *a, **kw)
   return R
 
@@ -483,33 +482,30 @@ class OnDemandResult(Result):
   ''' Wrap a callable, run it when required.
   '''
 
-  def __init__(self, func, *a, **kw):
+  def __init__(self, func, *fargs, **fkwargs):
     Result.__init__(self)
-    if a or kw:
-      func = partial(func, *a, **kw)
     self.func = func
+    self.fargs = fargs
+    self.fkwargs = fkwargs
 
-  def __call__(self):
+  def __str__(self):
+    s = super().__str__() + ":func=%s" % (funcname(self.func),)
+    if self.fargs:
+      s += ":fargs=%r" % (self.fargs,)
+    if self.fkwargs:
+      s += ":fkwargs=%r" % (self.fkwargs,)
+    return s
+
+  def __call__(self, *a, **kw):
+    if a or kw:
+      raise ValueError(
+          "%s.__call__: no parameters expected, received: *%r, **%r" %
+          (self, a, kw)
+      )
     with self._lock:
-      state = self.state
-      if state == ResultState.cancelled:
-        raise CancellationError()
-      if state == ResultState.pending:
-        self.state = ResultState.running
-      else:
-        raise RuntimeError(
-            "state should be ResultState.pending but is %s" % (self.state,)
-        )
-    result, exc_info = None, None
-    try:
-      result = self.func()
-    except Exception:
-      exc_info = sys.exc_info()
-      self.exc_info = exc_info
-      raise
-    else:
-      self.result = result
-    return result
+      if self.state == ResultState.pending:
+        self.call(self.func, *self.fargs, **self.fkwargs)
+    return super().__call__()
 
 OnDemandFunction = OnDemandResult
 

@@ -8,6 +8,7 @@ import csv
 import fnmatch
 import re
 import sys
+from types import SimpleNamespace as NS
 if sys.hexversion < 0x02060000:
   from sets import Set as set
 import itertools
@@ -19,7 +20,6 @@ from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
 from cs.lex import parseUC_sAttr
 from cs.logutils import D, error, warning, info, debug, exception
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, unicode
@@ -723,7 +723,7 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-class NodeDB(dict, O):
+class NodeDB(dict):
 
   _key = ('_', '_')     # index of metadata node
 
@@ -800,7 +800,7 @@ class NodeDB(dict, O):
     if self._noNode is None:
       self._noNode = _NoNode(self)
 
-  class __AttrTypeRegistration(O):
+  class __AttrTypeRegistration(NS):
     ''' An object to hold an attribute value type registration, with the
         following attributes:
           .type      the registered type

@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 
-''' Commandline main programme.
+''' Command line utility for working with Beyonwiz PVR devices.
 '''
 
 from __future__ import print_function
@@ -10,7 +10,7 @@ import json
 import os.path
 import sys
 from cs.cmdutils import BaseCommand
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 from cs.x import X
 from . import Recording
@@ -22,12 +22,6 @@ TRY_N = 32
 def main(argv=None, cmd=None):
   ''' Main command line.
   '''
-  if argv is None:
-    argv = sys.argv
-  argv0 = argv.pop(0)
-  if cmd is None:
-    cmd = argv0
-  setup_logging(os.path.basename(cmd))
   return BWizCmd().run(argv, cmd=cmd)
 
 class BWizCmd(BaseCommand):
@@ -62,7 +56,7 @@ class BWizCmd(BaseCommand):
           Run unit tests.'''
 
   @staticmethod
-  def cmd_cat(args, options, cmd):
+  def cmd_cat(args, options):
     ''' Output the tvwiz transport stream data.
     '''
     if not args:
@@ -76,7 +70,7 @@ class BWizCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_convert(args, options, cmd):
+  def cmd_convert(args, options):
     ''' Convert a recording to MP4.
     '''
     if not args:
@@ -111,7 +105,7 @@ class BWizCmd(BaseCommand):
       return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
 
   @staticmethod
-  def cmd_mconvert(args, options, cmd):
+  def cmd_mconvert(args, options):
     ''' Convert multiple recordings to MP4.
     '''
     if not args:
@@ -125,7 +119,7 @@ class BWizCmd(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_meta(args, options, cmd):
+  def cmd_meta(args, options):
     ''' Report metadata about recordings.
     '''
     if not args:
@@ -137,7 +131,7 @@ class BWizCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def scan(args, options, cmd):
+  def scan(args, options):
     ''' Scan a TVWiz directory.
     '''
     if not args:
@@ -169,7 +163,7 @@ class BWizCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_stat(args, options, cmd):
+  def cmd_stat(args, options):
     ''' Report information about a recording.
     '''
     if not args:
@@ -183,7 +177,7 @@ class BWizCmd(BaseCommand):
     return 0
 
   @staticmethod
-  def cmd_test(args, options, cmd):
+  def cmd_test(args, options):
     ''' Run the self tests.
     '''
     host = args.pop(0)

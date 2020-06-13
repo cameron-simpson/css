@@ -23,6 +23,8 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
+__version__ = '20200130'
+
 DISTINFO = {
     'description':
     "Facilities for mappings and objects associated with mappings.",
@@ -359,6 +361,35 @@ def _named_column_tuples(
     yield named_row
     previous = named_row
 
+def dicts_to_namedtuples(dicts, class_name, keys=None):
+  ''' Scan an iterable of `dict`s,
+      yield a sequence of `namedtuple`s derived from them.
+
+      Parameters:
+      * `dicts`: the `dict`s to scan and convert, an iterable
+      * `class_name`: the name for the new `namedtuple` class
+      * `keys`: optional iterable of `dict` keys of interest;
+        if omitted then the `dicts` are scanned in order to learn the keys
+
+      Note that if `keys` is not specified
+      this generator prescans the `dicts` in order to learn their keys.
+      As a consequence, all the `dicts` will be kept in memory
+      and no `namedtuple`s will be yielded until after that prescan completes.
+  '''
+  if keys is None:
+    keys = set()
+    ds = []
+    for d in dicts:
+      ds.append(d)
+      keys.update(d.keys())
+    keys = sorted(keys)
+  else:
+    ds = dicts
+    keys = list(keys)
+  factory = named_row_tuple(*keys, class_name=class_name)
+  for d in ds:
+    yield factory(*[d.get(dk) for dk in keys])
+
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys
       (matching the regular expression `^[A-Z][A-Z_0-9]*$`)
@@ -682,6 +713,10 @@ class SeenSet(object):
 class StackableValues(object):
   ''' A collection of named stackable values with the latest value
       available as an attribute.
+
+      I now recommand my `cs.context.stackattrs` context manager for most
+      uses; it may be applied to any object instead of requiring use of this
+      class.
 
       Note that names conflicting with methods are not available
       as attributes and must be accessed via `__getitem__`.

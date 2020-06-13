@@ -30,15 +30,18 @@ import sys
 import threading
 import time
 import traceback
+from types import SimpleNamespace as NS
 import cs.logutils
-from cs.logutils import debug, error, warning, D, ifdebug
-from cs.obj import O, Proxy
+from cs.logutils import debug, error, warning, D, ifdebug, loginfo
+from cs.obj import Proxy
 from cs.pfx import Pfx
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
+
+__version__ = '20200318'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -65,7 +68,7 @@ DISTINFO = {
 DEBUG_POLL_RATE = 0.25
 
 def Lock():
-  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+  ''' Factory function: if cs.logutils.loginfo.level <= logging.DEBUG
       then return a DebuggingLock, otherwise a threading.Lock.
   '''
   if not ifdebug():
@@ -74,7 +77,7 @@ def Lock():
   return DebuggingLock({'filename': filename, 'lineno': lineno})
 
 def RLock():
-  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+  ''' Factory function: if cs.logutils.loginfo.level <= logging.DEBUG
       then return a DebuggingRLock, otherwise a threading.RLock.
   '''
   if not ifdebug():
@@ -156,7 +159,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
       `logger`: a logger.Logger ducktype or the name of a logger.
                If missing or None, obtain a logger from logging.getLogger().
       `log_level`: the logging level for the dump.
-               If missing or None, use cs.logutils.logging_level.
+               If missing or None, use cs.logutils.loginfo.level.
   '''
   if stack is None:
     stack = traceback.extract_stack()
@@ -167,7 +170,7 @@ def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   elif isinstance(logger, str):
     logger = logging.getLogger(logger)
   if log_level is None:
-    log_level = cs.logutils.logging_level
+    log_level = loginfo.level
   for text in traceback.format_list(stack):
     for line in text.splitlines():
       logger.log(log_level, line.rstrip())
@@ -219,12 +222,9 @@ def DF(func, *a, **kw):
   '''
   return DEBUG(func, force=True)(*a, **kw)
 
-class DebugWrapper(O):
+class DebugWrapper(NS):
   ''' Base class for classes presenting debugging wrappers.
   '''
-
-  def __init__(self, **kw):
-    O.__init__(self, **kw)
 
   def debug(self, msg, *a):
     if a:

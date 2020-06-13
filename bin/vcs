@@ -10,22 +10,28 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
+: ${VCS_FORMAT_TSLOG_GIT:='%ci %ae %s'}
+: ${VCS_FORMAT_TSLOG_HG:='{date|isodate} {author|email} {desc|firstline}\n'}
 : ${VCS_FORMAT_GLOG_GIT:='%<(25)%ae %s%n%ci %h<-%p%d%n'}
 : ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(activebookmark,"","","@{activebookmark}")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
   -d dir        Working directory, default: .
+  -q            Quiet. Turn off tracing and a lot of command output.
   -t topdir     Top of the VCS tree.
   -V vcs_type   Specify the VCS type to use.
+  -x            Turn on command excution tracing.
                 An empty string asks $cmd to figure this out.
   Commands:
     branch      Report current branch name.
     branches    Report all branch names.
     diff        Run the VCS diff command.
+    dl, download Download remote changes.
+                Does not update or merge the local checkout.
     glog        Report a graphical change log.
-    get-branches [remote]
-                Fetch all remote branches.
+    get-branches [remote [remote-branch-names...]]
+                Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
     remote      Report remote paths.
@@ -33,13 +39,17 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     status      Report tree status.
     tags        Report tag names.
     top         Report top of tree.
+    tslog       Report a timesheet suitable change log:
+                  date time zone author headline
     type        Report type of tree."
 
 wd=.
 vcs_top=
 vcs_type=
 trace=command
-##[ -t 2 ] && trace=set-x
+hg_q=
+git_q=
+[ -t 2 ] && trace=set-x
 
 badopts=
 
@@ -47,8 +57,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) wd=$2; shift ;;
+    -q) trace=command hg_q=-q git_q=-q ;;
     -t) vcs_top=$2; shift ;;
     -V) vcs_type=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -100,7 +112,7 @@ else    op=$1; shift
 fi
 
 hg(){   $trace hg -R "$vcs_top" ${1+"$@"}; }
-git(){  $trace git --git-dir "$vcs_top/.git" ${1+"$@"}; }
+git(){  $trace git ${1+"$@"}; }
 
 # Compute working directory VCS type.
 # All other commands are split on type below.
@@ -139,10 +151,23 @@ case "$op" in
       # current diff
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
+      dl,git | download,git)
+                    git fetch $git_q --all ${1+"$@"} ;;
+      dl,hg | download,hg)
+                    hg pull $hg_q ${1+"$@"} ;;
       get-branches,git)
-                    remote=${1:-origin}
-                    git branch -r \
-                    | sed "s/^  //;/^$remote\\//!d; / /d" \
+                    if [ $# = 0 ]
+                    then  remote=origin
+                    else  remote=$1; shift
+                    fi
+                    if [ $# = 0 ]
+                    then
+                      git branch -r | sed "s/^  //;/^$remote\\//!d; / /d"
+                    else
+                      for rbr
+                      do  echo "$rbr"
+                      done
+                    fi \
                     | while read -r rbr
                       do
                         lbr=${rbr##$remote/}
@@ -184,6 +209,14 @@ case "$op" in
       # report tags
       tags,git)     [ $# -gt 0 ] || set -- -l; git tag "$@" ;;
       tags,hg)      hg tags ${1+"$@"} ;;
+      # timesheet suitable log: timestampts, author, headline
+      tslog,git)     git log \
+                      "--format=tformat:$VCS_FORMAT_TSLOG_GIT" \
+                      ${1+"$@"}
+                    ;;
+      tslog,hg)      hg log --template "$VCS_FORMAT_TSLOG_HG" \
+                      ${1+"$@"}
+                    ;;
       # update to revision
       up,git|update,git)
                     if [ $# = 1 ]

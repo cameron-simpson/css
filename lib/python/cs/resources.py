@@ -13,13 +13,13 @@ import sys
 from threading import Condition, Lock, RLock
 import time
 from cs.logutils import error, warning
-from cs.obj import O, Proxy
+from cs.obj import Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
+__version__ = '20200521-post'
+
 DISTINFO = {
-    'description':
-    "resourcing related classes and functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -248,7 +248,7 @@ class MultiOpenMixin(object):
 class _SubOpen(Proxy):
   ''' A single use proxy for another object with its own independent .closed attribute.
 
-      The target use case is MultiOpenMixins which return independent
+      The target use case is `MultiOpenMixin`s which return independent
       closables from their .open method.
   '''
 
@@ -285,7 +285,7 @@ class MultiOpen(MultiOpenMixin):
     '''
     self.openable.close()
 
-class Pool(O):
+class Pool(object):
   ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
 
       All the pool objects must be suitable for use, so the
@@ -307,7 +307,6 @@ class Pool(O):
             If 0, no upper limit is applied.
         * `lock`: optional shared Lock; if omitted or `None` a new Lock is allocated
     '''
-    O.__init__(self)
     if max_size is None:
       max_size = 4
     if lock is None:
@@ -347,7 +346,7 @@ class RunState(object):
       should stop (`.cancel`)
       and has stopped (`.stop`).
 
-      A `RunState` can be used a a context manager, with the enter
+      A `RunState` can be used as a context manager, with the enter
       and exit methods calling `.start` and `.stop` respectively.
       Note that if the suite raises an exception
       then the exit method also calls `.cancel` before the call to `.stop`.

@@ -12,10 +12,10 @@ from collections import defaultdict
 from contextlib import contextmanager
 import sys
 import time
-try:
-  from cs.logutils import warning
-except ImportError:
-  from logging import warning
+import traceback
+from cs.gimmicks import warning
+
+__version__ = '20200517.2-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -24,7 +24,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
 
 def fmtdoc(func):
@@ -86,16 +86,19 @@ def decorator(deco):
     if len(da) == 1 and callable(da[0]) and not dkw:
       func = da[0]
       decorated = deco(func)
-      decorated.__doc__ = getattr(func, '__doc__', '')
+      if not getattr(decorated, '__doc__', None):
+        decorated.__doc__ = getattr(func, '__doc__', '')
       func_module = getattr(func, '__module__', None)
       try:
         decorated.__module__ = func_module
       except AttributeError:
         pass
       return decorated
+
     # otherwise we collect the arguments supplied
     # and return a function which takes a callable
     # and returns deco(func, *da, **kw).
+
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
@@ -113,11 +116,32 @@ def decorator(deco):
   return metadeco
 
 @decorator
+def logging_wrapper(log_call, stacklevel_increment=1):
+  ''' Decorator for logging call shims
+      which bumps the `stacklevel` keyword argument so that the logging system
+      chooses the correct frame to cite in messages.
+
+      Note: has no effect on Python < 3.8 because `stacklevel` only
+      appeared in that version.
+  '''
+  if (sys.version_info.major, sys.version_info.minor) < (3, 8):
+    # do not wrap older Python log calls, no stacklevel keyword argument
+    return log_call
+
+  def log_func_wrapper(*a, **kw):
+    stacklevel = kw.pop('stacklevel', 1)
+    return log_call(*a, stacklevel=stacklevel + stacklevel_increment + 1, **kw)
+
+  log_func_wrapper.__name__ = log_call.__name__
+  log_func_wrapper.__doc__ = log_call.__doc__
+  return log_func_wrapper
+
+@decorator
 def cachedmethod(
     method, attr_name=None, poll_delay=None, sig_func=None, unset_value=None
 ):
-  ''' Decorator to cache the result of a method and keep a revision
-      counter for changes.
+  ''' Decorator to cache the result of an instance or class method
+      and keep a revision counter for changes.
 
       The cached values are stored on the instance (`self`).
       The revision counter supports the `@revised` decorator.
@@ -230,32 +254,77 @@ def cachedmethod(
         setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
-      try:
-        changed = value0 is unset_value or value != value0
-      except TypeError:
-        changed = True
+      changed = value0 is unset_value or value0 is not value
+      if not changed:
+        try:
+          changed = value0 != value
+        except TypeError:
+          changed = True
       if changed:
         setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
       return value
 
   return wrapper
 
-def cached(*a, **kw):
-  ''' Compatibility wrapper for `@cachedmethod`, issuing a warning.
+@decorator
+def OBSOLETE(func, suggestion=None):
+  ''' Decorator for obsolete functions.
+
+      Use:
+
+          @OBSOLETE
+          def func(...):
+
+      This emits a warning log message before calling the decorated function.
   '''
-  warning("obsolete use of @cached, please update to @cachedmethod")
+
+  def wrapped(*args, **kwargs):
+    ''' Wrap `func` to emit an "OBSOLETE" warning before calling `func`.
+    '''
+    frame = traceback.extract_stack(None, 2)[0]
+    caller = frame[0], frame[1]
+    try:
+      callers = func._OBSOLETE_callers
+    except AttributeError:
+      callers = func._OBSOLETE_callers = set()
+    if caller not in callers:
+      callers.add(caller)
+      warning(
+          "OBSOLETE call to %s:%d %s(), called from %s:%d %s",
+          func.__code__.co_filename, func.__code__.co_firstlineno,
+          func.__name__, frame[0], frame[1], frame[2]
+      )
+    return func(*args, **kwargs)
+
+  funcname = getattr(func, '__name__', str(func))
+  funcdoc = getattr(func, '__doc__', None) or ''
+  doc = "OBSOLETE FUNCTION " + funcname
+  if suggestion:
+    doc += ' - please use ' + suggestion
+  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  wrapped.__doc__ = funcdoc
+  return wrapped
+
+
+@OBSOLETE(suggestion='cachedmethod')
+def cached(*a, **kw):
+  ''' Former name for @cachedmethod.
+  '''
   return cachedmethod(*a, **kw)
 
 def contextual(func):
   ''' Wrap a simple function as a context manager.
 
-      This was written to support `@strable`,
-      which requires its `open_func` to be a context manager.
+      This was written to support users of `@strable`,
+      which requires its `open_func` to be a context manager;
+      this turns an arbitrary function into a context manager.
 
-      >>> f = lambda: 3
-      >>> cf = contextual(f)
-      >>> with cf() as x: print(x)
-      3
+      Example promoting a trivial function:
+
+          >>> f = lambda: 3
+          >>> cf = contextual(f)
+          >>> with cf() as x: print(x)
+          3
   '''
 
   @contextmanager

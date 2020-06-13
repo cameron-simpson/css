@@ -36,7 +36,7 @@ def choose_editor(editor=None, environ=None):
   return editor
 
 def edit_strings(strs, editor=None, environ=None):
-  ''' Edit a list of string, return tuples of changed string pairs.
+  ''' Edit an iterable list of string, return tuples of changed string pairs.
       Honours $EDITOR envvar, defaults to "vi".
   '''
   oldstrs = list(strs)

@@ -4,7 +4,8 @@
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
 
-''' A progress tracker with methods for throughput, ETA and update notification.
+''' A progress tracker with methods for throughput, ETA and update notification;
+    also a compound progress meter composed from other progress meters.
 '''
 
 from collections import namedtuple
@@ -14,9 +15,9 @@ from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 
+__version__ = '20200613-post'
+
 DISTINFO = {
-    'description':
-    "A progress tracker with methods for throughput, ETA and update notification",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -36,7 +37,15 @@ class BaseProgress(object):
       (the basis of `time.time()`).
   '''
 
-  def __init__(self, name=None, start_time=None):
+  def __init__(self, name=None, start_time=None, units_scale=None):
+    ''' Initialise a progress instance.
+
+        Parameters:
+        * `name`: optional name
+        * `start_time`: options UNIX epoch start time, default from `time.time()`
+        * `units_scale`: a scale for use with `cs.units.transcribe`,
+          default `BINARY_BYTES_SCALE`
+    '''
     now = time.time()
     if name is None:
       name = '-'.join((type(self).__name__, str(seq())))
@@ -44,8 +53,11 @@ class BaseProgress(object):
       start_time = now
     elif start_time > now:
       raise ValueError("start_time(%s) > now(%s)" % (start_time, now))
+    if units_scale is None:
+      units_scale = BINARY_BYTES_SCALE
     self.name = name
     self.start_time = start_time
+    self.units_scale = units_scale
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -128,10 +140,10 @@ class BaseProgress(object):
 
   @property
   def throughput(self):
-    ''' The overall throughput: `self.thoughput_overall()`.
+    ''' The overall throughput: `self.throughput_overall()`.
 
         By comparison,
-        the `Progress.throughput` property is `self.thoughput_recent`
+        the `Progress.throughput` property is `self.throughput_recent`
         if the `throughput_window` is not `None`,
         otherwise it falls back to `throughput_overall`.
     '''
@@ -170,9 +182,69 @@ class BaseProgress(object):
       return None
     return time.time() + remaining
 
+  def count_of_total_bytes_text(self):
+    ''' Return "count units / total units" using binary units.
+    '''
+    return (
+        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + '/' +
+        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
+    )
+
+  def arrow(self, width, no_padding=False):
+    ''' Construct a progress arrow representing completion
+        to fit in the specified `width`.
+    '''
+    if width < 1:
+      return ''
+    ratio = self.ratio
+    if ratio is None or ratio <= 0:
+      arrow = ''
+    elif ratio < 1.0:
+      arrow_len = width * ratio
+      if arrow_len < 1:
+        arrow = '>'
+      else:
+        arrow = '=' * int(arrow_len - 1) + '>'
+    else:
+      arrow = '=' * width
+    if not no_padding:
+      arrow += ' ' * (width - len(arrow))
+    return arrow
+
+  def format_counter(self, value, scale=None, max_parts=2):
+    ''' Format `value` accoridng to `scale` and `max_parts`
+        using `cs.units.transcribe`.
+    '''
+    if scale is None:
+      scale = self.units_scale
+    if scale is None:
+      return str(value)
+    return transcribe(value, scale, max_parts=max_parts)
+
+  def text_pos_of_total(
+      self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
+  ):
+    ''' Return a "position/total" style progress string.
+
+        Parameters:
+        * `fmt`: format string interpolating `pos_text` and `total_text`.
+          Default: `"{pos_text}/{total_text}"`
+        * `fmt_pos`: formatting function for `self.position`,
+          default `self.format_counter`
+        * `fmt_total`: formatting function for `self.total`,
+          default from `fmt_pos`
+    '''
+    if fmt_pos is None:
+      fmt_pos = self.format_counter
+    if fmt_total is None:
+      fmt_total = fmt_pos
+    pos_text = fmt_pos(self.position)
+    total_text = fmt_pos(self.total)
+    return fmt.format(pos_text=pos_text, total_text=total_text)
+
   def status(self, label, width):
     ''' A progress string of the form:
-        *label*`: `*pos*` / `*total*` ==>  ETA '*time*.
+        *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
     ratio = self.ratio
     remaining = self.remaining_time
@@ -183,11 +255,7 @@ class BaseProgress(object):
         return label + ': ETA unknown'
       return label + ': ETA ' + transcribe_time(remaining)
     # "label: ==>  ETA xs"
-    left = (
-        label + ': ' +
-        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + ' / ' +
-        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1) + ' '
-    )
+    left = (label + ': ' + self.text_pos_of_total() + ' ')
     if remaining is None:
       right = 'ETA unknown'
     else:
@@ -196,17 +264,7 @@ class BaseProgress(object):
     if arrow_width < 1:
       # no roow for an arrow
       return label + ':' + right
-    if ratio <= 0:
-      arrow = ''
-    elif ratio < 1.0:
-      arrow_len = arrow_width * ratio
-      if arrow_len < 1:
-        arrow = '>'
-      else:
-        arrow = '=' * int(arrow_len - 1) + '>'
-    else:
-      arrow = '=' * arrow_width
-    arrow_field = arrow + ' ' * (arrow_width - len(arrow))
+    arrow_field = self.arrow(arrow_width)
     return left + arrow_field + right
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
@@ -218,13 +276,13 @@ class Progress(BaseProgress):
 
           >>> P = Progress(name="example")
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=0,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0)]
+          Progress(name='example',start=0,position=0,start_time=...,throughput_window=None,total=None):[CheckPoint(time=..., position=0)]
           >>> P.advance(5)
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+          Progress(name='example',start=0,position=5,start_time=...,throughput_window=None,total=None):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
           >>> P.total = 100
           >>> P                         #doctest: +ELLIPSIS
-          Progress(name='example',start=0,position=5,start_time=...,thoughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
+          Progress(name='example',start=0,position=5,start_time=...,throughput_window=None,total=100):[CheckPoint(time=..., position=0), CheckPoint(time=..., position=5)]
 
       A Progress instance has an attribute ``notify_update`` which
       is a set of callables. Whenever the position is updated, each
@@ -259,6 +317,7 @@ class Progress(BaseProgress):
       start_time=None,
       throughput_window=None,
       total=None,
+      units_scale=None,
   ):
     ''' Initialise the Progesss object.
 
@@ -272,7 +331,9 @@ class Progress(BaseProgress):
           default None.
         * `total`: expected completion value, default None.
     '''
-    BaseProgress.__init__(self, name=name, start_time=start_time)
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     if position is None:
       position = 0
     if start is None:
@@ -291,7 +352,7 @@ class Progress(BaseProgress):
     self.notify_update = set()
 
   def __repr__(self):
-    return "%s(name=%r,start=%s,position=%s,start_time=%s,thoughput_window=%s,total=%s):%r" \
+    return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
         % (
             type(self).__name__, self.name,
             self.start, self.position, self.start_time,
@@ -427,7 +488,7 @@ class Progress(BaseProgress):
 
         If `self.throughput_window` is not `None`,
         calls `self.throughput_recent(throughput_window)`.
-        Otherwise call `self.thoughput_overall()`.
+        Otherwise call `self.throughput_overall()`.
     '''
     throughput_window = self.throughput_window
     if throughput_window is None:
@@ -475,7 +536,7 @@ class Progress(BaseProgress):
     return rate
 
 class OverProgress(BaseProgress):
-  ''' A `Progress`-like class computed from a set of subsidiary `Process`es.
+  ''' A `Progress`-like class computed from a set of subsidiary `Progress`es.
 
       Example:
 
@@ -509,8 +570,12 @@ class OverProgress(BaseProgress):
 
   '''
 
-  def __init__(self, subprogresses=None, name=None, start_time=None):
-    BaseProgress.__init__(self, name=name, start_time=start_time)
+  def __init__(
+      self, subprogresses=None, name=None, start_time=None, units_scale=None
+  ):
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     self.subprogresses = set()
     if subprogresses:
       for P in subprogresses:
@@ -539,11 +604,26 @@ class OverProgress(BaseProgress):
     '''
     return 0
 
+  def _overmax(self, fnP):
+    ''' Return the maximum of the non-`None` values
+        computed from the subsidiary `Progress`es.
+        Return the maximum, or `None` if there are no non-`None` values.
+    '''
+    maximum = None
+    for value in filter(fnP, self.subprogresses):
+      if value is not None:
+        maximum = value if maximum is None else max(maximum, value)
+    return maximum
+
   def _oversum(self, fnP):
-    return sum(
-        value for value in (fnP(P) for P in self.subprogresses)
-        if value is not None
-    )
+    ''' Sum non-`None` values computed from the subsidiary `Progress`es.
+        Return the sum, or `None` if there are no non-`None` values.
+    '''
+    summed = None
+    for value in map(fnP, self.subprogresses):
+      if value is not None:
+        summed = value if summed is None else summed + value
+    return summed
 
   @property
   def position(self):
@@ -557,6 +637,23 @@ class OverProgress(BaseProgress):
     ''' The `total` is the sum of the subsidiary totals.
     '''
     return self._oversum(lambda P: P.total)
+
+  @property
+  def throughput(self):
+    ''' The `throughput` is the sum of the subsidiary throughputs.
+    '''
+    return self._oversum(lambda P: P.throughput)
+
+  def throughput_recent(self, time_window):
+    ''' The `throughput_recent` is the sum of the subsidiary throughput_recentss.
+    '''
+    return self._oversum(lambda P: P.throughput_recent(time_window))
+
+  @property
+  def eta(self):
+    ''' The `eta` is the maximum of the subsidiary etas.
+    '''
+    return self._overmax(lambda P: P.eta)
 
 if __name__ == '__main__':
   from cs.debug import selftest

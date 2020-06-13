@@ -1,0 +1,8 @@
+Add -i option to cp,ln,mv for command line compatibility, just disables -f.
+New "rename" subcommand to rename files according to a format string.
+Ontology support (optional).
+Various classes are now singletons to avoid dissonance.
+Fold "edittags" subcommand into "edit" via the "-d" (directories like files) option.
+New "ns" subcommand reporting on the primary names available for formatting.
+Accept [clausename]entryname as a format string to obtain the string from that entry of the config file.
+Many bugfixes and improvements.

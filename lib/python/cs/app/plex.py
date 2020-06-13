@@ -4,13 +4,6 @@
 ''' Stuff for Plex media libraries.
 '''
 
-#!/usr/bin/python
-#
-# Create a media link tree for Plex Media Server based off our local media tree.
-#   - Cameron Simpson <cs@zip.com.au> 15jun2017
-#
-
-from __future__ import print_function
 from getopt import GetoptError
 import os
 from os.path import (
@@ -20,7 +13,7 @@ from os.path import (
 import sys
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, loadrc as fstags_loadrc, rfilepaths, TaggedPath
-from cs.logutils import setup_logging, Pfx, warning, error
+from cs.logutils import Pfx, warning, error
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -55,11 +48,10 @@ class PlexCommand(BaseCommand):
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    setup_logging(options.cmd)
     options.fstags = FSTags()
 
   @staticmethod
-  def cmd_linktree(argv, options, *, cmd):
+  def cmd_linktree(argv, options):
     ''' Produce a symlink tree for Plex from source trees.
     '''
     if len(argv) < 2:
@@ -78,6 +70,8 @@ class PlexCommand(BaseCommand):
             tagged_path.autotag(rules=rules, no_save=True)
             tags = tagged_path.merged_tags()
             linkpath(filepath, dstroot, tags)
+
+PlexCommand.add_usage_to_docstring()
 
 def linkpath(srcpath, dstroot, tags):
   ''' Symlink `srcpath` to the appropriate place in `dstroot` based on `tags`.

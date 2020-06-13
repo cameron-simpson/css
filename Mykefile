@@ -8,8 +8,11 @@ title           = Cameron Simpson's Scripts
 target  = bin
 
 dev = env-dev -d $. -x
+base_python = python3
 venvdir = $./venv
 venv_requirements = $./venv-requirements.txt
+venv_pip = $(venv_python) -m pip
+venv_python = $(venvdir)/bin/python
 
 rewrite = rewriteif -0 -v
 
@@ -59,7 +62,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
+rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -74,14 +77,21 @@ _help:
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
+        @echo '_venv              - make the Python virtual envionment based off $(base_python)'
 
 _setup:
     :make _tags _venv
 
 _venv: $(venvdir)
+
 $(venvdir): $(venv_requirements)
     :make $@/.
-    $(dev) pip install -U -r $(venv_requirements)
+    [ -x '$(venv_python)' ] || { \
+      set -xue \
+      rm -rf '$(venvdir)' \
+      $(base_python) -m venv '$(venvdir)' \
+    }
+    $(dev) $(venv_pip) install -U -r $(venv_requirements)
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
@@ -138,7 +148,8 @@ _home:
         @echo 'update $(HOME)/bin ...' \
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin $(rsync) -a --delete \\
+        pfx bin hg-shelved \\
+            $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$binskip \\
                 --include=synonyms/ \\
@@ -148,7 +159,8 @@ _home:
         :make _bin_$((bin_suffixes))
         @echo 'update $(HOME)/lib ...' \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib $(rsync) -a --delete \\
+        pfx lib hg-shelved \\
+            $(rsync) -a --delete \\
                 --include=/js \\
                 --include=/js/cs \\
                 --exclude=/js/* \\
@@ -175,7 +187,7 @@ _bin_$((bin_suffixes)):
       then \
         echo "update $$target ..." \
         skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
-        pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/" \
+        pfx "$$base" hg-shelved $(rsync) -a --delete $$skip "$$base/" "$$target/" \
       else \
         echo "WARNING: no $$base" >&2 \
       fi \

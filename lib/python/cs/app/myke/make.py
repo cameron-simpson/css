@@ -10,12 +10,12 @@ import getopt
 import logging
 from subprocess import Popen
 import time
+from types import SimpleNamespace as NS
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
 from cs.logutils import debug, info, error, D
-from cs.obj import O
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -51,9 +51,7 @@ class Maker(MultiOpenMixin):
       )
     if name is None:
       name = cs.pfx.cmd
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
-    self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.name = name
     self.debug = MakeDebugFlags()
@@ -131,7 +129,8 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get((cs.pfx.cmd + 'rc').upper())
+      makerc_envvar = (os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc').upper()
+      makerc = os.environ.get(makerc_envvar)
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
       makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
@@ -347,7 +346,7 @@ class Maker(MultiOpenMixin):
         self.default_target = first_target
     return ok
 
-class TargetMap(O):
+class TargetMap(NS):
   ''' A mapping interface to the known targets.
       Makes targets as needed if inferrable.
       Raise KeyError for missing Targets which are not inferrable.
@@ -357,7 +356,6 @@ class TargetMap(O):
     ''' Initialise the TargetMap.
         `maker` is the Maker using this TargetMap.
     '''
-    self._O_omit = ['maker', 'targets']
     self.maker = maker
     self.targets = {}
     self._lock = RLock()
@@ -683,7 +681,7 @@ class Target(Result):
         # all done, record success
         self.succeed()
 
-class Action(O):
+class Action(NS):
   ''' A make ation.
   '''
 

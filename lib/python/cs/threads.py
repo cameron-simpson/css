@@ -22,6 +22,8 @@ from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
+__version__ = '20200521-post'
+
 DISTINFO = {
     'description':
     "threading and communication/synchronisation conveniences",
@@ -370,11 +372,17 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
+@decorator
 def locked_property(
     func, lock_name='_lock', prop_name=None, unset_object=None
 ):
   ''' A thread safe property whose value is cached.
       The lock is taken if the value needs to computed.
+
+      The default lock attribute is `._lock`.
+      The default attribute for the cached value is `._`funcname
+      where funcname is `func.__name__`.
+      The default "unset" value for the cache is `None`.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__

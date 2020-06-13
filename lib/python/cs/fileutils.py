@@ -16,8 +16,10 @@ try:
   from os import pread
 except ImportError:
   pread = None
-from os.path import basename, dirname, isdir, isabs as isabspath, \
-                    abspath, join as joinpath
+from os.path import (
+    abspath, basename, dirname, isdir, isabs as isabspath,
+    join as joinpath, splitext
+)
 import shutil
 import stat
 import sys
@@ -25,10 +27,10 @@ from tempfile import TemporaryFile, NamedTemporaryFile, mkstemp
 from threading import Lock, RLock
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.deco import cachedmethod, decorator, strable
+from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
-from cs.lex import as_lines
+from cs.lex import as_lines, cutsuffix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread
@@ -36,6 +38,8 @@ from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
+
+__version__ = '20200517-post'
 
 DISTINFO = {
     'description':
@@ -69,9 +73,9 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test if a filelike object is seekable.
 
-      First try the .seekable method from IOBase, otherwise try
-      getting a file descriptor from fp.fileno and stat()ing that,
-      otherwise return False.
+      First try the `.seekable` method from `IOBase`, otherwise try
+      getting a file descriptor from `fp.fileno` and `os.stat`()ing that,
+      otherwise return `False`.
   '''
   try:
     test = fp.seekable
@@ -198,6 +202,11 @@ def rewrite_cmgr(
       * `empty_ok`: do not consider empty output an error.
       * `overwrite_anyway`: do not update the original if the new
         data are identical.
+
+      Example:
+
+          with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
+             ... write new content to f ...
   '''
   if backup_ext is None:
     backuppath = None
@@ -287,7 +296,12 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
 
 @decorator
 def file_based(
-    func, attr_name=None, filename=None, poll_delay=None, sig_func=None, **dkw
+    func,
+    attr_name=None,
+    filename=None,
+    poll_delay=None,
+    sig_func=None,
+    **dkw
 ):
   ''' A decorator which caches a value obtained from a file.
 
@@ -351,7 +365,8 @@ def file_property(func, **dkw):
 def files_property(func):
   ''' A property whose value reloads if any of a list of files changes.
 
-      This is just the default mode for make_files_property().
+      Note: this is just the default mode for `make_files_property`.
+
       `func` accepts the file path and returns the new value.
       The underlying attribute name is '_' + func.__name__,
       the default from make_files_property().
@@ -366,7 +381,9 @@ def files_property(func):
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
       and those of any included files so that they can be monitored,
-      triggering a fresh parse if one changes. Example:
+      triggering a fresh parse if one changes.
+
+      Example:
 
           class C(object):
             def __init__(self):
@@ -377,7 +394,7 @@ def files_property(func):
               return new_paths, result
 
       The load function is called on the first access and on every
-      access thereafter where an associated file's FileState() has
+      access thereafter where an associated file's `FileState` has
       changed and the time since the last successful load exceeds
       the poll_rate (1s). An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
@@ -386,28 +403,33 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
+@fmtdoc
 def make_files_property(
     attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL
 ):
   ''' Construct a decorator that watches multiple associated files.
 
       Parameters:
-      * `attr_name`: the underlying attribute, default: '_' + func.__name__
-      * `unset_object`: the sentinel value for "uninitialised", default: None
-      * `poll_rate`: how often in seconds to poll the file for changes, default: 1
+      * `attr_name`: the underlying attribute, default: `'_'+func.__name__`
+      * `unset_object`: the sentinel value for "uninitialised", default: `None`
+      * `poll_rate`: how often in seconds to poll the file for changes,
+        default from `DEFAULT_POLL_INTERVAL`: `{DEFAULT_POLL_INTERVAL}`
 
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      The attribute {{attr_name}}_lock controls access to the property.
+      The attributes {{attr_name}}_filestates and {{attr_name}}_paths track the
       associated files' state.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
+      The attribute {{attr_name}}_lastpoll tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
-      One example use would be a configuration file with recurive
+
+      One example use would be a configuration file with recursive
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
       and those of any included files so that they can be monitored,
-      triggering a fresh parse if one changes. Example:
+      triggering a fresh parse if one changes.
+
+      Example:
 
           class C(object):
             def __init__(self):
@@ -418,11 +440,13 @@ def make_files_property(
               return new_paths, result
 
       The load function is called on the first access and on every
-      access thereafter where an associated file's FileState() has
+      access thereafter where an associated file's `FileState` has
       changed and the time since the last successful load exceeds
-      the poll_rate (default 1s). An attempt at avoiding races is made by
+      the `poll_rate`.
+
+      An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
-      where files that were stat()ed during the change check have
+      where files that were `os.stat`()ed during the change check have
       changed state after the load.
   '''
 
@@ -599,6 +623,33 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
     with Pfx("remove %r", lockpath):
       os.remove(lockpath)
 
+def crop_name(name, name_max=255, ext=None):
+  ''' Crop a file basename so as not to exceed `name_max` in length.
+      Return the original `name` if it already short enough.
+      Otherwise crop `name` before the file extension
+      to make it short enough.
+
+      Parameters:
+      * `name`: the file basename to crop
+      * `name_max`: optional maximum length, default: `255`
+      * `ext`: optional file extension;
+        the default is to infer the extension with `os.path.splitext`.
+  '''
+  if ext is None:
+    base, ext = splitext(name)
+  else:
+    base = cutsuffix(name, ext)
+    if base is name:
+      base, ext = splitext(name)
+  max_base_len = name_max - len(ext)
+  if max_base_len < 0:
+    raise ValueError(
+        "cannot crop name %r before ext %r to <=%s"
+        % (name, ext, name_max))
+  if len(base) <= max_base_len:
+    return name
+  return base[:max_base_len] + ext
+
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix
       for names starting with the prefix `pfx`.
@@ -691,6 +742,59 @@ def tmpdirn(tmp=None):
   if tmp is None:
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
+
+def find(path, select=None, sort_names=True):
+  ''' Walk a directory tree `path`
+      yielding selected paths.
+
+      Note: not selecting a directory prunes all its descendants.
+  '''
+  if select is None:
+    select = lambda _: True
+  for dirpath, dirnames, filenames in os.walk(path):
+    if select(dirpath):
+      yield dirpath
+    else:
+      dirnames[:] = []
+      continue
+    if sort_names:
+      dirnames[:] = sorted(dirnames)
+      filenames[:] = sorted(filenames)
+    for filename in filenames:
+      filepath = joinpath(dirpath, filename)
+      if select(filepath):
+        yield filepath
+    dirnames[:] = [
+        dirname for dirname in dirnames
+        if select(joinpath(dirpath, dirname))
+    ]
+
+def findup(path, test, first=False):
+  ''' Test the pathname `abspath(path)` and each of its ancestors
+      against the callable `test`,
+      yielding paths satisfying the test.
+
+      If `first` is true (default `False`)
+      this function always yields exactly one value,
+      either the first path satisfying the test or `None`.
+      This mode supports a use such as:
+
+          matched_path = next(findup(path, test, first=True))
+          # post condition: matched_path will be `None` on no match
+          # otherwise the first matching path
+  '''
+  path = abspath(path)
+  while True:
+    if test(path):
+      yield path
+      if first:
+        return
+    up = dirname(path)
+    if up == path:
+      break
+    path = up
+  if first:
+    yield None
 
 DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
 

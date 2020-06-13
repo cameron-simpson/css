@@ -9,7 +9,6 @@
 from threading import RLock
 from cs.logutils import info, debug, warning
 from cs.threads import locked, locked_property
-from cs.obj import O
 
 DISTINFO = {
     'description': "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
@@ -19,10 +18,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.threads'],
+    'install_requires': ['cs.logutils', 'cs.threads'],
 }
 
-class ID3(O):
+class ID3(NS):
   ''' Wrapper for pyid3lib.tag.
   '''
 

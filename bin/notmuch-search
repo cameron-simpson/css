@@ -63,7 +63,8 @@ else
 fi \
 | egrep '/(new|cur)/[^/]+$' \
 | sort -u \
-| xxargs arg1 -end "$mdir/new" set-x ln -i -s
+| xxargs arg1 -end "$mdir/new" set-x ln -i -s \
+|| :
 
 mutt -e 'unset header_cache' -e 'push ",D$"' -f "$mdir" <&3 3<&-
 rm -r "$mdir"

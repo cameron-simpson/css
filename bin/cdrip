@@ -71,10 +71,10 @@ usage="Usage: $cmd [-A] [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-
                         discs with unpublished content.
         -b kbps         Fixed bitrate kilobits per second for the encoding.
                         Default: variable bit rate using quality.
-        -d device       Device holding the CD. Default: $CDRIP_DEV
+        -d device       Device holding the CD. Default from \$CDRIP_DEV: $CDRIP_DEV
         -D dir          Change working directory.
         -e enclist      Select encoding(s), comma separated.
-                        Supported: ogg,mp3,flac. Default: $CDRIP_ENC
+                        Supported: ogg,mp3,flac. Default from \$CDRIP_ENC: $CDRIP_ENC
         -f              Force; rip audio even if the desired file already
                         exists.
         -j jobs         Use this many CPUs for the encoding phase.
