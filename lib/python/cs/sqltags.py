@@ -392,7 +392,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             entity.add_tag('categories', list(tag_categories), session=session)
           session.add(entity)
           session.flush()
-          print(entity, entity.tags(session=session))
     return xit
 
   @staticmethod
