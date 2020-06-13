@@ -91,6 +91,7 @@ $(venvdir): $(venv_requirements)
       rm -rf '$(venvdir)' \
       $(base_python) -m venv '$(venvdir)' \
     }
+    $(dev) $(venv_pip) install -U wheel pip
     $(dev) $(venv_pip) install -U -r $(venv_requirements)
 
 _tags:  tags

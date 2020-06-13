@@ -1,12 +1,10 @@
-wheel
-pip
 enum34
 icontract
 lmdb
 mypy
-sqlalchemy
-pylint
-pyflakes
 pycodestyle
+pyflakes
+pylint
+sqlalchemy
 twine
 yapf
