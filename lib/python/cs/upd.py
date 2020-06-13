@@ -17,8 +17,9 @@ Example:
             upd.nl('an informational line')
 '''
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import atexit
+from builtins import print as builtin_print
 from contextlib import contextmanager
 import os
 import sys
@@ -65,6 +66,27 @@ def out(msg, *a, **outkw):
       Parameters are as for `Upd.out()`.
   '''
   return Upd().out(msg, *a, **outkw)
+
+def print(*a, **kw):
+  ''' Wrapper for the builtin print function
+      to call it inside `Upd.above()` and enforce a flush.
+
+      The function supports an addition parameter beyond the builtin print:
+      * `upd`: the `Upd` instance to use, default `Upd()`
+
+      Programmes intregrating `cs.upd` with use of the builtin `print`
+      function should use this as import time:
+
+          from cs.upd import print
+  '''
+  upd = kw.pop('upd', None)
+  if upd is None:
+    upd = Upd()
+  end = kw.get('end', '\n')
+  kw['flush'] = True
+  with upd.above(need_newline=not end.endswith('\n')):
+    builtin_print(*a, **kw)
+
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
