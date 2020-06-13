@@ -4,4 +4,4 @@
 #   - Cameron Simpson <cs@cskk.id.au> 10mar2015
 #
 
-exec venv 3 python2 ${1+"$@"}
+exec venv 3 python3 ${1+"$@"}
