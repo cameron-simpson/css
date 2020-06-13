@@ -59,7 +59,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
+rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
