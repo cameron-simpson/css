@@ -74,8 +74,8 @@ def human(n, scale):
       Parameters:
       * `n`: a nonnegative integer.
       * `scale`: a sequence of `(factor,unit)` where factor is the
-        size factor to the follow scale and `unit` is the designator
-        of the unit.
+        size factor to the following scale item
+        and `unit` is the designator of the unit.
   '''
   components = []
   for factor, unit in scale:
