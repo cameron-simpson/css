@@ -77,7 +77,7 @@ _help:
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
-        @echo '_venv              - make the Python virtual envionment based off $(base_python)'
+        @echo '_venv              - make the Python virtual environment based off $(base_python)'
 
 _setup:
     :make _tags _venv
