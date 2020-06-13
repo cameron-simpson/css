@@ -82,10 +82,9 @@ class Maker(MultiOpenMixin):
     )
 
   def startup(self):
-    ''' Set up the `Later` work qeueu and log to `'myke.log'`.
+    ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.logTo("myke-later.log")
 
   def shutdown(self):
     ''' Shut down the make queue and wait for it.
