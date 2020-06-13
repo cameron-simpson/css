@@ -4,17 +4,50 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 
 r'''
-Single line status updates with minimal update sequences.
+Single and multiple line status updates with minimal update sequences.
 
 This is available as an output mode in `cs.logutils`.
 
-Example:
+Single line example:
 
+    from cs.upd import Upd, nl, print
+    .....
     with Upd() as U:
         for filename in filenames:
             U.out(filename)
             ... process filename ...
-            upd.nl('an informational line')
+            U.nl('an informational line to stderr')
+            print('a line to stdout')
+
+Multiline multithread example:
+
+    from threading import Thread
+    from cs.upd import Upd, print
+    .....
+    def runner(filename, proxy):
+        # initial status message
+        proxy.text = "process %r" % filename
+        ... at various points:
+            # update the status message with current progress
+            proxy.text = '%r: progress status here' % filename
+        # completed, remove the status message
+        proxy.close()
+        # print completion message to stdout
+        print("completed", filename)
+    .....
+    with Upd() as U:
+        U.out("process files: %r", filenames)
+        Ts = []
+        for filename in filenames:
+            proxy = U.insert(1) # allocate an additional status line
+            T = Thread(
+                "process "+filename,
+                target=runner,
+                args=(filename, proxy))
+            Ts.append(T)
+            T.start()
+        for T in Ts:
+            T.join()
 '''
 
 from __future__ import with_statement, print_function
