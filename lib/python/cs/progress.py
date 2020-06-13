@@ -221,7 +221,9 @@ class BaseProgress(object):
       return str(value)
     return transcribe(value, scale, max_parts=max_parts)
 
-  def text_pos_of_total(self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None):
+  def text_pos_of_total(
+      self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
+  ):
     ''' Return a "position/total" style progress string.
 
         Parameters:
@@ -329,7 +331,9 @@ class Progress(BaseProgress):
           default None.
         * `total`: expected completion value, default None.
     '''
-    BaseProgress.__init__(self, name=name, start_time=start_time, units_scale=units_scale)
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     if position is None:
       position = 0
     if start is None:
@@ -566,8 +570,12 @@ class OverProgress(BaseProgress):
 
   '''
 
-  def __init__(self, subprogresses=None, name=None, start_time=None):
-    BaseProgress.__init__(self, name=name, start_time=start_time)
+  def __init__(
+      self, subprogresses=None, name=None, start_time=None, units_scale=None
+  ):
+    BaseProgress.__init__(
+        self, name=name, start_time=start_time, units_scale=units_scale
+    )
     self.subprogresses = set()
     if subprogresses:
       for P in subprogresses:
