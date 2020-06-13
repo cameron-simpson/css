@@ -4,7 +4,8 @@
 #
 
 '''
-Functions for decomposing nonnegative integers according to various unit scales.
+Functions for decomposing nonnegative integers according to various unit scales
+and also parsing support for values written in scales.
 
 Presupplied scales:
 * `BINARY_BYTES_SCALE`: Binary units of (B)ytes, KiB, MiB, GiB etc.
@@ -20,7 +21,6 @@ from cs.lex import get_chars, get_decimal, skipwhite
 __version__ = '20200613-post'
 
 DISTINFO = {
-    'description': "unit suffixes for nonnegative integers; parsing and transcription",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -30,41 +30,42 @@ DISTINFO = {
     'install_requires': ['cs.lex'],
 }
 
-UNSCALED_SCALE = ( ( 0, '' ), )
+UNSCALED_SCALE = ((0, ''),)
 
 TIME_SCALE = (
-    ( 60, 's' ),
-    ( 60, 'm' ),
-    ( 24, 'h' ),
-    ( 7, 'd' ),
-    ( 0, 'w' ),
+    (60, 's'),
+    (60, 'm'),
+    (24, 'h'),
+    (7, 'd'),
+    (0, 'w'),
 )
 
+# BINARY BYTES CALE
 BINARY_BYTES_SCALE = (
-    ( 1024, 'B' ),
-    ( 1024, 'KiB' ),
-    ( 1024, 'MiB' ),
-    ( 1024, 'GiB' ),
-    ( 1024, 'TiB' ),
-    ( 0, 'PiB' ),
+    (1024, 'B'),
+    (1024, 'KiB'),
+    (1024, 'MiB'),
+    (1024, 'GiB'),
+    (1024, 'TiB'),
+    (0, 'PiB'),
 )
 
 DECIMAL_BYTES_SCALE = (
-    ( 1000, 'B' ),
-    ( 1000, 'KB' ),
-    ( 1000, 'MB' ),
-    ( 1000, 'GB' ),
-    ( 1000, 'TB' ),
-    ( 0, 'PB' ),
+    (1000, 'B'),
+    (1000, 'KB'),
+    (1000, 'MB'),
+    (1000, 'GB'),
+    (1000, 'TB'),
+    (0, 'PB'),
 )
 
 DECIMAL_SCALE = (
-    ( 1000, '' ),
-    ( 1000, 'K' ),
-    ( 1000, 'M' ),
-    ( 1000, 'G' ),
-    ( 1000, 'T' ),
-    ( 0, 'P' ),
+    (1000, ''),
+    (1000, 'K'),
+    (1000, 'M'),
+    (1000, 'G'),
+    (1000, 'T'),
+    (0, 'P'),
 )
 
 def human(n, scale):
@@ -79,11 +80,11 @@ def human(n, scale):
   components = []
   for factor, unit in scale:
     if factor == 0:
-      components.append( (n, unit) )
+      components.append((n, unit))
       n = 0
       break
     remainder = n % factor
-    components.append( (remainder, unit) )
+    components.append((remainder, unit))
     n //= factor
     if n == 0:
       break
@@ -141,7 +142,7 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   for count, unit in reversed(components):
     if skip_zero and count == 0:
       continue
-    text.append( str(count) + unit )
+    text.append(str(count) + unit)
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
@@ -150,10 +151,12 @@ def transcribe_bytes_geek(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `BINARY_BYTES_SCALE`.
   '''
   return transcribe(n, BINARY_BYTES_SCALE, max_parts=max_parts, **kw)
+
 def transcribe_bytes_human(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `DECIMAL_BYTES_SCALE`.
   '''
   return transcribe(n, DECIMAL_BYTES_SCALE, max_parts=max_parts, **kw)
+
 def transcribe_time(n, max_parts=3, **kw):
   ''' Transcribe a nonnegative integer `n` against `TIME_SCALE`.
   '''
