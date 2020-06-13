@@ -23,6 +23,11 @@ DISTINFO = {
     'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],
 }
 
+def is_dunder(name):
+  ''' Test whether a name is a dunder name (`__`*foo*`__`).
+  '''
+  return len(name) > 4 and name.startswith('__') and name.endswith('__')
+
 def module_doc(
     module,
     *,
