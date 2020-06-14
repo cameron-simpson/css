@@ -251,6 +251,9 @@ class YDL:
     self.progresses = {}
     self.result = None
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.url)
+
   def bg(self):
     ''' Return the `Result` for this download,
         starting the download if necessary.
