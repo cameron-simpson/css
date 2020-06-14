@@ -262,8 +262,8 @@ class ModEval(Modifier):
   def modify(self, text, namespaces):
     ''' Evaluate `text` as a macro expression.
     '''
-    return parseMacroExpression(self.context,
-                                text)[0](self.context, namespaces)
+    mexpr = MacroExpression.from_text(self.context, text)
+    return mexpr(self.context, namespaces)
 
 class ModSubstitute(Modifier):
   ''' A modifier which returns `text` with substitutions.
@@ -360,7 +360,7 @@ class ModSubstitute(Modifier):
   def modify(self, text, namespaces):
     ''' Apply the substitution.
     '''
-    regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
+    regexp_mexpr = MacroExpression.from_text(self.context, text=self.ptn)
     return re.compile(regexp_mexpr(self.context,
                                    namespaces)).sub(self.repl, text)
 
@@ -428,7 +428,7 @@ class Macro(object):
     ''' The parsed MacroExpression.
     '''
     if self._mexpr is None:
-      self._mexpr, offset = parseMacroExpression(self.context, self.text)
+      self._mexpr, offset = MacroExpression.parse(self.context, self.text)
       assert offset == len(self.text)
     return self._mexpr
 
@@ -564,7 +564,7 @@ def readMakefileLines(
                   raise ParseError(
                       context, offset, ":include: no include files specified"
                   )
-                include_mexpr, _ = parseMacroExpression(context, offset=offset)
+                include_mexpr = MacroExpression.from_text(context, offset=offset)
                 for include_file in include_mexpr(context,
                                                   M.namespaces).split():
                   if len(include_file) == 0:
@@ -626,7 +626,7 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
             if word == 'append':
               if offset == len(line):
                 raise ParseError(context, offset, "nothing to append")
-              mexpr, offset = parseMacroExpression(context, line, offset)
+              mexpr, offset = MacroExpression.parse(context, line, offset)
               assert offset == len(line)
               for include_file in mexpr(context, M.namespaces).split():
                 if include_file:
@@ -662,7 +662,7 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
                 raise ParseError(
                     context, offset, "nothing to mark as precious"
                 )
-              mexpr, offset = parseMacroExpression(context, line, offset)
+              mexpr, offset = MacroExpression.parse(context, line, offset)
               M.precious.update(
                   word for word in mexpr(context, M.namespaces).split() if word
               )
@@ -709,14 +709,14 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
 
         # presumably a target definition
         # gather up the target as a macro expression
-        target_mexpr, offset = parseMacroExpression(context, stopchars=':')
+        target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
         if context.text[offset] != ':':
           raise ParseError(context, offset, "no colon in target definition")
-        prereqs_mexpr, offset = parseMacroExpression(
+        prereqs_mexpr, offset = MacroExpression.parse(
             context, offset=offset + 1, stopchars=':'
         )
         if offset < len(context.text) and context.text[offset] == ':':
-          postprereqs_mexpr, offset = parseMacroExpression(
+          postprereqs_mexpr, offset = MacroExpression.parse(
               context, offset=offset + 1
           )
         else:
@@ -755,48 +755,6 @@ def parseMacroAssignment(context, assignment_text):
   macro_text = assignment_text[m.end():].rstrip()
   return Macro(context, macro_name, param_names, macro_text)
 
-def parseMacroExpression(context, text=None, offset=0, stopchars=''):
-  ''' A macro expression is a concatenation of permutations.
-      Return (MacroExpression, offset).
-  '''
-  if type(context) is str:
-    context = FileContext('<string>', 1, context, None)
-
-  if text is None:
-    text = context.text
-
-  permutations = []
-  while offset < len(text):
-    ch = text[offset]
-    if ch == '$':
-      # macro
-      M, offset = parseMacro(context, text=text, offset=offset)
-      permutations.append(M)
-    elif ch.isspace():
-      # whitespace
-      wh, offset = get_white(text, offset)
-      # keep non-leading whitespace
-      if permutations:
-        permutations.append(wh)
-    else:
-      # non-white, non-macro
-      plain, offset = get_other_chars(
-          text, offset, stopchars + '$' + whitespace
-      )
-      if plain:
-        permutations.append(plain)
-      else:
-        # end of parsable string
-        break
-
-  # drop trailing whitespace
-  if permutations:
-    last = permutations[-1]
-    if type(last) is str and last.isspace():
-      permutations.pop()
-
-  return MacroExpression(context, permutations), offset
-
 class MacroExpression(object):
   ''' A MacroExpression represents a piece of text into which macro
       substitution is to occur.
@@ -819,6 +777,64 @@ class MacroExpression(object):
     return not self == other
 
   __hash__ = None
+
+  @classmethod
+  def from_text(cls, context, text=None, offset=0, stopchars=''):
+    ''' Obtain a `MacroExpression` from `text` or `context.text`.
+    '''
+    if text is None:
+      text = context.text
+    mexpr, offset = cls.parse(context, text=text, offset=offset, stopchars=stopchars)
+    if offset != len(text):
+      raise ValueError(
+          "unparsed text after MacroExpression.from_text(%r): %r"
+          % (text, text[offset:]))
+    return mexpr
+
+  @classmethod
+  def parse(cls, context, text=None, offset=0, stopchars=''):
+    ''' Parse a macro expression from `text` or `context.text` if `text` is `None`.
+        Return `(MacroExpression,offset)`.
+
+        A macro expression is a concatenation of permutations.
+    '''
+    if type(context) is str:
+      context = FileContext('<string>', 1, context, None)
+
+    if text is None:
+      text = context.text
+
+    permutations = []
+    while offset < len(text):
+      ch = text[offset]
+      if ch == '$':
+        # macro
+        M, offset = parseMacro(context, text=text, offset=offset)
+        permutations.append(M)
+      elif ch.isspace():
+        # whitespace
+        wh, offset = get_white(text, offset)
+        # keep non-leading whitespace
+        if permutations:
+          permutations.append(wh)
+      else:
+        # non-white, non-macro
+        plain, offset = get_other_chars(
+            text, offset, stopchars + '$' + whitespace
+        )
+        if plain:
+          permutations.append(plain)
+        else:
+          # end of parsable string
+          break
+
+    # drop trailing whitespace
+    if permutations:
+      last = permutations[-1]
+      if type(last) is str and last.isspace():
+        permutations.pop()
+
+    return cls(context, permutations), offset
 
   def __call__(self, context, namespaces):
     assert type(namespaces) is list, "namespaces = %r" % (namespaces,)
@@ -937,7 +953,7 @@ def parseMacro(context, text=None, offset=0):
         offset += 1
         _, offset = get_white(text, offset)
         while text[offset] != ')':
-          mexpr, offset = parseMacroExpression(
+          mexpr, offset = MacroExpression.parse(
               context, text=text, offset=offset, stopchars=',)'
           )
           param_mexprs.append(mexpr)
@@ -1128,7 +1144,7 @@ def parseMacro(context, text=None, offset=0):
             if ch == '/':
               modclass = ModSelectRegexp
               offset += 1
-              mexpr, end = parseMacroExpression(
+              mexpr, end = MacroExpression.parse(
                   context, text=text, offset=offset, stopchars='/'
               )
               if end >= len(text):
@@ -1269,12 +1285,12 @@ class TestAll(unittest.TestCase):
   def test10parseMacroExpr_PlainText(self):
     ''' Plain text parse.
     '''
-    self.assertEqual(parseMacroExpression(''), ([], 0))
-    self.assertEqual(parseMacroExpression('x'), (['x'], 1))
-    self.assertEqual(parseMacroExpression(' '), ([], 1))
-    self.assertEqual(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
+    self.assertEqual(macroExpression.parse(''), ([], 0))
+    self.assertEqual(macroExpression.parse('x'), (['x'], 1))
+    self.assertEqual(macroExpression.parse(' '), ([], 1))
+    self.assertEqual(macroExpression.parse('x y'), (['x', ' ', 'y'], 3))
     self.assertEqual(
-        parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8)
+        macroExpression.parse('abc  xyz'), (['abc', '  ', 'xyz'], 8)
     )
 
   def test20parseMakeLines(self):

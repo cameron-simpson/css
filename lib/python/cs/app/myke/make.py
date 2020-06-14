@@ -23,8 +23,8 @@ from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
 import cs.logutils
 import cs.pfx
-from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
-                   parseMakefile, parseMacroExpression
+from .parse import (SPECIAL_MACROS, Macro, MacroExpression,
+                   parseMakefile)
 
 SHELL = '/bin/sh'
 
@@ -688,7 +688,7 @@ class Action(NS):
     self.context = context
     self.variant = variant
     self.line = line
-    self.mexpr, _ = parseMacroExpression(context, line)
+    self.mexpr = MacroExpression.from_text(context, line)
     self.silent = silent
     self._lock = Lock()
 
