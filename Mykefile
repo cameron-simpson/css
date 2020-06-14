@@ -85,6 +85,7 @@ _setup:
 _venv: $(venvdir)
 
 $(venvdir): $(venv_requirements)
+    @[ -d '$@/' ] || set-x mkdir '$@'
     :make $@/.
     [ -x '$(venv_python)' ] || { \
       set -xue \
