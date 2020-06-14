@@ -423,6 +423,23 @@ class Macro(object):
 
   __repr__ = __str__
 
+  @classmethod
+  def from_assignment(cls, context, assignment_text):
+    ''' Try to parse `assignment_text` as a macro definition.
+        If it does not look like an assignment (does not match RE_ASSIGNMENT),
+        return None.
+        Otherwise return a Macro.
+    '''
+    with Pfx("%s.from_assignment(%r)", cls.__name__, assignment_text):
+      m = RE_ASSIGNMENT.match(assignment_text)
+      if not m:
+        raise ValueError("does not match RE_ASSIGNMENT")
+      macro_name = m.group(1)
+      params_text = m.group(3)
+      param_names = RE_COMMASEP.split(params_text) if params_text else ()
+      macro_text = assignment_text[m.end():].rstrip()
+      return cls(context, macro_name, param_names, macro_text)
+
   @prop
   def mexpr(self):
     ''' The parsed MacroExpression.
@@ -704,8 +721,11 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
             action_list.append(A)
             continue
 
-        macro = parseMacroAssignment(context, line)
-        if macro:
+        try:
+          macro = Macro.from_assignment(context, line)
+        except ValueError:
+          pass
+        else:
           yield macro
           continue
 
@@ -741,21 +761,6 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
         exception("%s", e)
 
   M.debug_parse("finish parse")
-
-def parseMacroAssignment(context, assignment_text):
-  ''' Try to parse `assignment_text` as a macro definition.
-      If it does not look like an assignment (does not match RE_ASSIGNMENT),
-      return None.
-      Otherwise return a Macro.
-  '''
-  m = RE_ASSIGNMENT.match(assignment_text)
-  if not m:
-    return None
-  macro_name = m.group(1)
-  params_text = m.group(3)
-  param_names = RE_COMMASEP.split(params_text) if params_text else ()
-  macro_text = assignment_text[m.end():].rstrip()
-  return Macro(context, macro_name, param_names, macro_text)
 
 class MacroExpression(object):
   ''' A MacroExpression represents a piece of text into which macro
