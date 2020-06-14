@@ -1295,12 +1295,12 @@ class TestAll(unittest.TestCase):
   def test10parseMacroExpr_PlainText(self):
     ''' Plain text parse.
     '''
-    self.assertEqual(macroExpression.parse(''), ([], 0))
-    self.assertEqual(macroExpression.parse('x'), (['x'], 1))
-    self.assertEqual(macroExpression.parse(' '), ([], 1))
-    self.assertEqual(macroExpression.parse('x y'), (['x', ' ', 'y'], 3))
+    self.assertEqual(MacroExpression.parse(''), ([], 0))
+    self.assertEqual(MacroExpression.parse('x'), (['x'], 1))
+    self.assertEqual(MacroExpression.parse(' '), ([], 1))
+    self.assertEqual(MacroExpression.parse('x y'), (['x', ' ', 'y'], 3))
     self.assertEqual(
-        macroExpression.parse('abc  xyz'), (['abc', '  ', 'xyz'], 8)
+        MacroExpression.parse('abc  xyz'), (['abc', '  ', 'xyz'], 8)
     )
 
   def test20parseMakeLines(self):
