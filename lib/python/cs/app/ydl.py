@@ -168,6 +168,7 @@ class OverYDL:
         )
 
     self.update0 = update0
+    update0()
 
   def report(self, Rs=None):
     ''' Wrapper returning `cs.result.report(.Rs)`.
@@ -261,7 +262,8 @@ class YDL:
     result = self.result
     if result is None:
       result = self.result = bg_result(
-          self.run, _name="%s.run(%r)" % (type(self).__name__, self.url)
+          self.run,
+          _name="%s.run(%r)" % (type(self).__name__, self.url),
       )
     return result
 
