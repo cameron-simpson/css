@@ -60,7 +60,12 @@ def module_doc(
       if obj_module and obj_module is not module:
         # name imported from another module
         continue
-      if not isclass(obj) and not isfunction(obj):
+      obj_doc = obj_docstring(obj) if obj_module else ''
+      if not callable(obj):
+        if obj_doc:
+          full_doc += f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}'
+        else:
+          full_doc += f'\n\n## `{Mname} = {obj!r}`'
         continue
       obj_doc = obj_docstring(obj)
       if not obj_doc:
