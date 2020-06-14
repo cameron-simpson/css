@@ -469,7 +469,7 @@ def readMakefileLines(
       :if/ifdef/ifndef/else/endif directives.
 
   '''
-  if type(fp) is str:
+  if isinstance(fp, str):
     # open file, yield contents
     filename = fp
     try:
@@ -651,7 +651,7 @@ def parseMakefile(M, fp, parent_context=None, missing_ok=False):
                 if include_file:
                   if not os.path.isabs(include_file):
                     include_file = os.path.join(
-                        realpath(dirname(filename)), include_file
+                        realpath(dirname(fp.name)), include_file
                     )
                   M.add_appendfile(include_file)
               continue
