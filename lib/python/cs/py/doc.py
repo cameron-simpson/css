@@ -34,7 +34,7 @@ def is_dunder(name):
 def module_doc(
     module,
     *,
-    sort_key=lambda item: item[0].lower(),
+    sort_key=lambda item: item[0],
     filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
     method_names=None,
 ):
@@ -43,7 +43,7 @@ def module_doc(
       Parameters:
       * `module`: the module or module name to inspect
       * `sort_key`: optional key for sorting names in the documentation;
-        default: `name.lower()`
+        default: `name`
       * filter_key`: optional test for a key used to select or reject keys
         to appear in the documentation
   '''
