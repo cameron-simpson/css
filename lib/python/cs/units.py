@@ -15,7 +15,6 @@ Presupplied scales:
 * `UNSCALED_SCALE`: no units
 '''
 
-from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
 
 __version__ = '20200613-post'
@@ -180,7 +179,7 @@ def parse(s, scale, offset=0):
   value = int(value_s)
   offset = skipwhite(s, offset2)
   if offset < len(s):
-    vunit, offset = get_chars(s, offset, ascii_letters)
+    vunit, offset = get_chars(s, offset, str.isalpha)
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()
