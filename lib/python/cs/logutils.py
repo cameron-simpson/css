@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200521-post'
+__version__ = '20200613-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -707,7 +707,7 @@ class UpdHandler(StreamHandler):
     StreamHandler.__init__(self, strm)
     self.upd = Upd(strm)
     self.upd_level = upd_level
-    self.__ansi_mode = ansi_mode
+    self.ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
@@ -717,16 +717,17 @@ class UpdHandler(StreamHandler):
         For other levels write a distinct line
         to the output stream, possibly colourised.
     '''
-    line = self.format(logrec)
     if logrec.levelno == self.upd_level:
+      line = self.format(logrec)
       with self.__lock:
         self.upd.out(line)
     else:
-      if self.__ansi_mode:
+      if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
           logrec.msg = colourise(logrec.msg, 'red')
         elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
+      line = self.format(logrec)
       with self.__lock:
         self.upd.nl(line)
 

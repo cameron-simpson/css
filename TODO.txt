@@ -1,3 +1,9 @@
+cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
+cs.upd: ansi_mode to accept coloured message strings - requires an ansi_ln function in cs.tty
+cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
+cs.progress: control over status display - units etc
+cs.upd: rate per proxy, bisect to update counter, autotune?
+incd: remote tmux session to be per target dir
 haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
 cs.upd: UpdProxy: make into context manage with null enter and self-delete on exit
 BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser

@@ -4,21 +4,55 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 
 r'''
-Single line status updates with minimal update sequences.
+Single and multiple line status updates with minimal update sequences.
 
 This is available as an output mode in `cs.logutils`.
 
-Example:
+Single line example:
 
+    from cs.upd import Upd, nl, print
+    .....
     with Upd() as U:
         for filename in filenames:
             U.out(filename)
             ... process filename ...
-            upd.nl('an informational line')
+            U.nl('an informational line to stderr')
+            print('a line to stdout')
+
+Multiline multithread example:
+
+    from threading import Thread
+    from cs.upd import Upd, print
+    .....
+    def runner(filename, proxy):
+        # initial status message
+        proxy.text = "process %r" % filename
+        ... at various points:
+            # update the status message with current progress
+            proxy.text = '%r: progress status here' % filename
+        # completed, remove the status message
+        proxy.close()
+        # print completion message to stdout
+        print("completed", filename)
+    .....
+    with Upd() as U:
+        U.out("process files: %r", filenames)
+        Ts = []
+        for filename in filenames:
+            proxy = U.insert(1) # allocate an additional status line
+            T = Thread(
+                "process "+filename,
+                target=runner,
+                args=(filename, proxy))
+            Ts.append(T)
+            T.start()
+        for T in Ts:
+            T.join()
 '''
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import atexit
+from builtins import print as builtin_print
 from contextlib import contextmanager
 import os
 import sys
@@ -34,7 +68,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20200517-post'
+__version__ = '20200613-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -57,6 +91,45 @@ def cleanupAtExit():
   instances = ()
 
 atexit.register(cleanupAtExit)
+
+# A couple of convenience functions.
+
+def out(msg, *a, **outkw):
+  ''' Update the status line of the default `Upd` instance.
+      Parameters are as for `Upd.out()`.
+  '''
+  return Upd().out(msg, *a, **outkw)
+
+def print(*a, **kw):
+  ''' Wrapper for the builtin print function
+      to call it inside `Upd.above()` and enforce a flush.
+
+      The function supports an addition parameter beyond the builtin print:
+      * `upd`: the `Upd` instance to use, default `Upd()`
+
+      Programmes intregrating `cs.upd` with use of the builtin `print`
+      function should use this at import time:
+
+          from cs.upd import print
+  '''
+  upd = kw.pop('upd', None)
+  if upd is None:
+    upd = Upd()
+  end = kw.get('end', '\n')
+  kw['flush'] = True
+  with upd.above(need_newline=not end.endswith('\n')):
+    builtin_print(*a, **kw)
+
+def nl(msg, *a, **kw):
+  ''' Write `msg` to `file` (default `sys.stdout`),
+      without interfering with the `Upd` instance.
+      This is a thin shim for `Upd.print`.
+  '''
+  if a:
+    msg = msg % a
+  if 'file' not in kw:
+    kw['file'] = sys.stderr
+  print(msg, **kw)
 
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
@@ -134,7 +207,9 @@ class Upd(SingletonMixin):
                   (isinstance(exc_val.code, int) and exc_val.code == 0)))):
       # move to the bottom and emit a newline
       txts = self.move_to_slot_v(self._current_slot, 0)
-      txts.append('\n')
+      if slots[0]:
+        # preserve the last status line if not empty
+        txts.append('\n')
       self._backend.write(''.join(txts))
       self._backend.flush()
     else:
@@ -423,6 +498,52 @@ class Upd(SingletonMixin):
         self._current_slot = top_slot
       self._backend.write(''.join(txts))
       self._backend.flush()
+
+  @contextmanager
+  def above(self, need_newline=False):
+    ''' Move to the top line of the display, clear it, yield, redraw below.
+
+        This context manager is for use when interleaving _another_
+        stream with the `Upd` display;
+        if you just want to write lines above the display
+        for the same backend use `Upd.nl`.
+
+        The usual situation for `Upd.above`
+        is interleaving `sys.stdout` and `sys.stderr`,
+        which are often attached to the same terminal.
+
+        Note that the caller's output should be flushed
+        before exiting the suite
+        so that the output is completed before the `Upd` resumes.
+
+        Example:
+
+            U = Upd()   # default sys.stderr Upd
+            ......
+            with U.above():
+                print('some message for stdout ...', flush=True)
+    '''
+    # go to the top slot, overwrite it and then rewrite the slots below
+    backend = self._backend
+    slots = self._slot_text
+    txts = []
+    top_slot = len(slots) - 1
+    txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+    txts.extend(self.redraw_line_v(''))
+    backend.write(''.join(txts))
+    backend.flush()
+    self._current_slot = top_slot
+    yield
+    txts = []
+    if need_newline:
+      clr_eol = self.ti_str('el')
+      if clr_eol:
+        txts.append(clr_eol)
+        txts.append('\v\r')
+    txts.extend(self.redraw_trailing_slots_v(top_slot, skip_first_vt=True))
+    backend.write(''.join(txts))
+    backend.flush()
+    self._current_slot = 0
 
   @contextmanager
   def without(self, temp_state='', slot=0):

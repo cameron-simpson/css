@@ -64,6 +64,9 @@ base=$( basename "$ymlbasedir" )
 primary_container=${base}_${DK_PRIMARY_SERVICE}_1
 
 case "$op" in
+  cp) set -x
+      exec docker "$op" ${1+"$@"}
+      ;;
   exec)
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
