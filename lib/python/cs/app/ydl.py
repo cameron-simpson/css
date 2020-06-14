@@ -35,7 +35,7 @@ from youtube_dl import YoutubeDL
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
-from cs.logutils import warning, LogTime
+from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
@@ -284,41 +284,46 @@ class YDL:
     proxy = self.proxy = upd.insert(1) if upd else UpdProxy(None, None)
     proxy.prefix = url + ' '
 
-    ydl_opts = {
-        'progress_hooks': [self.update_progress],
-        'format': DEFAULT_OUTPUT_FORMAT,
-        'logger': logging.getLogger(),
-        'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
-        ##'skip_download': True,
-        'writeinfojson': False,
-        'updatetime': False,
-        'process_info': [self.process_info]
-    }
-    if self.kw_opts:
-      ydl_opts.update(self.kw_opts)
-    ydl = self.ydl = YoutubeDL(ydl_opts)
+    with proxy:
+      try:
+        ydl_opts = {
+            'progress_hooks': [self.update_progress],
+            'format': DEFAULT_OUTPUT_FORMAT,
+            'logger': logging.getLogger(),
+            'outtmpl': DEFAULT_OUTPUT_FILENAME_TEMPLATE,
+            ##'skip_download': True,
+            'writeinfojson': False,
+            'updatetime': False,
+            'process_info': [self.process_info]
+        }
+        if self.kw_opts:
+          ydl_opts.update(self.kw_opts)
+        ydl = self.ydl = YoutubeDL(ydl_opts)
 
-    proxy('...')
-    self.tick()
+        proxy('...')
+        self.tick()
 
-    with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
-      with ydl:
-        ydl.download([url])
-    proxy("elapsed %ds, saving metadata ...", LT.elapsed)
-    self.tick()
+        with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
+          with ydl:
+            ydl.download([url])
+        proxy("elapsed %ds, saving metadata ...", LT.elapsed)
+        self.tick()
 
-    ie_result = ydl.extract_info(url, download=False, process=True)
-    output_path = ydl.prepare_filename(ie_result)
-    tagged_path = self.fstags[output_path]
-    for key, value in ie_result.items():
-      tag_name = FSTAGS_PREFIX + '.' + key
-      tagged_path.direct_tags.add(Tag(tag_name, value))
-    self.fstags.sync()
-    if upd:
-      upd.nl(output_path)
-      proxy.delete()
-    else:
-      print(output_path, flush=True)
+        ie_result = ydl.extract_info(url, download=False, process=True)
+        output_path = ydl.prepare_filename(ie_result)
+        tagged_path = self.fstags[output_path]
+        for key, value in ie_result.items():
+          tag_name = FSTAGS_PREFIX + '.' + key
+          tagged_path.direct_tags.add(Tag(tag_name, value))
+        self.fstags.sync()
+        if upd:
+          upd.nl(output_path)
+        else:
+          print(output_path, flush=True)
+      except Exception as e:
+        error("download fails: %s", e)
+        raise
+
     return self
 
   @logexc
