@@ -23,8 +23,7 @@ from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
 import cs.logutils
 import cs.pfx
-from .parse import (SPECIAL_MACROS, Macro, MacroExpression,
-                   parseMakefile)
+from .parse import (SPECIAL_MACROS, Macro, MacroExpression, parseMakefile)
 
 SHELL = '/bin/sh'
 
@@ -128,7 +127,9 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc_envvar = (os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc').upper()
+      makerc_envvar = (
+          os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc'
+      ).upper()
       makerc = os.environ.get(makerc_envvar)
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
@@ -711,12 +712,10 @@ class Action(NS):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    target.maker.defer(
-        "%s:act[%s]" % (
-            self,
-            target,
-        ), self._act, R, target
-    )
+    target.maker.defer("%s:act[%s]" % (
+        self,
+        target,
+    ), self._act, R, target)
     return R
 
   def _act(self, R, target):

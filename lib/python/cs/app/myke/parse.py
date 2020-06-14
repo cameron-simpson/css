@@ -564,7 +564,9 @@ def readMakefileLines(
                   raise ParseError(
                       context, offset, ":include: no include files specified"
                   )
-                include_mexpr = MacroExpression.from_text(context, offset=offset)
+                include_mexpr = MacroExpression.from_text(
+                    context, offset=offset
+                )
                 for include_file in include_mexpr(context,
                                                   M.namespaces).split():
                   if len(include_file) == 0:
@@ -784,11 +786,14 @@ class MacroExpression(object):
     '''
     if text is None:
       text = context.text
-    mexpr, offset = cls.parse(context, text=text, offset=offset, stopchars=stopchars)
+    mexpr, offset = cls.parse(
+        context, text=text, offset=offset, stopchars=stopchars
+    )
     if offset != len(text):
       raise ValueError(
-          "unparsed text after MacroExpression.from_text(%r): %r"
-          % (text, text[offset:]))
+          "unparsed text after MacroExpression.from_text(%r): %r" %
+          (text, text[offset:])
+      )
     return mexpr
 
   @classmethod
