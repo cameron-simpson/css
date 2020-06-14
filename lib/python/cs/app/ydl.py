@@ -127,7 +127,7 @@ class YDLCommand(BaseCommand):
                 with Pfx("URL %r", url):
                   over_ydl.queue(url)
         else:
-          over_ydl.queue_iter(argv)
+          over_ydl.queue(url)
       for R in over_ydl.report():
         upd.nl("COMPLETED R=%s", R)
 
