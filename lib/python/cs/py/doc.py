@@ -67,7 +67,6 @@ def module_doc(
         else:
           full_doc += f'\n\n## `{Mname} = {obj!r}`'
         continue
-      obj_doc = obj_docstring(obj)
       if not obj_doc:
         continue
       if isfunction(obj):
@@ -115,6 +114,8 @@ def module_doc(
             if ismethod(attr) or isfunction(attr):
               method_sig = signature(attr)
               obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
+            elif not callable(attr):
+              obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
             else:
               obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
