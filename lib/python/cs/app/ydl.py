@@ -29,9 +29,11 @@
 
 from getopt import GetoptError
 import logging
+from os.path import splitext
 import sys
 from threading import RLock
 from youtube_dl import YoutubeDL
+from youtube_dl.utils import DownloadError
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
@@ -40,7 +42,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
-from cs.upd import UpdProxy
+from cs.upd import UpdProxy, print
 
 __version__ = '20200615.1-post'
 
@@ -75,8 +77,8 @@ DISTINFO = {
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
-    '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s' \
-    '--id=%(id)s.%(ext)s'
+    '%(uploader)s--%(title)s--%(upload_date)s--%(resolution)s' \
+    '--%(extractor_key)s--id=%(id)s.%(ext)s'
 
 FSTAGS_PREFIX = 'youtube_dl'
 
@@ -129,7 +131,7 @@ class YDLCommand(BaseCommand):
         else:
           over_ydl.queue(url)
       for R in over_ydl.report():
-        upd.nl("COMPLETED R=%s", R)
+        pass
 
 YDLCommand.add_usage_to_docstring()
 
@@ -302,31 +304,28 @@ class YDL:
           ydl_opts.update(self.kw_opts)
         ydl = self.ydl = YoutubeDL(ydl_opts)
 
-        proxy('...')
+        proxy('extract_info...')
         self.tick()
+        ie_result = ydl.extract_info(url, download=False, process=True)
+        output_path = ydl.prepare_filename(ie_result)
+        proxy.prefix = (ie_result.get('title') or output_path) + ' '
 
+        proxy('download...')
+        self.tick()
         with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
           with ydl:
             ydl.download([url])
         proxy("elapsed %ds, saving metadata ...", LT.elapsed)
         self.tick()
 
-        ie_result = ydl.extract_info(url, download=False, process=True)
-        output_path = ydl.prepare_filename(ie_result)
         tagged_path = self.fstags[output_path]
         for key, value in ie_result.items():
           tag_name = FSTAGS_PREFIX + '.' + key
           tagged_path.direct_tags.add(Tag(tag_name, value))
         self.fstags.sync()
-        if upd:
-          upd.nl(output_path)
-        else:
-          print(output_path, flush=True)
-      except Exception as e:
+      except DownloadError as e:
         error("download fails: %s", e)
-        raise
-
-    return self
+    print(output_path)
 
   @logexc
   def update_progress(self, ydl_progress):
@@ -346,10 +345,8 @@ class YDL:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
       pass
-    status = progress.status(
-        filename if len(filename) <= 24 else '...' + filename[-21:],
-        self.proxy.width
-    )
+    fprefix, fext = splitext(filename)
+    status = progress.status(fext, self.proxy.width)
     self.proxy(status)
     self.tick()
 
