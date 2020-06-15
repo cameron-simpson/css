@@ -32,6 +32,7 @@ import logging
 import sys
 from threading import RLock
 from youtube_dl import YoutubeDL
+from youtube_dl.utils import DownloadError
 from cs.cmdutils import BaseCommand
 from cs.excutils import logexc
 from cs.fstags import FSTags
@@ -318,9 +319,8 @@ class YDL:
           tag_name = FSTAGS_PREFIX + '.' + key
           tagged_path.direct_tags.add(Tag(tag_name, value))
         self.fstags.sync()
-      except Exception as e:
+      except DownloadError as e:
         error("download fails: %s", e)
-        raise
     print(output_path)
 
   @logexc
