@@ -130,7 +130,7 @@ class YDLCommand(BaseCommand):
         else:
           over_ydl.queue(url)
       for R in over_ydl.report():
-        upd.nl("COMPLETED R=%s", R)
+        pass
 
 YDLCommand.add_usage_to_docstring()
 
@@ -303,17 +303,20 @@ class YDL:
           ydl_opts.update(self.kw_opts)
         ydl = self.ydl = YoutubeDL(ydl_opts)
 
-        proxy('...')
+        proxy('extract_info...')
         self.tick()
+        ie_result = ydl.extract_info(url, download=False, process=True)
+        output_path = ydl.prepare_filename(ie_result)
+        proxy.prefix = (ie_result.get('title') or output_path) + ' '
 
+        proxy('download...')
+        self.tick()
         with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
           with ydl:
             ydl.download([url])
         proxy("elapsed %ds, saving metadata ...", LT.elapsed)
         self.tick()
 
-        ie_result = ydl.extract_info(url, download=False, process=True)
-        output_path = ydl.prepare_filename(ie_result)
         tagged_path = self.fstags[output_path]
         for key, value in ie_result.items():
           tag_name = FSTAGS_PREFIX + '.' + key
