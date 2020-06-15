@@ -29,6 +29,7 @@
 
 from getopt import GetoptError
 import logging
+from os.path import splitext
 import sys
 from threading import RLock
 from youtube_dl import YoutubeDL
@@ -344,13 +345,8 @@ class YDL:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
       pass
-    filename_width = max(24, self.proxy.width - len(filename))
-    status = progress.status(
-        (
-            filename if len(filename) <= filename_width else '...' +
-            filename[-(filename_width - 3):]
-        ), self.proxy.width
-    )
+    fprefix, fext = splitext(filename)
+    status = progress.status(fext, self.proxy.width)
     self.proxy(status)
     self.tick()
 
