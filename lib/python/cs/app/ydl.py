@@ -42,7 +42,7 @@ from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 from cs.upd import UpdProxy
 
-__version__ = '20200615.1'
+__version__ = '20200615.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
