@@ -344,9 +344,12 @@ class YDL:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
       pass
+    filename_width = max(24, self.proxy.width - len(filename))
     status = progress.status(
-        filename if len(filename) <= 24 else '...' + filename[-21:],
-        self.proxy.width
+        (
+            filename if len(filename) <= filename_width else '...' +
+            filename[-(filename_width - 3):]
+        ), self.proxy.width
     )
     self.proxy(status)
     self.tick()
