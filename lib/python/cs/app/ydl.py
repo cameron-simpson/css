@@ -76,8 +76,8 @@ DISTINFO = {
 
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
-    '%(uploader)s@youtube--%(title)s--%(upload_date)s--%(resolution)s' \
-    '--id=%(id)s.%(ext)s'
+    '%(uploader)s--%(title)s--%(upload_date)s--%(resolution)s' \
+    '--%(extractor_key)s--id=%(id)s.%(ext)s'
 
 FSTAGS_PREFIX = 'youtube_dl'
 
