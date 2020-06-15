@@ -40,7 +40,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
-from cs.upd import UpdProxy
+from cs.upd import UpdProxy, print
 
 __version__ = '20200521-post'
 
@@ -318,15 +318,10 @@ class YDL:
           tag_name = FSTAGS_PREFIX + '.' + key
           tagged_path.direct_tags.add(Tag(tag_name, value))
         self.fstags.sync()
-        if upd:
-          upd.nl(output_path)
-        else:
-          print(output_path, flush=True)
       except Exception as e:
         error("download fails: %s", e)
         raise
-
-    return self
+    print(output_path)
 
   @logexc
   def update_progress(self, ydl_progress):
