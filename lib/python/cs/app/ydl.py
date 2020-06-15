@@ -90,7 +90,7 @@ class YDLCommand(BaseCommand):
   '''
 
   GETOPT_SPEC = 'f'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] URLs...
+  USAGE_FORMAT = '''Usage: {cmd} [-f] {{URLs|-}}...
     -f  Force download - do not use the cache.'''
 
   @staticmethod
@@ -130,6 +130,8 @@ class YDLCommand(BaseCommand):
           over_ydl.queue(url)
       for R in over_ydl.report():
         upd.nl("COMPLETED R=%s", R)
+
+YDLCommand.add_usage_to_docstring()
 
 class OverYDL:
   ''' A manager for multiple `YDL` instances.

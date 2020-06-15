@@ -184,19 +184,21 @@ class BaseCommand:
     if usage_format is None:
       return None
     usage_message = usage_format.format_map(usage_format_mapping)
-    subusages = []
-    for attr, method in sorted(cls.subcommands().items()):
-      with Pfx(attr):
-        subusage = cls.subcommand_usage_text(attr)
-        if subusage:
-          subusages.append(subusage.replace('\n', '\n  '))
-    if subusages:
-      usage_message = '\n'.join(
-          [usage_message, '  Subcommands:'] + [
-              '    ' + subusage.replace('\n', '\n    ')
-              for subusage in subusages
-          ]
-      )
+    subcmds = cls.subcommands()
+    if subcmds and list(subcmds) != ['help']:
+      subusages = []
+      for attr, method in sorted(subcmds.items()):
+        with Pfx(attr):
+          subusage = cls.subcommand_usage_text(attr)
+          if subusage:
+            subusages.append(subusage.replace('\n', '\n  '))
+      if subusages:
+        usage_message = '\n'.join(
+            [usage_message, '  Subcommands:'] + [
+                '    ' + subusage.replace('\n', '\n    ')
+                for subusage in subusages
+            ]
+        )
     return usage_message
 
   @classmethod
