@@ -1,5 +1,3 @@
-wheel
-pip
 enum34
 icontract
 lmdb
@@ -10,3 +8,4 @@ pyflakes
 pycodestyle
 twine
 yapf
+youtube-dl
