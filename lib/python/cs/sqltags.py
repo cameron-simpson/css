@@ -229,7 +229,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   @staticmethod
   def cmd_import(argv, options):
-    ''' Usage: {cmd} [{{-u|--update}} {{-|srcpath}}...
+    ''' Usage: {cmd} [{{-u|--update}}] {{-|srcpath}}...
           Import CSV data in the format emitted by "export".
           Each argument is a file path or "-", indicating standard input.
           -u, --update  If a named entity already exists then update its tags.
