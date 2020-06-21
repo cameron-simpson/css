@@ -1,4 +1,3 @@
-BaseCommand: not stripping the text before Usage: from per subcmd docstrings - in the "help" output
 securer findup: sanity check on ownership or perms to stop walk? tunable?
 BaseCommand: can we provide the expected command name instead of the class name in the docstring?
 cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level

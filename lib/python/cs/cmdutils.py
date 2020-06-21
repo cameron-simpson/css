@@ -422,20 +422,23 @@ class BaseCommand:
           or for all subcommands if no names are specified.
     '''
     subcmds = cls.subcommands()
-    if not argv:
+    if argv:
+      fulldoc = True
+    else:
+      fulldoc = False
       argv = sorted(subcmds)
     xit = 0
+    print("help:")
     for subcmd in argv:
       with Pfx(subcmd):
         if subcmd not in subcmds:
           warning("unknown subcommand")
           xit = 1
           continue
-        subusage = cls.subcommand_usage_text(subcmd, fulldoc=True)
+        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
         if not subusage:
           warning("no help")
           xit = 1
           continue
-        print(subcmd + ':')
         print(' ', subusage.replace('\n', '\n    '))
     return xit
