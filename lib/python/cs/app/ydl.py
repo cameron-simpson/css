@@ -42,7 +42,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
-from cs.upd import UpdProxy, print
+from cs.upd import Upd, print
 
 __version__ = '20200615.1-post'
 
@@ -117,9 +117,8 @@ class YDLCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing URLs")
-    upd = options.loginfo.upd
     with FSTags() as fstags:
-      over_ydl = OverYDL(upd=upd, fstags=fstags, ydl_opts=options.ydl_opts)
+      over_ydl = OverYDL(fstags=fstags, ydl_opts=options.ydl_opts)
       for url in argv:
         if url == '-':
           with Pfx('stdin'):
@@ -147,10 +146,12 @@ class OverYDL:
       all_progress=None,
       ydl_opts=None,
   ):
+    if upd is None:
+      upd = Upd()
     if all_progress is None:
       all_progress = OverProgress()
     self.upd = upd
-    self.proxy0 = upd.proxy(0) if upd else None
+    self.proxy0 = upd.proxy(0)
     self.fstags = fstags
     self.all_progress = OverProgress()
     self.ydl_opts = ydl_opts
@@ -242,6 +243,8 @@ class YDL:
         * `kw_opts`: other keyword arguments are used to initialise
           the options for the underlying `YoutubeDL` instance
     '''
+    if upd is None:
+      upd = Upd()
     if tick is None:
       tick = lambda: None
     self.url = url
@@ -285,7 +288,7 @@ class YDL:
     '''
     url = self.url
     upd = self.upd
-    proxy = self.proxy = upd.insert(1) if upd else UpdProxy(None, None)
+    proxy = self.proxy = upd.insert(1)
     proxy.prefix = url + ' '
 
     with proxy:
