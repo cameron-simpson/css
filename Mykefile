@@ -82,11 +82,8 @@ _help:
 _setup:
     :make _tags _venv
 
-_venv: $(venvdir)
-
-$(venvdir): $(venv_requirements)
+_venv:
     @[ -d '$@/' ] || set-x mkdir '$@'
-    :make $@/.
     [ -x '$(venv_python)' ] || { \
       set -xue \
       rm -rf '$(venvdir)' \
