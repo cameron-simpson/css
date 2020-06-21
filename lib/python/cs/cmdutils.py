@@ -25,7 +25,7 @@ __version__ = '20200615-post'
 
 DISTINFO = {
     'description':
-    "convenience functions for working with the Cmd module and other command line related stuff",
+    "convenience functions for working with the Cmd module, a BaseCommand class for constructing command lines and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -39,7 +39,7 @@ DISTINFO = {
 }
 
 def docmd(dofunc):
-  ''' Decorator for Cmd subclass methods
+  ''' Decorator for `cmd.Cmd` subclass methods
       to supply some basic quality of service.
 
       This decorator:
@@ -54,6 +54,8 @@ def docmd(dofunc):
       The intended use is to decorate `cmd.Cmd` `do_`* methods:
 
           from cmd import Cmd
+          from cs.cmdutils import docmd
+          ...
           class MyCmd(Cmd):
             @docmd
             def do_something(...):
@@ -294,6 +296,8 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if options is None:
+      options = NS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -303,12 +307,11 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    loginfo = setup_logging(cmd)
+    options.cmd = cmd
+    log_level = getattr(options, 'log_level', None)
+    loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     usage = self.usage_text(cmd=cmd)
-    if options is None:
-      options = NS()
-    options.cmd = cmd
     options.usage = usage
     options.loginfo = loginfo
     self.apply_defaults(options)
