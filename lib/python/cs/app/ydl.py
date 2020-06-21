@@ -44,7 +44,7 @@ from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 from cs.upd import Upd, print
 
-__version__ = '20200615.1-post'
+__version__ = '20200621'
 
 DISTINFO = {
     'keywords': ["python3"],
