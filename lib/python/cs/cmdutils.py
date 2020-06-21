@@ -225,6 +225,7 @@ class BaseCommand:
       doc = obj_docstring(method)
       if doc and 'Usage:' in doc:
         pre_usage, post_usage = doc.split('Usage:', 1)
+        pre_usage = pre_usage.strip()
         post_usage_parts = post_usage.split('\n\n', 1)
         post_usage_format = post_usage_parts.pop(0)
         subusage_format = stripped_dedent(post_usage_format)
@@ -233,7 +234,9 @@ class BaseCommand:
           mapping.update(cmd=subcmd)
           subusage = subusage_format.format_map(mapping)
           if fulldoc:
-            subusage = pre_usage + subusage + '\n\n'.join(post_usage_parts)
+            parts = [pre_usage, subusage] if pre_usage else [subusage]
+            parts.extend(post_usage_parts)
+            subusage = '\n\n'.join(parts)
     return subusage if subusage else None
 
   @classmethod
