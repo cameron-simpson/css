@@ -939,7 +939,7 @@ class SQLTags(MultiOpenMixin):
     te = self.get(index, session=session)
     if te is None:
       if isinstance(index, int):
-        raise IndexError("%s[%r]" % (self,index))
+        raise IndexError("%s[%r]" % (self, index))
       raise KeyError("%s[%r]" % (self, index))
     return te
 
@@ -957,7 +957,7 @@ class SQLTags(MultiOpenMixin):
       query = entities.query(session).filter_by(id=index)
     else:
       query = entities.by_name(index)
-    matches = list(self._run_query(query,session=session))
+    matches = list(self._run_query(query, session=session))
     if not matches:
       return None
     match, = matches
@@ -1040,7 +1040,7 @@ class SQLTags(MultiOpenMixin):
       session.add(e)
     for tag in te.tags:
       with Pfx(tag):
-        e.add_tag(tag,session=session)
+        e.add_tag(tag, session=session)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
