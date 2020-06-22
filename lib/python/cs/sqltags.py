@@ -1014,7 +1014,8 @@ class SQLTags(MultiOpenMixin):
         te = TaggedEntity.from_csvrow(csvrow)
         self.add_tagged_entity(te)
 
-  def add_tagged_entity(self, te, *, update_mode=False):
+  @orm_auto_session
+  def add_tagged_entity(self, te, *, session, update_mode=False):
     ''' Add the `TaggedEntity` `te`.
 
         If `update_mode` is true
@@ -1026,9 +1027,10 @@ class SQLTags(MultiOpenMixin):
       raise ValueError("entity named %r already exists" % (te.name,))
     if e is None:
       e = self.orm.entities(name=te.name or None, unixtime=te.unixtime)
+      session.add(e)
     for tag in te.tags:
       with Pfx(tag):
-        e.add_tag(tag)
+        e.add_tag(tag,session=session)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
