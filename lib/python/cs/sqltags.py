@@ -174,12 +174,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     csvw = csv.writer(sys.stdout)
     with sqltags.orm.session() as session:
-      with Upd(sys.stderr) as U:
-        U.out("select %s ...", ' '.join(map(str, tag_choices)))
-        tagged_entities = sqltags.find(
-            tag_choices, session=session, with_tags=True
-        )
-      for te in tagged_entities:
+      for te in sqltags.find(tag_choices, session=session):
         with Pfx(te):
           csvw.writerow(te.csvrow)
 
@@ -211,12 +206,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("bad arguments")
     xit = 0
     with sqltags.orm.session() as session:
-      with Upd(sys.stderr) as U:
-        U.out("select %s ...", ' '.join(map(str, tag_choices)))
-        tagged_entities = sqltags.find(
-            tag_choices, session=session, with_tags=True
-        )
-      for te in tagged_entities:
+      for te in sqltags.find(tag_choices, session=session):
         with Pfx(te):
           try:
             output = te.format_as(output_format, error_sep='\n  ')
@@ -458,12 +448,12 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               index = int(name)
             except ValueError:
               index = name
-            entity = sqltags.get(index, session=session)
-            if entity is None:
+            te = sqltags.get(name)
+            if te is None:
               error("missing")
               xit = 1
               continue
-            tags = entity.tags(session=session)
+            tags = te.tags
             for tag_choice in tag_choices:
               if tag_choice.choice:
                 if tag_choice.tag not in tags:
