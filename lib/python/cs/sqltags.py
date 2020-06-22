@@ -657,9 +657,38 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       @classmethod
       @pfx_method
       @auto_session
-      def by_tags(cls, tag_criteria, *, session, with_tags=False):
-        ''' Construct a query to yield `Entity` rows
-            matching the supplied `tag_criteria`.
+      def by_name(cls, name, *, session, query=None):
+        ''' Return a query to select `Entity` rows by `name`.
+
+            If `name` is `None`, log entities are returned (`name IS NULL`),
+            otherwise the entity with the specific name will be matched.
+        '''
+        entities = orm.entities
+        if query is None:
+          query = session.query(entities)
+        query = query.filter_by(name=name)
+        return query
+
+      @classmethod
+      @pfx_method
+      @auto_session
+      def by_tags(
+          cls,
+          tag_criteria,
+          *,
+          session,
+          with_tags=False,
+          name=None,
+          query=None
+      ):
+        ''' Construct a query to match `Entity` rows
+            matching `name` and the supplied `tag_criteria`.
+
+            If `name` is omitted or `None` the query will match log entities
+            otherwise the entity with the specified `name`.
+
+            An existing query may be supplied,
+            in which case it will be extended.
 
             The `tag_criteria` should be an iterable
             yielding any of the following types:
@@ -675,10 +704,13 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
             If `with_tags` is true (default `False`)
             add a final RIGHT JOIN to include the associated `Tags` rows.
+            *Warning*:
+            setting `with_tags` adds additional columns to the result set,
+            and so it must be the last query if constructing a compound query.
         '''
         entities = orm.entities
         tags = orm.tags
-        query = session.query(entities).filter_by(name=None)
+        query = cls.by_name(name=name, session=session)
         for taggy in tag_criteria:
           with Pfx(taggy):
             if isinstance(taggy, str):
