@@ -701,16 +701,13 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               of a tag with that name;
               if the string commences with a `'-'` (minus)
               a negative test is made
-
-            If `with_tags` is true (default `False`)
-            add a final RIGHT JOIN to include the associated `Tags` rows.
-            *Warning*:
-            setting `with_tags` adds additional columns to the result set,
-            and so it must be the last query if constructing a compound query.
         '''
         entities = orm.entities
         tags = orm.tags
-        query = cls.by_name(name=name, session=session)
+        if query is None:
+          query = cls.by_name(name=name, session=session)
+        elif name is not None:
+          raise ValueError("cannot supply both a query and a name")
         for taggy in tag_criteria:
           with Pfx(taggy):
             if isinstance(taggy, str):
@@ -748,14 +745,24 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                     tags_alias.id is None, tag_column != tag_test_value
                 )
             query = query.join(tags_alias, isouter=isouter).filter(*match)
-        if with_tags:
-          tags_alias = aliased(tags)
-          query = query.join(
-              tags_alias, isouter=True
-          ).filter(entities.id is not None).add_columns(
-              tags_alias.name, tags_alias.float_value, tags_alias.string_value,
-              tags_alias.structured_value
-          )
+          return query
+
+      @classmethod
+      @pfx_method
+      def with_tags(cls, query):
+        ''' Extend `query` to `RIGHT JOIN` against the `Tags`,
+            adding `(tag_name,float_value,string_value,structured_value)`
+            to the columns returned.
+        '''
+        entities = orm.entities
+        tags = orm.tags
+        tags_alias = aliased(tags)
+        query = query.join(
+            tags_alias, isouter=True
+        ).filter(entities.id is not None).add_columns(
+            tags_alias.name, tags_alias.float_value, tags_alias.string_value,
+            tags_alias.structured_value
+        )
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -963,12 +970,14 @@ class SQLTags(MultiOpenMixin):
         the `tags` attribute will be the `Entity`'s `TagSet`
         otherwise it will be an empty `TagSet` (i.e. not `None`).
     '''
-    query = self.orm.entities.by_tags(
+    entities = self.orm.entities
+    query = entities.by_tags(
         tag_choices, session=session, with_tags=with_tags
     )
-    results = session.execute(query)
     if with_tags:
       # entities and tag information which must be merged
+      query = entities.with_tags(query)
+      results = session.execute(query)
       entity_map = {}
       for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
            tag_string_value, tag_structured_value) in results:
@@ -984,6 +993,7 @@ class SQLTags(MultiOpenMixin):
           e.tags.add(tag_name, value)
       yield from entity_map.values()
     else:
+      results = session.execute(query)
       for entity_id, entity_name, unixtime in results:
         yield TaggedEntity(
             id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
