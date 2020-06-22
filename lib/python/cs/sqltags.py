@@ -958,6 +958,11 @@ class SQLTags(MultiOpenMixin):
   def get(self, index, *, session):
     ''' Return a `TaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
+    if not isinstance(index, (int, str)):
+      raise TypeError(
+          "%s.get: index must be int or str, not %s",
+          type(self).__name__, type(index)
+      )
     entities = self.orm.entities
     if isinstance(index, int):
       query = entities.query(session).filter_by(id=index)
