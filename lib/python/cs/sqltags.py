@@ -945,59 +945,75 @@ class SQLTags(MultiOpenMixin):
   @locked
   @orm_auto_session
   def __getitem__(self, index, *, session):
-    ''' Return the `TaggedPath` for `path`.
+    ''' Return a `TaggedEntity` for `index` (an `int` or `str`).
     '''
-    row = self.get(index, session=session)
-    if row is None:
+    te = self.get(index, session=session)
+    if te is None:
+      if isinstance(index, int):
+        raise IndexError("%s[%r]" % (self,index))
       raise KeyError("%s[%r]" % (self, index))
-    return row
+    return te
 
   @orm_auto_session
   def get(self, index, *, session):
-    ''' Get the entity matching `index`, or `None` if there is no such entity.
+    ''' Return a `TaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     entities = self.orm.entities
     if isinstance(index, int):
-      return entities.lookup1(id=index, session=session)
-    return entities.lookup1(name=index, session=session)
+      query = entities.query(session).filter_by(id=index)
+    else:
+      query = entities.by_name(index)
+    matches = list(self._run_query(query,session=session))
+    if not matches:
+      return None
+    match, = matches
+    return match
 
   @orm_auto_session
-  def find(self, tag_choices, *, session, with_tags=False):
-    ''' Generator yielding `TaggedEntity` instances
-        for the the `Entity` rows matching `tag_choices`.
+  def _run_query(self, query, *, session, without_tags=False):
+    ''' Run a query derived from `self.orm.entities.query(session)`
+        yielding `TaggedEntity` instances.
 
-        If `with_tags` is true,
-        the `tags` attribute will be the `Entity`'s `TagSet`
-        otherwise it will be an empty `TagSet` (i.e. not `None`).
+        If the optional `without_tags` parameter (default `False`)
+        is true, this function does not JOIN against the `tags` table,
+        resulting in empty `.tags` `TagSet`s
+        in the resulting `TaggedEntity` instances.
     '''
     entities = self.orm.entities
-    query = entities.by_tags(
-        tag_choices, session=session, with_tags=with_tags
-    )
-    if with_tags:
-      # entities and tag information which must be merged
-      query = entities.with_tags(query)
-      results = session.execute(query)
-      entity_map = {}
-      for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
-           tag_string_value, tag_structured_value) in results:
-        e = entity_map.get(entity_id)
-        if not e:
-          e = entity_map[entity_id] = TaggedEntity(
-              id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
-          )
-        value = self.orm.tags.pick_value(
-            tag_float_value, tag_string_value, tag_structured_value
-        )
-        if tag_name is not None:
-          e.tags.add(tag_name, value)
-      yield from entity_map.values()
-    else:
+    if without_tags:
+      # do not bother fetching tags
       results = session.execute(query)
       for entity_id, entity_name, unixtime in results:
         yield TaggedEntity(
             id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
         )
+      return
+    # entities and tag information which must be merged
+    query = entities.with_tags(query)
+    results = session.execute(query)
+    entity_map = {}
+    for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
+         tag_string_value, tag_structured_value) in results:
+      e = entity_map.get(entity_id)
+      if not e:
+        e = entity_map[entity_id] = TaggedEntity(
+            id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
+        )
+      if tag_name is not None:
+        value = self.orm.tags.pick_value(
+            tag_float_value, tag_string_value, tag_structured_value
+        )
+        e.tags.add(tag_name, value)
+    yield from entity_map.values()
+
+  @orm_auto_session
+  def find(self, tag_choices, *, session):
+    ''' Generator yielding `TaggedEntity` instances
+        for the the `Entity` rows matching `tag_choices`.
+    '''
+    entities = self.orm.entities
+    query = entities.by_tags(tag_choices, session=session)
+    yield from self._run_query(query, session=session)
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
