@@ -171,7 +171,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    xit = 0
     csvw = csv.writer(sys.stdout)
     with sqltags.orm.session() as session:
       for te in sqltags.find(tag_choices, session=session):
