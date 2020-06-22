@@ -745,7 +745,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                     tags_alias.id is None, tag_column != tag_test_value
                 )
             query = query.join(tags_alias, isouter=isouter).filter(*match)
-          return query
+        return query
 
       @classmethod
       @pfx_method
