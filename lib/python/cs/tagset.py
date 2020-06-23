@@ -1286,9 +1286,21 @@ class TagsCommandMixin:
         choices.append(TagChoice.from_str(arg))
     return choices
 
-class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
-                   FormatableMixin):
-  ''' An entity record with its `Tag`s.
+class TaggedEntityMixin(FormatableMixin):
+  ''' A mixin for classes like `TaggedEntity`.
+
+      A `TaggedEnity`like instance has the following attributes:
+      * `id`: a domain specific identifier;
+        this may reasonably be `None` for entities
+        not associated with database rows.
+      * `name`: the entity's name;
+        this is typically `None` for log entries.
+      * `unixtime`: a UNIX timestamp,
+        a `float` holdsing seconds since the UNIX epoch
+        (midnight, 1 January 1970 UTC).
+        This is typically the row creation time
+        for entities associated with database rows.
+      * `tags`: a `TagSet`, a mapping of names to values.
 
       This is a common representation of some tagged entity,
       and also is the intermediary form used by the `cs.fstags` and
@@ -1368,3 +1380,18 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
     # convert the TagSet to an ExtendedNamespace
     kwargs = kwtags.format_kwargs()
     return kwargs
+
+class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
+                   TaggedEntityMixin):
+  ''' A `namedtuple` entity record with its `Tag`s.
+
+      This is a common representation of some tagged entity,
+      and also is the intermediary form used by the `cs.fstags` and
+      `cs.sqltags` import/export CSV format.
+
+      The `id` column has domain specific use.
+      For `cs.sqltags` the `id` attribute will be the database row id.
+      For `cs.fstags` the `id` attribute will be `None`.
+      It is available for other domains as an arbitrary identifier/key value,
+      should that be useful.
+  '''
