@@ -326,9 +326,9 @@ class YDL:
           tag_name = FSTAGS_PREFIX + '.' + key
           tagged_path.direct_tags.add(Tag(tag_name, value))
         self.fstags.sync()
+        print(output_path)
       except DownloadError as e:
         error("download fails: %s", e)
-    print(output_path)
 
   @logexc
   def update_progress(self, ydl_progress):
