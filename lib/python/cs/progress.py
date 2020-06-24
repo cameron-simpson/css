@@ -211,7 +211,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2):
+  def format_counter(self, value, scale=None, max_parts=2, sep=' '):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
@@ -219,7 +219,7 @@ class BaseProgress(object):
       scale = self.units_scale
     if scale is None:
       return str(value)
-    return transcribe(value, scale, max_parts=max_parts)
+    return transcribe(value, scale, max_parts=max_parts, sep=sep)
 
   def text_pos_of_total(
       self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
