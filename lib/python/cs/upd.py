@@ -892,3 +892,5 @@ class UpdProxy(object):
     index = self.index
     if index is not None:
       self.upd.delete(index)
+
+  __del__ = delete
