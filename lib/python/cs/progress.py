@@ -274,7 +274,7 @@ class BaseProgress(object):
       label=None,
       upd=None,
       proxy=None,
-      lenfunc=None,
+      itemlenfunc=None,
       statusfunc=None,
       incfirst=False,
       width=None,
@@ -284,7 +284,7 @@ class BaseProgress(object):
 
         Parameters:
         * `it`: the iterable to consume and yield.
-        * `lenfunc`: an optional function returning the "size" of each item
+        * `itemlenfunc`: an optional function returning the "size" of each item
           from `it`, used to advance `self.position`.
           The default is to assume a size of `1`.
           A convenient alternative choice may be the builtin function `len`.
@@ -327,7 +327,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.bar(readfrom(f, lenfunc=len)):
+            for bs in P.bar(readfrom(f, itemlenfunc=len)):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -340,7 +340,7 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(label, width)
     proxy(statusfunc(self, label, width or proxy.width))
     for i in it:
-      length = lenfunc(i) if lenfunc else 1
+      length = itemlenfunc(i) if itemlenfunc else 1
       if incfirst:
         self += length
       proxy(statusfunc(self, label, width or proxy.width))
