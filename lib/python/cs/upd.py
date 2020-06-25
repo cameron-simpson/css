@@ -53,11 +53,11 @@ Multiline multithread example:
 
 I routinely use an `Upd()` as a progress reporting tool for commands
 running on a terminal. This attaches to `sys.stderr`.
-However, it is usually not desirable to run a `Upd` display
+However, it is usually not desirable to run an `Upd` display
 if the backend is not a tty/terminal.
 Therefore, an `Upd` has a "disabled" mode
 which performs no output;
-if the backend is not a tty (as tested by `backend.isatty()`
+if the backend is not a tty (as tested by `backend.isatty()`)
 this mode activates by default.
 
 The constructor has an optional parameter `disabled` to override
@@ -65,7 +65,7 @@ this default behaviour.
 
 The whole purpose of this "disabled" mode is to ease main programme
 implementation.
-Without the mode one has two basic idoms to support "noninteractive" use,
+Without the mode one has two basic idioms to support "noninteractive" use,
 described below.
 
 The former is to test `sys.stderr.isatty()` and define an `Upd` or not:
@@ -877,8 +877,8 @@ class UpdProxy(object):
     ''' The available space for text after `self.prefix`.
 
         This is available width for uncropped text,
-        intended support presizing messages such as progress bars.
-        Setting the text to something linger will the rightmost
+        intended to support presizing messages such as progress bars.
+        Setting the text to something longer will crop the rightmost
         portion of the text which fits.
     '''
     prefix = self.prefix
