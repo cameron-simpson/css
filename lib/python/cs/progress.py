@@ -14,6 +14,7 @@ import time
 from cs.logutils import warning, exception
 from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
+from cs.upd import Upd
 
 __version__ = '20200613-post'
 
@@ -24,7 +25,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units'],
+    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
 @functools.total_ordering
@@ -266,6 +267,87 @@ class BaseProgress(object):
       return label + ':' + right
     arrow_field = self.arrow(arrow_width)
     return left + arrow_field + right
+
+  def bar(
+      self,
+      it,
+      label=None,
+      upd=None,
+      proxy=None,
+      lenfunc=None,
+      statusfunc=None,
+      incfirst=False,
+      width=None,
+  ):
+    ''' Generator yielding values from the iterable `it`
+        while updating a progress bar.
+
+        Parameters:
+        * `it`: the iterable to consume and yield.
+        * `lenfunc`: an optional function returning the "size" of each item
+          from `it`, used to advance `self.position`.
+          The default is to assume a size of `1`.
+          A convenient alternative choice may be the builtin function `len`.
+        * `incfirst`: whether to advance `self.position` before we
+          `yield` an item from `it` or afterwards.
+          This reflects whether it is considered that progress is
+          made as items are obtained or only after items are processed
+          by whatever is consuming this generator.
+          The default is `False`,
+        * `label`: a label for the progress bar,
+          default from `self.name`.
+        * `width`: an optional width expressioning how wide the progress bar
+          text may be.
+          The default comes from the `proxy.width` property.
+        * `statusfunc`: an optional function to compute the progress bar text
+          accepting `(self,label,width)`.
+        * `proxy`: an optional proxy for displaying the progress bar,
+          a callable accepting a the result of `statusfunc`.
+          The default is a `cs.upd.UpdProxy` created from `upd`,
+          which inserts a progress bar above the main status line.
+        * `upd`: an optional `cs.upd.Upd` instance,
+          used only to produce the default `proxy` if that is not supplied.
+          The default `upd` is `cs.upd.Upd()`
+          which uses `sys.stderr` for display.
+
+        Example use:
+
+            from cs.units import DECIMAL_SCALE
+            rows = [some list of data]
+            P = Progress(total=len(rows), units_scale=DECIMAL_SCALE)
+            for row in P.bar(rows, incfirst=True):
+                ... do something with each row ...
+
+            f = open(data_filename, 'rb')
+            datalen = os.stat(f).st_size
+            def readfrom(f):
+                while True:
+                    bs = f.read(65536)
+                    if not bs:
+                        break
+                    yield bs
+            P = Progress(total=datalen)
+            for bs in P.bar(readfrom(f, lenfunc=len)):
+                ... process the file data in bs ...
+    '''
+    if label is None:
+      label = self.name
+    if proxy is None:
+      if upd is None:
+        upd = Upd()
+      proxy = upd.insert(1)
+    if statusfunc is None:
+      statusfunc = lambda P, label, width: P.status(label, width)
+    proxy(statusfunc(self, label, width or proxy.width))
+    for i in it:
+      length = lenfunc(i) if lenfunc else 1
+      if incfirst:
+        self += length
+      proxy(statusfunc(self, label, width or proxy.width))
+      yield i
+      if not incfirst:
+        self += length
+      proxy(statusfunc(self, label, width or proxy.width))
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
