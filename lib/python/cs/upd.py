@@ -261,8 +261,6 @@ class Upd(SingletonMixin):
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    if self._disabled:
-      return
     slots = self._slot_text
     if (exc_type is None or
         (issubclass(exc_type, SystemExit and (exc_val.code == 0 if isinstance(
@@ -272,7 +270,7 @@ class Upd(SingletonMixin):
       while len(slots) > 1:
         del self[len(slots) - 1]
       self[0] = ''
-    else:
+    elif not self._disabled and self._backend is not None:
       # preserve the display for debugging purposes
       # move to the bottom and emit a newline
       txts = self.move_to_slot_v(self._current_slot, 0)
@@ -516,7 +514,7 @@ class Upd(SingletonMixin):
       txt = self.normalise(txt)
     backend = self._backend
     with self._lock:
-      if self._disabled:
+      if self._disabled or self._backend is None:
         oldtxt = self._slot_text[slot]
         self._slot_text[slot] = txt
       else:
@@ -549,7 +547,7 @@ class Upd(SingletonMixin):
         or if `txt` is wider than `self.columns`
         or if there is no "insert line" capability.
     '''
-    if self._disabled:
+    if self._disabled or self._backend is None:
       return
     if a:
       txt = txt % a
@@ -614,7 +612,7 @@ class Upd(SingletonMixin):
             with U.above():
                 print('some message for stdout ...', flush=True)
     '''
-    if self._disabled:
+    if self._disabled or self._backend is None:
       yield
     else:
       # go to the top slot, overwrite it and then rewrite the slots below
@@ -647,7 +645,7 @@ class Upd(SingletonMixin):
         The `temp_state` parameter may be used to set the inner status line
         content if a value other than `''` is desired.
     '''
-    if self._disabled:
+    if self._disabled or self._backend is None:
       yield
     else:
       with self._lock:
@@ -692,7 +690,7 @@ class Upd(SingletonMixin):
             (len(self), index)
         )
       proxy = UpdProxy(self, index)
-      if self._disabled:
+      if self._disabled or self._backend is None:
         # just maintain the slot text
         slots.insert(index, txt)
         proxies.insert(index, proxy)
@@ -752,7 +750,7 @@ class Upd(SingletonMixin):
         )
       if len(slots) == 1:
         raise ValueError("cannot delete the last slot")
-      if self._disabled:
+      if self._disabled or self._backend is None:
         # just remote the data entries
         del slots[index]
         proxy = proxies[index]
