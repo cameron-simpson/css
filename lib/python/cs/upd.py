@@ -749,7 +749,9 @@ class Upd(SingletonMixin):
             (len(self), index)
         )
       if len(slots) == 1:
-        raise ValueError("cannot delete the last slot")
+        # silently do not delete
+        ##raise ValueError("cannot delete the last slot")
+        return
       if self._disabled or self._backend is None:
         # just remote the data entries
         del slots[index]
