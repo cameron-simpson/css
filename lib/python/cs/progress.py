@@ -744,5 +744,11 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 if __name__ == '__main__':
+  import sys
+  from cs.units import DECIMAL_SCALE
+  lines = open(__file__).readlines()
+  P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
+  for line in P.bar(open(__file__)):
+    time.sleep(0.01)
   from cs.debug import selftest
   selftest('cs.progress_tests')
