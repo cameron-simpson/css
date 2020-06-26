@@ -263,8 +263,8 @@ class Upd(SingletonMixin):
     '''
     slots = self._slot_text
     if (exc_type is None or
-        (issubclass(exc_type, SystemExit and (exc_val.code == 0 if isinstance(
-            exc_val.code, int) else exc_val.code is None)))):
+        (issubclass(exc_type, SystemExit) and (exc_val.code == 0 if isinstance(
+            exc_val.code, int) else exc_val.code is None))):
       # no exception or SystemExit(0) or SystemExit(None)
       # remove the Upd display
       while len(slots) > 1:
