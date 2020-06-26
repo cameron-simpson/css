@@ -747,12 +747,41 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
+def progressbar(it, label=None, total=None, **kw):
+  ''' Convenience function to construct and run a `Progress.bar`.
+
+      Parameters:
+      * `it`: the iterable to consume
+      * `label`: optional label, doubles as the `Progress.name`
+      * `total`: optional value for `Progress.total`,
+        default from `len(it)` if supported.
+
+      If `total` is `None` and `it` supports `len()`
+      then the `Progress.total` is set from it.
+
+      All arguments are passed through to `Progress.bar`.
+
+      Example use:
+
+          for row in progressbar(rows):
+              ... do something with row ...
+  '''
+  if total is None:
+    try:
+      total = len(it)
+    except TypeError:
+      total = None
+  P = Progress(name=label, total=total)
+  yield from P.bar(it, label=label, **kw)
+
 if __name__ == '__main__':
   import sys
   from cs.units import DECIMAL_SCALE
   lines = open(__file__).readlines()
+  for line in progressbar(lines, "lines"):
+    time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
   for line in P.bar(open(__file__)):
-    time.sleep(0.01)
+    time.sleep(0.005)
   from cs.debug import selftest
   selftest('cs.progress_tests')
