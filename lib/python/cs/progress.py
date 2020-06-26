@@ -193,14 +193,6 @@ class BaseProgress(object):
       return None
     return time.time() + remaining
 
-  def count_of_total_bytes_text(self):
-    ''' Return "count units / total units" using binary units.
-    '''
-    return (
-        transcribe(self.position, BINARY_BYTES_SCALE, max_parts=1) + '/' +
-        transcribe(self.total, BINARY_BYTES_SCALE, max_parts=1)
-    )
-
   def arrow(self, width, no_padding=False):
     ''' Construct a progress arrow representing completion
         to fit in the specified `width`.
