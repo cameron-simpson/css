@@ -431,7 +431,7 @@ class Progress(BaseProgress):
     self._total = total
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
-    positions = [CheckPoint(start_time, start)]
+    positions = [CheckPoint(self.start_time, start)]
     if position != start:
       positions.append(CheckPoint(time.time(), position))
     self._positions = positions
