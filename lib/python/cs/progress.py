@@ -321,7 +321,7 @@ class BaseProgress(object):
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
         * `proxy`: an optional proxy for displaying the progress bar,
-          a callable accepting a the result of `statusfunc`.
+          a callable accepting the result of `statusfunc`.
           The default is a `cs.upd.UpdProxy` created from `upd`,
           which inserts a progress bar above the main status line.
         * `upd`: an optional `cs.upd.Upd` instance,
