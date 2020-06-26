@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Progress counting.
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
@@ -22,7 +22,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
