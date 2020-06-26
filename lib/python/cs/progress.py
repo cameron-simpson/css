@@ -28,6 +28,9 @@ DISTINFO = {
     'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
+# default to 5s of position buffer for computing recent thoroughput
+DEFAULT_THROUGHPUT_WINDOW = 5
+
 @functools.total_ordering
 class BaseProgress(object):
   ''' The base class for `Progress` and `OverProcess`
@@ -420,7 +423,9 @@ class Progress(BaseProgress):
       position = 0
     if start is None:
       start = position
-    if throughput_window is not None and throughput_window <= 0:
+    if throughput_window is None:
+      throughput_window = DEFAULT_THROUGHPUT_WINDOW
+    elif throughput_window <= 0:
       raise ValueError("throughput_window <= 0: %s" % (throughput_window,))
     self.start = start
     self._total = total
