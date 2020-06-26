@@ -46,7 +46,7 @@ class BaseProgress(object):
 
         Parameters:
         * `name`: optional name
-        * `start_time`: options UNIX epoch start time, default from `time.time()`
+        * `start_time`: optional UNIX epoch start time, default from `time.time()`
         * `units_scale`: a scale for use with `cs.units.transcribe`,
           default `BINARY_BYTES_SCALE`
     '''
