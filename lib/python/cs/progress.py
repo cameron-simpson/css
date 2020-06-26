@@ -257,26 +257,34 @@ class BaseProgress(object):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
+    left = label
     remaining = self.remaining_time
     if remaining:
       remaining = int(remaining)
     throughput = self.throughput_recent(5)
-    if throughput == 0:
+    if throughput is None:
+      throughput_s = ''
+    elif throughput == 0:
       throughput_s = 'stalled'
     else:
       throughput_s = self.format_counter(throughput, max_parts=1) + '/s'
-    left = label + ': ' + throughput_s
+    if throughput_s:
+      left += ': ' + throughput_s
     if self.total is not None:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
       right = 'ETA unknown'
     else:
       right = 'ETA ' + transcribe_time(remaining)
-    arrow_width = width - len(left) - len(right)
-    if arrow_width < 1:
-      # no room for an arrow
-      return left + ':' + right
-    arrow_field = self.arrow(arrow_width)
+    if self.total is None:
+      arrow_field = ' '
+    else:
+      arrow_width = width - len(left) - len(right)
+      if arrow_width < 1:
+        # no room for an arrow
+        arrow_field = ':'
+      else:
+        arrow_field = self.arrow(arrow_width)
     return left + arrow_field + right
 
   def bar(
