@@ -783,6 +783,7 @@ def progressbar(it, label=None, total=None, **kw):
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
   lines = open(__file__).readlines()
+  lines += lines
   for line in progressbar(lines, "lines"):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
