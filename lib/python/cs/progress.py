@@ -747,20 +747,10 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, **kw):
-  try:
-    total = len(it)
-  except TypeError:
-    total = None
-  P = Progress(name=label, total=total)
-  yield from P.bar(it, label=label, **kw)
-
 if __name__ == '__main__':
   import sys
   from cs.units import DECIMAL_SCALE
   lines = open(__file__).readlines()
-  for line in progressbar(lines, label=__file__):
-    time.sleep(0.01)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
   for line in P.bar(open(__file__)):
     time.sleep(0.01)
