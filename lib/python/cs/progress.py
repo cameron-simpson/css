@@ -287,7 +287,7 @@ class BaseProgress(object):
         arrow_field = self.arrow(arrow_width)
     return left + arrow_field + right
 
-  def bar(
+  def bar(  # pylint: disable=blacklisted-name,too-many-arguments
       self,
       it,
       label=None,
@@ -414,7 +414,7 @@ class Progress(BaseProgress):
           my_thing.amount = Progress(my_thing.amount)
   '''
 
-  def __init__(
+  def __init__( # pylint: disable=too-many-arguments
       self,
       position=None,
       name=None,
@@ -471,7 +471,7 @@ class Progress(BaseProgress):
     for notify in self.notify_update:
       try:
         notify(self, datum)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception("%s: notify_update %s: %s", self, notify, e)
 
   @property
@@ -685,8 +685,8 @@ class OverProgress(BaseProgress):
     )
     self.subprogresses = set()
     if subprogresses:
-      for P in subprogresses:
-        self.add(P)
+      for subP in subprogresses:
+        self.add(subP)
 
   def __repr__(self):
     return "%s(name=%r,start=%s,position=%s,start_time=%s,total=%s)" \
@@ -790,7 +790,6 @@ def progressbar(it, label=None, total=None, **kw):
   yield from P.bar(it, label=label, **kw)
 
 if __name__ == '__main__':
-  import sys
   from cs.units import DECIMAL_SCALE
   lines = open(__file__).readlines()
   for line in progressbar(lines, "lines"):
