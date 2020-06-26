@@ -532,7 +532,7 @@ def makelockfile(
       This is the core functionality supporting the lockfile()
       context manager.
 
-      Paramaters:
+      Parameters:
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.

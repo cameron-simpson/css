@@ -1358,7 +1358,7 @@ class Packet(PacketField):
         Updates the internal field records.
         Returns the new `PacketField`'s .value.
 
-        Paramaters:
+        Parameters:
         * `field_name`: the name for the new field; it must be new.
         * `bfr`: a `CornuCopyBuffer` from which to parse the field data.
         * `factory`: a factory for parsing the field data, returning
