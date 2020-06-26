@@ -786,8 +786,7 @@ def progressbar(it, label=None, total=None, **kw):
       total = len(it)
     except TypeError:
       total = None
-  P = Progress(name=label, total=total)
-  yield from P.bar(it, label=label, **kw)
+  yield from Progress(name=label, total=total).bar(it, label=label, **kw)
 
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
