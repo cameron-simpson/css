@@ -336,10 +336,12 @@ class BaseProgress(object):
     '''
     if label is None:
       label = self.name
+    delete_proxy = False
     if proxy is None:
       if upd is None:
         upd = Upd()
       proxy = upd.insert(1)
+      delete_proxy = True
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
     proxy(statusfunc(self, label, width or proxy.width))
@@ -352,6 +354,8 @@ class BaseProgress(object):
       if not incfirst:
         self += length
       proxy(statusfunc(self, label, width or proxy.width))
+    if delete_proxy:
+      proxy.delete()
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
