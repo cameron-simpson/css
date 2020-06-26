@@ -118,6 +118,14 @@ class BaseProgress(object):
       return None
     return float(self.position - start) / (total - start)
 
+  def throughput_recent(self, time_window):
+    ''' The recent throughput. Implemented by subclasses.
+    '''
+    raise NotImplementedError(
+        "%s.throughtput_recent(time_window=%s): subclass must implement" %
+        (type(self).__name__, time_window)
+    )
+
   def throughput_overall(self):
     ''' The overall throughput from `start` to `position`
         during `elapsed_time`.
