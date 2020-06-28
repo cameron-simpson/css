@@ -42,7 +42,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
-from cs.upd import Upd, print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200621-post'
 
@@ -129,7 +129,7 @@ class YDLCommand(BaseCommand):
                   over_ydl.queue(url)
         else:
           over_ydl.queue(url)
-      for R in over_ydl.report():
+      for _ in over_ydl.report():
         pass
 
 YDLCommand.add_usage_to_docstring()
@@ -348,7 +348,7 @@ class YDL:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
       pass
-    fprefix, fext = splitext(filename)
+    _, fext = splitext(filename)
     status = progress.status(fext, self.proxy.width)
     self.proxy(status)
     self.tick()
