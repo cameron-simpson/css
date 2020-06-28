@@ -42,7 +42,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.tagset import Tag
-from cs.upd import Upd, print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200621-post'
 
@@ -129,7 +129,7 @@ class YDLCommand(BaseCommand):
                   over_ydl.queue(url)
         else:
           over_ydl.queue(url)
-      for R in over_ydl.report():
+      for _ in over_ydl.report():
         pass
 
 YDLCommand.add_usage_to_docstring()
@@ -258,6 +258,7 @@ class YDL:
     self.over_progress = over_progress
     self.progresses = {}
     self.result = None
+    self._warned = set()
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.url)
@@ -339,8 +340,16 @@ class YDL:
     filename = self.filename = ydl_progress['filename']
     progress = self.progresses.get(filename)
     if progress is None:
+      total = ydl_progress.get('total_bytes'
+                               ) or ydl_progress.get('total_bytes_estimate')
+      if total is None:
+        message = 'no total_bytes or total_bytes_estimate in ydl_progress'
+        if message not in self._warned:
+          warning("%s: %r", message, ydl_progress)
+          self._warned.add(message)
+        return
       progress = self.progresses[filename] = Progress(
-          name=self.url + ':' + filename, total=ydl_progress['total_bytes']
+          name=self.url + ':' + filename, total=total
       )
       if self.over_progress is not None:
         self.over_progress.add(progress)
@@ -348,7 +357,7 @@ class YDL:
       progress.position = ydl_progress['downloaded_bytes']
     except KeyError:
       pass
-    fprefix, fext = splitext(filename)
+    _, fext = splitext(filename)
     status = progress.status(fext, self.proxy.width)
     self.proxy(status)
     self.tick()
