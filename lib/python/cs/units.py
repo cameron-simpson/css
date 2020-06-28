@@ -17,7 +17,7 @@ Presupplied scales:
 from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20200613-post'
+__version__ = '20200626-post'
 
 DISTINFO = {
     'description': "unit suffixes for nonnegative integers; parsing and transcription",
@@ -141,7 +141,8 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   for count, unit in reversed(components):
     if skip_zero and count == 0:
       continue
-    text.append( str(count) + unit )
+    count_i = int(count)
+    text.append( (str(count) if count_i == count else "%.1f" % count) + unit )
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)

@@ -13,16 +13,16 @@ useful if unconventional context hooks for logging.
 
 The default logging verbosity output format has different defaults
 based on whether an output log file is a tty
-and whether the environment variable $DEBUG is set, and to what.
+and whether the environment variable `$DEBUG` is set, and to what.
 
 On terminals warnings and errors get ANSI colouring.
 
-A mode is available that uses cs.upd.
+A mode is available that uses `cs.upd` for certain log levels.
 
 Some examples:
 --------------
 
-Program initialisation::
+Program initialisation:
 
     from cs.logutils import setup_logging
 
@@ -30,7 +30,7 @@ Program initialisation::
       cmd = os.path.basename(argv.pop(0))
       setup_logging(cmd)
 
-Basic logging from anywhere::
+Basic logging from anywhere:
 
     from cs.logutils import info, warning, error
     [...]
@@ -116,7 +116,7 @@ def setup_logging(
 ):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
-      That object is also available as the global `cs.lgutils.loginfo`.
+      That object is also available as the global `cs.logutils.loginfo`.
 
       Parameters:
       * `cmd_name`: program name, default from `basename(sys.argv[0])`.
@@ -377,10 +377,10 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
       comes from the environment variable `$DEBUG`.
 
-      Usually default to logging.WARNING, but if sys.stderr is a terminal,
-      default to TRACK.
+      Usually default to `logging.WARNING`, but if `sys.stderr` is a terminal,
+      default to `STATUS`.
 
-      Parse the environment variable $DEBUG as a comma separated
+      Parse the environment variable `$DEBUG` as a comma separated
       list of flags.
 
       Examine the in sequence flags to affect the logging level:

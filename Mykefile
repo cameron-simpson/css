@@ -82,16 +82,14 @@ _help:
 _setup:
     :make _tags _venv
 
-_venv: $(venvdir)
-
-$(venvdir): $(venv_requirements)
-    @[ -d '$@/' ] || set-x mkdir '$@'
-    :make $@/.
+_venv:
+    @[ -d '$(venvdir)/' ] || set-x mkdir '$(venvdir)'
     [ -x '$(venv_python)' ] || { \
       set -xue \
       rm -rf '$(venvdir)' \
       $(base_python) -m venv '$(venvdir)' \
     }
+    $(dev) $(venv_pip) install -U wheel pip
     $(dev) $(venv_pip) install -U -r $(venv_requirements)
 
 _tags:  tags
