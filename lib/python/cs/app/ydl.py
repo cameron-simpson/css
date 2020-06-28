@@ -258,6 +258,7 @@ class YDL:
     self.over_progress = over_progress
     self.progresses = {}
     self.result = None
+    self._warned = set()
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.url)
@@ -342,10 +343,10 @@ class YDL:
       total = ydl_progress.get('total_bytes'
                                ) or ydl_progress.get('total_bytes_estimate')
       if total is None:
-        warning(
-            "no total or total_bytes_estimate in ydl_progress: %r",
-            ydl_progress
-        )
+        message = 'no total_bytes or total_bytes_estimate in ydl_progress'
+        if message not in self._warned:
+          warning("%s: %r", message, ydl_progress)
+          self._warned.add(message)
         return
       progress = self.progresses[filename] = Progress(
           name=self.url + ':' + filename, total=total
