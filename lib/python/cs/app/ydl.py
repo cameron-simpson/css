@@ -339,8 +339,16 @@ class YDL:
     filename = self.filename = ydl_progress['filename']
     progress = self.progresses.get(filename)
     if progress is None:
+      total = ydl_progress.get('total_bytes'
+                               ) or ydl_progress.get('total_bytes_estimate')
+      if total is None:
+        warning(
+            "no total or total_bytes_estimate in ydl_progress: %r",
+            ydl_progress
+        )
+        return
       progress = self.progresses[filename] = Progress(
-          name=self.url + ':' + filename, total=ydl_progress['total_bytes']
+          name=self.url + ':' + filename, total=total
       )
       if self.over_progress is not None:
         self.over_progress.add(progress)
