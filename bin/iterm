@@ -138,7 +138,7 @@ fi
 # <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
 # only accepts ESC backslash for ST. We use TERM instead of TMUX because TERM
 # gets passed through ssh.
-function print_osc() {
+print_osc() {
   case "$TERM" in
     screen*)  printf "\e33Ptmux;\e\e]" ;;
     *)        printf "\e33]" ;;
@@ -146,14 +146,14 @@ function print_osc() {
 }
 
 # More of the tmux workaround described above.
-function print_st() {
+print_st() {
   case "$TERM" in
     screen*)    printf "\a\e\\" ;;
     *)          printf "\a" ;;
   esac
 }
 
-function l33t() {
+l33t() {
   printf "\e]1337;%s\a" "$*"
 }
 
