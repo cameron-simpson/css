@@ -813,7 +813,8 @@ class MessageFiler(NS):
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
-        info("    MATCH %s", R)
+        if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
+          info("    MATCH %s", R)
 
       return self.save_message()
 
