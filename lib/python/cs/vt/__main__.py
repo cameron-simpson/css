@@ -201,13 +201,14 @@ class VTCmd(BaseCommand):
     old_sigquit = signal(SIGQUIT, sig_handler)
 
     ticker = options.ticker
-    if False and ticker is None and sys.stderr.isatty():
-      _, cols = ttysize(2)
-      status_width = cols - 2
+    if ticker is None and sys.stderr.isatty():
+      ticker_proxy = Upd().insert(1)
 
       def ticker():
         while not runstate.cancelled:
-          upd(progress.status(options.status_label, status_width))
+          ticker_proxy.text = progress.status(
+              options.status_label, ticker_proxy.width
+          )
           sleep(0.25)
 
       ticker = bg_thread(ticker, name='status-line', daemon=True)
