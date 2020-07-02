@@ -36,7 +36,7 @@ from cs.fileutils import file_data, shortpath
 from cs.lex import hexify, get_identifier
 import cs.logutils
 from cs.logutils import (
-    exception, error, warning, track, info, upd, debug, logTo, loginfo
+    exception, error, warning, track, info, upd, debug, logTo
 )
 from cs.pfx import Pfx
 from cs.progress import Progress
@@ -162,7 +162,7 @@ class VTCmd(BaseCommand):
             (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
         )
     if options.verbose:
-      loginfo.level = logging.INFO
+      options.loginfo.level = logging.INFO
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
     options.config = Config(options.config_path)
