@@ -14,6 +14,7 @@ from cs.fileutils import shortpath
 from cs.logutils import warning
 from cs.py.stack import caller, stack_dump
 from cs.tty import ttysize
+from cs.upd import print
 from cs.x import X
 
 def dump_Block(block, indent=''):
