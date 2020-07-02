@@ -55,7 +55,6 @@ from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
-from .httpd import main as httpd_main
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
@@ -398,6 +397,7 @@ class VTCmd(BaseCommand):
     ''' Usage: {cmd} [httpd-args...]
           Run the HTTP daemon.
     '''
+    from .httpd import main as httpd_main
     httpd_main([options.cmd + ': ' + 'httpd'] + args)
 
   @staticmethod
