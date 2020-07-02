@@ -42,6 +42,7 @@ from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
+from cs.upd import Upd, print
 import cs.x
 from cs.x import X
 from . import defaults, DEFAULT_CONFIG_PATH
@@ -212,7 +213,7 @@ class VTCmd(BaseCommand):
 
       ticker = bg_thread(ticker, name='status-line', daemon=True)
     with stackattrs(options, progress=progress, ticker=ticker):
-      with stackattrs(defaults, runstate=runstate):
+      with stackattrs(defaults, runstate=runstate, progress=progress):
         if cmd in ("config", "dump", "init", "profile", "scan", "test"):
           yield
         else:
