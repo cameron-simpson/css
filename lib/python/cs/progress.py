@@ -257,12 +257,12 @@ class BaseProgress(object):
     if throughput is None:
       throughput_s = ''
     elif throughput == 0:
-      throughput_s = 'stalled'
+      throughput_s = 'stalled' if self.position < self.total else 'idle'
     else:
       throughput_s = self.format_counter(throughput, max_parts=1) + '/s'
     if throughput_s:
       left += ': ' + throughput_s
-    if self.total is not None:
+    if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
       right = 'ETA unknown'
