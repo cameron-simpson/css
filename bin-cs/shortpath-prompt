@@ -15,13 +15,21 @@ import stat
 import sys
 from cs.logutils import setup_logging, warning, error
 
-USAGE = "Usage: %s [path]"
+USAGE = "Usage: %s [-n] [path]"
 
 def main(argv):
   cmd = basename(argv.pop(0))
   setup_logging(cmd)
   usage = USAGE % (cmd,)
+  nparts = None
   badopts = False
+  # optional -n switch
+  if argv:
+    arg0 = argv[0]
+    if arg0.startswith('-') and arg0[1:].isdigit():
+      nparts = int(arg0[1:])
+      argv.pop(0)
+  # optional path if not cwd
   if argv:
     path = argv.pop(0)
   else:
@@ -32,7 +40,12 @@ def main(argv):
   if badopts:
     print(usage, file=sys.stderr)
     return 2
-  print(short_path(path))
+  shortp = short_path(path)
+  if nparts:
+    shortpv = shortp.split('/')
+    if len(shortpv) > nparts:
+      shortp = '/'.join(shortpv[len(shortpv) - nparts:])
+  print(shortp)
 
 def short_path(path, no_tilde=False, no_symlinks=False):
   # stat the path components

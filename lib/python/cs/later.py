@@ -1052,7 +1052,7 @@ class LatePool(object):
     self.LFs.append(LF)
 
   def submit(self, func, **params):
-    ''' Submit a function using the LatePool's default paramaters, overridden by `params`.
+    ''' Submit a function using the LatePool's default parameters, overridden by `params`.
     '''
     submit_params = dict(self.parameters)
     submit_params.update(params)
@@ -1061,7 +1061,7 @@ class LatePool(object):
     return LF
 
   def defer(self, func, *a, **kw):
-    ''' Defer a function using the LatePool's default paramaters.
+    ''' Defer a function using the LatePool's default parameters.
     '''
     if a or kw:
       func = partial(func, *a, **kw)

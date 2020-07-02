@@ -39,7 +39,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 
-__version__ = '20200318'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'description':
@@ -310,7 +310,7 @@ def file_based(
       * `attr_name`: the name for the associated attribute, used as
         the basis for the internal cache value attribute
       * `filename`: the filename to monitor.
-        Default from the `._{attr_name}__filename attribute.
+        Default from the `._{attr_name}__filename` attribute.
         This value will be passed to the method as the `filename` keyword
         parameter.
       * `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
@@ -368,15 +368,16 @@ def files_property(func):
       Note: this is just the default mode for `make_files_property`.
 
       `func` accepts the file path and returns the new value.
-      The underlying attribute name is '_' + func.__name__,
-      the default from make_files_property().
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      The underlying attribute name is `'_'+func.__name__`,
+      the default from `make_files_property()`.
+      The attribute *{attr_name}*`_lock` is a mutex controlling access to the property.
+      The attributes *{attr_name}*`_filestates` and *{attr_name}*`_paths` track the
       associated file states.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
+      The attribute *{attr_name}*`_lastpoll` tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
+
       One example use would be a configuration file with recurive
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
@@ -415,10 +416,10 @@ def make_files_property(
       * `poll_rate`: how often in seconds to poll the file for changes,
         default from `DEFAULT_POLL_INTERVAL`: `{DEFAULT_POLL_INTERVAL}`
 
-      The attribute {{attr_name}}_lock controls access to the property.
-      The attributes {{attr_name}}_filestates and {{attr_name}}_paths track the
+      The attribute *attr_name*`_lock` controls access to the property.
+      The attributes *attr_name*`_filestates` and *attr_name*`_paths` track the
       associated files' state.
-      The attribute {{attr_name}}_lastpoll tracks the last poll time.
+      The attribute *attr_name*`_lastpoll` tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
@@ -446,7 +447,7 @@ def make_files_property(
 
       An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
-      where files that were `os.stat`()ed during the change check have
+      where files that were `os.stat()`ed during the change check have
       changed state after the load.
   '''
 
@@ -528,11 +529,11 @@ def makelockfile(
 ):
   ''' Create a lockfile and return its path.
 
-      The lockfile can be removed with os.remove.
-      This is the core functionality supporting the lockfile()
+      The lockfile can be removed with `os.remove`.
+      This is the core functionality supporting the `lockfile()`
       context manager.
 
-      Paramaters:
+      Parameters:
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.
@@ -542,8 +543,8 @@ def makelockfile(
         Note that zero is an accepted value
         and requires the lock to succeed on the first attempt.
       * `poll_interval`: polling frequency when timeout is not 0.
-      * `runstate`: optional RunState duck instance supporting cancellation.
-        Note that if a cancelled RunState is provided
+      * `runstate`: optional `RunState` duck instance supporting cancellation.
+        Note that if a cancelled `RunState` is provided
         no attempt will be made to make the lockfile.
   '''
   if poll_interval is None:
@@ -604,11 +605,11 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
       Parameters:
       * `path`: the base associated with the lock file.
       * `ext`: the extension to the base used to construct the lock file name.
-        Default: ".lock"
+        Default: `'.lock'`
       * `timeout`: maximum time to wait before failing.
         Default: `None` (wait forever).
-      * `poll_interval`: polling frequency when timeout is not 0.
-      * `runstate`: optional RunState duck instance supporting cancellation.
+      * `poll_interval`: polling frequency when timeout is not `0`.
+      * `runstate`: optional `RunState` duck instance supporting cancellation.
   '''
   lockpath = makelockfile(
       path,
@@ -679,7 +680,7 @@ def mkdirn(path, sep=''):
       Parameters:
       * `path`: the basic directory path.
       * `sep`: a separator between `path` and n.
-        Default: ""
+        Default: `''`
   '''
   with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
     if os.sep in sep:
@@ -732,7 +733,7 @@ def mkdirn(path, sep=''):
 
 def tmpdir():
   ''' Return the pathname of the default temporary directory for scratch data,
-      $TMPDIR or '/tmp'.
+      the environment variable `$TMPDIR` or `'/tmp'`.
   '''
   return os.environ.get('TMPDIR', '/tmp')
 
@@ -742,6 +743,32 @@ def tmpdirn(tmp=None):
   if tmp is None:
     tmp = tmpdir()
   return mkdirn(joinpath(tmp, basename(sys.argv[0])))
+
+def find(path, select=None, sort_names=True):
+  ''' Walk a directory tree `path`
+      yielding selected paths.
+
+      Note: not selecting a directory prunes all its descendants.
+  '''
+  if select is None:
+    select = lambda _: True
+  for dirpath, dirnames, filenames in os.walk(path):
+    if select(dirpath):
+      yield dirpath
+    else:
+      dirnames[:] = []
+      continue
+    if sort_names:
+      dirnames[:] = sorted(dirnames)
+      filenames[:] = sorted(filenames)
+    for filename in filenames:
+      filepath = joinpath(dirpath, filename)
+      if select(filepath):
+        yield filepath
+    dirnames[:] = [
+        dirname for dirname in dirnames
+        if select(joinpath(dirpath, dirname))
+    ]
 
 def findup(path, test, first=False):
   ''' Test the pathname `abspath(path)` and each of its ancestors
@@ -777,7 +804,7 @@ def shortpath(path, environ=None, prefixes=None):
 
       Parameters:
       * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of (prefix, subst) to consider for replacement;
+      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
         each `prefix` is subject to environment variable
         substitution before consideration
         The default considers "$HOME/" for replacement by "~/".
@@ -792,7 +819,7 @@ def shortpath(path, environ=None, prefixes=None):
 
 def longpath(path, environ=None, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
-      The converse of shortpath().
+      The converse of `shortpath()`.
   '''
   if prefixes is None:
     prefixes = DEFAULT_SHORTEN_PREFIXES

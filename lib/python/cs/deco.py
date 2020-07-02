@@ -15,7 +15,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20200417'
+__version__ = '20200517.2-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -296,16 +296,21 @@ def OBSOLETE(func, suggestion=None):
       )
     return func(*args, **kwargs)
 
-  wrapped.__name__ = '@OBSOLETE(%s)' % (getattr(func, '__name__', str(func)),)
-  wrapped.__doc__ = (
-      (
-          wrapped.__name__ + ': ' +
-          suggestion if suggestion else wrapped.__name__
-      ) + '\n\n' + (getattr(func, '__doc__', None) or '')
-  )
+  funcname = getattr(func, '__name__', str(func))
+  funcdoc = getattr(func, '__doc__', None) or ''
+  doc = "OBSOLETE FUNCTION " + funcname
+  if suggestion:
+    doc += ' - please use ' + suggestion
+  wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
+  wrapped.__doc__ = funcdoc
   return wrapped
 
-cached = OBSOLETE(cachedmethod)
+
+@OBSOLETE(suggestion='cachedmethod')
+def cached(*a, **kw):
+  ''' Former name for @cachedmethod.
+  '''
+  return cachedmethod(*a, **kw)
 
 def contextual(func):
   ''' Wrap a simple function as a context manager.

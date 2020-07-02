@@ -13,16 +13,16 @@ useful if unconventional context hooks for logging.
 
 The default logging verbosity output format has different defaults
 based on whether an output log file is a tty
-and whether the environment variable $DEBUG is set, and to what.
+and whether the environment variable `$DEBUG` is set, and to what.
 
 On terminals warnings and errors get ANSI colouring.
 
-A mode is available that uses cs.upd.
+A mode is available that uses `cs.upd` for certain log levels.
 
 Some examples:
 --------------
 
-Program initialisation::
+Program initialisation:
 
     from cs.logutils import setup_logging
 
@@ -30,7 +30,7 @@ Program initialisation::
       cmd = os.path.basename(argv.pop(0))
       setup_logging(cmd)
 
-Basic logging from anywhere::
+Basic logging from anywhere:
 
     from cs.logutils import info, warning, error
     [...]
@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200229'
+__version__ = '20200613-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -116,7 +116,7 @@ def setup_logging(
 ):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
-      That object is also available as the global `cs.lgutils.loginfo`.
+      That object is also available as the global `cs.logutils.loginfo`.
 
       Parameters:
       * `cmd_name`: program name, default from `basename(sys.argv[0])`.
@@ -195,7 +195,7 @@ def setup_logging(
     ##is_reg = stat.S_ISREG(st.st_mode)     # unused
     is_tty = stat.S_ISCHR(st.st_mode)
 
-  if main_log.encoding is None:
+  if getattr(main_log, 'encoding', None) is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
   if trace_mode is None:
@@ -285,6 +285,7 @@ def setup_logging(
           setattr(M, funcpart, _ftrace(F))
 
   loginfo = NS(
+      logger=root_logger,
       level=level,
       trace_level=trace_level,
       flags=flags,
@@ -376,10 +377,10 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
       comes from the environment variable `$DEBUG`.
 
-      Usually default to logging.WARNING, but if sys.stderr is a terminal,
-      default to TRACK.
+      Usually default to `logging.WARNING`, but if `sys.stderr` is a terminal,
+      default to `STATUS`.
 
-      Parse the environment variable $DEBUG as a comma separated
+      Parse the environment variable `$DEBUG` as a comma separated
       list of flags.
 
       Examine the in sequence flags to affect the logging level:
@@ -661,6 +662,7 @@ class LogTime(object):
     self.warning_threshold = warning_threshold
     self.warning_level = warning_level
     self.start = None
+    self.end = None
     self.elapsed = None
 
   def __enter__(self):
@@ -668,8 +670,8 @@ class LogTime(object):
     return self
 
   def __exit__(self, *_):
-    now = time.time()
-    elapsed = now - self.start
+    now = self.end = time.time()
+    elapsed = self.elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
       level = self.level
       if self.warning_threshold is not None and elapsed >= self.warning_threshold:
@@ -678,7 +680,6 @@ class LogTime(object):
       if self.tag_args:
         tag = tag % self.tag_args
       log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
-    self.elapsed = elapsed
     return False
 
 class UpdHandler(StreamHandler):
@@ -706,7 +707,7 @@ class UpdHandler(StreamHandler):
     StreamHandler.__init__(self, strm)
     self.upd = Upd(strm)
     self.upd_level = upd_level
-    self.__ansi_mode = ansi_mode
+    self.ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
@@ -716,16 +717,17 @@ class UpdHandler(StreamHandler):
         For other levels write a distinct line
         to the output stream, possibly colourised.
     '''
-    line = self.format(logrec)
     if logrec.levelno == self.upd_level:
+      line = self.format(logrec)
       with self.__lock:
         self.upd.out(line)
     else:
-      if self.__ansi_mode:
+      if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
           logrec.msg = colourise(logrec.msg, 'red')
         elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
+      line = self.format(logrec)
       with self.__lock:
         self.upd.nl(line)
 

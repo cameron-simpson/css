@@ -1,0 +1,13 @@
+bs4
+enum34
+icontract
+lmdb
+lxml
+mypy
+sqlalchemy
+pylint
+pyflakes
+pycodestyle
+twine
+yapf
+youtube-dl

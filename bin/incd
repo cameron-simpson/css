@@ -4,9 +4,16 @@
 # - Cameron Simpson <cs@cskk.id.au> 05mar2003
 #
 
+set -ue
+
 cmd=$0
 usage="Usage: $cmd [[user@]host:]dir [command [args...]]"
 
+trace= do_trace=
+[ -t 2 ] && trace=set-x do_trace=1
+
+fstags_latest=incd.latest
+set_latest=1
 mayuseparent=
 hostpart=
 sshopts=
@@ -15,13 +22,26 @@ badopts=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing dir" >&2
-  badopts=1
-else
-  dir=$1; shift
-  if hostpart=$( expr "x$dir" : 'x\([a-z][a-z0-9_@]*[a-z]\):.*' )
+  if target=$( fstags ls -d -o "{$fstags_latest}" . ) && [ -n "$target" ]
   then
-    dir=$(       expr "x$dir" : 'x[a-z][a-z0-9_@]*[a-z]:\(.*\)' )
+    set_latest=
+  else
+    echo "$cmd: missing dir and no $fstags_latest fstag" >&2
+    badopts=1
+  fi
+else
+  target=$1; shift
+  [ -n "$target" ] || {
+    echo "$cmd: dir may not be empty" >&2
+    badopts=1
+  }
+fi
+
+if [ -n "$target" ]
+then
+  if hostpart=$( expr "x$target" : 'x\([a-z][-a-z0-9_@]*[a-z0-9]\):.*' )
+  then
+    dir=$(       expr "x$target" : 'x[a-z][-a-z0-9_@]*[a-z0-9]:\(.*\)' )
     if [ $# = 0 ]
     then
       sshopts=-t
@@ -30,6 +50,7 @@ else
       qcmd=$( shqstr "$@" )
     fi
   else
+    dir=$target
     if [ $# = 0 ]
     then
       echo "$cmd: missing command" >&2
@@ -48,11 +69,14 @@ fi
 
 if [ -n "$hostpart" ]
 then
+  # update the latest tag
+  if [ $set_latest ]
+  then  $trace fstags tag . "$fstags_latest=\"$target\""
+  fi
   qdir=$( shqstr "$dir" )
-  [ -t 2 ] && set -x
-  exec ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
+  exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
 else
+  [ -z "$do_trace" ] || set -x
   cd "$dir" || exit 1
-  ##[ -t 2 ] && set -x
   exec "$@"
 fi

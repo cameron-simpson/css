@@ -3,15 +3,19 @@ containing thousands of scripts and hundreds of Python modules
 and assorted other code.
 
 Some relevant links:
-* Documentation:
-  [some overview documentation](http://www.cskk.ezoshosting.com/cs/css/),
-  [some manual entries](http://www.cskk.ezoshosting.com/cs/man/)
-* Bitbucket.org source repository:
-  [overview](https://bitbucket.org/cameron_simpson/css/),
-  [commit log](https://bitbucket.org/cameron_simpson/css/commits/all)
 * PyPI.org:
   [several modules](https://pypi.org/user/cameron.simpson/)
   are published here for reuse.
+* SourceHut repository:
+  [overview](https://hg.sr.ht/~cameron-simpson/css),
+  [commit log](https://hg.sr.ht/~cameron-simpson/css/log),
+  [browse code](https://hg.sr.ht/~cameron-simpson/css/browse).
+* Documentation:
+  [some overview documentation](http://www.cskk.ezoshosting.com/cs/css/),
+  [some manual entries](http://www.cskk.ezoshosting.com/cs/man/)
+* OBSOLETE: Bitbucket.org source repository - (Atlassian have abandoned their Mercurial users):
+  [overview](https://bitbucket.org/cameron_simpson/css/),
+  [commit log](https://bitbucket.org/cameron_simpson/css/commits/all)
 
 An autoindex of the scripts is in the file 1INDEX.txt.
 

@@ -1,0 +1,5 @@
+New ValueDetail and KeyValueDetail classes for returning ontology information; TagInfo.detail now returns a ValueDetail for scalar types, a list of ValueDetails for sequence types and a list of KeyValueDetails for mapping types; drop various TagInfo mapping/iterable style methods, too confusing to use.
+Plumb ontology parameter throughout, always optional.
+Drop TypedTag, Tags now use ontologies for this.
+New TagsCommandMixin to support BaseCommands which manipulate Tags.
+Many improvements and bugfixes.

@@ -9,6 +9,7 @@ set -ue
 : ${DK_PRIMARY_SERVICE=''}
 : ${DK_ENVVARS:=''}
 : ${DK_EXEC_PREFIX:=''}
+: ${DK_CP_PREFIX:=''}
 
 docker_compose_opts=
 
@@ -64,6 +65,30 @@ base=$( basename "$ymlbasedir" )
 primary_container=${base}_${DK_PRIMARY_SERVICE}_1
 
 case "$op" in
+  cp) set -x
+      if [ -n "$DK_CP_PREFIX" ]
+      then
+        src=$1 dst=$2; shift; shift
+        case "$src" in
+          /* | ./* | ../* ) ;;
+          *:/*) ;;
+          *:*)  hostpart=$( expr "x$src" : 'x\([^:]*\):.*' )
+                pathpart=$( expr "x$src" : 'x[^:]*:\(.*\)' )
+                src=$hostpart:$DK_CP_PREFIX/$pathpart
+                ;;
+        esac
+        case "$dst" in
+          /* | ./* | ../* ) ;;
+          *:/*) ;;
+          *:*)  hostpart=$( expr "x$dst" : 'x\([^:]*\):.*' )
+                pathpart=$( expr "x$dst" : 'x[^:]*:\(.*\)' )
+                dst=$hostpart:$DK_CP_PREFIX/$pathpart
+                ;;
+        esac
+        set -- "$src" "$dst" ${1+"$@"}
+      fi
+      exec docker "$op" ${1+"$@"}
+      ;;
   exec)
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]

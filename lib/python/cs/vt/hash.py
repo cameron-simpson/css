@@ -358,7 +358,7 @@ class HashCodeUtilsMixin(object):
         expensive and also runtime expensive if only a few hashcodes
         are desired.
 
-        Paramaters:
+        Parameters:
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
           if None start the sequences from the smallest hashcode

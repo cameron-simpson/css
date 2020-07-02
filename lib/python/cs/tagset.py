@@ -3,8 +3,14 @@
 ''' Tags and sets of tags
     with __format__ support and optional ontology information.
 
-    Note: see `cs.fstags` for support for applying these to filesystem objects
+    See `cs.fstags` for support for applying these to filesystem objects
     such as directories and files.
+
+    See `cs.sqltags` for support for databases of entities with tags,
+    not directly associated with filesystem objects.
+    This is suited to both log entries (entities with no "name")
+    and large collections of named entities;
+    both accept `Tag`s and can be seached on that basis.
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
@@ -78,6 +84,7 @@ from json import JSONEncoder, JSONDecoder
 import re
 from types import SimpleNamespace
 from icontract import require
+from cs.dateutils import unixtime2datetime
 from cs.edit import edit as edit_lines
 from cs.lex import (
     cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -88,7 +95,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-__version__ = '20200318'
+__version__ = '20200521.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -97,11 +104,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.py3',
+        'icontract',
     ],
 }
 
@@ -465,12 +475,13 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
-    if post_offset < len(s):
-      raise ValueError(
-          "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
-      )
-    return tag
+    with Pfx("%s.from_string(%r[%d:],...)", cls.__name__, s, offset):
+      tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
+      if post_offset < len(s):
+        raise ValueError(
+            "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
+        )
+      return tag
 
   @staticmethod
   def is_valid_name(name):
@@ -775,6 +786,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
@@ -967,7 +988,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     attr_value = self.__dict__.get(attr)
     if attr_value is None:
-      warning("%s: no .%r", self, attr)
+      ##warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
@@ -1262,8 +1283,88 @@ class TagsCommandMixin:
     choices = []
     for arg in argv:
       with Pfx(arg):
-        choice, offset = TagChoice.parse(arg)
-        if offset < len(arg):
-          raise ValueError("unparsed: %r" % (arg[offset:],))
-        choices.append(choice)
+        choices.append(TagChoice.from_str(arg))
     return choices
+
+class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
+                   FormatableMixin):
+  ''' An entity record with its `Tag`s.
+
+      This is a common representation of some tagged entity,
+      and also is the intermediary form used by the `cs.fstags` and
+      `cs.sqltags` import/export CSV format.
+
+      The `id` column has domain specific use.
+      For `cs.sqltags` the `id` attribute will be the database row id.
+      For `cs.fstags` the `id` attribute will be `None`.
+      It is available for other domains as an arbitrary identifier/key value,
+      should that be useful.
+  '''
+
+  @classmethod
+  def from_csvrow(cls, csvrow):
+    ''' Construct a `TaggedEntity` from a CSV row like that from
+        `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
+    '''
+    with Pfx("%s.from_csvrow", cls.__name__):
+      te_unixtime, te_id, te_name = csvrow[:3]
+      tags = TagSet()
+      for i, csv_value in enumerate(csvrow[3:], 3):
+        with Pfx("field %d %r", i, csv_value):
+          tag = Tag.from_string(csv_value)
+          tags.add(tag)
+      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
+
+  @property
+  def csvrow(self):
+    ''' This `TaggedEntity` as a list useful to a `csv.writer`.
+        The inverse of `from_csvrow`.
+    '''
+    return [self.unixtime, self.id, self.name
+            ] + [str(tag) for tag in self.tags]
+
+  def format_tagset(self):
+    ''' Compute a `TagSet` from the tags
+        with additional derived tags.
+
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        via the `TagSet`'s `.format_kwargs()` method.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = TagSet()
+    kwtags.update(self.tags)
+    if self.id is not None:
+      kwtags.add('entity.id', self.id)
+    if self.name is not None:
+      kwtags.add('entity.name', self.name)
+    kwtags.add('entity.unixtime', self.unixtime)
+    dt = unixtime2datetime(self.unixtime)
+    kwtags.add('entity.datetime', dt)
+    kwtags.add('entity.isotime', dt.isoformat())
+    return kwtags
+
+  def format_kwargs(self):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = self.format_tagset()
+    kwtags['tags'] = str(kwtags)
+    # convert the TagSet to an ExtendedNamespace
+    kwargs = kwtags.format_kwargs()
+    return kwargs

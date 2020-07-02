@@ -1,0 +1,5 @@
+BaseCommand.run: support using BaseCommand subclasses as cmd_* names to make it easy to nest BaseCommands.
+BaseCommand: new hack_postopts_argv method called after parsing the main command line options, for inferring subcommands or the like.
+BaseCommand: extract "Usage:" paragraphs from subcommand method docstrings to build the main usage message.
+BaseCommand: new cmd_help default command.
+Assorted bugfixes and small improvements.
