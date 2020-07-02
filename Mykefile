@@ -1,8 +1,7 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_sr_ht        = ssh://hg@hg.sr.ht/~cameron-simpson/css
+repos = sr.ht bitbucket
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
-hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 title           = Cameron Simpson's Scripts
 
@@ -70,9 +69,9 @@ _help:
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'
-        @echo '_pub               - push to repo at
+        @echo '_pub               - push to upstream repos'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
-        @echo '_publish_bitbucket - deploy tip to bitbucket'
+        @echo '_publish_hg        - publish to upstream repos'
         @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
@@ -204,17 +203,19 @@ _deploy:
         OPTCSS=$(PREFIX) updcss
 
 _publish _pub:
-        :make _publish_bitbucket
+        :make _publish_hg
         #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
         syncezos
 
-_publish_bitbucket:
-        hg push --new-branch -r tip $(hg_sr_ht)
+_publish_hg:
+        for repo in $(repos) \
+        do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
+        done \
+        wait
         @echo 'changes visible at $(www_sr_ht)'
-        hg push --new-branch -r tip $(hg_bitbucket)
         @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
