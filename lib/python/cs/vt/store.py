@@ -464,8 +464,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
         Parameters:
         * `dstS`: the secondary Store to receive Blocks.
-        * `capacity`: the Queue capacity, arbitrary default 1024.
-        * `progress`: an optional Progress counting submitted and completed data bytes.
+        * `capacity`: the Queue capacity, arbitrary default `64`.
+        * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then .put Blocks onto the Queue.
         When finished, call Q.close() to indicate end of Blocks and
