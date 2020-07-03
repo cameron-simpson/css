@@ -316,7 +316,7 @@ class VTCmd(BaseCommand):
     '''
     if args:
       raise GetoptError("extra arguments: %r" % (args,))
-    options.config.write(sys.stdout)
+    print(options.config.as_text().rstrip())
     return 0
 
   @staticmethod
@@ -493,8 +493,8 @@ class VTCmd(BaseCommand):
     if not pathexists(config_path):
       info("write %r", config_path)
       with Pfx(config_path):
-        with open(config_path, 'w') as cfg:
-          options.config.write(cfg)
+        with open(config_path, 'w') as cfgf:
+          options.config.write(cfgf)
     basedir = config.basedir
     if not isdirpath(basedir):
       with Pfx("basedir"):
