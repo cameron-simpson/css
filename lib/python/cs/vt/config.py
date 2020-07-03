@@ -9,6 +9,7 @@ Store definition configuration file.
 '''
 
 from configparser import ConfigParser
+from io import StringIO
 import os
 from os.path import (
     abspath,
@@ -111,12 +112,17 @@ class Config(SingletonMixin):
       return repr(self)
     return "Config(%s)" % (shortpath(self.path),)
 
-  def write(self, fp=None):
-    ''' Write the configuration out to the file `fp`.
+  def as_text(self):
+    ''' Return a text transcription of the config.
     '''
-    if fp is None:
-      fp = sys.stdout
-    self.map.write(fp)
+    with StringIO() as S:
+      self.map.write(S)
+      return S.getvalue()
+
+  def write(self, f):
+    ''' Write the config to a file.
+    '''
+    self.map.write(f)
 
   def __getitem__(self, clause_name):
     ''' Return the Store defined by the named clause.
