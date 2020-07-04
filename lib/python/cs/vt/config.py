@@ -347,16 +347,14 @@ class Config(SingletonMixin):
         S.blockmapdir = blockmapdir
       return S
 
+  @require(lambda clause_name: isinstance(clause_name, str))
   def config_Store(
       self,
       _,  # store_name, unused
-      *,
-      clause_name=None,
+      clause_name,
   ):
     ''' Construct a Store from a reference to a configuration clause.
     '''
-    if clause_name is None:
-      raise ValueError("clause_name may not be None")
     return self[clause_name]
 
   def datadir_Store(
@@ -434,7 +432,7 @@ class Config(SingletonMixin):
   @staticmethod
   def memory_Store(
       store_name,
-      clause_name,
+      _,  # ignore the clause_name
       *,
       max_data=None,
       hashclass=None,
@@ -499,6 +497,7 @@ class Config(SingletonMixin):
   def proxy_Store(
       self,
       store_name,
+      _,  # ignore clause_name
       *,
       save=None,
       read=None,
@@ -569,6 +568,7 @@ class Config(SingletonMixin):
   @staticmethod
   def tcp_Store(
       store_name,
+      clause_name,
       *,
       host=None,
       port=None,
@@ -587,6 +587,7 @@ class Config(SingletonMixin):
   @staticmethod
   def socket_Store(
       store_name,
+      clause_name,
       *,
       socket_path=None,
       hashclass=None,
