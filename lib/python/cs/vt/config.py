@@ -290,7 +290,6 @@ class Config(SingletonMixin):
     store_specs = list(parse_store_specs(store_spec))
     if not store_specs:
       raise ValueError("empty Store specification: %r" % (store_specs,))
-    XP("store_specs=%r", store_specs)
     stores = []
     for store_text, store_type, params in store_specs:
       clause_name = params.pop('clause_name', f"<{store_text}>")
@@ -319,7 +318,6 @@ class Config(SingletonMixin):
     if store_name is None:
       store_name = str(self) + '[' + clause_name + ']'
     constructor_name = store_type + '_Store'
-    XP("constructor_name=%r", constructor_name)
     constructor = getattr(self, constructor_name, None)
     if not constructor:
       raise ValueError(
