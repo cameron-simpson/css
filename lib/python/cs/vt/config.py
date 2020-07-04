@@ -62,7 +62,7 @@ class Config(SingletonMixin):
       Parameters:
       * `config_map`: either a mapping of mappings: `{clause_name: {param: value}}`
         or the filename of a file in `.ini` format
-      * `environ`: optional environment mapp for `$varname` substitution.
+      * `environ`: optional environment map for `$varname` substitution.
         Default: `os.environ`
   '''
 
@@ -253,17 +253,17 @@ class Config(SingletonMixin):
     return fsname, readonly, special_store, specialD, special_basename, archive
 
   def Store_from_spec(self, store_spec, runstate=None, hashclass=None):
-    ''' Factory function to return an appropriate BasicStore* subclass
+    ''' Factory function to return an appropriate `BasicStore`* subclass
         based on its argument:
 
           store:...       A sequence of stores. Save new data to the
                           first, seek data in all from left to right.
 
-        Multiple stores are combined into a ProxyStore which saves
-        to the first Store and reads from all the Stores.
+        Multiple stores are combined into a `ProxyStore` which saves
+        to the first `Store` and reads from all the `Store`s.
 
-        See also the .Stores_from_spec method, which returns the
-        separate Stores unassembled.
+        See also the `.Stores_from_spec` method, which returns the
+        separate `Store`s unassembled.
     '''
     with Pfx(repr(store_spec)):
       stores = self.Stores_from_spec(store_spec, hashclass=hashclass)
@@ -615,7 +615,7 @@ class Config(SingletonMixin):
       socket_path=None,
       hashclass=None,
   ):
-    ''' Construct a UNIXSocketClientStore from a "socket" clause.
+    ''' Construct a `UNIXSocketClientStore` from a "socket" clause.
     '''
     if type_ is not None:
       assert type_ == 'socket'
