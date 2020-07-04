@@ -21,14 +21,13 @@ from os.path import (
     join as joinpath,
     exists as pathexists,
 )
-import sys
 from icontract import require
 from cs.fileutils import shortpath, longpath
 from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
-from cs.pfx import Pfx
-from cs.result import Result, OnDemandResult
+from cs.pfx import Pfx, XP, pfx_method
+from cs.result import OnDemandResult
 from . import Lock, DEFAULT_CONFIG
 from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
