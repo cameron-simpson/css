@@ -892,7 +892,7 @@ class RawDataDir(FilesDir):
       file into the store contiguously to effect efficient reads
       of that data later.
 
-      A RawDataDir may be used as the Mapping for a MappingStore.
+      A `RawDataDir` may be used as the `Mapping` for a `MappingStore`.
 
       NB: _not_ thread safe; callers must arrange that.
   '''
@@ -969,7 +969,7 @@ class PlatonicDir(FilesDir):
   ''' Presentation of a block map based on a raw directory tree of
       files such as a preexisting media server.
 
-      A `PlatonicDir` may be used as the Mapping for a `MappingStore`.
+      A `PlatonicDir` may be used as the `Mapping` for a `MappingStore`.
 
       NB: _not_ thread safe; callers must arrange that.
 
