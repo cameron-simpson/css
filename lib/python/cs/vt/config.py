@@ -37,11 +37,10 @@ from .compose import (
     get_archive_path,
 )
 from .convert import (
+    expand_path,
     get_integer,
-    convert_param_bool,
-    convert_param_int,
-    convert_param_scaled_int,
-    convert_param_path,
+    scaled_value,
+    truthy_word,
 )
 from .dir import Dir
 from .store import PlatonicStore, ProxyStore, DataDirStore
@@ -382,6 +381,8 @@ class Config(SingletonMixin):
           raise ValueError('relative path %r but no basedir' % (path,))
         basedir = longpath(basedir)
         path = joinpath(basedir, path)
+    if isinstance(raw, str):
+      raw = truthy_word(raw)
     return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
 
   def filecache_Store(
@@ -405,6 +406,10 @@ class Config(SingletonMixin):
       debug("path from clausename: %r", path)
     path = longpath(path)
     debug("longpath(path) ==> %r", path)
+    if isinstance(max_files, str):
+      max_files = scaled_value(max_files)
+    if isinstance(max_file_size, str):
+      max_file_size = scaled_value(max_file_size)
     if backend is None:
       backend_store = None
     else:
@@ -439,8 +444,8 @@ class Config(SingletonMixin):
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
-    if max_data is None:
-      raise ValueError("missing max_data")
+    if isinstance(max_data, str):
+      max_data = scaled_value(max_data)
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
 
   def platonic_Store(
@@ -576,8 +581,8 @@ class Config(SingletonMixin):
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
-    if not host:
-      host = 'localhost'
+    if host is None:
+      host = clause_name
     if port is None:
       raise ValueError('no "port"')
     if isinstance(port, str):
@@ -594,4 +599,7 @@ class Config(SingletonMixin):
   ):
     ''' Construct a `UNIXSocketClientStore` from a "socket" clause.
     '''
+    if socket_path is None:
+      socket_path = clause_name
+    socket_path = expand_path(socket_path)
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
