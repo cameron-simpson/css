@@ -351,15 +351,10 @@ class Config(SingletonMixin):
       self,
       _,  # store_name, unused
       *,
-      type_=None,
       clause_name=None,
   ):
     ''' Construct a Store from a reference to a configuration clause.
     '''
-    if type_ is None:
-      type_ = 'config'
-    else:
-      assert type_ == 'config'
     if clause_name is None:
       raise ValueError("clause_name may not be None")
     return self[clause_name]
@@ -369,7 +364,6 @@ class Config(SingletonMixin):
       store_name,
       clause_name,
       *,
-      type_=None,
       path=None,
       basedir=None,
       hashclass=None,
@@ -377,8 +371,6 @@ class Config(SingletonMixin):
   ):
     ''' Construct a DataDirStore from a "datadir" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'datadir'
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -399,7 +391,6 @@ class Config(SingletonMixin):
       store_name,
       clause_name,
       *,
-      type_=None,
       path=None,
       max_files=None,
       max_file_size=None,
@@ -409,8 +400,6 @@ class Config(SingletonMixin):
   ):
     ''' Construct a FileCacheStore from a "filecache" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'filecache'
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -447,14 +436,11 @@ class Config(SingletonMixin):
       store_name,
       clause_name,
       *,
-      type_=None,
       max_data=None,
       hashclass=None,
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'memory'
     if max_data is None:
       raise ValueError("missing max_data")
     return MemoryCacheStore(store_name, max_data, hashclass=hashclass)
@@ -464,7 +450,6 @@ class Config(SingletonMixin):
       store_name,
       clause_name,
       *,
-      type_=None,
       path=None,
       basedir=None,
       follow_symlinks=False,
@@ -474,8 +459,6 @@ class Config(SingletonMixin):
   ):
     ''' Construct a PlatonicStore from a "datadir" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'platonic'
     if basedir is None:
       basedir = self.get_default('basedir')
     if path is None:
@@ -517,7 +500,6 @@ class Config(SingletonMixin):
       self,
       store_name,
       *,
-      type_=None,
       save=None,
       read=None,
       save2=None,
@@ -528,8 +510,6 @@ class Config(SingletonMixin):
   ):
     ''' Construct a ProxyStore.
     '''
-    if type_ is not None:
-      assert type_ == 'proxy'
     if save is None:
       save_stores = []
       readonly = True
@@ -590,15 +570,12 @@ class Config(SingletonMixin):
   def tcp_Store(
       store_name,
       *,
-      type_=None,
       host=None,
       port=None,
       hashclass=None,
   ):
     ''' Construct a TCPClientStore from a "tcp" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'tcp'
     if not host:
       host = 'localhost'
     if port is None:
@@ -611,12 +588,9 @@ class Config(SingletonMixin):
   def socket_Store(
       store_name,
       *,
-      type_=None,
       socket_path=None,
       hashclass=None,
   ):
     ''' Construct a `UNIXSocketClientStore` from a "socket" clause.
     '''
-    if type_ is not None:
-      assert type_ == 'socket'
     return UNIXSocketClientStore(store_name, socket_path, hashclass=hashclass)
