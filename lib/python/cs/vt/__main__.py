@@ -914,7 +914,7 @@ class VTCmd(BaseCommand):
                   "extra text after storespec: %r" %
                   (named_store_spec[offset:],)
               )
-            namedS = options.config.new_Store(parsed, type_, params)
+            namedS = options.config.new_Store(parsed, type_, **params)
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
