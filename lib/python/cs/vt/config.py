@@ -147,7 +147,7 @@ class Config(SingletonMixin):
         raise ValueError("missing type field in clause")
       store_name = "%s[%s]" % (self, clause_name)
       S = self.new_Store(
-          store_name, store_type, clause, clause_name=clause_name
+          store_name, store_type, clause_name=clause_name, **clause
       )
       return S
 
@@ -291,60 +291,47 @@ class Config(SingletonMixin):
     store_specs = list(parse_store_specs(store_spec))
     if not store_specs:
       raise ValueError("empty Store specification: %r" % (store_specs,))
-    stores = [
-        self.new_Store(store_text, store_type, params, hashclass=hashclass)
-        for store_text, store_type, params in store_specs
-    ]
+    XP("store_specs=%r", store_specs)
+    stores = []
+    for store_text, store_type, params in store_specs:
+      clause_name = params.pop('clause_name', f"<{store_text}>")
+      stores.append(
+          self.new_Store(
+              store_text,
+              store_type,
+              clause_name=clause_name,
+              hashclass=hashclass,
+              **params
+          )
+      )
     return stores
 
+  @pfx_method(use_str=True)
   def new_Store(
-      self, store_name, store_type, params, clause_name=None, hashclass=None
+      self, store_name, store_type, *, clause_name, hashclass=None, **params
   ):
     ''' Construct a store given its specification.
     '''
-    with Pfx("new_Store(%r,type=%r,params=%r,...)", store_name, store_type,
-             params):
-      if not isinstance(params, dict):
-        params = dict(params)
-      if hashclass is not None:
-        params['hashclass'] = hashclass
-      # process general purpose params
-      # blockmapdir: location to store persistent blockmaps
-      blockmapdir = params.pop('blockmapdir', None)
-      if store_name is None:
-        store_name = str(self) + '[' + clause_name + ']'
-      if store_type == 'config':
-        S = self.config_Store(store_name, **params)
-      elif store_type == 'datadir':
-        convert_param_bool(params, 'raw')
-        S = self.datadir_Store(store_name, clause_name, **params)
-      elif store_type == 'filecache':
-        convert_param_int(params, 'max_files')
-        convert_param_scaled_int(params, 'max_file_size')
-        S = self.filecache_Store(store_name, clause_name, **params)
-      elif store_type == 'memory':
-        convert_param_scaled_int(params, 'max_data')
-        S = self.memory_Store(store_name, clause_name, **params)
-      elif store_type == 'platonic':
-        S = self.platonic_Store(store_name, clause_name, **params)
-      elif store_type == 'proxy':
-        S = self.proxy_Store(store_name, **params)
-      elif store_type == 'socket':
-        if 'socket_path' not in params:
-          params['socket_path'] = clause_name
-        convert_param_path(params, 'socket_path')
-        S = self.socket_Store(store_name, **params)
-      elif store_type == 'tcp':
-        if 'host' not in params:
-          params['host'] = clause_name
-        S = self.tcp_Store(store_name, **params)
-      else:
-        raise ValueError("unsupported type %r" % (store_type,))
-      if S.config is None:
-        S.config = self
-      if blockmapdir is not None:
-        S.blockmapdir = blockmapdir
-      return S
+    if hashclass is not None:
+      params['hashclass'] = hashclass
+    # process general purpose params
+    # blockmapdir: location to store persistent blockmaps
+    blockmapdir = params.pop('blockmapdir', None)
+    if store_name is None:
+      store_name = str(self) + '[' + clause_name + ']'
+    constructor_name = store_type + '_Store'
+    XP("constructor_name=%r", constructor_name)
+    constructor = getattr(self, constructor_name, None)
+    if not constructor:
+      raise ValueError(
+          "unsupported Store type (no .%s method)" % (constructor_name,)
+      )
+    S = constructor(store_name, clause_name, **params)
+    if S.config is None:
+      S.config = self
+    if blockmapdir is not None:
+      S.blockmapdir = blockmapdir
+    return S
 
   @require(lambda clause_name: isinstance(clause_name, str))
   def config_Store(
