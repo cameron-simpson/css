@@ -227,7 +227,7 @@ class VTCmd(BaseCommand):
           try:
             # set up the primary Store using the main programme RunState for control
             S = Store(options.store_spec, options.config)
-          except ValueError as e:
+          except (KeyError, ValueError) as e:
             raise GetoptError(
                 "unusable Store specification: %s: %s" %
                 (options.store_spec, e)
