@@ -136,8 +136,14 @@ class Config(SingletonMixin):
     return R()
 
   def _make_clause_store(self, clause_name):
+    ''' Instantiate the `Store` associated with `clause_name`.
+    '''
     with Pfx("%s._make_clause_store(%r)", self, clause_name):
-      clause = dict(self.map[clause_name])
+      try:
+        bare_clause = self.map[clause_name]
+      except KeyError:
+        raise KeyError(f"no clause named [{clause_name}]")
+      clause = dict(bare_clause)
       for discard in 'address', :
         clause.pop(discard, None)
       try:
