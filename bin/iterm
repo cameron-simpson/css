@@ -159,15 +159,19 @@ l33t() {
 
 case "$op" in
   badge-format)
-    format64=$( printf '%s' "$*" | $base64 )
-    l33t "SetBadgeFormat=$format64"
+    [ ! -x "$base64" ] || {
+      format64=$( printf '%s' "$*" | $base64 )
+      l33t "SetBadgeFormat=$format64"
+    }
     ;;
   bgimg)
     case "$imgpath" in
       /*) ;; *) imgpath=$(pwd)/$imgpath ;;
     esac
-    imgpath64=$( printf '%s' "$imgpath" | $base64 )
-    l33t "SetBackgroundImageFile=$imgpath64"
+    [ ! -x "$base64" ] || {
+      imgpath64=$( printf '%s' "$imgpath" | $base64 )
+      l33t "SetBackgroundImageFile=$imgpath64"
+    }
     ;;
   colour | color )
     tee /dev/tty <<X | osascript -
@@ -225,8 +229,10 @@ X
   setvar)
     varname=$1
     shift
-    value64=$( printf '%s' "$*" | $base64 )
-    l33t "SetUserVar=$varname=$value64"
+    [ ! -x "$base64" ] || {
+      value64=$( printf '%s' "$*" | $base64 )
+      l33t "SetUserVar=$varname=$value64"
+    }
     ;;
 
   switch-profile)
