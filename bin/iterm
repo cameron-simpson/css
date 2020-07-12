@@ -140,21 +140,21 @@ fi
 # gets passed through ssh.
 print_osc() {
   case "$TERM" in
-    screen*)  printf "\e33Ptmux;\e\e]" ;;
-    *)        printf "\e33]" ;;
+    screen*)  printf "\03333Ptmux;\033\033]" ;;
+    *)        printf "\03333]" ;;
   esac
 }
 
 # More of the tmux workaround described above.
 print_st() {
   case "$TERM" in
-    screen*)    printf "\a\e\\" ;;
+    screen*)    printf "\a\033\\" ;;
     *)          printf "\a" ;;
   esac
 }
 
 l33t() {
-  printf "\e]1337;%s\a" "$*"
+  printf "\033]1337;%s\a" "$*"
 }
 
 case "$op" in
@@ -237,7 +237,7 @@ X
 
   switch-profile)
     profilename=$*
-    printf '\e]50;SetProfile=%s\a' "$profilename" >/dev/tty
+    printf '\033]50;SetProfile=%s\a' "$profilename" >/dev/tty
     ;;
 
   *)echo "$cmd: $op: unimplemented op" >&2
