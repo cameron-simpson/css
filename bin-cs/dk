@@ -109,6 +109,14 @@ case "$op" in
       set -x
       [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
       ;;
+  rsh)
+      rhost=$1; shift
+      set -x
+      exec "$0" -n "$rhost" exec sh -c "$*"
+      ;;
+  rsync)
+      set -x
+      exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
   update)
       set -ex
       "$0" down
