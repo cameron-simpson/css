@@ -1,4 +1,4 @@
-This is my personal kit,
+This a mirror of my personal kit,
 containing thousands of scripts and hundreds of Python modules
 and assorted other code.
 
@@ -17,18 +17,32 @@ Some relevant links:
   [overview](https://bitbucket.org/cameron_simpson/css/),
   [commit log](https://bitbucket.org/cameron_simpson/css/commits/all)
 
-An autoindex of the scripts is in the file 1INDEX.txt.
+An autoindex of the command scripts is in the file 1INDEX.txt.
 
-Installation:
-* Unpack the tarball: http://www.cskk.ezoshosting.com/cs/css/css.tar.gz
+=Installation=
+
+The Python modules on [PyPI](https://pypi.org/user/cameron.simpson/)
+can just be installed with:
+
+    pip install cs.module_name
+
+Installing the whole source tree can be done as follows:
+* Obtain the tree, wither by cloning this repository or fetching the
+  [(possibly stale) tarball](http://www.cskk.ezoshosting.com/cs/css/css.tar.gz)
   into a suitable directory such as `/opt/css`, which I will assume for
   the sake of example below.
 * Configure your environment to use the scripts:
-  `. /opt/css/env.sh` 
+
+    . /opt/css/env.sh
+
   That line should be in your .profile or other environment setup
   script.  It's pretty simple; it adds the css components to the
-  END of your PATHs (so that no css script name preempts anything you
-  already have).
+  END of your various PATHs.
+  It is expected that this should be one of the last things in your setup,
+  so that is merely adds to your environment instead of preempting things.
+  If your install point is not `/opt/css`,
+  set the environment variable``$OPTCSS` to the install point
+  before sourcing the `$OPTCSS/env.sh`.
 
 The configuration script mostly does the following:
 
