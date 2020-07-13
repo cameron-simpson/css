@@ -863,7 +863,7 @@ class VTCmd(BaseCommand):
 
   @staticmethod
   def cmd_serve(args, options):
-    ''' Usage: serve [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
+    ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
           Start a service daemon listening on a TCP port
           or on a UNIX domain socket or on stdin/stdout.
           With no `name:storespec` arguments the default Store is served,
