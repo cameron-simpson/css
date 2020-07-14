@@ -35,12 +35,16 @@ class VCS_Hg(VCS):
     with self._pipefrom('tags') as f:
       return list(map(lambda line: line.split(None, 1)[0], f))
 
-  def tag(self, tag_name, revision=None):
+  def tag(self, tag_name, revision=None, message=None):
     ''' Tag a revision with the supplied `tag`, by default revision "tip".
     '''
     if revision is None:
       revision = 'tip'
-    self.hg_cmd('tag', '-r', revision, '--', tag_name)
+    args = ['tag', '-r', revision]
+    if message is not None:
+      args.extend(['-m', message])
+    args.extend(['--', tag_name])
+    self.hg_cmd(*args)
 
   def log_since(self, tag, paths):
     ''' Generator yielding `(commit_files,commit_firstline)`

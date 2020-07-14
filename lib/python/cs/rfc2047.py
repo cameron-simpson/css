@@ -4,7 +4,7 @@
 #
 
 r'''
-Decoder for RFC2047 (MIME Part 3) encoded text.
+unrfc2047: a decoder for RFC2047 (MIME Part 3) encoded text.
 '''
 
 from __future__ import print_function
@@ -14,6 +14,8 @@ import re
 from cs.gimmicks import warning
 from cs.pfx import Pfx
 from cs.py3 import unicode
+
+__version__ = '20200524-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -36,17 +38,15 @@ re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 # This has been arbitrarily chosen, and parochially assumes the
 # author's European heritage is the likely source of incoming email.
 # The most useful fallbacks should be 8-bit character sets which
-# are (a) always available and (b) never fail to decode.
+# (a) are always available and (b) never fail to decode.
 FALLBACK_CHARSET = 'iso8859-1'
 
 def unrfc2047(s):
   ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
-      `warning`: optional parameter specifying function to report
-        warning messages, default is to use cs.logutils.warning if
-        cs.logutils has been imported, otherwise it just prints to
-        sys.stderr
+
+      See http://tools.ietf.org/html/rfc2047 for the specification.
   '''
   if not isinstance(s, unicode):
     # TODO: should this come from the locale? that seems arbitrary as well

@@ -65,7 +65,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200521-post'
+__version__ = '20200613-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -662,6 +662,7 @@ class LogTime(object):
     self.warning_threshold = warning_threshold
     self.warning_level = warning_level
     self.start = None
+    self.end = None
     self.elapsed = None
 
   def __enter__(self):
@@ -669,8 +670,8 @@ class LogTime(object):
     return self
 
   def __exit__(self, *_):
-    now = time.time()
-    elapsed = now - self.start
+    now = self.end = time.time()
+    elapsed = self.elapsed = now - self.start
     if self.threshold is not None and elapsed >= self.threshold:
       level = self.level
       if self.warning_threshold is not None and elapsed >= self.warning_threshold:
@@ -679,7 +680,6 @@ class LogTime(object):
       if self.tag_args:
         tag = tag % self.tag_args
       log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
-    self.elapsed = elapsed
     return False
 
 class UpdHandler(StreamHandler):
@@ -707,7 +707,7 @@ class UpdHandler(StreamHandler):
     StreamHandler.__init__(self, strm)
     self.upd = Upd(strm)
     self.upd_level = upd_level
-    self.__ansi_mode = ansi_mode
+    self.ansi_mode = ansi_mode
     self.__lock = Lock()
 
   def emit(self, logrec):
@@ -717,16 +717,17 @@ class UpdHandler(StreamHandler):
         For other levels write a distinct line
         to the output stream, possibly colourised.
     '''
-    line = self.format(logrec)
     if logrec.levelno == self.upd_level:
+      line = self.format(logrec)
       with self.__lock:
         self.upd.out(line)
     else:
-      if self.__ansi_mode:
+      if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
           logrec.msg = colourise(logrec.msg, 'red')
         elif logrec.levelno >= logging.WARNING:
           logrec.msg = colourise(logrec.msg, 'yellow')
+      line = self.format(logrec)
       with self.__lock:
         self.upd.nl(line)
 

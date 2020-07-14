@@ -11,10 +11,13 @@ Presupplied scales:
 * `DECIMAL_BYTES_SCALE`: Decimal units of (B)ytes, KB, MB, GB etc.
 * `DECIMAL_SCALE`: Unit suffixes K, M, G etc.
 * `TIME_SCALE`: Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
+* `UNSCALED_SCALE`: no units
 '''
 
 from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
+
+__version__ = '20200626-post'
 
 DISTINFO = {
     'description': "unit suffixes for nonnegative integers; parsing and transcription",
@@ -26,6 +29,8 @@ DISTINFO = {
     ],
     'install_requires': ['cs.lex'],
 }
+
+UNSCALED_SCALE = ( ( 0, '' ), )
 
 TIME_SCALE = (
     ( 60, 's' ),
@@ -136,7 +141,8 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   for count, unit in reversed(components):
     if skip_zero and count == 0:
       continue
-    text.append( str(count) + unit )
+    count_i = int(count)
+    text.append( (str(count) if count_i == count else "%.1f" % count) + unit )
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
