@@ -1045,16 +1045,12 @@ class DataDirStore(MappingStore):
     self.topdirpath = topdirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
     datadirclass = RawDataDir if raw else DataDir
-    self._datadir = _PerHashclassMapping(
-        lambda hcls: datadirclass(
-            self.topdirpath,
-            hcls,
-            indexclass=self.indexclass,
-            rollover=self.rollover
-        ), hashclass, self._lock
+    self._datadir = datadirclass(
+        self.topdirpath, hashclass, indexclass=indexclass, rollover=rollover
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
