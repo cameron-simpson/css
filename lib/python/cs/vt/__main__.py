@@ -38,7 +38,7 @@ import cs.logutils
 from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
@@ -512,13 +512,11 @@ class VTCmd(BaseCommand):
         store_type = clause.get('type')
         if store_type == 'datadir':
           S = config[clause_name]
-          with Pfx("%s.init()", S):
-            XP("INIT %s", S)
-            try:
-              S.init()
-            except OSError as e:
-              error("%s", e)
-              xit = 1
+          try:
+            S.init()
+          except OSError as e:
+            error("%s", e)
+            xit = 1
     return xit
 
   @staticmethod

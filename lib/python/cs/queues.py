@@ -55,8 +55,7 @@ class _QueueIterator(MultiOpenMixin):
       name = "QueueIterator-%d" % (seq(),)
     self.q = q
     self.name = name
-    MultiOpenMixin.__init__(self)
-    self.finalise_later = True
+    MultiOpenMixin.__init__(self, finalise_later=True)
     # count of non-sentinel items
     self._item_count = 0
 
