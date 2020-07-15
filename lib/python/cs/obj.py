@@ -286,16 +286,17 @@ class TrackedClassMixin(object):
       print(str(type(o)), id(o), repr(state), file=f)
 
 def singleton(registry, key, factory, fargs, fkwargs):
-  ''' Obtain an object for `key` via `registry` (a mapping of `key`=>`object`.
-      Return `(is_new,instance)`.
+  ''' Obtain an object for `key` via `registry` (a mapping of `key`=>object).
+      Return `(is_new,object)`.
 
       If the `key` exists in the registry, return the associated object.
       Otherwise create a new object by calling `factory(*fargs,**fkwargs)`
       and store it as `key` in the `registry`.
 
       The `registry` may be any mapping of `key`s to objects
-      but might usually be a `weakref.WeakValueMapping`
-      to that object references expire as normal.
+      but will usually be a `weakref.WeakValueDictionary`
+      in order that object references expire as normal,
+      allowing garbage collection.
 
       *Note*: this function *is not* thread safe.
       Multithreaded users should hold a mutex.
@@ -317,19 +318,44 @@ class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
       *Note*: this should be the *first* superclass of the subclass
-      in order to intercept `__new__` and `__init__`.
+      in order to intercept `__new__`.
 
-      A subclass should:
-      * *not* provide an `__init__` method.
-      * provide a `_singleton_init` method in place of the normal `__init__`
-        with the usual signature `(self,*args,**kwargs)`.
-      * provide a `_singleton_key(cls,*args,**kwargs)` class method
-        returning a key for the single registry
+      *Warning*: because of the mechanics of `__new__`,
+      the instance's `__init__` method will always be called
+      after `__new__`,
+      even when a preexisting object is returned.
+
+      Therefore that method should be sensible
+      even for an already initialised
+      and probably subsequently modified object.
+
+      One approach might be to access some attribute,
+      and preemptively return if it already exists.
+      Example:
+
+          def __init__(self, x, y):
+              if hasattr(self, 'x'):
+                  return
+              self.x = x
+              self.y = y
+
+      *Note*: each class registry has a lock,
+      which ensures that reuse of an object
+      in multiple threads will call the `__init__` method
+      in a thread safe serialised fashion.
+
+      Implementation requirements:
+      a subclass should:
+      * provide a class method `_singleton_key(cls,*args,**kwargs)`
+        returning a key for use in the single registry,
         computed from the positional and keyword arguments
         supplied on instance creation
         i.e. those which `__init__` would normally receive.
-        This should have the same signature as `_singleton_init`
-        (but using `cls` instead of `self`).
+        This should have the same signature as `__init__`
+        but using `cls` instead of `self`.
+      * provide a normal `__init__` method
+        which can be safely called again
+        after some earlier initialisation.
 
       This class is thread safe for the registry operations.
 
@@ -341,15 +367,19 @@ class SingletonMixin:
               def _singleton_key(cls, foo, bah=3):
                   return foo, bah
 
-              def _singleton_init(self, foo, bah=3):
+              def __init__(self, foo, bah=3):
+                  if hasattr(self, 'foo'):
+                      return
                  ... normal __init__ stuff here ...
+                 self.foo = foo
+                 ...
   '''
 
   # This lock is used to control setup of the per-class registry.
   # It is shared across all subclasses, but that bypasses any need to call an
   # __init__ for this mixin. In mitigation, the lock is only used if the class
   # does not yet have a registry.
-  _global_lock = Lock()
+  __global_lock = Lock()
 
   def __new__(cls, *a, **kw):
     ''' Prepare a new instance of `cls` if required.
@@ -361,7 +391,7 @@ class SingletonMixin:
     try:
       registry = cls._singleton_registry
     except AttributeError:
-      with cls._global_lock:
+      with cls.__global_lock:
         try:
           registry = cls._singleton_registry
         except AttributeError:
@@ -375,11 +405,13 @@ class SingletonMixin:
           Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
           on the new object.
       '''
-      o = object.__new__(cls)
-      o._singleton_init(*fargs, **fkwargs)
-      return o
+      return object.__new__(cls)
 
     okey = cls._singleton_key(*a, **kw)
     with registry._singleton_lock:
-      _, instance = singleton(registry, okey, factory, a, kw)
+      isnew, instance = singleton(registry, okey, factory, a, kw)
     return instance
+
+if __name__ == '__main__':
+  import cs.obj_tests
+  cs.obj_tests.selftest(sys.argv)

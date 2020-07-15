@@ -1364,7 +1364,9 @@ class TagFile(SingletonMixin):
     return filepath, ontology, find_parent
 
   @require(lambda filepath: isinstance(filepath, str))
-  def _singleton_init(self, filepath, *, ontology=None, find_parent=False):
+  def __init__(self, filepath, *, ontology=None, find_parent=False):
+    if hasattr(self, 'filepath'):
+      return
     self.filepath = filepath
     self.ontology = ontology
     self.find_parent = find_parent

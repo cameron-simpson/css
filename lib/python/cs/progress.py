@@ -255,14 +255,15 @@ class BaseProgress(object):
       remaining = int(remaining)
     throughput = self.throughput_recent(5)
     if throughput is None:
-      throughput_s = ''
-    elif throughput == 0:
-      throughput_s = 'stalled'
+      return left
+    if throughput == 0:
+      if self.position >= self.total:
+        left += ': idle'
+        return left
+      left += ': stalled'
     else:
-      throughput_s = self.format_counter(throughput, max_parts=1) + '/s'
-    if throughput_s:
-      left += ': ' + throughput_s
-    if self.total is not None:
+      left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
+    if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
       right = 'ETA unknown'

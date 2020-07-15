@@ -9,10 +9,10 @@ target  = bin
 
 dev = env-dev -d $. -x
 base_python = python3
-venvdir = $./venv
+venv_dir = $./venv
 venv_requirements = $./venv-requirements.txt
 venv_pip = $(venv_python) -m pip
-venv_python = $(venvdir)/bin/python
+venv_python = $(venv_dir)/bin/python
 
 rewrite = rewriteif -0 -v
 
@@ -68,6 +68,7 @@ _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
+        @echo '_venv              - prepare local venv from $(venv_requirements)'
         @echo '_deploy            - deploy current release to /opt/css'
         @echo '_pub               - push to upstream repos'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
@@ -84,11 +85,11 @@ _setup:
     :make _tags _venv
 
 _venv:
-    @[ -d '$(venvdir)/' ] || set-x mkdir '$(venvdir)'
+    @[ -d '$(venv_dir)/' ] || set-x mkdir '$(venv_dir)'
     [ -x '$(venv_python)' ] || { \
       set -xue \
-      rm -rf '$(venvdir)' \
-      $(base_python) -m venv '$(venvdir)' \
+      rm -rf '$(venv_dir)' \
+      $(base_python) -m venv '$(venv_dir)' \
     }
     $(dev) $(venv_pip) install -U wheel pip
     $(dev) $(venv_pip) install -U -r $(venv_requirements)

@@ -197,7 +197,9 @@ class Upd(SingletonMixin):
       backend = sys.stderr
     return id(backend)
 
-  def _singleton_init(self, backend=None, columns=None, disabled=None):
+  def __init__(self, backend=None, columns=None, disabled=None):
+    if hasattr(self, '_backend'):
+      return
     if backend is None:
       backend = sys.stderr
     if columns is None:

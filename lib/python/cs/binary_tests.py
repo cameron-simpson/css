@@ -22,7 +22,6 @@ class _TestPacketFields(object):
   def tearDown(self):
     ''' Tear down any setup.
     '''
-    pass
 
   def roundtrip_from_bytes(self, cls, bs):
     ''' Perform a bytes => instance => bytes round trip test.
@@ -50,19 +49,20 @@ class _TestPacketFields(object):
       kwargs = args.pop()
     with self.subTest(cls=cls, args=args, kwargs=kwargs):
       P = cls(*args, **kwargs)
-      bs2 = bytes(P)
-      if transcription is not None:
+      with self.subTest(packet=P):
+        bs2 = bytes(P)
+        if transcription is not None:
+          self.assertEqual(
+              bs2, transcription,
+              "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
+          )
+        P2, offset = cls.from_bytes(bs2, **kwargs)
         self.assertEqual(
-            bs2, transcription,
-            "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
+            offset, len(bs2),
+            "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
+            (offset, bs2[:offset], bs2[offset:])
         )
-      P2, offset = cls.from_bytes(bs2, **kwargs)
-      self.assertEqual(
-          offset, len(bs2),
-          "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
-          (offset, bs2[:offset], bs2[offset:])
-      )
-      self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
+        self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
 
   def test_PacketField_round_trip(self):
     ''' Perform round trip tests of the PacketFields for which we have test cases.
@@ -89,6 +89,8 @@ class _TestPacketFields(object):
                     raise ValueError("unhandled test case: %r" % (test_case,))
 
 class TestCSBinaryPacketFields(_TestPacketFields, unittest.TestCase):
+  ''' `unittest.TestCase` subclass of `_TestPacketFields`.
+  '''
 
   def setUp(self):
     ''' We're testing the cs.binary module.

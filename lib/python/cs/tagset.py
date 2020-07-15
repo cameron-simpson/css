@@ -1157,7 +1157,9 @@ class TagsOntology(SingletonMixin):
   def _singleton_key(cls, tagset_mapping):
     return id(tagset_mapping)
 
-  def _singleton_init(self, tagset_mapping):
+  def __init__(self, tagset_mapping):
+    if hasattr(self, 'tagsets'):
+      return
     self.tagsets = tagset_mapping
 
   def __str__(self):
