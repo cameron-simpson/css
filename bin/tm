@@ -9,7 +9,6 @@
 set -ue
 
 : ${TMUX:=''}
-: ${USER:=`id -ud`}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${TMPDIR:=/tmp}
@@ -94,27 +93,7 @@ have_tmux(){
 }
 
 do_tmux(){
-  case "$tmux_version" in
-    0.*|1.*|2.0|2.1)
-        TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
-    '')
-        case "$OS" in
-          openbsd)
-            $trace tmux ${1+"$@"} ;;
-          *)
-            TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
-        esac
-        ;;
-    *)  $trace tmux ${1+"$@"} ;;
-  esac
-}
-
-# honours $TMUX_TMPDIR?
-use_tmux_tmpdir(){
-  case "$tmux_version" in
-    0.*|1.*|2.0|2.1)    return 1 ;;
-  esac
-  return 0
+  $trace tmux ${1+"$@"}
 }
 
 # Strip prefix from incoming strings, compute max of remaining numbers, add 1.
@@ -334,11 +313,6 @@ rcmd(){
       else  TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`
       fi
     fi
-    tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //")
-    case "$tmux_version" in
-      ""|0.*|1.*|2.0|2.1) tmux="env TMPDIR=$TMUX_TMPDIR tmux" ;;
-      *) tmux=tmux ;;
-    esac
     export TMUX_TMPDIR
     '"$*"
 }
