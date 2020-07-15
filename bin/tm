@@ -12,7 +12,8 @@ set -ue
 : ${USER:=`id -ud`}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
-: ${TMUX_TMPDIR:=$HOME/var/tmux}
+: ${TMPDIR:=/tmp}
+: ${TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`}
 export TMUX_TMPDIR
 
 trace=
@@ -324,15 +325,21 @@ rcmd(){
   $trace $_rcmd_ssh -t "$_rcmd_rhost" "
     $setx"'
     PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH
-    : ${TMUX_TMPDIR:=}
+    : ${TMPDIR:=/tmp}
+    export PATH TMPDIR
     if [ -z "$TMUX_TMPDIR" ]
-    then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR
+    then
+      if [ -d "$HOME/var/tmux/." ]
+      then  TMUX_TMPDIR=$HOME/var/tmux
+      else  TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`
+      fi
     fi
     tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //")
     case "$tmux_version" in
       ""|0.*|1.*|2.0|2.1) tmux="env TMPDIR=$TMUX_TMPDIR tmux" ;;
       *) tmux=tmux ;;
     esac
+    export TMUX_TMPDIR
     '"$*"
 }
 
