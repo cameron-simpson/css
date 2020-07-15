@@ -227,7 +227,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
 
   @require(lambda topdirpath: isinstance(topdirpath, str))
   @require(lambda hashclass: issubclass(hashclass, HashCode))
-  def _singleton_init(
+  def __init__(
       self,
       topdirpath,
       hashclass,
@@ -260,6 +260,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         The monitor thread and runtime state are set up by the `startup` method
         and closed down by the `shutdown` method.
     '''
+    if hasattr(self, '_filemap'):
+      return
     resolved = self._resolve(
         hashclass=hashclass,
         indexclass=indexclass,

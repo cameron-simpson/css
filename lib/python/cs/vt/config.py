@@ -76,7 +76,9 @@ class Config(SingletonMixin):
         id(DEFAULT_CONFIG) if default_config is None else id(default_config)
     )
 
-  def _singleton_init(self, config_map, environ=None, default_config=None):
+  def __init__(self, config_map, environ=None, default_config=None):
+    if hasattr(self, 'map'):
+      return
     if environ is None:
       environ = os.environ
     if default_config is None:
