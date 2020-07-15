@@ -36,6 +36,7 @@
     to their block data location within the backing files.
 '''
 
+from collections import namedtuple
 from collections.abc import Mapping
 import errno
 import os
@@ -67,7 +68,7 @@ from cs.fileutils import (
 )
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop as property
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
@@ -173,9 +174,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   INDEX_FILENAME_BASE_FORMAT = 'index-{hashname}'
   DATA_ROLLOVER = DEFAULT_ROLLOVER
 
+  _FD_Singleton_Key_Tuple = namedtuple(
+      'FilesDir_FD_Singleton_Key_Tuple',
+      'cls realdirpath hashclass indexclass rollover flags_id'
+  )
+
   @classmethod
   def _resolve(cls, *, hashclass, indexclass, rollover, flags, flags_prefix):
-    resolved = SimpleNamespace()
     if indexclass is None:
       indexclass = choose_indexclass(
           cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
@@ -195,11 +200,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     else:
       if flags_prefix is None:
         raise ValueError("flags provided but no flags_prefix")
-    resolved.indexclass = indexclass
-    resolved.rollover = rollover
-    resolved.flags = flags
-    resolved.flags_prefix = flags_prefix
-    return resolved
+    return SimpleNamespace(
+        hashclass=hashclass,
+        indexclass=indexclass,
+        rollover=rollover,
+        flags=flags,
+        flags_prefix=flags_prefix
+    )
 
   @classmethod
   def _singleton_key(
@@ -219,10 +226,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         flags=flags,
         flags_prefix=flags_prefix
     )
-    return cls, realpath(
-        topdirpath
-    ), resolved.hashclass, resolved.indexlass, resolved.rollover, id(
-        resolved.flags
+    return cls._FD_Singleton_Key_Tuple(
+        cls=cls,
+        realdirpath=realpath(topdirpath),
+        hashclass=resolved.hashclass,
+        indexclass=resolved.indexclass,
+        rollover=resolved.rollover,
+        flags_id=id(resolved.flags)
     )
 
   @require(lambda topdirpath: isinstance(topdirpath, str))
@@ -262,6 +272,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     if hasattr(self, '_filemap'):
       return
+    XP("%s SINGLETON_INIT", type(self))
     resolved = self._resolve(
         hashclass=hashclass,
         indexclass=indexclass,

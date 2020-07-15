@@ -18,7 +18,7 @@ from icontract import require
 from cs.excutils import logexc
 from cs.later import Later, SubLater
 from cs.logutils import warning, error, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP, pfx_method
 from cs.progress import Progress
 from cs.py.func import prop, funcname
 from cs.queues import Channel, IterableQueue
@@ -1045,16 +1045,14 @@ class DataDirStore(MappingStore):
     self.topdirpath = topdirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
     datadirclass = RawDataDir if raw else DataDir
-    self._datadir = _PerHashclassMapping(
-        lambda hcls: datadirclass(
-            self.topdirpath,
-            hcls,
-            indexclass=self.indexclass,
-            rollover=self.rollover
-        ), hashclass, self._lock
+    XP("datadirclass=%r", datadirclass)
+    XP("datadirclass.__init__=%r", datadirclass.__init__)
+    self._datadir = datadirclass(
+        self.topdirpath, hashclass, indexclass=indexclass, rollover=rollover
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
@@ -1070,9 +1068,11 @@ class DataDirStore(MappingStore):
     self._datadir.close()
     super().shutdown()
 
+  @pfx_method(use_str=True)
   def init(self):
     ''' Init the supporting data dir.
     '''
+    XP("_datadir=%s, call _datadir.initdir()...", self._datadir)
     self._datadir.initdir()
 
   def pathto(self, rpath):
