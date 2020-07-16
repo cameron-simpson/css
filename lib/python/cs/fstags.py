@@ -116,7 +116,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }

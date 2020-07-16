@@ -108,7 +108,7 @@ DISTINFO = {
         'cs.edit',
         'cs.lex',
         'cs.logutils',
-        'cs.obj',
+        'cs.obj>=20200716',
         'cs.pfx',
         'cs.py3',
         'icontract',
