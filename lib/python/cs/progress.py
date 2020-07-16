@@ -262,6 +262,8 @@ class BaseProgress(object):
         return left
       left += ': stalled'
     else:
+      if throughput >= 10:
+        throughput = int(throughput)
       left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
     if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
