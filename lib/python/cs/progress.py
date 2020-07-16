@@ -16,7 +16,7 @@ from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 from cs.upd import Upd
 
-__version__ = '20200716-post'
+__version__ = '20200716.1'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
