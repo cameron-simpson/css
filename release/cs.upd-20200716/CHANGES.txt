@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200626.1.
+lib/python/cs/upd.py: cs.*: update uses of SingletonMixin for new regime: normal __init__ method with a guard against reinitialisation

@@ -8,7 +8,7 @@ from __future__ import absolute_import
 import sys
 import unittest
 from io import BytesIO
-from cs.randutils import rand0, randbool, randblock
+from cs.randutils import rand0, randbool, make_randblock
 from cs.serialise import get_bs, put_bs, \
                          get_bsdata, put_bsdata, \
                          get_bss, put_bss
@@ -64,7 +64,7 @@ class TestSerialise(unittest.TestCase):
     self.assertEqual(get_bsdata(bytes((0,))), (bytes(()), 1))
     self.assertEqual(get_bsdata(bytes((2, 0, 0))), (bytes((0, 0)), 3))
     for n in 1, 3, 7, 127, 128, 255, 256, 16383, 16384:
-      chunk = randblock(n)
+      chunk = make_randblock(n)
       with self.subTest(n=n, chunk=chunk):
         if type(chunk) is not bytes:
           raise RuntimeError("type(chunk)=%s" % (type(chunk),))

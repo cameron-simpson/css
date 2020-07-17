@@ -43,6 +43,7 @@ import os
 import tempfile
 import threading
 from cs.logutils import error, warning
+from cs.progress import Progress
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
@@ -86,6 +87,7 @@ DISTINFO = {
         'cs.threads',
         'cs.tty',
         'cs.units',
+        'cs.upd',
         'cs.x',
         'icontract',
         'lmdb',
@@ -156,6 +158,10 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
+# some shared default state
+_common_progress = Progress(name="cs.vt._common_progress")
+_common_runstate = RunState("cs.vt._common_runstate")
+
 class _Defaults(threading.local):
   ''' Per-thread default context stack.
 
@@ -170,7 +176,8 @@ class _Defaults(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.runstate = RunState(self.__module__ + " _Defaults initial")
+    self.progress = _common_progress
+    self.runstate = _common_runstate
     self.fs = None
     self.block_cache = None
     self.Ss = []

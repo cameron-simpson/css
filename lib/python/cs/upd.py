@@ -65,10 +65,10 @@ this default behaviour.
 
 The whole purpose of this "disabled" mode is to ease main programme
 implementation.
-Without the mode one has two basic idioms to support "noninteractive" use,
+Before this mode one had two basic idioms to support "noninteractive" use,
 described below.
 
-The former is to test `sys.stderr.isatty()` and define an `Upd` or not:
+The former was to test `sys.stderr.isatty()` and define an `Upd` or not:
 
     upd = Upd() if sys.stderr.isatty() else None
 
@@ -77,7 +77,7 @@ and to scatter tests throughout the code:
     if upd:
         upd.out("new status here")
 
-The latter is to work entirely through `UpdProxy` instances
+The latter was to work entirely through `UpdProxy` instances
 (which is convenient anyway), like this 2 status line example:
 
     if sys.stderr.isatty():
@@ -122,7 +122,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20200626.1-post'
+__version__ = '20200716.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -131,7 +131,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.lex', 'cs.obj', 'cs.tty'],
+    'install_requires':
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
 }
 
 instances = []
@@ -197,7 +198,9 @@ class Upd(SingletonMixin):
       backend = sys.stderr
     return id(backend)
 
-  def _singleton_init(self, backend=None, columns=None, disabled=None):
+  def __init__(self, backend=None, columns=None, disabled=None):
+    if hasattr(self, '_backend'):
+      return
     if backend is None:
       backend = sys.stderr
     if columns is None:

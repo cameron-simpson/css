@@ -16,7 +16,7 @@ from cs.seq import seq
 from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
 from cs.upd import Upd
 
-__version__ = '20200627-post'
+__version__ = '20200716.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -255,14 +255,17 @@ class BaseProgress(object):
       remaining = int(remaining)
     throughput = self.throughput_recent(5)
     if throughput is None:
-      throughput_s = ''
-    elif throughput == 0:
-      throughput_s = 'stalled'
+      return left
+    if throughput == 0:
+      if self.position >= self.total:
+        left += ': idle'
+        return left
+      left += ': stalled'
     else:
-      throughput_s = self.format_counter(throughput, max_parts=1) + '/s'
-    if throughput_s:
-      left += ': ' + throughput_s
-    if self.total is not None:
+      if throughput >= 10:
+        throughput = int(throughput)
+      left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
+    if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
       right = 'ETA unknown'

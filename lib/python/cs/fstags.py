@@ -39,11 +39,16 @@
 
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series_title="Series Full Name"`
+
+        series-name sf series_title="Series Full Name"
+
     * tag file `/path/to/series-name/.fstags`:
-      `season-02 season=2`
+
+      season-02 season=2
+
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 
@@ -51,15 +56,15 @@
 
     Walk the media tree for files tagged for backup to `archive2`:
 
-        find /path/to/media backup=archive2
+        fstags find /path/to/media backup=archive2
 
     Walk the media tree for files not assigned to a backup archive:
 
-        find /path/to/media -backup
+        fstags find /path/to/media -backup
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \
+        fstags find --for-rsync /path/to/media backup=archive2 \\
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
@@ -103,7 +108,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200521.1-post'
+__version__ = '20200717.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -116,7 +121,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -1364,7 +1369,9 @@ class TagFile(SingletonMixin):
     return filepath, ontology, find_parent
 
   @require(lambda filepath: isinstance(filepath, str))
-  def _singleton_init(self, filepath, *, ontology=None, find_parent=False):
+  def __init__(self, filepath, *, ontology=None, find_parent=False):
+    if hasattr(self, 'filepath'):
+      return
     self.filepath = filepath
     self.ontology = ontology
     self.find_parent = find_parent

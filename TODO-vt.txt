@@ -1,4 +1,8 @@
-datadir SqliteFilemap: mappings with path=NULL, how?
+move usage strings to subcommand docstrings
+make config-based Stores singletons, make datadirs singletons on the dir realpath
+completed-indirect-block index supporting efficient indirect-block completion code
+blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
+datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
 blockmap: continues running even after connection shutdown
 OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
 virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
