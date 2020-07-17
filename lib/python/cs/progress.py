@@ -13,7 +13,7 @@ import functools
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
-from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
+from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE, UNSCALED_SCALE
 from cs.upd import Upd
 
 __version__ = '20200716.1-post'
@@ -757,7 +757,7 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, total=None, **kw):
+def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
   ''' Convenience function to construct and run a `Progress.bar`.
 
       Parameters:
@@ -765,6 +765,8 @@ def progressbar(it, label=None, total=None, **kw):
       * `label`: optional label, doubles as the `Progress.name`
       * `total`: optional value for `Progress.total`,
         default from `len(it)` if supported.
+      * `units_scale`: optional units scale for `Progress`,
+        default `UNSCALED_SCALE`
 
       If `total` is `None` and `it` supports `len()`
       then the `Progress.total` is set from it.
@@ -781,7 +783,11 @@ def progressbar(it, label=None, total=None, **kw):
       total = len(it)
     except TypeError:
       total = None
-  yield from Progress(name=label, total=total).bar(it, label=label, **kw)
+  yield from Progress(
+      name=label, total=total, units_scale=units_scale
+  ).bar(
+      it, label=label, **kw
+  )
 
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
