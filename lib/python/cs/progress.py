@@ -292,6 +292,7 @@ class BaseProgress(object):
       statusfunc=None,
       incfirst=False,
       width=None,
+      update_frequency=None,
   ):
     ''' Generator yielding values from the iterable `it`
         while updating a progress bar.
@@ -323,6 +324,9 @@ class BaseProgress(object):
           used only to produce the default `proxy` if that is not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
+        * `update_frequency`: optional update frequency;
+          only update the progress bar after an advance of this many units,
+          useful if the iteration rate is very high
 
         Example use:
 
@@ -355,17 +359,24 @@ class BaseProgress(object):
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
     proxy(statusfunc(self, label, width or proxy.width))
+    last_pos = self.position
     for i in it:
       length = itemlenfunc(i) if itemlenfunc else 1
       if incfirst:
         self += length
-      proxy(statusfunc(self, label, width or proxy.width))
+      if not update_frequency or self.position >= last_pos + update_frequency:
+        proxy(statusfunc(self, label, width or proxy.width))
+        last_pos = self.position
       yield i
       if not incfirst:
         self += length
-      proxy(statusfunc(self, label, width or proxy.width))
+      if not update_frequency or self.position >= last_pos + update_frequency:
+        proxy(statusfunc(self, label, width or proxy.width))
+        last_pos = self.position
     if delete_proxy:
       proxy.delete()
+    else:
+      proxy(statusfunc(self, label, width or proxy.width))
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -794,6 +805,8 @@ if __name__ == '__main__':
   lines = open(__file__).readlines()
   lines += lines
   for line in progressbar(lines, "lines"):
+    time.sleep(0.005)
+  for line in progressbar(lines, "lines step 100", update_frequency=100):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
   for line in P.bar(open(__file__)):
