@@ -103,7 +103,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200717-post'
+__version__ = '20200717.1'
 
 DISTINFO = {
     'keywords': ["python3"],
