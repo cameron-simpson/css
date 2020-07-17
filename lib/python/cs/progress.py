@@ -257,7 +257,7 @@ class BaseProgress(object):
     if throughput is None:
       return left
     if throughput == 0:
-      if self.position >= self.total:
+      if self.total is not None and self.position >= self.total:
         left += ': idle'
         return left
       left += ': stalled'
