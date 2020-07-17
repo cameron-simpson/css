@@ -39,11 +39,16 @@
 
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series_title="Series Full Name"`
+
+        series-name sf series_title="Series Full Name"
+
     * tag file `/path/to/series-name/.fstags`:
-      `season-02 season=2`
+
+      season-02 season=2
+
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 
@@ -51,15 +56,15 @@
 
     Walk the media tree for files tagged for backup to `archive2`:
 
-        find /path/to/media backup=archive2
+        fstags find /path/to/media backup=archive2
 
     Walk the media tree for files not assigned to a backup archive:
 
-        find /path/to/media -backup
+        fstags find /path/to/media -backup
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \
+        fstags find --for-rsync /path/to/media backup=archive2 \\
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
