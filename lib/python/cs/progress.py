@@ -274,12 +274,12 @@ class BaseProgress(object):
     if self.total is None:
       arrow_field = ' '
     else:
-      arrow_width = width - len(left) - len(right)
+      arrow_width = width - len(left) - len(right) - 2
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
       else:
-        arrow_field = self.arrow(arrow_width)
+        arrow_field = ' ' + self.arrow(arrow_width) + ' '
     return left + arrow_field + right
 
   def bar(  # pylint: disable=blacklisted-name,too-many-arguments
