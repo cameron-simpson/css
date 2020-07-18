@@ -330,16 +330,22 @@ class CSReleaseCommand(BaseCommand):
 
   @staticmethod
   def cmd_readme(argv, options):
-    ''' Usage: {cmd} pkg_name
+    ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
+          -a  Document all public class members (default is just
+              __new__ and __init__ for the PyPI README.md file).
     '''
+    all_class_names = False
+    if argv and argv[0] == '-a':
+      all_class_names = True
+      argv.pop(0)
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     pkg = options.modules[pkg_name]
-    docs = pkg.compute_doc()
+    docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
   @staticmethod
@@ -724,7 +730,7 @@ class Module(object):
         (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
     )
 
-  def compute_doc(self):
+  def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
     '''
     # break out the release log and format it
@@ -741,7 +747,10 @@ class Module(object):
             f'*Release {release_tag.version}*:\n{release_entry}'
         )
     # split the module documentation after the opening paragraph
-    full_doc = module_doc(self.module, method_names=('__new__', '__init__'))
+    full_doc = module_doc(
+        self.module,
+        method_names=None if all_class_names else ('__new__', '__init__')
+    )
     try:
       doc_head, doc_tail = full_doc.split('\n\n', 1)
     except ValueError:
@@ -781,7 +790,7 @@ class Module(object):
 
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
-    docs = self.compute_doc()
+    docs = self.compute_doc(all_class_names=True)
     dinfo.update(
         description=docs.description, long_description=docs.long_description
     )
