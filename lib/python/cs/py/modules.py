@@ -101,7 +101,8 @@ def module_attributes(M):
   '''
   for attr in dir(M):
     value = getattr(M, attr, None)
-    if getmodule(value) is not M:
+    valueM= getmodule(value)
+    if valueM is not None and valueM is not M:
       continue
     yield attr, value
 

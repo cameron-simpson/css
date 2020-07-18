@@ -370,6 +370,7 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
         return func(self, *a, **kw)
 
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
+  lockfunc.__doc__ = getattr(func, '__doc__', '')
   return lockfunc
 
 @decorator
