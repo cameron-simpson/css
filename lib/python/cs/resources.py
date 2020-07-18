@@ -19,7 +19,7 @@ from cs.py.stack import caller, frames as stack_frames, stack_dump
 
 from cs.pfx import XP
 
-__version__ = '20200521-post'
+__version__ = '20200718'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
