@@ -57,15 +57,13 @@ def module_doc(
       if not filter_key(Mname):
         continue
       obj_module = getmodule(obj)
-      if obj_module and obj_module is not module:
+      if obj_module is not module:
         # name imported from another module
         continue
       obj_doc = obj_docstring(obj) if obj_module else ''
       if not callable(obj):
         if obj_doc:
           full_doc += f'\n\n## `{Mname} = {obj!r}`\n\n{obj_doc}'
-        else:
-          full_doc += f'\n\n## `{Mname} = {obj!r}`'
         continue
       if not obj_doc:
         continue
@@ -86,27 +84,38 @@ def module_doc(
         if mro_names:
           classname_etc += '(' + ','.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
+        seen_names = set()
         direct_attrs = dict(obj.__dict__)
+        # iterate over specified names or default names in order
         for attr_name in method_names or chain(
             # constructor and initialiser
-            ('__new__', '__init__'),
+            (
+                '__init__',),
             # "constants"
             sorted(filter(lambda name: name and name[0].isupper(),
                           direct_attrs)),
             # dunder methods
             sorted(filter(is_dunder, direct_attrs)),
             # remaining attributes
-            sorted(direct_attrs),
+            sorted(filter(lambda name: name and not name.startswith('_'),
+                          direct_attrs)),
         ):
+          # prevent repeats, as the automatic list is composed of
+          # overlapping components
+          if attr_name in seen_names:
+            continue
+          seen_names.add(attr_name)
           if not method_names:
             # prune some boring names
-            if attr_name in ('__doc__', '__module__'):
+            if attr_name in ('__abstractmethods__', '__doc__',
+                             '__getnewargs__', '__module__', '__new__',
+                             '__repr__', '__weakref__'):
               continue
             # prune private names which are not dunder names
-            if attr_name.startswith('_') and is_dunder(attr_name):
+            if attr_name.startswith('_') and not is_dunder(attr_name):
               continue
           if attr_name in direct_attrs:
-            attr = direct_attrs.pop(attr_name)
+            attr = getattr(obj, attr_name)
             attr_doc = obj_docstring(attr)
             if not attr_doc:
               continue
@@ -115,9 +124,12 @@ def module_doc(
               method_sig = signature(attr)
               obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
             elif not callable(attr):
-              obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
-            else:
+              ##obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
+              pass
+            elif isinstance(attr, property):
               obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
+            else:
+              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\nSKIP DOC: {attr_doc}'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)
