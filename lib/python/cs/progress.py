@@ -13,8 +13,10 @@ import functools
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
-from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE, UNSCALED_SCALE
-from cs.upd import Upd
+from cs.units import (
+    transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
+)
+from cs.upd import Upd, print as upd_print
 
 __version__ = '20200718.2-post'
 
@@ -293,6 +295,7 @@ class BaseProgress(object):
       incfirst=False,
       width=None,
       update_frequency=None,
+      report_print=None,
   ):
     ''' Generator yielding values from the iterable `it`
         while updating a progress bar.
@@ -327,6 +330,10 @@ class BaseProgress(object):
         * `update_frequency`: optional update frequency;
           only update the progress bar after an advance of this many units,
           useful if the iteration rate is very high
+        * `report_print`: optional `print` compatible function
+          with which to write a report on completion;
+          this may also be a `bool`, which if true will use `Upd.print`
+          in order to interoperate with `Upd`.
 
         Example use:
 
@@ -359,7 +366,7 @@ class BaseProgress(object):
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
     proxy(statusfunc(self, label, width or proxy.width))
-    last_pos = self.position
+    last_pos = start_pos = self.position
     for i in it:
       length = itemlenfunc(i) if itemlenfunc else 1
       if incfirst:
@@ -377,6 +384,15 @@ class BaseProgress(object):
       proxy.delete()
     else:
       proxy(statusfunc(self, label, width or proxy.width))
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = upd_print
+      report_print(
+          label + ':', self.format_counter(self.position - start_pos), 'in',
+          transcribe(
+              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+          )
+      )
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -806,7 +822,7 @@ if __name__ == '__main__':
   lines += lines
   for line in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for line in progressbar(lines, "lines step 100", update_frequency=100):
+  for line in progressbar(lines, "lines step 100", update_frequency=100, report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
   for line in P.bar(open(__file__)):
