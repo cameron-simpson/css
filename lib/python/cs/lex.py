@@ -21,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200718'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
