@@ -92,7 +92,7 @@
     The leaves of this hierarchy will be `PacketField`s,
     whose attributes are ordinary types.
 
-    By contrast, a `PacketField`'s attributes are "flat" values:
+    By contrast, a `PacketField`'s attributes are expected to be "flat" values:
     the plain post-parse value, such as a `str` or an `int`
     or some other conventional Python type.
 
@@ -180,7 +180,7 @@ def flatten(chunks):
 class PacketField(ABC):
   ''' A record for an individual packet field.
 
-      This normally holds a single value, such as a int of a particular size
+      This normally holds a single value, such as an int of a particular size
       or a string.
 
       There are 2 basic ways to implement a `PacketField` subclass.
@@ -191,7 +191,7 @@ class PacketField(ABC):
       * `transcribe_value`:
         transcribe the value as bytes
 
-      Sometimes a `PacketField` may be slightly more complex
+      Sometimes a `PacketField` may be more complex
       while still not warranting (or perhaps fitting)
       the formality of a `Packet` with its multifield structure.
       One example is the `cs.iso14496.UTF8or16Field` class.
@@ -273,36 +273,54 @@ class PacketField(ABC):
   def from_buffer(cls, bfr, **kw):
     ''' Factory to return a `PacketField` instance from a `CornuCopyBuffer`.
 
-        This default implementation instantiates the instance from
-        the value returned by `cls.value_from_buffer(bfr, **kw)`.
+        This default implementation is for single value `PacketField`s
+        and instantiates the instance from the value returned
+        by `cls.value_from_buffer(bfr, **kw)`;
+        implementors should implement `value_from_buffer`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
     return cls(value, **kw)
-    ##return cls(cls.value_from_buffer(bfr, **kw))
 
-  @staticmethod
-  def value_from_buffer(bfr, **kw):
+  @classmethod
+  def value_from_buffer(cls, bfr, **kw):
     ''' Function to parse and return the core value from a `CornuCopyBuffer`.
 
         For single value fields it is enough to implement this method.
+
+        For multiple value fields it is better to implement `cls.from_buffer`.
     '''
-    raise NotImplementedError("no value_from_buffer method")
+    packet = cls.from_buffer(bfr, **kw)
+    return packet.value
+
+  @classmethod
+  def parse_buffer_with_offsets(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+        Yields `(offset,instance,post_offset)`
+        where `offset` if the buffer offset where the instance commenced
+        and `post_offset` is the buffer offset after the instance.
+    '''
+    offset = bfr.offset
+    while not bfr.at_eof():
+      post_offset = bfr.offset
+      yield offset, cls.from_buffer(bfr, **kw), post_offset
+      offset = post_offset
 
   @classmethod
   def parse_buffer(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls` from the buffer `bfr`
         until end of input.
     '''
-    while not bfr.at_eof():
-      yield cls.from_buffer(bfr, **kw)
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj
 
   @classmethod
   def parse_buffer_values(cls, bfr, **kw):
     ''' Function to parse repeated instances of `cls.value`
         from the buffer `bfr` until end of input.
     '''
-    while not bfr.at_eof():
-      yield cls.from_buffer(bfr, **kw).value
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj.value
 
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
@@ -555,7 +573,8 @@ class BytesesField(PacketField):
   def from_buffer(
       cls, bfr, end_offset=None, discard_data=False, short_ok=False
   ):
-    ''' Gather from `bfr` until `end_offset`.
+    ''' Create a new `BytesesField` from a buffer
+        by gathering from `bfr` until `end_offset`.
 
         Parameters:
         * `bfr`: the input buffer
@@ -565,6 +584,12 @@ class BytesesField(PacketField):
         * `short_ok`: if true, do not raise EOFError if there are
           insufficient data; the field's .end_offset value will be
           less than `end_offset`; the default is False
+
+        Note that this method also sets the following attributes
+        on the new `BytesesField`:
+        * `offset`: the starting offset of the gathered bytes
+        * `end_offset`: the ending offset after the gathered bytes
+        * `length`: the length of the data
     '''
     if end_offset is None:
       raise ValueError("missing end_offset")
@@ -887,7 +912,7 @@ Float64LE.TEST_CASES = (
 )
 
 class BSUInt(PacketField):
-  ''' A binary serialsed unsigned int.
+  ''' A binary serialised unsigned int.
 
       This uses a big endian byte encoding where continuation octets
       have their high bit set. The bits contributing to the value
@@ -943,20 +968,40 @@ class BSData(PacketField):
       (b'A', b'\x01A'),
   )
 
-  @staticmethod
-  def value_from_buffer(bfr):
-    return bfr.take(BSUInt.value_from_buffer(bfr))
+  def __init__(self, data, data_offset=None):
+    if data_offset is None:
+      data_offset = len(BSUInt(len(data)))
+    else:
+      assert data_offset == len(BSUInt(len(data)))
+    self.data = data
+    self.data_offset = data_offset
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    offset0 = bfr.offset
+    data_length = BSUInt.value_from_buffer(bfr)
+    data_offset = bfr.offset - offset0
+    data = bfr.take(data_length)
+    return cls(data, data_offset=data_offset)
+
+  @property
+  def value(self):
+    ''' The "value", `self.data`.
+    '''
+    return self.data
 
   def transcribe(self):
     ''' Transcribe the payload length and then the payload.
     '''
-    payload = self.value
-    yield BSUInt.transcribe_value(len(payload))
-    yield payload
+    data = self.data
+    yield BSUInt.transcribe_value(len(data))
+    yield data
 
-  @classmethod
-  def transcribe_value(cls, data):
-    return b''.join(cls(data).transcribe())
+  @staticmethod
+  def data_offset_for(bs):
+    ''' Compute the `data_offset` which would obtain for the bytes `bs`.
+    '''
+    return len(BSUInt.transcribe_value(len(bs)))
 
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
@@ -1048,12 +1093,12 @@ class ListField(PacketField):
 _multi_struct_fields = {}
 
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
-  ''' Factory for `PacketField` subclasses build around complex struct formats.
+  ''' Factory for `PacketField` subclasses build around complex `struct` formats.
 
       Parameters:
-      * `struct_format`: the struct format string
-      * `subvalue_names`: an optional namedtuple field name list;
-        if supplied then the field value will be a namedtuple with
+      * `struct_format`: the `struct` format string
+      * `subvalue_names`: an optional field name list;
+        if supplied then the field value will be a `namedtuple` with
         these names
       * `class_name`: option name for the generated class
   '''
@@ -1086,7 +1131,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
       @classmethod
       def from_buffer(cls, bfr):
-        ''' Parse via struct.unpack.
+        ''' Parse via `struct.unpack`.
         '''
         bs = bfr.take(struct.size)
         values = struct.unpack(bs)
@@ -1105,14 +1150,14 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     if subvalue_names:
       MultiStructField.__doc__ = (
           ''' A `PacketField` which parses and transcribes the struct
-              format `%r`, whose `.value` is a namedtuple with
+              format `%r`, whose `.value` is a `namedtuple` with
               attributes %r.
           ''' % (struct_format, subvalue_names)
       )
     else:
       MultiStructField.__doc__ = (
           ''' A `PacketField` which parses and transcribes the struct
-              format `%r`, whose `.value` is a tuple of the struct values.
+              format `%r`, whose `.value` is a `tuple` of the struct values.
           ''' % (struct_format,)
       )
     MultiStructField.struct = struct
@@ -1358,7 +1403,7 @@ class Packet(PacketField):
         Updates the internal field records.
         Returns the new `PacketField`'s .value.
 
-        Paramaters:
+        Parameters:
         * `field_name`: the name for the new field; it must be new.
         * `bfr`: a `CornuCopyBuffer` from which to parse the field data.
         * `factory`: a factory for parsing the field data, returning

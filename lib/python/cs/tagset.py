@@ -95,7 +95,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-__version__ = '20200521.1-post'
+__version__ = '20200716-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -108,7 +108,7 @@ DISTINFO = {
         'cs.edit',
         'cs.lex',
         'cs.logutils',
-        'cs.obj',
+        'cs.obj>=20200716',
         'cs.pfx',
         'cs.py3',
         'icontract',
@@ -1157,7 +1157,9 @@ class TagsOntology(SingletonMixin):
   def _singleton_key(cls, tagset_mapping):
     return id(tagset_mapping)
 
-  def _singleton_init(self, tagset_mapping):
+  def __init__(self, tagset_mapping):
+    if hasattr(self, 'tagsets'):
+      return
     self.tagsets = tagset_mapping
 
   def __str__(self):

@@ -48,6 +48,60 @@ Multiline multithread example:
             T.start()
         for T in Ts:
             T.join()
+
+## A note about Upd and terminals
+
+I routinely use an `Upd()` as a progress reporting tool for commands
+running on a terminal. This attaches to `sys.stderr`.
+However, it is usually not desirable to run an `Upd` display
+if the backend is not a tty/terminal.
+Therefore, an `Upd` has a "disabled" mode
+which performs no output;
+if the backend is not a tty (as tested by `backend.isatty()`)
+this mode activates by default.
+
+The constructor has an optional parameter `disabled` to override
+this default behaviour.
+
+The whole purpose of this "disabled" mode is to ease main programme
+implementation.
+Before this mode one had two basic idioms to support "noninteractive" use,
+described below.
+
+The former was to test `sys.stderr.isatty()` and define an `Upd` or not:
+
+    upd = Upd() if sys.stderr.isatty() else None
+
+and to scatter tests throughout the code:
+
+    if upd:
+        upd.out("new status here")
+
+The latter was to work entirely through `UpdProxy` instances
+(which is convenient anyway), like this 2 status line example:
+
+    if sys.stderr.isatty():
+        upd = Upd()
+        status_proxy = upd.proxy(0)
+        progress_proxy = upd.insert(1)
+    else:
+        status_proxy = UpdProxy(None, None)
+        progress_proxy = UpdProxy(None, None)
+
+and to use the proxies thereafter:
+
+    status_proxy.text = "doing task A"
+    ... during task A ...
+    ... progress_proxy.text = progress.status() ...
+
+This works because `UpdProxy` instances support a "detached" mode,
+which is they state they move to when deleted
+in the normal course of operations.
+
+However, because an `Upd` defaults to being "disabled"
+if its backend is not a tty
+the usual main programme can just set one up and use it unconditionally;
+on a nontty there will simply be no output.
 '''
 
 from __future__ import with_statement, print_function
@@ -68,7 +122,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20200613-post'
+__version__ = '20200716.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -77,7 +131,8 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.gimmicks', 'cs.lex', 'cs.obj', 'cs.tty'],
+    'install_requires':
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
 }
 
 instances = []
@@ -107,7 +162,7 @@ def print(*a, **kw):
       The function supports an addition parameter beyond the builtin print:
       * `upd`: the `Upd` instance to use, default `Upd()`
 
-      Programmes intregrating `cs.upd` with use of the builtin `print`
+      Programmes integrating `cs.upd` with use of the builtin `print`
       function should use this at import time:
 
           from cs.upd import print
@@ -138,12 +193,14 @@ class Upd(SingletonMixin):
   '''
 
   @classmethod
-  def _singleton_key(cls, backend=None, columns=None):
+  def _singleton_key(cls, backend=None, columns=None, disabled=False):
     if backend is None:
       backend = sys.stderr
     return id(backend)
 
-  def _singleton_init(self, backend=None, columns=None):
+  def __init__(self, backend=None, columns=None, disabled=None):
+    if hasattr(self, '_backend'):
+      return
     if backend is None:
       backend = sys.stderr
     if columns is None:
@@ -152,7 +209,14 @@ class Upd(SingletonMixin):
         rc = ttysize(backend)
         if rc.columns is not None:
           columns = rc.columns
+    if disabled is None:
+      try:
+        disabled = not backend.isatty()
+      except AttributeError:
+        disabled = True
     self._backend = backend
+    self._disabled = disabled
+    self._disabled_backend = None
     self.columns = columns
     self._ti_ready = False
     self._ti_strs = {}
@@ -201,10 +265,16 @@ class Upd(SingletonMixin):
         Otherwise we clean up the status lines.
     '''
     slots = self._slot_text
-    if (exc_type
-        and not (issubclass(exc_type, SystemExit) and
-                 (exc_val.code is None or
-                  (isinstance(exc_val.code, int) and exc_val.code == 0)))):
+    if (exc_type is None or
+        (issubclass(exc_type, SystemExit) and (exc_val.code == 0 if isinstance(
+            exc_val.code, int) else exc_val.code is None))):
+      # no exception or SystemExit(0) or SystemExit(None)
+      # remove the Upd display
+      while len(slots) > 1:
+        del self[len(slots) - 1]
+      self[0] = ''
+    elif not self._disabled and self._backend is not None:
+      # preserve the display for debugging purposes
       # move to the bottom and emit a newline
       txts = self.move_to_slot_v(self._current_slot, 0)
       if slots[0]:
@@ -212,11 +282,25 @@ class Upd(SingletonMixin):
         txts.append('\n')
       self._backend.write(''.join(txts))
       self._backend.flush()
-    else:
-      # remove the Upd display
-      while len(slots) > 1:
-        del self[len(slots) - 1]
-      self[0] = ''
+
+  # Enable/disable. TODO: restore/withdrawn upd display on toggle.
+  def enable(self):
+    ''' Enable updates.
+    '''
+    with self._lock:
+      if self._disabled:
+        self._backend = self._disabled_backend
+        self._disabled_backend = None
+        self._disabled = False
+
+  def disable(self):
+    ''' Disable updates.
+    '''
+    with self._lock:
+      if not self._disabled:
+        self._disabled_backend = self._backend
+        self._backend = None
+        self._disabled = True
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
@@ -390,6 +474,8 @@ class Upd(SingletonMixin):
   def flush(self):
     ''' Flush the backend stream.
     '''
+    if self._disabled:
+      return
     backend = self._backend
     if backend is not None:
       backend.flush()
@@ -431,13 +517,17 @@ class Upd(SingletonMixin):
       txt = self.normalise(txt)
     backend = self._backend
     with self._lock:
-      oldtxt = self._slot_text[slot]
-      if oldtxt != txt:
-        txts = self.update_slot_v(slot, txt, raw_text=True, redraw=redraw)
-        self._current_slot = slot
+      if self._disabled or self._backend is None:
+        oldtxt = self._slot_text[slot]
         self._slot_text[slot] = txt
-        backend.write(''.join(txts))
-        backend.flush()
+      else:
+        oldtxt = self._slot_text[slot]
+        if oldtxt != txt:
+          txts = self.update_slot_v(slot, txt, raw_text=True, redraw=redraw)
+          self._current_slot = slot
+          self._slot_text[slot] = txt
+          backend.write(''.join(txts))
+          backend.flush()
     return oldtxt
 
   def nl(self, txt, *a, redraw=False):
@@ -460,6 +550,8 @@ class Upd(SingletonMixin):
         or if `txt` is wider than `self.columns`
         or if there is no "insert line" capability.
     '''
+    if self._disabled or self._backend is None:
+      return
     if a:
       txt = txt % a
     txts = []
@@ -523,27 +615,30 @@ class Upd(SingletonMixin):
             with U.above():
                 print('some message for stdout ...', flush=True)
     '''
-    # go to the top slot, overwrite it and then rewrite the slots below
-    backend = self._backend
-    slots = self._slot_text
-    txts = []
-    top_slot = len(slots) - 1
-    txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
-    txts.extend(self.redraw_line_v(''))
-    backend.write(''.join(txts))
-    backend.flush()
-    self._current_slot = top_slot
-    yield
-    txts = []
-    if need_newline:
-      clr_eol = self.ti_str('el')
-      if clr_eol:
-        txts.append(clr_eol)
-        txts.append('\v\r')
-    txts.extend(self.redraw_trailing_slots_v(top_slot, skip_first_vt=True))
-    backend.write(''.join(txts))
-    backend.flush()
-    self._current_slot = 0
+    if self._disabled or self._backend is None:
+      yield
+    else:
+      # go to the top slot, overwrite it and then rewrite the slots below
+      backend = self._backend
+      slots = self._slot_text
+      txts = []
+      top_slot = len(slots) - 1
+      txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+      txts.extend(self.redraw_line_v(''))
+      backend.write(''.join(txts))
+      backend.flush()
+      self._current_slot = top_slot
+      yield
+      txts = []
+      if need_newline:
+        clr_eol = self.ti_str('el')
+        if clr_eol:
+          txts.append(clr_eol)
+          txts.append('\v\r')
+      txts.extend(self.redraw_trailing_slots_v(top_slot, skip_first_vt=True))
+      backend.write(''.join(txts))
+      backend.flush()
+      self._current_slot = 0
 
   @contextmanager
   def without(self, temp_state='', slot=0):
@@ -553,14 +648,21 @@ class Upd(SingletonMixin):
         The `temp_state` parameter may be used to set the inner status line
         content if a value other than `''` is desired.
     '''
-    with self._lock:
-      old = self.out(temp_state, slot=slot)
-      try:
-        yield old
-      finally:
-        self.out(old, slot=slot)
+    if self._disabled or self._backend is None:
+      yield
+    else:
+      with self._lock:
+        old = self.out(temp_state, slot=slot)
+        try:
+          yield old
+        finally:
+          self.out(old, slot=slot)
 
   def selfcheck(self):
+    ''' Sanity check the internal data structures.
+
+        Warning: this uses asserts.
+    '''
     with self._lock:
       assert len(self._slot_text) == len(self._proxies)
       assert len(self._slot_text) > 0
@@ -591,42 +693,49 @@ class Upd(SingletonMixin):
             (len(self), index)
         )
       proxy = UpdProxy(self, index)
-      if il1:
-        # make sure insert line does not push the bottom line off the screen
-        # by forcing a scroll
-        txts.extend(self.move_to_slot_v(self._current_slot, 0))
-        self._current_slot = 0
-        txts.append('\v')
-        txts.append(cuu1)
-      if index == 0:
-        # move to bottom slot, add line below
-        txts.extend(self.move_to_slot_v(self._current_slot, 0))
-        txts.append('\v\r')
-        if il1:
-          txts.append(il1)
-          txts.append(txt)
-        else:
-          txts.extend(self.redraw_line_v(txt))
+      if self._disabled or self._backend is None:
+        # just maintain the slot text
         slots.insert(index, txt)
         proxies.insert(index, proxy)
-        self._update_proxies()
-        self._current_slot = 0
       else:
-        # move to the line which is to be below the inserted line
-        txts.extend(self.move_to_slot_v(self._current_slot, index - 1))
-        slots.insert(index, txt)
-        proxies.insert(index, proxy)
-        self._update_proxies()
         if il1:
-          txts.append(il1)
-          txts.append('\r')
-          txts.append(txt)
-          self._current_slot = index
-        else:
-          txts.extend(self.redraw_trailing_slots_v(index, skip_first_vt=True))
+          # make sure insert line does not push the bottom line off the screen
+          # by forcing a scroll
+          txts.extend(self.move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
-      self._backend.write(''.join(txts))
-      self._backend.flush()
+          txts.append('\v')
+          txts.append(cuu1)
+        if index == 0:
+          # move to bottom slot, add line below
+          txts.extend(self.move_to_slot_v(self._current_slot, 0))
+          txts.append('\v\r')
+          if il1:
+            txts.append(il1)
+            txts.append(txt)
+          else:
+            txts.extend(self.redraw_line_v(txt))
+          slots.insert(index, txt)
+          proxies.insert(index, proxy)
+          self._update_proxies()
+          self._current_slot = 0
+        else:
+          # move to the line which is to be below the inserted line
+          txts.extend(self.move_to_slot_v(self._current_slot, index - 1))
+          slots.insert(index, txt)
+          proxies.insert(index, proxy)
+          self._update_proxies()
+          if il1:
+            txts.append(il1)
+            txts.append('\r')
+            txts.append(txt)
+            self._current_slot = index
+          else:
+            txts.extend(
+                self.redraw_trailing_slots_v(index, skip_first_vt=True)
+            )
+            self._current_slot = 0
+        self._backend.write(''.join(txts))
+        self._backend.flush()
     return proxy
 
   def delete(self, index):
@@ -643,43 +752,54 @@ class Upd(SingletonMixin):
             (len(self), index)
         )
       if len(slots) == 1:
-        raise ValueError("cannot delete the last slot")
-      dl1 = self.ti_str('dl1')
-      cuu1 = self.ti_str('cuu1')
-      txts = self.move_to_slot_v(self._current_slot, index)
-      del slots[index]
-      proxy = proxies[index]
-      proxy.index = None
-      del proxies[index]
-      self._update_proxies()
-      if index == 0:
-        if dl1:
-          # erase bottom line and move up and then to the end of that slot
-          txts.append(dl1)
-        else:
-          # clear the bottom lone
-          txts.extend(self.redraw_line_v(''))
-        # move up and to the end of that slot
-        txts.append(cuu1)
-        txts.append('\r')
-        txts.append(slots[index])
+        # silently do not delete
+        ##raise ValueError("cannot delete the last slot")
+        return
+      if self._disabled or self._backend is None:
+        # just remote the data entries
+        del slots[index]
+        proxy = proxies[index]
+        proxy.index = None
+        del proxies[index]
       else:
-        # the effectiove index has now moved down
-        index -= 1
-        if dl1:
-          # delete line and advance to the end of the new current line
-          txts.extend((dl1, '\r', slots[index]))
-          self._current_slot = index
-        else:
-          # no delete line: redraw from here on down then clear the line below
-          txts.extend(self.redraw_trailing_slots_v(index, skip_first_vt=True))
-          txts.append('\v')
-          txts.extend(self.redraw_line_v(''))
+        dl1 = self.ti_str('dl1')
+        cuu1 = self.ti_str('cuu1')
+        txts = self.move_to_slot_v(self._current_slot, index)
+        del slots[index]
+        proxy = proxies[index]
+        proxy.index = None
+        del proxies[index]
+        self._update_proxies()
+        if index == 0:
+          if dl1:
+            # erase bottom line and move up and then to the end of that slot
+            txts.append(dl1)
+          else:
+            # clear the bottom lone
+            txts.extend(self.redraw_line_v(''))
+          # move up and to the end of that slot
           txts.append(cuu1)
-          txts.append(slots[0])
-          self._current_slot = 0
-      self._backend.write(''.join(txts))
-      self._backend.flush()
+          txts.append('\r')
+          txts.append(slots[index])
+        else:
+          # the effectiove index has now moved down
+          index -= 1
+          if dl1:
+            # delete line and advance to the end of the new current line
+            txts.extend((dl1, '\r', slots[index]))
+            self._current_slot = index
+          else:
+            # no delete line: redraw from here on down then clear the line below
+            txts.extend(
+                self.redraw_trailing_slots_v(index, skip_first_vt=True)
+            )
+            txts.append('\v')
+            txts.extend(self.redraw_line_v(''))
+            txts.append(cuu1)
+            txts.append(slots[0])
+            self._current_slot = 0
+        self._backend.write(''.join(txts))
+        self._backend.flush()
       return proxy
 
 class UpdProxy(object):
@@ -760,12 +880,14 @@ class UpdProxy(object):
     ''' The available space for text after `self.prefix`.
 
         This is available width for uncropped text,
-        intended support presizing messages such as progress bars.
-        Setting the text to something linger will the rightmost
+        intended to support presizing messages such as progress bars.
+        Setting the text to something longer will crop the rightmost
         portion of the text which fits.
     '''
     prefix = self.prefix
-    return self.upd.columns - 1 - (len(prefix) if prefix else 0)
+    return (self.upd.columns if self.upd else 80) - 1 - (
+        len(prefix) if prefix else 0
+    )
 
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
@@ -773,3 +895,5 @@ class UpdProxy(object):
     index = self.index
     if index is not None:
       self.upd.delete(index)
+
+  __del__ = delete

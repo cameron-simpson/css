@@ -14,7 +14,7 @@ from threading import Thread
 import unittest
 from cs.binary_tests import _TestPacketFields
 from cs.py3 import bytes
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, make_randblock
 from cs.socketutils import bind_next_port, OpenSocket
 from . import packetstream
 from .packetstream import Packet, PacketConnection
@@ -86,7 +86,7 @@ class _TestStream(object):
     rqs = []
     for _ in range(16):
       size = rand0(16385)
-      data = randblock(size)
+      data = make_randblock(size)
       flags = rand0(65537)
       R = self.local_conn.request(0, flags, data, self._decode_response, 0)
       rqs.append((R, flags, data))

@@ -1,3 +1,5 @@
+securer findup: sanity check on ownership or perms to stop walk? tunable?
+BaseCommand: can we provide the expected command name instead of the class name in the docstring?
 cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
 cs.upd: ansi_mode to accept coloured message strings - requires an ansi_ln function in cs.tty
 cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
@@ -11,7 +13,6 @@ new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?
 rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
-cs.cmdutils: usage includes subcommands even if no subcommands, because of cmd_help
 can putacc be recoded to use fstags --for-rsync efficiently?
 ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
 treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc

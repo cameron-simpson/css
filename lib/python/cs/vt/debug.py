@@ -14,6 +14,7 @@ from cs.fileutils import shortpath
 from cs.logutils import warning
 from cs.py.stack import caller, stack_dump
 from cs.tty import ttysize
+from cs.upd import print
 from cs.x import X
 
 def dump_Block(block, indent=''):
@@ -75,7 +76,7 @@ def dump_Store(S, indent=''):
   X("%s%s:%s", indent, type(S).__name__, S.name)
   indent += '  '
   if isinstance(S, DataDirStore):
-    X("%sdir = %s", indent, shortpath(S._datadir.statedirpath))
+    X("%sdir = %s", indent, shortpath(S._datadir.topdirpath))
   elif isinstance(S, FileCacheStore):
     X("%sdatadir = %s", indent, shortpath(S.cache.dirpath))
   elif isinstance(S, ProxyStore):

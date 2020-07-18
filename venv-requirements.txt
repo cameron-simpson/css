@@ -1,6 +1,8 @@
+bs4
 enum34
 icontract
 lmdb
+lxml
 mypy
 pycodestyle
 pyflakes
@@ -8,3 +10,4 @@ pylint
 sqlalchemy
 twine
 yapf
+youtube-dl
