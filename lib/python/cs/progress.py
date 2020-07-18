@@ -18,7 +18,7 @@ from cs.units import (
 )
 from cs.upd import Upd, print as upd_print
 
-__version__ = '20200718.3'
+__version__ = '20200718.3-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
