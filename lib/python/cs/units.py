@@ -17,7 +17,7 @@ Presupplied scales:
 
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20200718'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
