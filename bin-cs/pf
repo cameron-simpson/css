@@ -17,6 +17,7 @@ usage="Usage:
                                           the named portfwds.
     $cmd kill {ALL|portfwd-names}         Kill the processes
                                           enumerated by the portfwd pid files.
+    $cmd ls                               List available names from ~/.ssh/config-pf.
     $cmd remove portfwd-name...           Remove portfwd from the auto list.
     $cmd restart {ALL|portfwd-names...}   Restart the named portfwds.
     $cmd scrub                            Remove tunnel sockets and
@@ -117,6 +118,12 @@ case $arg1 in
             esac
           done
         fi
+        ;;
+  ls)   [ $# = 0 ] || {
+          echo "$cmd: $arg1: extra arguments: $*" >&2
+          exit 2
+        }
+        sed -n 's/^Host  *//p' "$HOME/.ssh/config-pf"
         ;;
   restart)
         if [ $# = 0 ]

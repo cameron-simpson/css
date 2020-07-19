@@ -1,0 +1,1 @@
+get_chars: accept a callable for gochars, indicating a per character test function.

@@ -11,12 +11,6 @@ import time
 import unittest
 from cs.result import Result, after, bg
 
-def D(msg, *a):
-  if a:
-    msg = msg % a
-  with open('/dev/tty', 'a') as tty:
-    print(msg, file=tty)
-
 class TestResult(unittest.TestCase):
 
   def setUp(self):

@@ -21,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200517-post'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -302,10 +302,17 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
+
+      `gochars` may also be a callable, in which case a character
+      `ch` is accepted if `gochars(ch)` is true.
   '''
   ooffset = offset
-  while offset < len(s) and s[offset] in gochars:
-    offset += 1
+  if callable(gochars):
+    while offset < len(s) and gochars(s[offset]):
+      offset += 1
+  else:
+    while offset < len(s) and s[offset] in gochars:
+      offset += 1
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
@@ -907,14 +914,14 @@ def cutsuffix(s, suffix):
 def cropped_repr(s, max_length=32, offset=0):
   ''' If the length of the sequence `s` after `offset (default `0`)
       exceeds `max_length` (default 32)
-      return the `repr` of the leading 29 characters from `offset`
+      return the `repr` of the leading `max_length-3` characters from `offset`
       plus `'...'`.
       Otherwise return the `repr` of `s[offset:]`.
 
       This is typically used for `str` values.
   '''
   if len(s) - offset > max_length:
-    return repr(s[offset:offset+29])+'...'
+    return repr(s[offset:offset + max_length - 3]) + '...'
   return repr(s[offset:])
 
 def get_ini_clausename(s, offset=0):

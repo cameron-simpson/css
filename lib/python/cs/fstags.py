@@ -39,11 +39,16 @@
 
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series_title="Series Full Name"`
+
+        series-name sf series_title="Series Full Name"
+
     * tag file `/path/to/series-name/.fstags`:
-      `season-02 season=2`
+
+      season-02 season=2
+
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 
@@ -51,21 +56,22 @@
 
     Walk the media tree for files tagged for backup to `archive2`:
 
-        find /path/to/media backup=archive2
+        fstags find /path/to/media backup=archive2
 
     Walk the media tree for files not assigned to a backup archive:
 
-        find /path/to/media -backup
+        fstags find /path/to/media -backup
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \
+        fstags find --for-rsync /path/to/media backup=archive2 \\
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
 
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
+import csv
 from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
@@ -96,11 +102,13 @@ from cs.logutils import error, warning, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
-from cs.tagset import TagSet, Tag, TagChoice, TagsOntology, TagsCommandMixin
+from cs.tagset import (
+    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
+)
 from cs.threads import locked, locked_property
 from cs.upd import Upd
 
-__version__ = '20200521.1-post'
+__version__ = '20200717.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -113,7 +121,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -234,6 +242,53 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return xit
 
   @classmethod
+  def cmd_export(cls, argv, options):
+    ''' Usage: {cmd} [-a] [--direct] path {{tag[=value]|-tag}}...
+          Export tags for files from path matching all the constraints.
+          -a        Export all paths, not just those with tags.
+          --direct  Export the direct tags instead of the computed tags.
+          The output is in the same CSV format as that from "sqltags export",
+          with the following columns:
+          * unixtime: the file's st_mtime from os.stat.
+          * id: empty
+          * name: the file path
+          * tags: the file's direct or indirect tags
+    '''
+    fstags = options.fstags
+    badopts = False
+    all_paths = False
+    use_direct_tags = False
+    options, argv = getopt(argv, 'a', longopts=['direct'])
+    for option, value in options:
+      with Pfx(option):
+        if option == '-a':
+          all_paths = true
+        elif option == '--direct':
+          use_direct_tags = True
+        else:
+          raise RuntimeError("unimplemented option")
+    if not argv:
+      warning("missing path")
+      badopts = True
+    else:
+      path = argv.pop(0)
+      try:
+        tag_choices = cls.parse_tag_choices(argv)
+      except ValueError as e:
+        warning("bad tag specifications: %s", e)
+        badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    xit = 0
+    csvw = csv.writer(sys.stdout)
+    for filepath in fstags.find(realpath(path), tag_choices,
+                                use_direct_tags=use_direct_tags):
+      te = fstags[filepath].as_TaggedEntity(indirect=not use_direct_tags)
+      if all_paths or te.tags:
+        csvw.writerow(te.csvrow)
+    return xit
+
+  @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
           List files from path matching all the constraints.
@@ -304,6 +359,52 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           U.out(oldU)
     return xit
 
+  @staticmethod
+  def cmd_import(argv, options):
+    ''' Usage: {cmd} {{-|srcpath}}...
+          Import CSV data in the format emitted by "export".
+          Each argument is a file path or "-", indicating standard input.
+    '''
+    fstags = options.fstags
+    badopts = False
+    if not argv:
+      warning("missing srcpaths")
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    for srcpath in argv:
+      if srcpath == '-':
+        with Pfx("stdin"):
+          fstags.import_csv_file(sys.stdin)
+      else:
+        with Pfx(srcpath):
+          with open(srcpath) as f:
+            fstags.import_csv_file(f)
+
+  def import_csv_file(self, f, *, convert_name=None):
+    ''' Import CSV data from the file `f`.
+
+        Parameters:
+        * `f`: the source CSV file
+        * `convert_name`: a callable to convert each input name
+          into a file path; the default is to use the input name directly
+    '''
+    csvr = csv.reader(f)
+    for csvrow in csvr:
+      with Pfx(csvr.line_num):
+        te = TaggedEntity.from_csvrow(csvrow)
+        if convert_name:
+          with Pfx("convert_name(%r)", te.name):
+            path = convert_name(te.name)
+        else:
+          path = te.name
+        self.add_tagged_entity(te, path=path)
+
+  def add_tagged_entity(self, te, path=None):
+    ''' Import a `TaggedEntity` as `path` (default `te.name`).
+    '''
+    TaggedPath.from_TaggedEntity(te, fstags=self, path=path)
+
   @classmethod
   def cmd_json_import(cls, argv, options):
     ''' Usage: json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
@@ -325,7 +426,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         if option == '--prefix':
           tag_prefix = value
         else:
-          raise RuntimeError("unsupported option")
+          raise RuntimeError("unimplemented option")
     if tag_prefix is None:
       warning("missing required --prefix option")
       badopts = True
@@ -887,7 +988,7 @@ class FSTags(MultiOpenMixin):
 
   @locked
   def __getitem__(self, path):
-    ''' Return the `TaggedPath` for `path`.
+    ''' Return the `TaggedPath` for `abspath(path)`.
     '''
     path = abspath(path)
     tagged_path = self._tagged_paths.get(path)
@@ -1268,7 +1369,9 @@ class TagFile(SingletonMixin):
     return filepath, ontology, find_parent
 
   @require(lambda filepath: isinstance(filepath, str))
-  def _singleton_init(self, filepath, *, ontology=None, find_parent=False):
+  def __init__(self, filepath, *, ontology=None, find_parent=False):
+    if hasattr(self, 'filepath'):
+      return
     self.filepath = filepath
     self.ontology = ontology
     self.find_parent = find_parent
@@ -1556,6 +1659,50 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     ''' Test for the presence of `tag` in the `all_tags`.
     '''
     return tag in self.all_tags
+
+  def as_TaggedEntity(self, te_id=None, name=None, indirect=False):
+    ''' Return a `TaggedEntity` for this `TaggedPath`,
+        useful for export.
+
+        Parameters:
+        * `te_id`: a value for the `TaggedEntity.id` attribute, default `None`
+        * `name`: a value for the `TaggedEntity.name` attribute,
+          default `self.filepath`
+        * `indirect`: if true, use a copy of `self.all_tags`
+          for `TaggedEntity.tags`, otherwise a copy of `self.direct_tags`.
+          The default is `False`.
+    '''
+    if name is None:
+      name = self.filepath
+    try:
+      S = os.stat(self.filepath)
+    except OSError:
+      unixtime = None
+    else:
+      unixtime = S.st_mtime
+    tags = TagSet()
+    tags.update(self.all_tags if indirect else self.direct_tags)
+    return TaggedEntity(id=te_id, name=name, unixtime=unixtime, tags=tags)
+
+  @classmethod
+  def from_TaggedEntity(cls, te, *, fstags, path=None):
+    ''' Factory to create a `TaggedPath` from a `TaggedEntity`.
+
+        Parameters:
+        * `te`: the source `TaggedEntity`
+        * `fstags`: the associated `FSTags` instance
+        * `path`: the path for the new instance,
+          default from `te.name`
+
+        Note that the `te.tags` are merged into the existing `TagSet`
+        for the `path`.
+    '''
+    if path is None:
+      path = te.name
+    tagged_path = fstags[path]
+    if te.tags:
+      tagged_path.direct_tags.update(te.tags)
+    return tagged_path
 
   @property
   def ontology(self):

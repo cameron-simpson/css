@@ -16,7 +16,7 @@ import sys
 import tempfile
 import unittest
 from cs.logutils import setup_logging
-from .randutils import rand0, randbool, randblock
+from .randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
@@ -209,7 +209,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
                                                      ):
       with self.subTest(hashname=hashname):
         size = random.randint(127, 16384)
-        data = randblock(size)
+        data = make_randblock(size)
         h = S.hash(data, hashclass)
         self.assertLen(S, n_added)
         ok = S.contains(h)
@@ -237,7 +237,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       with self.subTest(hashname=hashname):
         for _ in range(16):
           size = random.randint(127, 16384)
-          data = randblock(size)
+          data = make_randblock(size)
           h = S.hash(data, hashclass)
           h2 = S.add(data, type(h))
           n_added += 1
@@ -259,13 +259,13 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
-    data = randblock(rand0(8193))
+    data = make_randblock(rand0(8193))
     h = M1.add(data)
     KS1.add(h)
     self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
-    data2 = randblock(rand0(8193))
+    data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
     self.assertLen(M1, 2)
@@ -280,11 +280,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     M1 = self.S
     KS1 = self.keys1
     for _ in range(16):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
     # make a block not in the map
-    data2 = randblock(rand0(8193))
+    data2 = make_randblock(rand0(8193))
     h2 = self.S.hash(data2)
     self.assertNotIn(h2, KS1, "abort test: %s in previous blocks" % (h2,))
     #
@@ -324,7 +324,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     KS1 = self.keys1
     # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h = M1.add(data)
       self.assertIn(h, M1)
       self.assertNotIn(h, KS1)
@@ -413,7 +413,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     M1 = self.S
     KS1 = self.keys1
     for _ in range(16):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
     with MappingStore("M2MappingStore", mapping={},
@@ -422,7 +422,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       # construct M2 as a mix of M1 and random new blocks
       for _ in range(16):
         if randbool():
-          data = randblock(rand0(8193))
+          data = make_randblock(rand0(8193))
           h = M2.add(data)
           KS2.add(h)
         else:
