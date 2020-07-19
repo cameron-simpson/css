@@ -1296,7 +1296,7 @@ class TaggedEntityMixin(FormatableMixin):
       * `name`: the entity's name;
         this is typically `None` for log entries.
       * `unixtime`: a UNIX timestamp,
-        a `float` holdsing seconds since the UNIX epoch
+        a `float` holding seconds since the UNIX epoch
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
         for entities associated with database rows.
