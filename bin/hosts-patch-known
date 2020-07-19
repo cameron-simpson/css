@@ -8,13 +8,20 @@
 
 set -ue
 
+marker='KNOWN ADDRESSES'
 hosts=/etc/hosts
 sfx=.l
 
 cmd=$0
-usage="Usage: $cmd [hostsfile] <etc-hosts-content"
+usage="Usage: $cmd [-m marker] [hostsfile] <etc-hosts-content"
 
 badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-m ]
+then
+  marker=$2
+  shift; shift
+fi
 
 if [ $# -gt 0 ]
 then
@@ -35,8 +42,8 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # make sure marker lines are present
-grep '^## BEGIN KNOWN ADDRESSES' "$hosts" >/dev/null \
-|| { echo; echo '## BEGIN KNOWN ADDRESSES'; echo '## END KNOWN ADDRESSES'; } \
+grep "^## BEGIN $marker" "$hosts" >/dev/null \
+|| { echo; echo "## BEGIN $marker"; echo "## END $marker"; } \
    >>"$hosts"
 
-exec rlr -f '^## BEGIN KNOWN ADDRESSES' -t '^## END KNOWN ADDRESSES' "$hosts"
+exec rlr -f "^## BEGIN $marker" -t "^## END $marker" "$hosts"
