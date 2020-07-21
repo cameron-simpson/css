@@ -20,7 +20,30 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     Default from \$DK_COMPOSE_YML: $DK_COMPOSE_YML
   -n name
     Specify primary service name.
-    This is also the target service for \"exec\"."
+    This is also the target service for \"exec\".
+  Most ops are passed to docker or docker-compose, but the following
+  are specially handled:
+    cp [name:]path [name:]path
+      Passed to \"docker cp\".
+      \"name\" is the short container name.
+      The \"path\" is, if relative, relative to \$DK_CP_PREFIX.
+    exec [command...]
+      Passwd to \"docker exec\".
+      The -i option is presupplied, and the -t option if stdin is a tty.
+      The environment variables names in \$DK_ENVVARS are passed through.
+      The default \"command\" is \"bash\".
+      The command is prefixed by \$DK_EXEC_PREFIX, for example if
+      there is a standard aenvironment setup script within the
+      container.
+    logs
+      Passed to docker-compose -f \$DK_PRIMARY_SERVICE.
+    rsh name command...
+      Run command inside \"name\" in an rsh/ssh compatible way, to
+      support use as a drop in for commands which themselve can use
+      an rsh/ssh-like command such as rsync.
+    rsync rsync-args...
+      Rsync into or out of the container where the container name
+      comes from the \"host\" part of an rsync remote path."
 
 badopts=
 
@@ -90,6 +113,8 @@ case "$op" in
       exec docker "$op" ${1+"$@"}
       ;;
   exec)
+      docker_exec_opts=-i
+      [ -t 0 ] && docker_exec_opts="$docker_exec_opts -t"
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
       then
@@ -101,12 +126,20 @@ case "$op" in
         set -- env "$@"
       fi
       set -x
-      exec docker exec -it "$primary_container" $DK_EXEC_PREFIX "$@"
+      exec docker exec $docker_exec_opts "$primary_container" $DK_EXEC_PREFIX "$@"
       ;;
   logs)
       set -x
       [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
       ;;
+  rsh)
+      rhost=$1; shift
+      set -x
+      exec "$0" -n "$rhost" exec sh -c "$*"
+      ;;
+  rsync)
+      set -x
+      exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
   update)
       set -ex
       "$0" down

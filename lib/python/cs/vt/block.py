@@ -69,7 +69,7 @@ class BlockType(IntEnum):
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
 class BlockRecord(PacketField):
-  ''' PacketField support binary parsing and transcription of blockrefs.
+  ''' PacketField support for binary parsing and transcription of blockrefs.
   '''
 
   TEST_CASES = (
@@ -216,6 +216,8 @@ class _Block(Transcriber, ABC):
     self._lock = RLock()
 
   def __eq__(self, oblock):
+    ''' Compare this Block with another Block for data equality.
+    '''
     if self is oblock:
       return True
     if self.span != oblock.span:
@@ -357,8 +359,10 @@ class _Block(Transcriber, ABC):
   @locked
   def get_blockmap(self, force=False, blockmapdir=None):
     ''' Get the blockmap for this block, creating it if necessary.
-        `force`: if true, create a new blockmap anyway; default: False
-        `blockmapdir`: directory to hold persistent block maps
+
+        Parameters:
+        * `force`: if true, create a new blockmap anyway; default: `False`
+        * `blockmapdir`: directory to hold persistent block maps
     '''
     if force:
       blockmap = None
@@ -505,7 +509,7 @@ class _Block(Transcriber, ABC):
         * `progress`: optional Progress to update its total
 
         TODO: optional `no_wait` parameter to control waiting,
-        default False, which would support closing the Queue but
+        default `False`, which would support closing the Queue but
         not waiting for the worker completion. This is on the premise
         that the final Store shutdown of `S2` will wait for outstanding
         operations anyway.
@@ -996,8 +1000,8 @@ class _SubBlock(_Block):
 
   @require(lambda superB, suboffset: 0 <= suboffset < len(superB))
   @require(
-      lambda superB, suboffset, span: span > 0 and suboffset + span <
-      len(superB)
+      lambda superB, suboffset, span:
+      (span > 0 and suboffset + span <= len(superB))
   )
   def __init__(self, superB, suboffset, span, **kw):
     with Pfx("_SubBlock(suboffset=%d, span=%d)[len(superB)=%d]", suboffset,

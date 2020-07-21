@@ -4,10 +4,10 @@ icontract
 lmdb
 lxml
 mypy
-sqlalchemy
-pylint
-pyflakes
 pycodestyle
+pyflakes
+pylint
+sqlalchemy
 twine
 yapf
 youtube-dl

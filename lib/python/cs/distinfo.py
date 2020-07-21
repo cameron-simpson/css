@@ -25,7 +25,6 @@ from os.path import (
 )
 from pprint import pprint, pformat
 import re
-import shutil
 from subprocess import Popen
 import sys
 from tempfile import TemporaryDirectory
@@ -38,6 +37,7 @@ from cs.deco import cachedmethod
 from cs.fstags import TagFile
 from cs.lex import cutsuffix
 from cs.logutils import error, warning, info, status
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 import cs.psutils
 from cs.py.doc import module_doc
@@ -125,7 +125,7 @@ class CSReleaseCommand(BaseCommand):
   def apply_opts(opts, options):
     ''' Apply the command line options mapping `opts` to `options`.
     '''
-    for opt, val in opts:
+    for opt, _ in opts:
       if opt == '-f':
         options.force = True
       elif opt == '-q':
@@ -202,6 +202,7 @@ class CSReleaseCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing package name")
+    vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
     if argv:
@@ -213,8 +214,8 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    with pkg.checkout(vcstag, checkout_dir, persist=True):
-      print(checkout_dir)
+    ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True, bare=True)
+    print(checkout_dir)
 
   @staticmethod
   def cmd_distinfo(argv, options):
@@ -294,6 +295,7 @@ class CSReleaseCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing package name")
+    vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
     if argv:
@@ -305,9 +307,8 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    with pkg.checkout(vcstag, checkout_dir, persist=True):
-      pkg.prepare_package(checkout_dir)
-      print(checkout_dir)
+    ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True)
+    print(checkout_dir)
 
   @staticmethod
   def cmd_pypi(argv, options):
@@ -319,28 +320,32 @@ class CSReleaseCommand(BaseCommand):
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
+        vcs = options.vcs
         release = pkg.latest
         vcstag = release.vcstag
-        with TemporaryDirectory(prefix=vcstag + '-') as pkg_dir:
-          with Pfx(pkg_dir):
-            with pkg.checkout(vcstag, pkg_dir, exists=True, persist=True):
-              pkg.prepare_package(pkg_dir)
-              pkg.prepare_dist(pkg_dir)
-              pkg.upload_dist(pkg_dir)
-              pkg.latest_pypi_version = release.version
+        pkg_dir = ModulePackageDir(pkg, vcs, vcstag)
+        dirpath = pkg_dir.dirpath
+        pkg.upload_dist(dirpath)
+        pkg.latest_pypi_version = release.version
 
   @staticmethod
   def cmd_readme(argv, options):
-    ''' Usage: {cmd} pkg_name
+    ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
+          -a  Document all public class members (default is just
+              __new__ and __init__ for the PyPI README.md file).
     '''
+    all_class_names = False
+    if argv and argv[0] == '-a':
+      all_class_names = True
+      argv.pop(0)
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     pkg = options.modules[pkg_name]
-    docs = pkg.compute_doc()
+    docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
   @staticmethod
@@ -407,7 +412,10 @@ class CSReleaseCommand(BaseCommand):
         (next_vcstag, release_message), summary_filename, changes_filename,
         versioned_filename
     )
-    vcs.tag(next_vcstag, message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag))
+    vcs.tag(
+        next_vcstag,
+        message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag)
+    )
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
         '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
@@ -462,10 +470,11 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
 def runcmd(argv, **kw):
   ''' Run command.
   '''
-  P = Popen(argv, **kw)
-  xit = P.wait()
-  if xit != 0:
-    raise ValueError("command failed, exit code %d: %r" % (xit, argv))
+  with Pfx("Popen(%r,...)", argv):
+    P = Popen(argv, **kw)
+    xit = P.wait()
+    if xit != 0:
+      raise ValueError("command failed, exit code %d: %r" % (xit, argv))
 
 def cd_shcmd(wd, shcmd):
   ''' Run a command supplied as a sh(1) command string.
@@ -721,7 +730,7 @@ class Module(object):
         (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
     )
 
-  def compute_doc(self):
+  def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
     '''
     # break out the release log and format it
@@ -738,7 +747,10 @@ class Module(object):
             f'*Release {release_tag.version}*:\n{release_entry}'
         )
     # split the module documentation after the opening paragraph
-    full_doc = module_doc(self.module)
+    full_doc = module_doc(
+        self.module,
+        method_names=None if all_class_names else ('__new__', '__init__')
+    )
     try:
       doc_head, doc_tail = full_doc.split('\n\n', 1)
     except ValueError:
@@ -778,7 +790,7 @@ class Module(object):
 
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
-    docs = self.compute_doc()
+    docs = self.compute_doc(all_class_names=True)
     dinfo.update(
         description=docs.description, long_description=docs.long_description
     )
@@ -898,7 +910,8 @@ class Module(object):
           continue
         for filename in sorted(filenames):
           if not (filename.endswith('.pyc') or filename.endswith('.o')):
-            pathlist.append(joinpath(subpath, filename))
+            filepath=joinpath(subpath, filename)
+            pathlist.append(filepath)
     else:
       base = self.basename
       updir = dirname(basepath)
@@ -914,28 +927,6 @@ class Module(object):
     if not pathlist:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
-
-  @contextmanager
-  def checkout(self, vcs_revision, dirpath, exists=False, persist=False):
-    ''' Check out the specified `vcs_revision` to the directory `dirpath`.
-    '''
-    with Pfx("checkout %r ==> %r", vcs_revision, dirpath):
-      if exists:
-        if not isdirpath(dirpath):
-          raise ValueError("already exists")
-      else:
-        with Pfx("mkdir(%r)", dirpath):
-          os.mkdir(dirpath)
-      hg_argv = ['archive', '-r', vcs_revision]
-      hg_argv.extend(self.vcs.hg_include(self.paths()))
-      hg_argv.extend(['--', dirpath])
-      self.vcs.hg_cmd(*hg_argv)
-    try:
-      yield dirpath
-    finally:
-      if not persist:
-        with Pfx("rmtree(%r)", dirpath):
-          shutil.rmtree(dirpath)
 
   @pfx_method
   def prepare_package(self, pkg_dir):
@@ -1019,20 +1010,26 @@ class Module(object):
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
+  def reldistfiles(self, pkg_dir):
+    return [
+        relpath(fullpath, pkg_dir)
+        for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
+    ]
+
   @pfx_method
   def prepare_dist(self, pkg_dir):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check', 'sdist']))
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check']))
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'sdist']))
+    distfiles = self.reldistfiles(pkg_dir)
+    cd_shcmd(pkg_dir, shqv(['twine', 'check'] + distfiles))
 
   @pfx_method
   def upload_dist(self, pkg_dir):
     ''' Upload the package to PyPI using twine.
     '''
-    distfiles = [
-        relpath(fullpath, pkg_dir)
-        for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
-    ]
+    distfiles = self.reldistfiles(pkg_dir)
     cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
 
   @pfx_method(use_str=True)
@@ -1233,6 +1230,53 @@ class Module(object):
     for name in sorted(self.imported_names):
       if name.startswith(prefix) and name != self.name:
         yield self.modules[name]
+
+class ModulePackageDir(SingletonMixin):
+  ''' A singleton class for module package distributions.
+  '''
+
+  @classmethod
+  def _singleton_key(cls, pkg, vcs, revision):
+    return pkg.name, revision
+
+  def __init__(self, pkg, vcs, revision, persist=False):
+    # upgrade persist setting if requested
+    self.persist = getattr(self, 'persist', False) or persist
+    if hasattr(self, 'pkg'):
+      return
+    self.pkg = pkg
+    self.vcs = vcs
+    self.revision = revision
+    self._setup()
+
+  def __del__(self):
+    if self.pkg_dir and not self.persist:
+      self.pkg_dir.cleanup()
+      self.pkg_dir = None
+
+  @pfx_method
+  def _setup(self):
+    pkg = self.pkg
+    vcs = self.vcs
+    vcs_revision = self.revision
+    pkg_dir = self.pkg_dir = TemporaryDirectory(prefix=vcs_revision + '-')
+    dirpath = self.dirpath = pkg_dir.name
+    self.fill(dirpath, pkg, vcs, vcs_revision)
+
+  @staticmethod
+  def fill(dirpath, pkg, vcs, vcs_revision, *, do_mkdir=False, bare=False):
+    with Pfx(dirpath):
+      if do_mkdir:
+        with Pfx("mkdir(%r)", dirpath):
+          os.mkdir(dirpath, 0o777)
+      hg_argv = ['archive', '-r', vcs_revision]
+      hg_argv.extend(vcs.hg_include(pkg.paths()))
+      hg_argv.extend(['--', dirpath])
+      vcs.hg_cmd(*hg_argv)
+      os.system("find %r -type f -print" % (dirpath,))
+      if not bare:
+        pkg.prepare_package(dirpath)
+        pkg.prepare_dist(dirpath)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -19,7 +19,7 @@ usage="Usage: $cmd [-f cfg] [--] op [args...]
     process [{name|directory}...]
       Move all images prior to today into subdirectories by day.
       Create per-day MP4 files for all such subdirectories.
-  Config names: $all_names"
+  Config names from $cfg: $all_names"
 
 badopts=
 

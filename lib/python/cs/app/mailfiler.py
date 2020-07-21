@@ -82,6 +82,8 @@ from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
 
+__version__ = '20200719-post'
+
 DISTINFO = {
     'description':
     "email message filing system which monitors multiple inbound Maildir folders",
@@ -814,7 +816,8 @@ class MessageFiler(NS):
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
-        info("    MATCH %s", R)
+        if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
+          info("    MATCH %s", R)
 
       return self.save_message()
 
