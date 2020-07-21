@@ -1169,6 +1169,13 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
 def structtuple(class_name, struct_format, subvalue_names):
   ''' Convenience wrapper for multi_struct_field.
+
+      Example:
+
+          Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+
+      which is a record with big-endian unsigned 64 and 32 fields
+      named `pts` and `type`.
   '''
   return multi_struct_field(
       struct_format, subvalue_names=subvalue_names, class_name=class_name
