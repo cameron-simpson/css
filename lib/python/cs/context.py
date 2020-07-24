@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-''' Context managers. Initially just `stackattrs`.
+''' Assorted context managers.
 '''
 
 from contextlib import contextmanager
@@ -31,7 +31,7 @@ def pushattrs(o, **attr_values):
       Push `attr_values` onto `o` as attributes,
       return the previous attribute values in a dict.
 
-      This can be useful in hook/signal/callback,
+      This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
   '''
   old_values = {}
@@ -50,7 +50,7 @@ def popattrs(o, attr_names, old_values):
       Restore previous attributes of `o`
       named by `attr_names` with previous state in `old_values`.
 
-      This can be useful in hook/signal/callback,
+      This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
   '''
   for attr in attr_names:
@@ -73,6 +73,9 @@ def stackattrs(o, **attr_values):
 
       Restoration includes deleting attributes which were not present
       initially.
+
+      This makes it easy to adjust temporarily some shared context object
+      without having to pass it through the call stack.
 
       See `stackkeys` for a flavour of this for mappings.
 
@@ -136,7 +139,7 @@ def pushkeys(d, **key_values):
       Push `key_values` onto `d` as key values.
       return the previous key values in a dict.
 
-      This can be useful in hook/signal/callback,
+      This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
   '''
   old_values = {}
@@ -155,7 +158,7 @@ def popkeys(d, key_names, old_values):
       Restore previous key values of `d`
       named by `key_names` with previous state in `old_values`.
 
-      This can be useful in hook/signal/callback,
+      This can be useful in hooks/signals/callbacks,
       where you cannot inline a context manager.
   '''
   for key in key_names:
@@ -179,7 +182,10 @@ def stackkeys(d, **key_values):
       Restoration includes deleting key values which were not present
       initially.
 
-      See `stackattrs` for a flavour of this for objects.
+      This makes it easy to adjust temporarily some shared context object
+      without having to pass it through the call stack.
+
+      See `stackattrs` for a flavour of this for object attributes.
 
       Example of making log entries which may reference
       some higher level context log entry:
