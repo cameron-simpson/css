@@ -124,9 +124,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   def apply_defaults(options):
     ''' Set up the default values in `options`.
     '''
-    db_url = os.environ.get(DBURL_ENVVAR)
-    if db_url is None:
-      db_url = expanduser(DBURL_DEFAULT)
+    db_url = SQLTags.infer_db_url()
     options.db_url = db_url
     options.sqltags = None
 
@@ -472,6 +470,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     db_path = cutprefix(db_url, 'sqlite://')
     if db_path is db_url:
       if db_url.startswith(('/', './', '../')) or '://' not in db_url:
+        # turn filesystenm pathnames into SQLite db URLs
         db_path = abspath(db_url)
         db_url = 'sqlite:///' + db_url
       else:
@@ -919,6 +918,24 @@ class SQLTags(MultiOpenMixin):
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
+
+  @staticmethod
+  @fmtdoc
+  def infer_db_url(envvar=None, default_path=None):
+    ''' Infer the database URL.
+
+        Parameters:
+        * `envvar`: environment variable to specify a default,
+          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+    '''
+    if envvar is None:
+      envvar = DBURL_ENVVAR
+    if default_path is None:
+      default_path = DBURL_DEFAULT
+    db_url = os.environ.get(envvar)
+    if not db_url:
+      db_url = expanduser(default_path)
+    return db_url
 
   def startup(self):
     ''' Stub for startup: prepare the ORM.
