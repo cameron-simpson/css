@@ -222,10 +222,20 @@ class ORM(MultiOpenMixin):
         See `with_session` for details.
     '''
 
-    def wrapper(self, *a, session=None, **kw):
-      ''' Prepare a session if one is not supplied.
-      '''
-      return with_session(method, self, *a, session=session, orm=self, **kw)
+    if isgeneratorfunction(method):
+
+      def wrapper(self, *a, session=None, **kw):
+        ''' Prepare a session if one is not supplied.
+        '''
+        with using_session(session=session, orm=self):
+          yield from method(self, *a, session=session, **kw)
+    else:
+
+      def wrapper(self, *a, session=None, **kw):
+        ''' Prepare a session if one is not supplied.
+        '''
+        with using_session(session=session, orm=self):
+          return method(self, *a, session=session, **kw)
 
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
