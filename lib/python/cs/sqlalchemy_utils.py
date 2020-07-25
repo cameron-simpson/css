@@ -248,11 +248,20 @@ class ORM(MultiOpenMixin):
         to set the shared state `orm` to `self`.
     '''
 
-    def wrapper(self, *a, **kw):
-      ''' Call `method` with its ORM as the shared state `orm`.
-      '''
-      with _state(orm=self):
-        return method(self, *a, **kw)
+    if isgeneratorfunction(method):
+
+      def wrapper(self, *a, **kw):
+        ''' Call `method` with its ORM as the shared state `orm`.
+        '''
+        with _state(orm=self):
+          yield from method(self, *a, **kw)
+    else:
+
+      def wrapper(self, *a, **kw):
+        ''' Call `method` with its ORM as the shared state `orm`.
+        '''
+        with _state(orm=self):
+          return method(self, *a, **kw)
 
     wrapper.__name__ = method.__name__
     wrapper.__doc__ = method.__doc__
