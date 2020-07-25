@@ -126,15 +126,20 @@ def auto_session(function):
       See `with_session` for details.
   '''
 
-  def wrapper(*a, orm=None, session=None, **kw):
-    ''' Call the function with a session.
+  if isgeneratorfunction(function):
 
-        If no session is supplied
-        and the shared per-thread state does not have an active session,
-        prepare a new session for the function
-        using `with_session()`.
-    '''
-    return with_session(function, *a, orm=orm, session=session, **kw)
+    def wrapper(*a, orm=None, session=None, **kw):
+      ''' Yield from the function with a session.
+      '''
+      with using_session(orm=orm, session=session) as session:
+        yield from function(*a, session=session, **kw)
+  else:
+
+    def wrapper(*a, orm=None, session=None, **kw):
+      ''' Call the function with a session.
+      '''
+      with using_session(orm=orm, session=session) as session:
+        return function(*a, session=session, **kw)
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
   wrapper.__doc__ = function.__doc__
