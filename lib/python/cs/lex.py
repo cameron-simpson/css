@@ -121,13 +121,6 @@ def strlist(ary, sep=", "):
   '''
   return sep.join([str(a) for a in ary])
 
-def lastlinelen(s):
-  ''' The length of text after the last newline in a string.
-
-      (Initially used by cs.hier to compute effective text width.)
-  '''
-  return len(s) - s.rfind('\n') - 1
-
 def htmlify(s, nbsp=False):
   ''' Convert a string for safe transcription in HTML.
 
