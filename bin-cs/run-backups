@@ -27,7 +27,7 @@ do
   do
     : ${dst:=$(basename "$src")}
     ( cd
-      pfx "$target" $set-x rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst"
+      pfx "$target" set-x rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst"
     )
   done <"$hbf"
 done
