@@ -785,6 +785,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           JSON, nullable=True, default=None, comment='tag value in JSON form'
       )
 
+      # one tag value per name, use structured_value for complex values
+      UniqueConstraint('entity_id', 'name')
+
       @staticmethod
       @require(
           lambda float_value: float_value is None or
