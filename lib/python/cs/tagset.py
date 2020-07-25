@@ -20,7 +20,7 @@
     * `Tag`: an object with a `.name` and optional `.value` (default `None`)
       and also an optional reference `.ontology`
       for associating semantics with tag values.
-      The `.value` (if not `None`) will often be a string,
+      The `.value`, if not `None`, will often be a string,
       but may be any Python object.
       If you're using these via `cs.fstags`,
       the object will need to be JSON transcribeable.
@@ -125,6 +125,10 @@ class TagSet(dict, FormatableMixin):
 
       Also note that all the `Tags` from `TagSet`
       share its ontology.
+
+      Subclasses should override the `set` and `discard` methods;
+      the `dict` and mapping methods
+      are defined in terms of these two basic operations.
   '''
 
   @pfx_method
@@ -803,7 +807,7 @@ class ExtendedNamespace(SimpleNamespace):
 
       Because [:alpha:]* attribute names
       are reserved for "public" keys/attributes,
-      most methods commence with an underscore (`'_'`).
+      most methods commence with an underscore (`_`).
   '''
 
   def _public_keys(self):
@@ -888,9 +892,12 @@ class TagSetNamespace(ExtendedNamespace):
   ''' A formattable nested namespace for a `TagSet`,
       subclassing `ExtendedNamespace`.
 
-      Where the node paths of this namespace tree match
-      the name of a `Tag` from the `TagSet`
-      that node has the following direct attributes:
+      These are useful within format strings
+      and `str.format` or `str.format_map`.
+
+      This provides an assortment of special names derived from the `TagSet`.
+      See the docstring for `__getattr__` for the special attributes provided
+      beyond those already provided by `ExtendedNamespace.__getattr__`.
   '''
 
   @classmethod
@@ -899,7 +906,7 @@ class TagSetNamespace(ExtendedNamespace):
     ''' Compute and return a presentation of this `TagSet` as a
         nested `ExtendedNamespace`.
 
-        `ExtendedNamespaces` provide a number of convenience attibutes
+        `ExtendedNamespace`s provide a number of convenience attibutes
         derived from the concrete attributes. They are also usable
         as mapping in `str.format_map` and the like as they implement
         the `keys` and `__getitem__` methods.
@@ -958,6 +965,8 @@ class TagSetNamespace(ExtendedNamespace):
   def __getitem__(self, key):
     tag = self.__dict__.get('_tag')
     if tag is not None:
+      # This node in the hierarchy is associated with a Tag.
+      # Dereference the Tag's value.
       value = tag.value
       try:
         element = value[key]
@@ -965,11 +974,15 @@ class TagSetNamespace(ExtendedNamespace):
         warning("[%r]: %s", key, e)
         pass
       except KeyError:
+        # Leave a visible indication of the unfulfilled dereference.
         return self._path + '[' + repr(key) + ']'
       else:
+        # Look up this element in the ontology (if any).
         member_metadata = tag.member_metadata(key)
         if member_metadata is None:
+          # No metadata? Return the element.
           return element
+        # Return teh metadata for the element.
         return member_metadata.ns()
     return super().__getitem__(key)
 
