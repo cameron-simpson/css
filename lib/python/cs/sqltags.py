@@ -213,7 +213,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             error(str(e))
             xit = 1
             continue
-          print(output)
+          print(output.replace('\n', ' '))
     return xit
 
   @staticmethod
