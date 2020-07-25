@@ -1045,11 +1045,10 @@ class SQLTags(MultiOpenMixin):
         otherwise the conflict will raise a `ValueError`.
     '''
     csvr = csv.reader(f)
-    orm = self.orm
     for csvrow in csvr:
       with Pfx(csvr.line_num):
         te = TaggedEntity.from_csvrow(csvrow)
-        self.add_tagged_entity(te)
+        self.add_tagged_entity(te, session=session)
 
   @orm_auto_session
   def add_tagged_entity(self, te, *, session, update_mode=False):
