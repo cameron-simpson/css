@@ -1410,3 +1410,13 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
       It is available for other domains as an arbitrary identifier/key value,
       should that be useful.
   '''
+
+  def set(self, tag_name, value, *, verbose=None):
+    ''' Set a tag on `self.tags`.
+    '''
+    self.tags.set(tag_name, value, verbose=verbose)
+
+  def discard(self, tag_name, value=None, *, verbose=None):
+    ''' Discard a tag from `self.tags`.
+    '''
+    self.discard(tag_name, value, verbose=verbose)
