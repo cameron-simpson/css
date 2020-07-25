@@ -15,7 +15,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20200517.2-post'
+__version__ = '20200725'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
