@@ -909,11 +909,12 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.entities = Entities
 
 class SQLTags(MultiOpenMixin):
-  ''' A class to examine filesystem tags.
+  ''' A class to embodying an database and its entities and tags.
   '''
 
-  def __init__(self, db_url):
-    MultiOpenMixin.__init__(self)
+  def __init__(self, db_url=None):
+    if not db_url:
+      db_url = self.infer_db_url()
     self.db_url = db_url
     self.orm = None
     self._lock = RLock()
