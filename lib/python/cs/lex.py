@@ -1019,7 +1019,7 @@ class FormatableMixin(object):
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TagSet` class
+      For example, the `cs.tagset.TaggedEntityMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
   '''
