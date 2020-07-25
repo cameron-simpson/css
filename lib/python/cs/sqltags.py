@@ -13,14 +13,12 @@
     documented under the `SQLTagsCommand` class below.
 '''
 
-from collections import namedtuple
-from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
 from datetime import datetime
 from getopt import getopt, GetoptError
 import os
-from os.path import abspath, basename, expanduser, exists as existspath
+from os.path import abspath, expanduser, exists as existspath
 import re
 import sys
 import threading
@@ -28,20 +26,19 @@ from threading import RLock
 import time
 from icontract import require
 from sqlalchemy import (
-    create_engine, event, Index, Column, Integer, Float, String, JSON,
-    ForeignKey
+    create_engine, Column, Integer, Float, String, JSON, ForeignKey,
+    UniqueConstraint
 )
-from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import sessionmaker, aliased
-import sqlalchemy.sql.functions as func
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.dateutils import UNIXTimeMixin, datetime2unixtime, unixtime2datetime
+from cs.dateutils import UNIXTimeMixin, unixtime2datetime
+from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import makelockfile
-from cs.lex import FormatableMixin, FormatAsError, cutprefix
-from cs.logutils import error, warning, ifverbose, info
+from cs.lex import FormatAsError, cutprefix
+from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -52,7 +49,6 @@ from cs.tagset import (
     TagSet as _TagSet, Tag, TagChoice, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
-from cs.upd import Upd
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -63,8 +59,12 @@ DISTINFO = {
     'entry_points': {
         'console_scripts': ['sqltags = cs.sqltags:main'],
     },
-    'install_requires':
-    ['cs.logutils', 'cs.pfx', 'cs.tagset', 'cs.upd', 'icontract'],
+    'install_requires': [
+        'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
+        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
+        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads', 'icontract',
+        'sqlalchemy'
+    ],
 }
 
 # regexp for "word[,word...]:", the leading prefix for categories
@@ -157,10 +157,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Usage: {cmd} {{tag[=value]|-tag}}...
           Export entities matching all the constraints.
           The output format is CSV data with the following columns:
-          * unixtime: the entity unixtime, a float
-          * id: the entity database row id, an integer
-          * name: the entity name
-          * tags: a column per `Tag`
+          * `unixtime`: the entity unixtime, a float
+          * `id`: the entity database row id, an integer
+          * `name`: the entity name
+          * `tags`: a column per `Tag`
     '''
     sqltags = options.sqltags
     badopts = False
@@ -438,7 +438,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     sqltags = options.sqltags
     orm = sqltags.orm
-    with orm.session() as session:
+    with orm.session():
       with stackattrs(state, verbose=True):
         for name in names:
           with Pfx(name):
@@ -691,7 +691,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               if the string commences with a `'-'` (minus)
               a negative test is made
         '''
-        entities = orm.entities
         tags = orm.tags
         if query is None:
           query = cls.by_name(name=name, session=session)
@@ -1034,7 +1033,7 @@ class SQLTags(MultiOpenMixin):
   @orm_auto_session
   def find(self, tag_choices, *, session):
     ''' Generator yielding `TaggedEntity` instances
-        for the the `Entity` rows matching `tag_choices`.
+        for the `Entity` rows matching `tag_choices`.
     '''
     entities = self.orm.entities
     query = entities.by_tags(tag_choices, session=session)
@@ -1083,6 +1082,8 @@ class TagSet(_TagSet):
 
   @property
   def entity(self):
+    ''' The `TaggedEntity` associated with this `TagSet`.
+    '''
     return self.sqltags[self.entity_id]
 
   @auto_session
