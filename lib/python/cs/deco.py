@@ -76,16 +76,21 @@ def decorator(deco):
   '''
 
   def metadeco(*da, **dkw):
-    # TODO: general handling of first-argument-callable
-    # to support func2 = deco(func1, args..., kwargs...).
-    # Currently this must be done as:
-    # func2=deco(args..., kwargs...)(func1)
-    #
-    # if there's exactly one callable position argument
-    # then it is the target function: call deco(func).
-    if len(da) == 1 and callable(da[0]) and not dkw:
+    ''' Compute either the wrapper function for `func`
+        or a decorator expecting to get `func` when used.
+
+        If there is at least one positional parameter
+        and it is callable the it is presumed to be the function to decorate;
+        decorate it directly.
+
+        Otherwise return a decorator using the provided arguments,
+        ready for the subsequent function.
+    '''
+    if len(da) == 1 and callable(da[0]):
+      # `func` is already supplied, decorate it now.
       func = da[0]
-      decorated = deco(func)
+      da = tuple(da[1:])
+      decorated = deco(func, *da, **dkw)
       if not getattr(decorated, '__doc__', None):
         decorated.__doc__ = getattr(func, '__doc__', '')
       func_module = getattr(func, '__module__', None)
@@ -95,10 +100,9 @@ def decorator(deco):
         pass
       return decorated
 
-    # otherwise we collect the arguments supplied
-    # and return a function which takes a callable
-    # and returns deco(func, *da, **kw).
-
+    # `func` is not supplied, collect the arguments supplied and return a
+    # decorator which takes the subsequent callable and returns
+    # `deco(func, *da, **kw)`.
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
