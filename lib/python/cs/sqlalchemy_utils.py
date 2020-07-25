@@ -63,6 +63,32 @@ def with_orm(function, *a, orm=None, **kw):
   with _state(orm=orm):
     return function(*a, orm=orm, **kw)
 
+@contextmanager
+def using_session(orm=None, session=None):
+  # use the shared state session if no session is supplied
+  if session is None:
+    session = _state.session
+  # we have a session, run the function inside a nested transaction
+  if session is not None:
+    with _state(session=session):
+      # run the function inside a savepoint in the supplied session
+      with session.begin_nested():
+        yield session
+  else:
+    # no session, we need to create one
+    if orm is None:
+      # use the shared state ORM if no orm is supplied
+      orm = _state.orm
+      if orm is None:
+        raise ValueError(
+            "no orm supplied from which to make a session,"
+            " and no shared state orm"
+        )
+    # create a new session and run the function within it
+    with orm.session() as new_session:
+      with _state(orm=orm, session=new_session):
+        yield new_session
+
 def with_session(function, *a, orm=None, session=None, **kw):
   ''' Call `function(*a,session=session,**kw)`, creating a session if required.
       The function `function` runs within a transaction,
