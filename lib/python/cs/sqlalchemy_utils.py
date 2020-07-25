@@ -277,10 +277,20 @@ def orm_auto_session(method):
       See `with_session` for details.
   '''
 
-  def wrapper(self, *a, session=None, **kw):
-    ''' Prepare a session if one is not supplied.
-    '''
-    return with_session(method, self, *a, session=session, orm=self.orm, **kw)
+  if isgeneratorfunction(method):
+
+    def wrapper(self, *a, session=None, **kw):
+      ''' Yield from the method with a session.
+      '''
+      with using_session(orm=self.orm, session=session) as session:
+        yield from method(self, *a, session=session, **kw)
+  else:
+
+    def wrapper(self, *a, session=None, **kw):
+      ''' Call the method with a session.
+      '''
+      with using_session(orm=self.orm, session=session) as session:
+        return method(self, *a, session=session, **kw)
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
