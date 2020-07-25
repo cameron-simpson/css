@@ -972,7 +972,7 @@ class SQLTags(MultiOpenMixin):
       )
     entities = self.orm.entities
     if isinstance(index, int):
-      query = entities.query(session).filter_by(id=index)
+      query = session.query(entities).filter_by(id=index)
     else:
       query = entities.by_name(index)
     matches = list(self._run_query(query, session=session))
