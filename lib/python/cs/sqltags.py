@@ -446,7 +446,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               index = int(name)
             except ValueError:
               index = name
-            te = sqltags.get(name)
+            te = sqltags.get(index)
             if te is None:
               error("missing")
               xit = 1
