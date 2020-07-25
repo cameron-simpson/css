@@ -455,10 +455,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             for tag_choice in tag_choices:
               if tag_choice.choice:
                 if tag_choice.tag not in tags:
-                  entity.add_tag(tag_choice.tag, session=session)
+                  te.set(tag_choice.tag)
               else:
                 if tag_choice.tag in tags:
-                  entity.discard_tag(tag_choice.tag, session=session)
+                  te.discard(tag_choice.tag)
     return xit
 
 SQLTagsCommand.add_usage_to_docstring()
@@ -602,7 +602,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             *Note*: this is a copy. Modifying this `TagSet`
             will not affect the database tags.
         '''
-        entity_tags = TagSet()
+        entity_tags = TagSet(sqltags=None, entity_id=self.id)
         entity_tags.update(
             (
                 (tagrow.name, tagrow.value)
