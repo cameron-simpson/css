@@ -48,7 +48,9 @@ from cs.sqlalchemy_utils import (
     ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
     HasIdMixin
 )
-from cs.tagset import TagSet, Tag, TagChoice, TagsCommandMixin, TaggedEntity
+from cs.tagset import (
+    TagSet as _TagSet, Tag, TagChoice, TagsCommandMixin, TaggedEntity
+)
 from cs.threads import locked
 from cs.upd import Upd
 
@@ -995,10 +997,13 @@ class SQLTags(MultiOpenMixin):
       results = session.execute(query)
       for entity_id, entity_name, unixtime in results:
         yield TaggedEntity(
-            id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
+            id=entity_id,
+            name=entity_name,
+            unixtime=unixtime,
+            tags=TagSet(sqltags=self, entity_id=entity_id)
         )
       return
-    # entities and tag information which must be merged
+    # obtain entities and tag information which must be merged
     query = entities.with_tags(query)
     results = session.execute(query)
     entity_map = {}
@@ -1006,14 +1011,20 @@ class SQLTags(MultiOpenMixin):
          tag_string_value, tag_structured_value) in results:
       e = entity_map.get(entity_id)
       if not e:
+        # not seen before
         e = entity_map[entity_id] = TaggedEntity(
-            id=entity_id, name=entity_name, unixtime=unixtime, tags=TagSet()
+            id=entity_id,
+            name=entity_name,
+            unixtime=unixtime,
+            tags=TagSet(sqltags=self, entity_id=entity_id)
         )
       if tag_name is not None:
+        # set the dict entry directly - we are loading db values,
+        # not applying them to the db
         value = self.orm.tags.pick_value(
             tag_float_value, tag_string_value, tag_structured_value
         )
-        e.tags.add(tag_name, value)
+        e.tags.set(tag_name, value, skip_db=True)
     yield from entity_map.values()
 
   @orm_auto_session
@@ -1057,6 +1068,35 @@ class SQLTags(MultiOpenMixin):
     for tag in te.tags:
       with Pfx(tag):
         e.add_tag(tag, session=session)
+
+class TagSet(_TagSet):
+  ''' A `TagSet` associated with a tagged entity.
+  '''
+
+  def __init__(self, *a, sqltags, entity_id, **kw):
+    super().__init__(*a, **kw)
+    self.sqltags = sqltags
+    self.entity_id = entity_id
+
+  @property
+  def entity(self):
+    return self.sqltags[self.entity_id]
+
+  @auto_session
+  def set(self, tag_name, value=None, *, session, skip_db=False, **kw):
+    ''' Add `tag_name`=`value` to this `TagSet`.
+    '''
+    if not skip_db:
+      self.entity.add_tag(tag_name, value, session=session)
+    super().set(tag_name, value=value, **kw)
+
+  @auto_session
+  def discard(self, tag_name, value=None, *, session, skip_db=False, **kw):
+    ''' Discard `tag_name`=`value` from this `TagSet`.
+    '''
+    if not skip_db:
+      self.entity.discard_tag(tag_name, value, session=session)
+    super().discard(tag_name, value, **kw)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
