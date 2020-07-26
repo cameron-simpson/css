@@ -1,6 +1,7 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-repos = sr.ht bitbucket
+##repos = sr.ht bitbucket
+repos = sr.ht
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 title           = Cameron Simpson's Scripts
