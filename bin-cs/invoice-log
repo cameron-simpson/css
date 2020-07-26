@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Pull out log lines for a date range.
+# - Cameron Simpson <cs@cskk.id.au> 26jul2020
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd org startdate enddate"
+
+[ $# = 3 ] || { echo "$usage" >&2; exit 2; }
+org=$1 start=$2 end=$3
+
+rcfile=$HOME/rc/invoice/$org.sh
+[ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
+. "$rcfile"
+
+(
+  egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
+  for d in $gitdirs
+  do
+    ( cd "$d"
+      git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
+    )
+  done
+) \
+| awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$4 == email && $1 >= start && $1 <= end {print}' \
+| sort -u
