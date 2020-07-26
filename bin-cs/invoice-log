@@ -27,4 +27,6 @@ set -x
   done
 ) \
 | awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$1 >= start && $1 <= end {print}' \
-| sort -u
+| sort -u \
+| awk '$1 != last_date {print("")}
+       {print; last_date=$1}'
