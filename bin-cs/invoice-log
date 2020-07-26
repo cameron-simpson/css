@@ -16,14 +16,15 @@ rcfile=$HOME/rc/invoice/$org.sh
 [ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
 . "$rcfile"
 
+set -x
 (
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
   for d in $gitdirs
   do
     ( cd "$d"
       git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
-    )
+    ) | awk -v "email=$EMAIL" '$4 == email {print}'
   done
 ) \
-| awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$4 == email && $1 >= start && $1 <= end {print}' \
+| awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$1 >= start && $1 <= end {print}' \
 | sort -u
