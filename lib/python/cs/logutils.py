@@ -57,7 +57,7 @@ from threading import Lock
 import time
 import traceback
 from types import SimpleNamespace as NS
-from cs.ansi_colour import colourise
+from cs.ansi_colour import colourise, env_no_color
 from cs.deco import fmtdoc, logging_wrapper
 from cs.lex import is_dotted_identifier
 import cs.pfx
@@ -75,7 +75,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.ansi_colour', 'cs.deco', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
+    ['cs.ansi_colour>=20200729', 'cs.deco', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -148,7 +148,10 @@ def setup_logging(
         otherwise to `False` if `flags` contains 'NOUPD',
         otherwise set it from `main_log.isatty()`.
         A true value causes the root logger to use `cs.upd` for logging.
-      * `ansi_mode`: if `None`, set it from `main_log.isatty()`.
+      * `ansi_mode`: if `None`,
+        set it from `main_log.isatty() and not cs.colourise.env_no_color()`,
+        which thus honours the `$NO_COLOR` environment variable
+        (see https://no-color.org/ for the convention).
         A true value causes the root logger to colour certain logging levels
         using ANSI terminal sequences (currently only if `cs.upd` is used).
       * `trace_mode`: if `None`, set it according to the presence of
@@ -213,7 +216,7 @@ def setup_logging(
       upd_mode = is_tty
 
   if ansi_mode is None:
-    ansi_mode = is_tty
+    ansi_mode = is_tty and not env_no_color()
 
   if format is None:
     if is_tty or is_fifo:
