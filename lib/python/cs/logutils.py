@@ -74,8 +74,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.ansi_colour>=20200729', 'cs.deco', 'cs.lex', 'cs.pfx', 'cs.py.func', 'cs.upd'],
+    'install_requires': [
+        'cs.ansi_colour>=20200729', 'cs.deco', 'cs.lex', 'cs.pfx',
+        'cs.py.func', 'cs.upd'
+    ],
 }
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
