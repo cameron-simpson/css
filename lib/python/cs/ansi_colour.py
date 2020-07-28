@@ -147,7 +147,7 @@ def colourise_patterns(s, patterns, default_colour=None):
       Returns the string with ANSI colour escapes embedded.
   '''
   patterns = make_patterns(patterns, default_colour=default_colour)
-  chars = [ [c, NORMAL_COLOUR] for c in s ]
+  chars = [[c, NORMAL_COLOUR] for c in s]
   for colour, regexp in patterns:
     for m in regexp.finditer(s):
       for pos in range(m.start(), m.end()):
