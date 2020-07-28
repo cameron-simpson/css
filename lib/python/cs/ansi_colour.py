@@ -59,15 +59,17 @@ def env_no_color(environ=None):
     environ = os.environ
   return 'NO_COLOR' in environ
 
-def colourise(s, colour=None, uncolour='normal'):
+def colourise(s, colour=None, uncolour=None):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
 
       * `colour`: names the desired ANSI colour.
       * `uncolour`: may be used to specify the colour-off colour;
-        the default is 'normal'.
+        the default is 'normal' (from `NORMAL_COLOUR`).
   '''
   if colour is None:
     colour = DEFAULT_HIGHLIGHT
+  if uncolour is None:
+    uncolour = NORMAL_COLOUR
   return COLOURS[colour] + s + COLOURS[uncolour]
 
 def make_pattern(pattern, default_colour=None):
