@@ -73,12 +73,17 @@ def colourise(s, colour=None, uncolour=None):
   return COLOURS[colour] + s + COLOURS[uncolour]
 
 def make_pattern(pattern, default_colour=None):
-  ''' Convert a pattern specification into a (colour, regexp) tuple.
+  ''' Convert a `pattern` specification into a `(colour,regexp)` tuple.
 
-      Each pattern may be:
+      Parameters:
+      * `pattern`: the pattern to parse
+      * `default_colour`: the highlight colour,
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
+
+      Each `pattern` may be:
       * a string of the form "[colour]:regexp"
       * a string containing no colon, taken to be a regexp
-      * a tuple of the form (colour, regexp)
+      * a tuple of the form `(colour,regexp)`
       * a regexp object
   '''
   if default_colour is None:
@@ -103,7 +108,12 @@ def make_pattern(pattern, default_colour=None):
 
 def make_patterns(patterns, default_colour=None):
   ''' Convert an iterable of pattern specifications into a list of
-      (colour, regexp) tuples.
+      `(colour,regexp)` tuples.
+
+      Parameters:
+      * `patterns`: an iterable of patterns to parse
+      * `default_colour`: the highlight colour,
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
 
       Each pattern may be:
       * a string of the form "[colour]:regexp"
@@ -117,17 +127,19 @@ def make_patterns(patterns, default_colour=None):
   ]
 
 def colourise_patterns(s, patterns, default_colour=None):
-  ''' Colourise a string according to patterns.
+  ''' Colourise a string `s` according to `patterns`.
 
-      * `s`: the string
-      * `patterns`: a sequence of patterns
+      Parameters:
+      * `s`: the string.
+      * `patterns`: a sequence of patterns.
       * `default_colour`: if a string pattern has no colon, or starts
-        with a colon, use this colour; default DEFAULT_HIGHLIGHT
+        with a colon, use this colour;
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
 
       Each pattern may be:
       * a string of the form "[colour]:regexp"
       * a string containing no colon, taken to be a regexp
-      * a tuple of the form (colour, regexp)
+      * a tuple of the form `(colour,regexp)`
       * a regexp object
 
       Returns the string with ANSI colour escapes embedded.
