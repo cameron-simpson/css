@@ -14,6 +14,8 @@ to strings for colour highlighting of output.
 import os
 import re
 
+__version__ = '20200729'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
