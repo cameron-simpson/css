@@ -5,12 +5,13 @@
 #
 
 '''
-Convenience functions for ANSI terminal colour sequences
+Convenience functions for ANSI terminal colour sequences [color].
 
 Mapping and function for adding ANSI terminal colour escape sequences
 to strings for colour highlighting of output.
 '''
 
+import os
 import re
 
 DISTINFO = {
@@ -49,6 +50,14 @@ assert NORMAL_COLOUR in COLOURS
 # default highlight colour
 DEFAULT_HIGHLIGHT = 'cyan'
 assert DEFAULT_HIGHLIGHT in COLOURS
+
+def env_no_color(environ=None):
+  ''' Test the `$NO_COLOR` environment variable per the specification at
+      https://no-color.org/
+  '''
+  if environ is None:
+    environ = os.environ
+  return 'NO_COLOR' in environ
 
 def colourise(s, colour=None, uncolour='normal'):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
