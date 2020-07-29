@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 from cs.logutils import setup_logging
-from .randutils import randomish_chunks
+from cs.randutils import randomish_chunks
 from .datadir import DataDir, RawDataDir
 from .hash import HASHCLASS_BY_NAME
 from .index import (

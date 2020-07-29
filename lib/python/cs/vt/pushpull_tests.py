@@ -5,7 +5,7 @@
 
 import unittest
 from random import randint
-from .randutils import rand0, make_randblock
+from cs.randutils import rand0, make_randblock
 from cs.x import X
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum

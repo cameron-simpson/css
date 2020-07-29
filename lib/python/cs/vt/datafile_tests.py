@@ -16,7 +16,7 @@ except ImportError:
 from cs.binary_tests import _TestPacketFields
 from cs.buffer import CornuCopyBuffer
 ##from cs.debug import thread_dump
-from .randutils import rand0, make_randblock
+from cs.randutils import rand0, make_randblock
 from . import datafile
 from .datafile import DataRecord, DataFilePushable
 # from .hash_tests import _TestHashCodeUtils
