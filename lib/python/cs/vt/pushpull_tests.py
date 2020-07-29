@@ -14,6 +14,8 @@ import cs.x
 cs.x.X_via_tty = True
 
 class _TestMissingHashCodes(object):
+  ''' Base class for testing missing hashcodes.
+  '''
 
   def setUp(self):
     self.map1 = HashUtilDict()
@@ -85,6 +87,8 @@ class _TestMissingHashCodes(object):
 
 class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes,
                                              unittest.TestCase):
+  ''' Test basic missing hashcodes function.
+  '''
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes
@@ -92,6 +96,8 @@ class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes,
 
 class TestMissingHashCodes_Missing_hashcodes_checksum(_TestMissingHashCodes,
                                                       unittest.TestCase):
+  ''' Test checksum based missing hashcodes function.
+  '''
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes_by_checksum

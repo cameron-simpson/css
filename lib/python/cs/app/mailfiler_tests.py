@@ -26,6 +26,8 @@ testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.app.mailfiler')
 test_rules_file = joinpath(testdatadir, 'rules')
 
 class TestMailFiler(unittest.TestCase):
+  ''' Tests for `cs.app.mailfiler`.
+  '''
 
   def setUp(self):
     pass

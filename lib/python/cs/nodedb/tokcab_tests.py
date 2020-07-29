@@ -18,6 +18,8 @@ from . import NodeDB
 from .tokcab import Backend_TokyoCabinet
 
 class TestAll(NodeTestAll):
+  ''' Tests for `cs.nodedb.tokcab`.
+  '''
 
   def setUp(self):
     dbpath = 'test-%d.tch' % (seq(),)

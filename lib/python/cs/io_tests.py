@@ -10,6 +10,8 @@ import unittest
 from cs.io import contlines
 
 class TestIO(unittest.TestCase):
+  ''' Test `cs.io`.
+  '''
 
   def setUp(self):
     pass

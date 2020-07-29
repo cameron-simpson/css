@@ -27,11 +27,15 @@ MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Test the `PacketField`s.
+  '''
 
   def setUp(self):
     self.module = datafile
 
 class TestDataFile(unittest.TestCase):
+  ''' Tests for `DataFile`.
+  '''
 
   def setUp(self):
     random.seed()

@@ -21,6 +21,8 @@ testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.mailutils')
 testmaildir = joinpath(testdatadir, 'maildir')
 
 class TestMaildir(unittest.TestCase):
+  ''' Tests for `cs.mailutils.Maildir`.
+  '''
 
   def test00basic(self):
     t0 = time.time()

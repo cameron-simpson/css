@@ -18,6 +18,8 @@ from .store import MappingStore
 TESTDIR = 'vtfuse_testdir'
 
 class Test_VTFuse(unittest.TestCase):
+  ''' Tests for `cs.vt.fuse`.
+  '''
 
   def setUp(self):
     self.store_dict = {}

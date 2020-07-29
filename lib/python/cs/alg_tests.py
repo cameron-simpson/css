@@ -9,6 +9,8 @@ import unittest
 from cs.alg import collate
 
 class TestAlg(unittest.TestCase):
+  ''' Test cs.logfunctions.
+  '''
 
   class Klass(object):
 

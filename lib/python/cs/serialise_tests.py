@@ -22,6 +22,8 @@ else:
     return BytesIO(bs.as_str())
 
 class TestSerialise(unittest.TestCase):
+  ''' Tests for `cs.serialise`.
+  '''
 
   def setUp(self):
     pass

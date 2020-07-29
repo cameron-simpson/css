@@ -13,6 +13,8 @@ from .store import MappingStore
 from .file import RWBlockFile
 
 class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
+  ''' Tests for `RWBlockFile`.
+  '''
 
   def setUp(self):
     self.store_dict = {}
