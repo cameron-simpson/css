@@ -1,3 +1,4 @@
+use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
 cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
