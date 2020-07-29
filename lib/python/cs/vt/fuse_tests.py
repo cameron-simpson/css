@@ -9,10 +9,15 @@ import sys
 import unittest
 from random import randint
 from cs.fileutils import BackedFile, BackedFile_TestMethods
+from cs.logutils import warning
 from cs.x import X
 from . import defaults
 from .dir import Dir
-from .fuse import mount
+try:
+  from .fuse import mount
+except ImportError as e:
+  warning("import fails, no mount function: %s", e)
+  mount = None
 from .store import MappingStore
 
 TESTDIR = 'vtfuse_testdir'
@@ -35,6 +40,7 @@ class Test_VTFuse(unittest.TestCase):
   def tearDown(self):
     os.rmdir(TESTDIR)
 
+  @unittest.skipIf(mount is None, "no FUSE mount function")
   def test_FS(self):
     X("test_FS...")
 
