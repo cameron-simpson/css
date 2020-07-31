@@ -18,7 +18,7 @@ sed -n 's/^[Hh]ost //p' "$ssh_cfg" \
       ssh -F "$ssh_cfg" -G "$host1" 2>/dev/null | sed -n 's/^hostname //p' | {
         read hostname || exit 1
         case "$hostname" in
-          127.0.0.1)
+          127.0.*)
             addrs=
             ;;
           [0-9]* | *:* )
