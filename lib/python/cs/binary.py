@@ -325,6 +325,21 @@ class PacketField(ABC):
     for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
       yield obj.value
 
+  @classmethod
+  def parse_file(cls, f, **kw):
+    ''' Function to parse repeated instances of `cls` from the file `f`
+        until end of input.
+
+        Parameters:
+        * `f`: the binary file object to parse;
+          if `f` is a string, that pathname is opened for binary read.
+    '''
+    if isinstance(f, str):
+      with open(f, 'rb') as f2:
+        yield from cls.parse_file(f2, **kw)
+      return
+    return cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
+
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
 
