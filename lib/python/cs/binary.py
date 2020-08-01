@@ -337,8 +337,8 @@ class PacketField(ABC):
     if isinstance(f, str):
       with open(f, 'rb') as f2:
         yield from cls.parse_file(f2, **kw)
-      return
-    return cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
+    else:
+      yield from cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
 
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
