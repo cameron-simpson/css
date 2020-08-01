@@ -43,12 +43,24 @@
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
 
     Classes built from `struct` format strings:
-    * `struct_field`: a factory for making `PacketField` classes
-      from `struct` formats with a single value field.
     * `structtuple`: a factory for `PacketField` subclasses
       for `struct` formats with multiple value fields.
       These classes are `namedtuple` subclasses
       supporting trivial access to the parsed values.
+    * `struct_field`: a factory for making `PacketField` classes
+      from `struct` formats with a single value field.
+
+    Here's an example of a `structtuple`:
+
+        # a "cut" record from the .cuts file
+        Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+
+    which makes the `Enigma2Cut` class for a `'>QL'` `struct` definition.
+    Like every such class, it comes with all the parsing and transcription
+    methods from `PacketField`.
+    Here's some code to read these from a file:
+
+        yield from Enigma2Cut.parse_file(pathname)
 
     You don't need to make fields only from binary source data;
     because `PacketField.__init__` takes a post parse value,
