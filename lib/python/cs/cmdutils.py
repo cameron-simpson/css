@@ -339,8 +339,10 @@ class BaseCommand:
           main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
         except AttributeError:
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %r" %
-              (subcmd, sorted(subcmds.keys()))
+              "%s: unrecognised subcommand, expected one of: %s" % (
+                  subcmd,
+                  ', '.join(sorted(subcmds.keys())),
+              )
           )
         subcmd_context = Pfx(subcmd)
         try:
