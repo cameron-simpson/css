@@ -401,11 +401,11 @@ class Pfx(object):
 
   # Logger methods
   @logging_wrapper
-  def exception(self, msg, *args):
+  def exception(self, msg, *args, **kwargs):
     ''' Log an exception message to this Pfx's loggers.
     '''
     for L in self.loggers:
-      L.exception(msg, *args)
+      L.exception(msg, *args, **kwargs)
 
   @logging_wrapper
   def log(self, level, msg, *args, **kwargs):

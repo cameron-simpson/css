@@ -546,10 +546,10 @@ def logException(exc_type, exc_value, exc_tb):
     sys.excepthook = curhook
 
 # Logger public functions
-def exception(msg, *args):
+def exception(msg, *args, **kwargs):
   ''' Emit an exception log with the current Pfx prefix.
   '''
-  Pfx._state.cur.exception(msg, *args)
+  Pfx._state.cur.exception(msg, *args, **kwargs)
 
 @logging_wrapper
 def log(level, msg, *args, **kwargs):
