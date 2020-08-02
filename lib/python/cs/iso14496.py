@@ -253,6 +253,34 @@ class MP4Command(BaseCommand):
         over_box, = parse(parsee)
         over_box.dump(crop_length=None)
 
+  def cmd_tags(self, argv, options):
+    ''' Usage: {cmd} path
+          Report the tags of `path` based on embedded MP4 metadata.
+    '''
+    xit = 0
+    fstags = FSTags()
+    tag_prefix = self.TAG_PREFIX
+    opts, argv = getopt(argv, 'p:', longopts=['prefix'])
+    for option, value in opts:
+      with Pfx(option):
+        if option in ('-p', '--prefix'):
+          tag_prefix = value
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after path: %r" % (argv,))
+    with fstags:
+      out(path)
+      with Pfx(path):
+        for box, tags in parse_tags(path, tag_prefix=tag_prefix,
+                                    discard_data=True):
+          for tag in tags:
+            print(tag)
+    return xit
+
   @staticmethod
   def cmd_test(argv, options):
     ''' Run self tests.
