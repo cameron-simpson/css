@@ -192,7 +192,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
 
   @multitest
   def test00empty(self):
-    ''' Test that a new STore is empty.
+    ''' Test that a new Store is empty.
     '''
     S = self.S
     self.assertLen(S, 0)
