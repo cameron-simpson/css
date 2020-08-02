@@ -142,7 +142,7 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
     if skip_zero and count == 0:
       continue
     count_i = int(count)
-    text.append( (str(count) if count_i == count else "%.1f" % count) + unit )
+    text.append( (str(count_i) if count_i == count else "%.1f" % count) + unit )
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
