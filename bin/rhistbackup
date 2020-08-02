@@ -48,7 +48,7 @@ do
     for remote in $( echo "$remotes" | tr , ' ' )
     do
       set-x envssh -o controlpath=none "$remote" \
-        "set -ue; set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1; cd $qremotedir; pwd; set -x; histbackup -i -x $remotessh:$qqlocaldir ." \
+        "set -ue; set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1; cd $qremotedir; pwd; set -x; histbackup -i -x $remotessh:$qqlocaldir . --outbuf=line" \
         || xit=1
     done
     exit $xit

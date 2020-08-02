@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Run my backups from the current machine to other places.
+# Consults ~/rc-local/rsync.* files for image backups
+# and ~/rc-local/histbackup.* for rhistbackup backups.
+# - Cameron Simpson <cs@cskk.id.au> 25jul2020
+#
+
+set -ue
+
+rcdir=$HOME/rc-local
+
+for rsyncf in "$rcdir"/rsync.*
+do
+  base=$( basename "$rsyncf" )
+  target=${base#*.}
+  ( cd
+    pfx "$target" set-x rsync --files-from=- -iar --delete . "$target:BACKUP/$HOST/rsync/"
+  ) < "$rsyncf"
+done
+
+for hbf in "$rcdir"/histbackup.*
+do
+  base=$( basename "$hbf" )
+  target=${base#*.}
+  while read src dst
+  do
+    : ${dst:=$(basename "$src")}
+    ( cd
+      pfx "$target" set-x rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst"
+    ) </dev/null
+  done <"$hbf"
+done
