@@ -52,7 +52,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.upd import Upd, print, out
+from cs.upd import print, out
 
 __version__ = '20200229'
 
@@ -88,28 +88,17 @@ def main(argv=None):
   return MP4Command().run(argv)
 
 class MP4Command(BaseCommand):
-  GETOPT_SPEC = ''
 
-  USAGE_FORMAT = '''Usage:
-    {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
-        Tag paths based on embedded MP4 metadata.
-        -n  No action.
-        -p prefix, --prefix=prefix
-            Set the prefix of added tags, default: 'mp4'
-    {cmd} extract [-H] filename boxref output
-        Extract the referenced Box from the specified filename into output.
-        -H  Skip the Box header.
-    {cmd} [parse [{{-|filename}}]...]
-        Parse the named files (or stdin for "-").
-    {cmd} info [{{-|filename}}]...]
-        Print informative report about each source.
-    {cmd} test
-        Run unit tests.'''
+  GETOPT_SPEC = ''
 
   TAG_PREFIX = 'mp4'
 
   def cmd_autotag(self, argv, options):
-    ''' Tag paths based on embedded MP4 metadata.
+    ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
+          Tag paths based on embedded MP4 metadata.
+          -n  No action.
+          -p prefix, --prefix=prefix
+              Set the prefix of added tags, default: 'mp4'
     '''
     xit = 0
     fstags = FSTags()
@@ -169,7 +158,9 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_extract(argv, options):
-    ''' Extract the content of the specified Box.
+    ''' Usage: {cmd} extract [-H] filename boxref output
+          Extract the referenced Box from the specified filename into output.
+          -H  Skip the Box header.
     '''
     skip_header = False
     if argv and argv[0] == '-H':
@@ -221,7 +212,8 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_info(argv, options):
-    ''' Produce a human friendly report.
+    ''' Usage: {cmd} info [{{-|filename}}]...]
+          Print informative report about each source.
     '''
     if not argv:
       argv = ['-']
@@ -240,7 +232,8 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_parse(argv, options):
-    ''' Parse an ISO14496 based file.
+    ''' Usage: {cmd} [parse [{{-|filename}}]...]
+          Parse the named files (or stdin for "-").
     '''
     if not argv:
       argv = ['-']
@@ -283,10 +276,13 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_test(argv, options):
-    ''' Run self tests.
+    ''' Usage: {cmd} [testnames...]
+          Run self tests.
     '''
     import cs.iso14496_tests
-    cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
+    cs.iso14496_tests.selftest(
+        ["%s: %s" % (options.cmd, options.subcmd)] + argv
+    )
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
