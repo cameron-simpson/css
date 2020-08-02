@@ -115,8 +115,8 @@ class MP4Command(BaseCommand):
     fstags = FSTags()
     no_action = False
     tag_prefix = self.TAG_PREFIX
-    options, argv = getopt(argv, 'np:', longopts=['prefix'])
-    for option, value in options:
+    opts, argv = getopt(argv, 'np:', longopts=['prefix'])
+    for option, value in opts:
       with Pfx(option):
         if option == '-n':
           no_action = True
