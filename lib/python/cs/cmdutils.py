@@ -183,11 +183,15 @@ class BaseCommand:
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
-    if usage_format is None:
-      return None
-    usage_message = usage_format.format_map(usage_format_mapping)
     subcmds = cls.subcommands()
-    if subcmds and list(subcmds) != ['help']:
+    has_subcmds = subcmds and list(subcmds) != ['help']
+    if usage_format is None:
+      usage_format = (
+          r'Usage: {cmd} subcommand [...]'
+          if has_subcmds else 'Usage: {cmd} [...]'
+      )
+    usage_message = usage_format.format_map(usage_format_mapping)
+    if has_subcmds:
       subusages = []
       for attr, method in sorted(subcmds.items()):
         with Pfx(attr):
@@ -339,8 +343,10 @@ class BaseCommand:
           main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
         except AttributeError:
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %r" %
-              (subcmd, sorted(subcmds.keys()))
+              "%s: unrecognised subcommand, expected one of: %s" % (
+                  subcmd,
+                  ', '.join(sorted(subcmds.keys())),
+              )
           )
         subcmd_context = Pfx(subcmd)
         try:
