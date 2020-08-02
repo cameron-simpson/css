@@ -133,21 +133,16 @@ class MP4Command(BaseCommand):
           with Pfx(path):
             tagged_path = fstags[path]
             try:
-              over_box, = parse(path, discard_data=True)
-              for top_box in over_box:
-                for box, tags in top_box.gather_metadata():
-                  if tags:
-                    for tag in tags:
-                      new_tag = Tag.with_prefix(
-                          tag.name, tag.value, prefix=tag_prefix
-                      )
-                      if no_action:
-                        new_tag_s = str(new_tag)
-                        if len(new_tag_s) > 32:
-                          new_tag_s = new_tag_s[:29] + '...'
-                        print(path, '+', new_tag_s)
-                      else:
-                        tagged_path.add(new_tag)
+              for box, tags in parse_tags(path, tag_prefix=tag_prefix,
+                                          discard_data=True):
+                for tag in tags:
+                  if no_action:
+                    tag_s = str(tag)
+                    if len(tag_s) > 32:
+                      tag_s = tag_s[:29] + '...'
+                    print(path, '+', tag_s)
+                  else:
+                    tagged_path.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
@@ -2456,8 +2451,30 @@ class SMHDBoxBody(FullBoxBody):
 
 add_body_class(SMHDBoxBody)
 
+def parse_tags(path, tag_prefix=None, **kw):
+  ''' Parse the tags from `path`.
+      Yield `(box,tags)` for each subbox with tags.
+
+      The optional `tag_prefix` parameter
+      may be specified to prefix each tag name with a prefix.
+      Other keyword arguments are passed to `parse()`
+      (typical example: `discard_data=True`).
+  '''
+  over_box, = parse(path, discard_data=True)
+  for top_box in over_box:
+    for box, tags in top_box.gather_metadata():
+      if tags:
+        if tag_prefix:
+          new_tags = TagSet()
+          new_tags.update(
+              Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
+              for tag in tags
+          )
+          tags = new_tags
+        yield box, tags
+
 def parse(o, **kw):
-  ''' Return the OverBoxes from source (str, int, file).
+  ''' Return the OverBoxes from a source (str, int, file).
 
       The leading `o` parameter may be one of:
       * `str`: a filesystem file pathname
