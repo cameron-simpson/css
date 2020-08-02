@@ -52,7 +52,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.upd import Upd
+from cs.upd import Upd, print, out
 
 __version__ = '20200229'
 
@@ -126,11 +126,10 @@ class MP4Command(BaseCommand):
           raise RuntimeError("unsupported option")
     if not argv:
       argv = [os.getcwd()]
-    U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
         for _, path in rpaths(top_path):
-          U.out(path)
+          out(path)
           with Pfx(path):
             tagged_path = fstags[path]
             try:
@@ -154,7 +153,6 @@ class MP4Command(BaseCommand):
             except Exception as e:
               warning("%s: %s", type(e).__name__, e)
               xit = 1
-    U.out('')
     return xit
 
   @staticmethod
