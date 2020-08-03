@@ -24,6 +24,7 @@ class TestMaildir(unittest.TestCase):
   ''' Tests for `cs.mailutils.Maildir`.
   '''
 
+  @unittest.skipUnless(os.path.exists(testmaildir), 'no test Maildir ' + testmaildir)
   def test00basic(self):
     t0 = time.time()
     M = Maildir(testmaildir)
