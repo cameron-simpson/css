@@ -10,7 +10,7 @@
 import os
 import os.path
 import sys
-from collections import Mapping
+from collections.abc import Mapping
 from threading import RLock
 from cs.fileutils import file_property
 from cs.py3 import ConfigParser, StringTypes
