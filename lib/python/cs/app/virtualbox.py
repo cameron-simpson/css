@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 #
-# Convenience functions for working with VirtualBox.
-# Many operations are done by invoking VBoxManage.
-# - Cameron Simpson <cs@cskk.id.au> 23oct2016
-#
+
+''' Convenience functions for working with VirtualBox.
+    Many operations are done by invoking VBoxManage.
+    - Cameron Simpson <cs@cskk.id.au> 23oct2016
+'''
 
 from __future__ import print_function
 from getopt import GetoptError
 import os
 import os.path
-from os.path import basename, splitext
-from subprocess import Popen, PIPE
+from os.path import splitext
 import sys
 from cs.cmdutils import BaseCommand
 from cs.psutils import run
-from cs.logutils import setup_logging, warning
+from cs.logutils import warning, error
 from cs.pfx import Pfx
 
 VBOXMANAGE = 'VBoxManage'
@@ -25,16 +25,18 @@ def main(argv=None, cmd=None):
   return VBoxCommand().run(argv, cmd=cmd)
 
 class VBoxCommand(BaseCommand):
+  ''' "vbox" command line implementation.
+  '''
 
-  def cmd_ls(argv):
+  @staticmethod
+  def cmd_ls(argv, _):
     ''' Usage: {cmd} [VBoxManage list options...]
           List various things, by default "vms".
     '''
-    if not argv:
-      argv.append('vms')
     return run([VBOXMANAGE, 'list'] + argv)
 
-  def cmd_mkimg(argv):
+  @staticmethod
+  def cmd_mkimg(argv, _):
     ''' Usage: {cmd} {{path.vdi|uuid}} [VBoxManage clonemedium options...]
           Create a .img file from a disc image file.
     '''
@@ -52,7 +54,8 @@ class VBoxCommand(BaseCommand):
       error("mkimg fails: %s", e)
       return 1
 
-  def cmd_mkvdi(argv):
+  @staticmethod
+  def cmd_mkvdi(argv, _):
     ''' Usage: {cmd} img [VBoxManage convertfromraw options...]
           Create a .vdi file from a .img file.
     '''
@@ -60,7 +63,7 @@ class VBoxCommand(BaseCommand):
       raise GetoptError("missing source img")
     imgpath = argv.pop(0)
     imgpfx, imgext = splitext(imgpath)
-    if imgext == '.raw' or imgext == '.img':
+    if imgext('.raw', '.img'):
       vdipath = imgpfx + '.vdi'
     else:
       vdipath = imgpath + '.vdi'
@@ -70,7 +73,8 @@ class VBoxCommand(BaseCommand):
       error("mkvdi fails: %s", e)
       return 1
 
-  def cmd_pause(argv):
+  @staticmethod
+  def cmd_pause(argv, _):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Pause the specified VM using "controlvm .. pause".
     '''
@@ -79,7 +83,15 @@ class VBoxCommand(BaseCommand):
     vmspec = argv.pop(0)
     return run([VBOXMANAGE, 'controlvm', vmspec, 'pause'] + argv, logger=True)
 
-  def cmd_resume(argv, trace=False):
+  @staticmethod
+  def cmd_ps(argv, _):
+    ''' Usage: {cmd} [VBoxManage list options...]
+          List runnings VMs.
+    '''
+    return run([VBOXMANAGE, 'list'] + argv + ['runningvms'])
+
+  @staticmethod
+  def cmd_resume(argv, _):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Resume the specified VM using "controlvm .. resume".
     '''
@@ -88,7 +100,8 @@ class VBoxCommand(BaseCommand):
     vmspec = argv.pop(0)
     return run([VBOXMANAGE, 'controlvm', vmspec, 'resume'] + argv, logger=True)
 
-  def cmd_start(argv):
+  @staticmethod
+  def cmd_start(argv, _):
     ''' Usage: {cmd} vmname [VBoxManage startvm options...]
           Start the specified VM using "startvm".
     '''
@@ -97,7 +110,8 @@ class VBoxCommand(BaseCommand):
     vmspec = argv.pop(0)
     return run([VBOXMANAGE, 'startvm', vmspec] + argv, logger=True)
 
-  def cmd_suspend(argv):
+  @staticmethod
+  def cmd_suspend(argv, _):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Suspend the specified VM using "controlvm .. savestate".
     '''
