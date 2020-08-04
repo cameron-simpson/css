@@ -82,6 +82,13 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# translate "@foo" into "-n foo exec"
+case "$op" in
+  @?*)DK_PRIMARY_SERVICE=$( expr "$op" : '@\(.*\)' )
+      op=exec
+      ;;
+esac
+
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 base=$( basename "$ymlbasedir" )
