@@ -23,6 +23,8 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     This is also the target service for \"exec\".
   Most ops are passed to docker or docker-compose, but the following
   are specially handled:
+    @name
+      Shorthand for \"-n name exec\".
     cp [name:]path [name:]path
       Passed to \"docker cp\".
       \"name\" is the short container name.
