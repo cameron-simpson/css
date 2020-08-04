@@ -103,7 +103,7 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    self._lock = self.node._lock
+    self._lock = None if node is None else node._lock
 
   def __str__(self):
     return str(list(self))
