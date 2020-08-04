@@ -25,7 +25,7 @@ class MappingBackend(Backend):
   def _open(self):
     pass
 
-  def _close(self):
+  def close(self):
     pass
 
   def iteritems(self):
