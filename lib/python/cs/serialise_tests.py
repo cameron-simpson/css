@@ -72,21 +72,6 @@ class TestSerialise(unittest.TestCase):
           raise RuntimeError("type(chunk)=%s" % (type(chunk),))
         self._test_roundtrip_bsdata(chunk)
 
-  def _test_roundtrip_bss(self, s, encoding):
-    data = put_bss(s, encoding)
-    s2, offset = get_bss(data, 0)
-    self.assertEqual(
-        offset, len(data), "get_bss(put_bss(%r)): %d unparsed bytes: %r" %
-        (s, len(data) - offset, data[offset:])
-    )
-    self.assertEqual(s, s2, "get_bss(put_bss(%r)): round trip fails" % (s,))
-
-  def test02bss(self):
-    for s in '', 'a', 'qwerty':
-      for encoding in 'utf-8', 'ascii':
-        with self.subTest(s=s, encoding=encoding):
-          self._test_roundtrip_bss(s, encoding)
-
 def selftest(argv):
   unittest.main(__name__, None, argv)
 
