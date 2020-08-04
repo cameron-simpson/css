@@ -104,10 +104,13 @@ class VBoxCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing vmname")
     vmspec = argv.pop(0)
-    return run([VBOXMANAGE, 'controlvm', vmspec, 'savestate'] + argv, logger=True)
+    return run(
+        [VBOXMANAGE, 'controlvm', vmspec, 'savestate'] + argv, logger=True
+    )
 
 def parse_clauses(fp):
-  ''' Generator that parses VBoxManage clause output and yields maps from field name to field value.
+  ''' Generator that parses VBoxManage clause output
+      and yields maps from field name to field value.
   '''
   clause = {}
   for lineno, line in enumerate(fp, 1):
@@ -122,25 +125,37 @@ def parse_clauses(fp):
         k, v = line.strip().split(':', 1)
         v = v.lstrip()
         if k in clause:
-          warning("repeated key %r: keeping old %r, ignoring new %r", k, clause[k], v)
+          warning(
+              "repeated key %r: keeping old %r, ignoring new %r", k, clause[k],
+              v
+          )
         else:
           clause[k] = v
   if clause:
     yield clause
 
 def mkvdi(srcimg, dstvdi, argv, trace=False):
-  ''' Create VDI image `dstvdi` from source raw image `srcimg`. Return VBoxManage convertfromraw exit code.
+  ''' Create VDI image `dstvdi` from source raw image `srcimg` using `convertfromraw`.
+      Return `VBoxManage convertfromraw` exit code.
   '''
   if os.path.exists(dstvdi):
     raise ValueError("destination VDI image already exists: %r" % (dstvdi,))
-  return run([VBOXMANAGE, 'convertfromraw', srcimg, dstvdi, '--format', 'VDI'] + argv, logger=trace)
+  return run(
+      [VBOXMANAGE, 'convertfromraw', srcimg, dstvdi, '--format', 'VDI'] + argv,
+      logger=trace
+  )
 
 def mkimg(src, dstimg, argv, trace=False):
-  ''' Create raw image `dstimg` from source `src`. Return VBoxManage clonemedium exit code.
+  ''' Create raw image `dstimg` from source `src` using `clonemedium disk`.
+      Return `VBoxManage clonemedium` exit code.
   '''
   if os.path.exists(dstimg):
     raise ValueError("destination RAW image already exists: %r" % (dstimg,))
-  return run([VBOXMANAGE, 'clonemedium', 'disk', src, dstimg, '--format', 'RAW'] + argv, logger=trace)
+  return run(
+      [VBOXMANAGE, 'clonemedium', 'disk', src, dstimg, '--format', 'RAW'] +
+      argv,
+      logger=trace
+  )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
