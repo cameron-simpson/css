@@ -19,6 +19,9 @@ class MappingBackend(Backend):
     Backend.__init__(self, readonly=readonly, raw=True)
     self.mapping = mapping
 
+  def init_nodedb(self):
+    pass
+
   def _open(self):
     pass
 
