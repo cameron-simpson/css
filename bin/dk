@@ -53,6 +53,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -f) DK_COMPOSE_YML=$2; shift ;;
+    -h|--help)
+        echo "$usage"
+        exit 0
+        ;;
     -n) DK_PRIMARY_SERVICE=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -97,6 +101,10 @@ base=$( basename "$ymlbasedir" )
 primary_container=${base}_${DK_PRIMARY_SERVICE}_1
 
 case "$op" in
+  help)
+      echo "$usage"
+      exit 0
+      ;;
   cp) set -x
       if [ -n "$DK_CP_PREFIX" ]
       then
