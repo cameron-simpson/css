@@ -114,6 +114,9 @@ case "$op" in
           *:/*) ;;
           *:*)  hostpart=$( expr "x$src" : 'x\([^:]*\):.*' )
                 pathpart=$( expr "x$src" : 'x[^:]*:\(.*\)' )
+                case "$hostpart" in
+                  *_*) ;; *) hostpart=${base}_${hostpart}_1 ;;
+                esac
                 src=$hostpart:$DK_CP_PREFIX/$pathpart
                 ;;
         esac
@@ -122,6 +125,9 @@ case "$op" in
           *:/*) ;;
           *:*)  hostpart=$( expr "x$dst" : 'x\([^:]*\):.*' )
                 pathpart=$( expr "x$dst" : 'x[^:]*:\(.*\)' )
+                case "$hostpart" in
+                  *_*) ;; *) hostpart=${base}_${hostpart}_1 ;;
+                esac
                 dst=$hostpart:$DK_CP_PREFIX/$pathpart
                 ;;
         esac
