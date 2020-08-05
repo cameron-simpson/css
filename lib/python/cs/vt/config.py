@@ -46,6 +46,8 @@ from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
 
+DEFAULT_BASEDIR = '~/.local/share/vt'
+
 def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
   '''
@@ -175,7 +177,7 @@ class Config(SingletonMixin):
   def basedir(self):
     ''' The default location for local archives and stores.
     '''
-    return longpath(self.get_default('basedir'))
+    return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
 
   @property
   def mountdir(self):
