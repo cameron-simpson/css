@@ -28,7 +28,7 @@ from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, XP, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_CONFIG
+from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG
 from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
@@ -45,8 +45,6 @@ from .dir import Dir
 from .store import PlatonicStore, ProxyStore, DataDirStore
 from .socket import TCPClientStore, UNIXSocketClientStore
 from .transcribe import parse
-
-DEFAULT_BASEDIR = '~/.local/share/vt'
 
 def Store(spec, config, runstate=None, hashclass=None):
   ''' Factory to construct Stores from string specifications.
