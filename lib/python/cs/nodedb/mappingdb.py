@@ -10,6 +10,7 @@ from cs.py3 import iteritems as map_iteritems, \
                    itervalues as map_itervalues
 from cs.logutils import error, warning , info, D
 from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method, XP
 from . import Node
 from .backend import Backend
 
@@ -39,6 +40,15 @@ class MappingBackend(Backend):
 
   def __getitem__(self, key):
     return self.mapping[key]
+
+  @pfx_method
+  def _update(self, update):
+    ''' Apply a cs.nodedb.backend.Update.
+    '''
+    if update.do_append:
+      self.extendAttr(update.type, update.name, update.attr, update.values)
+    else:
+      self.setAttr(update.type, update.name, update.attr, update.values)
 
   def __setitem__(self, key, value):
     if not isinstance(value, Node):
