@@ -61,10 +61,10 @@ class MappingBackend(Backend):
     del self.mapping[key]
 
   def setAttr(self, t, name, attr, values):
-    self.mapping[t, name][attr] = list(values)
+    self.mapping.setdefault((t, name), {})[attr] = list(values)
 
   def extendAttr(self, t, name, attr, values):
-    self.mapping[t, name].setdefault(attr, []).extend(values)
+    self.mapping.setdefault((t, name), {}).setdefault(attr, []).extend(values)
 
 if __name__ == '__main__':
   import cs.nodedb.mappingdb_tests
