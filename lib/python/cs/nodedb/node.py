@@ -582,7 +582,8 @@ class Node(dict):
 
     k, plural = parseUC_sAttr(attr)
     if k:
-      # .ATTR[s] = value
+      # .ATTR = value
+      # .ATTRs = values
       if not plural:
         value = (value,)
       self[k] = value
@@ -1148,7 +1149,7 @@ class NodeDB(dict):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external Unicode string storage.
+    r''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1184,7 +1185,7 @@ class NodeDB(dict):
     raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
-    ''' Convert a stored string into a value.
+    r''' Convert a stored string into a value.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
