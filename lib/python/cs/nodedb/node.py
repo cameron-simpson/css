@@ -1018,7 +1018,6 @@ class NodeDB(dict):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
-      self[t, name] = N
     return N
 
   @locked
