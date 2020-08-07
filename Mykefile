@@ -170,35 +170,7 @@ _optcss:
         @$(deploy(/opt/css))
 
 _home:
-        echo 'update $(target) ...'; \
-        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'`; \
-        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'`; \
-        pfx bin hg-shelved \
-            $(rsync) -a --delete \
-                --include=/CHANGELOG.txt \
-                $$binskip \
-                --include=synonyms/ \
-                --exclude=squid_redirect \
-                --exclude=/\*/ \
-                bin/. $(target)/bin/.; \
-        :make _bin_$((bin_suffixes))
-        @echo 'update $(HOME)/lib ...' \
-        libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/js \\
-                --include=/js/cs \\
-                --exclude=/js/* \\
-                --include=/perl \\
-                --include=/perl/cs \\
-                --exclude=/perl/* \\
-                --include=/python \\
-                --include=/python/cs \\
-                --exclude=/python/* \\
-                $$libskip \\
-                --exclude=/* \\
-                --exclude=testdata* \\
-                lib/. $(HOME)/lib/.
+        @$(deploy($(HOME)))
 
 bin_suffixes = cs darwin
 
