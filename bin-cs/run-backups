@@ -18,15 +18,31 @@ dont=
 isatty=
 [ -t 2 ] && isatty=1 rsopts=-P trace=set-x
 
-rcdir=$HOME/rc-local/run-backups
+rcdir=$HOME/.run-backups
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [backup-filelists...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
-  backup-filelistys...
-        Backup file list files suitable for rsync --files-from,
-        used to specify the backup."
+  backup-filelists...
+        Backup definition files. Each file's basename has the form:
+          mode.target
+	where the target is used by ssh for the remote backup target
+	and the mode specifies the file format and backup semantics.
+
+Modes:
+  histbackup
+    The file contains lines of the form:
+      src [dst]
+    dst defaults to the basename of src.
+    Use rhistbackup to backup from ~/src to target:BACKUP/\$HOST/histbackup/dst
+  mv, push, rsync
+    The file contains lines of the form:
+      path
+    Uses rsync to backup from ~/path to target:BACKUP/\$HOST/rsync/path
+    mv: passes --remove-source-files to rsync.
+    push: does not use --delete, accumulating at the far end
+    rsync: passed --delete-after to rsync, making an image copy."
 
 badopts=
 
