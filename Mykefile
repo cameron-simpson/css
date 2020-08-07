@@ -146,18 +146,41 @@ _2to3:
 $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
-_home:
-        @echo 'update $(HOME)/bin ...' \
+deploy_dir(targetdir, base, includes) = \
+        set -ue \
+        echo 'update $(targetdir)/$(base) ...' \
+        [ -d $(targetdir)/$(base) ] || ( set -x; mkdir -p $(targetdir)/$(base) ) \
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
-        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/CHANGELOG.txt \\
-                $$binskip \\
-                --include=synonyms/ \\
-                --exclude=squid_redirect \\
-                --exclude=/\*/ \\
-                bin/. $(HOME)/bin/.
+        dirskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
+        pfx $(targetdir)/$(base) hg-shelved \\
+            $(rsync) -aO --delete --delete-excluded \\
+                $$dirskip \\
+                --exclude=\*.orig \\
+                $(base)/. $(targetdir)/$(base)/.
+
+deploy(targetdir) = \
+        $(deploy_dir($(targetdir), bin, synonyms)) \
+        $(deploy_dir($(targetdir), bin-cs, synonyms)) \
+        $(deploy_dir($(targetdir), bin-darwin, synonyms)) \
+        $(deploy_dir($(targetdir), lib/js/cs, "")) \
+        $(deploy_dir($(targetdir), lib/perl/cs, "")) \
+        $(deploy_dir($(targetdir), lib/python/cs, ""))
+
+_optcss:
+        @$(deploy(/opt/css))
+
+_home:
+        echo 'update $(target) ...'; \
+        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'`; \
+        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'`; \
+        pfx bin hg-shelved \
+            $(rsync) -a --delete \
+                --include=/CHANGELOG.txt \
+                $$binskip \
+                --include=synonyms/ \
+                --exclude=squid_redirect \
+                --exclude=/\*/ \
+                bin/. $(target)/bin/.; \
         :make _bin_$((bin_suffixes))
         @echo 'update $(HOME)/lib ...' \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
