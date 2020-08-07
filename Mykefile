@@ -147,24 +147,36 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 deploy_dir(targetdir, base, includes) = \
-        set -ue \
-        echo 'update $(targetdir)/$(base) ...' \
-        [ -d $(targetdir)/$(base) ] || ( set -x; mkdir -p $(targetdir)/$(base) ) \
-        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
-        dirskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx $(targetdir)/$(base) hg-shelved \\
-            $(rsync) -aO --delete --delete-excluded \\
-                $$dirskip \\
-                --exclude=\*.orig \\
-                $(base)/. $(targetdir)/$(base)/.
+        ( \
+          set -ue \
+          echo 'update $(targetdir)/$(base) ...' \
+          [ -d $(targetdir)/$(base) ] || ( \
+            set -x; mkdir -p $(targetdir)/$(base) \
+          ) \
+          pfx $(targetdir)/$(base) \\
+              $(rsync) -aO --delete $(base)/. $(targetdir)/$(base)/. \
+        )
 
 deploy(targetdir) = \
-        $(deploy_dir($(targetdir), bin, synonyms)) \
-        $(deploy_dir($(targetdir), bin-cs, synonyms)) \
-        $(deploy_dir($(targetdir), bin-darwin, synonyms)) \
-        $(deploy_dir($(targetdir), lib/js/cs, "")) \
-        $(deploy_dir($(targetdir), lib/perl/cs, "")) \
-        $(deploy_dir($(targetdir), lib/python/cs, ""))
+        ( \
+          set -ue \
+          tmpdir=$$TMPDIR/css-deploy-$$$$ \
+          mkdir "$$tmpdir" \
+          ( set -ue \
+            hg archive -t files -r tip "$$tmpdir" \
+            hg-apply-manifest-dates -r "tip" "$$tmpdir" \
+            cd "$$tmpdir" \
+            $(deploy_dir($(targetdir), bin, synonyms)) \
+            $(deploy_dir($(targetdir), bin-cs, synonyms)) \
+            $(deploy_dir($(targetdir), bin-darwin, synonyms)) \
+            $(deploy_dir($(targetdir), lib/js/cs, "")) \
+            $(deploy_dir($(targetdir), lib/perl/cs, "")) \
+            $(deploy_dir($(targetdir), lib/python/cs, "")) \
+          ) \
+          xit=$$? \
+          rm -rf "$$tmpdir" \
+          exit $$xit \
+        )
 
 _optcss:
         @$(deploy(/opt/css))
