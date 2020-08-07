@@ -12,6 +12,8 @@ import unittest
 from cs.result import Result, after, bg
 
 class TestResult(unittest.TestCase):
+  ''' Tests for `cs.result`.
+  '''
 
   def setUp(self):
     self.R = Result()

@@ -10,6 +10,7 @@ from cs.py3 import iteritems as map_iteritems, \
                    itervalues as map_itervalues
 from cs.logutils import error, warning , info, D
 from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method, XP
 from . import Node
 from .backend import Backend
 
@@ -19,10 +20,13 @@ class MappingBackend(Backend):
     Backend.__init__(self, readonly=readonly, raw=True)
     self.mapping = mapping
 
+  def init_nodedb(self):
+    pass
+
   def _open(self):
     pass
 
-  def _close(self):
+  def close(self):
     pass
 
   def iteritems(self):
@@ -37,6 +41,15 @@ class MappingBackend(Backend):
   def __getitem__(self, key):
     return self.mapping[key]
 
+  @pfx_method
+  def _update(self, update):
+    ''' Apply a cs.nodedb.backend.Update.
+    '''
+    if update.do_append:
+      self.extendAttr(update.type, update.name, update.attr, update.values)
+    else:
+      self.setAttr(update.type, update.name, update.attr, update.values)
+
   def __setitem__(self, key, value):
     if not isinstance(value, Node):
       raise ValueError(
@@ -48,10 +61,10 @@ class MappingBackend(Backend):
     del self.mapping[key]
 
   def setAttr(self, t, name, attr, values):
-    self.mapping[t, name][attr] = list(values)
+    self.mapping.setdefault((t, name), {})[attr] = list(values)
 
   def extendAttr(self, t, name, attr, values):
-    self.mapping[t, name].setdefault(attr, []).extend(values)
+    self.mapping.setdefault((t, name), {}).setdefault(attr, []).extend(values)
 
 if __name__ == '__main__':
   import cs.nodedb.mappingdb_tests

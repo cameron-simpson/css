@@ -208,32 +208,34 @@ def cachedmethod(
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
   lastpoll_attr = val_attr + '__lastpoll'
-  firstpoll_attr = val_attr + '__firstpoll'
 
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
-      first = getattr(self, firstpoll_attr, True)
-      sig = getattr(self, sig_attr, None)
-      setattr(self, firstpoll_attr, False)
+      now = None
       value0 = getattr(self, val_attr, unset_value)
-      if not first and value0 is not unset_value:
-        # see if we should use the cached value
-        if poll_delay is None and sig_func is None:
+      sig0 = getattr(self, sig_attr, None)
+      sig = getattr(self, sig_attr, None)
+      if value0 is unset_value:
+        # value unknown, needs compute
+        pass
+      # we have a cached value for return in the following logic
+      elif poll_delay is None:
+        # always poll
+        pass
+      else:
+        lastpoll = getattr(self, lastpoll_attr)
+        now = time.time()
+        if now - lastpoll < poll_delay:
+          # reuse cache
           return value0
-        if poll_delay is not None:
-          # too early to check the signature function?
-          now = time.time()
-          lastpoll = getattr(self, lastpoll_attr, None)
-          if lastpoll is not None and now - lastpoll < poll_delay:
-            # still valid, return the value
-            return value0
-          setattr(self, lastpoll_attr, now)
-        # no poll_delay or poll expired
-        if sig_func is None:
-          # no sig func
-          return value0
-        # see if the signature is unchanged
-        sig0 = getattr(self, sig_attr, None)
+      # not too soon, try to update the value
+      # update the poll time if we use it
+      if poll_delay is not None:
+        now = now or time.time()
+        setattr(self, lastpoll_attr, now)
+      # check the signature if provided
+      # see if the signature is unchanged
+      if sig_func is not None:
         try:
           sig = sig_func(self)
         except Exception as e:
@@ -249,13 +251,14 @@ def cachedmethod(
       try:
         value = method(self, *a, **kw)
       except Exception as e:
+        # computation fails, return cached value
         if value0 is unset_value:
+          # no cached value
           raise
         warning("exception calling %s(self): %s", method, e, exc_info=True)
         return value0
+      # update the cache
       setattr(self, val_attr, value)
-      if sig_func is not None and not first:
-        setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
       changed = value0 is unset_value or value0 is not value

@@ -39,12 +39,11 @@ def get_bs(data, offset=0):
 
 put_bs = BSUInt.transcribe_value
 
-# old names
+# deprecated old names
 get_bsdata = BSData.value_from_bytes
-put_bsdata = BSData.transcribe_value
-
+put_bsdata = BSData.value_as_bytes
 get_bss = BSString.value_from_bytes
-put_bss = BSString.transcribe_value
+put_bss = BSString.value_as_bytes
 
 if __name__ == '__main__':
   import sys

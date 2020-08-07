@@ -103,7 +103,7 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    self._lock = self.node._lock
+    self._lock = None if node is None else node._lock
 
   def __str__(self):
     return str(list(self))
@@ -582,7 +582,8 @@ class Node(dict):
 
     k, plural = parseUC_sAttr(attr)
     if k:
-      # .ATTR[s] = value
+      # .ATTR = value
+      # .ATTRs = values
       if not plural:
         value = (value,)
       self[k] = value
@@ -1018,7 +1019,6 @@ class NodeDB(dict):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
-      self[t, name] = N
     return N
 
   @locked
@@ -1149,7 +1149,7 @@ class NodeDB(dict):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external Unicode string storage.
+    r''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1185,7 +1185,7 @@ class NodeDB(dict):
     raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
-    ''' Convert a stored string into a value.
+    r''' Convert a stored string into a value.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.

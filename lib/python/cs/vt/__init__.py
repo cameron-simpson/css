@@ -103,9 +103,9 @@ DISTINFO = {
     },
 }
 
-DEFAULT_CONFIG_PATH = '~/.vtrc'
+DEFAULT_BASEDIR = '~/.local/share/vt'
 
-DEFAULT_BASEDIR = '~/.vt_stores'
+DEFAULT_CONFIG_PATH = '~/.vtrc'
 
 DEFAULT_CONFIG = {
     'GLOBAL': {
