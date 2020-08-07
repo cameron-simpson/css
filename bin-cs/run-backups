@@ -1,40 +1,106 @@
 #!/bin/sh
 #
 # Run my backups from the current machine to other places.
-# Consults ~/rc-local/rsync.* files for image backups
-# and ~/rc-local/histbackup.* for rhistbackup backups.
+# Consults ~/rc-local/run-backups files as follows:
+#   histbackup.*    update histbackup tree at target
+#   mv.*            files to move (delete after sync)
+#   push.*          files to push (no --delete)
+#   rsync.*         files for image backups (includes --delete)
 # - Cameron Simpson <cs@cskk.id.au> 25jul2020
 #
 
 set -ue
 
 rsopts=
-[ -t 2 ] && rsopts=-P
+trace=
+doit=1
+dont=
+isatty=
+[ -t 2 ] && isatty=1 rsopts=-P trace=set-x
 
-rcdir=$HOME/rc-local
+rcdir=$HOME/rc-local/run-backups
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-n] [backup-filelists...]
+  -n    No action. Passed -n to rsync for the rsync backups,
+        and suppresses the histbackup runs.
+  backup-filelistys...
+        Backup file list files suitable for rsync --files-from,
+        used to specify the backup."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -h|--help)
+        echo "$usage"
+        exit 0
+        ;;
+    -n) doit= dont=echo ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || \
+  set -- \
+        "$rcdir"/histbackup.* \
+        "$rcdir"/mv.* \
+        "$rcdir"/push.* \
+        "$rcdir"/rsync.*
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+prefix(){
+  if [ $isatty ]
+  then  echo "$1 ..." >&2; shift; "$@"
+  else  pfx "$@"
+  fi
+}
 
 xit=0
 
-for rsyncf in "$rcdir"/rsync.*
+for rsyncf
 do
+  [ -s "$rsyncf" ] || continue
+  echo "$rsyncf"
   base=$( basename "$rsyncf" )
   target=${base#*.}
+  frsopts=
   ( cd
-    pfx "$target" set-x rsync --files-from=- -iar --delete $rsopts . "$target:BACKUP/$HOST/rsync/"
-  ) < "$rsyncf" || xit=1
-done
-
-for hbf in "$rcdir"/histbackup.*
-do
-  base=$( basename "$hbf" )
-  target=${base#*.}
-  while read -r src dst
-  do
-    : ${dst:=$(basename "$src")}
-    ( cd
-      pfx "$target" set-x rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst"
-    ) </dev/null || xit=1
-  done <"$hbf"
+    case "$base" in
+      rsync.*)  frsopts="$frsopts --delete-after" ;;
+      mv.*)     frsopts="$frsopts --remove-source-files" ;;
+      push.*)   ;;  # no --delete, files accumulate
+      histbackup.*)
+                while read -r src dst
+                do
+                  : "${dst:=$(basename "$src")}"
+                  ( cd
+                    $dont prefix "$target" $trace \
+                      rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst"
+                  ) </dev/null || xit=1
+                done <"$rsyncf"
+                exit $?
+                ;;
+      *)        echo "$0: unsupported rsync file: $rsyncf" >&2
+                exit 1
+                ;;
+    esac
+    while read -r path
+    do
+      [ -d "$path/" ] && path=$path/
+      $dont prefix "$target:$path" $trace \
+        rsync -ia $rsopts $frsopts "$path" "$target:BACKUP/$HOST/rsync/$path" \
+        </dev/null \
+      || xit=1
+    done <"$rsyncf"
+  ) || xit=1
 done
 
 exit $xit
