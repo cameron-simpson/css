@@ -78,7 +78,7 @@ class Backend_CSVFile(Backend):
     for row in self.csv:
       self._import_backend_row(row)
     self._monitor = PfxThread(
-        name="monitor", target=self._monitor_foreign_updates, daemon=True
+        name="monitor", target=self._monitor_backend_updates, daemon=True
     )
     self._monitor.start()
 
@@ -94,7 +94,7 @@ class Backend_CSVFile(Backend):
     self.csv.close()
     self.csv = None
 
-  def _monitor_foreign_updates(self):
+  def _monitor_backend_updates(self):
     for row in self.csv.tail():
       self._import_backend_row(row)
       if self.csv.closed:
