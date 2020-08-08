@@ -76,7 +76,7 @@ class Backend_CSVFile(Backend):
       self.csv = SharedCSVFile(self.pathname, read_only=self.readonly)
       # initial scan of the database
       for row in self.csv:
-        self._import_foreign_row(row)
+        self._import_backend_row(row)
       self._monitor = PfxThread(
           name="monitor", target=self._monitor_foreign_updates, daemon=True
       )
@@ -96,11 +96,11 @@ class Backend_CSVFile(Backend):
 
   def _monitor_foreign_updates(self):
     for row in self.csv.tail():
-      self._import_foreign_row(row)
+      self._import_backend_row(row)
       if self.csv.closed:
         break
 
-  def _import_foreign_row(self, row0):
+  def _import_backend_row(self, row0):
     ''' Apply the values from an individual CSV update row
         to the NodeDB without propagating to the backend.
 
