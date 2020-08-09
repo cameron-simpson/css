@@ -4,28 +4,22 @@
 from __future__ import print_function
 import os.path
 from cmd import Cmd
-import csv
 import fnmatch
 import re
 import sys
 from types import SimpleNamespace as NS
-if sys.hexversion < 0x02060000:
-  from sets import Set as set
 import itertools
 from getopt import GetoptError
 from threading import RLock
-from threading import Thread
 from collections import namedtuple
-from cs.debug import RLock, trace
-from cs.excutils import unimplemented, transmute
+##from cs.debug import RLock
+from cs.excutils import unimplemented
 from cs.lex import parseUC_sAttr
-from cs.logutils import D, error, warning, info, debug, exception
-from cs.pfx import Pfx
-from cs.py.func import derived_property
+from cs.logutils import error, warning, info, debug, exception
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes, unicode
 from cs.seq import the, get0
 from cs.threads import locked
-from cs.x import X
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -900,6 +894,7 @@ class NodeDB(dict):
     byType = self.__nodesByType
     return [ t for t in byType.keys() if byType[t] ]
 
+  @pfx_method
   def __contains__(self, item):
     key = self.nodekey(item)
     return dict.__contains__(self, key)
@@ -1010,6 +1005,7 @@ class NodeDB(dict):
 
     return t, name
 
+  @pfx_method
   def newNode(self, *args):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
@@ -1019,6 +1015,7 @@ class NodeDB(dict):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
+      assert (t,name) in self
     return N
 
   @locked
