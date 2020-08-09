@@ -17,7 +17,7 @@ class Backend_SQLAlchemy(Backend):
     from sqlalchemy.pool import QueuePool
     Backend.__init__(self, readonly=readonly)
     if isinstance(engine, StringTypes):
-      echo = len(os.environ.get('DEBUG','')) > 0
+      echo = len(os.environ.get('DEBUG', '')) > 0
     if isinstance(engine, StringTypes):
       engine = create_engine(engine, poolclass=QueuePool, echo=echo)
     if nodes_name is None:
@@ -52,26 +52,30 @@ class Backend_SQLAlchemy(Backend):
     '''
     from sqlalchemy import Table, Column, Index, Integer, String
     if name is None:
-      name='NODES'
-    return Table(name, metadata,
-                 Column('ID', Integer, primary_key=True, nullable=False),
-                 Column('NAME', String(64)),
-                 Column('TYPE', String(64), nullable=False),
-                )
+      name = 'NODES'
+    return Table(
+        name,
+        metadata,
+        Column('ID', Integer, primary_key=True, nullable=False),
+        Column('NAME', String(64)),
+        Column('TYPE', String(64), nullable=False),
+    )
 
   def ATTRSTable(metadata, name=None):
     ''' Set up an SQLAlchemy Table for the attributes.
     '''
     from sqlalchemy import Table, Column, Index, Integer, String
     if name is None:
-      name='ATTRS'
-    return Table(name, metadata,
-                 Column('ID', Integer, primary_key=True, nullable=False),
-                 Column('NODE_ID', Integer, nullable=False, index=True),
-                 Column('ATTR', String(64), nullable=False, index=True),
-                 # mysql max index key len is 1000, so VALUE only 900
-                 Column('VALUE', String(900), index=True),
-                )
+      name = 'ATTRS'
+    return Table(
+        name,
+        metadata,
+        Column('ID', Integer, primary_key=True, nullable=False),
+        Column('NODE_ID', Integer, nullable=False, index=True),
+        Column('ATTR', String(64), nullable=False, index=True),
+        # mysql max index key len is 1000, so VALUE only 900
+        Column('VALUE', String(900), index=True),
+    )
 
   def _noteNodeKey(self, t, name, node_id):
     ''' Remember the mapping between db node_id and (type, name).
@@ -85,7 +89,7 @@ class Backend_SQLAlchemy(Backend):
     with self._lock:
       node_id = self.__IDbyTypeName.get(nodekey)
       if node_id is not None:
-        self._forgetNode( t, name, node_id )
+        self._forgetNode(t, name, node_id)
     for attr in N.keys():
       self.saveAttrs(N[attrs])
 
@@ -93,10 +97,12 @@ class Backend_SQLAlchemy(Backend):
     ''' Return the db node_id for the supplied type and name.
         Create a new node_id if unknown.
     '''
-    node_id = self.__IDbyTypeName.get( (t, name) )
+    node_id = self.__IDbyTypeName.get((t, name))
     if node_id is None:
       if self.nodedb.readonly:
-        raise RuntimeError("readonly: can't instantiate new NODE_ID for (%s, %s)" % (t, name))
+        raise RuntimeError(
+            "readonly: can't instantiate new NODE_ID for (%s, %s)" % (t, name)
+        )
       ins = self.nodes.insert().values(TYPE=t, NAME=name).execute()
       node_id = ins.lastrowid
       self._noteNodeKey(t, name, node_id)
@@ -137,10 +143,8 @@ class Backend_SQLAlchemy(Backend):
       attrs = self.attrs
       byID = self.__nodekeysByID
       # load node data
-      for node_id, t, name in select( [ nodes.c.ID,
-                                        nodes.c.TYPE,
-                                        nodes.c.NAME
-                                      ] ).execute():
+      for node_id, t, name in select([nodes.c.ID, nodes.c.TYPE,
+                                      nodes.c.NAME]).execute():
         self._noteNodeKey(t, name, node_id)
       # load Node attributes
       # TODO: order by NODE_ID, ATTR and use .extend in batches
@@ -176,9 +180,10 @@ class Backend_SQLAlchemy(Backend):
   def iterkeys(self):
     nodes = self.nodes
     # load node keys
-    for node_id, t, name in select( [ nodes.c.TYPE,
-                                      nodes.c.NAME,
-                                    ] ).execute():
+    for node_id, t, name in select([
+        nodes.c.TYPE,
+        nodes.c.NAME,
+    ]).execute():
       yield t, name
 
   def push_updates(self, csvrows):
@@ -194,9 +199,12 @@ class Backend_SQLAlchemy(Backend):
       if attr.startswith('-'):
         attr = attr[1:]
         if value != "":
-          raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
-        self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
-                               self.attrs.c.ATTR == attr)).execute()
+          raise ValueError(
+              "ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value)
+          )
+        self.attrs.delete(
+            and_(self.attrs.c.NODE_ID == node_id, self.attrs.c.ATTR == attr)
+        ).execute()
       else:
         # add attribute
         if name.startswith('='):
@@ -206,12 +214,16 @@ class Backend_SQLAlchemy(Backend):
         if attr.startswith('='):
           # reset attribute completely before appending value
           attr = attr[1:]
-          self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
-                                 self.attrs.c.ATTR == attr)).execute()
-        self.attrs.insert().execute([ { 'NODE_ID': node_id,
-                                        'ATTR':    attr,
-                                        'VALUE':   totext(value),
-                                      } ])
+          self.attrs.delete(
+              and_(self.attrs.c.NODE_ID == node_id, self.attrs.c.ATTR == attr)
+          ).execute()
+        self.attrs.insert().execute(
+            [{
+                'NODE_ID': node_id,
+                'ATTR': attr,
+                'VALUE': totext(value),
+            }]
+        )
       with self._lock:
         self._updated_count += 1
       lastrow = thisrow
