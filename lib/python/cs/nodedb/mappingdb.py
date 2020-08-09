@@ -5,12 +5,8 @@
 #
 
 import sys
-from cs.py3 import iteritems as map_iteritems, \
-                   iterkeys as map_iterkeys, \
-                   itervalues as map_itervalues
-from cs.logutils import error, warning , info, D
-from cs.pfx import Pfx
-from cs.pfx import Pfx, pfx_method, XP
+from cs.logutils import error, warning
+from cs.pfx import Pfx, pfx_method
 from . import Node
 from .backend import Backend
 
@@ -46,7 +42,6 @@ class MappingBackend(Backend):
   def __getitem__(self, key):
     return self.mapping[key]
 
-  @pfx_method
   def _update(self, update):
     ''' Apply a cs.nodedb.backend.Update.
     '''
@@ -63,11 +58,13 @@ class MappingBackend(Backend):
     self.mapping[key] = dict(value)
 
   def __delitem__(self, key):
-    del self.mapping[key]
+    if key in self.mapping:
+      del self.mapping[key]
 
   def setAttr(self, t, name, attr, values):
     self.mapping.setdefault((t, name), {})[attr] = list(values)
 
+  @pfx_method
   def extendAttr(self, t, name, attr, values):
     self.mapping.setdefault((t, name), {}).setdefault(attr, []).extend(values)
 
