@@ -22,7 +22,7 @@ class MappingBackend(Backend):
     for nodekey, nodeish in self.mapping.items():
       node = nodedb.make(nodekey)
       for attr, values in nodeish.items():
-        getattr(node, attr+'s').extend(values)
+        getattr(node, attr + 's').extend(values)
 
   def _open(self):
     pass
@@ -53,8 +53,9 @@ class MappingBackend(Backend):
   def __setitem__(self, key, value):
     if not isinstance(value, Node):
       raise ValueError(
-              "MappingBackend.__setitem__: value is not a Node: key=%r, value=%r"
-              % (key, value))
+          "MappingBackend.__setitem__: value is not a Node: key=%r, value=%r" %
+          (key, value)
+      )
     self.mapping[key] = dict(value)
 
   def __delitem__(self, key):

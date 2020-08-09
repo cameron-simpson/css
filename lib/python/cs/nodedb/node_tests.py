@@ -13,7 +13,8 @@ from cs.timeutils import sleep
 from . import NodeDB, Node
 from .mappingdb import MappingBackend
 
-import cs.x; cs.x.X_via_tty = True
+import cs.x
+cs.x.X_via_tty = True
 
 class TestAll(unittest.TestCase):
   ''' Tests for `cs.nodedb.node`.
@@ -68,7 +69,7 @@ class TestAll(unittest.TestCase):
   def test11setAttrs(self):
     with self.nodedb() as db:
       H = db.newNode('HOST', 'foo')
-      assert ('HOST','foo') in db
+      assert ('HOST', 'foo') in db
       H.Xs = [1, 2, 3, 4, 5]
 
   @pfx_method
@@ -165,8 +166,9 @@ class TestAll(unittest.TestCase):
       ):
         token = db.totoken(value, H, attr=attr)
         self.assertEqual(
-            token, expected_token, "wrong tokenisation, expected %s but got %s"
-            % (expected_token, token)
+            token, expected_token,
+            "wrong tokenisation, expected %s but got %s" %
+            (expected_token, token)
         )
         value2 = db.fromtoken(token, node=H, attr=attr, doCreate=True)
         self.assertEqual(

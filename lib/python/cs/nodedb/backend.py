@@ -84,7 +84,9 @@ def ResetUpdate(t, name, attr=None, values=None):
   '''
   if attr is None:
     if values is not None:
-      raise ValueError("ResetUpdate: attr is None, but values is %r" % (values,))
+      raise ValueError(
+          "ResetUpdate: attr is None, but values is %r" % (values,)
+      )
     return Update(False, t, name, None, None)
   if values is None:
     values = ()
@@ -116,7 +118,7 @@ class Backend(NS):
     self.monitor = monitor
     self.raw = raw
     self.closed = False
-    self._lock = RLock()     # general mutex
+    self._lock = RLock()  # general mutex
     self._update_count = 0
 
   def __str__(self):
@@ -133,7 +135,9 @@ class Backend(NS):
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
     '''
-    raise NotImplementedError("method to shutdown backend, set .nodedb=None, etc")
+    raise NotImplementedError(
+        "method to shutdown backend, set .nodedb=None, etc"
+    )
 
   @pfx_method
   def _update(self, update):
@@ -145,7 +149,9 @@ class Backend(NS):
                         to be appended to the attribute.
           .value        The value to store, already textencoded.
     '''
-    raise NotImplementedError("missing method to update the backend from an _Update with difference information")
+    raise NotImplementedError(
+        "missing method to update the backend from an _Update with difference information"
+    )
 
   @property
   def update_count(self):
