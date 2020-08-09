@@ -34,14 +34,14 @@ class MappingBackend(Backend):
   def close(self):
     pass
 
-  def iteritems(self):
-    return map_iteritems(self.mapping)
+  def items(self):
+    return self.mapping.items()
 
-  def iterkeys(self):
-    return map_iterkeys(self.mapping)
+  def keys(self):
+    return self.mapping.keys()
 
-  def itervalues(self):
-    return map_itervalues(self.mapping)
+  def values(self):
+    return self.mapping.values()
 
   def __getitem__(self, key):
     return self.mapping[key]
