@@ -20,8 +20,13 @@ class MappingBackend(Backend):
     Backend.__init__(self, readonly=readonly, raw=True)
     self.mapping = mapping
 
+  @pfx_method(use_str=True)
   def init_nodedb(self):
-    pass
+    nodedb = self.nodedb
+    for nodekey, nodeish in self.mapping.items():
+      node = nodedb.make(nodekey)
+      for attr, values in nodeish.items():
+        getattr(node, attr+'s').extend(values)
 
   def _open(self):
     pass
