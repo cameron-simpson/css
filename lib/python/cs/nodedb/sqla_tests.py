@@ -13,7 +13,7 @@ from . import NodeDB
 from .node_tests import TestAll as NodeTestAll
 from .sqla import Backend_SQLAlchemy
 
-class TestAll(NodeTestAll):
+class SQLATestAll(NodeTestAll):
   ''' Tests for `cs.nodedb.sqla`.
   '''
 
