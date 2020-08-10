@@ -10,10 +10,12 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import and_, asc
 from cs.py3 import StringTypes
 from cs.logutils import error, debug, trace
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx
 from . import Backend
 
 class Backend_SQLAlchemy(Backend):
+  ''' Use an SQL database via sqlalchemy as the backend.
+  '''
 
   def __init__(self, engine, nodes_name=None, attrs_name=None, readonly=False):
     Backend.__init__(self, readonly=readonly)
@@ -47,8 +49,9 @@ class Backend_SQLAlchemy(Backend):
   def close(self):
     self.engine = None
 
-  def NODESTable(self, metadata, name=None):
-    ''' Set up an SQLAlchemy Table for the nodes.
+  @staticmethod
+  def NODESTable(metadata, name=None):
+    ''' Define an SQLAlchemy Table for the nodes.
     '''
     if name is None:
       name = 'NODES'
@@ -60,8 +63,9 @@ class Backend_SQLAlchemy(Backend):
         Column('TYPE', String(64), nullable=False),
     )
 
-  def ATTRSTable(self, metadata, name=None):
-    ''' Set up an SQLAlchemy Table for the attributes.
+  @staticmethod
+  def ATTRSTable(metadata, name=None):
+    ''' Define an SQLAlchemy Table for the attributes.
     '''
     if name is None:
       name = 'ATTRS'
@@ -170,14 +174,18 @@ class Backend_SQLAlchemy(Backend):
         ot, oname = byID[onode_id]
         yield ot, oname, attrmap
 
-  def iteritems(self):
+  def items(self):
+    ''' Yield `((t,name),attrmap)` for the node data.
+    '''
     for t, name, attrmap in self.nodedata():
       yield (t, name), attrmap
 
-  def iterkeys(self):
+  def keys(self):
+    ''' Yield `t,name` for the node data.
+    '''
     nodes = self.nodes
     # load node keys
-    for node_id, t, name in select([
+    for _, t, name in select([
         nodes.c.TYPE,
         nodes.c.NAME,
     ]).execute():
@@ -188,14 +196,12 @@ class Backend_SQLAlchemy(Backend):
     '''
     self.push_updates(update.to_csv())
 
-  @pfx_method
   def push_updates(self, csvrows):
     ''' Apply the update rows from the iterable `csvrows` to the database.
     '''
     trace("push_updates: write our own updates")
     totext = self.nodedb.totext
     for thisrow in csvrows:
-      XP("thisrow=%s",thisrow)
       t, name, attr, value = thisrow
       node_id = self._node_id(t, name)
       if attr.startswith('-'):
