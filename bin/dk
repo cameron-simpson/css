@@ -23,6 +23,8 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     This is also the target service for \"exec\".
   Most ops are passed to docker or docker-compose, but the following
   are specially handled:
+    @name
+      Shorthand for \"-n name exec\".
     cp [name:]path [name:]path
       Passed to \"docker cp\".
       \"name\" is the short container name.
@@ -51,6 +53,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -f) DK_COMPOSE_YML=$2; shift ;;
+    -h|--help)
+        echo "$usage"
+        exit 0
+        ;;
     -n) DK_PRIMARY_SERVICE=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -82,12 +88,23 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# translate "@foo" into "-n foo exec"
+case "$op" in
+  @?*)DK_PRIMARY_SERVICE=$( expr "$op" : '@\(.*\)' )
+      op=exec
+      ;;
+esac
+
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 base=$( basename "$ymlbasedir" )
 primary_container=${base}_${DK_PRIMARY_SERVICE}_1
 
 case "$op" in
+  help)
+      echo "$usage"
+      exit 0
+      ;;
   cp) set -x
       if [ -n "$DK_CP_PREFIX" ]
       then
@@ -97,6 +114,9 @@ case "$op" in
           *:/*) ;;
           *:*)  hostpart=$( expr "x$src" : 'x\([^:]*\):.*' )
                 pathpart=$( expr "x$src" : 'x[^:]*:\(.*\)' )
+                case "$hostpart" in
+                  *_*) ;; *) hostpart=${base}_${hostpart}_1 ;;
+                esac
                 src=$hostpart:$DK_CP_PREFIX/$pathpart
                 ;;
         esac
@@ -105,6 +125,9 @@ case "$op" in
           *:/*) ;;
           *:*)  hostpart=$( expr "x$dst" : 'x\([^:]*\):.*' )
                 pathpart=$( expr "x$dst" : 'x[^:]*:\(.*\)' )
+                case "$hostpart" in
+                  *_*) ;; *) hostpart=${base}_${hostpart}_1 ;;
+                esac
                 dst=$hostpart:$DK_CP_PREFIX/$pathpart
                 ;;
         esac

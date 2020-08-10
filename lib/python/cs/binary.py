@@ -2,30 +2,32 @@
 #
 
 ''' Facilities associated with binary data parsing and transcription.
-
     The classes in this module support easy parsing of binary data
-    structures.
+    structures,
+    returning instances with the binary data decoded into attributes
+    and capable of transcribing themselves in binary form
+    (trivially via `bytes(instance)` and also otherwise).
 
-    These classes work in conjuction with a `cs.buffer.CornuCopyBuffer`
-    (henceforce a "buffer"),
-    which presents an iterable of bytes-like values
-    via various useful methods
-    and with factory methods to make one from a variety of sources
-    such as bytes, iterables, binary files, `mmap`ped files,
-    TCP data streams, etc.
+    Terminology used below:
+    * buffer:
+      an instance of `cs.buffer.CornuCopyBuffer`,
+      which presents an iterable of bytes-like values
+      via various useful methods
+      and with factory methods to make one from a variety of sources
+      such as bytes, iterables, binary files, `mmap`ped files,
+      TCP data streams, etc.
+    * chunk:
+      a piece of binary data obeying the buffer protocol,
+      almost always a `bytes` instance or a `memoryview`,
+      but in principle also things like `bytearray`.
 
     Note: this module requires Python 3 and recommends Python 3.6+
-    because it uses abc.ABC, because a Python 2 bytes object is too
+    because it uses `abc.ABC`, because a Python 2 bytes object is too
     weak (just a `str`) as also is my `cs.py3.bytes` hack class and
     because the keyword based `Packet` initiialisation benefits from
     keyword argument ordering.
 
-    In the description below I use the word "chunk" to mean a piece
-    of binary data obeying the buffer protocol, almost always a
-    `bytes` instance or a `memoryview`, but in principle also things
-    like `bytearray`.
-
-    The functions and classes in this module the following:
+    The functions and classes in this module include the following:
 
     The two base classes for binary data:
     * `PacketField`: an abstract class for a binary field, with a
@@ -37,27 +39,40 @@
       fields.
       The fields themselves may be `Packet`s for complex structures.
 
-    Several presupplied subclasses for common basic types such
-    as `UInt32BE` (an unsigned 32 bit big endian integer).
+    There are several presupplied subclasses for common basic types
+    such as `UInt32BE` (an unsigned 32 bit big endian integer).
 
     Classes built from `struct` format strings:
-    * `struct_field`: a factory for making PacketField classes for
-      `struct` formats with a single value field.
-    * `multi_struct_field` and `structtuple`: factories for making
-      `PacketField`s from `struct` formats with multiple value
-      fields;
-      `structtuple` makes `PacketField`s which are also `namedtuple`s,
+    * `structtuple`: a factory for `PacketField` subclasses
+      for `struct` formats with multiple value fields.
+      These classes are `namedtuple` subclasses
       supporting trivial access to the parsed values.
+    * `struct_field`: a factory for making `PacketField` classes
+      from `struct` formats with a single value field.
 
-    You don't need to make fields only from binary data; because
-    `PacketField.__init__` takes a post parse value, you can also
-    construct `PacketField`s from scratch with their values and
-    transcribe the resulting binary form.
+    Here's an example of a `structtuple`:
+
+        # a "cut" record from the .cuts file
+        Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+
+    which makes the `Enigma2Cut` class for a `'>QL'` `struct` definition.
+    Like every such class, it comes with all the parsing and transcription
+    methods from `PacketField`.
+    Here's some code to read these from a file:
+
+        yield from Enigma2Cut.parse_file(pathname)
+
+    You don't need to make fields only from binary source data;
+    because `PacketField.__init__` takes a post parse value,
+    you can also construct `PacketField`s from scratch
+    with their values and later transcribe the resulting binary form.
 
     Each `PacketField` subclass has the following methods:
+    * `__bytes__`:
+      return an instance as a `bytes` object.
     * `transcribe`: easily return the binary transcription of this field,
-      either directly as a chunk (or for convenience, also None or
-      an ASCII str) or by yielding successive binary data.
+      either directly as a chunk (or for convenience, also `None` or
+      an ASCII `str`) or by yielding successive binary data.
     * `from_buffer`: a factory to parse this field from a
       `cs.buffer.CornuCopyBuffer`.
     * `from_bytes`: a factory to parse this field from a chunk with
@@ -90,7 +105,7 @@
     all of its attributes are themselves `PacketField`s
     (or `Packet`s, which are `PacketField` subclasses).
     The leaves of this hierarchy will be `PacketField`s,
-    whose attributes are ordinary types.
+    whose attributes are ordinary Python types.
 
     By contrast, a `PacketField`'s attributes are expected to be "flat" values:
     the plain post-parse value, such as a `str` or an `int`
@@ -321,6 +336,21 @@ class PacketField(ABC):
     '''
     for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
       yield obj.value
+
+  @classmethod
+  def parse_file(cls, f, **kw):
+    ''' Function to parse repeated instances of `cls` from the file `f`
+        until end of input.
+
+        Parameters:
+        * `f`: the binary file object to parse;
+          if `f` is a string, that pathname is opened for binary read.
+    '''
+    if isinstance(f, str):
+      with open(f, 'rb') as f2:
+        yield from cls.parse_file(f2, **kw)
+    else:
+      yield from cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
 
   def transcribe(self):
     ''' Return or yield the bytes transcription of this field.
@@ -1184,6 +1214,13 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
 def structtuple(class_name, struct_format, subvalue_names):
   ''' Convenience wrapper for multi_struct_field.
+
+      Example:
+
+          Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+
+      which is a record with big-endian unsigned 64 and 32 fields
+      named `pts` and `type`.
   '''
   return multi_struct_field(
       struct_format, subvalue_names=subvalue_names, class_name=class_name

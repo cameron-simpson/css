@@ -310,7 +310,7 @@ rcmd(){
     then
       if [ -d "$HOME/var/tmux/." ]
       then  TMUX_TMPDIR=$HOME/var/tmux
-      else  TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`
+      else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
       fi
     fi
     export TMUX_TMPDIR
