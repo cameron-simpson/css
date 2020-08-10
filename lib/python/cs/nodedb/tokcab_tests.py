@@ -12,8 +12,12 @@ import unittest
 from cs.seq import seq
 from .node_tests import TestAll as NodeTestAll
 from . import NodeDB
-from .tokcab import Backend_TokyoCabinet
+try:
+  from .tokcab import Backend_TokyoCabinet
+except ModuleNotFoundError:
+  raise unittest.SkipTest("tokyocabinet unavailable")
 
+@unittest.skip("tokyocabinet deferred until the big nodedb-mapping refactor")
 class TestAll(NodeTestAll):
   ''' Tests for `cs.nodedb.tokcab`.
   '''
