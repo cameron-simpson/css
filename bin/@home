@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run an arbitrary command on my home machine.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

@@ -2,7 +2,7 @@
 #
 # Pretty print the named file to standard output.
 # Used by my \pp vi macro.
-#   - Cameron Simpson <cs@zip.com.au> 19apr2017
+#   - Cameron Simpson <cs@cskk.id.au> 19apr2017
 #
 
 set -ue

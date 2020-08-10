@@ -2,7 +2,7 @@
 #
 # Convenience routines for web services.
 # Requires ZSI. I'm using Suds these days instead.
-#       - Cameron Simpson <cs@zip.com.au> 25mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 25mar2008
 #
 
 from __future__ import print_function
@@ -13,7 +13,9 @@ from io import StringIO
 import urllib2
 from cs.obj import flavour, T_MAP, T_SEQ
 import cs.logutils
-from cs.logutils import LogTime, Pfx, error
+from cs.logutils import LogTime, error
+import cs.pfx
+from cs.pfx import Pfx
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -61,7 +63,7 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
     U = urllib2.urlopen(rq)
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
-         "%s: expected text/xml, got \"%s\" from %s %s" % (cs.logutils.cmd,I.type,action,url)
+         "%s: expected text/xml, got \"%s\" from %s %s" % (cs.pfx.cmd, I.type, action, url)
   retxml=''.join(U.readlines())
   with LogTime('callSOAP(%s): decode %d bytes of %s response', action, len(retxml), retAction):
     ret = xml2pyobj(retxml,retTypecode)

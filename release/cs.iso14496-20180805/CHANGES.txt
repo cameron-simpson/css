@@ -1,0 +1,186 @@
+  lib/python/cs/iso14496.py: cs.iso14496: initial code for ISO14496: ISO Base Media File Format, the basis for MP4 and others
+  lib/python/cs/iso14496.py: cs.iso14496: fix spelling of "boxes"
+  lib/python/cs/iso14496.py: cs.iso14496: initial Box class for decoded boxes with from_file and from_bytes factory class methods
+  lib/python/cs/iso14496.py: cs.iso14496: rework write_box as wrapper for transcribe_box; new function transcribe box which accepts box_tail as bytes or iterable of bytes to facilitate structured transcription; add .transcribe and .write methods to Box class
+  lib/python/cs/iso14496.py: cs.iso14496: add FTYPBox subclass of Box; implement __str__ for Box and FTYPBox; turn .box_data into generator property yielding byteses; TODO: make .from_file and .from_bytes return correct subclass
+  lib/python/cs/iso14496.py: cs.iso14496: define global KNOWN_BOX_CLASSES mapping box_types to Box subclasses, as yet unused by factories
+  lib/python/cs/iso14496.py: cs.iso14496: FTYPBox: require box_type in initialiser and sanity check it
+  lib/python/cs/iso14496.py: cs.iso14496: Box.from_bytes: use supplied class to contruct new instance
+  lib/python/cs/iso14496.py: cs.iso14496: Box: make .from_file and .from_bytes static methods accepting an optional subclass; if unspecified look up box_type in KNOWN_BOX_CLASSES to get factory, default to Box
+  lib/python/cs/iso14496.py: cs.iso14496: add FREEBox Box subclass for free space blocks
+  lib/python/cs/iso14496.py: cs.iso14496: move file_boxes up near read_box
+  lib/python/cs/iso14496.py: cs.iso14496: get_box: update docstring and append offset_final to returned tuple; read_box: add offset and skip_data parameters
+  lib/python/cs/iso14496.py: cs.iso14496: refer to "type" or "name"
+  lib/python/cs/iso14496.py: cs.iso14496: free boxes may also have the type "skip"
+  lib/python/cs/iso14496.py: cs.iso14496: split out box header parse into read_box_header for distinct use in Box.from_file
+  lib/python/cs/iso14496.py: cs.iso14496: lazy load the data section of boxes if possible, allowing fast access/scan of files without special work by caller
+  lib/python/cs/iso14496.py: cs.iso14496: docstrings for FREEBox and FTYPBox
+  lib/python/cs/iso14496.py: cs.iso14496: docstring for Box
+  lib/python/cs/iso14496.py: cs.iso14496: FullBox class, subclass of Box, for versioned and flagged box subclasses
+  lib/python/cs/iso14496.py: cs.iso14496: preserve the supplied box_type
+  lib/python/cs/iso14496.py: cs.iso14496: minor docstring update for FTYPBox
+  lib/python/cs/iso14496.py: cs.iso14496: PDINBox, subclass of FullBox - UNTESTED
+  lib/python/cs/iso14496.py: cs.iso14496: assorted fixes for get_box and from_bytes, also implement box_size=0 (data extend to end of block/file)
+  lib/python/cs/iso14496.py: cs.iso14496: implement MOOVBox - ISO14496 section 8.2.1
+  lib/python/cs/iso14496.py: cs.iso14496: get pack and unpack from cs.py3
+  lib/python/cs/iso14496.py: cs.iso14496: move box_type sanity check into the base Box class
+  lib/python/cs/iso14496.py: cs.iso14496: move Box subclass selection into pick_box_class function, with python2 and python3 versions
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix some pack/unpack format strings
+  lib/python/cs/iso14496.py: cs.iso14496: new intermedia class ContainerBox for pure container boxes, make MOOVBox a subclass of ContainerBox
+  lib/python/cs/iso14496.py: cs.iso14496: new class MVHDBox for 'mvhd' boxes - section 8.2.2
+  lib/python/cs/iso14496.py: cs.iso14496: new class TRAKBox - section 8.3.1.
+  lib/python/cs/iso14496.py: cs.iso14496: for python2, decode strings to bytes type
+  lib/python/cs/iso14496.py: cs.iso14496: move TRAKBox down below the movie boxes
+  lib/python/cs/iso14496.py: cs.iso14496: MVHDBox: bugfix box_data_chunks: transcribe variant leading fields
+  lib/python/cs/iso14496.py: cs.iso14496: new class TRHDBox: Track Header box - section 8.3.2
+  lib/python/cs/iso14496.py: cs.iso14496: TKHDBox: bugfix flag meanings and add missing track_size_is_aspect_ratio per section 8.3.2.3
+  lib/python/cs/iso14496.py: cs.iso14496: TKHDBox: bugfix various signed fields, were being treated as unsigned
+  lib/python/cs/iso14496.py: cs.iso14496: MVHDBox: bugfix various signed fields, were being treated as unsigned
+  lib/python/cs/iso14496.py: cs.iso14496: add .dump method to Boxes
+  lib/python/cs/iso14496.py: cs.py3: implementation of struct.iter_unpack; cs.iso14496: classes TREFBox and TrackReferenceTypeBox
+  lib/python/cs/iso14496.py: cs.iso14496: hook TrackReferenceTypeBox variants to KNOWN_BOX_CLASSES
+  lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBox: fix up docstring
+  lib/python/cs/iso14496.py: cs.iso14496: TRGRBox and TrackGroupTypeBox classes - section 8.3.4
+  lib/python/cs/iso14496.py: cs.iso14496: TKHDBox: preserve values in reserved fields for retranscription
+  lib/python/cs/iso14496.py: cs.iso14496,cs.py3_for2: comment out some debugging
+  lib/python/cs/iso14496.py: cs.iso14496: add MDIABox container class
+  lib/python/cs/iso14496.py: cs.iso14496: TrackGroupTypeBox: bugfix box_data_chunks: transcribe leading version+flags
+  lib/python/cs/iso14496.py: cs.iso14496: new MDHDBox Media Header box class - section 8.4.2
+  lib/python/cs/iso14496.py: cs.iso14496: MDHD.language: docstring describing standard for .language property
+  lib/python/cs/iso14496.py: cs.iso14496: FullBox: add generic __str__ method parameterised by class .ATTRIBUTES attribute
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: remove superfluous "box_type=" text
+  lib/python/cs/iso14496.py: cs.iso14496: remove debug
+  lib/python/cs/iso14496.py: cs.iso14496: add HDLRBox class for Handler Reference boxes - section 8.4.3
+  lib/python/cs/iso14496.py: cs.iso14496: HDLRBox: record handler_type as a binary string instead of an unsigned long
+  lib/python/cs/iso14496.py: cs.iso14496: MINFBox: Media Information box - section 8.4.4
+  lib/python/cs/iso14496.py: cs.iso14496: class NMHD Null Media Header box - section 8.4.5.2
+  lib/python/cs/iso14496.py: cs.iso14496: HDLRBox: move NUL-terminated UTF8 string collection out into reusable function
+  lib/python/cs/iso14496.py: cs.iso14496: ELNGBox Extended Language box - section 8.4.6
+  lib/python/cs/iso14496.py: cs.iso14496: STBLBox Sample Table box - section 8.5.1
+  lib/python/cs/iso14496.py: cs.iso14496: ContainerBox: move Box parser out into get_boxes function for reuse
+  lib/python/cs/iso14496.py: cs.iso14496: ContainerBox.boxes: make into lazy property
+  lib/python/cs/iso14496.py: cs.iso14496: STSDBox: Sample Description box - section 8.5.2
+  lib/python/cs/iso14496.py: cs.iso14496: remove debug
+  lib/python/cs/iso14496.py: cs.iso14496: Box: fix up box_type sanity check
+  lib/python/cs/iso14496.py: cs.iso14496: pull out attribute_summary method into Box base class
+  lib/python/cs/iso14496.py: cs.iso14496: FullBox: docstring fix
+  lib/python/cs/iso14496.py: cs.iso14496: intermediate class _SampleEntry - section 8.5.2.2
+  lib/python/cs/iso14496.py: cs.iso14496: BitRateBox - section 8.5.2.2.
+  lib/python/cs/iso14496.py: cs.iso14496: make a common _SampleTableContainerBox intermediate class for Sample Table container boxes; add STDPBox Degradation Priority box -= section 8.5.3
+  lib/python/cs/iso14496.py: cs.iso14496: fix docstring typo
+  lib/python/cs/iso14496.py: cs.iso14496: register box classes via add_box_class to avoid repetition and mistakes
+  lib/python/cs/iso14496.py: cs.iso14496: use @cs.py.func.prop instead of @property
+  lib/python/cs/iso14496.py: cs.iso14496: python3 syntax compatibility fix
+  lib/python/cs/iso14496.py: cs.iso19946: derive box class .BOX_TYPE from class name
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix Box.box_type_from_klass: box types are bytes
+  lib/python/cs/iso14496.py: cs.iso14496: add _TimeToSampleBox and STTSBox - section 8.6.1
+  lib/python/cs/iso14496.py: cs.iso14496: add missing .ATTRIBUTES for FullBox subclasses, other minor tweaks
+  lib/python/cs/iso14496.py: cs.iso14496: whitespace
+  lib/python/cs/iso14496.py: cs.iso14496: CTTSBox Composition Time to Sample - section 8.6.1.3
+  lib/python/cs/iso14496.py: cs.iso14496: construct simple subclasses with add_box_subclass
+  lib/python/cs/iso14496.py: cs.iso14496: add CSLGBox Composition to Decode box - sections 8.6.1.4
+  lib/python/cs/iso14496.py: cs.iso14496: merge common logic of STTSBox and CTTSBox into _GenericSampleBox
+  lib/python/cs/iso14496.py: cs.iso14496: add STSSBox Sync Sample box - section 8.6.2; some fixes for ATTRIBUTES; some docstring tweaks
+  lib/python/cs/iso14496.py: cs.iso14496: add STSHBox - Shadow Sync Tbale box - section 8.6.3
+  lib/python/cs/iso14496.py: cs.iso14496: add SDTPBox Independent and Disposable Samples box - section 8.6.4
+  lib/python/cs/iso14496.py: cs.iso14496: add ELSTBox - Edit List box - section 8.6.6
+  lib/python/cs/iso14496.py: cs.iso14496: add Box._advance_box_data to support tracking fields parsed by subclasses
+  lib/python/cs/iso14496.py: cs.iso14496: rename wordy box_data_chunks with data_chunks
+  lib/python/cs/iso14496.py: cs.iso14496: refactor the Box transcription process by making the .parsed_box_data method easier to implement in subclasses
+  lib/python/cs/iso14496.py: cs.iso14496: apply Box._advance_box_type to all __init__s which parsed extra data fields
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: include class' actual name
+  lib/python/cs/iso14496.py: cs.iso14496: Box.from_bytes: include the data bytes directly
+  lib/python/cs/iso14496.py: cs.iso14496: add DINFBox, URL_Box, URN_Box, DREFBox; add put_utf8_nul for transcribing NUL terminated strings
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix DREFBox entry parse; make code more sensitive to incorrectness; docstring tweak
+  lib/python/cs/iso14496.py: cs.iso14496: docstring grammar fix
+  lib/python/cs/iso14496.py: cs.iso14496: port the entire parser to use CornuCopyBuffers
+  lib/python/cs/iso14496.py: cs.iso14496: Box.from_buffer: add copy_offsets parameter
+  lib/python/cs/iso14496.py: cs.iso14496: new convenience functions parse_file, parse_chunks, parse_buffer yielding Boxes from streams
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix CTTSBox definition
+  lib/python/cs/iso14496.py: cs.iso14496: fix typo in docstring
+  lib/python/cs/iso14496.py: cs.iso14496: use new CornuCopyBuffer.report_offset to report Box offsets
+  lib/python/cs/iso14496.py: cs.iso14496: remove debug
+  lib/python/cs/iso14496.py: cs.iso14496: simple unit test
+  lib/python/cs/iso14496.py: cs.venti.iso14496: debug
+  lib/python/cs/iso14496.py: cs.iso14496: add main program, present some memory buffer fields as bytes in __str__
+  lib/python/cs/iso14496.py: cs.iso14496,iso14496_tests: fix up unit test mode
+  lib/python/cs/iso14496.py: cs.iso14496: support callables for formatting ATTRIBUTES
+  lib/python/cs/iso14496.py: cs.iso14496: docstring typo fix
+  lib/python/cs/iso14496.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/iso14496.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/iso14496.py: my email address has changed - update Python code
+  lib/python/cs/iso14496.py: cs.iso14496: Box.from_buffer docstring correction
+  lib/python/cs/iso14496.py: cs.iso14496: drop debug
+  lib/python/cs/iso14496.py: merge default ==> media
+  lib/python/cs/iso14496.py: cs.iso14496: Box, FullBox: improve __str__ box_type transcription
+  lib/python/cs/iso14496.py: cs.iso14496: new VMHDBox Video Media Headerbox class - section 12.1.2
+  lib/python/cs/iso14496.py: cs.iso14496: new SMHD Sound Media Headerbox - section 12.2.2
+  lib/python/cs/iso14496.py: cs.iso14496: new STSCBox Sample To Chunk Box - section 8.7.4
+  lib/python/cs/iso14496.py: cs.iso14496: new STSZBox Sample Size Box - section 8.7.3.2
+  lib/python/cs/iso14496.py: cs.iso14496: new STCOBox and CO64Box Chunk Offset Box - section 8.7.5
+  lib/python/cs/iso14496.py: cs.iso14496: drop redundant FullBox subclass .dump methods
+  lib/python/cs/iso14496.py: cs.iso14496: Box.dump: crop the summary line, needs revisiting
+  lib/python/cs/iso14496.py: cs.iso14496: replace a bunch of special __str__ definitions with ATTRIBUTES
+  lib/python/cs/iso14496.py: cs.iso14496: make distinct TREFBox class which knows that is contains TrackReferenceTypeBoxs, back of box_type checks to warnings
+  lib/python/cs/iso14496.py: cs.iso14496: use CornuCopyBuffer.from_fd and CornuCopyBuffer.from_file to access files, thus supporting seeks
+  lib/python/cs/iso14496.py: cs.iso14496: add some Pfx context to the high level Box parse routines
+  lib/python/cs/iso14496.py: cs.iso14496: some more Pfx context
+  lib/python/cs/iso14496.py: cs.iso14496: new UDTABox class (section 8.10.1) and METABox class (section 8.11.1)
+  lib/python/cs/iso14496.py: cs.iso14496: Box._skip_data: raise informative RuntimeError instead of ValueError; HDLRBox.parse_data: just warn about unconsumed data instead of erroring
+  lib/python/cs/iso14496.py: cs.iso14496: drop self.end_offset from calls to Box.parse_subboxes, this is now the default
+  lib/python/cs/iso14496.py: cs.iso14496: DREFBox.dump: tweak output
+  lib/python/cs/iso14496.py: cs.iso14496: drop debug
+  lib/python/cs/iso14496.py: cs.iso14496: add Box.box_type_path, a dotted join of the enclosing box types; use it in various transcriptions
+  lib/python/cs/iso14496.py: cs.iso14496: add missing import
+  lib/python/cs/iso14496.py: cs.iso14496: clean a lot of lint
+  lib/python/cs/iso14496.py: cs.iso14496: plumbing for new `copy_boxes` parameter, a callable to report newly created Box instances
+  lib/python/cs/iso14496.py: cs.iso14496: record the length of the Box header as Box.header_length
+  lib/python/cs/iso14496.py: cs.iso14496: rename `discard` to `discard_data` throughout for consistency
+  lib/python/cs/iso14496.py: cs.iso14496: new polymorphic parse() function, clean up a few more `discard` ==> `discard_data` uses, generalise kwargs pass through from the parse* functions
+  lib/python/cs/iso14496.py: cs.iso14496: new Boxes class to accrue and index Box instances from a parse; new "extract" operation to copy specific Box content
+  lib/python/cs/iso14496.py: cs.iso14496: fix missing copy_boxes plumbing, drop obviated copy_boxes call
+  lib/python/cs/iso14496.py: cs.iso14496: new MDATBox Media Data Box subclass, section 8.1.1.1
+  lib/python/cs/iso14496.py: cs.iso14496: bugfix a warning message
+  lib/python/cs/iso14496.py: cs.iso14496: add a little whitespace
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: report the length of the unparsed data; fix a docstring typo
+  lib/python/cs/iso14496.py: cs.iso14496: base new BoxHeader class on cs.binary.Packet; move unfold_chunks into cs.binary as new flatten function
+  lib/python/cs/iso14496.py: cs.iso14496: massive refactor to parse via the cs.binary classes, which gets me reliable retranscription without maintaining a fragile parallel transcribe method and also makes for more readable code, with few bare struct format strings and hand assembly; also add a prototype DISTINFO for later PyPI release
+  lib/python/cs/iso14496.py: cs.iso14496: start on docstring improvements
+  lib/python/cs/iso14496.py: cs.iso14496: drop obsolete duplicate SubBoxesField implementation
+  lib/python/cs/iso14496.py: cs.iso14496: plumb the Box.parent attribute properly
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: use the both_type_path as the name; Box.boxtype_path: add some extra checking when getting the box_type_s
+  lib/python/cs/iso14496.py: cs.iso14496: rework Box.self_check and call it at the end of Box.from_buffer
+  lib/python/cs/iso14496.py: cs.iso14496: Box.from_buffer: tweak context messages
+  lib/python/cs/iso14496.py: cs.iso14496: drop Box.attribute_summary, also obsoleted by the cs.binary classes
+  lib/python/cs/iso14496.py: cs.iso14496: drop obsolete ATTRIBUTES and dump from classes, more docstring improvements, tweak PDIN box body definition
+  lib/python/cs/iso14496.py: cs.iso14496: more docstrings
+  lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: rename field from track_id to track_ids; drop some obsolete code
+  lib/python/cs/iso14496.py: cs.iso14496: URL_BoxBody: fix parse_buffer method; add_generic_sample_boxbody: fix use of sample_type size; clean up some unused imports
+  lib/python/cs/iso14496.py: cs.iso14496: drop use of fixed_bytes_field in favour of BytesField
+  lib/python/cs/iso14496.py: cs.iso14496: Box.self_check: call Packet.self_check; move BoxBody definition to above Box to support the self_check
+  lib/python/cs/iso14496.py: cs.iso14496: call self_check from BoxHeader.from_buffer and BoxBody.from_buffer; add BoxHeader.PACKET_FIELDS
+  lib/python/cs/iso14496.py: cs.iso14496: provide PACKET_FIELDS specifications for Box subtypes
+  lib/python/cs/iso14496.py: cs.iso14496: HDLRBoxBody.handler_type: bugfix reference to handler_type_long field
+  lib/python/cs/iso14496.py: cs.binary: BoxHeader: store the actual length in a distinct private field, make `length` a property which recomputes the `box_size` and `length` fields when it is changed
+  lib/python/cs/iso14496.py: cs.iso14496: Box.self_check: adjust indent of parent check
+  lib/python/cs/iso14496.py: cs.iso14496: Box: drop misleading .length property, modify transcribe to recompute the header length (and thus the header itself) first before kicking off ordinary transcription
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__getattr__: support .TYPE and .TYPEs for references .boxes subboxes by box_type == b'type', adjust TODO list
+  lib/python/cs/iso14496.py: cs.iso14496: expand the SubBoxesField.from_buffer docstring
+  lib/python/cs/iso14496.py: cs.iso14496: typo fix the SubBoxesField.from_buffer docstring
+  lib/python/cs/iso14496.py: cs.iso14496: new OverBox pseudoBox with just a .boxes field, used to encompass a stream of Boxes
+  lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: include count of unparsed bytes, if any
+  lib/python/cs/iso14496.py: cs.iso14496: STCOBoxBody: export PACKET_FIELDS, accidentally inside docstring
+  lib/python/cs/iso14496.py: cs.iso14496: SpecificSampleBoxBody Time to Sample box parser: bugfix entry_count calculation, improve error handling for short sample data
+  lib/python/cs/iso14496.py: cs.iso14496: FREEBoxBody: extend to end of buffer by default
+  lib/python/cs/iso14496.py: cs.iso14496: SpecificSampleBoxBody: handle end of samples more correctly
+  lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody: turn into proper class to gather the data
+  lib/python/cs/iso14496.py: cs.iso14496: upgrade DINFBoxBody
+  lib/python/cs/iso14496.py: cs.iso14496: fix up some stuff to do with BoxBody classes which still spoke about Boxes; no semantic changes
+  lib/python/cs/iso14496.py: cs.iso14496: move author string out of description header and into opening comment
+  lib/python/cs/iso14496.py: cs.iso14496: update DISTINFO ahead of PyPI release
+  lib/python/cs/iso14496.py: cs.iso14496: clean lint: add docstrings, adjust some names, improve some messages, clean an unused import
+  lib/python/cs/iso14496.py: cs.iso14496: DINFBoxBody: drop the idea of included subBoxes
+  lib/python/cs/iso14496.py: cs.iso14496: if we hit EOF during a BoxBody parse, complain and store an EmptyField placeholder; TODO: recover the incomplete but consumed bytes
+  lib/python/cs/iso14496.py: cs.iso14496: plumb keyword arguments further through the parse
+  lib/python/cs/iso14496.py: cs.iso14496: Box.parse_buffer: gather all unparsed data in bfr_tail (the tail of the packet) instead of some dubious notional end_offset
+  lib/python/cs/iso14496.py: cs.iso14496: clean some more lint

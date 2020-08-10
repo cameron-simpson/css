@@ -1,9 +1,10 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Emit positioning key bindings for FVWM.
-#       - Cameron Simpson <cs@zip.com.au> 20oct2007
+#       - Cameron Simpson <cs@cskk.id.au> 20oct2007
 #
 
+from __future__ import print_function
 import os
 import sys
 from cs.logutils import info, setup_logging
@@ -13,183 +14,181 @@ import cs.x11
 
 setup_logging()
 
-X='X'
-DX='DX'
-SLOTS='SLOTS'
-LEFTSLOTS='LEFTSLOTS'
-RIGHTSLOTS='RIGHTSLOTS'
-LEFTWIDTH='LEFTWIDTH'
-RIGHTWIDTH='RIGHTWIDTH'
+X = 'X'
+DX = 'DX'
+SLOTS = 'SLOTS'
+LEFTSLOTS = 'LEFTSLOTS'
+RIGHTSLOTS = 'RIGHTSLOTS'
+LEFTWIDTH = 'LEFTWIDTH'
+RIGHTWIDTH = 'RIGHTWIDTH'
 
-usage="Usage: %s"
+usage = "Usage: %s"
 
-width=None
-height=None
+width = None
+height = None
 
-topy=67
-charx=int(os.environ.get('FONT_X',5))
-chary=int(os.environ.get('FONT_Y',11))
-if os.environ.get('XSESSIONMODE','') == 'vnc':
-  fvMove='Move'
+topy = 67
+charx = int(os.environ.get('FONT_X', 5))
+chary = int(os.environ.get('FONT_Y', 11))
+if os.environ.get('XSESSIONMODE', '') == 'vnc':
+  fvMove = 'Move'
 else:
-  fvMove='AnimatedMove'
+  fvMove = 'AnimatedMove'
 
-mintty=charx*80
+mintty = charx * 80
 
-D=cs.x11.Display()
-screen=0
-display=D.DISPLAY
-displayBase=display
-dotpos=display.rfind('.')
+D = cs.x11.Display()
+screen = 0
+display = D.DISPLAY
+displayBase = display
+dotpos = display.rfind('.')
 if dotpos >= 0:
-  displayBase=display[:dotpos]
-  if display[dotpos+1:].isdigit():
-    screen=int(display[dotpos+1:])
+  displayBase = display[:dotpos]
+  if display[dotpos + 1:].isdigit():
+    screen = int(display[dotpos + 1:])
 
-##import cs.hier
-##print cs.hier.h2a(D,1)
-
-dx=D.SCREENS[screen].DX
-dy=D.SCREENS[screen].DY
+dx = D.SCREENS[screen].DX
+dy = D.SCREENS[screen].DY
 ##info("choose screen %d: %dx%d" % (screen,dx,dy))
 
 if len(sys.argv) > 1:
-  dx=int(sys.argv[1])
+  dx = int(sys.argv[1])
 
-def setenv(var,value):
+def setenv(var, value):
   from os import environ
   if type(value) is int:
-    value=str(value)
-  os.environ[var]=value
-  qvalue=cs.sh.quotestr(value)
-  envfiles=os.environ.get('ENVFILES','').split()
+    value = str(value)
+  os.environ[var] = value
+  qvalue = cs.sh.quotestr(value)
+  envfiles = os.environ.get('ENVFILES', '').split()
   if len(envfiles) > 0:
-    fp=open(envfiles[-1],"a")
-    fp.write("%s=%s; export %s\n" % (var,qvalue,var))
+    fp = open(envfiles[-1], "a")
+    fp.write("%s=%s; export %s\n" % (var, qvalue, var))
     fp.close()
-  print "SetEnv %s %s" % (var,qvalue)
+  print('SetEnv', var, qvalue)
 
 def settabenv(tabnum, px, wx):
   global charx
   if type(tabnum) is int:
-    tabnum=str(tabnum)
-  setenv("X11_TAB%s_X"%tabnum, px)
-  setenv("X11_TAB%s_DX"%tabnum, wx)
-  setenv("X11_TAB%s_DXC"%tabnum, wx/charx)
+    tabnum = str(tabnum)
+  setenv("X11_TAB%s_X" % tabnum, px)
+  setenv("X11_TAB%s_DX" % tabnum, wx)
+  setenv("X11_TAB%s_DXC" % tabnum, wx / charx)
 
-ttyheight=dy-topy
-ttyheight2=ttyheight/2
-ttycheight=ttyheight/chary
+ttyheight = dy - topy
+ttyheight2 = ttyheight / 2
+ttycheight = ttyheight / chary
 setenv("PIX_HIGH", ttyheight)
 setenv("PIX_HIGH2", ttyheight2)
 setenv("TTY_HIGH", ttycheight)
 
-print "#", dx, dy
-xy="%dx%d" % (dx,dy)
-aspect=float(dx)/float(dy)
-print "#", aspect
+print("#", dx, dy)
+xy = "%dx%d" % (dx, dy)
+aspect = float(dx) / float(dy)
+print("#", aspect)
 
 def slice(dx):
   ''' Slice a horizontal region into terminal sizes strips.
   '''
-  dx2=dx/2              # display midpoint
-  fat=dx%mintty         # padding for the wide terminal
-  px=0
+  dx2 = dx / 2  # display midpoint
+  fat = dx % mintty  # padding for the wide terminal
+  px = 0
   while px < dx:
-    if px < dx2 and px+mintty+fat > dx2:
-      wx=mintty+fat
+    if px < dx2 and px + mintty + fat > dx2:
+      wx = mintty + fat
     else:
-      wx=mintty
-    yield (wx,px)
+      wx = mintty
+    yield (wx, px)
     px += wx
 
 # infer physical monitors from display dimensions
 if dx == 3840 or dx == 3200 or dx == 2560:
   # two monitors
-  dx2=dx/2
-  slices=(dx2,dx2)
+  dx2 = dx / 2
+  slices = (dx2, dx2)
 elif dx == 3520:
   # two monitors
-  slices=(1920,1600)
+  slices = (1920, 1600)
 elif dx == 5120:
   # three monitors
-  slices=(1600,1920,1600)
+  slices = (1600, 1920, 1600)
 else:
   # one monitor
-  slices=(dx,)
+  slices = (dx,)
 
 setenv("X11_MONITOR_WIDTHS", " ".join(str(sl) for sl in slices))
 
 # slice up each monitor into strips
-slots=[]
-rightmon=[]
-ox=0
-slicenum=0
+slots = []
+rightmon = []
+ox = 0
+slicenum = 0
 for sx in slices:
-  mon=UCdict({X: ox, DX: sx})
+  mon = UCdict({X: ox, DX: sx})
   setenv("X11_MONITOR%d_X" % slicenum, ox)
   setenv("X11_MONITOR%d_DX" % slicenum, sx)
-  mslots=[]
+  mslots = []
   for wx, px in slice(sx):
-    geom=UCdict({X: ox+px, DX: wx})
+    geom = UCdict({X: ox + px, DX: wx})
     mslots.append(geom)
-  mon.SLOTS=mslots
+  mon.SLOTS = mslots
 
-  firstRightSlot=len(mon.SLOTS)/2
-  leftslots=mon.SLOTS[:firstRightSlot]
-  rightslots=mon.SLOTS[firstRightSlot:]
-  leftwidth=sum(slot.DX for slot in leftslots)
-  rightwidth=sum(slot.DX for slot in rightslots)
-  assert leftwidth+rightwidth == mon.DX
-  mon.LEFTSLOTS=leftslots
-  mon.LEFTWIDTH=leftwidth
-  mon.RIGHTSLOTS=rightslots
-  mon.RIGHTWIDTH=rightwidth
+  firstRightSlot = len(mon.SLOTS) / 2
+  leftslots = mon.SLOTS[:firstRightSlot]
+  rightslots = mon.SLOTS[firstRightSlot:]
+  leftwidth = sum(slot.DX for slot in leftslots)
+  rightwidth = sum(slot.DX for slot in rightslots)
+  assert leftwidth + rightwidth == mon.DX
+  mon.LEFTSLOTS = leftslots
+  mon.LEFTWIDTH = leftwidth
+  mon.RIGHTSLOTS = rightslots
+  mon.RIGHTWIDTH = rightwidth
 
   # save monitor, advance
   rightmon.append(mon)
-  ox+=sx
-  slicenum+=1
+  ox += sx
+  slicenum += 1
 
-physslots=[]
+physslots = []
 for mon in rightmon:
   physslots.append(mon.SLOTS)
 
 # locate middle monitor at rightmon[0]
-leftmon=[]
-while len(leftmon)+2 < len(rightmon):
+leftmon = []
+while len(leftmon) + 2 < len(rightmon):
   leftmon.append(rightmon.pop(0))
 
-seqslots=[]
-for mon in rightmon+leftmon:
+seqslots = []
+for mon in rightmon + leftmon:
   seqslots.append(mon.SLOTS)
 
-ox=0
-slicenum=0
-for mon in rightmon+leftmon:
+ox = 0
+slicenum = 0
+for mon in rightmon + leftmon:
   setenv("X11_MONSEQ%d_X" % slicenum, mon.X)
   setenv("X11_MONSEQ%d_DX" % slicenum, mon.DX)
-  ox+=mon.DX
-  slicenum+=1
+  ox += mon.DX
+  slicenum += 1
 
-print "#", leftmon
-print "#", rightmon
+print("#", leftmon)
+print("#", rightmon)
 
 def numPos(monitors):
   ''' Count and position the strips spanning a list of monitors.
   '''
-  n=0
-  monitors=monitors[:]
-  mslots=monitors.pop(0).SLOTS[:]
+  n = 0
+  monitors = monitors[:]
+  mslots = monitors.pop(0).SLOTS[:]
   for n in 1, 2, 3, 4, 5, 6, 7, 8, 9, 0:
     if len(mslots) == 0:
       if len(monitors) == 0:
         break
-      mslots=monitors.pop(0).SLOTS[:]
-    slot=mslots.pop(0)
+      mslots = monitors.pop(0).SLOTS[:]
+    slot = mslots.pop(0)
     yield n, slot
 
-print '''
+print(
+    '''
 SetAnimation 5
 DestroyFunc MoveWinFixed
 AddToFunc MoveWinFixed
@@ -197,50 +196,62 @@ AddToFunc MoveWinFixed
 + I Resize $2 $3
 + I %s $0 $1 Warp
 ''' % fvMove
+)
 
-poslist=[pos for pos in numPos(rightmon)]
-npos=len(poslist)
-tabnum=0
+poslist = [pos for pos in numPos(rightmon)]
+npos = len(poslist)
+tabnum = 0
 for n, slot in poslist:
-  px=slot.X
-  wx=slot.DX
-  print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n, "M", px, wx, ttyheight)
+  px = slot.X
+  wx = slot.DX
+  print(
+      "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n, "M", px, wx, ttyheight)
+  )
   if npos < 4:
-    print "Key %d W %s MoveWinFixed %dp -%dp %dp %dp" % (n+npos, "M", px, ttyheight2, wx, ttyheight2)
-    print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n+npos+npos, "M", px, wx, ttyheight2)
+    print(
+        "Key %d W %s MoveWinFixed %dp -%dp %dp %dp" %
+        (n + npos, "M", px, ttyheight2, wx, ttyheight2)
+    )
+    print(
+        "Key %d W %s MoveWinFixed %dp -0p %dp %dp" %
+        (n + npos + npos, "M", px, wx, ttyheight2)
+    )
   settabenv(tabnum, px, wx)
-  tabnum+=1
+  tabnum += 1
 
 if len(leftmon) > 0:
-  poslist=[pos for pos in numPos(leftmon)]
-  npos=len(poslist)
+  poslist = [pos for pos in numPos(leftmon)]
+  npos = len(poslist)
   for n, slot in poslist:
-    px=slot.X
-    wx=slot.DX
-    print "Key %d W %s MoveWinFixed %dp -0p %dp %dp" % (n, "MS", px, wx, ttyheight)
+    px = slot.X
+    wx = slot.DX
+    print(
+        "Key %d W %s MoveWinFixed %dp -0p %dp %dp" %
+        (n, "MS", px, wx, ttyheight)
+    )
     settabenv(tabnum, px, wx)
-    tabnum+=1
+    tabnum += 1
 
-slicenum=0
-for n, slot in numPos(leftmon+rightmon):
+slicenum = 0
+for n, slot in numPos(leftmon + rightmon):
   px, wx = slot.X, slot.DX
-  print "DestroyFunc MoveToSlice%d" % n
-  print "AddToFunc MoveToSlice%d" % n
-  print "+ I MoveWinFixed %dp -0p %dp %dp" % (px, wx, ttyheight)
+  print("DestroyFunc MoveToSlice%d" % n)
+  print("AddToFunc MoveToSlice%d" % n)
+  print("+ I MoveWinFixed %dp -0p %dp %dp" % (px, wx, ttyheight))
 
 # monitors of interest
-monMain=rightmon[0]
-monAlt=monMain
-monLeft=monMain
-monRight=monMain
+monMain = rightmon[0]
+monAlt = monMain
+monLeft = monMain
+monRight = monMain
 if len(rightmon) > 1:
-  monRight=rightmon[1]
-  monAlt=monRight
+  monRight = rightmon[1]
+  monAlt = monRight
 if len(leftmon) > 0:
-  monLeft=leftmon[-1]
-  monAlt=monLeft
+  monLeft = leftmon[-1]
+  monAlt = monLeft
 
-middleSlot=monMain.SLOTS[(len(monMain.SLOTS)-1)/2]
+middleSlot = monMain.SLOTS[(len(monMain.SLOTS) - 1) / 2]
 settabenv("MIDDLE", middleSlot.X, middleSlot.DX)
 
 setenv("X11_MONMAIN_X", monMain.X)
@@ -252,10 +263,31 @@ setenv("X11_MONLEFT_DX", monLeft.DX)
 setenv("X11_MONRIGHT_X", monRight.X)
 setenv("X11_MONRIGHT_DX", monRight.DX)
 
-print "Key Up W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.DX, ttyheight)
-print "Key Down W M MoveWinFixed %dp -0p %dp %dp" % (monMain.X, monMain.LEFTWIDTH, ttyheight)
-print "Key Down W MS MoveWinFixed %dp -0p %dp %dp" % (monMain.X+monMain.LEFTWIDTH, monMain.RIGHTWIDTH, ttyheight)
-print "Key Left W M MoveWinFixed %dp -0p %dp %dp" % (monLeft.X, monLeft.LEFTWIDTH, ttyheight)
-print "Key Left W MS MoveWinFixed %dp -0p %dp %dp" % (monLeft.X+monLeft.LEFTWIDTH, monLeft.RIGHTWIDTH, ttyheight)
-print "Key Right W M MoveWinFixed %dp -0p %dp %dp" % (monRight.X, monRight.LEFTWIDTH, ttyheight)
-print "Key Right W MS MoveWinFixed %dp -0p %dp %dp" % (monRight.X+monRight.LEFTWIDTH, monRight.RIGHTWIDTH, ttyheight)
+print(
+    "Key Up W M MoveWinFixed %dp -0p %dp %dp" %
+    (monMain.X, monMain.DX, ttyheight)
+)
+print(
+    "Key Down W M MoveWinFixed %dp -0p %dp %dp" %
+    (monMain.X, monMain.LEFTWIDTH, ttyheight)
+)
+print(
+    "Key Down W MS MoveWinFixed %dp -0p %dp %dp" %
+    (monMain.X + monMain.LEFTWIDTH, monMain.RIGHTWIDTH, ttyheight)
+)
+print(
+    "Key Left W M MoveWinFixed %dp -0p %dp %dp" %
+    (monLeft.X, monLeft.LEFTWIDTH, ttyheight)
+)
+print(
+    "Key Left W MS MoveWinFixed %dp -0p %dp %dp" %
+    (monLeft.X + monLeft.LEFTWIDTH, monLeft.RIGHTWIDTH, ttyheight)
+)
+print(
+    "Key Right W M MoveWinFixed %dp -0p %dp %dp" %
+    (monRight.X, monRight.LEFTWIDTH, ttyheight)
+)
+print(
+    "Key Right W MS MoveWinFixed %dp -0p %dp %dp" %
+    (monRight.X + monRight.LEFTWIDTH, monRight.RIGHTWIDTH, ttyheight)
+)

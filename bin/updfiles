@@ -2,7 +2,7 @@
 #
 # Accept chkfiles output on stdin, comm against snapshot and
 # write cpio archive of changed files.
-#	- Cameron Simpson <cs@zip.com.au> 17sep96
+#	- Cameron Simpson <cs@cskk.id.au> 17sep96
 #
 
 snapdir=${SNAPDIR-$HOME/etc/snap}

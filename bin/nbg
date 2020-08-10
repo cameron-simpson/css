@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Add a file to the not-a-background reject list.
-#	- Cameron Simpson <cs@zip.com.au> 20nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 20nov2000
 #
 
 yes=

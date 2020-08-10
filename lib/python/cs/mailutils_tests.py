@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.mailutils.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function
@@ -21,7 +21,10 @@ testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.mailutils')
 testmaildir = joinpath(testdatadir, 'maildir')
 
 class TestMaildir(unittest.TestCase):
+  ''' Tests for `cs.mailutils.Maildir`.
+  '''
 
+  @unittest.skipUnless(os.path.exists(testmaildir), 'no test Maildir ' + testmaildir)
   def test00basic(self):
     t0 = time.time()
     M = Maildir(testmaildir)

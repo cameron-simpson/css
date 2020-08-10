@@ -35,7 +35,7 @@
 #	The KEYS() function is expensive, and potentially sucks the whole
 #	cs::Persist object into memory. Gotta do better than this somehow.
 #
-# - Cameron Simpson <cs@zip.com.au> 
+# - Cameron Simpson <cs@cskk.id.au> 
 #
 
 use strict qw(vars);

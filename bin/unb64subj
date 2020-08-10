@@ -2,7 +2,7 @@
 #
 # Some email comes in with base64 Subject: lines without the RFC2047 markings.
 # Decode and leave raw stuff there too in case of mistake.
-#	- Cameron Simpson <cs@zip.com.au> 25jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 25jul2004
 #
 
 use cs::MIME::Base64;

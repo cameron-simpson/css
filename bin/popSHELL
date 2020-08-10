@@ -5,7 +5,7 @@
 # to run something arbitrary rather than the user's shell
 # since for some unknown reason it just execs $SHELL.
 # Sad but true. Hence this script.
-#	- Cameron Simpson <cs@zip.com.au> 18may2002
+#	- Cameron Simpson <cs@cskk.id.au> 18may2002
 #
 
 cmd=$0

@@ -1,0 +1,3 @@
+lib/python/cs/app/ydl.py: Release information for cs.app.ydl-20200615.
+lib/python/cs/app/ydl.py: cs.app.ydl: YDLCommand: add usage message to docstring
+lib/python/cs/app/ydl.py: merge media ==> default: cs.app.ydl: add usage to docstring; cs.cmdutils: bugfix no-subcommands usage message construction

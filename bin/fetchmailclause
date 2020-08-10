@@ -2,7 +2,7 @@
 #
 # Pull out a single clause from a .fetchmailrc file.
 # The parsing's a little simplistic but it works fairly well.
-#	- Cameron Simpson <cs@zip.com.au> 09sep2003
+#	- Cameron Simpson <cs@cskk.id.au> 09sep2003
 #
 
 rc=$HOME/.fetchmailrc

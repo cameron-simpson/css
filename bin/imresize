@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Squirrel away XbyY-sized versions of images.
-#	- Cameron Simpson <cs@zip.com.au> 12feb98
+#	- Cameron Simpson <cs@cskk.id.au> 12feb98
 #
 
 cmd=`basename "$0"`

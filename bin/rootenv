@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Adopt a rootlike environment.
-#	- Cameron Simpson <cs@zip.com.au> 07nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 07nov2000
 #
 
 if [ "x$1" = x-recall ]

@@ -1,0 +1,15 @@
+  lib/python/cs/pfx.py: move Pfx et al into standalone cs.pfx module
+  lib/python/cs/pfx.py: cs.pfx: reduce some external dependencies, one lint
+  lib/python/cs/pfx.py: cs.pfx: easy to use dynamic message prefixes: Pfx and friends, pulled from cs.logutils
+  lib/python/cs/pfx.py: cs.pfx: add deferred import of cs.logutils.cmd
+  lib/python/cs/pfx.py: cs.pfx: import cs.py3.unicode
+  lib/python/cs/pfx.py: cs.pfx,cs.logutils: move global "cmd" from cs.logutils to cs.pfx
+  lib/python/cs/pfx.py: cs.pfx: remove obsolete import of cs.logutils.cmd
+  lib/python/cs/pfx.py: cs.pfx: _PfxThreadState.cur: construct dummy Pfx if nothing on the stack
+  lib/python/cs/pfx.py: cs.pfx,cs.logutils: cs.pfx._PfxThreadState.trace is now a callback, removing final dependency of cs.logutils from cs.pfx
+  lib/python/cs/pfx.py: cs.pfx: Pfx: include prefix in warning message, strip some debug
+  lib/python/cs/pfx.py: cs.pfx: tweak default sys.argv[0] standin
+  lib/python/cs/pfx.py: cs.pfx: _PfxThreadState.cur: better handling of empty stack
+  lib/python/cs/pfx.py: my email address has changed - update Python code
+  lib/python/cs/pfx.py: cs.pfx: drop noisy message about unprefixable exceptions
+  lib/python/cs/pfx.py: cs.pfx: add docstring and DISTINFO, drop annoying debug message

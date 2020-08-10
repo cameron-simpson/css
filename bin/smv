@@ -1,12 +1,11 @@
 #!/bin/sh -ue
 #
 # Move files via rsync, like scp but better:-)
-#       - Cameron Simpson <cs@zip.com.au> 22jun2009
+#       - Cameron Simpson <cs@cskk.id.au> 22jun2009
 #
 
 cmd=$0
 usage="Usage: $cmd rsync-args..."
 
 set -x
-exec rsync --ignore-existing --remove-source-files --progress \
-        ${1+"$@"}
+exec rsync -a --progress --ignore-existing --remove-source-files ${1+"$@"}

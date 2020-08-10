@@ -1,28 +1,41 @@
 #!/usr/bin/python
 #
 # Unit tests for cs.range.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
 import unittest
 from random import randint
 from cs.range import Range, overlap, spans, Span
-from cs.logutils import X
 
 class TestAll(unittest.TestCase):
+  ''' Tests for `cs.range`.
+  '''
 
   def setUp(self):
-    self.items1 = [1,2,3,7,8,11,5]
-    self.spans1 = [ Span(1,4), Span(5,6), Span(7,9), Span(11,12) ]
-    self.items2 = [3,5,6,8,9,10,15,16,19]
-    self.spans2 = [ Span(3,4), Span(5,7), Span(8,11), Span(15,17), Span(19,20) ]
-    self.items1plus2 = [1,2,3,5,6,7,8,9,10,11,15,16,19]
-    self.spans1plus2 = [ Span(1,4), Span(5,12), Span(15,17), Span(19,20) ]
-    self.items1minus2 = [1,2,7,11]
-    self.spans1minus2 = [ Span(1,3), Span(7,8), Span(11,12) ]
-    self.items1xor2 = [1,2,6,7,9,10,11,15,16,19]
-    self.spans1xor2 = [ Span(1,3), Span(6,8), Span(9,12), Span(15,17), Span(19,20) ]
+    self.items1 = [1, 2, 3, 7, 8, 11, 5]
+    self.spans1 = [Span(1, 4), Span(5, 6), Span(7, 9), Span(11, 12)]
+    self.items2 = [3, 5, 6, 8, 9, 10, 15, 16, 19]
+    self.spans2 = [
+        Span(3, 4),
+        Span(5, 7),
+        Span(8, 11),
+        Span(15, 17),
+        Span(19, 20)
+    ]
+    self.items1plus2 = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 15, 16, 19]
+    self.spans1plus2 = [Span(1, 4), Span(5, 12), Span(15, 17), Span(19, 20)]
+    self.items1minus2 = [1, 2, 7, 11]
+    self.spans1minus2 = [Span(1, 3), Span(7, 8), Span(11, 12)]
+    self.items1xor2 = [1, 2, 6, 7, 9, 10, 11, 15, 16, 19]
+    self.spans1xor2 = [
+        Span(1, 3),
+        Span(6, 8),
+        Span(9, 12),
+        Span(15, 17),
+        Span(19, 20)
+    ]
 
   def test00spans(self):
     self.assertNotEqual(list(spans(self.items1)), self.spans1)
@@ -30,7 +43,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(list(spans(self.items2)), self.spans2)
 
   def test01overlap(self):
-    self.assertEqual( overlap([1,2], [3,4]), [3,3] )
+    self.assertEqual(overlap([1, 2], [3, 4]), [3, 3])
 
   def test10init(self):
     R0 = Range()
@@ -170,7 +183,7 @@ class TestAll(unittest.TestCase):
         S.discard(n)
       ##X("S = %s", S)
       ##X("R1 = %s", R1)
-      self.assertEqual(S, set(R1)) ## "set:%s vs Range:%s" % (S, R1))
+      self.assertEqual(S, set(R1))  ## "set:%s vs Range:%s" % (S, R1))
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)

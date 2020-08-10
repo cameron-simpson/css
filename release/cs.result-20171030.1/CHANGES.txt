@@ -1,0 +1,1 @@
+  lib/python/cs/result.py: cs.result: add cs.logutils to DISTINFO.install_requires

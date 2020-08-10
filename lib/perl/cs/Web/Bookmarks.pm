@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Bookmark data.
-#	- Cameron Simpson <cs@zip.com.au> 27mar1998
+#	- Cameron Simpson <cs@cskk.id.au> 27mar1998
 #
 
 =head1 NAME
@@ -765,7 +765,7 @@ cs::HTML(3), nsbmparse(1), nsbmclean(1), updaliases(1)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -3,12 +3,13 @@
 # Run a command via su, quoted to preserve the argument list.
 # Unfortunate conflict with "sux", the "su with X11 $DISPLAY".
 # Which I don't use! Yay!
-#       - Cameron Simpson <cs@zip.com.au> 03soct2011
+# - Cameron Simpson <cs@cskk.id.au> 03oct2011
 #
 
 set -ue
 
 : ${DEBUG:=}
+: ${TMPDIR:=/tmp}
 
 cmd=$0
 usage="Usage: $cmd [-] [-u user] [-x] [--] command [args...]"
@@ -43,6 +44,15 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-shcmd=`shqstr "$@"`
-##set -x
-exec $trace su $suargs "$user" -c "$setx; exec $shcmd"
+tmpf=$TMPDIR/sux.$$.sh
+
+umask 077
+
+cat >"$tmpf" <<X
+#!/bin/sh
+rm -f '$tmpf'
+$setx
+X
+{ necho 'exec '; shqstr "$@"; } >>"$tmpf"
+[ "x$user" = xroot ] || chown "$user" "$tmpf" || :
+exec $trace su $suargs "$user" -c "$setx; . '$tmpf'"

@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
-# Emit primes.  - Cameron Simpson <cs@zip.com.au> 06may2017
+# Emit primes.  - Cameron Simpson <cs@cskk.id.au> 06may2017
 #
 
 from __future__ import print_function

@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-# Update the tags file from the specified files, or from all files.
-#   - Cameron Simpson <cs@zip.com.au>
+# Update the tags file from the specified files.
+# Recite the chosen tags file to standard output.
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -9,7 +10,7 @@ set -ue
 tags=
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-o tagfile] [--] [files...]"
+usage="Usage: $cmd [-o tagfile] [--] paths..."
 
 badopts=
 
@@ -26,19 +27,16 @@ do
   shift
 done
 
-[ -n "$tags" ] || tags=$(findup tags) || {
-  echo "$cmd: no tags file located, aborting" >&2
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$tags" ] || tags=$( findup tags ) || {
+  echo "$cmd: cannot find tags file and no -o option" >&2
   exit 1
 }
 
-if [ -s "$tags" -a $# -gt 0 ]
-then
-  set -- -a "$@"
-else
-  set -- -R
-  cd "$(dirname "$tags")"
-fi
+echo "$tags"
+exec 1>&2
 
-set -- ctags -o "$tags" --tag-relative --links=no "$@"
-
-exec "$@"
+##[ -s "$tags" ] || set --
+set -x
+exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extra=fq ${1+"$@"}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manage a range. Ints, initially.
-#	- Cameron Simpson <cs@zip.com.au> 20jun98
+#	- Cameron Simpson <cs@cskk.id.au> 20jun98
 #
 
 =head1 NAME
@@ -371,7 +371,7 @@ sub Invert($)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -1,9 +1,9 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Convert my categories file to procmail recipes.
 # Note that these days I use mailfiler(1cs), which operates on these
 # rules directly.
-#       - Cameron Simpson <cs@zip.com.au> 02mar2001
+#       - Cameron Simpson <cs@cskk.id.au> 02mar2001
 #
 # Release version: 2011-02-19
 #
@@ -231,7 +231,7 @@
 #       attn    EFF-Cafe-News   cafe-news@eff.org
 #       crypto  AUCrypto        aucrypto@suburbia.net
 #
-# matching B<cs@zip.com.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
+# matching B<cs@cskk.id.au>, B<cameron@cskk.homeip.net>, B<cafe-news@eff.org>
 # and B<aucrypto@suburbia.net> respectively. The "Personal" items generate
 # an alert.
 #
@@ -306,7 +306,7 @@
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson E<lt>cs@zip.com.auE<gt>
+# Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 #
 # =cut
 #
@@ -328,8 +328,8 @@ target_re=re.compile(r'("[^"]*"|[^",\s]+)')
 hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
 def main(argv):
-  setup_logging()
-  cmd = cs.logutils.cmd
+  cmd = os.path.basename(argv[0])
+  setup_logging(cmd)
 
   trackRules=True       # add X-Cats2Procmailrc line to show rule
   useXLabel=False       # put tag in X-Label header instead of subject

@@ -1,14 +1,19 @@
 #!/bin/sh
 #
-# Require existence of directory, creating it if needed.
-#	- Cameron Simpson <cs@zip.com.au> 04may2002
+# Require existence of directories, creating them if needed.
+# - Cameron Simpson <cs@cskk.id.au> 04may2002
 #
+
+set -ue
 
 [ $# = 0 ] && { echo "Usage: $0 dirs..." >&2; exit 2; }
 
+xit=0
+
 for d
 do
-    [ -d "$d/." ] || mkdir -p "$d" || exit 1
+  # second -d test for race conditions
+  [ -d "$d/." ] || mkdir -p "$d" || [ -d "$d/." ] || xit=1
 done
 
-exit 0
+exit $xit

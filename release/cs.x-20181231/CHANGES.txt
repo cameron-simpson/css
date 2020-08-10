@@ -1,0 +1,3 @@
+  lib/python/cs/x.py: cs.x: X: trivial ANSO colour support via new `colour` keyword argument
+  lib/python/cs/x.py: cs.x: new global X_discard, False unless sys.stderr.isatty(); discard X() if true and no `file` keyword parameter
+  lib/python/cs/x.py: cs.x: apply X_discard after X_logger and X_via_tty

@@ -1,0 +1,38 @@
+lib/python/cs/upd.py: cs.upd: make Upd a SingletonMixin subclass keyed on the backend
+lib/python/cs/upd.py: cs.upd: fix docstring grammar
+lib/python/cs/upd.py: cs.upd: Upd.out: extract the line differencing code into new adjust_text() static method
+lib/python/cs/upd.py: cs.upd: handle systems with no curses module
+lib/python/cs/upd.py: cs.upd: add cs.gimmicks to requirements, warning() needed by failed curses import
+lib/python/cs/upd.py: cs.upd: cache for curses terminfo capability strings; drop unused and obsolete .state property
+lib/python/cs/upd.py: cs.upd: initial multiline status support, incomplete
+lib/python/cs/upd.py: cs.upd: Upd.out: optimisation for text unchanged
+lib/python/cs/upd.py: cs.upd: Upd.out: shuffle no-change logic, fixing return value; add a couple of assertions
+lib/python/cs/upd.py: cs.upd: Upd.nl: multiline support (UNTESTED)
+lib/python/cs/upd.py: cs.upd: Upd: drop .flush method, add optional slot= parameter to .without
+lib/python/cs/upd.py: cs.upd: Upd: pull out line redraw code as methods for reuse; Upd.out: add optional `redraw=False` parameter for forcing a whole line redraw
+lib/python/cs/upd.py: cs.upd: Upd.ti_str: decode bytes curses responses to ASCII str for use in text
+lib/python/cs/upd.py: cs.upd: Upd.move_to_slot_v: bugfix move up - had subtraction backwards
+lib/python/cs/upd.py: cs.upd: Upd.adjust_text_v: bugfix - oldtxt obtained from the wrong slot
+lib/python/cs/upd.py: cs.upd: Upd.out: not using local "current_slot" variable any more
+lib/python/cs/upd.py: cs.upd: Upd.redraw_trailing_slots_v: new optional parameter skip_first_vt=False to suppress the initial '\v' for when we are on the display screen line instead of above it
+lib/python/cs/upd.py: cs.upd: autoformat
+lib/python/cs/upd.py: cs.upd: new Upd.insert method to insert a new output slot
+lib/python/cs/upd.py: cs.upd: Upd.out: docstring update, fix return value
+lib/python/cs/upd.py: cs.upd: new Upd.__len__ returning the number of slots
+lib/python/cs/upd.py: cs.upd: Upd.redraw_line_v: bugfix spelling of clear-to-eol capability
+lib/python/cs/upd.py: cs.upd: new Upd.update_slot_v: compute the text sequences to update the status line at `slot` to `newtxt`
+lib/python/cs/upd.py: cs.upd: Upd.out: move update logic into update_slot_v
+lib/python/cs/upd.py: cs.upd: Upd.out: remaining part of previous logic patch
+lib/python/cs/upd.py: cs.upd: Upd.nl: complete rewrite: rename `raw` param to `redraw`, make the criteria for "redraw" mode more obvious, redo the screen update stuff
+lib/python/cs/upd.py: cs.upd: Upd.insert: complete rewrite, no longer return the index, reject negative indices, redoc the display logic
+lib/python/cs/upd.py: cs.upd: Upd.insert: raise IndexError if the terminal has no coursor_up capability, clean some related logic
+lib/python/cs/upd.py: cs.upd: new Upd.delete to delete a status line
+lib/python/cs/upd.py: cs.upd: Upd: provide sequence methods
+lib/python/cs/upd.py: cs.upd: new UpdProxy class to track a status line of a multiline Upd in the face of further inserts and deletes; Upd.insert and Upd.delete now return an UpdProxy
+lib/python/cs/upd.py: cs.upd: remove some unused variables, update docstrings
+lib/python/cs/upd.py: cs.upd: clean lint and comments
+lib/python/cs/upd.py: cs.upd: new Upd.proxy(index) to return the UpdProxy at index; new UpdProxy.delete to remove an UpdProxy from its parent Upd
+lib/python/cs/upd.py: cs.upd: Upd.__exit__: tweak the tidyup - if there's a non-SystemExit(0) exception, preserve the status lines, otherwise clean them up
+lib/python/cs/upd.py: cs.upd: UpdProxy: define __slot__ as a dict for documentation purposes
+lib/python/cs/upd.py: cs.upd: Upd.nl: bugfix "redraw" mode (used for dumb terminals or long lines) - drop unwanted newline, done by the VT from the following redraw call
+lib/python/cs/upd.py: cs.upd: Upd.__exit__: with an exception, only preserve the final line if nonempty

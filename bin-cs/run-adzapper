@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Dispatch an adzapper squid.
-#	- Cameron Simpson <cs@zip.com.au> 01jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2004
 #
 
 set -ue
@@ -23,11 +23,12 @@ usage="Usage: $cmd [-L listen]... [squid-options...]
   squid-options         Passed to squid on invocation."
 
 trace=set-x
-case "`uname -s`" in
-  Darwin)  dfltrc=/opt/local/etc/squid/squid.conf ;;
-  *)       dfltrc=/etc/squid/squid.conf ;;
-esac
-[ -s "$dfltrc" ] || { echo "$cmd: no default squid.conf? ($dfltrc)" >&2; exit 1; }
+dfltrc=
+for rcpath in /usr/local/etc/squid.conf /opt/local/etc/squid/squid.conf /etc/squid/squid.conf
+do
+  [ -s "$rcpath" ] && { dfltrc=$rcpath; break; }
+done
+[ -n "$dfltrc" ] || { echo "$cmd: no default squid.conf?" >&2; exit 1; }
 
 tmppfx=$TMPDIR/$cmd.$$
 directives=$tmppfx.tags

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.inttypes.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys
@@ -10,6 +10,8 @@ from cs.logutils import D
 from cs.inttypes import BitMask, Enum, Flags
 
 class TestInttypes(unittest.TestCase):
+  ''' Test `cs.inttypes`.
+  '''
 
   def setUp(self):
     pass

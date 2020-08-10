@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Trivial wrapper for the struct-tm array returned by localtime() and gmtime().
-#	- Cameron Simpson <cs@zip.com.au> 03dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 03dec2002
 #
 
 =head1 NAME
@@ -105,7 +105,7 @@ cs::DMY(), perlfunc(1)
 
 =head1 AUTHOR
 
-Cameron Simpson &lt;cs@zip.com.au&gt; 04dec2002
+Cameron Simpson &lt;cs@cskk.id.au&gt; 04dec2002
 
 =cut
 

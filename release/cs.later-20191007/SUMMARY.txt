@@ -1,0 +1,1 @@
+Drop pipeline functionality, moved to new cs.pipeline module.

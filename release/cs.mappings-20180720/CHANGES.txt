@@ -1,0 +1,54 @@
+  lib/python/cs/mappings.py: split lib/cs into distinct perl, python and js parts
+  lib/python/cs/mappings.py: cs.mappings: new AttributableList to map an attribute over the list members
+  lib/python/cs/mappings.py: cs.mappings: rename AttributableList to MethodicalList since it calls member methods and make new AttributableList that fetchs member attributes
+  lib/python/cs/mappings.py: cs.mappings.MethodicalList: docstring fix
+  lib/python/cs/mappings.py: cs.mappings: add FallbackDict, intended for use with configparser
+  lib/python/cs/mappings.py: cs.*: move to using %r string format
+  lib/python/cs/mappings.py: cs/**.py: trim other trailing whitespace
+  lib/python/cs/mappings.py: cs.nodedb.csvdb_tests: simplify dict comparison
+  lib/python/cs/mappings.py: cs.misc, cs.seq: move the() from cs.misc to cs.seq; adjust lots of modules
+  lib/python/cs/mappings.py: cs.mappings: new UNTESTED LRUCache class to sit in front of other mappings
+  lib/python/cs/mappings.py: cs.mappings: LRUCache: fix variable name
+  lib/python/cs/mappings.py: cs.app.aws, cs.logutils, cs.mappings: resolve merge from decommissioning cs.misc
+  lib/python/cs/mappings.py: cs.mappings: import cs.obj.O
+  lib/python/cs/mappings.py: cs.mappings: use cs.py3.StringTypes
+  lib/python/cs/mappings.py: cs.mappings: new class MappingChain, a mapping interface to a sequence of mappings
+  lib/python/cs/mappings.py: cs.mappings: MappingChain is a class!
+  lib/python/cs/mappings.py: cs.mappings: MappingChain: rename "map" to "mapping", avoids builtin function name, no semantic change
+  lib/python/cs/mappings.py: cs.mappings: MappingChain: add missing __contains__ method
+  lib/python/cs/mappings.py: cs.mappings: MappingChain.get(): catch KeyError, not Attribute Error
+  lib/python/cs/mappings.py: cs.app.pilfer,cs.mappings: move SeenSet into cs.mappings
+  lib/python/cs/mappings.py: cs.mappings: add missing import of threading.Thread
+  lib/python/cs/mappings.py: cs.mappings: add another missing import
+  lib/python/cs/mappings.py: cs.mappings: another missing import; TODO: unit tests for this module
+  lib/python/cs/mappings.py: cs.mappings: another missing import :-(
+  lib/python/cs/mappings.py: cs.mappings: discard LRUCache, will break cs.app.aws when I go back to it, needs recode using cs.cache.LRU_Cache if we make it again
+  lib/python/cs/mappings.py: cs.mappins,cs.app.pilfer: rename backing_file to backing_path
+  lib/python/cs/mappings.py: cs.mappings: SeenSet: use cs.fileutils.SharedAppendLines to manage the backing file
+  lib/python/cs/mappings.py: cs.mappings: SeenSet: update for new SharedAppendLines API
+  lib/python/cs/mappings.py: cs.mappings: SeenSet: fix spelling of True
+  lib/python/cs/mappings.py: cs.mappings: SeenSet._add_foreign_line: discard None, EOF markers from new API
+  lib/python/cs/mappings.py: cs.mappings: SeenSet._add_foreign_line: return, not continue
+  lib/python/cs/mappings.py: cs.mappings: adjust import
+  lib/python/cs/mappings.py: cs.mappings: new named_column_tuples generator accepting an iterable of data rows with a leading column heading row, and yielding a namedtuple subclass for the heading row and instances of that class for each subsequent row
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: support spreadsheet exports with empty column headings (very common), improve docstring
+  lib/python/cs/mappings.py: cs.mappings: turn examples into working doctests
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: doctests for most cases, bugfixes for issues found from tests
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: doctest for human friendly column names
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: document human friendly titles => column attributes mapping
+  lib/python/cs/mappings.py: cs.mappings: clean a lot of lint
+  lib/python/cs/mappings.py: cs.mappings: new StackableValues class (UNTESTED), a collection of named stackable values with the latest value available as an attribute, intended to provide a general version of the functionality used in cs.vt.defaults
+  lib/python/cs/mappings.py: merge default ==> venti
+  lib/python/cs/mappings.py: cs.mappings: StackableValues: add doctest illustrating usage, implement StackableValues.__setattr, fix bugs around private attributes
+  lib/python/cs/mappings.py: cs.mappings: clean some lint
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: pull the internal class definition out as a new named_row_tuple function which returns a factory for named rows, and clean up a lot of the implementation
+  lib/python/cs/mappings.py: lib/python/cs/mappings.py
+  lib/python/cs/mappings.py: cs.mappings: named_row_tuple: add new `computed` parameter, a mapping of key to callable(self) to add keys to __getitem__
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: plumb the `computed` parameter for named_row_tuple; add new `preprocess` parameter to modify rows before processing
+  lib/python/cs/mappings.py: cs.mappings: named_row_tuple,named_column_tuples: add support for a mixin class; named_column_tuples: include the tuple class in the Context object used in preprocessing
+  lib/python/cs/mappings.py: cs.mappings: named row tuples: support accessing methods via __getitem__(method_name); reorder priority to field, method, computed
+  lib/python/cs/mappings.py: cs.mappings: lint
+  lib/python/cs/mappings.py: cs.mappings: named row tuples: change internal class attributes from _foo to foo_
+  lib/python/cs/mappings.py: cs.mappings: put the named tuple stuff up the top
+  lib/python/cs/mappings.py: cs.mappings: named_column_tuples: now returns (cls, rows)
+  lib/python/cs/mappings.py: cs.mappings: mention named_column_tuple and named_column_tuples in module docstring

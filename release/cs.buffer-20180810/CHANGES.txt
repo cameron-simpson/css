@@ -1,0 +1,13 @@
+  lib/python/cs/buffer.py: cs.buffer: refactor SeekableFDIterator and SeekableFileIterator to subclass new SeekableIterator class with common offset and readsize attributes, and new align and next_hint attributes; add CornuCopyBuffer.hint method to pass a length hint through to the input_data iterator if it has a `hint` method, causing it possibly to make a differently sized fetch
+  lib/python/cs/buffer.py: cs.buffer: SeekableIterator: new __del__ method calling self.close() - subclasses must provide .close, which should be safe to call multiple times; SeekableFDIterator: dup the supplied file descriptor and close the dup on __del__; SeekableFileIterator: close the file on __del__
+  lib/python/cs/buffer.py: cs.buffer: new SeekableMMapIterator to process a memory mapped file descriptor, intended for large files
+  lib/python/cs/buffer.py: cs.buffer: SeekableIterator: put __iter__ directly above __next__ for readability
+  lib/python/cs/buffer.py: cs.buffer.py: CornuCopyBuffer: add support for .offset and .end_offset optional attributes on the input_data iterator, compute input_data_displacement and correct logic presuming input offsets and buffer offsets were the same; _BoundedBufferIterator: add .offset property plumbed to the underlying buffer offset; improve docstrings and fix a few typos
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_fd: docstring: note that the underlying SeekableFDIterator makes an os.dup() of the provided file descriptor
+  lib/python/cs/buffer.py: cs.buffer: _BoundedBufferIterator: plumb hint and seek methods to the underlying buffer
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: rename some variables for clarity
+  lib/python/cs/buffer.py: cs.buffer: _BoundedBufferIterator.__next__: additional sanity check on termination, tweak some comments
+  lib/python/cs/buffer.py: cs.buffer: SeekableIterator: pull common seek method in from subclasses; SeekableFileIterator: do a seek on the file and then call the superclass logical seek; SeekableFDIterator: implement optional .end_offset property
+  lib/python/cs/buffer.py: cs.buffer: SeekableMMapIterator: seek now in the superclass; bugfix ._fetch - does not move the offset; handle BufferError during close, expected due to memorybuffers pointing at the mmap; set .base_offset to 0, forward looking for future mapping only part of the file; fix definition of .mmap
+  lib/python/cs/buffer.py: cs.buffer: new CornuCopyBuffer.from_mmap to make a mmap backed buffer so that large data can be returned without penalty
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_mmap: drop warning about early mmap release, does not apply; clean a little lint

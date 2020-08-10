@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Do multiple DNS lookups in parallel.
-#       - Cameron Simpson <cs@zip.com.au> 04jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 04jan2009
 #
 
 from threading import Thread

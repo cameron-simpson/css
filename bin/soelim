@@ -2,7 +2,7 @@
 #
 # Replacement for the usual soelim program.
 # Handles relative .sos properly, compressed files etc.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

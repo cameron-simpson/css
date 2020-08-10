@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: set __version__ to 'test__version'

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convenience tool for virtualenv setups.
-#       - Cameron Simpson <cs@zip.com.au> 07mar2014
+#       - Cameron Simpson <cs@cskk.id.au> 07mar2014
 #
 
 set -ue
@@ -35,7 +35,7 @@ esac
 
 if [ $# = 0 ]
 then
-  $trace pyver "$VENV_DIR/$pyver/bin/python"
+  pyver "$VENV_DIR/$pyver/bin/python"
   exit $?
 fi
 
@@ -80,8 +80,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 venvdir=$VENV_DIR/$pyver
+PATH=$venvdir/bin:$PATH
+export PATH
 
-set +u
-[ -t 2 ] && echo "+ . $venvdir/bin/activate" >&2
-. "$venvdir/bin/activate"
 exec $trace "$@"

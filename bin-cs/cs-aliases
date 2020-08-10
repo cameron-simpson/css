@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Tool to manipulate my email address table.
-#       - Cameron Simpson <cs@zip.com.au> 26apr2008
+#       - Cameron Simpson <cs@cskk.id.au> 26apr2008
 #
 
 import sys
@@ -26,8 +26,8 @@ new_syntax = 'MAILITEM'
 
 def main(argv):
   global aliases, byCategory, byAddress
-  setup_logging()
-  cmd = cs.logutils.cmd
+  cmd = os.path.basename(sys.argv[0])
+  setup_logging(cmd)
 
   usage = '''Usage:
   %s [-f aliasfile] [list]

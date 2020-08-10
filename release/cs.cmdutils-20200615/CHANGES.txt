@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: Release information for cs.cmdutils-20200521.1.
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text: do not mention the "help" command if it is the only cmd_help

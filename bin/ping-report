@@ -2,7 +2,7 @@
 #
 # Ping multiple hosts in parallel.
 # Report status.
-#       - Cameron Simpson <cs@zip.com.au> 20dec2013
+#       - Cameron Simpson <cs@cskk.id.au> 20dec2013
 #
 
 set -ue

@@ -1,0 +1,21 @@
+  lib/python/cs/binary.py: cs.binary: fix docstring typos
+  lib/python/cs/binary.py: cs.binary: multi_struct_field: implement __len__ for generated clss; fix docstring typo
+  lib/python/cs/binary.py: cs.binary: make PacketField an abstract class, make ListField's .from_buffer fail
+  lib/python/cs/binary.py: cs.binary: BytesField: implement value_s and from_buffer
+  lib/python/cs/binary.py: cs.binary: move the fixed_bytes_field factory to below BytesField and make its generated subclasses subclass BytesField; fix up BytesField.value_s
+  lib/python/cs/binary.py: cs.binary: fixed_bytes_field's FixedBytesFIeld.from_buffer returns a BytesField
+  lib/python/cs/binary.py: cs.binary: Packet: new self_check method to verify fields presence and types
+  lib/python/cs/binary.py: cs.binary: Packet.self_check: support multiple types for a Packet field, and also support the field being an ordinary attribute; tweak a warning message
+  lib/python/cs/binary.py: cs.binary: struct_field: make class_name mandatory, add doctest, add nice __repr__; adjust presupplied struct_fields to match
+  lib/python/cs/binary.py: cs.binary: Packet.self_check: improve wrong field type exception message
+  lib/python/cs/binary.py: cs.binary: Packet.self_check: improve unspecified fields exception message
+  lib/python/cs/binary.py: cs.binary: add PacketField.__len__ computed directory from a transcribe; drop other __len__ methods; fix a comment typo
+  lib/python/cs/binary.py: cs.binary: Packet: allow keyword arguments to initialise the Packet fields; document the dependency on keyword argument ordering
+  lib/python/cs/binary.py: cs.binary: decent docstring for Packet.self_check to describe how a PACKET_FIELDS specification is used
+  lib/python/cs/binary.py: cs.binary: flatten: treat memoryviews like bytes
+  lib/python/cs/binary.py: cs.binary: new EmptyPakcet singleton to use as a placeholder for optional fields
+  lib/python/cs/binary.py: cs.binary: bugfix BytesesField: maintain a distinct length attribute even if the data were discarded during the parse; len() works but transcribe will still raise if there are no saved data
+  lib/python/cs/binary.py: cs.binary: Packet: new methods get_field and set_field to fetch or replace existing fields
+  lib/python/cs/binary.py: cs.binary: more compact BytesRunField.__str__
+  lib/python/cs/binary.py: cs.binary: BytesesField: say NO_DATA instead of None in __str__ for discarded data
+  lib/python/cs/binary.py: cs.binary: EmptyPacketField.from_buffer now a classmethod; Packet.set_field bugfix; Packet.add_from_buffer: supply missing argument for struct_field; tidy a couple of docstrings

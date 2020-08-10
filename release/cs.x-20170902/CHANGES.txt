@@ -1,0 +1,4 @@
+  lib/python/cs/x.py: cs.x: X: cope with IOError from opening /dev/tty
+  lib/python/cs/x.py: cs.x: clarify comment
+  lib/python/cs/x.py: my email address has changed - update Python code
+  lib/python/cs/x.py: cs.x: move description to module docstring

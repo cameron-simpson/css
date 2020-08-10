@@ -1,0 +1,2 @@
+lib/python/cs/mappings.py: cs.mappings: support unfilled heading row entries
+lib/python/cs/mappings.py: cs.mappings: autoformat

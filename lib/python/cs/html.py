@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Useful HTML facilities.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import absolute_import
@@ -20,8 +20,9 @@ DISTINFO = {
 from io import StringIO
 import re
 import sys
-from cs.logutils import warning, X
+from cs.logutils import warning
 from cs.py3 import StringTypes
+from cs.x import X
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')

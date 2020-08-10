@@ -1,0 +1,15 @@
+lib/python/cs/logutils.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/logutils.py: cs.logutils: default to logging level TRACK if stderr is a tty instead of logging.INFO
+lib/python/cs/logutils.py: cs.logutils: new ifverbose function with leading `verbose` parameter: if None, log at INFO otherwise if true, log at TRACK, otherwise do not log
+lib/python/cs/logutils.py: cs.logutils: slight import shuffle
+lib/python/cs/logutils.py: cs.logutils: remove global logging_level and trace_level variables, put it all in the global loginfo
+lib/python/cs/logutils.py: cs.logutils: make STATUS just below TRACK so that it is above INFO instead of below, which was causing it to be filtered out by the logging system; new status() function for cs.upd messages; UpdHandler: treat status_level as special, going directly to Upd.out, instead of the old nl_level threshold; associated changes
+lib/python/cs/logutils.py: cs.logutils: assertions above the value of the TRACK and STATUS logging levels
+lib/python/cs/logutils.py: cs.logutils: drop @OBSOLETE decorator, obsoleted by cs.deco.OBSOLETE
+lib/python/cs/logutils.py: cs.logutils: drop the old status() function, now shuffled off the cs.tty, in favour of the newer cs.upd based function
+lib/python/cs/logutils.py: cs.logutils: now requires cs.deco, update some docstrings, tweak imports
+lib/python/cs/logutils.py: cs.logutils: add caveat text to upd() docstring, directing the reader to statsus()
+lib/python/cs/logutils.py: cs.pfx,cs.logutils: wrap logging call wrapers in @logging_wrapper
+lib/python/cs/logutils.py: cs.logutils: default level if sys.stderr.isatty() should be STATUS, not TRACK
+lib/python/cs/logutils.py: cs.logutils: ifdebug(): set loginfo if not yet ready
+lib/python/cs/logutils.py: cs.logutils: fix up loginfo initialisation and setting cs.pfx.cmd

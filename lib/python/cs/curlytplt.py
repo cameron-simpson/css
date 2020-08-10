@@ -10,7 +10,7 @@ import re
 import string
 import unittest
 from itertools import product
-from cs.logutils import Pfx
+from cs.pfx import Pfx
 
 def re_alt(res, name=None):
   return '(' + '|'.join(res) + ')'
@@ -22,12 +22,12 @@ CONST_VALUE = re_alt( (r'\d+',
                        r'"[^\\"]*"',
                        r"'[^\\']*'",
                       ) )
-CONST_VALUES = re_opt( CONST_VALUE + '(\s*,\s*' + CONST_VALUE + ')*' )
-CALLISH    = IDENTIFIER + re_opt( re_alt( ( '\(\s*' + CONST_VALUES + '\s*\)',
-                                            '\[\s*' + CONST_VALUE + '\s*\]',
+CONST_VALUES = re_opt( CONST_VALUE + r'(\s*,\s*' + CONST_VALUE + r')*' )
+CALLISH    = IDENTIFIER + re_opt( re_alt( ( r'\(\s*' + CONST_VALUES + r'\s*\)',
+                                            r'\[\s*' + CONST_VALUE + r'\s*\]',
                                           ) )
                                 )
-DOTTED     = CALLISH + '(\.' + CALLISH + ')*'
+DOTTED     = CALLISH + r'(\.' + CALLISH + r')*'
 
 CURLY      = re_alt( ( r'\{(?P<braced>' + DOTTED + r')\}',
                        r'(?P<named>)(?!)',

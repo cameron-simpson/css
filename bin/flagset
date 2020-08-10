@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Utility for batch updating sets of flags.
-#   - Cameron Simpson <cs@zip.com.au> 05jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 05jan2017
 #
 
 set -ue

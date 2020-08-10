@@ -9,7 +9,7 @@
 #   /System/Library/Frameworks/Python.framework/Versions/2.6/Extras/lib/python/PyObjC
 # so I may need to add that to sys.path in for other python installs.
 #
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function
@@ -21,7 +21,8 @@ from .objc import convertObjCtype
 import time
 from threading import Lock
 from AddressBook import ABAddressBook
-from cs.logutils import setup_logging, Pfx, warning, info, D, debug
+from cs.logutils import setup_logging, warning, info, D, debug
+from cs.pfx import Pfx
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
 

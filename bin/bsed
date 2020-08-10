@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # bsed - batch edit with sed
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${TMPDIR:=/tmp}
@@ -141,7 +141,7 @@ do
     # This is a defense against files without newlines:
     # we append a newline and then toss the last line if it's empty.
     # This because sed discards newlineless trailing lines.
-    # - Cameron Simpson <cs@zip.com.au> 09nov2001
+    # - Cameron Simpson <cs@cskk.id.au> 09nov2001
     #
     if ( cat <"$file"; echo ) \
        | sed -e '$!b notlast' -e '/^$/d' -e ':notlast' \
@@ -156,7 +156,7 @@ do
 # Theoretically the sed should fail if the disc fills.
 # Therefore dropping this test, which is a hack and breaks things
 # when we really do end up with empty files.
-# - Cameron Simpson <cs@zip.com.au> 09nov2001
+# - Cameron Simpson <cs@cskk.id.au> 09nov2001
 #
 #	else
 #	    if [ ! -s "$tmp" ]

@@ -1,0 +1,18 @@
+  lib/python/cs/cache.py: split lib/cs into distinct perl, python and js parts
+  lib/python/cs/cache.py: cs.upd: add UpdHandler to present Upd as a logger handler; hack lots of pre-logging debug stuff from cs.misc and hack many modules to match the cs.misc pruning
+  lib/python/cs/cache.py: cs/**.py: trim trailing whitespace from blank lines
+  lib/python/cs/cache.py: cs.*: adjust a lot of except clauses
+  lib/python/cs/cache.py: cs.*: lots of print, import and exception fixes for python3 compatibility
+  lib/python/cs/cache.py: cs.cache: LRU: tweak initialiser to raise ValueError if max < 1
+  lib/python/cs/cache.py: cs.cache: new LRU_Cache class and @lru_cache decorator which can utilise it (all untested)
+  lib/python/cs/cache.py: cs.cache: remove obsolete old LRU cache in favour of shiny new LRU_Cache
+  lib/python/cs/cache.py: cs.cache: LRU_Cache: implement callbacks, ._selfcheck, ==, !=, assorted bugfixes
+  lib/python/cs/cache.py: cs.cache: add LRU_Cache.flush method to empty the cache
+  lib/python/cs/cache.py: cs.cache: add LRU_Cache.flush to unit tests, bugfix .flush :-(
+  lib/python/cs/cache.py: cs.cache: autopep8
+  lib/python/cs/cache.py: cs.cache: docstring
+  lib/python/cs/cache.py: cs.cache: LRU_Cache: bugfix variable name; import fix and lint
+  lib/python/cs/cache.py: cs.cache: two bugfixes and drop obsolete "long" reference
+  lib/python/cs/cache.py: cs.cache: strip back to just LRU_Cache class and lru_cache function; cs.dbdigraph: pull in Cache and CrossReference from cs.cache, never used elsewhere
+  lib/python/cs/cache.py: cs.cache: clean lint before release
+  lib/python/cs/cache.py: cs.cache: add install_requires to DISTINFO to satisfy my release script

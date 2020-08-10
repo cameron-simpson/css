@@ -1,13 +1,12 @@
 #!/bin/sh
 #
 # Probe "netstat -rn" routes, set flags accordingly.
-#   - Cameron Simpson <cs@zip.com.au> 02feb2015
+#   - Cameron Simpson <cs@cskk.id.au> 02feb2015
 #
 
 set -ue
 
 trace=
-[ -t 2 ] && trace=set-x
 do_monitor=
 interval=7
 
@@ -19,6 +18,8 @@ badopts=
 if [ $# -gt 0 ]
 then
   case "$1" in
+    -x) trace=set-x
+        ;;
     --monitor)
         shift
         do_monitor=1
@@ -43,22 +44,20 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-if [ $do_monitor ]
-then
-  while :; do $trace "$0"; sleep "$interval" || break; done
-else
-  set -- $( get-default-gateway )
-  if [ $# = 0 ]
-  then  flag ROUTE_DEFAULT && $trace flag ROUTE_DEFAULT 0
-  else  flag ROUTE_DEFAULT || $trace flag ROUTE_DEFAULT 1
-  fi
+[ $do_monitor ] && exec $trace loop -d "$interval" $trace "$0"
 
-  for gw
-  do
-    echo "$gw"
-  done | tr . _  | flagset ROUTE_GW set-all
+set -- $( get-default-gateway )
 
-  netstat -rn \
-  | sed -n '/^Internet:/,/^$/{ /^[1-9][^ ]* /!d; s/ .*//; y/./_/; s|/|__|; p; }' \
-  | flagset ROUTE_TO set-all
+if [ $# = 0 ]
+then  flag ROUTE_DEFAULT && $trace flag ROUTE_DEFAULT 0
+else  flag ROUTE_DEFAULT || $trace flag ROUTE_DEFAULT 1
 fi
+
+for gw
+do
+  echo "$gw"
+done | tr . _  | flagset ROUTE_GW set-all
+
+netstat -rn \
+| sed -n '/^Internet:/,/^$/{ /^[1-9][^ ]* /!d; s/ .*//; y/./_/; s|/|__|; p; }' \
+| flagset ROUTE_TO set-all

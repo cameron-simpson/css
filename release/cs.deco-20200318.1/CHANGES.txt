@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: new @OBSOLETE to issue a warning on a call to an obsolete function, like an improved @cs.logutils.OBSOLETE (which needs to retire)

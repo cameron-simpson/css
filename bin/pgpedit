@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Edit a PGP encrypted file. Extracted from "edit".
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"`

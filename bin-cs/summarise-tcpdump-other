@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Summarise the output of a tcpdump of traffic not for our modem, as from:
 #   tcpdump -nle -ttt -i vr0 not host our.ip.address.here
-# - Cameron Simpson <cs@zip.com.au> 21feb2017
+# - Cameron Simpson <cs@cskk.id.au> 21feb2017
 #
 
 from __future__ import print_function

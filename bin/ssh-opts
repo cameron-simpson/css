@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Parse command line options and ssh config files.
-#   - Cameron Simpson <cs@zip.com.au> 01oct2016
+#   - Cameron Simpson <cs@cskk.id.au> 01oct2016
 #
 
 import sys
