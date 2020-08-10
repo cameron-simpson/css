@@ -183,6 +183,11 @@ class Backend_SQLAlchemy(Backend):
     ]).execute():
       yield t, name
 
+  def _update(self, update):
+    ''' Apply a single `Update` to the database.
+    '''
+    self.push_updates(update.to_csv())
+
   def push_updates(self, csvrows):
     ''' Apply the update rows from the iterable `csvrows` to the database.
     '''
@@ -219,8 +224,6 @@ class Backend_SQLAlchemy(Backend):
                 'VALUE': totext(value),
             }]
         )
-      with self._lock:
-        self._updated_count += 1
 
 if __name__ == '__main__':
   import cs.nodedb.sqla_tests
