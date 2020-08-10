@@ -10,7 +10,7 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import and_, asc
 from cs.py3 import StringTypes
 from cs.logutils import error, debug, trace
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method, XP
 from . import Backend
 
 class Backend_SQLAlchemy(Backend):
@@ -188,12 +188,14 @@ class Backend_SQLAlchemy(Backend):
     '''
     self.push_updates(update.to_csv())
 
+  @pfx_method
   def push_updates(self, csvrows):
     ''' Apply the update rows from the iterable `csvrows` to the database.
     '''
     trace("push_updates: write our own updates")
     totext = self.nodedb.totext
     for thisrow in csvrows:
+      XP("thisrow=%s",thisrow)
       t, name, attr, value = thisrow
       node_id = self._node_id(t, name)
       if attr.startswith('-'):
