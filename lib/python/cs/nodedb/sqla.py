@@ -1,20 +1,21 @@
 #!/usr/bin/python
 
 import os
-from threading import Lock
 import sys
 from contextlib import contextmanager
+from sqlalchemy import (
+    MetaData, Table, Column, Index, Integer, String,
+    select, create_engine)
+from sqlalchemy.pool import QueuePool
+from sqlalchemy.sql import and_, asc
 from cs.py3 import StringTypes
-from cs.excutils import unimplemented
-from cs.logutils import error, warning, debug, trace, D
+from cs.logutils import error, debug, trace
 from cs.pfx import Pfx
-from . import NodeDB, Backend
+from . import Backend
 
 class Backend_SQLAlchemy(Backend):
 
   def __init__(self, engine, nodes_name=None, attrs_name=None, readonly=False):
-    from sqlalchemy import create_engine
-    from sqlalchemy.pool import QueuePool
     Backend.__init__(self, readonly=readonly)
     if isinstance(engine, StringTypes):
       echo = len(os.environ.get('DEBUG', '')) > 0
@@ -32,8 +33,7 @@ class Backend_SQLAlchemy(Backend):
     self.__nodekeysByID = {}
     self.__IDbyTypeName = {}
 
-  def _open(self):
-    from sqlalchemy import MetaData
+  def init_nodedb(self):
     engine = self.engine
     metadata = MetaData()
     metadata.bind = engine
@@ -44,13 +44,12 @@ class Backend_SQLAlchemy(Backend):
     metadata.create_all()
     self.attrs.select().execute()
 
-  def _close(self):
-    raise RuntimeError("how to close .engine?")
+  def close(self):
+    self.engine = None
 
-  def NODESTable(metadata, name=None):
+  def NODESTable(self, metadata, name=None):
     ''' Set up an SQLAlchemy Table for the nodes.
     '''
-    from sqlalchemy import Table, Column, Index, Integer, String
     if name is None:
       name = 'NODES'
     return Table(
@@ -61,10 +60,9 @@ class Backend_SQLAlchemy(Backend):
         Column('TYPE', String(64), nullable=False),
     )
 
-  def ATTRSTable(metadata, name=None):
+  def ATTRSTable(self, metadata, name=None):
     ''' Set up an SQLAlchemy Table for the attributes.
     '''
-    from sqlalchemy import Table, Column, Index, Integer, String
     if name is None:
       name = 'ATTRS'
     return Table(
@@ -91,7 +89,7 @@ class Backend_SQLAlchemy(Backend):
       if node_id is not None:
         self._forgetNode(t, name, node_id)
     for attr in N.keys():
-      self.saveAttrs(N[attrs])
+      self.saveAttrs(N[attr])
 
   def _node_id(self, t, name):
     ''' Return the db node_id for the supplied type and name.
@@ -136,8 +134,6 @@ class Backend_SQLAlchemy(Backend):
   def nodedata(self):
     ''' Pull all node data from the database.
     '''
-    from sqlalchemy import select
-    from sqlalchemy.sql import and_, asc
     with Pfx("%s.nodedata()...", self):
       nodes = self.nodes
       attrs = self.attrs
@@ -149,6 +145,7 @@ class Backend_SQLAlchemy(Backend):
       # load Node attributes
       # TODO: order by NODE_ID, ATTR and use .extend in batches
       onode_id = None
+      attrmap = {}
       for node_id, attr, value in select( [ attrs.c.NODE_ID,
                                             attrs.c.ATTR,
                                             attrs.c.VALUE,
@@ -189,10 +186,8 @@ class Backend_SQLAlchemy(Backend):
   def push_updates(self, csvrows):
     ''' Apply the update rows from the iterable `csvrows` to the database.
     '''
-    from sqlalchemy.sql import and_
     trace("push_updates: write our own updates")
     totext = self.nodedb.totext
-    lastrow = None
     for thisrow in csvrows:
       t, name, attr, value = thisrow
       node_id = self._node_id(t, name)
@@ -226,7 +221,6 @@ class Backend_SQLAlchemy(Backend):
         )
       with self._lock:
         self._updated_count += 1
-      lastrow = thisrow
 
 if __name__ == '__main__':
   import cs.nodedb.sqla_tests
