@@ -4,8 +4,8 @@ import os
 import sys
 from contextlib import contextmanager
 from sqlalchemy import (
-    MetaData, Table, Column, Index, Integer, String,
-    select, create_engine)
+    MetaData, Table, Column, Index, Integer, String, select, create_engine
+)
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.sql import and_, asc
 from cs.py3 import StringTypes
