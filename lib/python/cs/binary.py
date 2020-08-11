@@ -294,7 +294,7 @@ class PacketField(ABC):
         implementors should implement `value_from_buffer`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
-    return cls(value, **kw)
+    return cls(value)
 
   @classmethod
   def value_from_buffer(cls, bfr, **kw):
