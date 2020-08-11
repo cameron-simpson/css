@@ -54,7 +54,7 @@ class RqType(IntEnum):
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
 
 class StreamStore(BasicStoreSync):
-  ''' A Store connected to a remote Store via a PacketConnection.
+  ''' A Store connected to a remote Store via a `PacketConnection`.
       Optionally accept a local store to facilitate bidirectional activities
       or simply to implement the server side.
   '''
@@ -72,15 +72,15 @@ class StreamStore(BasicStoreSync):
       capacity=None,
       **kw
   ):
-    ''' Initialise the Stream Store.
+    ''' Initialise the `StreamStore`.
 
         Parameters:
-        * `addif`: optional mode causing .add to probe the peer for
+        * `addif`: optional mode causing `.add` to probe the peer for
           the data chunk's hash and to only submit a ADD request
           if the block is missing; this is a bandwith optimisation
           at the expense of latency.
-        * `connect`: if not None, a function to return `recv` and `send`.
-          If specified, the `recv` and `send` parameters must be None.
+        * `connect`: if not `None`, a function to return `recv` and `send`.
+          If specified, the `recv` and `send` parameters must be `None`.
         * `exports`: a mapping of name=>Store providing requestable Stores
         * `local_store`: optional local Store for serving requests from the peer.
         * `name`: the Store name.
@@ -92,7 +92,7 @@ class StreamStore(BasicStoreSync):
           If this is an `int` it is taken to be an OS file descriptor,
           otherwise it should be a file like object with `.write(bytes)`
           and `.flush()` methods.
-          For a file descriptor sending is done via an os.dup() of
+          For a file descriptor sending is done via an `os.dup()` of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
 
@@ -156,7 +156,7 @@ class StreamStore(BasicStoreSync):
 
   def startup(self):
     ''' Start up the StreamStore.
-        Open the local_store if not None.
+        Open the `local_store` if not `None`.
     '''
     super().startup()
     local_store = self.local_store
@@ -201,7 +201,7 @@ class StreamStore(BasicStoreSync):
     return conn
 
   def _packet_connection(self, recv, send):
-    ''' Wrap a pair of binary streams in a PacketConnection.
+    ''' Wrap a pair of binary streams in a `PacketConnection`.
     '''
     conn = PacketConnection(
         recv,
@@ -227,15 +227,15 @@ class StreamStore(BasicStoreSync):
       )
 
   def join(self):
-    ''' Wait for the PacketConnection to shut down.
+    ''' Wait for the `PacketConnection` to shut down.
     '''
     conn = self._conn
     if conn:
       conn.join()
 
   def do(self, rq):
-    ''' Wrapper for self._conn.do to catch and report failed autoconnection.
-        Raises StoreError on protocol failure or not `ok` responses.
+    ''' Wrapper for `self._conn.do` to catch and report failed autoconnection.
+        Raises `StoreError` on protocol failure or not `ok` responses.
         Returns `(flags,payload)` otherwise.
     '''
     with Pfx("%s.do(%s)", self, rq):
@@ -262,7 +262,7 @@ class StreamStore(BasicStoreSync):
 
   @staticmethod
   def decode_request(rq_type, flags, payload):
-    ''' Decode `(flags, payload)` into a request packet.
+    ''' Decode `(flags,payload)` into a request packet.
     '''
     with Pfx("decode_request(rq_type=%s, flags=0x%02x, payload=%d bytes)",
              rq_type, flags, len(payload)):
@@ -325,7 +325,7 @@ class StreamStore(BasicStoreSync):
     return None
 
   def contains(self, h):
-    ''' Dispatch a contains request, return a Result for collection.
+    ''' Dispatch a contains request, return a `Result` for collection.
     '''
     flags, payload = self.do(ContainsRequest(h))
     found = flags & 0x01
@@ -451,7 +451,7 @@ class StreamStore(BasicStoreSync):
   )
   def hashcodes_from(self, start_hashcode=None, hashclass=None, reverse=False):
     ''' Unbounded sequence of hashcodes
-        obtained by successive calls to self.hashcodes.
+        obtained by successive calls to `self.hashcodes`.
     '''
     if hashclass is None:
       if start_hashcode is None:
@@ -477,7 +477,7 @@ class StreamStore(BasicStoreSync):
       after = True
 
   def raw_get_Archive(self, archive_name, missing_ok=False):
-    ''' Factory to return a StreamStoreArchive for `archive_name`.
+    ''' Factory to return a `StreamStoreArchive` for `archive_name`.
     '''
     return StreamStoreArchive(self, archive_name)
 
@@ -497,7 +497,7 @@ class StreamStoreArchive(BaseArchive):
 
   @prop
   def last(self):
-    ''' The last Archive entry (when, E) or (None, None).
+    ''' The last Archive entry `(when,E)` or `(None,None)`.
     '''
     with Pfx("%s.last", self):
       try:
@@ -532,7 +532,7 @@ class StreamStoreArchive(BaseArchive):
         Parameters:
         * `E`: the Dirent to save.
         * `when`: the POSIX timestamp for the save, default now.
-        * `source`: optional source indicator for the update, default None
+        * `source`: optional source indicator for the update, default `None`
     '''
     assert E is not None
     if when is None:
@@ -549,7 +549,7 @@ class StreamStoreArchive(BaseArchive):
 class VTPacket(PacketField):
   ''' Base packet class for VT stream requests and responses.
 
-      The real stream packet has the VTPacket.flags value folded
+      The real stream packet has the `VTPacket.flags` value folded
       into its flags.
   '''
 
