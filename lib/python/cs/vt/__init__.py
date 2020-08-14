@@ -107,7 +107,7 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 
 DEFAULT_CONFIG_PATH = '~/.vtrc'
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
         'basedir': DEFAULT_BASEDIR,
         'blockmapdir': '[default]/blockmaps',
