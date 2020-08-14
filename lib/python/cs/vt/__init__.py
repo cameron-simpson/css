@@ -193,6 +193,14 @@ class _Defaults(threading.local):
     self.block_cache = None
     self.Ss = []
 
+  @property
+  def config(self):
+    cfg = common.config
+    if not cfg:
+      from .config import Config
+      cfg = Config()
+    return cfg
+
   def _fallback(self, key):
     ''' Fallback function for empty stack.
     '''
