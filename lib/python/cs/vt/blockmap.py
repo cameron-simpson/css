@@ -200,7 +200,7 @@ class BlockMap(RunStateMixin):
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
-  def __init__(self, block, mapsize=None, blockmapdir=None):
+  def __init__(self, block, mapsize=None, blockmapdir=None, runstate=None):
     ''' Initialise the `BlockMap`, dispatch the index generator.
 
         Parameters:
@@ -208,6 +208,7 @@ class BlockMap(RunStateMixin):
         * `mapsize`: the size of each index map, default `OFFSET_SCALE`
         * `blockmapdir`: the pathname for persistent storage of `BlockMaps`
     '''
+    super().__init__(runstate=runstate)
     if mapsize is None:
       mapsize = OFFSET_SCALE
     elif mapsize <= 0 or mapsize > OFFSET_SCALE:
@@ -221,7 +222,6 @@ class BlockMap(RunStateMixin):
       X("BlockMap: set blockmapdir to %r (was None)", blockmapdir)
     else:
       X("BlockMap: supplied blockmapdir=%r", blockmapdir)
-    RunStateMixin.__init__(self, "BlockMap")
     if not isinstance(block, IndirectBlock):
       raise TypeError(
           "block needs to be an IndirectBlock, got a %s instead" %
