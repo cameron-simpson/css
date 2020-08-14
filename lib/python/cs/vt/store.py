@@ -415,55 +415,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     ''' The path to this Store's blockmap directory, if specified.
         Falls back too the Config.blockmapdir.
     '''
-    with Pfx("%s.blockmapdir", self):
-      dirpath = self._blockmapdir
-      if dirpath is None:
-        cfg = self.config
-        dirpath = cfg.get_default('blockmapdir')
-        if dirpath is not None:
-          if dirpath.startswith('['):
-            endpos = dirpath.find(']', 1)
-            if endpos < 0:
-              # TODO: "GLOBAL" ???
-              warning(
-                  '[GLOBAL].blockmapdir: starts with "[" but no "]": %r',
-                  dirpath
-              )
-            else:
-              clausename = dirpath[1:endpos].strip()
-              with Pfx('[%s]', clausename):
-                if not clausename:
-                  warning(
-                      '[GLOBAL].blockmapdir: empty clause name: %r', dirpath
-                  )
-                else:
-                  try:
-                    S = cfg[clausename]
-                  except KeyError:
-                    warning("unknown config clause")
-                  else:
-                    rdirpathpos = endpos + 1
-                    if rdirpathpos == len(dirpath):
-                      rdirpath = 'blockmaps'
-                    elif dirpath.startswith('/', rdirpathpos):
-                      rdirpath = dirpath[rdirpathpos + 1:]
-                      if not rdirpath:
-                        rdirpath = 'blockmaps'
-                    else:
-                      warning(
-                          '[GLOBAL].blockmapdir: %r not followed with a slash: %r',
-                          dirpath[:endpos + 1], dirpath
-                      )
-                      rdirpath = None
-                    if rdirpath:
-                      dirpath = S.pathto(rdirpath)
-          else:
-            # TODO: generic handler for Store subpaths needed
-            if not isabspath(dirpath):
-              dirpath = expanduser(dirpath)
-              if not isabspath(dirpath):
-                dirpath = S.pathto(dirpath)
-      return dirpath
+    return self._blockmapdir or self.config.blockmapdir
 
   @blockmapdir.setter
   def blockmapdir(self, dirpath):
