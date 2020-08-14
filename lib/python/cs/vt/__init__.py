@@ -42,8 +42,9 @@
 import os
 import tempfile
 import threading
+from types import SimpleNamespace as NS
 from cs.logutils import error, warning
-from cs.progress import Progress
+from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
@@ -158,9 +159,19 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-# some shared default state
-_common_progress = Progress(name="cs.vt._common_progress")
-_common_runstate = RunState("cs.vt._common_runstate")
+_progress = Progress(name="cs.vt.common.progress"),
+_over_progress = OverProgress(name="cs.vt.common.over_progress")
+
+# some shared default state, Thread independent
+common = NS(
+    progress=_progress,
+    over_progress=_over_progress,
+    runstate=RunState("cs.vt.common.runstate"),
+    config=None
+)
+
+del _progress
+del _over_progress
 
 class _Defaults(threading.local):
   ''' Per-thread default context stack.
@@ -176,8 +187,8 @@ class _Defaults(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.progress = _common_progress
-    self.runstate = _common_runstate
+    self.progress = common.progress
+    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
     self.Ss = []
