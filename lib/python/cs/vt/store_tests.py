@@ -201,28 +201,20 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   def test01add_new_block(self):
     ''' Add a block and check that it worked.
     '''
-    n_added = 0
     S = self.S
-    self.assertLen(S, n_added)
     # compute block hash but do not store
-    hashed = set()
     for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
                                                      ):
       with self.subTest(hashname=hashname):
         size = random.randint(127, 16384)
         data = make_randblock(size)
         h = S.hash(data, hashclass)
-        self.assertLen(S, n_added)
         ok = S.contains(h)
         self.assertFalse(ok)
         self.assertNotIn(h, S)
         # now add the block
         h2 = S.add(data, type(h))
-        if h not in hashed:
-          n_added += 1
-          hashed.add(h)
         self.assertEqual(h, h2)
-        self.assertLen(S, n_added)
         ok = S.contains(h)
         self.assertTrue(ok)
         self.assertIn(h, S)
@@ -234,7 +226,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
-    n_added = 0
     for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
                                                      ):
       with self.subTest(hashname=hashname):
@@ -243,10 +234,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           data = make_randblock(size)
           h = S.hash(data, hashclass)
           h2 = S.add(data, type(h))
-          n_added += 1
           self.assertEqual(h, h2)
           random_chunk_map[h] = data
-        self.assertLen(S, n_added)
     for h in random_chunk_map:
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
