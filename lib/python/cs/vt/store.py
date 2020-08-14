@@ -395,7 +395,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     return None
 
   @prop
-  @pfx_method
   def config(self):
     ''' The configuration for use with this Store.
         Falls back to `defaults.config`.
