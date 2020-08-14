@@ -205,6 +205,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, n_added)
     # compute block hash but do not store
+    hashed = set()
     for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
                                                      ):
       with self.subTest(hashname=hashname):
@@ -217,7 +218,9 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
         self.assertNotIn(h, S)
         # now add the block
         h2 = S.add(data, type(h))
-        n_added += 1
+        if h not in hashed:
+          n_added += 1
+          hashed.add(h)
         self.assertEqual(h, h2)
         self.assertLen(S, n_added)
         ok = S.contains(h)
