@@ -5,7 +5,7 @@
 #
 
 '''
-X(), for low level debugging
+X(), for low level debugging.
 
 X() is my function for low level ad hoc debug messages.
 It takes a message and optional format arguments for use with `%`.
@@ -51,12 +51,12 @@ def X(msg, *args, **kw):
         If specified, surround the message with ANSI escape sequences
         to render the text in that colour.
 
-      If `file` is not None, write to it unconditionally.
+      If `file` is not `None`, write to it unconditionally.
       Otherwise, the following globals are consulted in order:
       * `X_logger`: if not `None` then log a warning to that logger
       * `X_via_tty`: if true then open `/dev/tty` and write the message to it
       * `X_discard`: if true then discard the message
-      Otherwise write the message to sys.stderr.
+      Otherwise write the message to `sys.stderr`.
 
       `X_logger` is `None` by default.
       `X_via_tty` is true if the environment variable `$CS_X_VIA_TTY` is not empty,
@@ -102,6 +102,9 @@ if os.environ.get('CS_X_GLOBAL', ''):
 
 def Xtty(msg, *args, **kw):
   ''' Call `X()` with `X_via_tty` set to `True`.
+
+      *Note*:
+      this is now obsoleted by the `$CS_X_VIA_TTY` environment variable.
 
       This supports using:
 
