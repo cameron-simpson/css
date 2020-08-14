@@ -400,7 +400,7 @@ class UTF8or16Field(PacketField):
         bom = None
         text = UTF8NULField.value_from_buffer(bfr)
       else:
-        text = UTF16NULField.value_from_buffer(bfr, encoding)
+        text = UTF16NULField.value_from_buffer(bfr, encoding=encoding)
     return cls(text, bom=bom)
 
   def transcribe(self):
