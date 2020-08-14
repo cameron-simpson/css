@@ -82,8 +82,6 @@ class Config(SingletonMixin):
         if default_config is None else id(default_config)
     )
 
-    if hasattr(self, 'map'):
-      return
   def __init__(self, config_map=None, environ=None, default_config=None):
     if config_map is None:
       config_map = DEFAULT_CONFIG_MAP
@@ -110,6 +108,7 @@ class Config(SingletonMixin):
         warning("falling back to default configuration")
         config.read_dict(default_config)
     else:
+      self.path = None
       config.read_dict(config_map)
     self.map = config
     self._clause_stores = {}  # clause_name => Result->Store
