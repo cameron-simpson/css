@@ -185,6 +185,15 @@ class Config(SingletonMixin):
     return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
 
   @property
+  def blockmapdir(self):
+    ''' The global blockmapdir.
+        Falls back to `{self.basedir}/blockmaps`.
+    '''
+    return longpath(
+        self.get_default('blockmapdir', joinpath(self.basedir, 'blockmaps'))
+    )
+
+  @property
   def mountdir(self):
     ''' The default directory for mount points.
     '''
