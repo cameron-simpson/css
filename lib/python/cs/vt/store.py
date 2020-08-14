@@ -346,19 +346,19 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
   @abstractmethod
   def add_bg(self, data, hashclass=None):
-    ''' Dispatch the add request in the backgrounmd, return Result.
+    ''' Dispatch the add request in the backgrounmd, return a `Result`.
     '''
     raise NotImplementedError()
 
   @abstractmethod
   def get(self, h):
-    ''' Fetch the data for hashcode `h` from the Store, or None.
+    ''' Fetch the data for hashcode `h` from the Store, or `None`.
     '''
     raise NotImplementedError()
 
   @abstractmethod
   def get_bg(self, h):
-    ''' Dispatch the get request in the backgrounmd, return Result.
+    ''' Dispatch the get request in the backgrounmd, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -370,7 +370,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
   @abstractmethod
   def contains_bg(self, h):
-    ''' Dispatch the contains request in the backgrounmd, return Result.
+    ''' Dispatch the contains request in the backgrounmd, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -382,7 +382,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
   @abstractmethod
   def flush_bg(self):
-    ''' Dispatch the flush request in the backgrounmd, return Result.
+    ''' Dispatch the flush request in the backgrounmd, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -413,6 +413,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
   @prop
   def blockmapdir(self):
     ''' The path to this Store's blockmap directory, if specified.
+        Falls back too the Config.blockmapdir.
     '''
     with Pfx("%s.blockmapdir", self):
       dirpath = self._blockmapdir
