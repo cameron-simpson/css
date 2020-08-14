@@ -22,7 +22,7 @@
 
     These are logically disconnected.
     Dirents are not associated with particular Stores;
-    it is it sufficient to have access to any Store
+    it is sufficient to have access to any Store
     containing the required blocks.
 
     The other common entity is the Archive,
@@ -111,7 +111,6 @@ DEFAULT_CONFIG_PATH = '~/.vtrc'
 DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
         'basedir': DEFAULT_BASEDIR,
-        'blockmapdir': '[default]/blockmaps',
     },
     'default': {
         'type': 'datadir',
