@@ -19,7 +19,7 @@ BIND_HOST = '127.0.0.1'
 BASE_PORT = 9999
 
 def make_tcp_store():
-  ''' prepare a TCP based Store.
+  ''' Prepare a TCP based Store.
   '''
   global BASE_PORT
   base_port = BASE_PORT
