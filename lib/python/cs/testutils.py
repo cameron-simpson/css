@@ -33,12 +33,12 @@ def product_test(test_method, **params):
               ],
           )
 
-      whose test suite then just decorates each method with `@multitest`.
+      whose test suite then just decorates each method with `@multitest`:
 
       Note that because there must be setup and teardown for each product,
       the TestCase class may well have empty `setUp` and `tearDown` methods
       and instead is expected to provide:
-      * `setup_product(self,**params)`:
+      * `product_setup(self,**params)`:
         a setup method taking keyword arguments for each product
       * `product_teardown(self)`:
         the corresponding testdown method
