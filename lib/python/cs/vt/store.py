@@ -200,7 +200,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
       self.name = name
       self._capacity = capacity
       self.hashclass = hashclass
-      self.config = None
+      self._config = None
       self.logfp = None
       self.mountdir = None
       self.readonly = False
@@ -393,6 +393,20 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     '''
     warning("no get_Archive for %s", type(self).__name__)
     return None
+
+  @prop
+  @pfx_method
+  def config(self):
+    ''' The configuration for use with this Store.
+        Falls back to `defaults.config`.
+    '''
+    return self._config or defaults.config
+
+  @config.setter
+  def config(self, new_config):
+    ''' Set the configuration for use with this Store.
+    '''
+    self._config = new_config
 
   ##########################################################################
   # Blockmaps.
