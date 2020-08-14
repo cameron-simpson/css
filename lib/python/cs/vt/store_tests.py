@@ -254,13 +254,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     KS1.add(h)
-    self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
-    self.assertLen(M1, 2)
     self.assertEqual(set(M1.hashcodes()), KS1)
 
   @multitest
