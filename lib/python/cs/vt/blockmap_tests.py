@@ -15,7 +15,7 @@ from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
 from .store import MappingStore
 
-class TestAll(unittest.TestCase):
+class TestBlockMap(unittest.TestCase):
   ''' Tests for BlockMaps.
   '''
 
