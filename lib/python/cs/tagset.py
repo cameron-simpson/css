@@ -683,8 +683,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
+        Returns `None` if there is no ontology.
 
-        This calls `TagsOntology.basetype(self.type)`.
+        This calls `TagsOntology.basetype(self.ontology,self.type)`.
     '''
     ont = self.ontology
     if ont is None:
@@ -816,6 +817,10 @@ class ExtendedNamespace(SimpleNamespace):
     return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
 
   def __str__(self):
+    ''' Return a visible placeholder, supporting exposing this object
+        in a format string so that the user knows there wasn't a value
+        at this point in the dotted path.
+    '''
     return '{' + type(self).__name__ + ':' + ','.join(
         str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
     ) + '}'
@@ -885,12 +890,12 @@ class TagSetNamespace(ExtendedNamespace):
   @pfx_method
   def from_tagset(cls, tags, pathnames=None):
     ''' Compute and return a presentation of this `TagSet` as a
-        nested `ExtendedNamespace`.
+        nested `TagSetNamespace`.
 
-        `ExtendedNamespaces` provide a number of convenience attibutes
-        derived from the concrete attributes. They are also usable
-        as mapping in `str.format_map` and the like as they implement
-        the `keys` and `__getitem__` methods.
+        `TagSetNamespace`s provide a number of convenience attributes
+        derived from the concrete attributes. a `TagSetNamespace` is also 
+        usable as a mapping in `str.format_map` and the like as it 
+        implements the `keys` and `__getitem__` methods.
 
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
