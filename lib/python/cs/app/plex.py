@@ -12,7 +12,7 @@ from os.path import (
 )
 import sys
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, loadrc as fstags_loadrc, rfilepaths, TaggedPath
+from cs.fstags import FSTags, rfilepaths, TaggedPath
 from cs.logutils import Pfx, warning, error
 
 DISTINFO = {
@@ -39,11 +39,6 @@ class PlexCommand(BaseCommand):
   '''
 
   GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage:
-    {cmd} linktree srctrees... dsttree
-        Link media files from the srctrees into the dsttree
-        using the Plex naming conventions.
-  '''
 
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
@@ -52,7 +47,9 @@ class PlexCommand(BaseCommand):
 
   @staticmethod
   def cmd_linktree(argv, options):
-    ''' Produce a symlink tree for Plex from source trees.
+    ''' Usage: {cmd} linktree srctrees... dsttree
+          Link media files from the srctrees into the dsttree
+          using the Plex naming conventions.
     '''
     if len(argv) < 2:
       raise GetoptError("missing srctrees or dsttree")
