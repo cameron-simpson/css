@@ -858,22 +858,10 @@ class ExtendedNamespace(SimpleNamespace):
     return subns
 
   def __getattr__(self, attr):
-    ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        containing a `Tag` for the attribute with a placeholder string.
+    ''' Just a stub so that (a) subclasses can call `super().__getattr__`
+        and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    if attr and attr[0].isalpha():
-      # no such attribute, create a placeholder `Tag`
-      # for [:alpha:]* names
-      format_placeholder = '{' + self._path + '.' + attr + '}'
-      subns = self._subns(attr)
-      overtag = self.__dict__.get('_tag')
-      subns._tag = Tag(
-          attr,
-          format_placeholder,
-          ontology=overtag.ontology if overtag else None
-      )
-      return subns
-    raise AttributeError("%s: %s" % (self._path, attr))
+    raise AttributeError("%s:.%s" % (self._path, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -998,6 +986,10 @@ class TagSetNamespace(ExtendedNamespace):
         whose value is inferred from another.
 
         The following attribute names and forms are supported:
+        * `[:alpha:]*`:
+          an identifierish name binds to a stub subnamespace
+          so the `{a.b.c.d}` in a format string
+          can be replaced with itself to present the undefined name in full.
         * `_keys`: the keys of the value
           for the `Tag` associated with this node;
           meaningful if `self._tag.value` has a `keys` method
@@ -1011,8 +1003,8 @@ class TagSetNamespace(ExtendedNamespace):
           If *baseattr* exists,
           return its value lowercased via `cs.lex.lc_()`.
           Conversely, if *baseattr* is required
-          and does not directly exists
-          but its *baseattr*`_lc` form does,
+          and does not directly exist
+          but its *baseattr*`_lc` form *does*,
           return the value of *baseattr*`_lc`
           titlelified using `cs.lex.titleify_lc()`.
         * *baseattr*`s`, *baseattr*`es`: singular/plural.
@@ -1022,6 +1014,19 @@ class TagSetNamespace(ExtendedNamespace):
           if *baseattr* does not exist but one of its plural attributes does,
           return the first element from the plural attribute.
     '''
+    if attr and attr[0].isalpha():
+      # no such attribute, create a placeholder `Tag`
+      # for [:alpha:]* names
+      format_placeholder = '{' + self._path + '.' + attr + '}'
+      subns = self._subns(attr)
+      overtag = self.__dict__.get('_tag')
+      subns._tag = Tag(
+          attr,
+          format_placeholder,
+          ontology=overtag.ontology if overtag else None
+      )
+      self.__dict__[attr] = subns
+      return subns
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
       if attr == 'cover':
