@@ -1,0 +1,5 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200621.
+lib/python/cs/upd.py: cs.upd: UpdProxy: call self.delete on __del__
+lib/python/cs/upd.py: cs.upd: docstring tweaks
+lib/python/cs/upd.py: cs.upd: if self._backend is None act as if disabled, occurs during shutdown
+lib/python/cs/upd.py: cs.upd: Upd.delete: ignore attempts to delete the last line

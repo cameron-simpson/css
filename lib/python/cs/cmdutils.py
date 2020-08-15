@@ -21,11 +21,11 @@ from cs.pfx import Pfx, XP
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200521.1-post'
+__version__ = '20200615-post'
 
 DISTINFO = {
     'description':
-    "convenience functions for working with the Cmd module and other command line related stuff",
+    "convenience functions for working with the Cmd module, a BaseCommand class for constructing command lines and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -39,7 +39,7 @@ DISTINFO = {
 }
 
 def docmd(dofunc):
-  ''' Decorator for Cmd subclass methods
+  ''' Decorator for `cmd.Cmd` subclass methods
       to supply some basic quality of service.
 
       This decorator:
@@ -54,6 +54,8 @@ def docmd(dofunc):
       The intended use is to decorate `cmd.Cmd` `do_`* methods:
 
           from cmd import Cmd
+          from cs.cmdutils import docmd
+          ...
           class MyCmd(Cmd):
             @docmd
             def do_something(...):
@@ -181,22 +183,28 @@ class BaseCommand:
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
+    subcmds = cls.subcommands()
+    has_subcmds = subcmds and list(subcmds) != ['help']
     if usage_format is None:
-      return None
-    usage_message = usage_format.format_map(usage_format_mapping)
-    subusages = []
-    for attr, method in sorted(cls.subcommands().items()):
-      with Pfx(attr):
-        subusage = cls.subcommand_usage_text(attr)
-        if subusage:
-          subusages.append(subusage.replace('\n', '\n  '))
-    if subusages:
-      usage_message = '\n'.join(
-          [usage_message, '  Subcommands:'] + [
-              '    ' + subusage.replace('\n', '\n    ')
-              for subusage in subusages
-          ]
+      usage_format = (
+          r'Usage: {cmd} subcommand [...]'
+          if has_subcmds else 'Usage: {cmd} [...]'
       )
+    usage_message = usage_format.format_map(usage_format_mapping)
+    if has_subcmds:
+      subusages = []
+      for attr, method in sorted(subcmds.items()):
+        with Pfx(attr):
+          subusage = cls.subcommand_usage_text(attr)
+          if subusage:
+            subusages.append(subusage.replace('\n', '\n  '))
+      if subusages:
+        usage_message = '\n'.join(
+            [usage_message, '  Subcommands:'] + [
+                '    ' + subusage.replace('\n', '\n    ')
+                for subusage in subusages
+            ]
+        )
     return usage_message
 
   @classmethod
@@ -221,6 +229,7 @@ class BaseCommand:
       doc = obj_docstring(method)
       if doc and 'Usage:' in doc:
         pre_usage, post_usage = doc.split('Usage:', 1)
+        pre_usage = pre_usage.strip()
         post_usage_parts = post_usage.split('\n\n', 1)
         post_usage_format = post_usage_parts.pop(0)
         subusage_format = stripped_dedent(post_usage_format)
@@ -229,7 +238,9 @@ class BaseCommand:
           mapping.update(cmd=subcmd)
           subusage = subusage_format.format_map(mapping)
           if fulldoc:
-            subusage = pre_usage + subusage + '\n\n'.join(post_usage_parts)
+            parts = [pre_usage, subusage] if pre_usage else [subusage]
+            parts.extend(post_usage_parts)
+            subusage = '\n\n'.join(parts)
     return subusage if subusage else None
 
   @classmethod
@@ -292,6 +303,8 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if options is None:
+      options = NS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -301,12 +314,11 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    loginfo = setup_logging(cmd)
+    options.cmd = cmd
+    log_level = getattr(options, 'log_level', None)
+    loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     usage = self.usage_text(cmd=cmd)
-    if options is None:
-      options = NS()
-    options.cmd = cmd
     options.usage = usage
     options.loginfo = loginfo
     self.apply_defaults(options)
@@ -331,8 +343,10 @@ class BaseCommand:
           main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
         except AttributeError:
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %r" %
-              (subcmd, sorted(subcmds.keys()))
+              "%s: unrecognised subcommand, expected one of: %s" % (
+                  subcmd,
+                  ', '.join(sorted(subcmds.keys())),
+              )
           )
         subcmd_context = Pfx(subcmd)
         try:
@@ -420,20 +434,23 @@ class BaseCommand:
           or for all subcommands if no names are specified.
     '''
     subcmds = cls.subcommands()
-    if not argv:
+    if argv:
+      fulldoc = True
+    else:
+      fulldoc = False
       argv = sorted(subcmds)
     xit = 0
+    print("help:")
     for subcmd in argv:
       with Pfx(subcmd):
         if subcmd not in subcmds:
           warning("unknown subcommand")
           xit = 1
           continue
-        subusage = cls.subcommand_usage_text(subcmd, fulldoc=True)
+        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
         if not subusage:
           warning("no help")
           xit = 1
           continue
-        print(subcmd + ':')
         print(' ', subusage.replace('\n', '\n    '))
     return xit

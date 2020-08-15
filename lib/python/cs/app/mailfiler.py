@@ -39,7 +39,7 @@ from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
-from logging import DEBUG
+import logging
 import os
 import os.path
 import re
@@ -81,6 +81,8 @@ from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
+
+__version__ = '20200719-post'
 
 DISTINFO = {
     'description':
@@ -131,9 +133,7 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
-  if 'DEBUG' not in os.environ:
-    os.environ['DEBUG'] = 'INFO'
-  return MailFilerCommand().run(argv, options=NS(stdin=stdin))
+  return MailFilerCommand().run(argv, options=NS(stdin=stdin, log_level=logging.INFO))
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -523,7 +523,7 @@ class MailFiler(NS):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+          with LogTime("key = %s", key, threshold=1.0, level=logging.DEBUG):
             ok = self.file_wmdir_key(wmdir, key)
             if not ok:
               warning("NOT OK, lurking key %s", key)
@@ -584,7 +584,7 @@ class MailFiler(NS):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
         This does not remove a successfully filed message or update the lurking list.
     '''
-    with LogTime("file key %s", key, threshold=1.0, level=DEBUG):
+    with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
       M = wmdir[key]
       filer = MessageFiler(self)
       ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
@@ -816,7 +816,8 @@ class MessageFiler(NS):
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
-        info("    MATCH %s", R)
+        if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
+          info("    MATCH %s", R)
 
       return self.save_message()
 

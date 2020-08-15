@@ -16,7 +16,7 @@ import time
 import unittest
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
-from .randutils import rand0, randblock
+from cs.randutils import randomish_chunks
 from .blockify import blockify, blocked_chunks_of, \
                       MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE
 from .parsers import scan_text, scan_mp3, scan_mp4
@@ -28,13 +28,6 @@ cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
-def random_blocks(max_size=65536, count=64):
-  ''' Generate `count` blocks of random sizes from 1 to `max_size`.
-  '''
-  for _ in range(count):
-    size = rand0(max_size) + 1
-    yield randblock(size)
-
 class TestAll(unittest.TestCase):
   ''' All the unit tests.
   '''
@@ -44,9 +37,9 @@ class TestAll(unittest.TestCase):
     mycode = myfp.read()
 
   if QUICK:
-    random_data = list(random_blocks(max_size=1200, count=12))
+    random_data = list(randomish_chunks(1200, limit=12))
   else:
-    random_data = list(random_blocks(max_size=12000, count=1280))
+    random_data = list(randomish_chunks(12000, limit=1280))
 
   def setUp(self):
     ''' Open the source file.
@@ -61,7 +54,6 @@ class TestAll(unittest.TestCase):
   def test01scanners(self):
     ''' Test some domain specific data parsers.
     '''
-    rand_total = sum(len(chunk) for chunk in self.random_data)
     for scanner in (scan_text, scan_mp3):
       with self.subTest(scanner.__name__):
         input_chunks = self.random_data
@@ -105,7 +97,7 @@ class TestAll(unittest.TestCase):
           testfile = 'TEST.mp4'
         if testfile is not None:
           if os.path.exists(testfile):
-            X("%s: replace input data with chunks from %s", scanner, testfile)
+            ##X("%s: replace input data with chunks from %s", scanner, testfile)
             rfp = open(testfile, 'rb')
             input_chunks = read_from(rfp, DEFAULT_SCAN_SIZE)
             input_desc = testfile

@@ -1,31 +1,27 @@
 #!/usr/bin/python
 #
-# Self tests for cs.app.mailfiler.
-#       - Cameron Simpson <cs@cskk.id.au>
-#
 
-import os
+''' Self tests for cs.app.mailfiler.
+    - Cameron Simpson <cs@cskk.id.au>
+'''
+
 import sys
-from os.path import basename, dirname, join as joinpath
-from types import Namespace as NS
+from os.path import dirname, join as joinpath
+from types import SimpleNamespace as NS
 import unittest
 from cs.app.mailfiler import (
-        get_targets, get_target,
-        Target_Assign, Target_PipeLine, Target_Substitution, Target_SetFlag,
-        Target_Function, Target_MailAddress, Target_MailFolder,
-        parserules)
+    get_targets, get_target, Target_Assign, Target_PipeLine,
+    Target_Substitution, Target_SetFlag, Target_Function, Target_MailAddress,
+    Target_MailFolder, parserules
+)
 from cs.logutils import D
-from cs.x import X
-
-if not os.environ.get('DEBUG', ''):
-
-  def D(*a):
-    pass
 
 testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.app.mailfiler')
 test_rules_file = joinpath(testdatadir, 'rules')
 
 class TestMailFiler(unittest.TestCase):
+  ''' Tests for `cs.app.mailfiler`.
+  '''
 
   def setUp(self):
     pass
@@ -189,9 +185,13 @@ class TestMailFiler(unittest.TestCase):
     )
 
   def testRulesParseFile(self):
-    rules = list(parserules(test_rules_file))
+    ''' Test parse.
+    '''
+    list(parserules(test_rules_file))
 
 def selftest(argv):
+  ''' Run the unittest main function.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':

@@ -14,17 +14,21 @@ from threading import Thread
 import unittest
 from cs.binary_tests import _TestPacketFields
 from cs.py3 import bytes
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, make_randblock
 from cs.socketutils import bind_next_port, OpenSocket
 from . import packetstream
 from .packetstream import Packet, PacketConnection
 
 class TestPacketStreamPacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Test for all the `PacketField`s.
+  '''
 
   def setUp(self):
     self.module = packetstream
 
 class TestPacket(unittest.TestCase):
+  ''' Test various trivial packets.
+  '''
 
   def test00round_trip(self):
     for is_request in False, True:
@@ -44,6 +48,8 @@ class TestPacket(unittest.TestCase):
                 self.assertEqual(P, P2)
 
 class _TestStream(object):
+  ''' Base class for stream tests.
+  '''
 
   def setUp(self):
     self._open_Streams()
@@ -86,7 +92,7 @@ class _TestStream(object):
     rqs = []
     for _ in range(16):
       size = rand0(16385)
-      data = randblock(size)
+      data = make_randblock(size)
       flags = rand0(65537)
       R = self.local_conn.request(0, flags, data, self._decode_response, 0)
       rqs.append((R, flags, data))
@@ -99,6 +105,8 @@ class _TestStream(object):
       self.assertEqual(payload, bytes(reversed(data)))
 
 class TestStreamPipes(_TestStream, unittest.TestCase):
+  ''' Test streaming over pipes.
+  '''
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
@@ -120,6 +128,8 @@ class TestStreamPipes(_TestStream, unittest.TestCase):
     os.close(self.downstream_wr)
 
 class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
+  ''' Test streaming over sockets.
+  '''
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = socket.socketpair()
@@ -143,6 +153,8 @@ class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
     self.downstream_wr.close()
 
 class TestStreamTCP(_TestStream, unittest.TestCase):
+  ''' Test streaming over TCP.
+  '''
 
   def _open_Streams(self):
     self.listen_sock = socket.socket()

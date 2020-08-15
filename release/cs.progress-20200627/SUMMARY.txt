@@ -1,0 +1,2 @@
+BaseProgress.status: handle throughput=None (before any activity).
+BaseProgress: drop count_of_total_bytes_text, superceded by format_counter (which honours the units_scale).
