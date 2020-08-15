@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Bypass MH/next on systems which stupidly put that stuff in a main bin dir.
-#	- Cameron Simpson <cs@zip.com.au> 14jan99
+#	- Cameron Simpson <cs@cskk.id.au> 14jan99
 #
 
 next=false

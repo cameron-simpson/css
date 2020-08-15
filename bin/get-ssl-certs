@@ -3,7 +3,7 @@
 # Connect to an SSL service and transcribe its certificates based on the recipe at:
 #    http://how2ssl.com/articles/openssl_commands_and_tips/
 # The output may be copied to a .pem file for later use.
-#   - Cameron Simpson <cs@zip.com.au> 09sep2014
+#   - Cameron Simpson <cs@cskk.id.au> 09sep2014
 #
 
 cmd=$(basename "$0")

@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Hack to support "#!/usr/bin/env sed -f" on platforms not supporting
+# options beyond the first one (hello Linux and minimal POSIX).
+# Cameron Simpson <cs@cskk.id.au>
+#
+exec sed -f ${1+"$@"}

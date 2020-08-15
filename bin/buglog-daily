@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Log to daily log files.
-#       - Cameron Simpson <cs@zip.com.au> 13mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 13mar2008
 #
 
 exec </dev/null
@@ -30,8 +30,6 @@ do
   shift
 done
 
-[ -d "$logdir/." ] || mkdir -- "$logdir" || badopts=1
-
 if [ $# = 0 ]
 then
   echo "$cmd: missing headline" >&2
@@ -49,9 +47,9 @@ else
   daycode=`date "+%Y-%m-%d"`
   hhmm=`date "+%H:%M"`
 fi
-logdir=$logdir/$daycode
 
-[ -d "$logdir/." ] || mkdir -- "$logdir"
+logdir=$logdir/$daycode
+needdir "$logdir"
 
 printf "%s %s\n" "$hhmm" "$*" >>"$logdir/ALL"
 

@@ -2,7 +2,7 @@
 #
 # Perform a task and attribute its time to a job.
 # Return to the old job on exit if we haven't already switched.
-#	- Cameron Simpson <cs@zip.com.au> 02jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 02jul2003
 #
 
 cmd=$0

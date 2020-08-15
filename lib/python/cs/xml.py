@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Basic XML conveniences.
-#   - Cameron Simpson <cs@zip.com.au> 12feb2017
+#   - Cameron Simpson <cs@cskk.id.au> 12feb2017
 #
 
 from __future__ import print_function

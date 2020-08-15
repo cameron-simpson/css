@@ -1,0 +1,2 @@
+lib/python/cs/debug.py: cs.debug: avoid circular import with cs.result
+lib/python/cs/debug.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace

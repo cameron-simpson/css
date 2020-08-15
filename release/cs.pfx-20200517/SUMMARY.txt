@@ -1,0 +1,3 @@
+@pfx: handle normal functions and also generators, improve behaviour with the wrapped docstring.
+@pfx_method: @pfx for methods.
+@pfxtag obsoleted by new @pfx.

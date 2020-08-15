@@ -1,0 +1,2 @@
+OnDemandResult: bugfixes and improvements.
+Result.bg: accept optional _name parameter to specify the Result.name.

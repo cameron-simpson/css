@@ -1,0 +1,1 @@
+Use str.isalpha to recognise "unit" words instead of string.ascii_letters (uses new cs.lex.get_chars "callable gochars" mode).

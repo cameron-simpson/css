@@ -2,7 +2,7 @@
 #
 # Record address of host.
 # Mostly used to tell my main sites about where I just dialed in from.
-#	- Cameron Simpson <cs@zip.com.au> 25jul99
+#	- Cameron Simpson <cs@cskk.id.au> 25jul99
 #
 
 aliases=${HOSTALIASES:=$HOME/rc/hostaliases}

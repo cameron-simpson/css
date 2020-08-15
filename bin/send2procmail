@@ -2,7 +2,7 @@
 #
 # Used as the sendmail backend for mutt to assemble a message (usually for
 # multiple attachments) and refile with procmail.
-#	- Cameron Simpson <cs@zip.com.au> 08jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 08jul2002
 #
 
 # just discard the sendmail arguments and go

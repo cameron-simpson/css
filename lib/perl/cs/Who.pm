@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to track who's logged in.
-#	- Cameron Simpson <cs@zip.com.au> 14mar95
+#	- Cameron Simpson <cs@cskk.id.au> 14mar95
 #
 
 use strict qw(vars);

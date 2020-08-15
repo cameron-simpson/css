@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Run a windows app on its own via the SeamlessRDP extension.
-#       - Cameron Simpson <cs@zip.com.au> 17jan2008
+#       - Cameron Simpson <cs@cskk.id.au> 17jan2008
 #
 
 : ${RDESKTOP_HOST:=windows}

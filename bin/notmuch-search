@@ -2,7 +2,7 @@
 #
 # Yet another wrapper for notmuch, to construct a results maildir from a
 # notmuch search.
-#       - Cameron Simpson <cs@zip.com.au> 18apr2014
+#       - Cameron Simpson <cs@cskk.id.au> 18apr2014
 #
 
 set -ue
@@ -63,7 +63,8 @@ else
 fi \
 | egrep '/(new|cur)/[^/]+$' \
 | sort -u \
-| xxargs arg1 -end "$mdir/new" set-x ln -i -s
+| xxargs arg1 -end "$mdir/new" set-x ln -i -s \
+|| :
 
 mutt -e 'unset header_cache' -e 'push ",D$"' -f "$mdir" <&3 3<&-
 rm -r "$mdir"

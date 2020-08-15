@@ -1,0 +1,9 @@
+lib/python/cs/app/ydl.py: Release information for cs.app.ydl-20200615.1.
+lib/python/cs/app/ydl.py: cs.app.ydl: use the new cs.upd print function to print the downloaded filename
+lib/python/cs/app/ydl.py: cs.app.ydl: YDL.run: just catch the youtube_dl DownloadError
+lib/python/cs/app/ydl.py: cs.app.ydl: DEFAULT_OUTPUT_FILENAME_TEMPLATE: drop hardwired "@youtube" up the front for %(extractor_key)s down the back
+lib/python/cs/app/ydl.py: cs.app.ydl: drop spurious COMPLETE message, improve some other messaging
+lib/python/cs/app/ydl.py: cs.app.ydl: improve the filename citation in the progress meter a bit
+lib/python/cs/app/ydl.py: cs.app.ydl: just show the file extension in the progress meter, the whol;e filename is too noise and too long
+lib/python/cs/app/ydl.py: merge media ==> default: cs.app.ydl polish
+lib/python/cs/app/ydl.py: cs.app.ydl: utilise new cs.upd.Upd "disabled output" mode, removing explicit tests

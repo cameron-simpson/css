@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# pt wrapper - Cameron Simpson <cs@zip.com.au>
+# pt wrapper - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -34,4 +34,8 @@ if [ $# = 0 ]
 then  $pt
 else  $pt | grepall -H -i $gaopts "$@"
 fi \
+| case $OS in
+    linux)  awk '$3 != 2 || $6 != "\\_" || $7 !~ /^\[.*\]/ { print }' ;;
+    *)      cat ;;
+  esac \
 | entilde

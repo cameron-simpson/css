@@ -2,7 +2,7 @@
 #
 # Do a tail-f watching for a pattern.
 # Report that line and the surrounding ones.
-#	- Cameron Simpson <cs@zip.com.au> 12aug96
+#	- Cameron Simpson <cs@cskk.id.au> 12aug96
 #
 
 use cs::Monitor;

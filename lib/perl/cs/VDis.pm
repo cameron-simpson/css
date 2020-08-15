@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Minimalist curses accompished by piping to vdis.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

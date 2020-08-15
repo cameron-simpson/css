@@ -1,0 +1,9 @@
+ListField: new __iter__ method.
+Packet: __str__: accept optional `skip_fields` parameter to omit some field names.
+Packet: new .add_from_value method to add a named field with a presupplied value.
+Packet: new remove_field(field_name) and pop_field() methods to remove fields.
+BytesesField: __iter__ yields the bytes values, transcribe=__iter__.
+PacketField: propagate keyword arguments through various methods, required for parameterised PacketFields.
+New UTF16NULField, a NUL terminated UTF16 string.
+PacketField: provide a default `.transcribe_value` method which makes a new instance and calls its `.transcribe` method.
+Documentation update and several minor changes.

@@ -1,0 +1,2 @@
+Drop getLogin and getHomeDir, unused.
+Make get_standard_var private as _get_standard_var.

@@ -3,7 +3,7 @@
 # Report interface I/O stats.
 # Output format:
 #  ifname in-bytes out-bytes
-#       - Cameron Simpson <cs@zip.com.au> 01apr2011
+#       - Cameron Simpson <cs@cskk.id.au> 01apr2011
 #
 
 set -ue

@@ -2,7 +2,7 @@
 #
 # Disable user account.
 # Should run on the yp master.
-#	- Cameron Simpson <cs@zip.com.au> 12nov1996
+#	- Cameron Simpson <cs@cskk.id.au> 12nov1996
 #
 
 cmd=`basename "$0"`

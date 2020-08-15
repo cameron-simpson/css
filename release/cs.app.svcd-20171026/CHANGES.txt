@@ -1,0 +1,2 @@
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: prevent spurious initial restart with sig_func
+  lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: handle TypeError in sig_func return comparisons

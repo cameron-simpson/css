@@ -1,0 +1,1 @@
+lib/python/cs/py/func.py: cs.py.func: funcname: prefer func.__qualname__ over func.__name__

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Quick'n'easy ldapsearch.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${LDAPQOPTS:='-x'}

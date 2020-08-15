@@ -1,8 +1,8 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Report a minimal set of distinct spanning subdirectories including the
 # specified subdirectories.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import sys

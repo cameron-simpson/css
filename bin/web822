@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read RFC822 message from stdin and emit it in HTML form.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 require 'cs/html.pl';

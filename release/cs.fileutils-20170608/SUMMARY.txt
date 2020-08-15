@@ -1,0 +1,2 @@
+Move lockfile and the SharedAppend* classes to cs.sharedfile.
+BackedFile internal changes.

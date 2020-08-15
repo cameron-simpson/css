@@ -2,7 +2,7 @@
 #
 # Emit commes to update the tables in a database for cluster use by
 # altering the engine. Should be run in the mysql basedir.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2006
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2006
 #
 
 cmd=$0

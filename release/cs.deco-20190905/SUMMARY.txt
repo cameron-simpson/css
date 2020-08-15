@@ -1,0 +1,1 @@
+Bugfix @deco: it turns out that you may not set the .__module__ attribute on a property object.

@@ -1,0 +1,24 @@
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: add cs.excutils to DISTINFO[install_requires]
+  lib/python/cs/app/mailfiler.py: merge default ==> beyonwiz
+  lib/python/cs/app/mailfiler.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/app/mailfiler.py: cs.lex,cs.rfc2047,cs.app.mailfiler: move unrfc2047 into new cs.rfc2047 module
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: comment fix - semantic consistency
+  lib/python/cs/app/mailfiler.py: merge default ==> mailfiler
+  lib/python/cs/app/mailfiler.py: merge default ==> mailfiler
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: fix up use of cs.env.LOGDIR
+  lib/python/cs/app/mailfiler.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: fix imports broken with cs.pfx changes
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: parserules is a generator: remove with-Pfx suite, just wrap exceptions in the prefix
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler.monitor: catch all exceptions from sweep and report, resume polling
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: lint: drop some unused imports
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: lint: more fixes
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: rule file monitoring: drop cs.fileutils.{file_property,files_property}, use @cs.deco.cached and its sig_func facility
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler.maildir_watcher: fix docstring typo; WatchedMaildir: move _rules_state down next to rules
+  lib/python/cs/app/mailfiler.py: my email address has changed - update Python code
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: bugfix WatchedMaildir: fix initial value of _rules
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: adjust log file format
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: escape From_ lines when saving to an mbox, diagnosis from todd zullinger
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: drop unused import
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: lint
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Maildirs not have a .path instead of a .dir
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: clean a lot of lint and update various docstrings

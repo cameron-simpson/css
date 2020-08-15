@@ -2,7 +2,7 @@
 #
 # Recode of Larry Wall's rename script.
 # See also convenience scripts "lc", "__" and "_%".
-#	- Cameron Simpson <cs@zip.com.au> 20aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 20aug2003
 #
 
 use File::Basename;
@@ -59,14 +59,12 @@ for my $path (@ARGV)
   -e $path || next PATH;
   my $base = basename($path);
   $_ = ($fullpath ? $path : basename($path));
-  warn "_=$_\n";
   eval $perlop;
   die $@ if $@;
-  warn "_ => $_\n";
   my $npath = ($fullpath ? $_ : dirname($path).'/'.$_);
-  warn "napth => $npath\n";
   if ($npath ne $path)
   {
+    warn "path => $npath\n";
     my $ndir = dirname($npath);
     -d "$ndir/." || mkpath($ndir);
     if (-e $npath)

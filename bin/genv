@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Edit the global environment file.
-#	- Cameron Simpson <cs@zip.com.au> 23jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 23jun2005
 #
 
 : ${TMPDIR:=/tmp}

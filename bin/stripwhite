@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -nf
 #
 # Strip trailing whitespace and leading blank lines.
-#	- Cameron Simpson <cs@zip.com.au> 02jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 02jul2005
 #
 
 /^[ 	]*$/d

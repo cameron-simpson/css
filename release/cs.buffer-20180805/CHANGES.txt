@@ -1,0 +1,3 @@
+  lib/python/cs/buffer.py: cs.buffer: fix typo in docstring
+  lib/python/cs/buffer.py: cs.buffer: bugfix at_eof method, tweak module docstring
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_bytes: bugfix end_offset initialisation

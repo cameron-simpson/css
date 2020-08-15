@@ -1,7 +1,7 @@
-#!/usr/bin/env py26+
+#!/usr/bin/env python
 #
 # Run intergers from stdin, summarise in ordered list of runs.
-#   - Cameron Simpson <cs@zip.com.au> 17aug2014
+#   - Cameron Simpson <cs@cskk.id.au> 17aug2014
 #
 
 import sys

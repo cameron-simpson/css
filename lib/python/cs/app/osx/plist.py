@@ -2,7 +2,7 @@
 #
 # MacOSX plist facilities. Supports binary plist files, which the
 # stdlib plistlib module does not.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 import base64
@@ -14,8 +14,10 @@ import tempfile
 import cs.iso8601
 import cs.sh
 from cs.xml import etree
+from cs.logutils import warning
+from cs.pfx import Pfx, XP
+from cs.x import X
 from .iphone import is_iphone
-from cs.logutils import Pfx, X, XP, warning
 
 def import_as_etree(plist):
   ''' Load an Apple plist and return an etree.Element.

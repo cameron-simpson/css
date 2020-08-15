@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Access Calibre ebook library data.
-#       - Cameron Simpson <cs@zip.com.au> 13feb2016
+#       - Cameron Simpson <cs@cskk.id.au> 13feb2016
 #
 
 from __future__ import print_function
@@ -23,7 +23,6 @@ from cs.env import envsub
 from cs.py.func import prop
 from cs.lex import get_identifier
 from cs.logutils import info, warning, error, setup_logging
-from cs.obj import O
 from cs.pfx import Pfx, XP
 from cs.seq import the
 from cs.threads import locked, locked_property
@@ -85,7 +84,7 @@ def main(argv=None):
       return 2
     return xit
 
-class Calibre_Library(O):
+class Calibre_Library(NS):
 
   def __init__(self, libpath=None):
     ''' Open the Calibre library stored at `libpath`.

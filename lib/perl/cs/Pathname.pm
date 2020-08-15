@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Routines to manipulate pathnames, mostly lexical.
-#	- Cameron Simpson <cs@zip.com.au> 24oct95
+#	- Cameron Simpson <cs@cskk.id.au> 24oct95
 #
 
 =head1 NAME
@@ -565,7 +565,7 @@ sub compare($$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

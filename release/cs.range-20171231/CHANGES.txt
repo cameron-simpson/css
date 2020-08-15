@@ -1,0 +1,9 @@
+  lib/python/cs/range.py: merge default ==> beyonwiz
+  lib/python/cs/range.py: cs.range: bugfix: bisect_left can land to the right of an interesting range
+  lib/python/cs/range.py: cs.range: add Range.span0 returning the first Span, initially to support easily allocating a new low value not already in the Range (== span0.end)
+  lib/python/cs/range.py: cs.range: Range: implement __bool__ and __nonzero__, reimplement isempty as !self, accept a Span in __contains__
+  lib/python/cs/range.py: cs.*: import XP from cs.pfx instead of cs.logutils
+  lib/python/cs/range.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/range.py: my email address has changed - update Python code
+  lib/python/cs/range.py: cs.range: bugfix Range.pop
+  lib/python/cs/range.py: cs.range: clean lint, fixing some small bugs also

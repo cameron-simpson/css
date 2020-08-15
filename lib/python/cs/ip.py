@@ -1,7 +1,7 @@
 #!/usr/bin'python
 #
 # Functions for working with the Internet Protocol (IP).
-#   - Cameron Simpson <cs@zip.com.au> 27jan2017
+#   - Cameron Simpson <cs@cskk.id.au> 27jan2017
 #
 
 from collections import namedtuple, OrderedDict

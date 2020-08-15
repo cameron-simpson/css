@@ -1,0 +1,2 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: make ORM._Session private session factory the public ORM.Session factory for external use
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: with_session: preexisting sessions still trigger a session.begin_nested, removes flush/commit tension elsewhere

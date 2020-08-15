@@ -1,0 +1,11 @@
+  lib/python/cs/README-lex.rst: merge default ==> beyonwiz
+  lib/python/cs/README-lex.rst: merge default ==> iphoto
+  lib/python/cs/README-lex.rst: merge default ==> venti
+  lib/python/cs/lex.py: cs.lex: _texthexify_white_chars: note exclusion of "{" and "}", used in JSON
+  lib/python/cs/lex.py: cs.lex: new function get_decimal
+  lib/python/cs/README-lex.rst: merge default ==> later
+  lib/python/cs/lex.py: cs.lex: relayout docstrings
+  lib/python/cs/lex.py: default ==> pilfer
+  lib/python/cs/README-lex.rst lib/python/cs/lex.py: merge later ==> pilfer
+  lib/python/cs/lex.py: merge later ==> venti
+  lib/python/cs/lex.py: cs.lex: drop dict2js, unused; clean some lint

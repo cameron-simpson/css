@@ -1,7 +1,7 @@
 #!/usr/bin/perl -n
 #
 # Replace control characters with printable forms.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 chomp;

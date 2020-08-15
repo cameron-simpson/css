@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Simple program to read HTML and emit clean HTML.
-#	- Cameron Simpson <cs@zip.com.au> 31jul96
+#	- Cameron Simpson <cs@cskk.id.au> 31jul96
 #
 
 use cs::Hier;

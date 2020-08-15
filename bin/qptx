@@ -4,7 +4,7 @@
 # The permuted index should be like that produced from htmlptx:
 #	file	left-context	keyword	right-context	line-number
 # tab separated.
-#	- Cameron Simpson <cs@zip.com.au> 03dec2004
+#	- Cameron Simpson <cs@cskk.id.au> 03dec2004
 #
 
 cmd=`basename "$0"`

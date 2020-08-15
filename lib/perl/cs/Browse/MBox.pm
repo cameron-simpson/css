@@ -1,7 +1,7 @@
 #!/usr/local/lib/perl5
 #
 # Browse class for mailbox directory.
-#	- Cameron Simpson <cs@zip.com.au> 23dec96
+#	- Cameron Simpson <cs@cskk.id.au> 23dec96
 #
 
 use strict qw(vars);

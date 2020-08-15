@@ -1,0 +1,5 @@
+lib/python/cs/binary.py: cs.binary: docstring tweaks, additional comments, autoformat
+lib/python/cs/binary.py: cs.binary: ListField: replace transcribe method with transcribe_value method, aids external use
+lib/python/cs/binary.py: cs.binary: add `.length` attribute to struct based packet classes providing the data length of the structure (struct.Struct.size)
+lib/python/cs/binary.py: cs.binary: Packet: new `add_deferred_field` method to consume the raw data for a field for parsing later if the attribute is accessed; new `@deferred_field` decorator for the parser for that stashed data
+lib/python/cs/binary.py: cs.binary: docstring tweak
