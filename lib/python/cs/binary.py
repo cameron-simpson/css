@@ -380,8 +380,23 @@ class PacketField(ABC):
         For example, the `BSUInt` subclass stores a `int` as its
         `.value` and exposes its serialisation method, suitable for
         any `int`, as `transcribe_value`.
+
+        Note that this calls the class `transcribe` method, which
+        may return an iterable.
+        Use the `value_as_bytes` method to get a single flat `bytes` result.
     '''
     return cls(value, **kw).transcribe()
+
+  @classmethod
+  def value_as_bytes(cls, value, **kw):
+    ''' For simple `PacketField`s, return a transcription of a
+        value suitable for the `.value` attribute
+        as a single `bytes` value.
+
+        This flattens and joins the transcription returned by
+        `transcribe_value`.
+    '''
+    return b''.join(flatten(cls.transcribe_value(value, **kw)))
 
   def transcribe_flat(self):
     ''' Return a flat iterable of chunks transcribing this field.

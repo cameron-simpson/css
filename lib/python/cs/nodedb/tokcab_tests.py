@@ -6,9 +6,6 @@
 
 from __future__ import print_function
 import sys
-print("cs.nodedb.tokcab deprecated in favor of KyotoCabinet", file=sys.stderr)
-sys.exit(0)
-
 import os
 import os.path
 import unittest
@@ -18,6 +15,8 @@ from . import NodeDB
 from .tokcab import Backend_TokyoCabinet
 
 class TestAll(NodeTestAll):
+  ''' Tests for `cs.nodedb.tokcab`.
+  '''
 
   def setUp(self):
     dbpath = 'test-%d.tch' % (seq(),)

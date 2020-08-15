@@ -20,7 +20,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],

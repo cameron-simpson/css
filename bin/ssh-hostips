@@ -24,9 +24,12 @@ sed -n 's/^[Hh]ost //p' "$ssh_cfg" \
           [0-9]* | *:* )
             addrs=$hostname
             ;;
-          *)addrs=$(
-              host "$hostname" | sed -n 's/.* has IPv6 address \(.*\)/\1/p; s/.* has address \(.*\)/\1/p'
+          *.[a-z]?*)
+            addrs=$(
+              host "$hostname" | sed -n '/ address 127\./d; s/.* has IPv6 address \(.*\)/\1/p; s/.* has address \(.*\)/\1/p'
             ) || :
+            ;;
+          *)addrs=
             ;;
         esac
         for addr in $addrs

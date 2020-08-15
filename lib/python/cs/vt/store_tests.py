@@ -16,7 +16,7 @@ import sys
 import tempfile
 import unittest
 from cs.logutils import setup_logging
-from .randutils import rand0, randbool, make_randblock
+from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
@@ -192,7 +192,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
 
   @multitest
   def test00empty(self):
-    ''' Test that a new STore is empty.
+    ''' Test that a new Store is empty.
     '''
     S = self.S
     self.assertLen(S, 0)
