@@ -991,10 +991,6 @@ class TagSetNamespace(ExtendedNamespace):
         whose value is inferred from another.
 
         The following attribute names and forms are supported:
-        * `[:alpha:]*`:
-          an identifierish name binds to a stub subnamespace
-          so the `{a.b.c.d}` in a format string
-          can be replaced with itself to present the undefined name in full.
         * `_keys`: the keys of the value
           for the `Tag` associated with this node;
           meaningful if `self._tag.value` has a `keys` method
@@ -1018,20 +1014,11 @@ class TagSetNamespace(ExtendedNamespace):
           Conversely,
           if *baseattr* does not exist but one of its plural attributes does,
           return the first element from the plural attribute.
+        * `[:alpha:]*`:
+          an identifierish name binds to a stub subnamespace
+          so the `{a.b.c.d}` in a format string
+          can be replaced with itself to present the undefined name in full.
     '''
-    if attr and attr[0].isalpha():
-      # no such attribute, create a placeholder `Tag`
-      # for [:alpha:]* names
-      format_placeholder = '{' + self._path + '.' + attr + '}'
-      subns = self._subns(attr)
-      overtag = self.__dict__.get('_tag')
-      subns._tag = Tag(
-          attr,
-          format_placeholder,
-          ontology=overtag.ontology if overtag else None
-      )
-      self.__dict__[attr] = subns
-      return subns
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
       if attr == 'cover':
@@ -1090,6 +1077,19 @@ class TagSetNamespace(ExtendedNamespace):
           continue
         value0 = plural_value[0]
         return value0
+      if attr and attr[0].isalpha():
+        # no such attribute, create a placeholder `Tag`
+        # for [:alpha:]* names
+        format_placeholder = '{' + self._path + '.' + attr + '}'
+        subns = self._subns(attr)
+        overtag = self.__dict__.get('_tag')
+        subns._tag = Tag(
+            attr,
+            format_placeholder,
+            ontology=overtag.ontology if overtag else None
+        )
+        self.__dict__[attr] = subns
+        return subns
       return super().__getattr__(attr)
 
   @property
