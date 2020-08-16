@@ -1056,17 +1056,22 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
-      # attr vs attr_lc
-      title_attr = cutsuffix(attr, '_lc')
-      if title_attr is not attr:
-        title_value = self._attr_tag_value(title_attr)
-        if title_value is not None:
-          value_lc = lc_(title_value)
-          return value_lc
-      else:
-        attr_lc_value = getns(attr + '_lc')
-        if attr_lc_value is not None:
-          return titleify_lc(value)
+      for conv_suffix, conv in {
+          'i': int,
+          's': str,
+          'f': float,
+          'lc': lc_,
+      }.items():
+        ur_attr = cutsuffix(attr, '_' + conv_suffix)
+        if ur_attr is not attr:
+          ur_value = self._attr_tag_value(ur_attr)
+          if ur_value is not None:
+            with Pfx("%s(.%s=%r)", conv, ur_attr, ur_value):
+              ur_value = conv(ur_value)
+          return ur_value
+      attr_lc_value = getns(attr + '_lc')
+      if attr_lc_value is not None:
+        return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
