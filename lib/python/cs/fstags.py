@@ -106,7 +106,7 @@ from cs.tagset import (
     TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd
+from cs.upd import Upd, print
 
 __version__ = '20200717.1-post'
 
@@ -184,14 +184,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         with Upd(sys.stderr) as U:
           for top_path in argv:
             for isdir, path in rpaths(top_path, yield_dirs=True):
-              U.out(path)
-              with Pfx(path):
+              spath = shortpath(path)
+              U.out(spath)
+              with Pfx(shortpath(path)):
                 ont = fstags.ontology(path)
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(path + ' ' + str(autotag))
+                  U.out(spath + ' ' + str(autotag))
                   if ont:
                     autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
@@ -202,7 +203,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                   except OSError:
                     pass
                   else:
-                    direct_tags.add('filesize', S.st_size, ontology=ont)
+                    direct_tags.add('filesize', S.st_size)
                 # update the
                 all_tags = tagged_path.merged_tags()
                 for tag in fstags.cascade_tags(all_tags):
