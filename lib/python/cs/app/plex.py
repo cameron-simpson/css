@@ -74,7 +74,6 @@ class PlexCommand(BaseCommand):
         for filepath in sorted(rfilepaths(srcroot)):
           with Pfx(filepath):
             tags = fstags[filepath].format_tagset()
-            print(filepath)
             print(linkpath(filepath, dstroot, tags, update_mode=update_mode))
 
 @pfx
