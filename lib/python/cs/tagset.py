@@ -936,6 +936,11 @@ class TagSetNamespace(ExtendedNamespace):
           ns._tag = tag
     return ns0
 
+  def __bool__(self):
+    ''' Truthiness: `True` unless the `._bool` attribute overrides that.
+    '''
+    return getattr(self, '_bool', True)
+
   @pfx_method
   def __format__(self, spec):
     ''' Format this node.
@@ -1088,6 +1093,7 @@ class TagSetNamespace(ExtendedNamespace):
             format_placeholder,
             ontology=overtag.ontology if overtag else None
         )
+        subns._bool = False
         self.__dict__[attr] = subns
         return subns
       return super().__getattr__(attr)
