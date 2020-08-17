@@ -1,19 +1,41 @@
 #!/bin/sh
 #
 # Edit something.
-#   - Cameron Simpson <cs@zip.com.au> 02jun2016
+#   - Cameron Simpson <cs@cskk.id.au> 02jun2016
 #
 
 set -ue
 
-if [ $# = 1 ] && [ -d "$1/." ]
+: ${TMPDIR:=/tmp}
+
+tmppfx=$TMPDIR/e.$$
+trap 'rm -f -- "$tmppfx".*' 0 1 3 15
+
+cmd=$0
+usage="Usage:
+  $0            Edit the clipboard.
+  $0 dirname    Edit the filenames in a directory.
+  $0 ...        Invoke editor on ..."
+
+if [ $# = 0 ]
 then
-  erename "$1"/*
+  tmpf=$tmppfx.txt
+  pbpaste >"$tmpf"
+  "$0" "$tmpf"
+  [ -s "$tmpf" ] && pbcopy <"$tmpf"
 else
-  if [ -n "${ITERM_SESSION_ID:-}" ]
+  if [ $# = 1 ] && [ -d "$1/." ]
   then
-    subl ${1+"$@"}
+    cd "$1"
+    fstags edit
+    ##erename -a
   else
-    $EDITOR ${1+"$@"}
+    if [ -n "${ITERM_SESSION_ID:-}" ]
+    then
+      # subl ${1+"$@"}
+      set-x open -n -W "$@"
+    else
+      $EDITOR "$@"
+    fi
   fi
 fi

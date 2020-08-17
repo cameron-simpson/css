@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Update the .md5index file with newer files.
-#	- Cameron Simpson <cs@zip.com.au> 04dec98
+#	- Cameron Simpson <cs@cskk.id.au> 04dec98
 #
 
 : ${TMPDIR:=/tmp}

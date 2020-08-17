@@ -1,0 +1,2 @@
+lib/python/cs/fstags.py: Release information for cs.fstags-20200521.
+lib/python/cs/fstags.py: cs.fstags: fix DISTINFO.install_requires

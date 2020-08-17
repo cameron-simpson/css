@@ -1,0 +1,2 @@
+  lib/python/cs/lex.py: cs.lex: update docstrings, add a couple of doctests
+  lib/python/cs/lex.py: cs.lex: clean some lint

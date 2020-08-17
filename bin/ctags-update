@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Update the tags file from the specified files.
+# Recite the chosen tags file to standard output.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+tags=
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-o tagfile] [--] paths..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -o) tags=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$tags" ] || tags=$( findup tags ) || {
+  echo "$cmd: cannot find tags file and no -o option" >&2
+  exit 1
+}
+
+echo "$tags"
+exec 1>&2
+
+##[ -s "$tags" ] || set --
+set -x
+exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extra=fq ${1+"$@"}

@@ -1,8 +1,8 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Roll messages older than "days" from maildir
 # into archivedir/date/`basename maildir`.
-#       - Cameron Simpson <cs@zip.com.au> 05aug2006
+#       - Cameron Simpson <cs@cskk.id.au> 05aug2006
 #
 
 import sys
@@ -12,9 +12,10 @@ import os
 import stat
 import errno
 import cs.mail
-from cs.logutils import setup_logging, error, warn, cmd
+from cs.logutils import setup_logging, error, warn
 
-setup_logging()
+cmd = sys.argv[0]
+setup_logging(cmd)
 
 fmt='%Y'
 

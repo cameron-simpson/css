@@ -1,0 +1,7 @@
+iphoto fstags_export: accept selectors on the command line
+event selector
+pass original selector text to selector factories as first arg, use in str/repr
+regexp selectors for faces, events, keywords
+use tag as synonym for keyword throughout cmd line
+decode album definitions
+import keywords from /path/to/iphoto-library

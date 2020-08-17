@@ -2,18 +2,19 @@
 #
 # Run a command in a development environment.
 # This means using the current directory as $prefix,
-# prefixing lots of $fooPATH vars with it approriately,
-# sourcing .env.sh if present, then running command.
-#       - Cameron Simpson <cs@zip.com.au> 25apr2007
+# prefixing lots of $fooPATH vars with it appropriately,
+# sourcing the dev .env.sh if present, then running command.
+#       - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
 
 set -ue
 
 trace=${DEBUG:+set-x}
 
-devdir=.
+devdir=
+dev_exec_precmd=
 
-cmd=`basename "$0"`
+cmd=$(basename "$0")
 usage="Usage: $cmd [-d develdir] [-x] [command [args...]]
         -d develdir     Development source dir. Default: current directory.
         -x              Trace invocation of command.
@@ -36,24 +37,33 @@ do
   shift
 done
 
+if [ -z "$devdir" ]
+then
+  devdir=$(findup -d -t "$HOME" .env.sh) || devdir=.
+fi
+
 [ -d "$devdir/." ] || { echo "$cmd: not a directory: $devdir" >&2
                         badopts=1
                       }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-case "$devdir" in /*) ;; *) devdir=`cd "$devdir" && pwd` ;; esac
+case "$devdir" in /*) ;; *) devdir=$(cd "$devdir" && pwd) ;; esac
+venvdir=$devdir/venv
 
+ENV_DEV_DIR=$devdir
 PYTHONPATH=$devdir/lib/python${PYTHONPATH:+:$PYTHONPATH}
 PERL5LIB=$devdir/lib/perl5${PERL5LIB:+:$PERL5LIB}
-MANPATH=$devdir/man:$MANPATH
+MANPATH=$devdir/man${MANPATH:+:$MANPATH}
 LD_LIBRARY_PATH=$devdir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-PATH=$devdir/bin:$PATH
-export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
+PATH=$devdir/bin:$venvdir/bin:$PATH
+export ENV_DEV_DIR PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
+
 [ ! -f "$devdir/.env.sh" ] || . "$devdir/.env.sh"
 
 if [ $# = 0 ]
 then
+  echo "ENV_DEV_DIR=$ENV_DEV_DIR"
   echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
   echo "MANPATH=$MANPATH"
   echo "PATH=$PATH"
@@ -62,4 +72,4 @@ then
   exit
 fi
 
-exec $trace "$@"
+exec $trace $dev_exec_precmd "$@"

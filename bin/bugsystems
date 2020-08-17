@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Report $BUGSYSTEMS, or its default value.
-#	- Cameron Simpson <cs@zip.com.au> 09jan2005
+#	- Cameron Simpson <cs@cskk.id.au> 09jan2005
 #
 : ${USER:=`whoami || id -un`}
 : ${BUGSYSTEMS:="dlog logger mailto:$USER"}

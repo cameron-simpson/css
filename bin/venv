@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convenience tool for virtualenv setups.
-#       - Cameron Simpson <cs@zip.com.au> 07mar2014
+#       - Cameron Simpson <cs@cskk.id.au> 07mar2014
 #
 
 set -ue
@@ -22,6 +22,9 @@ usage="Usage:
     $cmd [version]
     $cmd [version] init [python [venv-dir]]
     $cmd [version] [exec] command [args...]"
+
+trace=
+[ -t 2 ] && trace=set-x
 
 badopts=
 
@@ -50,15 +53,14 @@ case "$op" in
     then  venvdir=$1; shift; set_major=
     else  venvdir=$VENV_DIR/$pyver set_major=1
     fi
-    [ -t 2 ] && set -x
-    mkdir -- "$venvdir"
-    virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
+    $trace mkdir -- "$venvdir"
+    $trace virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
     if [ $set_major ]
     then
       venvdir_up=$( dirname "$venvdir" )
       pyver_major=$( expr "x$pyver" : 'x\([1-9]\)\..*' )
       symlink=$venvdir_up/$pyver_major
-      [ -e "$symlink" ] || ln -s "$pyver" "$symlink"
+      [ -e "$symlink" ] || $trace ln -s "$pyver" "$symlink"
     fi
     exit $?
     ;;
@@ -78,7 +80,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 venvdir=$VENV_DIR/$pyver
+PATH=$venvdir/bin:$PATH
+export PATH
 
-set +u
-. "$venvdir/bin/activate"
-exec "$@"
+exec $trace "$@"

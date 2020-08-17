@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Class to manage a rectangular view of some text.
-#	- Cameron Simpson <cs@zip.com.au> 21aug96
+#	- Cameron Simpson <cs@cskk.id.au> 21aug96
 #
 
 use strict qw(vars);

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Read stdin and report IP addresses with names from /etc/hosts.
+#   - Cameron Simpson <cs@cskk.id.au> 05apr2017
+#
+
+sedf=$(
+    awk '/^[1-9]/ {print(length($1),$0)}' /etc/hosts \
+    | sort -rn \
+    | while read len ip name etc
+      do
+        ipf=$(printf '%s\n' "$ip" | sed 's/\.l$//; s/\./\\&/g')
+        printf '%s\n' "s/\\b$ipf\\b/$name/g"
+      done
+)
+
+exec sed "$sedf"

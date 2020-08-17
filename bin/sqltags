@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+#
+# Run the cs.sqltags module command line mode.
+# - Cameron Simpson <cs@cskk.id.au> 07may2020
+#
+
+import os
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.sqltags import main
+sys.exit(main(sys.argv))

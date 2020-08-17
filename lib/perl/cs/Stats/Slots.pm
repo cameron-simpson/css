@@ -2,7 +2,7 @@
 #
 # A slotted stats object, with fixed-width slots and means for
 # dropping samples across the slots.
-#	- Cameron Simpson <cs@zip.com.au> 30oct96
+#	- Cameron Simpson <cs@cskk.id.au> 30oct96
 #
 
 use strict qw(vars);

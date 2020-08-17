@@ -1,0 +1,8 @@
+#!/usr/bin/sed -f
+#
+# Turn #012 into a newline, used to unfold PHP syslog lines.
+#   - Cameron Simpson <cs@cskk.id.au> 10feb2017
+#
+
+s/#012/\
+/g

@@ -1,13 +1,13 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Flickr tool.
-#       - Cameron Simpson <cs@zip.com.au> 18dec2007
+#       - Cameron Simpson <cs@cskk.id.au> 18dec2007
 #
 
 from cs.flickr import FlickrURL
-from cs.logutils import cmd
 import sys
 
+cmd = sys.argv[0]
 usage="Usage: %s imurl photo-page-URLs\n" % cmd
 
 badopts=False

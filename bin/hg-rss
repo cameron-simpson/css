@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Dump an RSS feed for a Mercurial repository.
-#       - Cameron Simpson <cs@zip.com.au> 07oct2008
+#       - Cameron Simpson <cs@cskk.id.au> 07oct2008
 #
 # TODO: Control port number.
 #       Surely there is a non-socket mode for this?

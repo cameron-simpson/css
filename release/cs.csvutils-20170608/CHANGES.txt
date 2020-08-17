@@ -1,0 +1,6 @@
+  lib/python/cs/csvutils.py: merge default ==> beyonwiz
+  lib/python/cs/csvutils.py: cs.csvutils: recode SharedCSVFile on top if the new much simpler SharedAppendLines
+  lib/python/cs/csvutils.py: cs.csvutils: add missing import
+  lib/python/cs/csvutils.py: cs.csvutils: SharedCSVFile: pass newline=""
+  lib/python/cs/csvutils.py: cs.csvutils: SharedCSVFile now in cs.sharedfile
+  lib/python/cs/csvutils.py: cs.csvutils: remove unused import

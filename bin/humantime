@@ -2,7 +2,7 @@
 #
 # Crudely report a period of seconds in human friendly units.
 # Pulled code from xlo.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 cmd=$0

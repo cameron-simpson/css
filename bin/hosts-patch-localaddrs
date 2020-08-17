@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Patch /etc/hosts (by default) with 127.0.0.n addresses with names from standard input.
-#   - Cameron Simpson <cs@zip.com.au> 10apr2016
+#   - Cameron Simpson <cs@cskk.id.au> 10apr2016
 #
 
 set -ue
@@ -38,18 +38,26 @@ grep '^## BEGIN LOCAL ADDRESSES' "$hosts" >/dev/null \
    >>"$hosts"
 
 n=2
-while read names
+while read name0 names
 do
-  case "$names" in
+  # comments and blank lines
+  case "$name0" in
     '' | \#* )
-      echo "$names"
+      echo "$name0 $names"
       continue
       ;;
   esac
   printf "127.0.0.%d" "$n"
   n=$(expr $n + 1)
+  if [ "x$name0" = xPROXY ]
+  then
+    namesfx=-proxy
+  else
+    namesfx=
+    names="$name0 $names"
+  fi
   for name in $names
-  do  printf " $name$sfx"
+  do  printf " $name$namesfx $name$namesfx$sfx"
   done
   echo
 done \

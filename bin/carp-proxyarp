@@ -7,7 +7,7 @@
 # Note that if the upstream loses internal connectivity then both
 # CARP servers will become masters at the same time.
 # This is bad, unless pfsync is working between them.
-#       - Cameron Simpson <cs@zip.com.au> 30dec2012
+#       - Cameron Simpson <cs@cskk.id.au> 30dec2012
 #
 
 set -ue

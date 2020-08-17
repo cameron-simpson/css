@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Run a command but discard its standard error stream if it succeeds.
+# This is handy for scripts you want to be terse on success but to
+# display the full error output on failure.
+# - Cameron Simpson <cs@cskk.id.au> 07sep2019
+#
+
+set -ue
+
+[ $# -gt 0 ] || {
+  echo "Usage: $0 command [args...]" >&2
+  exit 2
+}
+
+tmpf=${TMPDIR:-/tmp}/stderr.$$
+trap 'rm -f "$tmpf"' 0 1 2 15
+
+xit=0
+"$@" 2>"$tmpf" || {
+  xit=$?
+  cat "$tmpf" >&2
+}
+
+rm -f "$tmpf"
+
+exit $xit

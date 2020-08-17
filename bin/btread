@@ -2,7 +2,7 @@
 #
 # Read a file from a tape written by budtool.
 # This script primarily exists to document the magic blocksize.
-#	- Cameron Simpson <cs@zip.com.au> 27jul98
+#	- Cameron Simpson <cs@cskk.id.au> 27jul98
 #
 
 cmd=`basename "$0"`

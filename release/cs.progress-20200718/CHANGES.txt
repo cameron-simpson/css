@@ -1,0 +1,3 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200716.1.
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: spaces around the arrow field, more readable
+lib/python/cs/progress.py: cs.progress: progressbar: default units_scale=UNSCALED_SCALE

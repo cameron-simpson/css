@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Emit commands for the PortMaster to write the dialback location table.
-#	- Cameron Simpson <cs@zip.com.au> 11jun97
+#	- Cameron Simpson <cs@cskk.id.au> 11jun97
 #
 # Use auto/pmlocs table to preserve IP addrs.
 # Reuse IPs for people with ALTDIALBACK #s.	- cameron 20nov97

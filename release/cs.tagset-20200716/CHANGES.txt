@@ -1,0 +1,6 @@
+lib/python/cs/tagset.py: Release information for cs.tagset-20200521.1.
+lib/python/cs/tagset.py: cs.tagset: pull in TaggedEntity from cs.sqltags and add the .csvrow property and the .from_csvrow factory
+lib/python/cs/tagset.py: cs.tagset: clean some lint, add cs.dateutils to DISTINFO
+lib/python/cs/tagset.py: cs.tagset: fix docstring typo
+lib/python/cs/tagset.py: cs.tagset: improve error reporting
+lib/python/cs/tagset.py: cs.*: update uses of SingletonMixin for new regime: normal __init__ method with a guard against reinitialisation

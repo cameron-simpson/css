@@ -2,7 +2,7 @@
 #
 # Place argument 1 at the right place in a command line and then run
 # the command. This is a tool to support filteredit et al.
-#	- Cameron Simpson <cs@zip.com.au> 17jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 17jul2004
 #
 
 cmd=$0

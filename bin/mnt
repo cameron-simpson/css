@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# Mount a filesystem, print the mountpoint.
+# - Cameron Simpson <cs@cskk.id.au> 22jul2020
+#
+
+set -ue
+
+: ${MNT_BASE:=$HOME/mnt}
+
+umount=
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-u] mount-path
+  -u    Unmount the mount-path.
+  mount-path
+        ssh://host/path
+        Note that the remote path commences _after_ the slash
+        separating the host from the path, so an absolute path will
+        have 2 slashes after the host."
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-u ] && { umount=1; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mount-path" >&2
+  badopts=1
+else
+  mount_path=$1
+  shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$mount_path" in
+  *://*)    type=$( expr "x$mount_path" : 'x\([^:/]*\)://[^/]*/.*' )
+            host=$( expr "x$mount_path" : 'x[^:/]*://\([^/]*\)/.*' )
+            path=$( expr "x$mount_path" : 'x[^:/]*://[^/]*/\(.*\)' )
+            ;;
+  *)        echo "$cmd: unsupported mount_path:: $mount_path" >&2
+            exit 2
+            ;;
+esac
+
+pathbase=$( printf '%s\n' "$path" | sed 's|^//*||; s|//$||; s|//*|__|g' )
+mnt_point=$MNT_BASE/$host/$pathbase
+
+if [ $umount ]
+then
+  set -x
+  umount "$mnt_point"
+  rmdir "$mnt_path"
+else
+  [ -d "$MNT_BASE/$host" ] || set-x mkdir "$MNT_BASE/$host"
+  [ -d "$mnt_point" ] || set-x mkdir "$mnt_point"
+  set -x
+  (
+    set -ue
+    case "$type" in
+      ssh | sshfs )
+        sshfs -o reconnect -- "$host:$path" "$mnt_point"
+        ;;
+      *)echo "$cmd: $mount_point: unsupported type: $type" >&2
+        exit 1
+        ;;
+    esac
+  ) || rmdir "$mnt_point"
+fi

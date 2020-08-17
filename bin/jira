@@ -1,0 +1,156 @@
+#!/bin/sh
+#
+# Convenience wrapper for jira-cli.
+#   - Cameron Simpson <cs@cskk.id.au> 18nov2016
+#
+
+set -ue
+
+jiradir=$HOME/.jira
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$(basename "$0")
+usage="Usage:
+  $cmd [bug] bug-id bug-command...
+  $cmd init username@jiradomain
+  $cmd new project headline-string [-|description-string]"
+
+badopts=
+
+cfgfile=$jiradir/config.ini
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op or bug-id" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case "$op" in
+    bug|init|new)
+      ;;
+    [A-Z]*-[1-9] | [A-Z]*-[0-9]*[0-9])
+      set -- "$op" ${1+"$@"}
+      op=bug
+      ;;
+    *)echo "$cmd: unrecognised operation: $op" >&2
+      badopts=1
+      ;;
+  esac
+  if [ ! $badopts ]
+  then
+    # TODO: load prefix->project mapping
+    case "$op" in
+      bug)
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing bug-id" >&2
+          badopts=1
+        else
+          case "$1" in
+            [A-Z]*-[1-9] | [A-Z]*-[0-9]*[0-9])
+              bug_id=$1
+              shift
+              ;;
+            *)echo "$cmd: $op: does not look like a bug-id: $1" >&2
+              badopts=1
+              ;;
+          esac
+        fi
+        ;;
+      new)
+        # new project headline-string [-|description-string]"
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing project" >&2
+          badopts=1
+        else
+          cfgname=$1
+          shift
+        fi
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing headline-string" >&2
+          badopts=1
+        else
+          headline=$1
+          shift
+        fi
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing description-string" >&2
+          badopts=1
+        else
+          description=$1
+          shift
+        fi
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments after description-string: $*" >&2
+          badopts=1
+        fi
+        ;;
+      *)echo "$cmd: $op: UNIMPLEMENTED" >&2
+        exit 1
+        ;;
+    esac
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+load_config(){
+  _lc_name=$1
+  cfg_domain=
+  cfg_username=
+  cfg_prefix=$_lc_name
+  eval $( winclausevars "$cfgfile" "$_lc_name" cfg )
+  cfg_base_url=${cfg_base_url:=https://$cfg_domain}
+  set | sort | sed -n 's/^cfg_//p' >&2
+}
+
+# jira_cli op
+jira_cli(){
+  _jc_op=$1
+  shift
+  $trace jira-cli "$_jc_op" --jira-url "https://$cfg_domain" --username "$cfg_username" ${1+"$@"} </dev/null
+}
+
+xit=0
+
+case "$op" in
+  # bug bug-id
+  bug)
+    prefix=$( expr "x$bug_id" : 'x\([^-][^-]*\)-.*' )
+    suffix=$( expr "x$bug_id" : 'x[^-][^-]*-\(.*\)' )
+    cfgname=$prefix
+    load_config "$cfgname"
+    bug_id=$cfg_prefix-$suffix
+    jira_cli view --oneline -- "$bug_id"
+    ;;
+  # new prefix headline...
+  new)
+    load_config "$cfgname"
+    if [ "x$description" = x- ]
+    then
+      if [ -t 0 ]
+      then
+        [ -t 2 ] || { echo "$cmd: $op: stderr not a tty, refusing to read interactive text" >&2; exit 1; }
+        description=$( readdottext "Enter desciption for \"$headline\". terminate with a lone dot." )
+      else
+        description=$( cat )
+      fi
+    fi
+    echo jira_cli new --type=Bug --priority=Unprioritised "--project=$cfg_prefix" \
+                 "--description=$description" \
+                 -- \
+                 "$headline"
+    ;;
+  *)echo "$cmd: $op: UNIMPLEMENTED 2" >&2
+    xit=1
+    ;;
+esac
+
+exit $xit

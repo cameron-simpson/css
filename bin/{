@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # {...} meta command for nesting quoted stuff.
-#       - Cameron Simpson <cs@zip.com.au> 14sep2007
+#       - Cameron Simpson <cs@cskk.id.au> 14sep2007
 #
 # TODO: && vs || vs ; precedence
 #

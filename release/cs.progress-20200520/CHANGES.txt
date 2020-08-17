@@ -1,0 +1,4 @@
+lib/python/cs/progress.py: cs.progress: spelling fixes
+lib/python/cs/progress.py: cs.progress: OverProgress.throughput property
+lib/python/cs/progress.py: cs.progress: implement OverProgress.eta, the base class eta is incorrect
+lib/python/cs/progress.py: cs.progress: docstring tweak

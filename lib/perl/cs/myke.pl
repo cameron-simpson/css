@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Myke v3 - myke in perl.
-#	- Cameron Simpson <cs@zip.com.au> 04mar97
+#	- Cameron Simpson <cs@cskk.id.au> 04mar97
 #
 
 ($cmd=$0) =~ s:.*/::;

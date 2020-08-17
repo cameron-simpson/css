@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+#
+# Trite mp4 parser utility based on cs.iso14496.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+import sys
+from os.path import basename
+from cs.iso14496 import main
+
+argv = list(sys.argv)
+argv[0] = basename(argv[0])
+sys.exit(main(argv))

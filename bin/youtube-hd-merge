@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# I spent a lot of time on a very laggy and often congested internet
+# link, so streaming video is not a thing for me. Therefore I download
+# video for viewing later. My youtube download plugin saves HD video
+# as separate .mp4 video and .m4a audio files. This script runs in
+# the save directory and joins all such pairs found together using
+# ffmpeg-merge and, if successful, moves the pair into a DONE
+# subdirectory for later removal.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -uex
+
+cmd=$(basename "$0")
+usage="Usage: $cmd"
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+trace=set-x
+merged=DONE
+
+[ -d "$merged" ] || $trace mkdir "$merged"
+
+xit=0
+
+for audio in *.m4a *.ogg
+do
+  [ -s "$audio" ] || continue
+  case "$audio" in
+    *.ogg)  video=$(basename "$audio" .ogg).webm ;;
+    *.m4a)  video=$(basename "$audio" .m4a).mp4 ;;
+    *)      echo "$cmd: unsupported audio extension: $audio" >&2
+            xit=1
+            continue
+            ;;
+  esac
+  if [ ! -s "$video" ]
+  then
+    echo "$cmd: $audio: missing video: $video" >&2
+    xit=1
+    continue
+  fi
+  output=$( printf '%s\n' "$video" | lc- )
+  if [ -s "$output" ]
+  then
+    echo "$cmd: already exists: $output; skipping $audio and $video" >&2
+    continue
+  fi
+  if $trace ffmpeg-merge "./$output" "./$video" "./$audio"
+  then
+    $trace mv -i "$audio" "$video" "$merged/"
+  else
+    xit=1
+    break
+  fi
+done
+
+exit $xit

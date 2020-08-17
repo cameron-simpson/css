@@ -1,0 +1,1 @@
+  lib/python/cs/sh.py: cs.sh/shqstr: workaround setuptool's slightly dumb console_scripts call of a "main" function

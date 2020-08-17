@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Do HTTP-related client stuff.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -732,7 +732,7 @@ cs::Net::TCP(3), cs::Port(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

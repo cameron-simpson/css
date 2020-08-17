@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Mail reader.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::VDis;

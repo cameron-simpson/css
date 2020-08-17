@@ -2,7 +2,7 @@
 #
 # Tail -f of various inlogspecs, copying the results to the log
 # specified by a logmap logspec.
-#	- Cameron Simpson <cs@zip.com.au>, 27jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 27jul94
 #
 
 $timeout=60;

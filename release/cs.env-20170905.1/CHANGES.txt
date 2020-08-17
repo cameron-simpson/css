@@ -1,0 +1,1 @@
+  lib/python/cs/env.py: cs.env: tweak doco and DISTINFO

@@ -1,0 +1,1 @@
+Have the decorators set .__module__.

@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Put a timestamp of the start of every input line.
+# With a command, use the command's output as the input.
+#   - Cameron Simpson <cs@cskk.id.au> 08apr2017
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [[fds] command [args...]]
+  fds     Process the specified file descriptors instead of just
+          the command's stdout. Requires the command."
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [0-9]*)
+      fds=$1
+      [ $# -gt 0 ] || {
+        echo "$cmd: missing command after \"2\"" >&2
+        exit 2
+      }
+      shift
+      exec filter_fd "$fds" "$0" "$@"
+      ;;
+  esac
+  "$@" | "$0"
+  exit $?
+fi
+
+while read -r line
+do  now=$( date )
+    printf '%s: %s\n' "$now" "$line"
+done
+
+exit 0

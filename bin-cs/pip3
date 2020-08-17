@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Run pip by invoking "python3 -m pip", suggestion by Mats Wichmann.
+# - Cameron Simpson <cs@cskk.id.au> 03may2019
+#
+
+set -ue
+py3=$( which python3 )
+set -x
+exec "$py3" -m pip ${1+"$@"}

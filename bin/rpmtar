@@ -2,7 +2,7 @@
 #
 # Emit a tar file on stdout containing the files supplied by
 # the named RPMs.
-#	- Cameron Simpson <cs@zip.com.au> 21oct2004
+#	- Cameron Simpson <cs@cskk.id.au> 21oct2004
 #
 
 cmd=`basename "$0"`

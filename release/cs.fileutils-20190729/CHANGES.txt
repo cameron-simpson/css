@@ -1,0 +1,1 @@
+lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: make `offset` optional, defaulting to fd position at call, update docstring

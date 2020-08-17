@@ -1,0 +1,4 @@
+New SubLater class to provide a grouping for deferred functions and an iteration to collect them as they complete.
+Drop WorkerThreadPool (leaks idle Threads, brings little benefit).
+Later: drop worker queue thread and semaphore, just try a dispatch on submit or complete.
+Later: drop tracking code. Drop capacity context manager, never used.

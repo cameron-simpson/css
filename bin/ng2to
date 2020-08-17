@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -nf
 #
 # Create a To: line with ng@usenet for use in mutt.
-#	- Cameron Simpson <cs@zip.com.au> 09jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 09jun2002
 #
 
 :top

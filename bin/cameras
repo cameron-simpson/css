@@ -1,0 +1,203 @@
+#!/bin/sh
+#
+# Poll and process IP camera snapshots.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cfg=$HOME/.cameras
+trace=
+[ -t 2 ] && trace=set-x
+once=
+
+cfgnames(){
+  [ $# = 1 ] || {
+    echo "$cmd: cfgnames: expected config file name" >&2
+    return 2
+  }
+  awk '$1 ~ /^[^#]/ { print $1 }' "$1" | keepfirst | tr '\012' ' '
+}
+
+cfgline(){
+  [ $# = 2 ] || {
+    echo "$cmd: cfgline: expected config file name and clause name" >&2
+    return 2
+  }
+  awk -v "name=$2" '$1 == name { print; exit 0; } END { exit 1; }' "$1"
+}
+
+cmd=$0
+usage="Usage: $cmd [-1] [-f cfg] [--] op [args...]
+  -1        Once. Process or collate only one date.
+  -f cfg    Specify the comfig file.
+            Default: $cfg
+  Operations:
+    collate [names...]
+      Move all snapshot images prior to today into subdirectories by day.
+    poll [names...]
+      Fetch camera images.
+    process [{name|directory}...]
+      Compile per-day MP4 files for all collated subdirectories."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -1) once=1 ;;
+    -f) cfg=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ -s "$cfg" ] || {
+  echo "$cmd: missing config file: $cfg" >&2
+  badopts=1
+}
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case $op in
+    collate | poll | process )
+        names=$*
+        ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -n "$names" ] || names=$( cfgnames "$cfg" )
+
+xit=0
+
+# process the named configurations
+for name in $names
+do
+  dir= url=
+  case "$name" in
+    /*)
+      dir=$name
+      ;;
+    *)
+      set -- $( cfgline "$cfg" "$name" )
+      dir=$2 url=$3
+      ;;
+  esac
+  [ -n "$dir" ] || {
+    echo "$cmd: no clause for name \"$name\"" >&2
+    xit=1
+    continue
+  }
+  [ -d "$dir/" ] || {
+    echo "$cmd: not a directory: $dir" >&2
+    xit=1
+    continue
+  }
+
+  # make paths absolute
+  case "$dir" in
+    /*) ;; *) dir=$(pwd)/$dir ;;
+  esac
+  collated=$dir/collated
+  compiled=$dir/compiled
+  snapshots=$dir/snapshots
+
+  (
+    set -ue
+    cd "$dir"
+    case "$op" in
+      poll)
+            [ -n "$url" ] || {
+              echo "$cmd: $name: no URL" >&2
+              exit 1
+            }
+            [ -d "$snapshots/" ] || $trace mkdir "$snapshots"
+            timestamp=$( date +%Y-%m-%d-%H:%M:%S )
+            $trace wget -q -O "$snapshots/$timestamp.jpg" "$url"
+            ;;
+      collate)
+            pwd
+            [ -d "$collated/" ] || $trace mkdir "$collated"
+            (
+              set -ue
+              cd "$snapshots"
+              pwd
+              for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
+              do
+                ddir=$collated/$date
+                [ -d "$ddir" ] || $trace mkdir "$ddir"
+                echo "mv $date-*.jpg $ddir/ ..." >&2
+                mv "$date"-*.jpg "$ddir/"
+                [ $once ] && break
+              done
+            )
+            ;;
+      process)
+            pwd
+            [ -d "$compiled/" ] || $trace mkdir "$compiled"
+            (
+              set -ue
+              cd "$collated"
+              xit=0
+              for date in $( ls -rd 20??-??-?? )
+              do
+                [ -d "$date" ] || continue
+                video=$date.mp4
+                ls -ldL "$video" 2>/dev/null && continue
+                (
+                  set -ue
+                  cd "$date"
+                  pwd
+                  # delete empty files
+                  find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
+                  set -- "$date-"*.jpg
+                  [ -s "$1" ] || {
+                    echo "$date: no .jpg files" >&2
+                    exit 0
+                  }
+                  # make nnnnn.jpg names for ffmpeg to process
+                  ls \
+                  | awk "/^$date"'-.*\.jpg$/ { printf("ln %s %05d.jpg\n", $1, n++); }' \
+                  | sh -ue
+                  # get video size from first image
+                  size=$(
+                    set -- "$date"-*jpg
+                    ls -ld "$1" >&2
+                    { gm identify "$1" || identify "$1"; } \
+                    | tee /dev/fd/2 \
+                    | awk '{print$3}' | sed 's/+.*//'
+                  )
+                  $trace ffmpeg -r 4 -s "$size" -i '%05d.jpg' "$video"
+                  # clean out the nnnnn.jpg files
+                  rm [0-9][0-9][0-9][0-9][0-9].jpg
+                  $trace touch -d "$date" "$video"
+                  $trace mv "$video" "$compiled/"
+                ) || {
+                  echo "VIDEO FAILED FOR $video" >&2
+                  xit=1
+                }
+                [ $once ] && break
+              done
+              exit $xit
+            )
+            ;;
+      *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
+    esac
+  ) || xit=1
+done
+
+exit $xit

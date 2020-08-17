@@ -1,0 +1,1 @@
+  lib/python/cs/rfc2047.py: cs.rfc2047: change final .decode to use "replace"; fix a bunch of warning format strings

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check presence or absense of timesheet reports.
-#	- Cameron Simpson <cs@zip.com.au> 15jan97
+#	- Cameron Simpson <cs@cskk.id.au> 15jan97
 #
 
 sheetcode=`sheetcode`
