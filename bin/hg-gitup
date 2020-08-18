@@ -1,6 +1,8 @@
 #!/bin/sh
 #
-# "hg push" to 
+# Update a git repo from the local Mercurial repo.
+# - Cameron Simpson <cs@cskk.id.au> 19aug2020
+#
 
 set -ue
 
@@ -9,7 +11,8 @@ usage="Usage: $cmd hg-path [hg-branch...]
   Push hg changesets to a git repo via the hggit extension.
     hg-path The mercurial remote path.
     hg-branch[:git-branch]
-            Mercurial branches to push, with optional corresponding git branch."
+            Mercurial branches to push, with optional corresponding git branch.
+            The default is the current branch and tip."
 
 trace=command
 [ -t 2 ] && trace=set-x
