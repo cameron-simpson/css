@@ -7,8 +7,9 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd hg-path [hg-branch...]
+usage="Usage: $cmd [-f] [--] hg-path [hg-branch...]
   Push hg changesets to a git repo via the hggit extension.
+    -f      Force push, passed to \"git push\".
     hg-path The mercurial remote path.
     hg-branch[:git-branch]
             Mercurial branches to push, with optional corresponding git branch.
@@ -16,8 +17,22 @@ usage="Usage: $cmd hg-path [hg-branch...]
 
 trace=command
 [ -t 2 ] && trace=set-x
+git_push_opts=
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -f) git_push_opts="$git_push_opts -f" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -78,8 +93,8 @@ pushrev(){
   }
   ( set -ue
     local_refspec=$1 upstream_repo=$2 upstream_branch=$3
-    git push --atomic "$upstream_repo" "$local_refspec:refs/heads/$upstream_branch"
-  )
+    git push $git_push_opts --atomic "$upstream_repo" "$local_refspec:refs/heads/$upstream_branch"
+  ) </dev/null
 }
 
 # update the git tree
@@ -96,14 +111,26 @@ do
     *)      git_branch=$hg_branch
             ;;
   esac
-  for gitrev in $($trace hg-revs -T '{gitnode}\n' "heads(branch(\"$hg_branch\"))")
-  do
-    pushrev "$gitrev" "$git_repo" "$git_branch" || {
-      echo "$cmd: branch $hg_branch: git rev $gitrev -> $git_repo $git_branch FAILS" >&2
-      xit=1
-      break
-    }
-  done
+  $trace hg-revs -T '{rev} {node} {gitnode} {desc|firstline}\n' "heads(branch(\"$hg_branch\"))" \
+  | sort -rn \
+  | (
+    xit=0
+    n=0
+    while read -r rev node gitrev desc
+    do
+      n=$(( n + 1 ))
+      case "$n" in
+        1)  git_push_branch=$git_branch ;;
+        *)  git_push_branch=$git_branch-$n ;;
+      esac
+      pushrev "$gitrev" "$git_repo" "$git_push_branch" || {
+        echo "$cmd: branch $hg_branch: git rev $gitrev -> $git_repo $git_branch FAILS" >&2
+        xit=1
+        break
+      }
+    done
+    exit $xit
+  ) || xit=1
 done
 
 exit $xit
