@@ -21,7 +21,11 @@ def main(argv=None):
   CMD = cmd
   usage = USAGE % (cmd,)
   do_colour = sys.stdout.isatty()
+  pathses = None
   badopts = False
+  if argv and argv[0] == '-f':
+    pathses=[['-']]
+    argv=argv[2:]
   if not argv:
     print("%s: missing paterrns" % (cmd,), file=sys.stderr)
     badopts = True
@@ -30,7 +34,8 @@ def main(argv=None):
     ptns = []
     for pattern in patterns:
       ptns.append(re.compile(pattern, re.I))
-  pathses = [ pathsof(path) for path in os.environ.get('TELNOS', expanduser('~/rc/telnos')).split(':') if path ]
+  if pathses is None:
+    pathses = [ pathsof(path) for path in os.environ.get('TELNOS', expanduser('~/rc/telnos')).split(':') if path ]
   paths = []
   for pathses0 in pathses:
     paths.extend(pathses0)
@@ -38,7 +43,9 @@ def main(argv=None):
     print(usage, file=sys.stderr)
     return 2
   for path in paths:
-    if path.endswith('.gpg'):
+    if path == '-':
+      lines = txtfrom(sys.stdin)
+    elif path.endswith('.gpg'):
       lines = gpgfrom(path)
     else:
       lines = txtfrom(path)
@@ -58,7 +65,7 @@ def main(argv=None):
   return 0
 
 def pathsof(path):
-  if isfile(path):
+  if path == '-' or isfile(path):
     yield path
   elif isdir(path):
     for dirpath, dirnames, filenames in os.walk(path):
