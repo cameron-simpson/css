@@ -51,7 +51,7 @@ fi
 (
   for host in $(hostlist "$hostlist")
   do
-    pfx "$host" $trace rsync "$@" "$userpfx$host:$dst" &
+    pfx "$userpfx$host:$dst" $trace rsync "$@" "$userpfx$host:$dst" &
   done
   wait
 )

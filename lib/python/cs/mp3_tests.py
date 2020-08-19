@@ -17,6 +17,8 @@ from .x import X
 TESTFILE = 'TEST.mp3'
 
 class Test_MP3(unittest.TestCase):
+  ''' Tests for `cs.mp3`.
+  '''
 
   @unittest.skipUnless(os.path.exists(TESTFILE), 'no ' + TESTFILE)
   def test(self):

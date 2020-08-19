@@ -4,28 +4,22 @@
 from __future__ import print_function
 import os.path
 from cmd import Cmd
-import csv
 import fnmatch
 import re
 import sys
 from types import SimpleNamespace as NS
-if sys.hexversion < 0x02060000:
-  from sets import Set as set
 import itertools
 from getopt import GetoptError
 from threading import RLock
-from threading import Thread
 from collections import namedtuple
-from cs.debug import RLock, trace
-from cs.excutils import unimplemented, transmute
+##from cs.debug import RLock
+from cs.excutils import unimplemented
 from cs.lex import parseUC_sAttr
-from cs.logutils import D, error, warning, info, debug, exception
-from cs.pfx import Pfx
-from cs.py.func import derived_property
+from cs.logutils import error, warning, info, debug, exception
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes, unicode
 from cs.seq import the, get0
 from cs.threads import locked
-from cs.x import X
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -66,7 +60,10 @@ def nodekey(*args):
         # (TYPE, NAME)
         t, name = item
     else:
-      raise ValueError("nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, ))
+      raise ValueError(
+          "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" %
+          (args,)
+      )
 
     if type(t) not in StringTypes:
       raise ValueError("expected TYPE to be a string: %r" % (t,))
@@ -103,7 +100,7 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    self._lock = self.node._lock
+    self._lock = None if node is None else node._lock
 
   def __str__(self):
     return str(list(self))
@@ -176,13 +173,15 @@ class _AttrList(list):
     if isinstance(index, int):
       ovalues = (self[index],)
       values = (value,)
-      index = slice(index, index+1)
+      index = slice(index, index + 1)
     elif isinstance(index, slice):
       ovalues = itertools.islice(self, index.start, index.stop, index.step)
       values = list(value)
     else:
-      raise TypeError("expected index to be int or slice, got %s: %s[%r] = %s"
-                      % (type(index), self, index, value))
+      raise TypeError(
+          "expected index to be int or slice, got %s: %s[%r] = %s" %
+          (type(index), self, index, value)
+      )
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
@@ -192,6 +191,7 @@ class _AttrList(list):
   try:
     _list_clear = list.clear
   except AttributeError:
+
     def _list_clear(self):
       list.__setslice__(self, 0, sys.maxint, ())
 
@@ -201,6 +201,7 @@ class _AttrList(list):
     if len(self):
       self._list_clear()
       self.nodedb._revision += 1
+
   _scrub = _scrub_local
 
   def _scrub_backend(self):
@@ -300,7 +301,7 @@ class _AttrList(list):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      hits = itertools.chain(*[ N[k] for N in self ])
+      hits = itertools.chain(*[N[k] for N in self])
       if plural:
         return _AttrList(node=None, attr=k, _items=hits)
       try:
@@ -376,13 +377,13 @@ class Node(dict):
   def __hash__(self):
     ''' Hash function, based on name, type and nodedb id.
     '''
-    return hash(self.name)^hash(self.type)^id(self.nodedb)
+    return hash(self.name) ^ hash(self.type) ^ id(self.nodedb)
 
   def __call__(self, name):
     if self.name == '_':
       # this Node is the "type" metanode
       # .TYPE(key) is the at-need factory for a node
-      return self.nodedb.make( (self.type, name) )
+      return self.nodedb.make((self.type, name))
     raise TypeError("only the NodeDB.TYPE metanode is callable")
 
   @unimplemented
@@ -460,7 +461,7 @@ class Node(dict):
     return "%s:%s:%s" % (self.type, self.name, dict.__repr__(self))
 
   def __str__(self):
-    return self.type+":"+self.name
+    return self.type + ":" + self.name
 
   def html(self, prefix, label=None, ext=None):
     ''' An HTML token to transcribe for this Node.
@@ -482,7 +483,7 @@ class Node(dict):
         return c
     except AttributeError:
       return 1
-    return cmp( id(self), id(other) )
+    return cmp(id(self), id(other))
 
   def __eq__(self, other):
     ''' Two Nodes are equal if their name and type are equal.
@@ -509,7 +510,9 @@ class Node(dict):
       if default is None:
         default = ()
       values = _AttrList(self, k, _items=default)
-      dict.__setitem__(self, k, values) # ensure that this is what gets used later
+      dict.__setitem__(
+          self, k, values
+      )  # ensure that this is what gets used later
     return values
 
   __getitem__ = get
@@ -528,7 +531,7 @@ class Node(dict):
     values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
-      values[:]=[]
+      values[:] = []
     new_values = list(new_values)
     if len(new_values):
       values.extend(new_values)
@@ -553,9 +556,11 @@ class Node(dict):
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k and not plural:
-        return _AttrList(node=None, attr=None,
-                         _items=[ N for N, a, c in self.references(type=k) ]
-                        )
+        return _AttrList(
+            node=None,
+            attr=None,
+            _items=[N for N, a, c in self.references(type=k)]
+        )
 
     # .ATTR and .ATTRs
     k, plural = parseUC_sAttr(attr)
@@ -566,10 +571,13 @@ class Node(dict):
       if len(values) == 1:
         return values[0]
       if self.nodedb._noNode is None:
-        raise AttributeError("%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values)))
+        raise AttributeError(
+            "%s.%s (values=%s %s, len=%s)" %
+            (self, attr, type(values), values, len(values))
+        )
       return self.nodedb._noNode
 
-    raise AttributeError(str(self)+'.'+repr(attr))
+    raise AttributeError(str(self) + '.' + repr(attr))
 
   def __setattr__(self, attr, value):
     ''' Support .ATTR[s] = value[s].
@@ -582,7 +590,8 @@ class Node(dict):
 
     k, plural = parseUC_sAttr(attr)
     if k:
-      # .ATTR[s] = value
+      # .ATTR = value
+      # .ATTRs = values
       if not plural:
         value = (value,)
       self[k] = value
@@ -616,7 +625,7 @@ class Node(dict):
           error("ignore non-ATTRs: %s", attr)
           continue
         if k not in self:
-          info("new .%s=%s", k+'s', new_attrs[attr])
+          info("new .%s=%s", k + 's', new_attrs[attr])
           self[k] = new_attrs[attr]
 
       # change or possibly remove old attributes
@@ -675,20 +684,20 @@ class Node(dict):
       # so we use curly_substitute below
       from cs.curlytplt import CurlyTemplate, EvalMapping
       T = CurlyTemplate(s)
-      M = EvalMapping(locals={ 'self': self, 'NL': "\n" })
+      M = EvalMapping(locals={'self': self, 'NL': "\n"})
       return T.safe_substitute(M) if safe else T.substitute(M)
 
     from cs.curlytplt import curly_substitute, EvalMapping
-    M = EvalMapping(locals={ 'self': self })
+    M = EvalMapping(locals={'self': self})
     with Pfx(str(self)):
       mapfn = lambda foo: M[foo]
-      return ''.join( [ curly_substitute(line,
-                                         mapfn = lambda foo: M[foo],
-                                         safe=safe,
-                                         permute=True)
-                        for line in s.splitlines(True)
-                      ]
-                    )
+      return ''.join(
+          [
+              curly_substitute(
+                  line, mapfn=lambda foo: M[foo], safe=safe, permute=True
+              ) for line in s.splitlines(True)
+          ]
+      )
 
   def safe_substitute(self, s):
     return self.substitute(s, safe=True)
@@ -725,7 +734,7 @@ class _NoNode(Node):
 
 class NodeDB(dict):
 
-  _key = ('_', '_')     # index of metadata node
+  _key = ('_', '_')  # index of metadata node
 
   def __init__(self, backend, readonly=False, type_factories=None):
     dict.__init__(self)
@@ -777,7 +786,7 @@ class NodeDB(dict):
     ''' Apply an update to the NodeDB values without updating the backend.
     '''
     do_append, t, name, attr, values = update
-    N = self.make( (t, name) )
+    N = self.make((t, name))
     if do_append:
       # simple append of values
       N[attr]._extend_local(values)
@@ -811,10 +820,7 @@ class NodeDB(dict):
           .frombytes function to compute a value from the binary form
     '''
 
-    def __init__(self,
-                   t, scheme,
-                   totext, fromtext,
-                   tobytes, frombytes):
+    def __init__(self, t, scheme, totext, fromtext, tobytes, frombytes):
       '''
       '''
       self.type = t
@@ -824,10 +830,9 @@ class NodeDB(dict):
       self.tobytes = tobytes
       self.frombytes = tobytes
 
-  def register_attr_type(self,
-                         t, scheme,
-                         totext, fromtext,
-                         tobytes=None, frombytes=None):
+  def register_attr_type(
+      self, t, scheme, totext, fromtext, tobytes=None, frombytes=None
+  ):
     ''' Register an attribute value type for storage and retrieval in this
         NodeDB. This permits the storage of values that are not
         presupported: strings, non-negative integers and Nodes.
@@ -851,9 +856,9 @@ class NodeDB(dict):
       tobytes = lambda v: totext(v).encode('utf-8')
     if frombytes is None:
       frombytes = lambda bs: fromtext(bs.decode('utf-8'))
-    R = NodeDB.__AttrTypeRegistration(t, scheme,
-                                  totext, fromtext,
-                                  tobytes, frombytes)
+    R = NodeDB.__AttrTypeRegistration(
+        t, scheme, totext, fromtext, tobytes, frombytes
+    )
     reg[t] = R
     sch[scheme] = R
 
@@ -873,7 +878,7 @@ class NodeDB(dict):
     return self.__nodesByType.get(t, ())
 
   def nodeByTypeName(self, t, name, doCreate=False):
-    N = self.get( (t, name), doCreate=doCreate )
+    N = self.get((t, name), doCreate=doCreate)
     if N is None:
       raise KeyError("no Node with key (%s,%s)" % (t, name))
     return N
@@ -897,8 +902,9 @@ class NodeDB(dict):
     ''' Return a list of the types in use.
     '''
     byType = self.__nodesByType
-    return [ t for t in byType.keys() if byType[t] ]
+    return [t for t in byType.keys() if byType[t]]
 
+  @pfx_method
   def __contains__(self, item):
     key = self.nodekey(item)
     return dict.__contains__(self, key)
@@ -929,7 +935,7 @@ class NodeDB(dict):
         # return Nodes of this type
         return self.__nodesByType.get(k, ())
       else:
-        return self.make( (k, '_') )
+        return self.make((k, '_'))
     return getattr(super(NodeDB, self), attr)
 
   def __getitem__(self, item):
@@ -1009,6 +1015,7 @@ class NodeDB(dict):
 
     return t, name
 
+  @pfx_method
   def newNode(self, *args):
     ''' Create and register a new Node.
         Subclasses of NodeDB should override _createNode, not this method.
@@ -1018,7 +1025,7 @@ class NodeDB(dict):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
-      self[t, name] = N
+      assert (t, name) in self
     return N
 
   @locked
@@ -1063,7 +1070,7 @@ class NodeDB(dict):
     '''
     if t is None:
       t = '_'
-    return self.make( (t, '_') ).seqNode()
+    return self.make((t, '_')).seqNode()
 
   def otherDB(self, dburl):
     ''' Take a database URL or sequence number and return:
@@ -1092,7 +1099,9 @@ class NodeDB(dict):
       if Ndb.SEQs == ss:
         return NodeDBFromURL(Ndb.URL)
 
-    raise ValueError("unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs))
+    raise ValueError(
+        "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
+    )
 
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
@@ -1108,9 +1117,11 @@ class NodeDB(dict):
     if attr:
       m = re_NAME.match(valuetxt)
       if m and m.group() == valuetxt:
-        if attr == "SUB"+node.type:
+        if attr == "SUB" + node.type:
           try:
-            value = self.nodeByTypeName(node.type, m.group(), doCreate=doCreate)
+            value = self.nodeByTypeName(
+                node.type, m.group(), doCreate=doCreate
+            )
           except ValueError:
             value = m.group()
         else:
@@ -1137,7 +1148,7 @@ class NodeDB(dict):
       # If value.type == FOO, Node is of type FOO and attr is SUBFOO,
       #   just write the value Node name
       if attr:
-        if attr == "SUB"+node.type and value.type == node.type:
+        if attr == "SUB" + node.type and value.type == node.type:
           return value.name
         # If value.type == FOO and attr == FOO,
         #   just write the value Node name
@@ -1149,7 +1160,7 @@ class NodeDB(dict):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external Unicode string storage.
+    r''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1171,7 +1182,7 @@ class NodeDB(dict):
       if not isinstance(value, unicode):
         value = unicode(value, 'iso8859-1')
       if value.startswith(':'):
-        return u':'+value
+        return u':' + value
       return value
     t = type(value)
     if t is int:
@@ -1185,7 +1196,7 @@ class NodeDB(dict):
     raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
-    ''' Convert a stored string into a value.
+    r''' Convert a stored string into a value.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1233,7 +1244,7 @@ class NodeDB(dict):
     if typenames is None:
       typenames = sorted(self.types)
     for t in typenames:
-      nodes = sorted(getattr(self, t+'s'), by_name)
+      nodes = sorted(getattr(self, t + 's'), by_name)
       for N in nodes:
         yield N
 
@@ -1269,7 +1280,7 @@ class NodeDB(dict):
     for N in nodes:
       attrmap = {}
       for attr, values in N.items():
-        attrmap[attr] = [ self.totext(value) for value in values ]
+        attrmap[attr] = [self.totext(value) for value in values]
       yield N.type, N.name, attrmap
 
   def apply_nodedata(self, nodedata, doCreate=True, doExtend=False, raw=False):
@@ -1283,14 +1294,14 @@ class NodeDB(dict):
       for t, name, attrmap in nodedata:
         debug("%s:%s", t, name)
         if doCreate:
-          N = self.make( (t, name) )
+          N = self.make((t, name))
         else:
           N = self[t, name]
         mapping = {}
         for attr, values in attrmap.items():
           ##debug("set %s:%s.%s", t, name, attr)
           if not raw:
-            values = [ self.fromtext(value) for value in values ]
+            values = [self.fromtext(value) for value in values]
           if doExtend:
             mapping[attr].extend(values)
           else:
@@ -1310,22 +1321,27 @@ class NodeDB(dict):
           t, n = nodekey(word)
         if '*' in t or '?' in t:
           debug("fnmatch(..,%s) against %s", t, list(self.types))
-          typelist = sorted([ _ for _ in self.types if fnmatch.fnmatch(_, t) ])
+          typelist = sorted([_ for _ in self.types if fnmatch.fnmatch(_, t)])
         else:
           debug("literal \"%s\"", t)
-          typelist = (t, )
+          typelist = (t,)
         debug("type list = %s", typelist)
         for t in typelist:
           if '*' in n or '?' in n:
-            namelist = sorted([ N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n) ])
+            namelist = sorted(
+                [N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n)]
+            )
           else:
-            namelist = (n, )
+            namelist = (n,)
           if not namelist:
             warning("no Nodes of type \"%s\"", t)
           for name in namelist:
-            N = self.get( (t, name), doCreate=doCreate )
+            N = self.get((t, name), doCreate=doCreate)
             if N is None:
-              warning("%s:%s: skip missing node (probably has no attributes)", t, name)
+              warning(
+                  "%s:%s: skip missing node (probably has no attributes)", t,
+                  name
+              )
             else:
               yield N
 
@@ -1350,20 +1366,27 @@ class NodeDB(dict):
       raise GetoptError("missing dburl")
     dburl = args.pop(0)
     if len(args) > 0:
-      raise GetoptError("extra arguments after dburl '%s': %s" % (dburl, " ".join(args)))
+      raise GetoptError(
+          "extra arguments after dburl '%s': %s" % (dburl, " ".join(args))
+      )
     DB2 = NodeDBFromURL(dburl, readonly=True)
     nodes1 = list(self.default_dump_nodes())
     for N in nodes1:
       t, name = N.type, N.name
-      N2 = DB2.get( (t, name), {} )
+      N2 = DB2.get((t, name), {})
       attrs = N.keys()
       attrs.sort()
       for attr in attrs:
         values = N[attr]
         ovalues = N2.get(attr, ())
         if values != ovalues:
-          fp.write("set %s:%s %s=%s\n" % (t, name, attr,
-                                          ",".join( [ self.totoken(V, node=N2, attr=attr) for V in values ] )))
+          fp.write(
+              "set %s:%s %s=%s\n" % (
+                  t, name, attr, ",".join(
+                      [self.totoken(V, node=N2, attr=attr) for V in values]
+                  )
+              )
+          )
     return xit
 
   def cmd_dump(self, args, fp=None):
@@ -1383,7 +1406,7 @@ class NodeDB(dict):
         if not first:
           fp.write('\n')
         node.textdump(fp)
-        first=False
+        first = False
     return xit
 
   def cmd_dumpwide(self, args, fp=None):
@@ -1484,11 +1507,11 @@ class NodeDB(dict):
     '''
     if len(args) == 0:
       raise GetoptError("missing TYPE:key")
-    key=args.pop(0)
+    key = args.pop(0)
     with Pfx(key):
       if ':' not in key:
         raise GetoptError("bad key")
-      nodetype, name = key.split(':',1)
+      nodetype, name = key.split(':', 1)
       if not nodetype.isupper():
         raise GetoptError("bad key type \"%s\"" % nodetype)
       N = self.newNode(nodetype, name)
@@ -1541,11 +1564,11 @@ class NodeDB(dict):
 
     @property
     def usage(self):
-      usage="Usage:"
-      for command in sorted([ command[3:] for command in set(self.get_names())
-                                          if command.startswith('do_')
-                            ]):
-        fn = getattr(self, 'do_'+command)
+      usage = "Usage:"
+      for command in sorted([command[3:]
+                             for command in set(self.get_names())
+                             if command.startswith('do_')]):
+        fn = getattr(self, 'do_' + command)
         fndoc = fn.__doc__
         if fndoc:
           fndoc = fndoc.rstrip()
@@ -1557,19 +1580,24 @@ class NodeDB(dict):
     def get_names(self):
       names = Cmd.get_names(self)
       # add do_* for cmd_* names in nodedb
-      names.extend( 'do_'+name[4:] for name in dir(self._nodedb) if name.startswith('cmd_') )
+      names.extend(
+          'do_' + name[4:]
+          for name in dir(self._nodedb)
+          if name.startswith('cmd_')
+      )
       return names
 
     def __getattr__(self, attr):
       if attr.startswith('do_'):
         op = attr[3:]
         try:
-          fn = getattr(self._nodedb, 'cmd_'+op)
+          fn = getattr(self._nodedb, 'cmd_' + op)
         except AttributeError:
           # fall back to superclass
           pass
         else:
           from .text import get_commatexts
+
           def do_op(argline):
             try:
               args = list(get_commatexts(argline))
@@ -1584,6 +1612,7 @@ class NodeDB(dict):
                 except ValueError as e:
                   exception(str(e))
             return False
+
           do_op.__doc__ = fn.__doc__
           return do_op
       return Cmd.__getattr__(self, attr)
@@ -1612,14 +1641,14 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     base = os.path.basename(url)
     _, ext = os.path.splitext(base)
     if ext == '.csv':
-      return NodeDBFromURL('file-csv://'+url, readonly=readonly, klass=klass)
+      return NodeDBFromURL('file-csv://' + url, readonly=readonly, klass=klass)
     if ext == '.kch':
-      return NodeDBFromURL('file-kch://'+url, readonly=readonly, klass=klass)
+      return NodeDBFromURL('file-kch://' + url, readonly=readonly, klass=klass)
     if ext == '.tch':
-      return NodeDBFromURL('file-tch://'+url, readonly=readonly, klass=klass)
+      return NodeDBFromURL('file-tch://' + url, readonly=readonly, klass=klass)
     if ext == '.sqlite':
-      return NodeDBFromURL('sqlite://'+url, readonly=readonly, klass=klass)
-    raise ValueError("unsupported NodeDB URL: "+url)
+      return NodeDBFromURL('sqlite://' + url, readonly=readonly, klass=klass)
+    raise ValueError("unsupported NodeDB URL: " + url)
 
   markpos = url.find('://')
   if markpos > 0:
@@ -1664,13 +1693,19 @@ def NodeDBFromURL(url, readonly=False, klass=None):
 
   if os.path.isfile(url):
     if url.endswith('.csv'):
-      return NodeDBFromURL('file-csv://'+os.path.abspath(url), readonly=readonly, klass=klass)
+      return NodeDBFromURL(
+          'file-csv://' + os.path.abspath(url), readonly=readonly, klass=klass
+      )
     if url.endswith('.kch'):
-      return NodeDBFromURL('file-kch://'+os.path.abspath(url), readonly=readonly, klass=klass)
+      return NodeDBFromURL(
+          'file-kch://' + os.path.abspath(url), readonly=readonly, klass=klass
+      )
     if url.endswith('.tch'):
-      return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly, klass=klass)
+      return NodeDBFromURL(
+          'file-tch://' + os.path.abspath(url), readonly=readonly, klass=klass
+      )
 
-  raise ValueError("unsupported NodeDB URL: "+url)
+  raise ValueError("unsupported NodeDB URL: " + url)
 
 if __name__ == '__main__':
   import cs.nodedb.node_tests

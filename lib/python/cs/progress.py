@@ -13,10 +13,12 @@ import functools
 import time
 from cs.logutils import warning, exception
 from cs.seq import seq
-from cs.units import transcribe_time, transcribe, BINARY_BYTES_SCALE
-from cs.upd import Upd
+from cs.units import (
+    transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
+)
+from cs.upd import Upd, print as upd_print
 
-__version__ = '20200627-post'
+__version__ = '20200718.3-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -257,11 +259,13 @@ class BaseProgress(object):
     if throughput is None:
       return left
     if throughput == 0:
-      if self.position >= self.total:
+      if self.total is not None and self.position >= self.total:
         left += ': idle'
         return left
       left += ': stalled'
     else:
+      if throughput >= 10:
+        throughput = int(throughput)
       left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
     if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
@@ -272,12 +276,12 @@ class BaseProgress(object):
     if self.total is None:
       arrow_field = ' '
     else:
-      arrow_width = width - len(left) - len(right)
+      arrow_width = width - len(left) - len(right) - 2
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
       else:
-        arrow_field = self.arrow(arrow_width)
+        arrow_field = ' ' + self.arrow(arrow_width) + ' '
     return left + arrow_field + right
 
   def bar(  # pylint: disable=blacklisted-name,too-many-arguments
@@ -290,6 +294,8 @@ class BaseProgress(object):
       statusfunc=None,
       incfirst=False,
       width=None,
+      update_frequency=None,
+      report_print=None,
   ):
     ''' Generator yielding values from the iterable `it`
         while updating a progress bar.
@@ -321,6 +327,13 @@ class BaseProgress(object):
           used only to produce the default `proxy` if that is not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
+        * `update_frequency`: optional update frequency;
+          only update the progress bar after an advance of this many units,
+          useful if the iteration rate is very high
+        * `report_print`: optional `print` compatible function
+          with which to write a report on completion;
+          this may also be a `bool`, which if true will use `Upd.print`
+          in order to interoperate with `Upd`.
 
         Example use:
 
@@ -353,17 +366,33 @@ class BaseProgress(object):
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
     proxy(statusfunc(self, label, width or proxy.width))
+    last_pos = start_pos = self.position
     for i in it:
       length = itemlenfunc(i) if itemlenfunc else 1
       if incfirst:
         self += length
-      proxy(statusfunc(self, label, width or proxy.width))
+      if not update_frequency or self.position >= last_pos + update_frequency:
+        proxy(statusfunc(self, label, width or proxy.width))
+        last_pos = self.position
       yield i
       if not incfirst:
         self += length
-      proxy(statusfunc(self, label, width or proxy.width))
+      if not update_frequency or self.position >= last_pos + update_frequency:
+        proxy(statusfunc(self, label, width or proxy.width))
+        last_pos = self.position
     if delete_proxy:
       proxy.delete()
+    else:
+      proxy(statusfunc(self, label, width or proxy.width))
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = upd_print
+      report_print(
+          label + ':', self.format_counter(self.position - start_pos), 'in',
+          transcribe(
+              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+          )
+      )
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -755,7 +784,7 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, total=None, **kw):
+def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
   ''' Convenience function to construct and run a `Progress.bar`.
 
       Parameters:
@@ -763,6 +792,8 @@ def progressbar(it, label=None, total=None, **kw):
       * `label`: optional label, doubles as the `Progress.name`
       * `total`: optional value for `Progress.total`,
         default from `len(it)` if supported.
+      * `units_scale`: optional units scale for `Progress`,
+        default `UNSCALED_SCALE`
 
       If `total` is `None` and `it` supports `len()`
       then the `Progress.total` is set from it.
@@ -779,13 +810,19 @@ def progressbar(it, label=None, total=None, **kw):
       total = len(it)
     except TypeError:
       total = None
-  yield from Progress(name=label, total=total).bar(it, label=label, **kw)
+  yield from Progress(
+      name=label, total=total, units_scale=units_scale
+  ).bar(
+      it, label=label, **kw
+  )
 
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
   lines = open(__file__).readlines()
   lines += lines
   for line in progressbar(lines, "lines"):
+    time.sleep(0.005)
+  for line in progressbar(lines, "lines step 100", update_frequency=100, report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
   for line in P.bar(open(__file__)):

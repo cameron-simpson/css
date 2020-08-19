@@ -7,6 +7,7 @@
 from __future__ import print_function
 from getopt import GetoptError
 import os.path
+from pprint import pformat
 import sys
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
@@ -124,7 +125,7 @@ class BWizCmd(BaseCommand):
     for filename in args:
       with Pfx(filename):
         R = Recording(filename)
-        print(filename, R.metadata._asjson(), sep='\t')
+        print(filename, pformat(R.metadata.as_dict()), sep='\t')
     return 0
 
   @staticmethod

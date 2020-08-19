@@ -1,0 +1,3 @@
+lib/python/cs/ansi_colour.py: cs.ansi_colour: new env_no_color() test function honouring the $NO_COLOUR envvar per https://no-color.org/
+lib/python/cs/ansi_colour.py: cs.ansi_colour: colourise: get the "normal" default from the global NORMAL_COLOUR
+lib/python/cs/ansi_colour.py: cs.ansi_colour: docstring updates

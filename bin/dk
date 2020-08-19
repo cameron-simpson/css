@@ -6,10 +6,10 @@
 set -ue
 
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
-: ${DK_PRIMARY_SERVICE=''}
+: ${DK_CP_PREFIX:='.'}
 : ${DK_ENVVARS:=''}
 : ${DK_EXEC_PREFIX:=''}
-: ${DK_CP_PREFIX:=''}
+: ${DK_PRIMARY_SERVICE=''}
 
 docker_compose_opts=
 
@@ -21,8 +21,11 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   -n name
     Specify primary service name.
     This is also the target service for \"exec\".
+
   Most ops are passed to docker or docker-compose, but the following
   are specially handled:
+    @name
+      Shorthand for \"-n name exec\".
     cp [name:]path [name:]path
       Passed to \"docker cp\".
       \"name\" is the short container name.
@@ -33,17 +36,32 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       The environment variables names in \$DK_ENVVARS are passed through.
       The default \"command\" is \"bash\".
       The command is prefixed by \$DK_EXEC_PREFIX, for example if
-      there is a standard aenvironment setup script within the
+      there is a standard environment setup script within the
       container.
     logs
       Passed to docker-compose -f \$DK_PRIMARY_SERVICE.
     rsh name command...
       Run command inside \"name\" in an rsh/ssh compatible way, to
-      support use as a drop in for commands which themselve can use
+      support use as a drop in for commands which themselves can use
       an rsh/ssh-like command such as rsync.
     rsync rsync-args...
       Rsync into or out of the container where the container name
-      comes from the \"host\" part of an rsync remote path."
+      comes from the \"host\" part of an rsync remote path.
+
+  Environment:
+    DK_COMPOSE_YML
+      The docker-compose filename, default docker-compose.yml.
+      If not present in the current directory it will be sought in an ancestor.
+    DK_CP_PREFIX
+      The in-container path prefix for relative \"dk cp\" paths.
+    DK_ENVVARS
+      Encironment variables to pass in to commands run via \"dk exec\".
+    DK_EXEC_PREFIX
+      A prefix for commands provided to \"dk exec\", such as an
+      in-container environment setup script.
+    DK_PRIMARY_SERVICE
+      The default short name for the target container for \"dk exec\"."
+    
 
 badopts=
 
@@ -51,6 +69,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -f) DK_COMPOSE_YML=$2; shift ;;
+    -h|--help)
+        echo "$usage"
+        exit 0
+        ;;
     -n) DK_PRIMARY_SERVICE=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -62,13 +84,14 @@ do
   shift
 done
 
-[ -s "$DK_COMPOSE_YML" ] || if yml=$( findup "$DK_COMPOSE_YML" )
-then
-  DK_COMPOSE_YML=$yml
-else
-  echo "$cmd: cannot find \$DK_COMPOSE_YML=$DK_COMPOSE_YML" >&2
-  badopts=1
-fi
+[ -s "$DK_COMPOSE_YML" ] || \
+  if yml=$( findup "$DK_COMPOSE_YML" )
+  then
+    DK_COMPOSE_YML=$yml
+  else
+    echo "$cmd: cannot find \$DK_COMPOSE_YML=$DK_COMPOSE_YML" >&2
+    badopts=1
+  fi
 
 if [ $# = 0 ]
 then
@@ -80,37 +103,76 @@ else
   shift
 fi
 
+# translate "@foo" into "-n foo exec"
+case "$op" in
+  @?*)DK_PRIMARY_SERVICE=$( expr "$op" : '@\(.*\)' )
+      op=exec
+      ;;
+esac
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+resolve_shortname(){
+  [ $# = 1 ] || {
+    echo "$0: Usage: resolve_shortname shortname" >&2
+    return 2
+  }
+  case "$1" in
+    *_*) echo "$1" ;;
+    *)  echo "${base}_${1}_1" ;;
+  esac
+}
+
+# resolve [[name]:path into full container and path
+resolve_container_path(){
+  [ $# = 1 ] || {
+    echo "$0: Usage: resolve_container_path [[name]:]path" >&2
+    return 2
+  }
+  case "$1" in
+    /* | ./* | ../*)
+      # local path, return unchanged
+      echo "$1"
+      return 0
+      ;;
+    *:*) ;;
+    *)# also local path, return unchanged
+      echo "$1"
+      return 0
+      ;;
+  esac
+  ( set -ue
+    hostpart=$( expr "x$1" : 'x\([^:]*\):.*' )
+    pathpart=$( expr "x$1" : 'x[^:]*:\(.*\)' )
+    [ -n "$hostpart" ] || hostpart=$DK_PRIMARY_SERVICE
+    hostpart=$( resolve_shortname "$hostpart" )
+    case "$pathpart" in
+      /*) ;; *) pathpart=$DK_CP_PREFIX/$pathpart ;;
+    esac
+    echo "$hostpart:$pathpart"
+  )
+}
 
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
 base=$( basename "$ymlbasedir" )
-primary_container=${base}_${DK_PRIMARY_SERVICE}_1
+primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )
 
 case "$op" in
-  cp) set -x
-      if [ -n "$DK_CP_PREFIX" ]
-      then
-        src=$1 dst=$2; shift; shift
-        case "$src" in
-          /* | ./* | ../* ) ;;
-          *:/*) ;;
-          *:*)  hostpart=$( expr "x$src" : 'x\([^:]*\):.*' )
-                pathpart=$( expr "x$src" : 'x[^:]*:\(.*\)' )
-                src=$hostpart:$DK_CP_PREFIX/$pathpart
-                ;;
-        esac
-        case "$dst" in
-          /* | ./* | ../* ) ;;
-          *:/*) ;;
-          *:*)  hostpart=$( expr "x$dst" : 'x\([^:]*\):.*' )
-                pathpart=$( expr "x$dst" : 'x[^:]*:\(.*\)' )
-                dst=$hostpart:$DK_CP_PREFIX/$pathpart
-                ;;
-        esac
-        set -- "$src" "$dst" ${1+"$@"}
-      fi
-      exec docker "$op" ${1+"$@"}
+  help)
+      echo "$usage"
+      exit 0
+      ;;
+  cp) [ $# = 2 ] || {
+        echo "$cmd: $op: expected exactly 2 arguments" >&2
+        echo "$usage" >&2
+        exit 2
+      }
+      src=$( resolve_container_path "$1" )
+      dst=$( resolve_container_path "$2" )
+      shift; shift
+      set -x
+      exec docker "$op" "$src" "$dst"
       ;;
   exec)
       docker_exec_opts=-i

@@ -28,7 +28,7 @@ from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, XP, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_CONFIG
+from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG
 from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
@@ -175,7 +175,7 @@ class Config(SingletonMixin):
   def basedir(self):
     ''' The default location for local archives and stores.
     '''
-    return longpath(self.get_default('basedir'))
+    return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
 
   @property
   def mountdir(self):

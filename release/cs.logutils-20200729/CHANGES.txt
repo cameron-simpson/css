@@ -1,0 +1,5 @@
+lib/python/cs/logutils.py: Release information for cs.logutils-20200613.
+lib/python/cs/logutils.py: cs.logutils: docstring updates
+lib/python/cs/logutils.py: merge mailfiler ==> default: internal logging level changes
+lib/python/cs/logutils.py: cs.logutils: setup_logging: honour $NO_COLOR if ansi_mode not specified, per https://no-color.org/
+lib/python/cs/logutils.py: cs.logutils: autoformat

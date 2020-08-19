@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: set __version__ to '20200517.2-post'
+lib/python/cs/deco.py: cs.deco: long overdue upgrade or @decorator to support combining the function and decorator args in one call

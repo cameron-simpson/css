@@ -51,7 +51,8 @@ accesses the flag named "PORTFWD_DISABLE".
 '''
 
 from __future__ import print_function
-from collections import MutableMapping, defaultdict
+from collections import defaultdict
+from collections.abc import MutableMapping
 from contextlib import contextmanager
 import errno
 from getopt import GetoptError

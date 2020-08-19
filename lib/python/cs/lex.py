@@ -21,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200613-post'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -120,13 +120,6 @@ def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with ", ".
   '''
   return sep.join([str(a) for a in ary])
-
-def lastlinelen(s):
-  ''' The length of text after the last newline in a string.
-
-      (Initially used by cs.hier to compute effective text width.)
-  '''
-  return len(s) - s.rfind('\n') - 1
 
 def htmlify(s, nbsp=False):
   ''' Convert a string for safe transcription in HTML.
@@ -302,10 +295,17 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
+
+      `gochars` may also be a callable, in which case a character
+      `ch` is accepted if `gochars(ch)` is true.
   '''
   ooffset = offset
-  while offset < len(s) and s[offset] in gochars:
-    offset += 1
+  if callable(gochars):
+    while offset < len(s) and gochars(s[offset]):
+      offset += 1
+  else:
+    while offset < len(s) and s[offset] in gochars:
+      offset += 1
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):

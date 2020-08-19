@@ -39,11 +39,16 @@
 
     obtained from the following `.fstags` entries:
     * tag file `/path/to/.fstags`:
-      `series-name sf series_title="Series Full Name"`
+
+        series-name sf series_title="Series Full Name"
+
     * tag file `/path/to/series-name/.fstags`:
-      `season-02 season=2`
+
+      season-02 season=2
+
     * tag file `/path/to/series-name/season-02/.fstags`:
-      `episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"`
+
+      episode-name--s02e03--something.mp4 episode=3 episode_title="Full Episode Title"
 
     ## `fstags` Examples ##
 
@@ -51,15 +56,15 @@
 
     Walk the media tree for files tagged for backup to `archive2`:
 
-        find /path/to/media backup=archive2
+        fstags find /path/to/media backup=archive2
 
     Walk the media tree for files not assigned to a backup archive:
 
-        find /path/to/media -backup
+        fstags find /path/to/media -backup
 
     Backup the `archive2` files using `rsync`:
 
-        fstags find --for-rsync /path/to/media backup=archive2 \
+        fstags find --for-rsync /path/to/media backup=archive2 \\
         | rsync -ia --include-from=- /path/to/media /path/to/backup_archive2
 
 '''
@@ -101,9 +106,9 @@ from cs.tagset import (
     TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd
+from cs.upd import Upd, print
 
-__version__ = '20200521.1-post'
+__version__ = '20200717.1-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -116,7 +121,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.resources',
+        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -179,14 +184,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         with Upd(sys.stderr) as U:
           for top_path in argv:
             for isdir, path in rpaths(top_path, yield_dirs=True):
-              U.out(path)
-              with Pfx(path):
+              spath = shortpath(path)
+              U.out(spath)
+              with Pfx(shortpath(path)):
                 ont = fstags.ontology(path)
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(path + ' ' + str(autotag))
+                  U.out(spath + ' ' + str(autotag))
                   if ont:
                     autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
@@ -197,7 +203,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                   except OSError:
                     pass
                   else:
-                    direct_tags.add('filesize', S.st_size, ontology=ont)
+                    direct_tags.add('filesize', S.st_size)
                 # update the
                 all_tags = tagged_path.merged_tags()
                 for tag in fstags.cascade_tags(all_tags):

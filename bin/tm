@@ -9,10 +9,10 @@
 set -ue
 
 : ${TMUX:=''}
-: ${USER:=`id -ud`}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
-: ${TMUX_TMPDIR:=$HOME/var/tmux}
+: ${TMPDIR:=/tmp}
+: ${TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`}
 export TMUX_TMPDIR
 
 trace=
@@ -93,27 +93,7 @@ have_tmux(){
 }
 
 do_tmux(){
-  case "$tmux_version" in
-    0.*|1.*|2.0|2.1)
-        TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
-    '')
-        case "$OS" in
-          openbsd)
-            $trace tmux ${1+"$@"} ;;
-          *)
-            TMPDIR=$TMUX_TMPDIR $trace tmux ${1+"$@"} ;;
-        esac
-        ;;
-    *)  $trace tmux ${1+"$@"} ;;
-  esac
-}
-
-# honours $TMUX_TMPDIR?
-use_tmux_tmpdir(){
-  case "$tmux_version" in
-    0.*|1.*|2.0|2.1)    return 1 ;;
-  esac
-  return 0
+  $trace tmux ${1+"$@"}
 }
 
 # Strip prefix from incoming strings, compute max of remaining numbers, add 1.
@@ -324,15 +304,16 @@ rcmd(){
   $trace $_rcmd_ssh -t "$_rcmd_rhost" "
     $setx"'
     PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH
-    : ${TMUX_TMPDIR:=}
+    : ${TMPDIR:=/tmp}
+    export PATH TMPDIR
     if [ -z "$TMUX_TMPDIR" ]
-    then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR
+    then
+      if [ -d "$HOME/var/tmux/." ]
+      then  TMUX_TMPDIR=$HOME/var/tmux
+      else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
+      fi
     fi
-    tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //")
-    case "$tmux_version" in
-      ""|0.*|1.*|2.0|2.1) tmux="env TMPDIR=$TMUX_TMPDIR tmux" ;;
-      *) tmux=tmux ;;
-    esac
+    export TMUX_TMPDIR
     '"$*"
 }
 
@@ -473,7 +454,6 @@ case "$op" in
       echo "$cmd: $op: no tmrc: $tmrc" >&2
       exit 1
     fi
-    set -x
     tmrc \
     | \
     {
@@ -492,10 +472,7 @@ case "$op" in
         fi
         matched=1
         do_tmux has-session -t "$session_name" 2>/dev/null \
-        || (
-          set -x
-          do_tmux new-session -d -s "$session_name" "set -x; $shcmd"
-        ) \
+        || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
         || xit=1
       done
       [ $matched ] || {
@@ -533,7 +510,19 @@ case "$op" in
     ;;
   use-session-remote)
     # connect to remote session, tmux by choice, screen if no tmux
-    rcmd "$remote_host" 'set -ue; if [ -n "$tmux_version" ]; then $tmux start-server; $tmux has-session -t '"'$session_name'"' && $tmux attach-session -t '"'$session_name'"' || exec env $tmux new-session -s '"'$session_name'"' "${SHELL:-/bin/sh}"; else exec screen -x '"'$session_name'"' || exec screen -S '"'$session_name'"' "${SHELL:-/bin/sh}"; fi'
+    rcmd "$remote_host" '
+      set -ue
+      if tmux -V >/dev/null 2>&1
+      then
+        tmux start-server
+        if tmux has-session -t '"'$session_name'"'
+        then  tmux attach-session -t '"'$session_name'"'
+        else  exec env tmux new-session -s '"'$session_name'"' "${SHELL:-/bin/sh}"
+        fi
+      else
+        exec screen -x '"'$session_name'"' \
+        || exec screen -S '"'$session_name'"' "${SHELL:-/bin/sh}"
+      fi'
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1
