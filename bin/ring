@@ -12,7 +12,7 @@ import sys
 from cs.ansi_colour import colourise_patterns
 
 CMD = basename(__file__)
-USAGE = 'Usage: %s regexps...'
+USAGE = 'Usage: %s [-f {-|pathname}] regexps...'
 
 def main(argv=None):
   if argv is None:
