@@ -91,17 +91,6 @@ git(){
   $trace git "--git-dir=$git_dir" ${1+"$@"}
 }
 
-pushrev(){
-  [ $# = 3 ] || {
-    echo "Usage: $0 local_refspec upstream_repo upstream_branch" >&2
-    return 2
-  }
-  ( set -ue
-    local_refspec=$1 upstream_repo=$2 upstream_branch=$3
-    git push $git_push_opts --atomic "$upstream_repo" "$local_refspec:refs/heads/$upstream_branch"
-  ) </dev/null
-}
-
 # update the git tree
 $trace hg gexport
 
@@ -124,26 +113,29 @@ do
             fi
             ;;
   esac
-  $trace hg-revs -T '{rev} {node} {gitnode} {desc|firstline}\n' "$revset" \
-  | sort -rn \
-  | (
-    xit=0
-    n=0
-    while read -r rev node gitrev desc
-    do
-      n=$(( n + 1 ))
-      case "$n" in
-        1)  git_push_branch=$git_branch ;;
-        *)  git_push_branch=$git_branch-$n ;;
-      esac
-      pushrev "$gitrev" "$git_repo" "$git_push_branch" || {
-        echo "$cmd: branch $hg_branch: git rev $gitrev -> $git_repo $git_branch FAILS" >&2
-        xit=1
-        break
-      }
-    done
-    exit $xit
-  ) || xit=1
-done
-
-exit $xit
+  $trace hg-revs \
+    -T "{rev} {node} $hg_branch $git_branch {gitnode} {desc|firstline}\n" \
+    "$revset" \
+  | sort -rn
+done \
+| tee /dev/tty \
+| (
+  xit=0
+  set --
+  old_hg_branch=
+  n=0
+  while read -r rev node hg_branch git_branch gitrev desc
+  do
+    if [ "x$hg_branch" = "x$old_hg_branch" ]
+    then  n=$(( n + 1 ))
+    else  n=1 old_hg_branch=$hg_branch
+    fi
+    case "$n" in
+      1)  git_push_branch=$git_branch ;;
+      *)  git_push_branch=$git_branch-$n ;;
+    esac
+    set -- ${1+"$@"} "$gitrev:refs/heads/$git_push_branch"
+  done
+  git push $git_push_opts --atomic "$git_repo" "$@" || xit=1
+  exit $xit
+)
