@@ -27,8 +27,7 @@ can just be installed with:
     pip install cs.module_name
 
 Installing the whole source tree can be done as follows:
-* Obtain the tree, wither by cloning this repository or fetching the
-  [(possibly stale) tarball](http://www.cskk.ezoshosting.com/cs/css/css.tar.gz)
+* Obtain the tree, whether by cloning this repository
   into a suitable directory such as `/opt/css`, which I will assume for
   the sake of example below.
 * Configure your environment to use the scripts:
