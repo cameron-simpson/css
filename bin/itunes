@@ -41,7 +41,7 @@ usage="Usage: $cmd [-x] [-F flags,...] [--] [op [args...]]
       selected  Use the currently selected iTunes tracks.
   $cmd selected
       Report the currently selected iTunes tracks to standard output.
-  $cmd tell tell-commands
+  $cmd tell tell-commands...
       Tell iTunes to execute the supplied AppleScript tell-commands."
 
 badopts=
