@@ -307,7 +307,7 @@ def OBSOLETE(func, suggestion=None):
   funcdoc = getattr(func, '__doc__', None) or ''
   doc = "OBSOLETE FUNCTION " + funcname
   if suggestion:
-    doc += ' - please use ' + suggestion
+    doc += ' suggestion: ' + suggestion
   wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
   wrapped.__doc__ = funcdoc
   return wrapped
