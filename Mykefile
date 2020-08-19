@@ -222,7 +222,7 @@ _publish_ezos:
 
 _publish_git:
         for repo in $(git_repos) \
-        do  pfx "$$repo" hg-gitup -a -x "$$repo" \
+        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
         done
         @echo 'changes visible at $(www_bitbucket)'
         @echo 'code visible at $(www_github)'
