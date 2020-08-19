@@ -118,7 +118,6 @@ do
     "$revset" \
   | sort -rn
 done \
-| tee /dev/tty \
 | (
   xit=0
   set --
