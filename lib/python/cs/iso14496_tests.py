@@ -19,6 +19,8 @@ from .x import X
 TESTFILE = 'TEST.mp4'
 
 class Test_iso14496(unittest.TestCase):
+  ''' Test `cs.iso14496`.
+  '''
 
   @unittest.skipUnless(os.path.exists(TESTFILE), 'no ' + TESTFILE)
   def test(self):
@@ -41,6 +43,10 @@ class Test_iso14496(unittest.TestCase):
     )
 
 class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Test the `PacketField`s in `cs.iso14496`.
+      Subclasses `cs.binary_tests._TestPacketFields`
+      which locates all `PacketFields` in the associated module.
+  '''
 
   def setUp(self):
     ''' We're testing the cs.binary module.

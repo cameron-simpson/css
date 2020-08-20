@@ -18,7 +18,7 @@ from stat import S_ISREG
 import sys
 from cs.py3 import pread
 
-__version__ = '20200328'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -622,10 +622,11 @@ class CornuCopyBuffer(object):
           copy_skip(buf)
         toskip -= len(buf)
     assert toskip >= 0
-    assert not self.bufs
-    assert self.buflen == 0
     if toskip == 0:
       return
+    # check that we consumed all the buffered data
+    assert not self.bufs
+    assert self.buflen == 0
     # advance the rest of the way
     seekable = False if copy_skip else self.seekable
     if seekable is None or seekable:
@@ -1060,9 +1061,7 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
   def close(self):
     ''' Detach from the file and close it.
     '''
-    if self.fp is not None:
-      self.fp.close()
-      self.fp = None
+    self.fp = None
 
   def _fetch(self, readsize):
     return self.read1(readsize)

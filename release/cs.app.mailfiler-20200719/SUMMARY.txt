@@ -1,0 +1,4 @@
+mailfiler: make "-R rules_pattern" a global option.
+Add some Received: headers, improving traceability.
+More friendly and less noisy terminal output (I run mailfiler as a daemon in a tmux session).
+Quite a few small internal changes.

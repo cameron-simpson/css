@@ -1,0 +1,85 @@
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: expose the static value_to_tag_name() method implementing the mapping from a type's value to the name for its defining TagSet
+lib/python/cs/tagset.py: Automated merge with file:///Users/cameron/hg/css
+lib/python/cs/tagset.py: cs.tagset: TagsOntology._singleton_key: just use the id of the mapping
+lib/python/cs/tagset.py: cs.tagset: TypedTag: simpler and more robust __repr__
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.defn_tagset: trite refactor aiding debugging
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace.__getattr__: tweak *_lc attribute logic
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace.__getitem__: honour the _return_None_if_missing attribute (if present and true) to return None if an attribute is missing
+lib/python/cs/tagset.py: cs.tagset: TagSet.ns(): set `._return_None_if_missing=True` on the generated ExtendedNamespaces
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: small docstring tweaks
+lib/python/cs/tagset.py: cs.tagset: TagSet.ns: drop the special None-for-missing-attributes mode; TagSet.format_kwargs: get the namespace from TagSet.ns and set the None-for-missing-attributes mode before return
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: rename TypedTag to TagInfo, less confusing
+lib/python/cs/tagset.py: cs.tagset: new ValueDetail and KeyValueDetail classes for returning ontology information; TagInfo.detail now returns a ValueDetail for scalar types, a list of ValueDetails for sequence types and a list of KeyValueDetails for mapping types; drop various TagInfo mapping/iterable style methods, too confusing to use
+lib/python/cs/tagset.py: cs.tagset: ValueDetail: docstring correction
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.value_detail: return None if the value is not a str
+lib/python/cs/tagset.py: cs.tagset: TagSet.ns: add optional ontology parameter, include metadata in the namespace if present; plumb ontology in related functions
+lib/python/cs/tagset.py: cs.tagset: plumb a verbose parameter default None for use with ifverbose
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: bugfix mix of verbose logic with self.modified logic
+lib/python/cs/tagset.py: cs.tagset: new TagSet.edit method to modify a TagSet using a text editor
+lib/python/cs/tagset.py: cs.tagset: shuffle imports, update DISTINFO to add cs.edit and cs.obj
+lib/python/cs/tagset.py: cs.tagset: autoformat
+lib/python/cs/tagset.py: cs.tagset: new TagSet.set_from method to completely update a TagSet from another TagSet or dict - includes logging
+lib/python/cs/tagset.py: cs.tagset: TagSet.as_tags: add an optional prefix parameter for the generated tag names; new Tag.with_prefix factory accepting a prefix for the tag name
+lib/python/cs/tagset.py: cs.tagset: Tag.with_prefix: make the prefix parameter mandatory
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: remove support for multiple others, and accept only prefix and verbose as keyword parameters
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: rework the logic to share common k,v iteration logic
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: make prefix and verbose keyword only
+lib/python/cs/tagset.py: cs.tagset: TagSet.edit: include explainatory comments, plumb the verbose parameter
+lib/python/cs/tagset.py: merge default ==> fstags
+lib/python/cs/tagset.py: cs.tagset.py: TagSet.__iter__ now yields Tags instead of keys, unlike a dict
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: remove obsolete calls to TagSet.as_tags, prefer iterator form
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: add BASE_TYPES, a mapping of type names to supported Python types; add new basetype method returning the base type name from a subtype name
+lib/python/cs/tagset.py: cs.tagset: TagInfo: new .basetype property returning the base type name via the ontology
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: new convert_tag(tag) method converting the tag.value (likely a str) to the appropriate base type -- returns the new Tag or the original Tag unchanged
+lib/python/cs/tagset.py: cs.lex: new get_ini_clausename to parse "[clausename]" from cs.vt.compose; cs.vt: use the function from cs.lex
+lib/python/cs/tagset.py: cs.tagset: improve TagSet.__repr__
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace.__getitem__: emit warning if returning None instead of raising KeyError
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace: new __missing__(attr) method to return {attr} for a missing attr instead of None, issues informative warning
+lib/python/cs/tagset.py: merge media ==> default: assorted features
+lib/python/cs/tagset.py: cs.tagset: give all Tags a .ontology attribute and upgrade Tag.__new__ to be more factory like, obsoleting the Tag.from_name_value factory method; this change will lead to dropping the TagInfo class
+lib/python/cs/tagset.py: cs.tagset: fold TagInfo into Tag now that Tags have ontologies
+lib/python/cs/tagset.py: cs.tagset: plumb the ontology some more
+lib/python/cs/tagset.py: cs.tagset: TagSet.ns: record the Tag and its dotted path within the namespace as ._tag and ._tag_path on its leaf node
+lib/python/cs/tagset.py: merge fstags ==> default: json_import fixes, merge TagInfo class into Tag to provide ontology features
+lib/python/cs/tagset.py: cs.tagset: move ValueDetail and KeyValueDetail up above Tag, which references them
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace: add __len__, the number of primary keys
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.__getitem__: accept only strings, no longer accept Tags
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.basetype: improve circular definition warning
+lib/python/cs/tagset.py: cs.tagset,cs.fstags: rename "defn" stuff to "typedata" (metadata about a type) and "detail" stuff to "metadata" (direct metadata)
+lib/python/cs/tagset.py: merge default ==> fstags
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: import cs.pfx.XP even if not always used
+lib/python/cs/tagset.py: cs.tagset: plumb ontology through most stuff
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace: new private methods aorund public keys ([a-z]*) and new __str__ showing just the public keys
+lib/python/cs/tagset.py: cs.tagset: new TagSetNamespace and ValueMetadataNamespace subclassing ExtendedNamespace, make the ns() methods stubs invoking their factory methods, give them __format__ methods to support doubling up Tags and their subtags, improve the metadata and type subattributes
+lib/python/cs/tagset.py: cs.tagset: format_kwargs: drop the ontology, it comes from the object itself
+lib/python/cs/tagset.py: cs.tagset: Tag.parse: make ontology mandatory, avoids accidents while still supporting naive (ontologyless) Tags
+lib/python/cs/tagset.py: cs.tagset: support for ontology=None
+lib/python/cs/tagset.py: cs.tagset: Tag.metadata: key the metadata on the tag name, not its type
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: pfx trace several things, drop a debug message
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: support ._keys and ._values, add stopper for other _* attributes
+lib/python/cs/tagset.py: cs.tagset: new Tag.member_metadata(member_key): return the metadata ontology entry for self[member_key], from ont[member_type"."ont.value_to_tag_name(self[member_key])]
+lib/python/cs/tagset.py: cs.tagset: Tag: new key_typedata and member_typedata properties and key_metadata method matching member_metadata
+lib/python/cs/tagset.py: cs.tagset: fixes from linting, autoformat
+lib/python/cs/tagset.py: cs.tagset: new TagSetNamespace.__getitem__: returning a tag memeber's metadata namespace
+lib/python/cs/tagset.py: cs.tagset: ExtendedNamespace: new _path property computed from self._pathnames, better __format__, new _subns factory for subnamespaces, new __getattr__ autogenerating [:alpha:]* named subnamespaces, more docstringage
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: drop .keys, use super()__getattr__; more docstringage
+lib/python/cs/tagset.py: cs.tagset: no longer allow '-' in a dotted identifier, just causes confusion and passes typing mistakes
+lib/python/cs/tagset.py: cs.tagset: TagSet: make the ontology optional again
+lib/python/cs/tagset.py: cs.tagset: docstring updates
+lib/python/cs/tagset.py: cs.tagset: TagSet.format_kwargs: drop obsolete _return_None_if_missing attribute, now TagSet.format_kwargs=TagSet.ns directly
+lib/python/cs/tagset.py: cs.tagset: TagSet.update docstring fix
+lib/python/cs/tagset.py: cs.tagset: TagSet: strip some method tracing, causing noise
+lib/python/cs/tagset.py: cs.tagset: get date_fromisoformat and datetime_fromisoformat from cs.py3
+lib/python/cs/tagset.py: cs.tagset: TagSet.update: accept a dict or an iterable of Taglike or (name,value) items
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.__getattr__: bugfix inferred attribute values to indirect through the associated Tag.value
+lib/python/cs/tagset.py: cs.tagset: fix spelling of exception, fix warning message, autoformat
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace: prevent infinite computed attribute recursion
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace.from_tagset: bugfix _tag assignment - move assignment out of inner loop
+lib/python/cs/tagset.py: cs.tagset: use cs.lex.cropped_repr to get a more manageable context prefix
+lib/python/cs/tagset.py: cs.tagset: docstring fixes
+lib/python/cs/tagset.py: cs.tagset: new TagsCommandMixin, initially with a parse_tag_choices(argv) static method
+lib/python/cs/tagset.py: cs.tagset: new TagChoice.from_str factory method
+lib/python/cs/tagset.py: cs.tagset: TagsCommandMixin.parse_tag_choices: cleaner code using the new TagChoice.from_str factory
+lib/python/cs/tagset.py: cs.tagset: TagSetNamespace._attr_tag_value: comment out warning about an unknown attribute
+lib/python/cs/tagset.py: cs.tagset: TagChoice.from_str: bugfix exception instantiation
+lib/python/cs/tagset.py: cs.tagset: update module docstring to improve mention of cs.fstags and cs.sqltags

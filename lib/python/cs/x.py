@@ -94,3 +94,23 @@ def X(msg, *args, **kw):
       return
     fp = sys.stderr
   print(msg, file=fp)
+
+def Xtty(msg, *args, **kw):
+  ''' Call `X()` with `X_via_tty` set to `True`.
+
+      This supports using:
+
+          from cs.x import Xtty as X
+
+      when hacking on tests without the tedious shuffle:
+
+          from cs.x import X
+          import cs.x; cs.x.X_via_tty = True
+
+      which I did _a lot_ to get timely debugging when fixing test failures.
+  '''
+  global X_via_tty
+  old = X_via_tty
+  X_via_tty = True
+  X(msg, *args, **kw)
+  X_via_tty = old

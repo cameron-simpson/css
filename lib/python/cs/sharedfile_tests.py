@@ -13,6 +13,8 @@ import unittest
 from .sharedfile import lockfile
 
 class Test_Misc(unittest.TestCase):
+  ''' Tests for `cs.sharedfile`.
+  '''
 
   def setUp(self):
     self.proppath = 'cs.fileutils_tests_tstprop'

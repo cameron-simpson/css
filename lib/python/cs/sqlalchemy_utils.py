@@ -5,9 +5,13 @@
 
 from contextlib import contextmanager
 import logging
+from threading import local as thread_local
+from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
+import sqlalchemy.sql.functions as func
 from icontract import require
+from cs.context import stackattrs
 from cs.deco import decorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
@@ -30,56 +34,104 @@ DISTINFO = {
     ],
 }
 
-@require(lambda orm, session: orm is not None or session is not None)
-def with_session(func, *a, orm=None, session=None, **kw):
-  ''' Call `func(*a,session=session,**kw)`, creating a session if required.
-      The function `func` runs within a transaction,
+# TODO: have a cs.threads.ThreadState superclass with __call__ etc
+class _State(thread_local):
+  ''' Shared per-thread state.
+  '''
+
+  def __init__(self):
+    self.orm = None
+    self.session = None
+
+  @contextmanager
+  def __call__(self, **kw):
+    ''' Calling the shared state returns a context manager
+        pushing the supplied keyword arguments as state attribute values.
+    '''
+    with stackattrs(self, **kw):
+      yield
+
+_state = _State()
+
+def with_orm(function, *a, orm=None, **kw):
+  ''' Call `function` with the supplied `orm` in the shared state.
+  '''
+  if orm is None:
+    orm = _state.orm
+    if orm is None:
+      raise RuntimeError("no ORM supplied and no _state.orm")
+  with _state(orm=orm):
+    return function(*a, orm=orm, **kw)
+
+def with_session(function, *a, orm=None, session=None, **kw):
+  ''' Call `function(*a,session=session,**kw)`, creating a session if required.
+      The function `function` runs within a transaction,
       nested if the session already exists.
+      If a new session is created
+      it is set as the default session in the shared state.
 
       This is the inner mechanism of `@auto_session` and
       `ORM.auto_session`.
 
       Parameters:
-      * `func`: the function to call
+      * `function`: the function to call
       * `a`: the positional parameters
       * `orm`: optional ORM class with a `.session()` context manager method
         such as the `ORM` base class supplied by this module.
       * `session`: optional existing ORM session
-      * `kw`: other keyword arguments, passed to `func`
+      * `kw`: other keyword arguments, passed to `function`
 
       One of `orm` or `session` must be not `None`; if `session`
       is `None` then one is made from `orm.session()` and used as
       a context manager.
 
-      The `session` is also passed to `func` as
+      The `session` is also passed to `function` as
       the keyword parameter `session` to support nested calls.
   '''
-  if session:
-    # run the function inside a savepoint in the supplied session
-    with session.begin_nested():
-      return func(*a, session=session, **kw)
-  if not orm:
-    raise ValueError("no orm supplied from which to make a session")
+  # use the shared state session if no session is supplied
+  if session is None:
+    session = _state.session
+  # we have a session, run the function inside a nested transaction
+  if session is not None:
+    with _state(session=session):
+      # run the function inside a savepoint in the supplied session
+      with session.begin_nested():
+        return function(*a, session=session, **kw)
+  # no session, we need to create one
+  if orm is None:
+    # use the shared state ORM if no orm is supplied
+    orm = _state.orm
+    if orm is None:
+      raise ValueError(
+          "no orm supplied from which to make a session,"
+          " and no shared state orm"
+      )
+  # create a new session and run the function within it
   with orm.session() as new_session:
-    return func(*a, session=new_session, **kw)
+    with _state(orm=orm, session=new_session):
+      return function(*a, session=new_session, **kw)
 
-def auto_session(func):
+def auto_session(function):
   ''' Decorator to run a function in a session if one is not presupplied.
-      The function `func` runs within a transaction,
+      The function `function` runs within a transaction,
       nested if the session already exists.
 
       See `with_session` for details.
   '''
 
-  @require(lambda orm, session: orm is not None or session is not None)
   def wrapper(*a, orm=None, session=None, **kw):
-    ''' Prepare a session if one is not supplied.
-    '''
-    return with_session(func, *a, orm=orm, session=session, **kw)
+    ''' Call the function with a session.
 
-  wrapper.__name__ = "@auto_session(%s)" % (funccite(func,),)
-  wrapper.__doc__ = func.__doc__
-  wrapper.__module__ = getattr(func, '__module__', None)
+        If no session is supplied
+        and the shared per-thread state does not have an active session,
+        prepare a new session for the function
+        using `with_session()`.
+    '''
+    return with_session(function, *a, orm=orm, session=session, **kw)
+
+  wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
+  wrapper.__doc__ = function.__doc__
+  wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
 @contextmanager
@@ -92,12 +144,14 @@ def push_log_level(level):
   logger = logging.getLogger('sqlalchemy.engine')
   old_level = logger.level
   logger.setLevel(level)
-  yield logger
-  logger.setLevel(old_level)
+  try:
+    yield logger
+  finally:
+    logger.setLevel(old_level)
 
 @decorator
-def log_level(func, level=None):
-  ''' Decorator to run `func` at the specified logging `level`, default `logging.DEBUG`.
+def log_level(function, level=None):
+  ''' Decorator to run `function` at the specified logging `level`, default `logging.DEBUG`.
   '''
   if level is None:
     level = logging.DEBUG
@@ -106,9 +160,9 @@ def log_level(func, level=None):
     ''' Push the desired log level and run the function.
     '''
     with push_log_level(level):
-      return func(*a, **kw)
+      return function(*a, **kw)
 
-  wrapper.__name__ = "@log_level(%s,%s)" % (func, level)
+  wrapper.__name__ = "@log_level(%s,%s)" % (function, level)
   return wrapper
 
 class ORM(MultiOpenMixin):
@@ -166,6 +220,24 @@ class ORM(MultiOpenMixin):
     wrapper.__module__ = getattr(method, '__module__', None)
     return wrapper
 
+  @staticmethod
+  def orm_method(method):
+    ''' Decorator for ORM subclass methods
+        to set the shared state `orm` to `self`.
+    '''
+
+    def wrapper(self, *a, **kw):
+      ''' Call `method` with its ORM as the shared state `orm`.
+      '''
+      with _state(orm=self):
+        return method(self, *a, **kw)
+
+    wrapper.__name__ = method.__name__
+    wrapper.__doc__ = method.__doc__
+    return wrapper
+
+orm_method = ORM.orm_method
+
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
@@ -183,6 +255,40 @@ def orm_auto_session(method):
   wrapper.__doc__ = method.__doc__
   wrapper.__module__ = getattr(method, '__module__', None)
   return wrapper
+
+class BasicTableMixin:
+  ''' Useful methods for most tables.
+  '''
+
+  @classmethod
+  @auto_session
+  def lookup(cls, *, session, **criteria):
+    ''' Return iterable of row entities matching `criteria`.
+    '''
+    return session.query(cls).filter_by(**criteria)
+
+  @classmethod
+  @auto_session
+  def lookup1(cls, *, session, **criteria):
+    ''' Return the row entity matching `criteria`, or `None` if no match.
+    '''
+    return session.query(cls).filter_by(**criteria).one_or_none()
+
+  @classmethod
+  @auto_session
+  def __getitem__(cls, index, *, session):
+    row = cls.lookup1(id=index, session=session)
+    if row is None:
+      raise IndexError("%s: no row with id=%s" % (
+          cls,
+          index,
+      ))
+    return row
+
+class HasIdMixin:
+  ''' Include an "id" `Column` as the primary key.
+  '''
+  id = Column(Integer, primary_key=True)
 
 @require(
     lambda field_name: field_name and not field_name.startswith('.') and

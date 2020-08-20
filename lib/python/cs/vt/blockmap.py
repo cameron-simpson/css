@@ -18,12 +18,11 @@ from os.path import isdir, exists as pathexists, join as joinpath
 from struct import Struct
 import sys
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import Thread
-from cs.excutils import logexc
-from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.logutils import warning, info as log_info
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.resources import RunStateMixin
+from cs.threads import bg as bg_thread
 from cs.x import X
 from . import defaults
 from .block import HashCodeBlock, IndirectBlock
@@ -266,16 +265,22 @@ class BlockMap(RunStateMixin):
           "BlockMap.__init__: dispatch worker to scan from offset %d ...",
           mapped_to
       )
-      self._worker = Thread(target=self._load_maps, args=(defaults.S,))
       self.runstate.start()
-      self._worker.start()
+      self._worker = bg_thread(
+          self._load_maps,
+          args=(defaults.S,),
+          daemon=True,
+          name="%s._load_maps" % (self,)
+      )
     else:
       self._worker = None
+
+  def __str__(self):
+    return "%s(%s,%r)" % (type(self).__name__, self.block, self.mappath)
 
   def join(self):
     ''' Wait for the worker to complete.
     '''
-    self.runstate.cancel()
     worker = self._worker
     if worker is not None:
       self._worker.join()
@@ -298,7 +303,7 @@ class BlockMap(RunStateMixin):
         submap.close()
         maps[i] = None
 
-  @logexc
+  @pfx_method(use_str=True)
   def _load_maps(self, S):
     ''' Load leaf offsets and hashcodes into the unfilled portion of the blockmap.
     '''
@@ -330,7 +335,7 @@ class BlockMap(RunStateMixin):
               # consume the submap in progress
               submap = MappedFD(submap_fp, hashclass)
               if submap_path is not None:
-                X("NEW submap: %r", submap_path)
+                log_info("new submap: %r", submap_path)
                 os.link(submap_fp.name, submap_path)
               submaps[submap_index] = submap
               last_entry = submap.entry(-1)
@@ -346,10 +351,10 @@ class BlockMap(RunStateMixin):
               )
               if pathexists(submap_path):
                 # existing map, attach and install, advance and restart loop
-                X("LOAD MAPS: attach existing map %r", submap_path)
+                log_info("attach existing map %r", submap_path)
                 submaps[submap_index] = MappedFD(submap_path, hashclass)
                 offset = (submap_index + 1) * mapsize
-                X("LOAD MAPS: skip to offset=0x%x", offset)
+                log_info("skip to offset=0x%x", offset)
                 break
               # start a new persistent file to attach later
               submap_fp = NamedTemporaryFile('wb')
@@ -382,24 +387,24 @@ class BlockMap(RunStateMixin):
           offset += leaf.span
           nleaves += 1
           if nleaves % 4096 == 0:
-            X(
-                "LOAD MAPS: processed %d leaves in %gs (%d leaves/s)", nleaves,
+            log_info(
+                "processed %d leaves in %gs (%d leaves/s)", nleaves,
                 runstate.run_time, nleaves // runstate.run_time
             )
-      X("LOAD MAPS: leaf scan finished")
+      log_info("leaf scan finished")
       # attach final submap after the loop if one is in progress
       if submap_fp is not None:
         # consume the submap in progress
         submap = MappedFD(submap_fp, hashclass)
         if submap_path is not None:
-          X("NEW submap: %r", submap_path)
+          log_info("new submap: %r", submap_path)
           os.link(submap_fp.name, submap_path)
         submaps[submap_index] = submap
         last_entry = submap.entry(-1)
         self.mapped_to = last_entry.offset + last_entry.span
         submap_fp.close()
         submap_fp = None
-      X("LOAD MAPS: COMPLETE")
+      log_info("LOAD MAPS: COMPLETE")
 
   def self_check(self):
     ''' Perform some integrity tests.

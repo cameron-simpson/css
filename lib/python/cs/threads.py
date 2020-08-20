@@ -22,6 +22,8 @@ from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
+__version__ = '20200718-post'
+
 DISTINFO = {
     'description':
     "threading and communication/synchronisation conveniences",
@@ -368,6 +370,7 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
         return func(self, *a, **kw)
 
   lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
+  lockfunc.__doc__ = getattr(func, '__doc__', '')
   return lockfunc
 
 @decorator

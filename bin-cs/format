@@ -120,6 +120,7 @@ do
   case "$type" in
     go) $trace gofmt -w "$srcfile" ;;
     js) $trace prettier --write "$srcfile" ;;
+    json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
     py2)style=$(yapf-style-for "$srcfile")
         $trace py2 -m yapf --style "$style" -i "$srcfile" ;;

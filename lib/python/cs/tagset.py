@@ -3,8 +3,14 @@
 ''' Tags and sets of tags
     with __format__ support and optional ontology information.
 
-    Note: see `cs.fstags` for support for applying these to filesystem objects
+    See `cs.fstags` for support for applying these to filesystem objects
     such as directories and files.
+
+    See `cs.sqltags` for support for databases of entities with tags,
+    not directly associated with filesystem objects.
+    This is suited to both log entries (entities with no "name")
+    and large collections of named entities;
+    both accept `Tag`s and can be seached on that basis.
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
@@ -29,7 +35,7 @@
       This mapping also contains entries for the metadata
       for specific type values.
 
-    Here's a simple example with some `Tags` and a `TagSet`.
+    Here's a simple example with some `Tag`s and a `TagSet`.
 
         >>> tags = TagSet()
         >>> # add a "bare" Tag named 'blue' with no value
@@ -78,17 +84,18 @@ from json import JSONEncoder, JSONDecoder
 import re
 from types import SimpleNamespace
 from icontract import require
+from cs.dateutils import unixtime2datetime
 from cs.edit import edit as edit_lines
 from cs.lex import (
-    cutsuffix, get_dotted_identifier, get_nonwhite, is_dotted_identifier,
-    skipwhite, lc_, titleify_lc, FormatableMixin
+    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 
-__version__ = '20200318'
+__version__ = '20200716-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -97,11 +104,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.dateutils',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
-        'cs.obj',
+        'cs.obj>=20200716',
         'cs.pfx',
+        'cs.py3',
+        'icontract',
     ],
 }
 
@@ -465,12 +475,13 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def from_string(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
-    if post_offset < len(s):
-      raise ValueError(
-          "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
-      )
-    return tag
+    with Pfx("%s.from_string(%r[%d:],...)", cls.__name__, s, offset):
+      tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
+      if post_offset < len(s):
+        raise ValueError(
+            "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
+        )
+      return tag
 
   @staticmethod
   def is_valid_name(name):
@@ -496,7 +507,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%r)", cls.__name__, s[offset:]):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -672,8 +683,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
+        Returns `None` if there is no ontology.
 
-        This calls `TagsOntology.basetype(self.type)`.
+        This calls `TagsOntology.basetype(self.ontology,self.type)`.
     '''
     ont = self.ontology
     if ont is None:
@@ -775,6 +787,16 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
     tag, offset = Tag.parse(s, offset=offset, ontology=None)
     return cls(s[offset0:offset], choice, tag), offset
 
+  @classmethod
+  @pfx_method
+  def from_str(cls, s):
+    ''' Prepare a `TagChoice` from the string `s`.
+    '''
+    tag_choice, offset = cls.parse(s)
+    if offset != len(s):
+      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
+    return tag_choice
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
@@ -795,6 +817,10 @@ class ExtendedNamespace(SimpleNamespace):
     return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
 
   def __str__(self):
+    ''' Return a visible placeholder, supporting exposing this object
+        in a format string so that the user knows there wasn't a value
+        at this point in the dotted path.
+    '''
     return '{' + type(self).__name__ + ':' + ','.join(
         str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
     ) + '}'
@@ -837,22 +863,10 @@ class ExtendedNamespace(SimpleNamespace):
     return subns
 
   def __getattr__(self, attr):
-    ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        contaiining a `Tag` for the attribute with a placeholder string.
+    ''' Just a stub so that (a) subclasses can call `super().__getattr__`
+        and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    if attr and attr[0].isalpha():
-      # no such attribute, create a placeholder `Tag`
-      # for [:alpha:]* names
-      format_placeholder = '{' + self._path + '.' + attr + '}'
-      subns = self._subns(attr)
-      overtag = self.__dict__.get('_tag')
-      subns._tag = Tag(
-          attr,
-          format_placeholder,
-          ontology=overtag.ontology if overtag else None
-      )
-      return subns
-    raise AttributeError("%s: %s" % (self._path, attr))
+    raise AttributeError("%s:.%s" % (self._path, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -876,12 +890,12 @@ class TagSetNamespace(ExtendedNamespace):
   @pfx_method
   def from_tagset(cls, tags, pathnames=None):
     ''' Compute and return a presentation of this `TagSet` as a
-        nested `ExtendedNamespace`.
+        nested `TagSetNamespace`.
 
-        `ExtendedNamespaces` provide a number of convenience attibutes
-        derived from the concrete attributes. They are also usable
-        as mapping in `str.format_map` and the like as they implement
-        the `keys` and `__getitem__` methods.
+        `TagSetNamespace`s provide a number of convenience attributes
+        derived from the concrete attributes. a `TagSetNamespace` is also 
+        usable as a mapping in `str.format_map` and the like as it 
+        implements the `keys` and `__getitem__` methods.
 
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
@@ -919,8 +933,13 @@ class TagSetNamespace(ExtendedNamespace):
                     None, subpath
                 )
               ns = subns
-            ns._tag = tag
+          ns._tag = tag
     return ns0
+
+  def __bool__(self):
+    ''' Truthiness: `True` unless the `._bool` attribute overrides that.
+    '''
+    return getattr(self, '_bool', True)
 
   @pfx_method
   def __format__(self, spec):
@@ -967,7 +986,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     attr_value = self.__dict__.get(attr)
     if attr_value is None:
-      warning("%s: no .%r", self, attr)
+      ##warning("%s: no .%r", self, attr)
       return None
     return attr_value._tag_value()
 
@@ -990,8 +1009,8 @@ class TagSetNamespace(ExtendedNamespace):
           If *baseattr* exists,
           return its value lowercased via `cs.lex.lc_()`.
           Conversely, if *baseattr* is required
-          and does not directly exists
-          but its *baseattr*`_lc` form does,
+          and does not directly exist
+          but its *baseattr*`_lc` form *does*,
           return the value of *baseattr*`_lc`
           titlelified using `cs.lex.titleify_lc()`.
         * *baseattr*`s`, *baseattr*`es`: singular/plural.
@@ -1000,6 +1019,10 @@ class TagSetNamespace(ExtendedNamespace):
           Conversely,
           if *baseattr* does not exist but one of its plural attributes does,
           return the first element from the plural attribute.
+        * `[:alpha:]*`:
+          an identifierish name binds to a stub subnamespace
+          so the `{a.b.c.d}` in a format string
+          can be replaced with itself to present the undefined name in full.
     '''
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
@@ -1033,17 +1056,22 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
-      # attr vs attr_lc
-      title_attr = cutsuffix(attr, '_lc')
-      if title_attr is not attr:
-        title_value = self._attr_tag_value(title_attr)
-        if title_value is not None:
-          value_lc = lc_(title_value)
-          return value_lc
-      else:
-        attr_lc_value = getns(attr + '_lc')
-        if attr_lc_value is not None:
-          return titleify_lc(value)
+      for conv_suffix, conv in {
+          'i': int,
+          's': str,
+          'f': float,
+          'lc': lc_,
+      }.items():
+        ur_attr = cutsuffix(attr, '_' + conv_suffix)
+        if ur_attr is not attr:
+          ur_value = self._attr_tag_value(ur_attr)
+          if ur_value is not None:
+            with Pfx("%s(.%s=%r)", conv, ur_attr, ur_value):
+              ur_value = conv(ur_value)
+          return ur_value
+      attr_lc_value = getns(attr + '_lc')
+      if attr_lc_value is not None:
+        return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
@@ -1059,6 +1087,20 @@ class TagSetNamespace(ExtendedNamespace):
           continue
         value0 = plural_value[0]
         return value0
+      if attr and attr[0].isalpha():
+        # no such attribute, create a placeholder `Tag`
+        # for [:alpha:]* names
+        format_placeholder = '{' + self._path + '.' + attr + '}'
+        subns = self._subns(attr)
+        overtag = self.__dict__.get('_tag')
+        subns._tag = Tag(
+            attr,
+            format_placeholder,
+            ontology=overtag.ontology if overtag else None
+        )
+        subns._bool = False
+        self.__dict__[attr] = subns
+        return subns
       return super().__getattr__(attr)
 
   @property
@@ -1136,7 +1178,9 @@ class TagsOntology(SingletonMixin):
   def _singleton_key(cls, tagset_mapping):
     return id(tagset_mapping)
 
-  def _singleton_init(self, tagset_mapping):
+  def __init__(self, tagset_mapping):
+    if hasattr(self, 'tagsets'):
+      return
     self.tagsets = tagset_mapping
 
   def __str__(self):
@@ -1246,3 +1290,104 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+class TagsCommandMixin:
+  ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
+  '''
+
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse a list of tag specifications of the form:
+        * `-`*tag_name*: a negative requirement for *tag_name*
+        * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
+          with optional *value*.
+        Return a list of `TagChoice` for each `arg` in `argv`.
+    '''
+    choices = []
+    for arg in argv:
+      with Pfx(arg):
+        choices.append(TagChoice.from_str(arg))
+    return choices
+
+class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
+                   FormatableMixin):
+  ''' An entity record with its `Tag`s.
+
+      This is a common representation of some tagged entity,
+      and also is the intermediary form used by the `cs.fstags` and
+      `cs.sqltags` import/export CSV format.
+
+      The `id` column has domain specific use.
+      For `cs.sqltags` the `id` attribute will be the database row id.
+      For `cs.fstags` the `id` attribute will be `None`.
+      It is available for other domains as an arbitrary identifier/key value,
+      should that be useful.
+  '''
+
+  @classmethod
+  def from_csvrow(cls, csvrow):
+    ''' Construct a `TaggedEntity` from a CSV row like that from
+        `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
+    '''
+    with Pfx("%s.from_csvrow", cls.__name__):
+      te_unixtime, te_id, te_name = csvrow[:3]
+      tags = TagSet()
+      for i, csv_value in enumerate(csvrow[3:], 3):
+        with Pfx("field %d %r", i, csv_value):
+          tag = Tag.from_string(csv_value)
+          tags.add(tag)
+      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
+
+  @property
+  def csvrow(self):
+    ''' This `TaggedEntity` as a list useful to a `csv.writer`.
+        The inverse of `from_csvrow`.
+    '''
+    return [self.unixtime, self.id, self.name
+            ] + [str(tag) for tag in self.tags]
+
+  def format_tagset(self):
+    ''' Compute a `TagSet` from the tags
+        with additional derived tags.
+
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        via the `TagSet`'s `.format_kwargs()` method.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = TagSet()
+    kwtags.update(self.tags)
+    if self.id is not None:
+      kwtags.add('entity.id', self.id)
+    if self.name is not None:
+      kwtags.add('entity.name', self.name)
+    kwtags.add('entity.unixtime', self.unixtime)
+    dt = unixtime2datetime(self.unixtime)
+    kwtags.add('entity.datetime', dt)
+    kwtags.add('entity.isotime', dt.isoformat())
+    return kwtags
+
+  def format_kwargs(self):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `entity.id`: the id of the entity database record
+        * `entity.name`: the name of the entity database record, if not `None`
+        * `entity.unixtime`: the UNIX timestamp of the entity database record
+        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
+    '''
+    kwtags = self.format_tagset()
+    kwtags['tags'] = str(kwtags)
+    # convert the TagSet to an ExtendedNamespace
+    kwargs = kwtags.format_kwargs()
+    return kwargs

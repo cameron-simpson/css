@@ -1,11 +1,10 @@
 #!/usr/bin/python
 
 r'''
-Lexical analysis functions, tokenisers, transcribers.
-
-An arbitrary assortment of lexical and tokenisation functions useful
+Lexical analysis functions, tokenisers, transcribers:
+an arbitrary assortment of lexical and tokenisation functions useful
 for writing recursive descent parsers, of which I have several.
-There are also some transcription function for producing text
+There are also some transcription functions for producing text
 from various objects, such as `hexify` and `unctrl`.
 
 Generally the get_* functions accept a source string and an offset
@@ -22,7 +21,7 @@ from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
 
-__version__ = '20200318'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -121,13 +120,6 @@ def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with ", ".
   '''
   return sep.join([str(a) for a in ary])
-
-def lastlinelen(s):
-  ''' The length of text after the last newline in a string.
-
-      (Initially used by cs.hier to compute effective text width.)
-  '''
-  return len(s) - s.rfind('\n') - 1
 
 def htmlify(s, nbsp=False):
   ''' Convert a string for safe transcription in HTML.
@@ -303,10 +295,17 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
+
+      `gochars` may also be a callable, in which case a character
+      `ch` is accepted if `gochars(ch)` is true.
   '''
   ooffset = offset
-  while offset < len(s) and s[offset] in gochars:
-    offset += 1
+  if callable(gochars):
+    while offset < len(s) and gochars(s[offset]):
+      offset += 1
+  else:
+    while offset < len(s) and s[offset] in gochars:
+      offset += 1
   return s[ooffset:offset], offset
 
 def get_white(s, offset=0):
@@ -905,6 +904,19 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
+def cropped_repr(s, max_length=32, offset=0):
+  ''' If the length of the sequence `s` after `offset (default `0`)
+      exceeds `max_length` (default 32)
+      return the `repr` of the leading `max_length-3` characters from `offset`
+      plus `'...'`.
+      Otherwise return the `repr` of `s[offset:]`.
+
+      This is typically used for `str` values.
+  '''
+  if len(s) - offset > max_length:
+    return repr(s[offset:offset + max_length - 3]) + '...'
+  return repr(s[offset:])
+
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
       Return `(clausename,new_offset)`.
@@ -933,6 +945,11 @@ def get_ini_clause_entryname(s, offset=0):
   if not entryname:
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
+
+def format_escape(s):
+  ''' Escape {} characters in a string to protect them from `str.format`.
+  '''
+  return s.replace('{', '{{').replace('}', '}}')
 
 class FormatAsError(LookupError):
   ''' Subclass of `LookupError` for use by `format_as`.

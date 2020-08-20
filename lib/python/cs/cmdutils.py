@@ -13,28 +13,33 @@ from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace as NS
-from cs.context import stackattrs
-from cs.lex import cutprefix
+from cs.context import nullcontext, stackattrs
+from cs.deco import cachedmethod
+from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
+from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200318'
+__version__ = '20200615-post'
 
 DISTINFO = {
     'description':
-    "convenience functions for working with the Cmd module and other command line related stuff",
+    "convenience functions for working with the Cmd module, a BaseCommand class for constructing command lines and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.context', 'cs.lex', 'cs.pfx', 'cs.resources'],
+    'install_requires': [
+        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
+        'cs.py.doc', 'cs.resources'
+    ],
 }
 
 def docmd(dofunc):
-  ''' Decorator for Cmd subclass methods
+  ''' Decorator for `cmd.Cmd` subclass methods
       to supply some basic quality of service.
 
       This decorator:
@@ -49,6 +54,8 @@ def docmd(dofunc):
       The intended use is to decorate `cmd.Cmd` `do_`* methods:
 
           from cmd import Cmd
+          from cs.cmdutils import docmd
+          ...
           class MyCmd(Cmd):
             @docmd
             def do_something(...):
@@ -143,16 +150,108 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
-  def add_usage_to_docstring(cls):
-    ''' Append `cls.USAGE_FORMAT` to `cls.__doc__`
-        with format substitutions.
+  def subcommands(cls):
+    ''' Return a mapping of subcommand names to class attributes
+        for attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
+        by default `'cmd_'`.
     '''
-    format_kwargs = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
-    if 'cmd' not in format_kwargs:
-      format_kwargs['cmd'] = cls.__name__
-    cls.__doc__ += '\n\nCommand line usage:\n\n    ' + cls.USAGE_FORMAT.format_map(
-        format_kwargs
-    ).replace('\n', '\n    ')
+    prefix = cls.SUBCOMMAND_METHOD_PREFIX
+    return {
+        cutprefix(attr, prefix): getattr(cls, attr)
+        for attr in dir(cls)
+        if attr.startswith(prefix)
+    }
+
+  @classmethod
+  @cachedmethod
+  def usage_text(cls, *, cmd=None, format_mapping=None):
+    ''' Compute the "Usage: message for this class
+        from the top level `USAGE_FORMAT`
+        and the `'Usage:'`-containing docstrings
+        from its `cmd_*` methods.
+
+        This is a cached method because it tries to update the
+        method docstrings after formatting, which is bad if it
+        happens more than once.
+    '''
+    if cmd is None:
+      cmd = cls.__name__
+    if format_mapping is None:
+      format_mapping = {}
+    if cmd is not None or 'cmd' not in format_mapping:
+      format_mapping['cmd'] = cls.__name__ if cmd is None else cmd
+    usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+    usage_format_mapping.update(format_mapping)
+    usage_format = getattr(cls, 'USAGE_FORMAT', None)
+    subcmds = cls.subcommands()
+    has_subcmds = subcmds and list(subcmds) != ['help']
+    if usage_format is None:
+      usage_format = (
+          r'Usage: {cmd} subcommand [...]'
+          if has_subcmds else 'Usage: {cmd} [...]'
+      )
+    usage_message = usage_format.format_map(usage_format_mapping)
+    if has_subcmds:
+      subusages = []
+      for attr, method in sorted(subcmds.items()):
+        with Pfx(attr):
+          subusage = cls.subcommand_usage_text(attr)
+          if subusage:
+            subusages.append(subusage.replace('\n', '\n  '))
+      if subusages:
+        usage_message = '\n'.join(
+            [usage_message, '  Subcommands:'] + [
+                '    ' + subusage.replace('\n', '\n    ')
+                for subusage in subusages
+            ]
+        )
+    return usage_message
+
+  @classmethod
+  def subcommand_usage_text(cls, subcmd, fulldoc=False):
+    ''' Return the usage text for a subcommand.
+
+        Parameters:
+        * `subcmd`: the subcommand name
+        * `fulldoc`: if true (default `False`)
+          return the full docstring with the Usage section expanded
+          otherwise just return the Usage section.
+    '''
+    method = cls.subcommands()[subcmd]
+    subusage = None
+    try:
+      classy = issubclass(method, BaseCommand)
+    except TypeError:
+      classy = False
+    if classy:
+      subusage = method.usage_text(cmd=subcmd)
+    else:
+      doc = obj_docstring(method)
+      if doc and 'Usage:' in doc:
+        pre_usage, post_usage = doc.split('Usage:', 1)
+        pre_usage = pre_usage.strip()
+        post_usage_parts = post_usage.split('\n\n', 1)
+        post_usage_format = post_usage_parts.pop(0)
+        subusage_format = stripped_dedent(post_usage_format)
+        if subusage_format:
+          mapping = dict(sys.modules[method.__module__].__dict__)
+          mapping.update(cmd=subcmd)
+          subusage = subusage_format.format_map(mapping)
+          if fulldoc:
+            parts = [pre_usage, subusage] if pre_usage else [subusage]
+            parts.extend(post_usage_parts)
+            subusage = '\n\n'.join(parts)
+    return subusage if subusage else None
+
+  @classmethod
+  def add_usage_to_docstring(cls):
+    ''' Append `cls.usage_text()` to `cls.__doc__`.
+    '''
+    usage_message = cls.usage_text()
+    cls.__doc__ += (
+        '\n\nCommand line usage:\n\n    ' +
+        usage_message.replace('\n', '\n    ')
+    )
 
   def apply_defaults(self, options):
     ''' Stub `apply_defaults` method.
@@ -204,6 +303,8 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    if options is None:
+      options = NS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -213,72 +314,66 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    setup_logging(cmd)
+    options.cmd = cmd
+    log_level = getattr(options, 'log_level', None)
+    loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
-    usage_format = getattr(self, 'USAGE_FORMAT')
-    # TODO: is this valid in the case of an already formatted usage string
-    if usage_format:
-      usage_kwargs = dict(getattr(self, 'USAGE_KEYWORDS', {}))
-      usage_kwargs['cmd'] = cmd
-      usage = usage_format.format_map(usage_kwargs)
-    else:
-      usage = None
-    if options is None:
-      options = NS(cmd=cmd, usage=usage)
-      self.apply_defaults(options)
+    usage = self.usage_text(cmd=cmd)
+    options.usage = usage
+    options.loginfo = loginfo
+    self.apply_defaults(options)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
-      # we do this regardless in order to honour --
+      # we do this regardless in order to honour '--'
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
         self.apply_opts(opts, options)
 
-      subcmd_prefix = self.SUBCOMMAND_METHOD_PREFIX
-      subcmd_names = list(
-          map(
-              lambda attr: cutprefix(attr, subcmd_prefix),
-              (attr for attr in dir(self) if attr.startswith(subcmd_prefix))
-          )
-      )
-      if subcmd_names:
-        # look for a subcommand
+      subcmds = self.subcommands()
+      if subcmds and list(subcmds) != ['help']:
+        # expect a subcommand on the command line
         if not argv:
           raise GetoptError(
-              "missing subcommand, expected one of %r" %
-              (sorted(subcmd_names))
+              "missing subcommand, expected one of: %s" %
+              (', '.join(sorted(subcmds.keys())),)
           )
         subcmd = argv.pop(0)
-        subcmd_attr = subcmd_prefix + subcmd
         try:
-          main = getattr(self, subcmd_attr)
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
         except AttributeError:
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %r" %
-              (subcmd, sorted(subcmd_names))
+              "%s: unrecognised subcommand, expected one of: %s" % (
+                  subcmd,
+                  ', '.join(sorted(subcmds.keys())),
+              )
           )
-        if isinstance(main, BaseCommand):
-
-          def run_main(argv, options):
-            ''' Invoke the run method of an instance of the subcommand class.
-            '''
-            return main().run(argv, options=options, cmd=subcmd)
-
-          main = run_main
+        subcmd_context = Pfx(subcmd)
+        try:
+          main_is_class = issubclass(main, BaseCommand)
+        except TypeError:
+          main_is_class = False
+        if main_is_class:
+          cls = main
+          main = lambda argv, options: cls().run(
+              argv, options=options, cmd=subcmd
+          )
       else:
         subcmd = cmd
         try:
           main = self.main
         except AttributeError:
-          raise GetoptError(
-              "no main method and no %s* subcommand methods" %
-              (subcmd_prefix,)
-          )
+          raise GetoptError("no main method and no subcommand methods")
+        subcmd_context = nullcontext()
+      upd_context = options.loginfo.upd
+      if upd_context is None:
+        upd_context = nullcontext()
       with RunState(cmd) as runstate:
         with stackattrs(options, cmd=subcmd, runstate=runstate):
-          with self.run_context(argv, options):
-            with Pfx(subcmd):
-              return main(argv, options)
+          with upd_context:
+            with self.run_context(argv, options):
+              with subcmd_context:
+                return main(argv, options)
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, options, e, usage):
@@ -331,3 +426,31 @@ class BaseCommand:
       yield
     finally:
       pass
+
+  @classmethod
+  def cmd_help(cls, argv, options):
+    ''' Usage: {cmd} [subcommand-names...]
+          Print the help for the named subcommands,
+          or for all subcommands if no names are specified.
+    '''
+    subcmds = cls.subcommands()
+    if argv:
+      fulldoc = True
+    else:
+      fulldoc = False
+      argv = sorted(subcmds)
+    xit = 0
+    print("help:")
+    for subcmd in argv:
+      with Pfx(subcmd):
+        if subcmd not in subcmds:
+          warning("unknown subcommand")
+          xit = 1
+          continue
+        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
+        if not subusage:
+          warning("no help")
+          xit = 1
+          continue
+        print(' ', subusage.replace('\n', '\n    '))
+    return xit

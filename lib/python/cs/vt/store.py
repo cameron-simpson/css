@@ -464,8 +464,8 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
         Parameters:
         * `dstS`: the secondary Store to receive Blocks.
-        * `capacity`: the Queue capacity, arbitrary default 1024.
-        * `progress`: an optional Progress counting submitted and completed data bytes.
+        * `capacity`: the Queue capacity, arbitrary default `64`.
+        * `progress`: an optional `Progress` counting submitted and completed data bytes.
 
         Once called, the caller can then .put Blocks onto the Queue.
         When finished, call Q.close() to indicate end of Blocks and
@@ -735,7 +735,7 @@ class ProxyStore(BasicStoreSync):
       This setup causes all saved data to be saved to `local` and
       `upstream`.
       If a save to `local` or `upstream` fails,
-      for example if the upstream if offline,
+      for example if the upstream is offline,
       the save is repeated to the `spool`,
       intended as a holding location for data needing a resave.
 
@@ -751,7 +751,7 @@ class ProxyStore(BasicStoreSync):
       from the first Store whose glob matches the name.
 
       TODO: replay and purge the spool? probably better as a separate
-      pushto operation ("vt -S spool_store pushto upstream_store").
+      pushto operation ("vt -S spool_store pushto --delete upstream_store").
   '''
 
   def __init__(
@@ -1012,13 +1012,13 @@ class ProxyStore(BasicStoreSync):
         seen.add(h)
 
 class DataDirStore(MappingStore):
-  ''' A MappingStore using a DataDir or RawDataDir as its backend.
+  ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
   '''
 
   def __init__(
       self,
       name,
-      statedirpath,
+      topdirpath,
       *,
       hashclass=None,
       indexclass=None,
@@ -1031,7 +1031,7 @@ class DataDirStore(MappingStore):
 
         Parameters:
         * `name`: Store name.
-        * `statedirpath`: data directory path.
+        * `topdirpath`: top directory path.
         * `hashclass`: hash class, default: `DEFAULT_HASHCLASS`.
         * `indexclass`: passed to the data dir.
         * `rollover`: passed to the data dir.
@@ -1042,19 +1042,15 @@ class DataDirStore(MappingStore):
     if lock is None:
       lock = RLock()
     self._lock = lock
-    self.statedirpath = statedirpath
+    self.topdirpath = topdirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
     self.indexclass = indexclass
     self.rollover = rollover
     datadirclass = RawDataDir if raw else DataDir
-    self._datadir = _PerHashclassMapping(
-        lambda hcls: datadirclass(
-            self.statedirpath,
-            hcls,
-            indexclass=self.indexclass,
-            rollover=self.rollover
-        ), hashclass, self._lock
+    self._datadir = datadirclass(
+        self.topdirpath, hashclass, indexclass=indexclass, rollover=rollover
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
@@ -1085,9 +1081,7 @@ class DataDirStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
-def PlatonicStore(
-    name, statedirpath, *a, meta_store=None, hashclass=None, **kw
-):
+def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
   ''' Factory function for platonic Stores.
 
       This is needed because if a meta_store is specified then it
@@ -1095,9 +1089,9 @@ def PlatonicStore(
       platonic Store.
   '''
   if meta_store is None:
-    return _PlatonicStore(name, statedirpath, *a, hashclass=hashclass, **kw)
+    return _PlatonicStore(name, topdirpath, *a, hashclass=hashclass, **kw)
   PS = _PlatonicStore(
-      name, statedirpath, *a, meta_store=meta_store, hashclass=hashclass, **kw
+      name, topdirpath, *a, meta_store=meta_store, hashclass=hashclass, **kw
   )
   S = ProxyStore(
       name,
@@ -1115,7 +1109,7 @@ class _PlatonicStore(MappingStore):
   def __init__(
       self,
       name,
-      statedirpath,
+      topdirpath,
       *,
       hashclass=None,
       indexclass=None,
@@ -1129,12 +1123,12 @@ class _PlatonicStore(MappingStore):
     if lock is None:
       lock = RLock()
     self.lock = lock
-    self.statedirpath = statedirpath
+    self.topdirpath = topdirpath
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     self._datadir = _PerHashclassMapping(
         lambda hcls: PlatonicDir(
-            self.statedirpath,
+            self.topdirpath,
             hcls,
             indexclass=indexclass,
             follow_symlinks=follow_symlinks,

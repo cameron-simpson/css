@@ -1,0 +1,4 @@
+New get_ini_clausename to parse "[clausename]".
+New get_ini_clause_entryname parsing "[clausename]entryname".
+New cropped_repr for returning a shortened repr()+"..." if the length exceeds a threshold.
+New format_escape function to double {} characters to survive str.format.

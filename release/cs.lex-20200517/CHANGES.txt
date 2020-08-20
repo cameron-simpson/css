@@ -1,0 +1,5 @@
+lib/python/cs/lex.py: cs.lex: new get_ini_clausename to parse "[clausename]" from cs.vt.compose; cs.vt: use the function from cs.lex
+lib/python/cs/lex.py: cs.lex, cs.vt: new get_ini_clause_entryname parsing "[clausename]entryname"
+lib/python/cs/lex.py: cs.lex: new cropped_repr for returning a shortened repr()+"..." if the length exceeds a threshold
+lib/python/cs/lex.py: cs.lex: new format_escape function to double {} characters to survive str.format
+lib/python/cs/lex.py: cs.lex: beef up the description a little

@@ -9,11 +9,13 @@
 
 from __future__ import with_statement
 from collections import namedtuple
+from os.path import isdir as isdirpath
 from tempfile import TemporaryFile
 from threading import Thread
 from icontract import require
 from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
+from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import RunState, RunStateMixin
 from cs.result import Result
@@ -163,6 +165,7 @@ class FileDataMappingProxy(RunStateMixin):
       storage.
   '''
 
+  @pfx_method
   def __init__(
       self,
       backend,
@@ -190,6 +193,8 @@ class FileDataMappingProxy(RunStateMixin):
     if max_cachefiles is None:
       max_cachefiles = DEFAULT_MAX_CACHEFILES
     self.backend = backend
+    if not isdirpath(dirpath):
+      raise ValueError("dirpath=%r: not a directory" % (dirpath,))
     self.dirpath = dirpath
     self.max_cachefile_size = max_cachefile_size
     self.max_cachefiles = max_cachefiles

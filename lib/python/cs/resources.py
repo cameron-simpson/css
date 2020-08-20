@@ -17,9 +17,11 @@ from cs.obj import Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
+from cs.pfx import XP
+
+__version__ = '20200718-post'
+
 DISTINFO = {
-    'description':
-    "resourcing related classes and functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -51,7 +53,17 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-_mom_lockclass = RLock
+class _mom_state(object):
+
+  def __init__(self):
+    self.opened = False
+    self._opens = 0
+    self._opened_from = {}
+    ##self.closed = False # final _close() not yet called
+    self._final_close_from = None
+    self._lock = RLock()
+    self._finalise_later = False
+    self._finalise = None
 
 ## debug: TrackedClassMixin
 class MultiOpenMixin(object):
@@ -68,38 +80,36 @@ class MultiOpenMixin(object):
       Multithread safe.
 
       Classes using this mixin need to define `.startup` and `.shutdown`.
+
+      TODO:
+      * `subopens`: if true (default false) then `.open` will return
+        a proxy object with its own `.closed` attribute set by the
+        proxy's `.close`.
   '''
 
-  def __init__(self, finalise_later=False):
-    ''' Initialise the `MultiOpenMixin` state.
-
-        Parameters:
-        * `finalise_later`: do not notify the finalisation `Condition`
-          on shutdown, instead require a separate call to `.finalise()`.
-          This is mode is useful for objects such as queues where
-          the final close prevents further `.put` calls, but users
-          calling `.join` may need to wait for all the queued items
-          to be processed.
-
-        TODO:
-        * `subopens`: if true (default false) then `.open` will return
-          a proxy object with its own `.closed` attribute set by the
-          proxy's `.close`.
+  def __mo_getstate(self):
+    ''' Fetch the state object for the mixin,
+        something of a hack to avoid providing an __init__.
     '''
-    ##INACTIVE##TrackedClassMixin.__init__(self, MultiOpenMixin)
-    self.opened = False
-    self._opens = 0
-    self._opened_from = {}
-    ##self.closed = False # final _close() not yet called
-    self._final_close_from = None
-    self.__mo_lock = _mom_lockclass()
-    self._finalise_later = finalise_later
-    self._finalise = None
+    try:
+      return self.__mo_state
+    except AttributeError:
+      state = self.__mo_state = _mom_state()
+      return state
+
+  @property
+  def finalise_later(self):
+    return self.__mo_getstate()._finalise_later
+
+  @finalise_later.setter
+  def finalise_later(self, truthy):
+    self.__mo_getstate()._finalise_later = truthy
 
   def tcm_get_state(self):
     ''' Support method for `TrackedClassMixin`.
     '''
-    return {'opened': self.opened, 'opens': self._opens}
+    state = self.__mo_getstate()
+    return {'opened': state.opened, 'opens': state._opens}
 
   def __enter__(self):
     self.open(caller_frame=caller())
@@ -113,18 +123,19 @@ class MultiOpenMixin(object):
     ''' Increment the open count.
         On the first `.open` call `self.startup()`.
     '''
+    state = self.__mo_getstate()
     if False:
       if caller_frame is None:
         caller_frame = caller()
       frame_key = caller_frame.filename, caller_frame.lineno
-      self._opened_from[frame_key] = self._opened_from.get(frame_key, 0) + 1
-    self.opened = True
-    with self.__mo_lock:
-      opens = self._opens
+      state._opened_from[frame_key] = state._opened_from.get(frame_key, 0) + 1
+    state.opened = True
+    with state._lock:
+      opens = state._opens
       opens += 1
-      self._opens = opens
+      state._opens = opens
       if opens == 1:
-        self._finalise = Condition(self.__mo_lock)
+        state._finalise = Condition(state._lock)
         self.startup()
     return self
 
@@ -147,20 +158,21 @@ class MultiOpenMixin(object):
           even if the original open never happened.
           (I'm looking at you, `cs.resources.RunState`.)
     '''
-    if not self.opened:
+    state = self.__mo_getstate()
+    if not state.opened:
       if unopened_ok:
         return None
       raise RuntimeError("%s: close before initial open" % (self,))
     retval = None
-    with self.__mo_lock:
-      opens = self._opens
+    with state._lock:
+      opens = state._opens
       if opens < 1:
         error("%s: UNDERFLOW CLOSE", self)
-        error("  final close was from %s", self._final_close_from)
-        for frame_key in sorted(self._opened_from.keys()):
+        error("  final close was from %s", state._final_close_from)
+        for frame_key in sorted(state._opened_from.keys()):
           error(
               "  opened from %s %d times", frame_key,
-              self._opened_from[frame_key]
+              state._opened_from[frame_key]
           )
         ##from cs.debug import thread_dump
         ##from threading import current_thread
@@ -168,14 +180,14 @@ class MultiOpenMixin(object):
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return retval
       opens -= 1
-      self._opens = opens
+      state._opens = opens
       if opens == 0:
-        ##INACTIVE##self.tcm_dump(MultiOpenMixin)
+        ##INACTIVE##state.tcm_dump(MultiOpenMixin)
         if caller_frame is None:
           caller_frame = caller()
-        self._final_close_from = caller_frame
+        state._final_close_from = caller_frame
         retval = self.shutdown()
-        if not self._finalise_later:
+        if not state._finalise_later:
           self.finalise()
     if enforce_final_close and opens != 0:
       raise RuntimeError(
@@ -188,11 +200,12 @@ class MultiOpenMixin(object):
         Normally this is called automatically after `.shutdown` unless
         `finalise_later` was set to true during initialisation.
     '''
-    with self.__mo_lock:
-      finalise = self._finalise
+    state = self.__mo_getstate()
+    with state._lock:
+      finalise = state._finalise
       if finalise is None:
         raise RuntimeError("%s: finalised more than once" % (self,))
-      self._finalise = None
+      state._finalise = None
       finalise.notify_all()
 
   @property
@@ -200,11 +213,12 @@ class MultiOpenMixin(object):
     ''' Whether this object has been closed.
         Note: False if never opened.
     '''
-    if self._opens > 0:
+    state = self.__mo_getstate()
+    if state._opens > 0:
       return False
-    ##if self._opens < 0:
-    ##  raise RuntimeError("_OPENS UNDERFLOW: _opens < 0: %r" % (self._opens,))
-    if not self.opened:
+    ##if state._opens < 0:
+    ##  raise RuntimeError("_OPENS UNDERFLOW: _opens < 0: %r" % (state._opens,))
+    if not state.opened:
       # never opened, so not totally closed
       return False
     return True
@@ -216,11 +230,12 @@ class MultiOpenMixin(object):
         Normally this is notified at the end of the shutdown procedure
         unless the object's `finalise_later` parameter was true.
     '''
-    self.__mo_lock.acquire()
-    if self._finalise:
-      self._finalise.wait()
+    state = self.__mo_getstate()
+    state._lock.acquire()
+    if state._finalise:
+      state._finalise.wait()
     else:
-      self.__mo_lock.release()
+      state._lock.release()
 
   @staticmethod
   def is_opened(func):
@@ -248,7 +263,7 @@ class MultiOpenMixin(object):
 class _SubOpen(Proxy):
   ''' A single use proxy for another object with its own independent .closed attribute.
 
-      The target use case is MultiOpenMixins which return independent
+      The target use case is `MultiOpenMixin`s which return independent
       closables from their .open method.
   '''
 
@@ -346,7 +361,7 @@ class RunState(object):
       should stop (`.cancel`)
       and has stopped (`.stop`).
 
-      A `RunState` can be used a a context manager, with the enter
+      A `RunState` can be used as a context manager, with the enter
       and exit methods calling `.start` and `.stop` respectively.
       Note that if the suite raises an exception
       then the exit method also calls `.cancel` before the call to `.stop`.

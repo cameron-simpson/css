@@ -10,9 +10,9 @@
 import sys
 from random import randint
 import unittest
-from .randutils import randblock
 import cs.x
 from cs.x import X
+from cs.randutils import randomish_chunks
 from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
 from .store import MappingStore
@@ -27,6 +27,7 @@ class TestAll(unittest.TestCase):
     ''' Unit test setup.
     '''
     self.S = MappingStore("TestAll", {})
+    self.chunk_source = randomish_chunks(1, 16384)
 
   def _gen_data(self, depth, width):
     ''' Generate a block tree of the specified width and height filled with random data.
@@ -41,7 +42,7 @@ class TestAll(unittest.TestCase):
     with S:
       for _ in range(width):
         if depth == 0:
-          flat_data = randblock(randint(1, 16384))
+          flat_data = next(self.chunk_source)
           ##flat_data = bytes(randint(1, 16384))
           top_block = HashCodeBlock(data=flat_data)
         else:
