@@ -98,7 +98,7 @@ from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
@@ -263,7 +263,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in options:
       with Pfx(option):
         if option == '-a':
-          all_paths = true
+          all_paths = True
         elif option == '--direct':
           use_direct_tags = True
         else:
