@@ -98,7 +98,7 @@ from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
@@ -263,7 +263,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in options:
       with Pfx(option):
         if option == '-a':
-          all_paths = true
+          all_paths = True
         elif option == '--direct':
           use_direct_tags = True
         else:
@@ -1200,30 +1200,32 @@ class FSTags(MultiOpenMixin):
         tags = tagsets[old_name]
         tags.set_from(new_tags, verbose=state.verbose)
         if old_name != new_name:
-          if new_name in tagsets:
-            warning("new name %r already exists", new_name)
-            new_name = old_name
-            ok = False
-          else:
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if existspath(new_path):
-                warning("new path exists, not renaming to %r", new_path)
-                ok = False
-                new_name = old_name
-              else:
-                verbose("=> %r", new_name)
-                with Pfx("rename => %r", new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    new_name = old_name
-                  else:
-                    del tagsets[old_name]
-                    tagsets[new_name] = tags
+          old_path = joinpath(dirpath, old_name)
+          if existspath(old_path):
+            new_path = joinpath(dirpath, new_name)
+            if existspath(new_path):
+              warning("new path exists, not renaming to %r", new_path)
+              ok = False
+              new_name = old_name
+            else:
+              verbose("=> %r", new_name)
+              with Pfx("rename => %r", new_path):
+                try:
+                  os.rename(old_path, new_path)
+                except OSError as e:
+                  warning("%s", e)
+                  ok = False
+                  new_name = old_name
+                else:
+                  # preserve nonconflicting tags at the target
+                  existing_tags = tagsets.get(new_name)
+                  if existing_tags:
+                    for tag_name, tag_value in existing_tags.items():
+                      if tag_name not in tags:
+                        tags.set(tag_name, tag_value, verbose=state.verbose)
+                  # switch in the new tags
+                  del tagsets[old_name]
+                  tagsets[new_name] = tags
     return ok
 
   def scrub(self, path):
