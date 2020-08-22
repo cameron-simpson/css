@@ -13,6 +13,7 @@
     documented under the `SQLTagsCommand` class below.
 '''
 
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 import csv
 from datetime import datetime
@@ -33,9 +34,8 @@ from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import sessionmaker, aliased
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.dateutils import UNIXTimeMixin, unixtime2datetime
+from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
-from cs.edit import edit_strings
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix
 from cs.logutils import error, warning, ifverbose
@@ -49,6 +49,7 @@ from cs.tagset import (
     TagSet as _TagSet, Tag, TagChoice as _TagChoice, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
+from cs.upd import print    # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -102,7 +103,7 @@ def verbose(msg, *a):
 class _Criterion(ABC):
 
   @abstractmethod
-  def extend_query(sqla_query, *, orm):
+  def extend_query(self, sqla_query, *, orm):
     ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
         returning the extended Query.
     '''
@@ -279,7 +280,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     opts, argv = getopt(argv, 'u')
     for option, value in opts:
       with Pfx(option):
-        if option == '-u' or option == '--update':
+        if option in ('-u', '--update'):
           update_mode = True
         else:
           raise RuntimeError("unsupported option")
@@ -712,7 +713,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           tag_criteria,
           *,
           session,
-          with_tags=False,
           name=None,
           query=None
       ):
@@ -734,7 +734,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             all the objects will be converted to `TagChoice`s
             and used to construct the query.
         '''
-        tags = orm.tags
         if query is None:
           query = cls.by_name(name=name, session=session)
         elif name is not None:
