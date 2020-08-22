@@ -240,7 +240,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in opts:
       with Pfx(option):
         if option == '-o':
-          output_format = sqltags.resolve_format_string(value)
+          ## TODO: indirects through the config file
+          ## output_format = sqltags.resolve_format_string(value)
+          output_format = value
         else:
           raise RuntimeError("unsupported option")
     try:
@@ -669,6 +671,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           # obtain the id value from the database
           session.add(self)
           session.flush()
+        # TODO: upsert!
         etag = tags.lookup1(session=session, entity_id=self.id, name=tag.name)
         if etag is None:
           etag = tags(entity_id=self.id, name=tag.name)
