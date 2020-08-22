@@ -100,7 +100,7 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
@@ -2010,6 +2010,7 @@ class RegexpTagRule:
           tags.append(tag)
     return tags
 
+@pfx
 def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
