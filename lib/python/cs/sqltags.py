@@ -195,7 +195,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     db_url = options.db_url
     sqltags = SQLTags(db_url)
-    with stackattrs(options, sqltags=sqltags):
+    with stackattrs(options, sqltags=sqltags, verbose=True):
       with sqltags:
         yield
 
