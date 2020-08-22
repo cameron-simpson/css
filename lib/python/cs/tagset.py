@@ -10,7 +10,7 @@
     not directly associated with filesystem objects.
     This is suited to both log entries (entities with no "name")
     and large collections of named entities;
-    both accept `Tag`s and can be seached on that basis.
+    both accept `Tag`s and can be searched on that basis.
 
     All of the available complexity is optional:
     you can use `Tag`s without bothering with `TagSet`s
@@ -643,7 +643,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @pfx_method(use_str=True)
   def type(self):
-    ''' The type name for this tag.
+    ''' The type name for this `Tag`.
 
         Unless the definition for `self.name` has a `type` tag,
         the type is `self.ontology.value_to_tag_name(self.name)`.
@@ -657,7 +657,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         The corresponding metadata `TagSet` for that tag
         would have the name `series.marvel.avengers`.
 
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel"}`
+        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel)"}`
         would look up the definition for `cast`
         which might look like this:
 
@@ -1237,9 +1237,9 @@ class TagsOntology(SingletonMixin):
     return None
 
   def basetype(self, typename):
-    ''' Infer the base type from a type name.
+    ''' Infer the base type name from a type name.
         The default type is `'str'`,
-        but any type which resolves to one in `BASE_TYPES`
+        but any type which resolves to one in `self.BASE_TYPES`
         may be returned.
     '''
     typename0 = typename
