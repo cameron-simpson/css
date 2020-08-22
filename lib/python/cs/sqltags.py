@@ -211,7 +211,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     sqltags = options.sqltags
     badopts = False
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -243,7 +243,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise RuntimeError("unsupported option")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -363,7 +363,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       if sys.stdin.isatty():
         warning("reading log lines from stdin...")
     cmdline_headline = argv.pop(0)
-    log_tags = cls.parse_tag_choices(argv)
+    log_tags = cls.parse_tagset_criteria(argv)
     for log_tag in log_tags:
       with Pfx(log_tag):
         if not log_tag.choice:
@@ -471,7 +471,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -1063,7 +1063,7 @@ class SQLTags(MultiOpenMixin):
     for te in self._run_query(query, session=session):
       ok = True
       for criterion in more_criteria:
-        if not criterion(te):
+        if not criterion.match(te.tags):
           ok = False
           break
       if ok:

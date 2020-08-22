@@ -273,7 +273,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       path = argv.pop(0)
       try:
-        tag_choices = cls.parse_tag_choices(argv)
+        tag_choices = cls.parse_tagset_criteria(argv)
       except ValueError as e:
         warning("bad tag specifications: %s", e)
         badopts = True
@@ -328,7 +328,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
@@ -765,7 +765,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -806,7 +806,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               raise GetoptError("missing tags")
             badopts = False
             try:
-              tag_choices = cls.parse_tag_choices(argv)
+              tag_choices = cls.parse_tagset_criteria(argv)
             except ValueError as e:
               warning("bad tag specifications: %s", e)
               badopts = True
@@ -840,7 +840,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing tag choice")
     tag_choice = argv.pop(0)
     try:
-      tag_choices = cls.parse_tag_choices([tag_choice])
+      tag_choices = cls.parse_tagset_criteria([tag_choice])
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -883,7 +883,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
