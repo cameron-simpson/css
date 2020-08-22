@@ -718,6 +718,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       ):
         ''' Construct a query to match `Entity` rows
             matching `name` and the supplied `tag_criteria`.
+            Return the `(query,other_criteria)`
+            being the SQLAlchemy `Query` and a list of other criteria
+            not expressible with SQL
+            which should be applied to the resulting entities.
 
             If `name` is omitted or `None` the query will match log entities
             otherwise the entity with the specified `name`.
@@ -726,60 +730,26 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             in which case it will be extended.
 
             The `tag_criteria` should be an iterable
-            yielding any of the following types:
-            * `TagChoice`: used as a positive or negative test
-            * `Tag`: an object with a `.name` and `.value`
-              is equivalent to a positive `TagChoice`
-            * `(name,value)`: a 2 element sequence
-              is equivalent to a positive `TagChoice`
-            * `str`: a string tests for the presence
-              of a tag with that name;
-              if the string commences with a `'-'` (minus)
-              a negative test is made
+            of objects acceptable to `TagChoice.from_any`;
+            all the objects will be converted to `TagChoice`s
+            and used to construct the query.
         '''
         tags = orm.tags
         if query is None:
           query = cls.by_name(name=name, session=session)
         elif name is not None:
           raise ValueError("cannot supply both a query and a name")
+        other_criteria = []
         for taggy in tag_criteria:
           with Pfx(taggy):
-            if isinstance(taggy, str):
-              tag_choice = TagChoice.from_str(taggy)
-            elif hasattr(taggy, 'choice'):
-              tag_choice = taggy
-            elif hasattr(taggy, 'name'):
-              tag_choice = TagChoice(None, True, taggy)
+            tag_choice = TagChoice.from_any(taggy)
+            try:
+              query_extender = tag_choice.extend_query
+            except AttributeError:
+              other_criteria.append(tag_choice)
             else:
-              name, value = taggy
-              tag_choice = TagChoice(None, True, Tag(name, value))
-            choice = tag_choice.choice
-            tag = tag_choice.tag
-            tags_alias = aliased(tags)
-            tag_column, tag_test_value = tags_alias.value_test(tag.value)
-            match = tags_alias.name == tag.name,
-            isouter = False
-            if choice:
-              # positive test
-              if tag_test_value is None:
-                # just test for presence
-                pass
-              else:
-                # test for presence and value
-                match = *match, tag_column == tag_test_value
-            else:
-              # negative test
-              isouter = True
-              if tag_column is None:
-                # just test for absence
-                match = *match, tags_alias.id is None
-              else:
-                # test for absence or incorrect value
-                match = *match, or_(
-                    tags_alias.id is None, tag_column != tag_test_value
-                )
-            query = query.join(tags_alias, isouter=isouter).filter(*match)
-        return query
+              query = query_extender(query, orm=orm)
+        return query, other_criteria
 
       @classmethod
       @pfx_method
@@ -1077,13 +1047,27 @@ class SQLTags(MultiOpenMixin):
     yield from entity_map.values()
 
   @orm_auto_session
-  def find(self, tag_choices, *, session):
+  def find(self, tag_choices, *, more_criteria=None, session):
     ''' Generator yielding `TaggedEntity` instances
         for the `Entity` rows matching `tag_choices`.
     '''
+    if more_criteria is None:
+      more_criteria = []
     entities = self.orm.entities
-    query = entities.by_tags(tag_choices, session=session)
-    yield from self._run_query(query, session=session)
+    query, other_criteria = entities.by_tags(tag_choices, session=session)
+    XP("QUERY = %s", query)
+    more_criteria.extend(other_criteria)
+    if not more_criteria:
+      yield from self._run_query(query, session=session)
+      return
+    for te in self._run_query(query, session=session):
+      ok = True
+      for criterion in more_criteria:
+        if not criterion(te):
+          ok = False
+          break
+      if ok:
+        yield te
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
