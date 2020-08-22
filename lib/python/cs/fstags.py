@@ -72,7 +72,6 @@
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 import csv
-from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -83,7 +82,6 @@ from os.path import (
     samefile, splitext
 )
 from pathlib import PurePath
-import re
 import shutil
 import sys
 import threading
@@ -95,15 +93,16 @@ from cs.deco import fmtdoc
 from cs.edit import edit_strings
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
+    get_nonwhite, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
+    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin,
+    RegexpTagRule
 )
 from cs.threads import locked, locked_property
 from cs.upd import Upd
@@ -262,7 +261,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in options:
       with Pfx(option):
         if option == '-a':
-          all_paths = true
+          all_paths = True
         elif option == '--direct':
           use_direct_tags = True
         else:
@@ -1166,7 +1165,6 @@ class FSTags(MultiOpenMixin):
     tags = (
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
-    ok = True
     for tag_choice in tag_choices:
       if not tag_choice.match(tags):
         return False
@@ -1942,7 +1940,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
-    U and U.out(dirpath)
+    U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:
