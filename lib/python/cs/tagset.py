@@ -1285,20 +1285,34 @@ class TagsOntology(SingletonMixin):
 
 class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
+
+      Optional subclass attributes:
+      * `TAG_CHOICE_CLASS`: a `TagChoice` duck class.
+        For example, `cs.sqltags` has a subclass
+        with an `.extend_query` method for computing an SQL JOIN
+        used in searching for tagged entities.
   '''
 
-  @staticmethod
-  def parse_tag_choices(argv):
-    ''' Parse a list of tag specifications of the form:
+  @classmethod
+  def parse_tag_choices(cls, argv, tag_choice_class=None):
+    ''' Parse a list of tag specifications `argv` of the form:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
-        Return a list of `TagChoice` for each `arg` in `argv`.
+        Return a list of `TagChoice` instances for each `arg` in `argv`.
+
+        The optional parameter `tag_choice_class` is a class
+        with a `.from_str(str)` factory method
+        returning a `TagChoice` duck instance.
+        The default `tag_choice_class` is `cls.TAG_CHOICE_CLASS`
+        or `TagChoice`.
     '''
+    if tag_choice_class is None:
+      tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagChoice)
     choices = []
     for arg in argv:
       with Pfx(arg):
-        choices.append(TagChoice.from_str(arg))
+        choices.append(tag_choice_class.from_str(arg))
     return choices
 
 class TaggedEntityMixin(FormatableMixin):
