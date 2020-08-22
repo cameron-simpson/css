@@ -162,9 +162,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
-  GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]'''
-
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
