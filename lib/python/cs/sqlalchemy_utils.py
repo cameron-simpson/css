@@ -41,6 +41,7 @@ class _State(thread_local):
   '''
 
   def __init__(self):
+    super().__init__()
     self.orm = None
     self.session = None
 
@@ -66,6 +67,24 @@ def with_orm(function, *a, orm=None, **kw):
 
 @contextmanager
 def using_session(orm=None, session=None):
+  ''' A context manager to prepare an SQLAlchemy session
+      for use by a suite.
+
+      Parameters:
+      * `orm`: optional reference ORM,
+        an object with a `.session()` method for creating a new session.
+        Default: if needed, obtained from the global `_state.orm`.
+      * `session`: optional existing session.
+        Default: the global `_state.session` if not `None`,
+        otherwise created by `orm.session()`.
+
+      If a new session is created, the new session and reference ORM
+      are pushed onto the globals `_state.session` and `_state.orm`
+      respectively.
+
+      If an existing session is reused,
+      the suite runs within a savepoint from `session.begin_nested()`.
+  '''
   # use the shared state session if no session is supplied
   if session is None:
     session = _state.session
@@ -131,15 +150,15 @@ def auto_session(function):
     def wrapper(*a, orm=None, session=None, **kw):
       ''' Yield from the function with a session.
       '''
-      with using_session(orm=orm, session=session) as session:
-        yield from function(*a, session=session, **kw)
+      with using_session(orm=orm, session=session) as active_session:
+        yield from function(*a, session=active_session, **kw)
   else:
 
     def wrapper(*a, orm=None, session=None, **kw):
       ''' Call the function with a session.
       '''
-      with using_session(orm=orm, session=session) as session:
-        return function(*a, session=session, **kw)
+      with using_session(orm=orm, session=session) as active_session:
+        return function(*a, session=active_session, **kw)
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
   wrapper.__doc__ = function.__doc__
@@ -282,15 +301,15 @@ def orm_auto_session(method):
     def wrapper(self, *a, session=None, **kw):
       ''' Yield from the method with a session.
       '''
-      with using_session(orm=self.orm, session=session) as session:
-        yield from method(self, *a, session=session, **kw)
+      with using_session(orm=self.orm, session=session) as active_session:
+        yield from method(self, *a, session=active_session, **kw)
   else:
 
     def wrapper(self, *a, session=None, **kw):
       ''' Call the method with a session.
       '''
-      with using_session(orm=self.orm, session=session) as session:
-        return method(self, *a, session=session, **kw)
+      with using_session(orm=self.orm, session=session) as active_session:
+        return method(self, *a, session=active_session, **kw)
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
