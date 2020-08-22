@@ -46,7 +46,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet as _TagSet, Tag, TagChoice, TagsCommandMixin, TaggedEntity
+    TagSet as _TagSet, Tag, TagChoice as _TagChoice, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
 
@@ -98,6 +98,50 @@ def verbose(msg, *a):
   ''' Emit message if in verbose mode.
   '''
   ifverbose(state.verbose, msg, *a)
+
+class _Criterion(ABC):
+
+  @abstractmethod
+  def extend_query(sqla_query, *, orm):
+    ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
+        returning the extended Query.
+    '''
+    raise NotImplemented
+
+class TagChoice(_TagChoice, _Criterion):
+  ''' A `cs.tagset.TagChoice` extended with a `.extend_query` method.
+  '''
+
+  def extend_query(self, sqla_query, *, orm):
+    ''' Extend the SQLAlchemy `Query` `sqla_query`
+        to match this `TagChoice`.
+        Return the new `Query`.
+    '''
+    tag = self.tag
+    tags_alias = aliased(orm.tags)
+    tag_column, tag_test_value = tags_alias.value_test(tag.value)
+    match = [tags_alias.name == tag.name]
+    isouter = False
+    if self.choice:
+      # positive test
+      if tag_test_value is None:
+        # just test for presence
+        pass
+      else:
+        # test for presence and value
+        match.append(tag_column == tag_test_value)
+    else:
+      # negative test
+      isouter = True
+      if tag_column is None:
+        # just test for absence
+        match.append(tags_alias.id is None)
+      else:
+        # test for absence or incorrect value
+        match.append(
+            or_(tags_alias.id is None, tag_column != tag_test_value)
+        )
+    return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
