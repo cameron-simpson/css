@@ -1506,7 +1506,8 @@ class TaggedEntityMixin(FormatableMixin):
     kwtags.add('entity.unixtime', self.unixtime)
     dt = unixtime2datetime(self.unixtime)
     kwtags.add('entity.datetime', dt)
-    kwtags.add('entity.isotime', dt.isoformat())
+    kwtags.add('entity.isodatetime', dt.isoformat())
+    kwtags.add('entity.isodate', dt.strftime('%Y-%m-%d'))
     return kwtags
 
   def format_kwargs(self):
