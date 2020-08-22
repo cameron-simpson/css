@@ -842,6 +842,11 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       return cls(None, True, Tag(name, value))
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
+  def match(self, tags):
+    ''' Test this `TagChoice` against the `Tag`s in `tags`.
+    '''
+    return self.tag in tags if self.choice else self.tag not in tags
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
