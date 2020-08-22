@@ -1167,17 +1167,10 @@ class FSTags(MultiOpenMixin):
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
     ok = True
-    for _, choice, tag in tag_choices:
-      if choice:
-        # tag_choice not present or not with same nonNone value
-        if tag not in tags:
-          ok = False
-          break
-      else:
-        if tag in tags:
-          ok = False
-          break
-    return ok
+    for tag_choice in tag_choices:
+      if not tag_choice.match(tags):
+        return False
+    return True
 
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
