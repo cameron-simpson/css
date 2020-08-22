@@ -147,6 +147,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
   '''
 
+  TAG_CHOICE_CLASS = TagChoice
+
   GETOPT_SPEC = 'f:'
 
   # TODO:
