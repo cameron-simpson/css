@@ -12,6 +12,8 @@ from cs.py3 import Queue
 from cs.queues import TimerQueue
 
 class TestTimerQueue(unittest.TestCase):
+  ''' Test `cs.queues.TimerQueue`.
+  '''
 
   def setUp(self):
     self.TQ = TimerQueue()

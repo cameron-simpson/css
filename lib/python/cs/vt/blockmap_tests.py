@@ -12,7 +12,7 @@ from random import randint
 import unittest
 import cs.x
 from cs.x import X
-from .randutils import randomish_chunks
+from cs.randutils import randomish_chunks
 from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
 from .store import MappingStore

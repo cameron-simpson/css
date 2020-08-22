@@ -688,8 +688,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
+        Returns `None` if there is no ontology.
 
-        This calls `TagsOntology.basetype(self.type)`.
+        This calls `TagsOntology.basetype(self.ontology,self.type)`.
     '''
     ont = self.ontology
     if ont is None:
@@ -938,6 +939,10 @@ class ExtendedNamespace(SimpleNamespace):
     return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
 
   def __str__(self):
+    ''' Return a visible placeholder, supporting exposing this object
+        in a format string so that the user knows there wasn't a value
+        at this point in the dotted path.
+    '''
     return '{' + type(self).__name__ + ':' + ','.join(
         str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
     ) + '}'
@@ -980,22 +985,10 @@ class ExtendedNamespace(SimpleNamespace):
     return subns
 
   def __getattr__(self, attr):
-    ''' Autogenerate stub subnamespacs for [:alpha:]* attributes
-        containing a `Tag` for the attribute with a placeholder string.
+    ''' Just a stub so that (a) subclasses can call `super().__getattr__`
+        and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    if attr and attr[0].isalpha():
-      # no such attribute, create a placeholder `Tag`
-      # for [:alpha:]* names
-      format_placeholder = '{' + self._path + '.' + attr + '}'
-      subns = self._subns(attr)
-      overtag = self.__dict__.get('_tag')
-      subns._tag = Tag(
-          attr,
-          format_placeholder,
-          ontology=overtag.ontology if overtag else None
-      )
-      return subns
-    raise AttributeError("%s: %s" % (self._path, attr))
+    raise AttributeError("%s:.%s" % (self._path, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -1022,12 +1015,12 @@ class TagSetNamespace(ExtendedNamespace):
   @pfx_method
   def from_tagset(cls, tags, pathnames=None):
     ''' Compute and return a presentation of this `TagSet` as a
-        nested `ExtendedNamespace`.
+        nested `TagSetNamespace`.
 
-        `ExtendedNamespace`s provide a number of convenience attibutes
-        derived from the concrete attributes. They are also usable
-        as mapping in `str.format_map` and the like as they implement
-        the `keys` and `__getitem__` methods.
+        `TagSetNamespace`s provide a number of convenience attributes
+        derived from the concrete attributes. a `TagSetNamespace` is also 
+        usable as a mapping in `str.format_map` and the like as it 
+        implements the `keys` and `__getitem__` methods.
 
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
@@ -1067,6 +1060,11 @@ class TagSetNamespace(ExtendedNamespace):
               ns = subns
           ns._tag = tag
     return ns0
+
+  def __bool__(self):
+    ''' Truthiness: `True` unless the `._bool` attribute overrides that.
+    '''
+    return getattr(self, '_bool', True)
 
   @pfx_method
   def __format__(self, spec):
@@ -1142,8 +1140,8 @@ class TagSetNamespace(ExtendedNamespace):
           If *baseattr* exists,
           return its value lowercased via `cs.lex.lc_()`.
           Conversely, if *baseattr* is required
-          and does not directly exists
-          but its *baseattr*`_lc` form does,
+          and does not directly exist
+          but its *baseattr*`_lc` form *does*,
           return the value of *baseattr*`_lc`
           titlelified using `cs.lex.titleify_lc()`.
         * *baseattr*`s`, *baseattr*`es`: singular/plural.
@@ -1152,6 +1150,10 @@ class TagSetNamespace(ExtendedNamespace):
           Conversely,
           if *baseattr* does not exist but one of its plural attributes does,
           return the first element from the plural attribute.
+        * `[:alpha:]*`:
+          an identifierish name binds to a stub subnamespace
+          so the `{a.b.c.d}` in a format string
+          can be replaced with itself to present the undefined name in full.
     '''
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
@@ -1185,17 +1187,22 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
-      # attr vs attr_lc
-      title_attr = cutsuffix(attr, '_lc')
-      if title_attr is not attr:
-        title_value = self._attr_tag_value(title_attr)
-        if title_value is not None:
-          value_lc = lc_(title_value)
-          return value_lc
-      else:
-        attr_lc_value = getns(attr + '_lc')
-        if attr_lc_value is not None:
-          return titleify_lc(value)
+      for conv_suffix, conv in {
+          'i': int,
+          's': str,
+          'f': float,
+          'lc': lc_,
+      }.items():
+        ur_attr = cutsuffix(attr, '_' + conv_suffix)
+        if ur_attr is not attr:
+          ur_value = self._attr_tag_value(ur_attr)
+          if ur_value is not None:
+            with Pfx("%s(.%s=%r)", conv, ur_attr, ur_value):
+              ur_value = conv(ur_value)
+          return ur_value
+      attr_lc_value = getns(attr + '_lc')
+      if attr_lc_value is not None:
+        return titleify_lc(value)
       # plural from singular
       for pl_suffix in 's', 'es':
         single_attr = cutsuffix(attr, pl_suffix)
@@ -1211,6 +1218,20 @@ class TagSetNamespace(ExtendedNamespace):
           continue
         value0 = plural_value[0]
         return value0
+      if attr and attr[0].isalpha():
+        # no such attribute, create a placeholder `Tag`
+        # for [:alpha:]* names
+        format_placeholder = '{' + self._path + '.' + attr + '}'
+        subns = self._subns(attr)
+        overtag = self.__dict__.get('_tag')
+        subns._tag = Tag(
+            attr,
+            format_placeholder,
+            ontology=overtag.ontology if overtag else None
+        )
+        subns._bool = False
+        self.__dict__[attr] = subns
+        return subns
       return super().__getattr__(attr)
 
   @property

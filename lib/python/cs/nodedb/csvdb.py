@@ -11,7 +11,7 @@ import time
 from cs.csvutils import csv_writerow
 from cs.fileutils import rewrite_cmgr
 from cs.logutils import error, warning
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx, PfxThread, pfx_method, XP
 from cs.sharedfile import SharedCSVFile
 from cs.threads import locked
 from .backend import Backend, Update as BackendUpdate
@@ -68,39 +68,39 @@ class Backend_CSVFile(Backend):
     self._lastrow = (None, None, None, None)
     self.csv = None
 
+  @pfx_method(use_str=True)
   def init_nodedb(self):
     ''' Open the CSV file and wait for the first update pass to complete.
     '''
     assert self.csv is None
-    with Pfx("%s.init_nodedb", self):
-      self.csv = SharedCSVFile(self.pathname, read_only=self.readonly)
-      # initial scan of the database
-      for row in self.csv:
-        self._import_foreign_row(row)
-      self._monitor = PfxThread(
-          name="monitor", target=self._monitor_foreign_updates, daemon=True
-      )
-      self._monitor.start()
+    self.csv = SharedCSVFile(self.pathname, read_only=self.readonly)
+    # initial scan of the database
+    for row in self.csv:
+      self._import_backend_row(row)
+    self._monitor = PfxThread(
+        name="monitor", target=self._monitor_backend_updates, daemon=True
+    )
+    self._monitor.start()
 
+  @pfx_method(use_str=True)
   def close(self):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
-    with Pfx("%s.close", self):
-      self._close_csv()
-      self._monitor.join()
+    self._close_csv()
+    self._monitor.join()
 
   @locked
   def _close_csv(self):
     self.csv.close()
     self.csv = None
 
-  def _monitor_foreign_updates(self):
+  def _monitor_backend_updates(self):
     for row in self.csv.tail():
-      self._import_foreign_row(row)
+      self._import_backend_row(row)
       if self.csv.closed:
         break
 
-  def _import_foreign_row(self, row0):
+  def _import_backend_row(self, row0):
     ''' Apply the values from an individual CSV update row
         to the NodeDB without propagating to the backend.
 
@@ -125,6 +125,7 @@ class Backend_CSVFile(Backend):
     for update in BackendUpdate.from_csv_row((t, name, attr, value)):
       nodedb._update_local(update)
 
+  @pfx_method
   def _update(self, update):
     ''' Update the backing store from an update csvrow.
     '''

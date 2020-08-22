@@ -401,11 +401,11 @@ class Pfx(object):
 
   # Logger methods
   @logging_wrapper
-  def exception(self, msg, *args):
+  def exception(self, msg, *args, **kwargs):
     ''' Log an exception message to this Pfx's loggers.
     '''
     for L in self.loggers:
-      L.exception(msg, *args)
+      L.exception(msg, *args, **kwargs)
 
   @logging_wrapper
   def log(self, level, msg, *args, **kwargs):
@@ -587,17 +587,9 @@ def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
       which prefixes the message with the current Pfx prefix.
   '''
-  f = kwargs.pop('file', None)
-  if f is None:
-    f = sys.stderr
-  elif f is not None:
-    if isinstance(f, StringTypes):
-      with open(f, "a") as f2:
-        return XP(msg, *args, file=f2)
-  f.write(prefix())
-  f.write(': ')
-  f.flush()
-  return X(msg, *args, file=f)
+  if args:
+    return X("%s: " + msg, prefix(), *args, **kwargs)
+  return X(prefix() + ': ' + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):
   ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.

@@ -10,10 +10,16 @@ import unittest
 from cs.obj import SingletonMixin
 
 class TestSingletonMixin(unittest.TestCase):
+  ''' Testing `SingletonMixin`.
+  '''
 
   def setUp(self):
+    ''' Prepare a `SingletonMixin` subclass as `.scls`.
+    '''
 
     class SClass(SingletonMixin):
+      ''' Test class.
+      '''
 
       @classmethod
       def _singleton_key(cls, x):

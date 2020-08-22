@@ -103,10 +103,14 @@ done
   echo 'acl QUERY urlpath_regex cgi-bin \?'
   echo 'acl GMAP urlpath_regex google.com/[a-z]*\? google.com.au/[a-z]*\?'
 
-  cat <<-X
+  if [ -x "$HOME/bin/squid_redirect" ]
+  then
+    echo
+    echo url_rewrite_program $HOME/bin/squid_redirect
+    echo url_rewrite_children 2
+  fi
 
-url_rewrite_program $HOME/bin/squid_redirect
-url_rewrite_children 2
+  cat <<-X
 
 # other directives
 visible_hostname $HOST.$MAILDOMAIN

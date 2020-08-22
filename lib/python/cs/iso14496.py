@@ -52,7 +52,7 @@ from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.upd import Upd
+from cs.upd import print, out
 
 __version__ = '20200229'
 
@@ -88,35 +88,24 @@ def main(argv=None):
   return MP4Command().run(argv)
 
 class MP4Command(BaseCommand):
-  GETOPT_SPEC = ''
 
-  USAGE_FORMAT = '''Usage:
-    {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
-        Tag paths based on embedded MP4 metadata.
-        -n  No action.
-        -p prefix, --prefix=prefix
-            Set the prefix of added tags, default: 'mp4'
-    {cmd} extract [-H] filename boxref output
-        Extract the referenced Box from the specified filename into output.
-        -H  Skip the Box header.
-    {cmd} [parse [{{-|filename}}]...]
-        Parse the named files (or stdin for "-").
-    {cmd} info [{{-|filename}}]...]
-        Print informative report about each source.
-    {cmd} test
-        Run unit tests.'''
+  GETOPT_SPEC = ''
 
   TAG_PREFIX = 'mp4'
 
   def cmd_autotag(self, argv, options):
-    ''' Tag paths based on embedded MP4 metadata.
+    ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
+          Tag paths based on embedded MP4 metadata.
+          -n  No action.
+          -p prefix, --prefix=prefix
+              Set the prefix of added tags, default: 'mp4'
     '''
     xit = 0
     fstags = FSTags()
     no_action = False
     tag_prefix = self.TAG_PREFIX
-    options, argv = getopt(argv, 'np:', longopts=['prefix'])
-    for option, value in options:
+    opts, argv = getopt(argv, 'np:', longopts=['prefix'])
+    for option, value in opts:
       with Pfx(option):
         if option == '-n':
           no_action = True
@@ -126,35 +115,28 @@ class MP4Command(BaseCommand):
           raise RuntimeError("unsupported option")
     if not argv:
       argv = [os.getcwd()]
-    U = Upd(sys.stderr)
     with fstags:
       for top_path in argv:
         for _, path in rpaths(top_path):
-          U.out(path)
+          out(path)
           with Pfx(path):
             tagged_path = fstags[path]
             try:
-              over_box, = parse(path, discard_data=True)
-              for top_box in over_box:
-                for box, tags in top_box.gather_metadata():
-                  if tags:
-                    for tag in tags:
-                      new_tag = Tag.with_prefix(
-                          tag.name, tag.value, prefix=tag_prefix
-                      )
-                      if no_action:
-                        new_tag_s = str(new_tag)
-                        if len(new_tag_s) > 32:
-                          new_tag_s = new_tag_s[:29] + '...'
-                        print(path, '+', new_tag_s)
-                      else:
-                        tagged_path.add(new_tag)
+              for box, tags in parse_tags(path, tag_prefix=tag_prefix,
+                                          discard_data=True):
+                for tag in tags:
+                  if no_action:
+                    tag_s = str(tag)
+                    if len(tag_s) > 32:
+                      tag_s = tag_s[:29] + '...'
+                    print(path, '+', tag_s)
+                  else:
+                    tagged_path.add(tag)
             except (TypeError, NameError, AttributeError, AssertionError):
               raise
             except Exception as e:
               warning("%s: %s", type(e).__name__, e)
               xit = 1
-    U.out('')
     return xit
 
   @staticmethod
@@ -176,7 +158,9 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_extract(argv, options):
-    ''' Extract the content of the specified Box.
+    ''' Usage: {cmd} extract [-H] filename boxref output
+          Extract the referenced Box from the specified filename into output.
+          -H  Skip the Box header.
     '''
     skip_header = False
     if argv and argv[0] == '-H':
@@ -228,7 +212,8 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_info(argv, options):
-    ''' Produce a human friendly report.
+    ''' Usage: {cmd} info [{{-|filename}}]...]
+          Print informative report about each source.
     '''
     if not argv:
       argv = ['-']
@@ -247,7 +232,8 @@ class MP4Command(BaseCommand):
 
   @staticmethod
   def cmd_parse(argv, options):
-    ''' Parse an ISO14496 based file.
+    ''' Usage: {cmd} [parse [{{-|filename}}]...]
+          Parse the named files (or stdin for "-").
     '''
     if not argv:
       argv = ['-']
@@ -260,12 +246,43 @@ class MP4Command(BaseCommand):
         over_box, = parse(parsee)
         over_box.dump(crop_length=None)
 
+  def cmd_tags(self, argv, options):
+    ''' Usage: {cmd} path
+          Report the tags of `path` based on embedded MP4 metadata.
+    '''
+    xit = 0
+    fstags = FSTags()
+    tag_prefix = self.TAG_PREFIX
+    opts, argv = getopt(argv, 'p:', longopts=['prefix'])
+    for option, value in opts:
+      with Pfx(option):
+        if option in ('-p', '--prefix'):
+          tag_prefix = value
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after path: %r" % (argv,))
+    with fstags:
+      out(path)
+      with Pfx(path):
+        for box, tags in parse_tags(path, tag_prefix=tag_prefix,
+                                    discard_data=True):
+          for tag in tags:
+            print(tag)
+    return xit
+
   @staticmethod
   def cmd_test(argv, options):
-    ''' Run self tests.
+    ''' Usage: {cmd} [testnames...]
+          Run self tests.
     '''
     import cs.iso14496_tests
-    cs.iso14496_tests.selftest(["%s: %s" % (cmd, op)] + argv)
+    cs.iso14496_tests.selftest(
+        ["%s: %s" % (options.cmd, options.subcmd)] + argv
+    )
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -1451,7 +1468,15 @@ class TrackReferenceTypeBoxBody(BoxBody):
   PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
 
   BOX_TYPES = (
-      b'hint', b'cdsc', b'chap', b'font', b'hind', b'vdep', b'vplx', b'subt'
+      b'hint',
+      b'cdsc',
+      b'chap',
+      b'font',
+      b'hind',
+      b'vdep',
+      b'vplx',
+      b'subt',
+      b'forc',
   )
 
   def parse_buffer(self, bfr, **kw):
@@ -2458,8 +2483,30 @@ class SMHDBoxBody(FullBoxBody):
 
 add_body_class(SMHDBoxBody)
 
+def parse_tags(path, tag_prefix=None, **kw):
+  ''' Parse the tags from `path`.
+      Yield `(box,tags)` for each subbox with tags.
+
+      The optional `tag_prefix` parameter
+      may be specified to prefix each tag name with a prefix.
+      Other keyword arguments are passed to `parse()`
+      (typical example: `discard_data=True`).
+  '''
+  over_box, = parse(path, discard_data=True)
+  for top_box in over_box:
+    for box, tags in top_box.gather_metadata():
+      if tags:
+        if tag_prefix:
+          new_tags = TagSet()
+          new_tags.update(
+              Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
+              for tag in tags
+          )
+          tags = new_tags
+        yield box, tags
+
 def parse(o, **kw):
-  ''' Return the OverBoxes from source (str, int, file).
+  ''' Return the OverBoxes from a source (str, int, file).
 
       The leading `o` parameter may be one of:
       * `str`: a filesystem file pathname

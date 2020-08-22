@@ -12,7 +12,7 @@ sys.setrecursionlimit(10000)
 from random import choice
 import unittest
 from cs.binary_tests import _TestPacketFields
-from .randutils import rand0, randomish_chunks
+from cs.randutils import rand0, randomish_chunks
 from . import block as block_module
 from .block import Block, \
     IndirectBlock, \

@@ -310,7 +310,7 @@ rcmd(){
     then
       if [ -d "$HOME/var/tmux/." ]
       then  TMUX_TMPDIR=$HOME/var/tmux
-      else  TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`
+      else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
       fi
     fi
     export TMUX_TMPDIR
@@ -454,7 +454,6 @@ case "$op" in
       echo "$cmd: $op: no tmrc: $tmrc" >&2
       exit 1
     fi
-    set -x
     tmrc \
     | \
     {
@@ -473,10 +472,7 @@ case "$op" in
         fi
         matched=1
         do_tmux has-session -t "$session_name" 2>/dev/null \
-        || (
-          set -x
-          do_tmux new-session -d -s "$session_name" "set -x; $shcmd"
-        ) \
+        || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
         || xit=1
       done
       [ $matched ] || {

@@ -20,11 +20,15 @@ from . import packetstream
 from .packetstream import Packet, PacketConnection
 
 class TestPacketStreamPacketFields(_TestPacketFields, unittest.TestCase):
+  ''' Test for all the `PacketField`s.
+  '''
 
   def setUp(self):
     self.module = packetstream
 
 class TestPacket(unittest.TestCase):
+  ''' Test various trivial packets.
+  '''
 
   def test00round_trip(self):
     for is_request in False, True:
@@ -44,6 +48,8 @@ class TestPacket(unittest.TestCase):
                 self.assertEqual(P, P2)
 
 class _TestStream(object):
+  ''' Base class for stream tests.
+  '''
 
   def setUp(self):
     self._open_Streams()
@@ -99,6 +105,8 @@ class _TestStream(object):
       self.assertEqual(payload, bytes(reversed(data)))
 
 class TestStreamPipes(_TestStream, unittest.TestCase):
+  ''' Test streaming over pipes.
+  '''
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
@@ -120,6 +128,8 @@ class TestStreamPipes(_TestStream, unittest.TestCase):
     os.close(self.downstream_wr)
 
 class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
+  ''' Test streaming over sockets.
+  '''
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = socket.socketpair()
@@ -143,6 +153,8 @@ class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
     self.downstream_wr.close()
 
 class TestStreamTCP(_TestStream, unittest.TestCase):
+  ''' Test streaming over TCP.
+  '''
 
   def _open_Streams(self):
     self.listen_sock = socket.socket()
