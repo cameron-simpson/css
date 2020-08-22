@@ -460,6 +460,9 @@ def get_dotted_identifier(s, offset=0, **kw):
 
       Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
+
+      Keyword arguments are passed to `get_identifier`
+      (used for each component of the dotted identifier).
   '''
   offset0 = offset
   _, offset = get_identifier(s, offset=offset, **kw)
