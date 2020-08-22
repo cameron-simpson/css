@@ -800,6 +800,48 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
     return tag_choice
 
+  @classmethod
+  @pfx_method
+  def from_any(cls, o):
+    ''' Convert some suitable object `o` into a `TagChoice`.
+
+        Various possibilities for `o` are:
+        * `TagChoice`: returned unchanged
+        * `str`: a string tests for the presence
+          of a tag with that name and optional value;
+        * an object with a `.choice` attribute;
+          this is taken to be a `TagChoice` ducktype and returned unchanged
+        * an object with `.name` and `.value` attributes;
+          this is taken to be `Tag`-like and a positive test is constructed
+        * `Tag`: an object with a `.name` and `.value`
+          is equivalent to a positive `TagChoice`
+        * `(name,value)`: a 2 element sequence
+          is equivalent to a positive `TagChoice`
+    '''
+    if isinstance(o, cls):
+      # already a TagChoice
+      return o
+    if isinstance(o, str):
+      # parse choice form string
+      return cls.from_str(o)
+    try:
+      name, value = o
+    except (TypeError, ValueError):
+      if hasattr(o, 'choice'):
+        # assume TagChoice ducktype
+        return o
+      try:
+        name = o.name
+        value = o.value
+      except AttributeError:
+        pass
+      else:
+        return cls(None, True, Tag(name, value))
+    else:
+      # (name,value) => True choice
+      return cls(None, True, Tag(name, value))
+    raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
+
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
       intended primarily for use in format strings.
