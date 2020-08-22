@@ -812,7 +812,7 @@ class TagSetCriterion(ABC):
         if offset == len(s) or s[offset].isspace() or (delim and s[offset] in delim):
           # tag_name present
           return TagChoice(s[offset0:offset], choice, Tag(tag_name)), offset
-        if s.startswith('='):
+        if s.startswith('=', offset):
           # tag_name present with specific value
           offset += 1
           try:
@@ -821,7 +821,7 @@ class TagSetCriterion(ABC):
             pass
           else:
             return TagChoice(s[offset0:offset], choice, Tag(tag_name, value)), offset
-        if s.startswith('~'):
+        if s.startswith('~', offset):
           # tag.value contains value
           offset += 1
           try:
