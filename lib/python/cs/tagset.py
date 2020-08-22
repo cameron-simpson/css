@@ -78,6 +78,7 @@
         False
 '''
 
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
@@ -764,53 +765,83 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     except KeyError:
       raise AttributeError('member_type')
 
-class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
-  ''' A "tag choice", an apply/reject flag and a `Tag`,
-      used to apply changes to a `TagSet`
-      or as a criterion for a tag search.
-
-      Attributes:
-      * `spec`: the source text from which this choice was parsed,
-        possibly `None`
-      * `choice`: the apply/reject flag
-      * `tag`: the `Tag` representing the criterion
+class TagSetCriterion(ABC):
+  ''' A testable criterion for a `TagSet`.
   '''
 
-  @classmethod
-  def parse(cls, s, offset=0):
-    ''' Parse a tag choice from `s` at `offset` (default `0`).
-        Return the `TagChoice` and new offset.
+  @abstractmethod
+  def match(self, tagset):
+    ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
-    offset0 = offset
-    if s.startswith('-', offset):
-      choice = False
-      offset += 1
-    else:
-      choice = True
-    tag, offset = Tag.parse(s, offset=offset, ontology=None)
-    return cls(s[offset0:offset], choice, tag), offset
+    raise NotImplementedError
 
   @classmethod
   @pfx_method
   def from_str(cls, s):
-    ''' Prepare a `TagChoice` from the string `s`.
+    ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
-    tag_choice, offset = cls.parse(s)
+    criterion, offset = cls.parse(s)
     if offset != len(s):
-      raise ValueError("unparsed TagChoice specification: %r" % (s[offset:],))
-    return tag_choice
+      raise ValueError("unparsed specification: %r" % (s[offset:],))
+    return criterion
+
+  @classmethod
+  @pfx_method
+  def parse(cls, s, offset=0, delim=None):
+    ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
+
+        This method recognises the following syntaxes:
+        * [`!`]*tag_name*: 
+          tests for the presence of *tag_name*
+        * [`!`]*tag_name*`=`*tag_value*: 
+          tests for the presence of *tag_name*`=`*tag_value`
+        * [`!`]*tag_name*`~`*tag_value*: 
+          tests for the presence of *tag_value* in the value of the `Tag` *tag_name*
+    '''
+    with Pfx("offset %d", offset):
+      offset0 = offset
+      if s.startswith('!', offset) or s.startswith('-', offset):
+        choice = False
+        offset += 1
+      else:
+        choice = True
+      offset1 = offset
+      tag_name, offset = get_dotted_identifier(s, offset)
+      if tag_name:
+        if offset == len(s) or s[offset].isspace() or (delim and s[offset] in delim):
+          # tag_name present
+          return TagChoice(s[offset0:offset], choice, Tag(tag_name)), offset
+        if s.startswith('='):
+          # tag_name present with specific value
+          offset += 1
+          try:
+            value, offset = Tag.parse_value(s, offset)
+          except ValueError:
+            pass
+          else:
+            return TagChoice(s[offset0:offset], choice, Tag(tag_name, value)), offset
+        if s.startswith('~'):
+          # tag.value contains value
+          offset += 1
+          try:
+            value, offset = Tag.parse_value(s, offset)
+          except ValueError:
+            pass
+          else:
+            return TagSetContainsTest(s[offset0:offset], choice, Tag(tag_name, value)), offset
+      raise ValueError("cannot parse %s %r" % (cls.__name__, s))
 
   @classmethod
   @pfx_method
   def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TagChoice`.
+    ''' Convert some suitable object `o` into a `TagSetCriterion`.
 
         Various possibilities for `o` are:
-        * `TagChoice`: returned unchanged
+        * `TagSetCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
         * an object with a `.choice` attribute;
-          this is taken to be a `TagChoice` ducktype and returned unchanged
+          this is taken to be a `TagSetCriterion` ducktype and returned unchanged
         * an object with `.name` and `.value` attributes;
           this is taken to be `Tag`-like and a positive test is constructed
         * `Tag`: an object with a `.name` and `.value`
@@ -818,8 +849,8 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive `TagChoice`
     '''
-    if isinstance(o, cls):
-      # already a TagChoice
+    if isinstance(o, (cls, TagSetCriterion)):
+      # already suitable
       return o
     if isinstance(o, str):
       # parse choice form string
@@ -838,14 +869,54 @@ class TagChoice(namedtuple('TagChoice', 'spec choice tag')):
       else:
         return cls(None, True, Tag(name, value))
     else:
-      # (name,value) => True choice
-      return cls(None, True, Tag(name, value))
+      # (name,value) => True TagChoice
+      return TagChoice(None, True, Tag(name, value))
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
+
+class TagBasedTest(namedtuple('TagChoice', 'spec choice tag'), TagSetCriterion):
+  ''' A test based on a `Tag`.
+  '''
+
+# TODO: rename to TagEqualityTest
+class TagChoice(TagBasedTest):
+  ''' A "tag choice", an apply/reject flag and a `Tag`,
+      used to apply changes to a `TagSet`
+      or as a criterion for a tag search.
+
+      Attributes:
+      * `spec`: the source text from which this choice was parsed,
+        possibly `None`
+      * `choice`: the apply/reject flag
+      * `tag`: the `Tag` representing the criterion
+  '''
 
   def match(self, tags):
     ''' Test this `TagChoice` against the `Tag`s in `tags`.
     '''
     return self.tag in tags if self.choice else self.tag not in tags
+
+# TODO: rename to TagEqualityTest
+class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'), TagSetCriterion):
+  ''' A "tag choice", an apply/reject flag and a `Tag`,
+      used to apply changes to a `TagSet`
+      or as a criterion for a tag search.
+
+      Attributes:
+      * `spec`: the source text from which this choice was parsed,
+        possibly `None`
+      * `choice`: the apply/reject flag
+      * `tag`: the `Tag` representing the criterion
+  '''
+
+  def match(self, tags):
+    ''' Test this `TagChoice` against the `Tag`s in `tags`.
+    '''
+    value = tags.get(self.tag.name)
+    if not value:
+      return not self.choice
+    if self.tag.value in value:
+      return self.choice
+    return not self.choice
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
@@ -1334,28 +1405,28 @@ class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
 
       Optional subclass attributes:
-      * `TAG_CHOICE_CLASS`: a `TagChoice` duck class.
+      * `TAG_CHOICE_CLASS`: a `TagSetCriterion` duck class.
         For example, `cs.sqltags` has a subclass
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
   '''
 
   @classmethod
-  def parse_tag_choices(cls, argv, tag_choice_class=None):
+  def parse_tagset_criteria(cls, argv, tag_choice_class=None):
     ''' Parse a list of tag specifications `argv` of the form:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
-        Return a list of `TagChoice` instances for each `arg` in `argv`.
+        Return a list of `TagSetCriterion` instances for each `arg` in `argv`.
 
         The optional parameter `tag_choice_class` is a class
         with a `.from_str(str)` factory method
-        returning a `TagChoice` duck instance.
+        returning a `TagSetCriterion` duck instance.
         The default `tag_choice_class` is `cls.TAG_CHOICE_CLASS`
-        or `TagChoice`.
+        or `TagSetCriterion`.
     '''
     if tag_choice_class is None:
-      tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagChoice)
+      tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagSetCriterion)
     choices = []
     for arg in argv:
       with Pfx(arg):
