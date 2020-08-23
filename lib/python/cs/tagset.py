@@ -558,6 +558,8 @@ class Tag(namedtuple('Tag', 'name value ontology')):
             nw_value = from_str(nonwhite)
           except ValueError:
             pass
+          else:
+            break
         if nw_value is not None:
           # special format found
           value = nw_value
