@@ -304,7 +304,7 @@ class TagSet(dict, FormatableMixin):
           continue
         tag = Tag.from_string(line)
         new_values[tag.name] = tag.value
-        self.set_from(new_values, verbose=verbose)
+    self.set_from(new_values, verbose=verbose)
 
 class ValueMetadata(namedtuple('ValueMetadata', 'ontology ontkey value')):
   ''' Metadata information about a value.
