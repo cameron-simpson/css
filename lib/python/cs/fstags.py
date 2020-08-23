@@ -1174,46 +1174,57 @@ class FSTags(MultiOpenMixin):
     ok = True
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
-    names = set(
-        name for name in os.listdir(dirpath)
-        if (name and name not in ('.', '..') and not name.startswith('.'))
+    names = sorted(
+        set(
+            name for name in os.listdir(dirpath)
+            if (name and name not in ('.', '..') and not name.startswith('.'))
+        )
     )
-    lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
-    changed = edit_strings(lines)
-    for old_line, new_line in changed:
-      with stackattrs(state, verbose=False):
-        old_name, _ = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-      with Pfx(old_name):
-        tags = tagsets[old_name]
-        tags.set_from(new_tags, verbose=state.verbose)
-        if old_name != new_name:
-          old_path = joinpath(dirpath, old_name)
-          if existspath(old_path):
-            new_path = joinpath(dirpath, new_name)
-            if existspath(new_path):
-              warning("new path exists, not renaming to %r", new_path)
-              ok = False
-              new_name = old_name
-            else:
-              verbose("=> %r", new_name)
-              with Pfx("rename => %r", new_path):
-                try:
-                  os.rename(old_path, new_path)
-                except OSError as e:
-                  warning("%s", e)
-                  ok = False
-                  new_name = old_name
-                else:
-                  # preserve nonconflicting tags at the target
-                  existing_tags = tagsets.get(new_name)
-                  if existing_tags:
-                    for tag_name, tag_value in existing_tags.items():
-                      if tag_name not in tags:
-                        tags.set(tag_name, tag_value, verbose=state.verbose)
-                  # switch in the new tags
-                  del tagsets[old_name]
-                  tagsets[new_name] = tags
+    tes = []
+    te_id_map = {}
+    for name in names:
+      if not name or os.sep in name:
+        warning("skip bogus name %r", name)
+        continue
+      path = joinpath(dirpath, name)
+      tagged_path = self[path]
+      te = tagged_path.as_TaggedEntity(name=name)
+      tes.append(te)
+      te_id_map[id(te)] = name, tagged_path, te
+    # now apply any file renames
+    changed_tes = TaggedEntity.edit_entities(tes)  # verbose-state.verbose
+    for te in changed_tes:
+      old_name, tagged_path, old_te = te_id_map[id(te)]
+      assert te is old_te
+      new_name = te.name
+      if old_name == new_name:
+        continue
+      with Pfx("%r => %r", old_name, new_name):
+        if not new_name:
+          warning("name removed? ignoring")
+          continue
+        old_path = joinpath(dirpath, old_name)
+        if not existspath(old_path):
+          warning("old path does not exist: %r", old_path)
+          ok = False
+          continue
+        new_path = joinpath(dirpath, new_name)
+        if existspath(new_path):
+          warning("new path exists, not renaming to %r", new_path)
+          ok = False
+          continue
+        with Pfx("os.rename(%r, %r)", old_path, new_path):
+          try:
+            os.rename(old_path, new_path)
+          except OSError as e:
+            warning("%s", e)
+            ok = False
+            continue
+          else:
+            ifverbose(True, "renamed")
+        # update tags of new path
+        self.dir_tagfile(dirname(new_path)).tagsets[new_name].set_from(te.tags)
+        del tagsets[old_name]
     return ok
 
   def scrub(self, path):
