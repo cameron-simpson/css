@@ -1464,42 +1464,12 @@ class TagFile(SingletonMixin):
     '''
     return list(self.tagsets.keys())
 
-  @staticmethod
-  def encode_name(name):
-    ''' Encode `name`.
-
-        If the `name` is not empty and does not start with a double quote
-        and contains no whitespace, return it as-is
-        otherwise JSON encode the name.
-    '''
-    if name and not name.startswith('"'):
-      _, offset = get_nonwhite(name)
-      if offset == len(name):
-        return name
-    return json.dumps(name)
-
-  @staticmethod
-  def decode_name(s, offset=0):
-    ''' Decode the *name* from the string `s` at `offset` (default `0`).
-        Return the *name* and the new offset.
-
-        If the *name* commences with a double quote,
-        decode it as a JSON string value.
-        Otherwise gather up all the available nonwhitespace.
-    '''
-    if s.startswith('"'):
-      name, suboffset = Tag.JSON_DECODER.raw_decode(s[offset:])
-      offset += suboffset
-    else:
-      name, offset = get_nonwhite(s, offset)
-    return name, offset
-
   @classmethod
   def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
-    name, offset = cls.decode_name(line)
+    name, offset = Tag.parse_value(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
@@ -1540,7 +1510,7 @@ class TagFile(SingletonMixin):
   def tags_line(cls, name, tags):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
-    fields = [cls.encode_name(name)]
+    fields = [Tag.transcribe_value(name)]
     for tag in tags:
       fields.append(str(tag))
     return ' '.join(fields)
@@ -1644,7 +1614,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
-    return TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags)
+    return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
 
   def __contains__(self, tag):
     ''' Test for the presence of `tag` in the `all_tags`.
@@ -1733,7 +1703,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         Tag('filepath.basename', basename(filepath), ontology=ont),
         Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
         Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', TagFile.encode_name(filepath), ontology=ont),
+        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
