@@ -1552,9 +1552,8 @@ class TaggedEntityMixin(FormatableMixin):
     kwargs = kwtags.format_kwargs()
     return kwargs
 
-class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
-                   TaggedEntityMixin):
-  ''' A `namedtuple` entity record with its `Tag`s.
+class TaggedEntity(TaggedEntityMixin):
+  ''' An entity record with its `Tag`s.
 
       This is a common representation of some tagged entity,
       and also is the intermediary form used by the `cs.fstags` and
@@ -1566,6 +1565,16 @@ class TaggedEntity(namedtuple('TaggedEntity', 'id name unixtime tags'),
       It is available for other domains as an arbitrary identifier/key value,
       should that be useful.
   '''
+
+  def __init__(self, *, id=None, name=None, unixtime=None, tags=None):
+    if unixtime is None:
+      unixtime = time.time()
+    if tags is None:
+      tags = TagSet()
+    self.id = id
+    self.name = name
+    self.unixtime = unixtime
+    self.tags = tags
 
   def set(self, tag_name, value, *, verbose=None):
     ''' Set a tag on `self.tags`.
