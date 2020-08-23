@@ -90,11 +90,9 @@ from icontract import require
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.edit import edit_strings
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    get_nonwhite, get_ini_clause_entryname, FormatableMixin,
-    FormatAsError
+    get_nonwhite, get_ini_clause_entryname, FormatableMixin, FormatAsError
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
@@ -119,8 +117,8 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
+        'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -1168,6 +1166,7 @@ class FSTags(MultiOpenMixin):
         return False
     return True
 
+  @pfx_method
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
     '''
