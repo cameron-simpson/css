@@ -1586,6 +1586,84 @@ class TaggedEntity(TaggedEntityMixin):
     '''
     self.discard(tag_name, value, verbose=verbose)
 
+  def edit(self, verbose=None):
+    ''' Edit the `Tag`s of this `TaggedEntity`.
+    '''
+    return self.tags.edit(verbose=verbose)
+
+  def as_editable_line(self):
+    ''' Transcribe the entity as *name*` `*tags...*
+        for use in a text file
+        for modifying entities.
+    '''
+    return ' '.join(
+        [Tag.transcribe_value(self.name or self.id)] +
+        [str(tag) for tag in self.tags]
+    )
+
+  @classmethod
+  def from_editable_line(cls, line, ontology=None):
+    ''' Parse a "value tags..." line as from `to_editable_line()`,
+        return `(name,TagSet)`.
+    '''
+    name, offset = Tag.parse_value(line)
+    if offset < len(line) and not line[offset].isspace():
+      _, offset2 = get_nonwhite(line, offset)
+      name = line[:offset2]
+      warning(
+          "offset %d: expected whitespace, adjusted name to %r", offset, name
+      )
+      offset = offset2
+    if offset < len(line) and not line[offset].isspace():
+      warning("offset %d: expected whitespace", offset)
+    tags = TagSet.from_line(line, offset, ontology=ontology)
+    return name, tags
+
+  @classmethod
+  @pfx_method
+  def edit_entities(cls, tes, verbose=True):
+    ''' Edit an iterable of `TaggedEntities`.
+        Return a list of the entities which were modified.
+
+        This function supports modifying `Tag`s
+        and changing the entity name.
+    '''
+    te_map = {te.name or te.id: te for te in tes}
+    assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
+        "not all entities have str or int keys: %r" % list(te_map.keys())
+    lines = list(map(cls.as_editable_line, te_map.values()))
+    changes = edit_strings(lines)
+    changed_tes = []
+    for old_line, new_line in changes:
+      old_name, _ = cls.from_editable_line(old_line)
+      assert isinstance(old_name, (str, int))
+      with Pfx("%r", old_name):
+        old_te = te_map[old_name]
+        changed_tes.append(old_te)
+        new_name, new_tags = cls.from_editable_line(new_line)
+        # modify Tags
+        old_te.tags.set_from(new_tags, verbose=verbose)
+        if old_name != new_name:
+          # update name
+          with Pfx("=> %r", new_name):
+            if not isinstance(new_name, (str, int)):
+              error("illegal value, expected str or int")
+            elif new_name in te_map:
+              error("already in map, not changing")
+            elif isinstance(new_name, int):
+              if isinstance(old_name, int):
+                error("may not change ids")
+              else:
+                old_te.name = None
+                ifverbose(verbose, "cleared name")
+            elif new_name:
+              old_te.name = new_name
+              ifverbose(verbose, "set name")
+            else:
+              old_te.name = None
+              ifverbose(verbose, "cleared name")
+    return changed_tes
+
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.
 
