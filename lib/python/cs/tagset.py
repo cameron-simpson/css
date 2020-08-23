@@ -83,15 +83,16 @@ from collections import namedtuple
 from datetime import date, datetime
 from json import JSONEncoder, JSONDecoder
 import re
+import time
 from types import SimpleNamespace
 from icontract import require
 from cs.dateutils import unixtime2datetime
-from cs.edit import edit as edit_lines
+from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
     cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
-from cs.logutils import warning, ifverbose
+from cs.logutils import warning, error, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
@@ -794,11 +795,11 @@ class TagSetCriterion(ABC):
     ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises the following syntaxes:
-        * [`!`]*tag_name*: 
+        * [`!`]*tag_name*:
           tests for the presence of *tag_name*
-        * [`!`]*tag_name*`=`*tag_value*: 
+        * [`!`]*tag_name*`=`*tag_value*:
           tests for the presence of *tag_name*`=`*tag_value`
-        * [`!`]*tag_name*`~`*tag_value*: 
+        * [`!`]*tag_name*`~`*tag_value*:
           tests for the presence of *tag_value* in the value of the `Tag` *tag_name*
     '''
     with Pfx("offset %d", offset):
@@ -809,9 +810,10 @@ class TagSetCriterion(ABC):
       else:
         choice = True
       offset1 = offset
-      tag_name, offset = get_dotted_identifier(s, offset)
+      tag_name, offset = get_dotted_identifier(s, offset1)
       if tag_name:
-        if offset == len(s) or s[offset].isspace() or (delim and s[offset] in delim):
+        if offset == len(s) or s[offset].isspace() or (delim
+                                                       and s[offset] in delim):
           # tag_name present
           return TagChoice(s[offset0:offset], choice, Tag(tag_name)), offset
         if s.startswith('=', offset):
@@ -822,7 +824,9 @@ class TagSetCriterion(ABC):
           except ValueError:
             pass
           else:
-            return TagChoice(s[offset0:offset], choice, Tag(tag_name, value)), offset
+            return TagChoice(
+                s[offset0:offset], choice, Tag(tag_name, value)
+            ), offset
         if s.startswith('~', offset):
           # tag.value contains value
           offset += 1
@@ -831,7 +835,9 @@ class TagSetCriterion(ABC):
           except ValueError:
             pass
           else:
-            return TagSetContainsTest(s[offset0:offset], choice, Tag(tag_name, value)), offset
+            return TagSetContainsTest(
+                s[offset0:offset], choice, Tag(tag_name, value)
+            ), offset
       raise ValueError("cannot parse %s %r" % (cls.__name__, s))
 
   @classmethod
@@ -876,7 +882,8 @@ class TagSetCriterion(ABC):
       return TagChoice(None, True, Tag(name, value))
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
-class TagBasedTest(namedtuple('TagChoice', 'spec choice tag'), TagSetCriterion):
+class TagBasedTest(namedtuple('TagChoice', 'spec choice tag'),
+                   TagSetCriterion):
   ''' A test based on a `Tag`.
   '''
 
@@ -899,7 +906,8 @@ class TagChoice(TagBasedTest):
     return self.tag in tags if self.choice else self.tag not in tags
 
 # TODO: rename to TagEqualityTest
-class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'), TagSetCriterion):
+class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
+                         TagSetCriterion):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
       used to apply changes to a `TagSet`
       or as a criterion for a tag search.
@@ -1020,8 +1028,8 @@ class TagSetNamespace(ExtendedNamespace):
         nested `TagSetNamespace`.
 
         `TagSetNamespace`s provide a number of convenience attributes
-        derived from the concrete attributes. a `TagSetNamespace` is also 
-        usable as a mapping in `str.format_map` and the like as it 
+        derived from the concrete attributes. a `TagSetNamespace` is also
+        usable as a mapping in `str.format_map` and the like as it
         implements the `keys` and `__getitem__` methods.
 
         Note that multiple dots in `Tag` names are collapsed;
