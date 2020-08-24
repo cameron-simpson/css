@@ -648,8 +648,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def tags(self, *, session):
         ''' Return a `TagSet` withg the `Tag`s for this entity.
 
-            *Note*: this is a copy. Modifying this `TagSet`
-            will not affect the database tags.
+            *Note*: this is just a reference copy.
+            Modifying this `TagSet` will not affect the database tags.
+            Obtain an `SQLTagSet` instead to affect the database.
         '''
         entity_tags = TagSet(sqltags=None, entity_id=self.id)
         entity_tags.update(
@@ -1007,7 +1008,7 @@ class SQLTags(MultiOpenMixin):
   @locked
   @orm_auto_session
   def __getitem__(self, index, *, session):
-    ''' Return a `TaggedEntity` for `index` (an `int` or `str`).
+    ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
     '''
     te = self.get(index, session=session)
     if te is None:
@@ -1018,7 +1019,7 @@ class SQLTags(MultiOpenMixin):
 
   @orm_auto_session
   def get(self, index, *, session):
-    ''' Return a `TaggedEntity` matching `index`, or `None` if there is no such entity.
+    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     query = self.db_query1(index)
     tes = list(self._run_query(query, session=session))
@@ -1033,23 +1034,24 @@ class SQLTags(MultiOpenMixin):
   @orm_auto_session
   def _run_query(self, query, *, session, without_tags=False):
     ''' Run a query derived from `self.orm.entities.query(session)`
-        yielding `TaggedEntity` instances.
+        yielding `SQLTaggedEntity` instances.
 
         If the optional `without_tags` parameter (default `False`)
         is true, this function does not JOIN against the `tags` table,
-        resulting in empty `.tags` `TagSet`s
-        in the resulting `TaggedEntity` instances.
+        resulting in empty `.tags` `SQLTagSet`s
+        in the resulting `SQLTaggedEntity` instances.
     '''
     entities = self.orm.entities
     if without_tags:
       # do not bother fetching tags
       results = session.execute(query)
       for entity_id, entity_name, unixtime in results:
-        yield TaggedEntity(
+        yield SQLTaggedEntity(
             id=entity_id,
             name=entity_name,
             unixtime=unixtime,
-            tags=TagSet(sqltags=self, entity_id=entity_id)
+            tags=SQLTagSet(sqltags=self, entity_id=entity_id),
+            sqltags=self
         )
       return
     # obtain entities and tag information which must be merged
@@ -1061,11 +1063,12 @@ class SQLTags(MultiOpenMixin):
       e = entity_map.get(entity_id)
       if not e:
         # not seen before
-        e = entity_map[entity_id] = TaggedEntity(
+        e = entity_map[entity_id] = SQLTaggedEntity(
             id=entity_id,
             name=entity_name,
             unixtime=unixtime,
-            tags=TagSet(sqltags=self, entity_id=entity_id)
+            tags=SQLTagSet(sqltags=self, entity_id=entity_id),
+            sqltags=self
         )
       if tag_name is not None:
         # set the dict entry directly - we are loading db values,
@@ -1131,18 +1134,27 @@ class SQLTags(MultiOpenMixin):
       with Pfx(tag):
         e.add_tag(tag, session=session)
 
-class TagSet(_TagSet):
-  ''' A `TagSet` associated with a tagged entity.
+class SQLTagSet(TagSet, SingletonMixin):
+  ''' A singleton `TagSet` associated with a tagged entity.
   '''
 
-  def __init__(self, *a, sqltags, entity_id, **kw):
-    super().__init__(*a, **kw)
-    self.sqltags = sqltags
-    self.entity_id = entity_id
+  @staticmethod
+  def _singleton_key(*, sqltags, entity_id, **kw):
+    return builtin_id(sqltags), entity_id
+
+  def __init__(self, *, sqltags, entity_id, **kw):
+    try:
+      pre_sqltags = self.sqltags
+    except AttributeError:
+      super().__init__(**kw)
+      self.sqltags = sqltags
+      self.entity_id = entity_id
+    else:
+      assert pre_sqltags is sqltags
 
   @property
   def entity(self):
-    ''' The `TaggedEntity` associated with this `TagSet`.
+    ''' The `SQLTaggedEntity` associated with this `TagSet`.
     '''
     return self.sqltags[self.entity_id]
 
@@ -1151,7 +1163,7 @@ class TagSet(_TagSet):
     ''' Add `tag_name`=`value` to this `TagSet`.
     '''
     if not skip_db:
-      self.entity.add_tag(tag_name, value, session=session)
+      self.entity.add_db_tag(tag_name, value, session=session)
     super().set(tag_name, value=value, **kw)
 
   @auto_session
@@ -1159,8 +1171,58 @@ class TagSet(_TagSet):
     ''' Discard `tag_name`=`value` from this `TagSet`.
     '''
     if not skip_db:
-      self.entity.discard_tag(tag_name, value, session=session)
+      self.entity.discard_db_tag(tag_name, value, session=session)
     super().discard(tag_name, value, **kw)
+
+class SQLTaggedEntity(TaggedEntity, SingletonMixin):
+  ''' A singleton `TaggedEntity` attached to an `SQLTags` instance.
+  '''
+
+  @staticmethod
+  def _singleton_key(*, sqltags, id, **kw):
+    return builtin_id(sqltags), id
+
+  def __init__(self, *, name=None, sqltags, **kw):
+    try:
+      pre_sqltags = self.sqltags
+    except AttributeError:
+      self._name = name
+      super().__init__(name=name, **kw)
+      self.sqltags = sqltags
+    else:
+      assert pre_sqltags is sqltags
+
+  @property
+  def name(self):
+    ''' Return the `.name`.
+    '''
+    return self._name
+
+  @name.setter
+  def name(self, new_name):
+    ''' Set the `.name`.
+    '''
+    if new_name != self._name:
+      e = self.sqltags.db_entity(self.id)
+      e.name = new_name
+      self._name = new_name
+
+  @property
+  def db_entity(self):
+    return self.sqltags[self.id]
+
+  @auto_session
+  @pfx_method
+  def add_db_tag(self, tag_name, value=None, *, session):
+    e = self.sqltags.db_entity(self.id)
+    XP("tag_name=%r, value=%r: entity=%s:%s", tag_name, value, type(e), e)
+    return e.add_tag(tag_name, value, session=session)
+
+  @auto_session
+  def discard_db_tag(self, tag_name, value=None, *, session):
+    return self.sqltags.db_entity(self.id).discard_tag(
+        tag_name, value, session=session
+    )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
