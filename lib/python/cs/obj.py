@@ -14,6 +14,7 @@ import traceback
 from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
+from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
 __version__ = '20200716-post'
@@ -25,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -206,6 +207,10 @@ def as_dict(o, attr_prefix=None, attr_match=None):
     if match(attr):
       d[attr] = getattr(o, attr)
   return d
+
+@OBSOLETE("use cs.obj.as_dict")
+def obj_as_dict(o, **kw):
+  return as_dict(o, **kw)
 
 class Proxy(object):
   ''' An extremely simple proxy object
