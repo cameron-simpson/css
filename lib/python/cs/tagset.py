@@ -1646,11 +1646,11 @@ class TaggedEntity(TaggedEntityMixin):
       old_name, _ = cls.from_editable_line(old_line)
       assert isinstance(old_name, (str, int))
       with Pfx("%r", old_name):
-        old_te = te_map[old_name]
-        changed_tes.append(old_te)
+        te = te_map[old_name]
+        changed_tes.append(te)
         new_name, new_tags = cls.from_editable_line(new_line)
         # modify Tags
-        old_te.tags.set_from(new_tags, verbose=verbose)
+        te.tags.set_from(new_tags, verbose=verbose)
         if old_name != new_name:
           # update name
           with Pfx("=> %r", new_name):
@@ -1662,13 +1662,13 @@ class TaggedEntity(TaggedEntityMixin):
               if isinstance(old_name, int):
                 error("may not change ids")
               else:
-                old_te.name = None
+                te.name = None
                 ifverbose(verbose, "cleared name")
             elif new_name:
-              old_te.name = new_name
-              ifverbose(verbose, "set name")
+              te.name = new_name
+              ifverbose(verbose, "set name=%r", new_name)
             else:
-              old_te.name = None
+              te.name = None
               ifverbose(verbose, "cleared name")
     return changed_tes
 
