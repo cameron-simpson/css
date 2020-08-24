@@ -88,12 +88,10 @@ def using_session(orm=None, session=None):
   # use the shared state session if no session is supplied
   if session is None:
     session = _state.session
-  # we have a session, run the function inside a nested transaction
+  # we have a session, push to the global context
   if session is not None:
     with _state(session=session):
-      # run the function inside a savepoint in the supplied session
-      with session.begin_nested():
-        yield session
+      yield session
   else:
     # no session, we need to create one
     if orm is None:
