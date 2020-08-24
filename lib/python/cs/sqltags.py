@@ -1124,7 +1124,8 @@ class SQLTags(MultiOpenMixin):
         named records which already exist will update from `te`,
         otherwise the conflict will raise a `ValueError`.
     '''
-    e = self[te.name] if te.name else None
+    e = self[te.name
+             ] if te.name else self[te.id] if te.id is not None else None
     if e and not update_mode:
       raise ValueError("entity named %r already exists" % (te.name,))
     if e is None:
