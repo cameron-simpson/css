@@ -14,6 +14,7 @@
 '''
 
 from abc import ABC, abstractmethod
+from builtins import id as builtin_id
 from contextlib import contextmanager
 import csv
 from datetime import datetime
@@ -39,6 +40,7 @@ from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix
 from cs.logutils import error, warning, ifverbose
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -46,10 +48,10 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet as _TagSet, Tag, TagChoice as _TagChoice, TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TagChoice as _TagChoice, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
-from cs.upd import print    # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -139,9 +141,7 @@ class TagChoice(_TagChoice, _Criterion):
         match.append(tags_alias.id is None)
       else:
         # test for absence or incorrect value
-        match.append(
-            or_(tags_alias.id is None, tag_column != tag_test_value)
-        )
+        match.append(or_(tags_alias.id is None, tag_column != tag_test_value))
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
@@ -1041,7 +1041,6 @@ class SQLTags(MultiOpenMixin):
         resulting in empty `.tags` `SQLTagSet`s
         in the resulting `SQLTaggedEntity` instances.
     '''
-    entities = self.orm.entities
     if without_tags:
       # do not bother fetching tags
       results = session.execute(query)
@@ -1055,6 +1054,7 @@ class SQLTags(MultiOpenMixin):
         )
       return
     # obtain entities and tag information which must be merged
+    entities = self.orm.entities
     query = entities.with_tags(query)
     results = session.execute(query)
     entity_map = {}
