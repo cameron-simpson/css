@@ -7,7 +7,9 @@
 import sys
 import unittest
 
-class TestLater(unittest.TestCase):
+class TestKyoto(unittest.TestCase):
+  ''' Test `cs.kyoto`, UNIMPLEMENTED.
+  '''
   pass
 
 def selftest(argv):

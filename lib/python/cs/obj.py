@@ -5,11 +5,6 @@
 
 r'''
 Convenience facilities for objects.
-
-Presents:
-* flavour, for deciding whether an object resembles a mapping or sequence.
-* Some O_* functions for working with objects
-* Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
 from __future__ import print_function
@@ -19,6 +14,7 @@ import traceback
 from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
+from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
 __version__ = '20200716-post'
@@ -30,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -187,8 +183,15 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
-def obj_as_dict(o, attr_prefix=None, attr_match=None):
-  ''' Return a dictionary with keys mapping to `o` attributes.
+def as_dict(o, attr_prefix=None, attr_match=None):
+  ''' Return a dictionary with keys mapping to the values of the attributes of `o`.
+
+      Parameters:
+      * `o`: the object to map
+      * `attr_prefix`: optional prefix for interesting attribute names
+      * `attr_match`: optional test for interesting attribute names
+
+      It is an error to specify both `attr_prefix` and `attr_match`.
   '''
   if attr_match is None:
     if attr_prefix is None:
@@ -199,11 +202,15 @@ def obj_as_dict(o, attr_prefix=None, attr_match=None):
     match = attr_match
   else:
     raise ValueError("cannot specify both attr_prefix and attr_match")
-  obj_attrs = {}
+  d = {}
   for attr in dir(o):
     if match(attr):
-      obj_attrs[attr] = getattr(o, attr)
-  return obj_attrs
+      d[attr] = getattr(o, attr)
+  return d
+
+@OBSOLETE("use cs.obj.as_dict")
+def obj_as_dict(o, **kw):
+  return as_dict(o, **kw)
 
 class Proxy(object):
   ''' An extremely simple proxy object

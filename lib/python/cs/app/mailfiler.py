@@ -82,6 +82,8 @@ from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
 
+__version__ = '20200719-post'
+
 DISTINFO = {
     'description':
     "email message filing system which monitors multiple inbound Maildir folders",

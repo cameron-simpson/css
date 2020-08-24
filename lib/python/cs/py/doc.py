@@ -14,13 +14,12 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20200521-post'
+__version__ = '20200718-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],
@@ -34,7 +33,7 @@ def is_dunder(name):
 def module_doc(
     module,
     *,
-    sort_key=lambda item: item[0],
+    sort_key=lambda item: item[0].lower(),
     filter_key=lambda key: key != 'DISTINFO' and not key.startswith('_'),
     method_names=None,
 ):

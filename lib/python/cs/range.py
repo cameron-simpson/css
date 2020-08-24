@@ -173,8 +173,6 @@ class Range(object):
     for span in _spans:
       if not isinstance(span, Span):
         raise TypeError("._spans elements should be lists, found "+repr(span))
-      if len(span) != 2:
-        raise ValueError("._spans elements should have length 2, found "+repr(span))
       start, end = span
       if not isinstance(start, int) or not isinstance(end, int):
         raise TypeError("._spans elements should be a pair of ints, found "+repr(span))

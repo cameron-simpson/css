@@ -98,7 +98,7 @@ from cs.lex import (
     get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
@@ -106,7 +106,7 @@ from cs.tagset import (
     TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd
+from cs.upd import Upd, print
 
 __version__ = '20200717.1-post'
 
@@ -184,14 +184,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         with Upd(sys.stderr) as U:
           for top_path in argv:
             for isdir, path in rpaths(top_path, yield_dirs=True):
-              U.out(path)
-              with Pfx(path):
+              spath = shortpath(path)
+              U.out(spath)
+              with Pfx(shortpath(path)):
                 ont = fstags.ontology(path)
                 tagged_path = fstags[path]
                 direct_tags = tagged_path.direct_tags
                 all_tags = tagged_path.merged_tags()
                 for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(path + ' ' + str(autotag))
+                  U.out(spath + ' ' + str(autotag))
                   if ont:
                     autotag = ont.convert_tag(autotag)
                   if autotag not in all_tags:
@@ -202,7 +203,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                   except OSError:
                     pass
                   else:
-                    direct_tags.add('filesize', S.st_size, ontology=ont)
+                    direct_tags.add('filesize', S.st_size)
                 # update the
                 all_tags = tagged_path.merged_tags()
                 for tag in fstags.cascade_tags(all_tags):
@@ -262,7 +263,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in options:
       with Pfx(option):
         if option == '-a':
-          all_paths = true
+          all_paths = True
         elif option == '--direct':
           use_direct_tags = True
         else:
@@ -1199,30 +1200,32 @@ class FSTags(MultiOpenMixin):
         tags = tagsets[old_name]
         tags.set_from(new_tags, verbose=state.verbose)
         if old_name != new_name:
-          if new_name in tagsets:
-            warning("new name %r already exists", new_name)
-            new_name = old_name
-            ok = False
-          else:
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if existspath(new_path):
-                warning("new path exists, not renaming to %r", new_path)
-                ok = False
-                new_name = old_name
-              else:
-                verbose("=> %r", new_name)
-                with Pfx("rename => %r", new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    new_name = old_name
-                  else:
-                    del tagsets[old_name]
-                    tagsets[new_name] = tags
+          old_path = joinpath(dirpath, old_name)
+          if existspath(old_path):
+            new_path = joinpath(dirpath, new_name)
+            if existspath(new_path):
+              warning("new path exists, not renaming to %r", new_path)
+              ok = False
+              new_name = old_name
+            else:
+              verbose("=> %r", new_name)
+              with Pfx("rename => %r", new_path):
+                try:
+                  os.rename(old_path, new_path)
+                except OSError as e:
+                  warning("%s", e)
+                  ok = False
+                  new_name = old_name
+                else:
+                  # preserve nonconflicting tags at the target
+                  existing_tags = tagsets.get(new_name)
+                  if existing_tags:
+                    for tag_name, tag_value in existing_tags.items():
+                      if tag_name not in tags:
+                        tags.set(tag_name, tag_value, verbose=state.verbose)
+                  # switch in the new tags
+                  del tagsets[old_name]
+                  tagsets[new_name] = tags
     return ok
 
   def scrub(self, path):

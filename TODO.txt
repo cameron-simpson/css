@@ -1,3 +1,7 @@
+vbox: cmd to associate the current default interface before starting vm?
+vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
+does dbdigraph really need T_SEQ and friends? try to push that into cs.hier too
+cs.distinfo: update URLs from bitbcuket to sr.ht
 securer findup: sanity check on ownership or perms to stop walk? tunable?
 BaseCommand: can we provide the expected command name instead of the class name in the docstring?
 cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
@@ -80,10 +84,6 @@ make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
 fvwm: move cs-fvwm-blah python code into cs.app.fvwm
-nodedb:
-  reform map: dunders update and push changes, foreign methods to
-    ingest changes, iter to watch foreign changes or all changes,
-    support multiple iterators by registering notifiers?
 cs.py.func: find out why eval causes syntax error with raise e from e2
 vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
 portfwd ARP_ADDR check for local networks

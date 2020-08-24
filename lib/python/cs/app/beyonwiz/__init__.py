@@ -37,6 +37,7 @@ DISTINFO = {
     ],
     'requires': [
         'cs.app.ffmpeg',
+        'cs.binary',
         'cs.deco',
         'cs.fstags',
         'cs.logutils',

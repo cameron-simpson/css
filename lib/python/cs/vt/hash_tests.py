@@ -7,13 +7,12 @@
 ''' Hash tests.
 '''
 
-from hashlib import sha1
 import random
 import sys
 import unittest
 from cs.binary_tests import _TestPacketFields
 from . import hash as hash_module
-from .hash import Hash_SHA1, decode as decode_hash
+from .hash import HASHCLASS_BY_NAME, decode as decode_hash
 from .transcribe import Transcriber, parse
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
@@ -37,20 +36,22 @@ class TestHashing(unittest.TestCase):
   def testSHA1(self):
     ''' Test the SHA1 hash function.
     '''
-    for _ in range(10):
-      rs = bytes(random.randint(0, 255) for _ in range(100))
-      H = Hash_SHA1.from_chunk(rs)
-      self.assertEqual(sha1(rs).digest(), bytes(H))
-      self.assertTrue(isinstance(H, Transcriber))
-      Hs = str(H)
-      H2, offset = parse(Hs)
-      self.assertTrue(offset == len(Hs))
-      self.assertEqual(H, H2)
-      # bytes(hash_num + hash_bytes)
-      Hencode = H.encode()
-      H2, offset = decode_hash(Hencode)
-      self.assertEqual(offset, len(Hencode))
-      self.assertEqual(H, H2)
+    for hash_name, cls in sorted(HASHCLASS_BY_NAME.items()):
+      with self.subTest(hash_name=hash_name):
+        for _ in range(10):
+          rs = bytes(random.randint(0, 255) for _ in range(100))
+          H = cls.from_chunk(rs)
+          self.assertEqual(cls.HASHFUNC(rs).digest(), bytes(H))
+          self.assertTrue(isinstance(H, Transcriber))
+          Hs = str(H)
+          H2, offset = parse(Hs)
+          self.assertTrue(offset == len(Hs))
+          self.assertEqual(H, H2)
+          # bytes(hash_num + hash_bytes)
+          Hencode = H.encode()
+          H2, offset = decode_hash(Hencode)
+          self.assertEqual(offset, len(Hencode))
+          self.assertEqual(H, H2)
 
 def selftest(argv):
   ''' Run the unit tests.
