@@ -711,14 +711,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       @classmethod
       @pfx_method
       @auto_session
-      def by_tags(
-          cls,
-          tag_criteria,
-          *,
-          session,
-          name=None,
-          query=None
-      ):
+      def by_tags(cls, tag_criteria, *, session, name=None, query=None, **kw):
         ''' Construct a query to match `Entity` rows
             matching `name` and the supplied `tag_criteria`.
             Return the `(query,other_criteria)`
@@ -737,10 +730,18 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             all the objects will be converted to `TagChoice`s
             and used to construct the query.
         '''
+        entities = orm.entities
         if query is None:
-          query = cls.by_name(name=name, session=session)
-        elif name is not None:
-          raise ValueError("cannot supply both a query and a name")
+          query = session.query(entities)
+        try:
+          name = kw.pop('name')
+        except KeyError:
+          # no name, get all Entities
+          pass
+        else:
+          query = cls.by_name(name=name, session=session, query=query)
+        if kw:
+          raise ValueError("unexpected keyword arguments: %r" % (kw,))
         other_criteria = []
         for taggy in tag_criteria:
           with Pfx(taggy):
