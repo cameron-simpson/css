@@ -971,6 +971,39 @@ class SQLTags(MultiOpenMixin):
     '''
     self.orm = None
 
+  @orm_auto_session
+  def db_query1(self, index, session):
+    ''' Construct a query to look up a `str` or `int` index value.
+    '''
+    if not isinstance(index, (int, str)):
+      raise TypeError(
+          "%s.get: index must be int or str, not %s",
+          type(self).__name__, type(index)
+      )
+    entities = self.orm.entities
+    if isinstance(index, int):
+      XP(
+          "entities=%s, entities.__mro__=%r", entities,
+          getattr(entities, '__mro__', None)
+      )
+      query = session.query(entities).filter_by(id=index)
+    else:
+      query = entities.by_name(index)
+    return query
+
+  @orm_auto_session
+  def db_entity(self, index, *, session):
+    ''' Return the `Entities` instance for `index` or `None`.
+    '''
+    entities = self.orm.entities
+    if isinstance(index, int):
+      return entities.lookup1(id=index, session=session)
+    if isinstance(index, str):
+      return entities.lookup1(name=index, session=session)
+    raise TypeError(
+        "expected index to be int or str, got %s:%s" % (type(index), index)
+    )
+
   @locked
   @orm_auto_session
   def __getitem__(self, index, *, session):
@@ -987,21 +1020,15 @@ class SQLTags(MultiOpenMixin):
   def get(self, index, *, session):
     ''' Return a `TaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
-    if not isinstance(index, (int, str)):
-      raise TypeError(
-          "%s.get: index must be int or str, not %s",
-          type(self).__name__, type(index)
-      )
-    entities = self.orm.entities
-    if isinstance(index, int):
-      query = session.query(entities).filter_by(id=index)
-    else:
-      query = entities.by_name(index)
-    matches = list(self._run_query(query, session=session))
-    if not matches:
+    query = self.db_query1(index)
+    tes = list(self._run_query(query, session=session))
+    if not tes:
       return None
-    match, = matches
-    return match
+    te, = tes
+    return te
+
+  def __contains__(self, index):
+    return self.db_entity(index) is not None
 
   @orm_auto_session
   def _run_query(self, query, *, session, without_tags=False):
