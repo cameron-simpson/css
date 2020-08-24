@@ -200,6 +200,38 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         yield
 
   @classmethod
+  def cmd_edit(cls, argv, options):
+    ''' Usage: edit name
+    '''
+    sqltags = options.sqltags
+    badopts = False
+    if not argv:
+      raise GetoptError("missing name or tag criteria")
+    tes = None
+    if len(argv) == 1:
+      try:
+        index = int(argv[0])
+      except ValueError:
+        index, offset = Tag.parse_name(argv[0])
+        if not index or offset < len(argv[0]):
+          index = None
+      if index is not None:
+        tes = [sqltags[index]]
+    if tes is None:
+      try:
+        tag_choices = cls.parse_tagset_criteria(argv)
+      except ValueError as e:
+        warning("bad tag specifications: %s", e)
+        badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    if tes is None:
+      tes = list(sqltags.find(tag_choices))
+    changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
+    for te in changed_tes:
+      print("changed", repr(te.name or te.id))
+
+  @classmethod
   def cmd_export(cls, argv, options):
     ''' Usage: {cmd} {{tag[=value]|-tag}}...
           Export entities matching all the constraints.
