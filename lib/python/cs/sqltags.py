@@ -1010,8 +1010,8 @@ class SQLTags(MultiOpenMixin):
     '''
     if not isinstance(index, (int, str)):
       raise TypeError(
-          "%s.get: index must be int or str, not %s",
-          type(self).__name__, type(index)
+          "%s.get: index must be int or str, not %s" %
+          (type(self).__name__, type(index))
       )
     entities = self.orm.entities
     if isinstance(index, int):
@@ -1146,7 +1146,7 @@ class SQLTags(MultiOpenMixin):
     for csvrow in csvr:
       with Pfx(csvr.line_num):
         te = TaggedEntity.from_csvrow(csvrow)
-        self.add_tagged_entity(te, session=session)
+        self.add_tagged_entity(te, session=session, update_mode=update_mode)
 
   @orm_auto_session
   def add_tagged_entity(self, te, *, session, update_mode=False):
@@ -1172,7 +1172,7 @@ class SQLTagSet(TagSet, SingletonMixin):
   '''
 
   @staticmethod
-  def _singleton_key(*, sqltags, entity_id, **kw):
+  def _singleton_key(*, sqltags, entity_id, **_):
     return builtin_id(sqltags), entity_id
 
   def __init__(self, *, sqltags, entity_id, **kw):
@@ -1212,7 +1212,7 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
   '''
 
   @staticmethod
-  def _singleton_key(*, sqltags, id, **kw):
+  def _singleton_key(*, sqltags, id, **_):
     return builtin_id(sqltags), id
 
   def __init__(self, *, name=None, sqltags, **kw):
@@ -1249,12 +1249,16 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
   @auto_session
   @pfx_method
   def add_db_tag(self, tag_name, value=None, *, session):
+    ''' Add a tag to the database.
+    '''
     e = self.sqltags.db_entity(self.id)
     XP("tag_name=%r, value=%r: entity=%s:%s", tag_name, value, type(e), e)
     return e.add_tag(tag_name, value, session=session)
 
   @auto_session
   def discard_db_tag(self, tag_name, value=None, *, session):
+    ''' Discard a tag from the database.
+    '''
     return self.sqltags.db_entity(self.id).discard_tag(
         tag_name, value, session=session
     )
