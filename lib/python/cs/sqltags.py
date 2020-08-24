@@ -1242,7 +1242,9 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
 
   @property
   def db_entity(self):
-    return self.sqltags[self.id]
+    ''' The database `Entities` instance for this `SQLTaggedEntity`.
+    '''
+    return self.sqltags.db_entity(self.id)
 
   @auto_session
   @pfx_method
