@@ -222,14 +222,15 @@ class ORM(MultiOpenMixin):
     '''
     with self:
       new_session = self.Session(*a, **kw)
-      try:
-        yield new_session
-        new_session.commit()
-      except:
-        new_session.rollback()
-        raise
-      finally:
-        new_session.close()
+      with using_session(orm=self, session=new_session):
+        try:
+          yield new_session
+          new_session.commit()
+        except:
+          new_session.rollback()
+          raise
+        finally:
+          new_session.close()
 
   @staticmethod
   def auto_session(method):
