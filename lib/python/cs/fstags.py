@@ -1483,9 +1483,10 @@ class TagFile(SingletonMixin):
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
-      warning(
-          "offset %d: expected whitespace, adjusted name to %r", offset, name
-      )
+      # This is normal.
+      ##warning(
+      ##    "offset %d: expected whitespace, adjusted name to %r", offset, name
+      ##)
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
