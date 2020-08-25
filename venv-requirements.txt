@@ -9,5 +9,6 @@ pyflakes
 pylint
 sqlalchemy
 twine
+typeguard
 yapf
 youtube-dl

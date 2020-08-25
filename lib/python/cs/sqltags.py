@@ -33,6 +33,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import sessionmaker, aliased
+from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
@@ -1005,14 +1006,10 @@ class SQLTags(MultiOpenMixin):
     self.orm = None
 
   @orm_auto_session
-  def db_query1(self, index, session):
+  @typechecked
+  def db_query1(self, index: [int, str], session):
     ''' Construct a query to look up a `str` or `int` index value.
     '''
-    if not isinstance(index, (int, str)):
-      raise TypeError(
-          "%s.get: index must be int or str, not %s" %
-          (type(self).__name__, type(index))
-      )
     entities = self.orm.entities
     if isinstance(index, int):
       XP(
