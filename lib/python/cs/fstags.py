@@ -72,7 +72,6 @@
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
 import csv
-from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -83,7 +82,6 @@ from os.path import (
     samefile, splitext
 )
 from pathlib import PurePath
-import re
 import shutil
 import sys
 import threading
@@ -92,18 +90,17 @@ from icontract import require
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.edit import edit_strings
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
-    FormatAsError
+    get_nonwhite, get_ini_clause_entryname, FormatableMixin, FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
+    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin,
+    RegexpTagRule
 )
 from cs.threads import locked, locked_property
 from cs.upd import Upd, print
@@ -120,8 +117,8 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
+        'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -161,9 +158,6 @@ def verbose(msg, *a):
 class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
-
-  GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]'''
 
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
@@ -263,7 +257,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for option, value in options:
       with Pfx(option):
         if option == '-a':
-          all_paths = true
+          all_paths = True
         elif option == '--direct':
           use_direct_tags = True
         else:
@@ -274,7 +268,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       path = argv.pop(0)
       try:
-        tag_choices = cls.parse_tag_choices(argv)
+        tag_choices = cls.parse_tagset_criteria(argv)
       except ValueError as e:
         warning("bad tag specifications: %s", e)
         badopts = True
@@ -329,7 +323,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
@@ -766,7 +760,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -807,7 +801,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               raise GetoptError("missing tags")
             badopts = False
             try:
-              tag_choices = cls.parse_tag_choices(argv)
+              tag_choices = cls.parse_tagset_criteria(argv)
             except ValueError as e:
               warning("bad tag specifications: %s", e)
               badopts = True
@@ -841,7 +835,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing tag choice")
     tag_choice = argv.pop(0)
     try:
-      tag_choices = cls.parse_tag_choices([tag_choice])
+      tag_choices = cls.parse_tagset_criteria([tag_choice])
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -884,7 +878,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
@@ -1167,63 +1161,69 @@ class FSTags(MultiOpenMixin):
     tags = (
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
-    ok = True
-    for _, choice, tag in tag_choices:
-      if choice:
-        # tag_choice not present or not with same nonNone value
-        if tag not in tags:
-          ok = False
-          break
-      else:
-        if tag in tags:
-          ok = False
-          break
-    return ok
+    for tag_choice in tag_choices:
+      if not tag_choice.match(tags):
+        return False
+    return True
 
+  @pfx_method
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
     '''
     ok = True
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
-    names = set(
-        name for name in os.listdir(dirpath)
-        if (name and name not in ('.', '..') and not name.startswith('.'))
+    names = sorted(
+        set(
+            name for name in os.listdir(dirpath)
+            if (name and name not in ('.', '..') and not name.startswith('.'))
+        )
     )
-    lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
-    changed = edit_strings(lines)
-    for old_line, new_line in changed:
-      with stackattrs(state, verbose=False):
-        old_name, _ = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-      with Pfx(old_name):
-        tags = tagsets[old_name]
-        tags.set_from(new_tags, verbose=state.verbose)
-        if old_name != new_name:
-          if new_name in tagsets:
-            warning("new name %r already exists", new_name)
-            new_name = old_name
+    tes = []
+    te_id_map = {}
+    for name in names:
+      if not name or os.sep in name:
+        warning("skip bogus name %r", name)
+        continue
+      path = joinpath(dirpath, name)
+      tagged_path = self[path]
+      te = tagged_path.as_TaggedEntity(name=name)
+      tes.append(te)
+      te_id_map[id(te)] = name, tagged_path, te
+    # now apply any file renames
+    changed_tes = TaggedEntity.edit_entities(tes)  # verbose-state.verbose
+    for te in changed_tes:
+      old_name, tagged_path, old_te = te_id_map[id(te)]
+      assert te is old_te
+      new_name = te.name
+      if old_name == new_name:
+        continue
+      with Pfx("%r => %r", old_name, new_name):
+        if not new_name:
+          warning("name removed? ignoring")
+          continue
+        old_path = joinpath(dirpath, old_name)
+        if not existspath(old_path):
+          warning("old path does not exist: %r", old_path)
+          ok = False
+          continue
+        new_path = joinpath(dirpath, new_name)
+        if existspath(new_path):
+          warning("new path exists, not renaming to %r", new_path)
+          ok = False
+          continue
+        with Pfx("os.rename(%r, %r)", old_path, new_path):
+          try:
+            os.rename(old_path, new_path)
+          except OSError as e:
+            warning("%s", e)
             ok = False
+            continue
           else:
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if existspath(new_path):
-                warning("new path exists, not renaming to %r", new_path)
-                ok = False
-                new_name = old_name
-              else:
-                verbose("=> %r", new_name)
-                with Pfx("rename => %r", new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    new_name = old_name
-                  else:
-                    del tagsets[old_name]
-                    tagsets[new_name] = tags
+            ifverbose(True, "renamed")
+        # update tags of new path
+        self.dir_tagfile(dirname(new_path)).tagsets[new_name].set_from(te.tags)
+        del tagsets[old_name]
     return ok
 
   def scrub(self, path):
@@ -1474,42 +1474,12 @@ class TagFile(SingletonMixin):
     '''
     return list(self.tagsets.keys())
 
-  @staticmethod
-  def encode_name(name):
-    ''' Encode `name`.
-
-        If the `name` is not empty and does not start with a double quote
-        and contains no whitespace, return it as-is
-        otherwise JSON encode the name.
-    '''
-    if name and not name.startswith('"'):
-      _, offset = get_nonwhite(name)
-      if offset == len(name):
-        return name
-    return json.dumps(name)
-
-  @staticmethod
-  def decode_name(s, offset=0):
-    ''' Decode the *name* from the string `s` at `offset` (default `0`).
-        Return the *name* and the new offset.
-
-        If the *name* commences with a double quote,
-        decode it as a JSON string value.
-        Otherwise gather up all the available nonwhitespace.
-    '''
-    if s.startswith('"'):
-      name, suboffset = Tag.JSON_DECODER.raw_decode(s[offset:])
-      offset += suboffset
-    else:
-      name, offset = get_nonwhite(s, offset)
-    return name, offset
-
   @classmethod
   def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
-    name, offset = cls.decode_name(line)
+    name, offset = Tag.parse_value(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
@@ -1550,7 +1520,7 @@ class TagFile(SingletonMixin):
   def tags_line(cls, name, tags):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
-    fields = [cls.encode_name(name)]
+    fields = [Tag.transcribe_value(name)]
     for tag in tags:
       fields.append(str(tag))
     return ' '.join(fields)
@@ -1654,7 +1624,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
-    return TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags)
+    return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
 
   def __contains__(self, tag):
     ''' Test for the presence of `tag` in the `all_tags`.
@@ -1743,7 +1713,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         Tag('filepath.basename', basename(filepath), ontology=ont),
         Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
         Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', TagFile.encode_name(filepath), ontology=ont),
+        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
@@ -1941,73 +1911,7 @@ class CascadeRule:
         return Tag(self.target, tagset[tag_name])
     return None
 
-class RegexpTagRule:
-  ''' A regular expression based `Tag` rule.
-  '''
-
-  def __init__(self, regexp):
-    self.regexp_src = regexp
-    self.regexp = re.compile(regexp)
-
-  def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.regexp_src)
-
-  @pfx_method
-  def infer_tags(self, s):
-    ''' Apply the rule to the string `s`, return a list of `Tag`s.
-    '''
-    # TODO: honour the JSON decode strings
-    tags = []
-    m = self.regexp.search(s)
-    if m:
-      tag_value_queue = list(m.groupdict().items())
-      while tag_value_queue:
-        tag_name, value = tag_value_queue.pop(0)
-        with Pfx(tag_name):
-          if value is None:
-            # unused branch of the regexp?
-            warning("value=None, skipped")
-            continue
-          # special case prefix_strpdate_strptimeformat
-          try:
-            prefix, strptime_format_tplt = tag_name.split('_strpdate_', 1)
-          except ValueError:
-            pass
-          else:
-            tag_name = prefix + '_date'
-            strptime_format = ' '.join(
-                '%' + letter for letter in strptime_format_tplt.split('_')
-            )
-            value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name, value))
-            continue
-          # special case prefix_strptime_strptimeformat
-          try:
-            prefix, strptime_format_tplt = tag_name.split('_strpdatetime_', 1)
-          except ValueError:
-            pass
-          else:
-            tag_name = prefix + '_datetime'
-            strptime_format = ' '.join(
-                '%' + letter for letter in strptime_format_tplt.split('_')
-            )
-            value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name, value))
-            continue
-          # special case *_n
-          tag_name_prefix = cutsuffix(tag_name, '_n')
-          if tag_name is not tag_name_prefix:
-            # numeric rule
-            try:
-              value = int(value)
-            except ValueError:
-              pass
-            else:
-              tag_name = tag_name_prefix
-          tag = Tag(tag_name, value)
-          tags.append(tag)
-    return tags
-
+@pfx
 def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
@@ -2017,7 +1921,7 @@ def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
-    U and U.out(dirpath)
+    U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:

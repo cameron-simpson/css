@@ -5,11 +5,6 @@
 
 r'''
 Convenience facilities for objects.
-
-Presents:
-* flavour, for deciding whether an object resembles a mapping or sequence.
-* Some O_* functions for working with objects
-* Proxy, a very simple minded object proxy intended to aid debugging.
 '''
 
 from __future__ import print_function
@@ -19,6 +14,7 @@ import traceback
 from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
+from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
 __version__ = '20200716-post'
@@ -30,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -62,7 +58,7 @@ class O(SimpleNamespace):
 
   def __init__(self, **kw):
     frame = traceback.extract_stack(None, 2)[0]
-    caller=(frame[0], frame[1])
+    caller = (frame[0], frame[1])
     if caller not in self.callers:
       self.callers.add(caller)
       print(
@@ -187,8 +183,15 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
-def obj_as_dict(o, attr_prefix=None, attr_match=None):
-  ''' Return a dictionary with keys mapping to `o` attributes.
+def as_dict(o, attr_prefix=None, attr_match=None):
+  ''' Return a dictionary with keys mapping to the values of the attributes of `o`.
+
+      Parameters:
+      * `o`: the object to map
+      * `attr_prefix`: optional prefix for interesting attribute names
+      * `attr_match`: optional test for interesting attribute names
+
+      It is an error to specify both `attr_prefix` and `attr_match`.
   '''
   if attr_match is None:
     if attr_prefix is None:
@@ -199,11 +202,15 @@ def obj_as_dict(o, attr_prefix=None, attr_match=None):
     match = attr_match
   else:
     raise ValueError("cannot specify both attr_prefix and attr_match")
-  obj_attrs = {}
+  d = {}
   for attr in dir(o):
     if match(attr):
-      obj_attrs[attr] = getattr(o, attr)
-  return obj_attrs
+      d[attr] = getattr(o, attr)
+  return d
+
+@OBSOLETE("use cs.obj.as_dict")
+def obj_as_dict(o, **kw):
+  return as_dict(o, **kw)
 
 class Proxy(object):
   ''' An extremely simple proxy object
@@ -317,14 +324,13 @@ def singleton(registry, key, factory, fargs, fkwargs):
 class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
-      *Note*: this should be the *first* superclass of the subclass
-      in order to intercept `__new__`.
+      *Note*: this mixin overrides `object.__new__`
+      and may not play well with other classes which oeverride `__new__`.
 
       *Warning*: because of the mechanics of `__new__`,
       the instance's `__init__` method will always be called
       after `__new__`,
       even when a preexisting object is returned.
-
       Therefore that method should be sensible
       even for an already initialised
       and probably subsequently modified object.
@@ -346,7 +352,7 @@ class SingletonMixin:
 
       Implementation requirements:
       a subclass should:
-      * provide a class method `_singleton_key(cls,*args,**kwargs)`
+      * provide a method `_singleton_key(*args,**kwargs)`
         returning a key for use in the single registry,
         computed from the positional and keyword arguments
         supplied on instance creation
@@ -363,8 +369,8 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              @classmethod
-              def _singleton_key(cls, foo, bah=3):
+              @staticmethod
+              def _singleton_key(foo, bah=3):
                   return foo, bah
 
               def __init__(self, foo, bah=3):

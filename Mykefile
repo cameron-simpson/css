@@ -1,9 +1,10 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-##repos = sr.ht bitbucket
-repos = sr.ht
+hg_repos        = sr.ht-css
+git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
 
 target  = bin
@@ -212,20 +213,26 @@ _deploy:
         OPTCSS=$(PREFIX) updcss
 
 _publish _pub:
-        :make _publish_hg
+        :make _publish_hg _publish_git
         #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
         syncezos
 
+_publish_git:
+        for repo in $(git_repos) \
+        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
+        done
+        @echo 'changes visible at $(www_bitbucket)'
+        @echo 'code visible at $(www_github)'
+
 _publish_hg:
-        for repo in $(repos) \
+        for repo in $(hg_repos) \
         do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
         done \
         wait
         @echo 'changes visible at $(www_sr_ht)'
-        @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
 _release:
