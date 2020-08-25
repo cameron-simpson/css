@@ -49,7 +49,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagChoice as _TagChoice, TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TagSetCriterion, TagChoice, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -103,7 +103,11 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-class _Criterion(ABC):
+class SQLTagSetCriterion(TagSetCriterion):
+
+  # list of TagSetCriterion classes
+  # whose .parse methods are used by .parse
+  CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
   def extend_query(self, sqla_query, *, orm):
@@ -112,7 +116,7 @@ class _Criterion(ABC):
     '''
     raise NotImplemented
 
-class TagChoice(_TagChoice, _Criterion):
+class SQLTagChoice(TagChoice, SQLTagSetCriterion):
   ''' A `cs.tagset.TagChoice` extended with a `.extend_query` method.
   '''
 
@@ -145,11 +149,16 @@ class TagChoice(_TagChoice, _Criterion):
         match.append(or_(tags_alias.id is None, tag_column != tag_test_value))
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
 
+SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagChoice)
+SQLTagSetCriterion.TAG_CHOICE_CLASS = SQLTagChoice
+
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
   '''
 
-  TAG_CHOICE_CLASS = TagChoice
+  TAGSET_CRITERION_CLASS = SQLTagSetCriterion
+
+  TAG_CHOICE_CLASS = SQLTagChoice
 
   GETOPT_SPEC = 'f:'
 
@@ -779,7 +788,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         other_criteria = []
         for taggy in tag_criteria:
           with Pfx(taggy):
-            tag_choice = TagChoice.from_any(taggy)
+            tag_choice = SQLTagSetCriterion.from_any(taggy)
             try:
               query_extender = tag_choice.extend_query
             except AttributeError:
