@@ -773,6 +773,10 @@ class TagSetCriterion(ABC):
   ''' A testable criterion for a `TagSet`.
   '''
 
+  # list of TagSetCriterion classes
+  # whose .parse methods are used by .parse
+  CRITERION_PARSE_CLASSES = []
+
   @abstractmethod
   def match(self, tagset):
     ''' Apply this `TagSetCriterion` to a `TagSet`.
@@ -794,13 +798,10 @@ class TagSetCriterion(ABC):
   def parse(cls, s, offset=0, delim=None):
     ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
-        This method recognises the following syntaxes:
-        * [`!`]*tag_name*:
-          tests for the presence of *tag_name*
-        * [`!`]*tag_name*`=`*tag_value*:
-          tests for the presence of *tag_name*`=`*tag_value`
-        * [`!`]*tag_name*`~`*tag_value*:
-          tests for the presence of *tag_value* in the value of the `Tag` *tag_name*
+        This method recognises an optional leading `'!'` or `'-'`
+        indicating negation of the test,
+        followed by a criterion recognised by the `.parse` method
+        of one of the classes in `cls.CRITERION_PARSE_CLASSES`.
     '''
     with Pfx("offset %d", offset):
       offset0 = offset
@@ -810,35 +811,21 @@ class TagSetCriterion(ABC):
       else:
         choice = True
       offset1 = offset
-      tag_name, offset = get_dotted_identifier(s, offset1)
-      if tag_name:
-        if offset == len(s) or s[offset].isspace() or (delim
-                                                       and s[offset] in delim):
-          # tag_name present
-          return TagChoice(s[offset0:offset], choice, Tag(tag_name)), offset
-        if s.startswith('=', offset):
-          # tag_name present with specific value
-          offset += 1
-          try:
-            value, offset = Tag.parse_value(s, offset)
-          except ValueError:
-            pass
-          else:
-            return TagChoice(
-                s[offset0:offset], choice, Tag(tag_name, value)
-            ), offset
-        if s.startswith('~', offset):
-          # tag.value contains value
-          offset += 1
-          try:
-            value, offset = Tag.parse_value(s, offset)
-          except ValueError:
-            pass
-          else:
-            return TagSetContainsTest(
-                s[offset0:offset], choice, Tag(tag_name, value)
-            ), offset
-      raise ValueError("cannot parse %s %r" % (cls.__name__, s))
+      criterion = None
+      for crit_cls in cls.CRITERION_PARSE_CLASSES:
+        with Pfx(crit_cls.__name__):
+          parse = crit_cls.parse
+          with Pfx("parse(%r,offset=%d)", s, offset):
+            try:
+              params, offset = parse(s, offset, delim)
+            except ValueError:
+              pass
+            else:
+              criterion = crit_cls(s[offset0:offset], choice, **params)
+              break
+      if criterion is None:
+        raise ValueError("no criterion parsed at offset %d" % (offset0,))
+      return criterion, offset
 
   @classmethod
   @pfx_method
@@ -858,6 +845,7 @@ class TagSetCriterion(ABC):
         * `(name,value)`: a 2 element sequence
           is equivalent to a positive `TagChoice`
     '''
+    tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagChoice)
     if isinstance(o, (cls, TagSetCriterion)):
       # already suitable
       return o
@@ -876,10 +864,10 @@ class TagSetCriterion(ABC):
       except AttributeError:
         pass
       else:
-        return cls(None, True, Tag(name, value))
+        return tag_choice_class(repr(o), True, tag=Tag(name, value))
     else:
       # (name,value) => True TagChoice
-      return TagChoice(None, True, Tag(name, value))
+      return tag_choice_class(repr((name, value)), True, tag=Tag(name, value))
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
 class TagBasedTest(namedtuple('TagChoice', 'spec choice tag'),
@@ -900,10 +888,31 @@ class TagChoice(TagBasedTest):
       * `tag`: the `Tag` representing the criterion
   '''
 
+  @staticmethod
+  def parse(s, offset=0, delim=None):
+    ''' Parse *tag_name*[`=`*value*], return `({'tag':Tag},offset)`.
+    '''
+    tag_name, offset = get_dotted_identifier(s, offset)
+    if not tag_name:
+      raise ValueError("no tag_name")
+    # end of text?
+    if offset == len(s) or s[offset].isspace() or (delim
+                                                   and s[offset] in delim):
+      # just tag_name present
+      return dict(tag=Tag(tag_name)), offset
+    if not s.startswith('=', offset):
+      raise ValueError("expected '='")
+    # tag_name present with specific value
+    offset += 1
+    value, offset = Tag.parse_value(s, offset)
+    return dict(tag=Tag(tag_name, value)), offset
+
   def match(self, tags):
     ''' Test this `TagChoice` against the `Tag`s in `tags`.
     '''
     return self.tag in tags if self.choice else self.tag not in tags
+
+TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagChoice)
 
 # TODO: rename to TagEqualityTest
 class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
@@ -919,6 +928,25 @@ class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
       * `tag`: the `Tag` representing the criterion
   '''
 
+  @staticmethod
+  def parse(s, offset=0, delim=None):
+    ''' Parse *tag_name*[`~`*value*], return `({'tag':Tag},offset)`.
+    '''
+    tag_name, offset = get_dotted_identifier(s, offset)
+    if not tag_name:
+      raise ValueError("no tag_name")
+    # end of text?
+    if offset == len(s) or s[offset].isspace() or (delim
+                                                   and s[offset] in delim):
+      # just tag_name present
+      return dict(tag=Tag(tag_name)), offset
+    if not s.startswith('~', offset):
+      raise ValueError("expected '='")
+    # tag_name present with specific value
+    offset += 1
+    value, offset = Tag.parse_value(s, offset)
+    return dict(tag=Tag(tag_name, value)), offset
+
   def match(self, tags):
     ''' Test this `TagChoice` against the `Tag`s in `tags`.
     '''
@@ -928,6 +956,8 @@ class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
     if self.tag.value in value:
       return self.choice
     return not self.choice
+
+TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagSetContainsTest)
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
@@ -1436,7 +1466,8 @@ class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
 
       Optional subclass attributes:
-      * `TAG_CHOICE_CLASS`: a `TagSetCriterion` duck class.
+      * `TAGSET_CRITERION_CLASS`: a `TagSetCriterion` duck class,
+        default `TagSetCriterion`.
         For example, `cs.sqltags` has a subclass
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
@@ -1453,11 +1484,13 @@ class TagsCommandMixin:
         The optional parameter `tag_choice_class` is a class
         with a `.from_str(str)` factory method
         returning a `TagSetCriterion` duck instance.
-        The default `tag_choice_class` is `cls.TAG_CHOICE_CLASS`
+        The default `tag_choice_class` is `cls.TAGSET_CRITERION_CLASS`
         or `TagSetCriterion`.
     '''
     if tag_choice_class is None:
-      tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagSetCriterion)
+      tag_choice_class = getattr(
+          cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
+      )
     choices = []
     for arg in argv:
       with Pfx(arg):
