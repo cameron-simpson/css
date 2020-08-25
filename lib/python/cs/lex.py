@@ -46,7 +46,7 @@ else:
 ord_space = ord(' ')
 
 def unctrl(s, tabsize=8):
-  ''' Return the string `s` with TABs expanded and control characters
+  ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
   '''
   s2 = ''
@@ -117,7 +117,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
   return pad
 
 def strlist(ary, sep=", "):
-  ''' Convert an iterable to strings and join with ", ".
+  ''' Convert an iterable to strings and join with `sep` (default `', '`).
   '''
   return sep.join([str(a) for a in ary])
 
@@ -359,19 +359,19 @@ def stripped_dedent(s):
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
-      starting at `offset` (default 0).
+      starting at `offset` (default `0`).
       Return `(match,new_offset)`.
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 def get_decimal(s, offset=0):
-  ''' Scan the string `s` for decimal characters starting at `offset`.
+  ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
 def get_decimal_value(s, offset=0):
-  ''' Scan the string `s` for a decimal value starting at `offset`.
+  ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   value_s, offset = get_decimal(s, offset)
@@ -380,13 +380,13 @@ def get_decimal_value(s, offset=0):
   return int(value_s), offset
 
 def get_hexadecimal(s, offset=0):
-  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+  ''' Scan the string `s` for hexadecimal characters starting at `offset` (default `0`).
       Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_hexadecimal_value(s, offset=0):
-  ''' Scan the string `s` for a hexadecimal value starting at `offset`.
+  ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   value_s, offset = get_hexadecimal(s, offset)
@@ -396,7 +396,7 @@ def get_hexadecimal_value(s, offset=0):
 
 def get_decimal_or_float_value(s, offset=0):
   ''' Fetch a decimal or basic float (nnn.nnn) value
-      from the str `s` at `offset`.
+      from the str `s` at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   int_part, offset = get_decimal(s, offset)
@@ -437,7 +437,8 @@ def get_identifier(
   return ch + idtail, offset
 
 def is_identifier(s, offset=0, **kw):
-  ''' Test if the string `s` is an identifier from position `offset` onward.
+  ''' Test if the string `s` is an identifier
+      from position `offset` (default `0`) onward.
   '''
   s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
@@ -459,6 +460,9 @@ def get_dotted_identifier(s, offset=0, **kw):
 
       Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
+
+      Keyword arguments are passed to `get_identifier`
+      (used for each component of the dotted identifier).
   '''
   offset0 = offset
   _, offset = get_identifier(s, offset=offset, **kw)
@@ -663,8 +667,8 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
       * `s`: the string with the variable reference
       * `offset`: the starting point for the reference
       * `default`: default value for missing environment variables;
-         if None (the default) a ValueError is raised
-      * `environ`: the environment mapping, default os.environ
+         if `None` (the default) a `ValueError` is raised
+      * `environ`: the environment mapping, default `os.environ`
       * `specials`: the mapping of special single character variables
   '''
   if environ is None:
@@ -698,10 +702,10 @@ def get_qstr(
 
       Parameters:
       * `s`: the string containg the quoted text.
-      * `offset`: the starting point, default 0.
-      * `q`: the quote character, default `'"'`. If `q` is set to `None`,
+      * `offset`: the starting point, default `0`.
+      * `q`: the quote character, default `'"'`. If `q` is `None`,
         do not expect the string to be delimited by quote marks.
-      * `environ`: if not `None`, also parse and expand $envvar references.
+      * `environ`: if not `None`, also parse and expand `$`*envvar* references.
       * `default`: passed to `get_envvar`
   '''
   if environ is None and default is not None:
@@ -748,22 +752,22 @@ def get_delimited(s, offset, delim):
 
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied
-      tokenise functions `getters`; return the list of tokens matched
-      and the final offset.
+      tokeniser functions `getters`.
+      Return the list of tokens matched and the final offset.
 
       Parameters:
       * `s`: the string to parse.
       * `offset`: the starting position for the parse.
       * `getters`: an iterable of tokeniser specifications.
 
-      Each tokeniser specification is either:
-      * a callable expecting (s, offset) and returning (token, new_offset)
+      Each tokeniser specification `getter` is either:
+      * a callable expecting `(s,offset)` and returning `(token,new_offset)`
       * a literal string, to be matched exactly
-      * a tuple or list with values (func, args, kwargs);
-        call func(s, offset, *args, **kwargs)
-      * an object with a .match method such as a regex;
-        call getter.match(s, offset) and return a match object with
-        a .end() method returning the offset of the end of the match
+      * a `tuple` or `list` with values `(func,args,kwargs)`;
+        call `func(s,offset,*args,**kwargs)`
+      * an object with a `.match` method such as a regex;
+        call `getter.match(s,offset)` and return a match object with
+        a `.end()` method returning the offset of the end of the match
   '''
   tokens = []
   for getter in getters:
@@ -799,8 +803,8 @@ def get_tokens(s, offset, getters):
   return tokens, offset
 
 def match_tokens(s, offset, getters):
-  ''' Wrapper for get_tokens which catches ValueError exceptions
-      and returns (None, offset).
+  ''' Wrapper for `get_tokens` which catches `ValueError` exceptions
+      and returns `(None,offset)`.
   '''
   try:
     tokens, offset2 = get_tokens(s, offset, getters)
@@ -810,7 +814,7 @@ def match_tokens(s, offset, getters):
     return tokens, offset2
 
 def isUC_(s):
-  ''' Check that a string matches `^[A-Z][A-Z_0-9]*$`.
+  ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
   '''
   if s.isalpha() and s.isupper():
     return True
@@ -824,11 +828,12 @@ def isUC_(s):
   return True
 
 def parseUC_sAttr(attr):
-  ''' Take an attribute name and return `(key, is_plural)`.
+  ''' Take an attribute name `attr` and return `(key,is_plural)`.
 
-      `'FOO'` returns `(`FOO`, False)`.
-      `'FOOs'` or `'FOOes'` returns `('FOO', True)`.
-      Otherwise return `(None, False)`.
+      Examples:
+      * `'FOO'` returns `('FOO',False)`.
+      * `'FOOs'` or `'FOOes'` returns `('FOO',True)`.
+      Otherwise return `(None,False)`.
   '''
   if len(attr) > 1:
     if attr[-1] == 's':
@@ -846,10 +851,10 @@ def parseUC_sAttr(attr):
 
 def as_lines(chunks, partials=None):
   ''' Generator yielding complete lines from arbitrary pieces of text from
-      the iterable `chunks`.
+      the iterable of `str` `chunks`.
 
       After completion, any remaining newline-free chunks remain
-      in the partials list; this will be unavailable to the caller
+      in the partials list; they will be unavailable to the caller
       unless the list is presupplied.
   '''
   if partials is None:
@@ -905,11 +910,11 @@ def cutsuffix(s, suffix):
   return s
 
 def cropped_repr(s, max_length=32, offset=0):
-  ''' If the length of the sequence `s` after `offset (default `0`)
-      exceeds `max_length` (default 32)
+  ''' If the length of the sequence `s` after `offset` (default `0`)
+      exceeds `max_length` (default `32`)
       return the `repr` of the leading `max_length-3` characters from `offset`
       plus `'...'`.
-      Otherwise return the `repr` of `s[offset:]`.
+      Otherwise return the `repr(s[offset:])`.
 
       This is typically used for `str` values.
   '''
@@ -947,7 +952,7 @@ def get_ini_clause_entryname(s, offset=0):
   return clausename, entryname, offset
 
 def format_escape(s):
-  ''' Escape {} characters in a string to protect them from `str.format`.
+  ''' Escape `{}` characters in a string to protect them from `str.format`.
   '''
   return s.replace('{', '{{').replace('}', '}}')
 
@@ -975,7 +980,7 @@ class FormatAsError(LookupError):
 
 @fmtdoc
 def format_as(format_s, format_mapping, error_sep=None):
-  ''' Format the string `format_s` using `format_mapping`,
+  ''' Format the string `format_s` using `str.format_mapping`,
       return the formatted result.
       This is a wrapper for `str.format_map`
       which raises a more informative `FormatAsError` exception on failure.
@@ -984,7 +989,7 @@ def format_as(format_s, format_mapping, error_sep=None):
       * `format_s`: the format string to use as the template
       * `format_mapping`: the mapping of available replacement fields
       * `error_sep`: optional separator for the multipart error message,
-        default from FormatAsError.DEFAULT_SEPARATOR:
+        default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
   '''
   try:
@@ -1010,7 +1015,7 @@ class FormatableMixin(object):
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TagSet` class
+      For example, the `cs.tagset.TaggedEntityMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
   '''
