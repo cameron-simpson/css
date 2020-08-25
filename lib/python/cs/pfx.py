@@ -499,7 +499,6 @@ def PfxThread(target=None, **kw):
 @decorator
 def pfx(func, message=None, message_args=()):
   ''' General purpose @pfx for generators, methods etc.
-      Pfx needs a .overPfx attribute to hook up chained Pfx stacks.
 
       Parameters:
       * `func`: the function to decorate

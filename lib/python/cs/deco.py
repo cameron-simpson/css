@@ -309,7 +309,7 @@ def OBSOLETE(func, suggestion=None):
   if suggestion:
     doc += ' suggestion: ' + suggestion
   wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = funcdoc
+  wrapped.__doc__ = doc + '\n\n' + funcdoc
   return wrapped
 
 
