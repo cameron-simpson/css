@@ -79,9 +79,8 @@ do
   hg_root=$( hg root )
   git_dir=$hg_root/.hg/git
   [ -d "$git_dir" ] || {
-    echo "$cmd: no git tree at $git_dir" >&2
-    badopts=1
-    break
+    echo "$cmd: no git tree at $git_dir, runing gexport" >&2
+    $trace hg gexport || exit $?
   }
 
   break
