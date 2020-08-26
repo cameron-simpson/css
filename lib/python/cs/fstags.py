@@ -16,7 +16,7 @@
       tags can be automatically acquired merely by arranging your file tree
 
     Tags are stored in the file `.fstags` in each directory;
-    there is a line for each entry in the directory with tags
+    there is a line for each entry in the directory
     consisting of the directory entry name and the associated tags.
 
     Tags may be "bare", or have a value.
