@@ -529,11 +529,16 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     name = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    try:
-      tag_criteria = cls.parse_tagset_criteria(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
-      badopts = True
+    tag_choices = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          tag_choice = TagChoice.from_str(arg)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+        else:
+          tag_choices.append(TagChoice.from_str(arg))
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
