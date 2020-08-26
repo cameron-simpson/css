@@ -170,39 +170,39 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           Tag paths based on rules from the rc file.
     '''
     fstags = options.fstags
+    U = options.upd
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
     with stackattrs(state, verbose=True):
       with fstags:
-        with Upd(sys.stderr) as U:
-          for top_path in argv:
-            for isdir, path in rpaths(top_path, yield_dirs=True):
-              spath = shortpath(path)
-              U.out(spath)
-              with Pfx(shortpath(path)):
-                ont = fstags.ontology(path)
-                tagged_path = fstags[path]
-                direct_tags = tagged_path.direct_tags
-                all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(spath + ' ' + str(autotag))
-                  if ont:
-                    autotag = ont.convert_tag(autotag)
-                  if autotag not in all_tags:
-                    direct_tags.add(autotag, verbose=state.verbose)
-                if not isdir:
-                  try:
-                    S = os.stat(path)
-                  except OSError:
-                    pass
-                  else:
-                    direct_tags.add('filesize', S.st_size)
-                # update the
-                all_tags = tagged_path.merged_tags()
-                for tag in fstags.cascade_tags(all_tags):
-                  if tag.name not in direct_tags:
-                    direct_tags.add(tag)
+        for top_path in argv:
+          for isdir, path in rpaths(top_path, yield_dirs=True):
+            spath = shortpath(path)
+            U.out(spath)
+            with Pfx(spath):
+              ont = fstags.ontology(path)
+              tagged_path = fstags[path]
+              direct_tags = tagged_path.direct_tags
+              all_tags = tagged_path.merged_tags()
+              for autotag in tagged_path.infer_from_basename(filename_rules):
+                U.out(spath + ' ' + str(autotag))
+                if ont:
+                  autotag = ont.convert_tag(autotag)
+                if autotag not in all_tags:
+                  direct_tags.add(autotag, verbose=state.verbose)
+              if not isdir:
+                try:
+                  S = os.stat(path)
+                except OSError:
+                  pass
+                else:
+                  direct_tags.add('filesize', S.st_size)
+              # update the
+              all_tags = tagged_path.merged_tags()
+              for tag in fstags.cascade_tags(all_tags):
+                if tag.name not in direct_tags:
+                  direct_tags.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options):
