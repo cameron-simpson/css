@@ -781,7 +781,7 @@ class TagSetCriterion(ABC):
   def match(self, tagset):
     ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
-    raise NotImplementedError
+    raise NotImplementedError("match")
 
   @classmethod
   @pfx_method

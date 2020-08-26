@@ -115,7 +115,7 @@ class SQLTagSetCriterion(TagSetCriterion):
     ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
         returning the extended Query.
     '''
-    raise NotImplemented
+    raise NotImplementedError("extend_query")
 
 class SQLTagChoice(TagChoice, SQLTagSetCriterion):
   ''' A `cs.tagset.TagChoice` extended with a `.extend_query` method.
