@@ -68,7 +68,7 @@ DISTINFO = {
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
         'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
         'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads', 'icontract',
-        'sqlalchemy'
+        'sqlalchemy', 'typeguard'
     ],
 }
 
@@ -105,6 +105,10 @@ def verbose(msg, *a):
   ifverbose(state.verbose, msg, *a)
 
 class SQLTagSetCriterion(TagSetCriterion):
+  ''' Subclass of `TagSetCriterion` requiring the `.extend_query` method.
+      It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
+      the SQL capable criterion classes below.
+  '''
 
   # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
@@ -152,6 +156,8 @@ SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagChoice)
 SQLTagSetCriterion.TAG_CHOICE_CLASS = SQLTagChoice
 
 class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
+  ''' A `cs.tagset.TagSetContainsTest` extended with a `.extend_query` method.
+  '''
 
   def extend_query(self, sqla_query, *, orm):
     ''' Extend the SQLAlchemy `Query` `sqla_query`.
@@ -159,7 +165,6 @@ class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
     '''
     tag = self.tag
     tags_alias = aliased(orm.tags)
-    tag_column, tag_test_value = tags_alias.value_test(tag.value)
     match = [tags_alias.name == tag.name]
     isouter = not self.choice
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
@@ -336,7 +341,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     badopts = False
     update_mode = False
     opts, argv = getopt(argv, 'u')
-    for option, value in opts:
+    for option, _ in opts:
       with Pfx(option):
         if option in ('-u', '--update'):
           update_mode = True
@@ -363,6 +368,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           Initialise the database.
           This includes defining the schema and making the root metanode.
     '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     options.sqltags.orm.define_schema()
 
   @classmethod
@@ -562,7 +569,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               xit = 1
               continue
             tags = te.tags
-            for tag_choice in tag_criteria:
+            for tag_choice in tag_choices:
               if tag_choice.choice:
                 if tag_choice.tag not in tags:
                   te.set(tag_choice.tag)
