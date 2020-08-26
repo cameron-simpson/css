@@ -49,7 +49,8 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagChoice, TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TagSetCriterion, TagChoice, TagSetContainsTest,
+    TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -121,15 +122,14 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
   '''
 
   def extend_query(self, sqla_query, *, orm):
-    ''' Extend the SQLAlchemy `Query` `sqla_query`
-        to match this `TagChoice`.
+    ''' Extend the SQLAlchemy `Query` `sqla_query`.
         Return the new `Query`.
     '''
     tag = self.tag
     tags_alias = aliased(orm.tags)
     tag_column, tag_test_value = tags_alias.value_test(tag.value)
     match = [tags_alias.name == tag.name]
-    isouter = False
+    isouter = not self.choice
     if self.choice:
       # positive test
       if tag_test_value is None:
@@ -140,7 +140,6 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
         match.append(tag_column == tag_test_value)
     else:
       # negative test
-      isouter = True
       if tag_column is None:
         # just test for absence
         match.append(tags_alias.id is None)
@@ -151,6 +150,21 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
 
 SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagChoice)
 SQLTagSetCriterion.TAG_CHOICE_CLASS = SQLTagChoice
+
+class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
+
+  def extend_query(self, sqla_query, *, orm):
+    ''' Extend the SQLAlchemy `Query` `sqla_query`.
+        Return the new `Query`.
+    '''
+    tag = self.tag
+    tags_alias = aliased(orm.tags)
+    tag_column, tag_test_value = tags_alias.value_test(tag.value)
+    match = [tags_alias.name == tag.name]
+    isouter = not self.choice
+    return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
+
+SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagSetContainsTest)
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
@@ -757,20 +771,22 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def by_tags(cls, tag_criteria, *, session, name=None, query=None, **kw):
         ''' Construct a query to match `Entity` rows
             matching `name` and the supplied `tag_criteria`.
-            Return the `(query,other_criteria)`
-            being the SQLAlchemy `Query` and a list of other criteria
-            not expressible with SQL
-            which should be applied to the resulting entities.
-
-            If `name` is omitted or `None` the query will match log entities
-            otherwise the entity with the specified `name`.
+            Return an SQLAlchemy `Query`.
 
             An existing query may be supplied,
             in which case it will be extended.
 
+            *Note*:
+            the SQL query may not apply all the criteria,
+            so every criterion must still be applied
+            to the resulting `TaggedEntities`.
+
+            If `name` is omitted or `None` the query will match log entities
+            otherwise the entity with the specified `name`.
+
             The `tag_criteria` should be an iterable
-            of objects acceptable to `TagChoice.from_any`;
-            all the objects will be converted to `TagChoice`s
+            of objects acceptable to `TagSetCriterion.from_any`;
+            all the objects will be converted to `TagSetCriterion`s
             and used to construct the query.
         '''
         entities = orm.entities
@@ -785,17 +801,16 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           query = cls.by_name(name=name, session=session, query=query)
         if kw:
           raise ValueError("unexpected keyword arguments: %r" % (kw,))
-        other_criteria = []
         for taggy in tag_criteria:
           with Pfx(taggy):
             tag_choice = SQLTagSetCriterion.from_any(taggy)
             try:
               query_extender = tag_choice.extend_query
             except AttributeError:
-              other_criteria.append(tag_choice)
+              pass
             else:
               query = query_extender(query, orm=orm)
-        return query, other_criteria
+        return query
 
       @classmethod
       @pfx_method
@@ -1118,22 +1133,16 @@ class SQLTags(MultiOpenMixin):
     yield from entity_map.values()
 
   @orm_auto_session
-  def find(self, tag_choices, *, more_criteria=None, session):
+  def find(self, tag_criteria, *, session):
     ''' Generator yielding `TaggedEntity` instances
-        for the `Entity` rows matching `tag_choices`.
+        for the `Entity` rows matching `tag_criteria`.
     '''
-    if more_criteria is None:
-      more_criteria = []
     entities = self.orm.entities
-    query, other_criteria = entities.by_tags(tag_choices, session=session)
+    query = entities.by_tags(tag_criteria, session=session)
     XP("QUERY = %s", query)
-    more_criteria.extend(other_criteria)
-    if not more_criteria:
-      yield from self._run_query(query, session=session)
-      return
     for te in self._run_query(query, session=session):
       ok = True
-      for criterion in more_criteria:
+      for criterion in tag_criteria:
         if not criterion.match(te.tags):
           ok = False
           break
