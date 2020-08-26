@@ -103,7 +103,7 @@ from cs.tagset import (
     RegexpTagRule
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd, print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200717.1-post'
 
@@ -759,11 +759,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    try:
-      tag_choices = cls.parse_tagset_criteria(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
-      badopts = True
+    tag_choices = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          tag_choice = TagChoice.from_str(arg)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+        else:
+          tag_choices.append(tag_choice)
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':

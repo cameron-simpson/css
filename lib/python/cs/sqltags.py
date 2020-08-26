@@ -538,7 +538,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           warning("bad tag specifications: %s", e)
           badopts = True
         else:
-          tag_choices.append(TagChoice.from_str(arg))
+          tag_choices.append(tag_choice)
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
