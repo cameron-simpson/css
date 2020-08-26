@@ -702,13 +702,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       @auto_session
       def tags(self, *, session):
-        ''' Return a `TagSet` withg the `Tag`s for this entity.
-
-            *Note*: this is just a reference copy.
-            Modifying this `TagSet` will not affect the database tags.
-            Obtain an `SQLTagSet` instead to affect the database.
+        ''' Return an `SQLTagSet` with the `Tag`s for this entity.
         '''
-        entity_tags = TagSet(sqltags=None, entity_id=self.id)
+        entity_tags = SQLTagSet(sqltags=None, entity_id=self.id)
         entity_tags.update(
             (
                 (tagrow.name, tagrow.value)
