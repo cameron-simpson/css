@@ -870,9 +870,15 @@ class TagSetCriterion(ABC):
       return tag_choice_class(repr((name, value)), True, tag=Tag(name, value))
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
-class TagBasedTest(namedtuple('TagChoice', 'spec choice tag'),
+class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag'),
                    TagSetCriterion):
   ''' A test based on a `Tag`.
+
+      Attributes:
+      * `spec`: the source text from which this choice was parsed,
+        possibly `None`
+      * `choice`: the apply/reject flag
+      * `tag`: the `Tag` representing the criterion
   '''
 
 # TODO: rename to TagEqualityTest
@@ -880,12 +886,6 @@ class TagChoice(TagBasedTest):
   ''' A "tag choice", an apply/reject flag and a `Tag`,
       used to apply changes to a `TagSet`
       or as a criterion for a tag search.
-
-      Attributes:
-      * `spec`: the source text from which this choice was parsed,
-        possibly `None`
-      * `choice`: the apply/reject flag
-      * `tag`: the `Tag` representing the criterion
   '''
 
   @staticmethod
@@ -908,24 +908,15 @@ class TagChoice(TagBasedTest):
     return dict(tag=Tag(tag_name, value)), offset
 
   def match(self, tags):
-    ''' Test this `TagChoice` against the `Tag`s in `tags`.
+    ''' Test against the `Tag`s in `tags`.
     '''
     return self.tag in tags if self.choice else self.tag not in tags
 
 TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagChoice)
 
 # TODO: rename to TagEqualityTest
-class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
-                         TagSetCriterion):
-  ''' A "tag choice", an apply/reject flag and a `Tag`,
-      used to apply changes to a `TagSet`
-      or as a criterion for a tag search.
-
-      Attributes:
-      * `spec`: the source text from which this choice was parsed,
-        possibly `None`
-      * `choice`: the apply/reject flag
-      * `tag`: the `Tag` representing the criterion
+class TagSetContainsTest(TagBasedTest):
+  ''' A test for the presense of a `Tag` value in a collection of `Tag`s.
   '''
 
   @staticmethod
@@ -948,7 +939,7 @@ class TagSetContainsTest(namedtuple('TagChoice', 'spec choice tag'),
     return dict(tag=Tag(tag_name, value)), offset
 
   def match(self, tags):
-    ''' Test this `TagChoice` against the `Tag`s in `tags`.
+    ''' Test against the `Tag`s in `tags`.
     '''
     value = tags.get(self.tag.name)
     if not value:
@@ -1607,6 +1598,7 @@ class TaggedEntity(TaggedEntityMixin):
       should that be useful.
   '''
 
+  # pylint: disable=redefined-builtin
   def __init__(self, *, id=None, name=None, unixtime=None, tags=None):
     if unixtime is None:
       unixtime = time.time()
