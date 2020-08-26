@@ -13,7 +13,7 @@
     documented under the `SQLTagsCommand` class below.
 '''
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from builtins import id as builtin_id
 from contextlib import contextmanager
 import csv
@@ -243,14 +243,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         tes = [sqltags[index]]
     if tes is None:
       try:
-        tag_choices = cls.parse_tagset_criteria(argv)
+        tag_criteria = cls.parse_tagset_criteria(argv)
       except ValueError as e:
         warning("bad tag specifications: %s", e)
         badopts = True
     if badopts:
       raise GetoptError("bad arguments")
     if tes is None:
-      tes = list(sqltags.find(tag_choices))
+      tes = list(sqltags.find(tag_criteria))
     changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
@@ -268,7 +268,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     sqltags = options.sqltags
     badopts = False
     try:
-      tag_choices = cls.parse_tagset_criteria(argv)
+      tag_criteria = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -276,7 +276,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("bad arguments")
     csvw = csv.writer(sys.stdout)
     with sqltags.orm.session() as session:
-      for te in sqltags.find(tag_choices, session=session):
+      for te in sqltags.find(tag_criteria, session=session):
         with Pfx(te):
           csvw.writerow(te.csvrow)
 
@@ -302,7 +302,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise RuntimeError("unsupported option")
     try:
-      tag_choices = cls.parse_tagset_criteria(argv)
+      tag_criteria = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -310,7 +310,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("bad arguments")
     xit = 0
     with sqltags.orm.session() as session:
-      for te in sqltags.find(tag_choices, session=session):
+      for te in sqltags.find(tag_criteria, session=session):
         with Pfx(te):
           try:
             output = te.format_as(output_format, error_sep='\n  ')
@@ -530,7 +530,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tagset_criteria(argv)
+      tag_criteria = cls.parse_tagset_criteria(argv)
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -557,7 +557,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               xit = 1
               continue
             tags = te.tags
-            for tag_choice in tag_choices:
+            for tag_choice in tag_criteria:
               if tag_choice.choice:
                 if tag_choice.tag not in tags:
                   te.set(tag_choice.tag)
@@ -1223,6 +1223,7 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
   '''
 
   @staticmethod
+  # pylint: disable=redefined-builtin
   def _singleton_key(*, sqltags, id, **_):
     return builtin_id(sqltags), id
 
