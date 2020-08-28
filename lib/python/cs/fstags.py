@@ -103,7 +103,7 @@ from cs.tagset import (
     RegexpTagRule
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd, print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200717.1-post'
 
@@ -170,39 +170,39 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           Tag paths based on rules from the rc file.
     '''
     fstags = options.fstags
+    U = options.upd
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
     with stackattrs(state, verbose=True):
       with fstags:
-        with Upd(sys.stderr) as U:
-          for top_path in argv:
-            for isdir, path in rpaths(top_path, yield_dirs=True):
-              spath = shortpath(path)
-              U.out(spath)
-              with Pfx(shortpath(path)):
-                ont = fstags.ontology(path)
-                tagged_path = fstags[path]
-                direct_tags = tagged_path.direct_tags
-                all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(spath + ' ' + str(autotag))
-                  if ont:
-                    autotag = ont.convert_tag(autotag)
-                  if autotag not in all_tags:
-                    direct_tags.add(autotag, verbose=state.verbose)
-                if not isdir:
-                  try:
-                    S = os.stat(path)
-                  except OSError:
-                    pass
-                  else:
-                    direct_tags.add('filesize', S.st_size)
-                # update the
-                all_tags = tagged_path.merged_tags()
-                for tag in fstags.cascade_tags(all_tags):
-                  if tag.name not in direct_tags:
-                    direct_tags.add(tag)
+        for top_path in argv:
+          for isdir, path in rpaths(top_path, yield_dirs=True):
+            spath = shortpath(path)
+            U.out(spath)
+            with Pfx(spath):
+              ont = fstags.ontology(path)
+              tagged_path = fstags[path]
+              direct_tags = tagged_path.direct_tags
+              all_tags = tagged_path.merged_tags()
+              for autotag in tagged_path.infer_from_basename(filename_rules):
+                U.out(spath + ' ' + str(autotag))
+                if ont:
+                  autotag = ont.convert_tag(autotag)
+                if autotag not in all_tags:
+                  direct_tags.add(autotag, verbose=state.verbose)
+              if not isdir:
+                try:
+                  S = os.stat(path)
+                except OSError:
+                  pass
+                else:
+                  direct_tags.add('filesize', S.st_size)
+              # update the
+              all_tags = tagged_path.merged_tags()
+              for tag in fstags.cascade_tags(all_tags):
+                if tag.name not in direct_tags:
+                  direct_tags.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options):
@@ -759,11 +759,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    try:
-      tag_choices = cls.parse_tagset_criteria(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
-      badopts = True
+    tag_choices = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          tag_choice = TagChoice.from_str(arg)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+        else:
+          tag_choices.append(tag_choice)
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':
@@ -1483,9 +1488,10 @@ class TagFile(SingletonMixin):
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
-      warning(
-          "offset %d: expected whitespace, adjusted name to %r", offset, name
-      )
+      # This is normal.
+      ##warning(
+      ##    "offset %d: expected whitespace, adjusted name to %r", offset, name
+      ##)
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)

@@ -245,7 +245,7 @@ def setup_logging(
     upd = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
-    upd = None
+    upd = Upd()
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
@@ -301,10 +301,10 @@ def setup_logging(
       module_names=module_names,
       function_names=function_names,
       cmd=cmd_name,
+      upd=upd,
       upd_mode=upd_mode,
       ansi_mode=ansi_mode,
       format=format,
-      upd=upd,
   )
 
   return loginfo
