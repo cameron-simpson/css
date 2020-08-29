@@ -1465,13 +1465,28 @@ class TagsOntology(SingletonMixin):
     '''
     return self['meta.' + type_name + '.' + self.value_to_tag_name(value)]
 
-  def meta_names(self):
+  def meta_names(self, type_name=None):
     ''' Generator yielding defined metadata names.
+
+        If `type_name` is specified, yield only the value_names
+        for that `type_name`.
+
+        For example, `meta_names('character')`
+        on an ontology with a `meta.character.marvel.black_widow`
+        would yield `'marvel.black_widow'`
+        i.e. only the suffix part for `character` metadata.
     '''
+    type_name_ = type_name + '.' if type_name else None
     for key in self.tagsets.keys():
       meta_name = cutprefix(key, 'meta.')
-      if meta_name is not key:
-        yield meta_name
+      if meta_name is key:
+        continue
+      if type_name_:
+        value_name = cutprefix(meta_name, type_name_)
+        if value_name is not meta_name:
+          yield value_name
+        continue
+      yield meta_name
 
   @staticmethod
   @pfx
