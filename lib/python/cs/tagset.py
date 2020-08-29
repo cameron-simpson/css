@@ -76,6 +76,68 @@
         >>> # test for subtopic=libraries
         >>> subtopic2 in tags
         False
+
+== Ontologies ===
+
+`Tag`s and `TagSet`s suffice to apply simple annotations to things.
+However, an ontology brings meaning to those annotations.
+
+Consider a record about a movie, with this `TagSet`:
+
+    title="Avengers Assemble"
+    series="Avengers (Marvel)"
+    cast={"Scarlett Johasson":"Black Widow (Marvel)"}
+
+where we have the movie title,
+a name for the series in which it resides,
+and a cast as an association of actors with roles.
+
+An ontology lets us associate implied types and metadata with these values.
+
+Here's an example ontology supporting the above `TagSet`:
+
+    type.cast type=dict key_type=person member_type=character description="members of a production"
+    type.character description="an identified member of a story"
+    type.series type=str
+    metadata.character.marvel.black_widow type=character names=["Natasha Romanov"]
+    metadata.person.scarlett_johasson fullname="Scarlett Johasson" bio="Known for Black Widow in the Marvel stories."
+
+The type information for a `cast`
+is defined by the ontology entry named `type.cast`,
+which tells us that a `cast` `Tag` is a `dict`,
+whose keys are of type `person`
+and whose values are of type `character`.
+(The default type is `str`.)
+
+To find out the underlying type for a `character`
+we look that up in the ontology in turn;
+because it does not have a specified `type` `Tag`, it it taken to be a `str`.
+
+Having the types for a `cast`,
+it is now possible to look up the metadata for the described cast members.
+
+The key `"Scarlett Johasson"` is a `person`
+(from the type definition of `cast`).
+The ontology entry for her is named `meta.person.scarlett_johasson`
+which is computed as:
+* `meta`: the name prefix for metadata entries
+* `person`: the type name
+* `scarlett_johasson`: obtained by downcasing `"Scarlett Johasson"`
+  and replacing whitespace with an underscore.
+  The full conversion process is defined
+  by the `TagsOntology.value_to_tag_name` function.
+
+The key `"Black Widow (Marvel)"` is a `character`
+(again, from the type definition of `cast`).
+The ontology entry for her is named `meta.character.marvel.black_widow`
+which is computed as:
+* `meta`: the name prefix for metadata entries
+* `character`: the type name
+* `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
+  replacing whitespace with an underscore,
+  and moving a bracketed suffix to the front as an unbracketed prefix.
+  The full conversion process is defined
+  by the `TagsOntology.value_to_tag_name` function.
 '''
 
 from abc import ABC, abstractmethod
@@ -579,18 +641,21 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
         This is how its type is defined,
         and is obtained from:
-        `self.ontology.typedata_tagset(self.name)`
+        `self.ontology['type.'+self.name]`
     '''
     ont = self.ontology
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont[self.name]
+    return ont['type.' + self.name]
 
   @property
   @pfx_method(use_str=True)
   def key_typedata(self):
-    ''' Return the typedata definition for this `Tag`'s keys.
+    ''' Return the typedata definition for this `Tag`'s keys,
+        obtained from `self.ontology[self.typedata['key_type']]`
+        i.e. the ontology `TagSet` named by the `self.typedata`'s
+        `key_type` `Tag`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -599,11 +664,17 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont[key_type]
+    return ont['type.' + key_type]
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
     ''' Return the metadata definition for `key`.
+
+        The metadata `TagSet` is obtained from the ontology entry
+        'meta.`*type*`.`*key_tag_name*
+        where *type* is the `Tag`'s `key_type`
+        and *key_tag_name* is the key converted
+        into a dotted identifier by `TagsOntology.value_to_tag_name`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -612,7 +683,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if key_type is None:
       return None
     ont = self.ontology
-    key_metadata_name = key_type + '.' + ont.value_to_tag_name(key)
+    key_metadata_name = 'meta.' + key_type + '.' + ont.value_to_tag_name(key)
     return ont[key_metadata_name]
 
   @property
@@ -627,11 +698,17 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont[member_type]
+    return ont['type.' + member_type]
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
     ''' Return the metadata definition for self[member_key].
+
+        The metadata `TagSet` is obtained from the ontology entry
+        'meta.`*type*`.`*member_tag_name*
+        where *type* is the `Tag`'s `member_type`
+        and *member_tag_name* is the member value converted
+        into a dotted identifier by `TagsOntology.value_to_tag_name`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -641,7 +718,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     ont = self.ontology
     value = self.value[member_key]
-    member_metadata_name = member_type + '.' + ont.value_to_tag_name(value)
+    member_metadata_name = 'meta.' + member_type + '.' + ont.value_to_tag_name(
+        value
+    )
     return ont[member_metadata_name]
 
   @property
@@ -1402,7 +1481,9 @@ class TagsOntology(SingletonMixin):
     '''
     if isinstance(value, str):
       value_tag_name = self.value_to_tag_name(value)
-      ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
+      ontkey = 'meta.' + type_name + '.' + '_'.join(
+          value_tag_name.lower().split()
+      )
       return ValueMetadata(self, ontkey, value)
     return None
 
