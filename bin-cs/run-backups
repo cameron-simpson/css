@@ -24,6 +24,7 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [backup-filelists...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
+  -x    Trace execution.
   backup-filelists...
         Backup definition files. Each file's basename has the form:
           mode.target
@@ -58,6 +59,7 @@ do
         exit 0
         ;;
     -n) doit= dont=echo ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
