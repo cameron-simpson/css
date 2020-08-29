@@ -100,8 +100,8 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin,
-    RegexpTagRule
+    TagSet, Tag, TagChoice, TagsOntology, TagsOntologyCommand, TaggedEntity,
+    TagsCommandMixin, RegexpTagRule
 )
 from cs.threads import locked, locked_property
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
@@ -644,31 +644,29 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def cmd_ont(argv, options):
     ''' Ontology operations.
 
-        Usage: {cmd} [subcommand [args...]]
-          With no arguments, locate the ontology.
-          Subcommands:
-            tags tag[=value]...
-              Query ontology information for the specified tags.
+        Usage: {cmd} [-o ontology] [subcommand [args...]]
+          With no arguments, print the ontology.
     '''
-    ont = options.fstags.ontology('.')
+    ont_path = None
+    opts, argv = getopt(argv, 'o:', longopts=['ontology='])
+    for option, value in opts:
+      with Pfx(option):
+        if option in ('-o', '--ontology'):
+          ont_path = value
+        else:
+          raise RuntimeError("unsupported option")
+    if ont_path is None or isdirpath(ont_path):
+      ont = options.fstags.ontology(ont_path or '.')
+    else:
+      raise GetoptError(
+          "unhandled ontology path, expected directory: %r" % (ont_path,)
+      )
     if not argv:
       print(ont)
-      return 0
-    subcmd = argv.pop(0)
-    with Pfx(subcmd):
-      if subcmd == 'tags':
-        if not argv:
-          raise GetoptError("missing tags")
-        for tag_arg in argv:
-          with Pfx(tag_arg):
-            tag = Tag.from_string(tag_arg, ontology=ont)
-            typedata = tag.typedata
-            print(" ", typedata)
-            print(" ", repr(tag.value))
-            print(" ", repr(tag.metadata))
-      else:
-        raise GetoptError("unrecognised subcommand")
-    return 0
+      return
+    with stackattrs(options, ontology=ont):
+      subcmd = TagsOntologyCommand().run([options.cmd] + argv, options=options)
+    return
 
   @staticmethod
   def cmd_rename(argv, options):
