@@ -1429,9 +1429,13 @@ class TagsOntology(SingletonMixin):
 
   __repr__ = __str__
 
-  def __getitem__(self, index):
+  def __getitem__(self, index: str):
     assert isinstance(index, str)
-    return self.tagsets[index]
+    try:
+      tags = self.tagsets[index]
+    except KeyError:
+      tags = self.tagsets[index] = TagSet(ontology=self)
+    return tags
 
   @require(lambda type_name: Tag.is_valid_name(type_name))
   def type(self, type_name):
