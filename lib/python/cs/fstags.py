@@ -223,10 +223,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     directories_like_files = False
     xit = 0
-    options, argv = getopt(argv, 'd')
-    for option, _ in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'd')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
     if not argv:
       path = '.'
@@ -260,12 +260,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     badopts = False
     all_paths = False
     use_direct_tags = False
-    options, argv = getopt(argv, 'a', longopts=['direct'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '-a':
+    opts, argv = getopt(argv, 'a', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-a':
           all_paths = True
-        elif option == '--direct':
+        elif opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unimplemented option")
@@ -309,14 +309,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     use_direct_tags = False
     as_rsync_includes = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'o:', longopts=['direct', 'for-rsync'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '--direct':
+    opts, argv = getopt(argv, 'o:', longopts=['direct', 'for-rsync'])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '--direct':
           use_direct_tags = True
-        elif option == '--for-rsync':
+        elif opt == '--for-rsync':
           as_rsync_includes = True
-        elif option == '-o':
+        elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
@@ -422,10 +422,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = None
     json_path = None
     badopts = False
-    options, argv = getopt(argv, '', longopts=['prefix='])
-    for option, value in options:
-      with Pfx(option):
-        if option == '--prefix':
+    opts, argv = getopt(argv, '', longopts=['prefix='])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '--prefix':
           tag_prefix = value
         else:
           raise RuntimeError("unimplemented option")
@@ -489,14 +489,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     directories_like_files = False
     use_direct_tags = False
     output_format = LS_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'do:', longopts=['direct'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'do:', longopts=['direct'])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
-        elif option == '--direct':
+        elif opt == '--direct':
           use_direct_tags = True
-        elif option == '-o':
+        elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
@@ -556,11 +556,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
-    fstags = options.fstags
     cmd_force = False
     cmd_verbose = False
-    subopts, argv = getopt(argv, 'finv')
-    for subopt, _ in subopts:
+    opts, argv = getopt(argv, 'finv')
+    for subopt, _ in opts:
       if subopt == '-f':
         cmd_force = True
       elif subopt == '-i':
@@ -618,12 +617,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     directories_like_files = False
     use_direct_tags = False
-    options, argv = getopt(argv, 'd', longopts=['direct'])
-    for option, _ in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'd', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
-        elif option == '--direct':
+        elif opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unsupported option")
@@ -649,9 +648,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     ont_path = None
     opts, argv = getopt(argv, 'o:', longopts=['ontology='])
-    for option, value in opts:
-      with Pfx(option):
-        if option in ('-o', '--ontology'):
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt in ('-o', '--ontology'):
           ont_path = value
         else:
           raise RuntimeError("unsupported option")
@@ -665,7 +664,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       print(ont)
       return
     with stackattrs(options, ontology=ont):
-      subcmd = TagsOntologyCommand().run([options.cmd] + argv, options=options)
+      TagsOntologyCommand().run([options.cmd] + argv, options=options)
     return
 
   @staticmethod
@@ -679,8 +678,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     fstags = options.fstags
     name_format = None
-    subopts, argv = getopt(argv, 'n:')
-    for subopt, value in subopts:
+    opts, argv = getopt(argv, 'n:')
+    for subopt, value in opts:
       if subopt == '-n':
         name_format = fstags.resolve_format_string(value)
       else:
@@ -864,10 +863,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     badopts = False
     use_direct_tags = False
-    options, argv = getopt(argv, '', longopts=['direct'])
-    for option, _ in options:
-      with Pfx(option):
-        if option == '--direct':
+    opts, argv = getopt(argv, '', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unsupported option")
@@ -951,6 +950,7 @@ class FSTags(MultiOpenMixin):
     self.sync()
 
   @locked
+  @pfx_method
   def sync(self):
     ''' Flush modified tag files.
     '''
