@@ -86,7 +86,7 @@ Consider a record about a movie, with this `TagSet`:
 
     title="Avengers Assemble"
     series="Avengers (Marvel)"
-    cast={"Scarlett Johasson":"Black Widow (Marvel)"}
+    cast={"Scarlett Johansson":"Black Widow (Marvel)"}
 
 where we have the movie title,
 a name for the series in which it resides,
@@ -100,7 +100,7 @@ Here's an example ontology supporting the above `TagSet`:
     type.character description="an identified member of a story"
     type.series type=str
     metadata.character.marvel.black_widow type=character names=["Natasha Romanov"]
-    metadata.person.scarlett_johasson fullname="Scarlett Johasson" bio="Known for Black Widow in the Marvel stories."
+    metadata.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
 The type information for a `cast`
 is defined by the ontology entry named `type.cast`,
@@ -116,13 +116,13 @@ because it does not have a specified `type` `Tag`, it it taken to be a `str`.
 Having the types for a `cast`,
 it is now possible to look up the metadata for the described cast members.
 
-The key `"Scarlett Johasson"` is a `person`
+The key `"Scarlett Johansson"` is a `person`
 (from the type definition of `cast`).
-The ontology entry for her is named `meta.person.scarlett_johasson`
+The ontology entry for her is named `meta.person.scarlett_johansson`
 which is computed as:
 * `meta`: the name prefix for metadata entries
 * `person`: the type name
-* `scarlett_johasson`: obtained by downcasing `"Scarlett Johasson"`
+* `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
   and replacing whitespace with an underscore.
   The full conversion process is defined
   by the `TagsOntology.value_to_tag_name` function.
@@ -743,7 +743,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         The corresponding metadata `TagSet` for that tag
         would have the name `series.marvel.avengers`.
 
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel)"}`
+        By contrast, the tag `cast={"Scarlett Johansson":"Black Widow (Marvel)"}`
         would look up the definition for `cast`
         which might look like this:
 
@@ -758,7 +758,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         of the `cast=` tag.
         As such, the corresponding metadata `TagSet`s
         in this example would be named
-        `person.scarlett_johasson`
+        `person.scarlett_johansson`
         and `character.marvel.black_widow` respectively.
     '''
     typedata = self.typedata
