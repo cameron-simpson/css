@@ -151,7 +151,7 @@ from icontract import require
 from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
-    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
@@ -647,7 +647,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont['type.' + self.name]
+    return ont.type(self.name)
 
   @property
   @pfx_method(use_str=True)
@@ -664,7 +664,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont['type.' + key_type]
+    return ont.type(key_type)
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
@@ -698,7 +698,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont['type.' + member_type]
+    return ont.type(member_type)
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
@@ -1402,7 +1402,7 @@ class ValueMetadataNamespace(TagSetNamespace):
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
 
-      This is based around a mapping of tag names
+      This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
 
       A `cs.fstags.FSTags` uses ontologies initialised from `TagFile`s
@@ -1432,6 +1432,42 @@ class TagsOntology(SingletonMixin):
   def __getitem__(self, index):
     assert isinstance(index, str)
     return self.tagsets[index]
+
+  @require(lambda type_name: Tag.is_valid_name(type_name))
+  def type(self, type_name):
+    ''' Return the `TagSet` defining the type named `type_name`.
+    '''
+    return self['type.' + type_name]
+
+  def types(self):
+    ''' Generator yielding defined type names and their defining `TagSet`.
+    '''
+    for key, tags in self.tagsets.items():
+      type_name = cutprefix(key, 'type.')
+      if type_name is not key:
+        yield type_name, tags
+
+  def type_names(self):
+    ''' Generator yielding defined type names.
+    '''
+    for key in self.tagsets.keys():
+      type_name = cutprefix(key, 'type.')
+      if type_name is not key:
+        yield type_name
+
+  @require(lambda type_name: Tag.is_valid_name(type_name))
+  def meta(self, type_name, value):
+    ''' Return the metadata `TagSet` for `(type_name,value)`.
+    '''
+    return self['meta.' + type_name + '.' + self.value_to_tag_name(value)]
+
+  def meta_names(self):
+    ''' Generator yielding defined metadata names.
+    '''
+    for key in self.tagsets.keys():
+      meta_name = cutprefix(key, 'meta.')
+      if meta_name is not key:
+        yield meta_name
 
   @staticmethod
   @pfx
