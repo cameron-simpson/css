@@ -143,11 +143,13 @@ which is computed as:
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
+from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 import re
 import time
 from types import SimpleNamespace
-from icontract import require
+from icontract import ensure, require
+from cs.cmdutils import BaseCommand
 from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
@@ -168,6 +170,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.cmdutils',
         'cs.dateutils',
         'cs.edit',
         'cs.lex',
@@ -1589,6 +1592,44 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+class TagsOntologyCommand(BaseCommand):
+  ''' A command line for working with ontology types.
+  '''
+
+  @staticmethod
+  def cmd_type(argv, options):
+    ''' Usage: {cmd} [type_name]
+          With no arguments, list the defined types.
+          With a type name, print its `Tag`s.
+    '''
+    ont = options.ontology
+    if not argv:
+      # list defined types
+      for type_name, tags in ont.types():
+        print(type_name, tags)
+      return
+    type_name = argv.pop(0)
+    with Pfx(type_name):
+      tags = ont.type(type_name)
+      if not argv:
+        for tag in sorted(tags):
+          print(tag)
+        return
+      subcmd = argv.pop(0)
+      with Pfx(subcmd):
+        if subcmd == 'edit':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          tags.edit()
+          return
+        if subcmd == 'list':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          for meta_name in sorted(ont.meta_names(type_name=type_name)):
+            print(meta_name, ont.meta(type_name, meta_name))
+          return
+        raise GetoptError("unrecognised subcommand")
 
 class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
