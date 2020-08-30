@@ -369,8 +369,9 @@ class BaseCommand:
       if upd_context is None:
         upd_context = nullcontext()
       with RunState(cmd) as runstate:
-        with stackattrs(options, cmd=subcmd, runstate=runstate):
-          with upd_context:
+        with upd_context:
+          with stackattrs(options, cmd=subcmd, runstate=runstate,
+                          upd=options.loginfo.upd):
             with self.run_context(argv, options):
               with subcmd_context:
                 return main(argv, options)

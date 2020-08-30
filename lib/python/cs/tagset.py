@@ -76,20 +76,85 @@
         >>> # test for subtopic=libraries
         >>> subtopic2 in tags
         False
+
+== Ontologies ===
+
+`Tag`s and `TagSet`s suffice to apply simple annotations to things.
+However, an ontology brings meaning to those annotations.
+
+Consider a record about a movie, with this `TagSet`:
+
+    title="Avengers Assemble"
+    series="Avengers (Marvel)"
+    cast={"Scarlett Johansson":"Black Widow (Marvel)"}
+
+where we have the movie title,
+a name for the series in which it resides,
+and a cast as an association of actors with roles.
+
+An ontology lets us associate implied types and metadata with these values.
+
+Here's an example ontology supporting the above `TagSet`:
+
+    type.cast type=dict key_type=person member_type=character description="members of a production"
+    type.character description="an identified member of a story"
+    type.series type=str
+    metadata.character.marvel.black_widow type=character names=["Natasha Romanov"]
+    metadata.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+
+The type information for a `cast`
+is defined by the ontology entry named `type.cast`,
+which tells us that a `cast` `Tag` is a `dict`,
+whose keys are of type `person`
+and whose values are of type `character`.
+(The default type is `str`.)
+
+To find out the underlying type for a `character`
+we look that up in the ontology in turn;
+because it does not have a specified `type` `Tag`, it it taken to be a `str`.
+
+Having the types for a `cast`,
+it is now possible to look up the metadata for the described cast members.
+
+The key `"Scarlett Johansson"` is a `person`
+(from the type definition of `cast`).
+The ontology entry for her is named `meta.person.scarlett_johansson`
+which is computed as:
+* `meta`: the name prefix for metadata entries
+* `person`: the type name
+* `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
+  and replacing whitespace with an underscore.
+  The full conversion process is defined
+  by the `TagsOntology.value_to_tag_name` function.
+
+The key `"Black Widow (Marvel)"` is a `character`
+(again, from the type definition of `cast`).
+The ontology entry for her is named `meta.character.marvel.black_widow`
+which is computed as:
+* `meta`: the name prefix for metadata entries
+* `character`: the type name
+* `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
+  replacing whitespace with an underscore,
+  and moving a bracketed suffix to the front as an unbracketed prefix.
+  The full conversion process is defined
+  by the `TagsOntology.value_to_tag_name` function.
 '''
 
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
+import fnmatch
+from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 import re
 import time
 from types import SimpleNamespace
-from icontract import require
+from icontract import ensure, require
+from cs.cmdutils import BaseCommand
 from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
-    cropped_repr, cutsuffix, get_dotted_identifier, get_nonwhite,
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
@@ -106,6 +171,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.cmdutils',
         'cs.dateutils',
         'cs.edit',
         'cs.lex',
@@ -579,18 +645,21 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
         This is how its type is defined,
         and is obtained from:
-        `self.ontology.typedata_tagset(self.name)`
+        `self.ontology['type.'+self.name]`
     '''
     ont = self.ontology
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont[self.name]
+    return ont.type(self.name)
 
   @property
   @pfx_method(use_str=True)
   def key_typedata(self):
-    ''' Return the typedata definition for this `Tag`'s keys.
+    ''' Return the typedata definition for this `Tag`'s keys,
+        obtained from `self.ontology[self.typedata['key_type']]`
+        i.e. the ontology `TagSet` named by the `self.typedata`'s
+        `key_type` `Tag`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -599,11 +668,17 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont[key_type]
+    return ont.type(key_type)
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
     ''' Return the metadata definition for `key`.
+
+        The metadata `TagSet` is obtained from the ontology entry
+        'meta.`*type*`.`*key_tag_name*
+        where *type* is the `Tag`'s `key_type`
+        and *key_tag_name* is the key converted
+        into a dotted identifier by `TagsOntology.value_to_tag_name`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -612,7 +687,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if key_type is None:
       return None
     ont = self.ontology
-    key_metadata_name = key_type + '.' + ont.value_to_tag_name(key)
+    key_metadata_name = 'meta.' + key_type + '.' + ont.value_to_tag_name(key)
     return ont[key_metadata_name]
 
   @property
@@ -627,11 +702,17 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont[member_type]
+    return ont.type(member_type)
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
     ''' Return the metadata definition for self[member_key].
+
+        The metadata `TagSet` is obtained from the ontology entry
+        'meta.`*type*`.`*member_tag_name*
+        where *type* is the `Tag`'s `member_type`
+        and *member_tag_name* is the member value converted
+        into a dotted identifier by `TagsOntology.value_to_tag_name`.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -641,7 +722,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     ont = self.ontology
     value = self.value[member_key]
-    member_metadata_name = member_type + '.' + ont.value_to_tag_name(value)
+    member_metadata_name = 'meta.' + member_type + '.' + ont.value_to_tag_name(
+        value
+    )
     return ont[member_metadata_name]
 
   @property
@@ -661,7 +744,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         The corresponding metadata `TagSet` for that tag
         would have the name `series.marvel.avengers`.
 
-        By contrast, the tag `cast={"Scarlett Johasson":"Black Widow (Marvel)"}`
+        By contrast, the tag `cast={"Scarlett Johansson":"Black Widow (Marvel)"}`
         would look up the definition for `cast`
         which might look like this:
 
@@ -676,7 +759,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         of the `cast=` tag.
         As such, the corresponding metadata `TagSet`s
         in this example would be named
-        `person.scarlett_johasson`
+        `person.scarlett_johansson`
         and `character.marvel.black_widow` respectively.
     '''
     typedata = self.typedata
@@ -1323,7 +1406,7 @@ class ValueMetadataNamespace(TagSetNamespace):
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
 
-      This is based around a mapping of tag names
+      This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
 
       A `cs.fstags.FSTags` uses ontologies initialised from `TagFile`s
@@ -1350,12 +1433,87 @@ class TagsOntology(SingletonMixin):
 
   __repr__ = __str__
 
-  def __getitem__(self, index):
-    assert isinstance(index, str)
-    return self.tagsets[index]
+  def __getitem__(self, name: str):
+    assert isinstance(name, str)
+    try:
+      tags = self.tagsets[name]
+    except KeyError:
+      tags = self.tagsets[name] = TagSet(ontology=self)
+    return tags
+
+  def entity(self, index, name=None):
+    ''' Return a `TaggedEntity` for the entry `index`.
+        If specified, `name` is used for the entity name instead of `index`.
+
+        The entity returned is not a singleton, but its `tags` attribute is.
+    '''
+    return TaggedEntity(name=name or index, tags=self[index])
+
+  def type(self, type_name):
+    ''' Return the `TagSet` defining the type named `type_name`.
+    '''
+    return self[self.type_index(type_name)]
+
+  @require(lambda type_name: Tag.is_valid_name(type_name))
+  def type_index(self, type_name):
+    ''' Return the entry index for the type `type_name`.
+    '''
+    return 'type.' + type_name
+
+  def types(self):
+    ''' Generator yielding defined type names and their defining `TagSet`.
+    '''
+    for key, tags in self.tagsets.items():
+      type_name = cutprefix(key, 'type.')
+      if type_name is not key:
+        yield type_name, tags
+
+  def type_names(self):
+    ''' Generator yielding defined type names.
+    '''
+    for key in self.tagsets.keys():
+      type_name = cutprefix(key, 'type.')
+      if type_name is not key:
+        yield type_name
+
+  def meta(self, type_name, value):
+    ''' Return the metadata `TagSet` for `(type_name,value)`.
+    '''
+    return self[self.meta_index(type_name, value)]
+
+  @classmethod
+  def meta_index(cls, type_name=None, value=None):
+    ''' Return the entry index for the metadata for `(type_name,value)`.
+    '''
+    index = 'meta'
+    if type_name is None:
+      assert value is None
+    else:
+      index += '.' + type_name
+      if value:
+        index += '.' + cls.value_to_tag_name(value)
+    return index
+
+  def meta_names(self, type_name=None):
+    ''' Generator yielding defined metadata names.
+
+        If `type_name` is specified, yield only the value_names
+        for that `type_name`.
+
+        For example, `meta_names('character')`
+        on an ontology with a `meta.character.marvel.black_widow`
+        would yield `'marvel.black_widow'`
+        i.e. only the suffix part for `character` metadata.
+    '''
+    prefix = self.meta_index(type_name=type_name) + '.'
+    for key in self.tagsets.keys(prefix=prefix):
+      suffix = cutprefix(key, prefix)
+      assert suffix is not key
+      yield suffix
 
   @staticmethod
   @pfx
+  @ensure(lambda result: Tag.is_valid_name(result))
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
@@ -1402,7 +1560,9 @@ class TagsOntology(SingletonMixin):
     '''
     if isinstance(value, str):
       value_tag_name = self.value_to_tag_name(value)
-      ontkey = type_name + '.' + '_'.join(value_tag_name.lower().split())
+      ontkey = 'meta.' + type_name + '.' + '_'.join(
+          value_tag_name.lower().split()
+      )
       return ValueMetadata(self, ontkey, value)
     return None
 
@@ -1452,6 +1612,101 @@ class TagsOntology(SingletonMixin):
       else:
         tag = Tag(tag.name, converted)
     return tag
+
+  @pfx_method
+  def edit_indices(self, indices, prefix=None):
+    ''' Edit the entries specified by indices.
+        Return `TaggedEntity`s for the entries which were changed.
+    '''
+    tes = []
+    te_old_names = {}
+    for index in indices:
+      if prefix:
+        name = cutprefix(index, prefix)
+        assert name is not index
+      else:
+        name = index
+      te = self.entity(index, name=name)
+      tes.append(te)
+      te_old_names[id(te)] = name
+    # modify tagsets
+    changed_tes = TaggedEntity.edit_entities(tes)
+    return changed_tes
+    # rename entries
+    for te in changed_tes:
+      old_name = te_old_names[id(te)]
+      new_name = te.name
+      if old_name == new_name:
+        continue
+      with Pfx("name %r => %r", old_name, new_name):
+        new_index = prefix + new_name if prefix else new_name
+        if new_index in self:
+          warning("new name already exists, not renaming")
+          continue
+        old_index = prefix + old_name if prefix else old_name
+        self[new_index] = te.tags
+        del self[old_index]
+    return changes_tes
+
+class TagsOntologyCommand(BaseCommand):
+  ''' A command line for working with ontology types.
+  '''
+
+  @staticmethod
+  def cmd_type(argv, options):
+    ''' Usage:
+          {cmd}
+            With no arguments, list the defined types.
+          {cmd} type_name
+            With a type name, print its `Tag`s.
+          {cmd} type_name edit
+            Edit the tags defining a type.
+          {cmd} type_name edit meta_names_pattern...
+            Edit the tags for the metadata names matching the
+            meta_names_patterns.
+          {cmd} type_name list
+            Listt the metadata names for this type and their tags.
+    '''
+    ont = options.ontology
+    if not argv:
+      # list defined types
+      for type_name, tags in ont.types():
+        print(type_name, tags)
+      return
+    type_name = argv.pop(0)
+    with Pfx(type_name):
+      tags = ont.type(type_name)
+      if not argv:
+        for tag in sorted(tags):
+          print(tag)
+        return
+      subcmd = argv.pop(0)
+      with Pfx(subcmd):
+        if subcmd == 'edit':
+          if not argv:
+            # edit the type specification
+            tags.edit()
+          else:
+            # edit the metadata of this type
+            meta_names = ont.meta_names(type_name=type_name)
+            if not meta_names:
+              error("no metadata of type %r", type_name)
+              return 1
+            selected = set()
+            for ptn in argv:
+              selected.update(fnmatch.filter(meta_names, ptn))
+            indices = [
+                ont.meta_index(type_name, value) for value in sorted(selected)
+            ]
+            ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
+          return
+        if subcmd == 'list':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          for meta_name in sorted(ont.meta_names(type_name=type_name)):
+            print(meta_name, ont.meta(type_name, meta_name))
+          return
+        raise GetoptError("unrecognised subcommand")
 
 class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
@@ -1608,6 +1863,11 @@ class TaggedEntity(TaggedEntityMixin):
     self.name = name
     self.unixtime = unixtime
     self.tags = tags
+
+  def __str__(self):
+    return "%s(name=%s,id=%s,unixtime=%s,tags=%s)" % (
+        type(self).__name__, self.name, self.id, self.unixtime, self.tags
+    )
 
   def set(self, tag_name, value, *, verbose=None):
     ''' Set a tag on `self.tags`.
