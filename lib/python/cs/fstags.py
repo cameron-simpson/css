@@ -337,7 +337,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
-    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    U = options.upd
     filepaths = fstags.find(
         realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
     )
@@ -346,19 +346,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for filepath in filepaths:
-        if U:
-          oldU = U.out('')
-        try:
-          output = fstags[filepath].format_as(
-              output_format, error_sep='\n  ', direct=use_direct_tags
-          )
-        except FormatAsError as e:
-          error(str(e))
-          xit = 1
-          continue
-        print(output)
-        if U:
-          U.out(oldU)
+        with Pfx(filepath):
+          try:
+            output = fstags[filepath].format_as(
+                output_format, error_sep='\n  ', direct=use_direct_tags
+            )
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
     return xit
 
   @staticmethod
@@ -693,11 +690,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     xit = 0
-    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    U = options.upd
     with stackattrs(state, verbose=True):
       for filepath in paths:
-        if U:
-          oldU = U.out('')
+        U.out(filepath)
         with Pfx(filepath):
           if filepath == '-':
             warning(
@@ -726,8 +722,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           except OSError as e:
             error("-> %s: %s", dstpath, e)
             xit = 1
-    if U:
-      U.out(oldU)
     return xit
 
   @classmethod
@@ -1943,7 +1937,8 @@ def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
-    U.out(dirpath)
+    if U:
+      U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:
