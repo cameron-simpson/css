@@ -249,8 +249,11 @@ def setup_logging(
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
-  main_handler.setFormatter(PfxFormatter(format))
-  root_logger.addHandler(main_handler)
+  if loginfo is None:
+    # only do this the first time
+    # TODO: fix this clumsy hack, some kind of stackable state?
+    main_handler.setFormatter(PfxFormatter(format))
+    root_logger.addHandler(main_handler)
 
   if trace_mode:
     # enable tracing in the thread that called setup_logging
