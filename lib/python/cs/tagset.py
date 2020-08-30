@@ -143,6 +143,7 @@ which is computed as:
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
+import fnmatch
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 import re
@@ -1653,9 +1654,18 @@ class TagsOntologyCommand(BaseCommand):
 
   @staticmethod
   def cmd_type(argv, options):
-    ''' Usage: {cmd} [type_name]
-          With no arguments, list the defined types.
-          With a type name, print its `Tag`s.
+    ''' Usage:
+          {cmd}
+            With no arguments, list the defined types.
+          {cmd} type_name
+            With a type name, print its `Tag`s.
+          {cmd} type_name edit
+            Edit the tags defining a type.
+          {cmd} type_name edit meta_names_pattern...
+            Edit the tags for the metadata names matching the
+            meta_names_patterns.
+          {cmd} type_name list
+            Listt the metadata names for this type and their tags.
     '''
     ont = options.ontology
     if not argv:
@@ -1673,9 +1683,22 @@ class TagsOntologyCommand(BaseCommand):
       subcmd = argv.pop(0)
       with Pfx(subcmd):
         if subcmd == 'edit':
-          if argv:
-            raise GetoptError("extra arguments: %r" % (argv,))
-          tags.edit()
+          if not argv:
+            # edit the type specification
+            tags.edit()
+          else:
+            # edit the metadata of this type
+            meta_names = ont.meta_names(type_name=type_name)
+            if not meta_names:
+              error("no metadata of type %r", type_name)
+              return 1
+            selected = set()
+            for ptn in argv:
+              selected.update(fnmatch.filter(meta_names, ptn))
+            indices = [
+                ont.meta_index(type_name, value) for value in sorted(selected)
+            ]
+            ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
           return
         if subcmd == 'list':
           if argv:
