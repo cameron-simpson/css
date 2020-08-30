@@ -1612,6 +1612,41 @@ class TagsOntology(SingletonMixin):
         tag = Tag(tag.name, converted)
     return tag
 
+  @pfx_method
+  def edit_indices(self, indices, prefix=None):
+    ''' Edit the entries specified by indices.
+        Return `TaggedEntity`s for the entries which were changed.
+    '''
+    tes = []
+    te_old_names = {}
+    for index in indices:
+      if prefix:
+        name = cutprefix(index, prefix)
+        assert name is not index
+      else:
+        name = index
+      te = self.entity(index, name=name)
+      tes.append(te)
+      te_old_names[id(te)] = name
+    # modify tagsets
+    changed_tes = TaggedEntity.edit_entities(tes)
+    return changed_tes
+    # rename entries
+    for te in changed_tes:
+      old_name = te_old_names[id(te)]
+      new_name = te.name
+      if old_name == new_name:
+        continue
+      with Pfx("name %r => %r", old_name, new_name):
+        new_index = prefix + new_name if prefix else new_name
+        if new_index in self:
+          warning("new name already exists, not renaming")
+          continue
+        old_index = prefix + old_name if prefix else old_name
+        self[new_index] = te.tags
+        del self[old_index]
+    return changes_tes
+
 class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
