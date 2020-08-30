@@ -1440,11 +1440,24 @@ class TagsOntology(SingletonMixin):
       tags = self.tagsets[name] = TagSet(ontology=self)
     return tags
 
-  @require(lambda type_name: Tag.is_valid_name(type_name))
+  def entity(self, index, name=None):
+    ''' Return a `TaggedEntity` for the entry `index`.
+        If specified, `name` is used for the entity name instead of `index`.
+
+        The entity returned is not a singleton, but its `tags` attribute is.
+    '''
+    return TaggedEntity(name=name or index, tags=self[index])
+
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
-    return self['type.' + type_name]
+    return self[self.type_index(type_name)]
+
+  @require(lambda type_name: Tag.is_valid_name(type_name))
+  def type_index(self, type_name):
+    ''' Return the entry index for the type `type_name`.
+    '''
+    return 'type.' + type_name
 
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
@@ -1462,11 +1475,23 @@ class TagsOntology(SingletonMixin):
       if type_name is not key:
         yield type_name
 
-  @require(lambda type_name: Tag.is_valid_name(type_name))
   def meta(self, type_name, value):
     ''' Return the metadata `TagSet` for `(type_name,value)`.
     '''
-    return self['meta.' + type_name + '.' + self.value_to_tag_name(value)]
+    return self[self.meta_index(type_name, value)]
+
+  @classmethod
+  def meta_index(cls, type_name=None, value=None):
+    ''' Return the entry index for the metadata for `(type_name,value)`.
+    '''
+    index = 'meta'
+    if type_name is None:
+      assert value is None
+    else:
+      index += '.' + type_name
+      if value:
+        index += '.' + cls.value_to_tag_name(value)
+    return index
 
   def meta_names(self, type_name=None):
     ''' Generator yielding defined metadata names.
@@ -1479,17 +1504,11 @@ class TagsOntology(SingletonMixin):
         would yield `'marvel.black_widow'`
         i.e. only the suffix part for `character` metadata.
     '''
-    type_name_ = type_name + '.' if type_name else None
-    for key in self.tagsets.keys():
-      meta_name = cutprefix(key, 'meta.')
-      if meta_name is key:
-        continue
-      if type_name_:
-        value_name = cutprefix(meta_name, type_name_)
-        if value_name is not meta_name:
-          yield value_name
-        continue
-      yield meta_name
+    prefix = self.meta_index(type_name=type_name) + '.'
+    for key in self.tagsets.keys(prefix=prefix):
+      suffix = cutprefix(key, prefix)
+      assert suffix is not key
+      yield suffix
 
   @staticmethod
   @pfx
