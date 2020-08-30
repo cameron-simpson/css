@@ -562,7 +562,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               xit = 1
               continue
             tags = te.tags
-            for tag_choice in tag_criteria:
+            for tag_choice in tag_choices:
               if tag_choice.choice:
                 if tag_choice.tag not in tags:
                   te.set(tag_choice.tag)
