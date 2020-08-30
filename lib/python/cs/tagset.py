@@ -1806,6 +1806,11 @@ class TaggedEntity(TaggedEntityMixin):
     self.unixtime = unixtime
     self.tags = tags
 
+  def __str__(self):
+    return "%s(name=%s,id=%s,unixtime=%s,tags=%s)" % (
+        type(self).__name__, self.name, self.id, self.unixtime, self.tags
+    )
+
   def set(self, tag_name, value, *, verbose=None):
     ''' Set a tag on `self.tags`.
     '''
