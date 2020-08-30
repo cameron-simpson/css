@@ -1403,21 +1403,38 @@ class TagFile(SingletonMixin):
       self.save()
 
   # Mapping mathods, proxying through to .tagsets.
-  def keys(self):
+  def keys(self, prefix=None):
     ''' `tagsets.keys`
+
+        If the options `prefix` is supplied,
+        yield only those keys starting with `prefix`.
     '''
     ks = self.tagsets.keys()
+    if prefix:
+      ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-  def values(self):
+  def values(self, prefix=None):
     ''' `tagsets.values`
-    '''
-    return self.tagsets.values()
 
-  def items(self):
-    ''' `tagsets.items`
+        If the options `prefix` is supplied,
+        yield only those values whose keys start with `prefix`.
     '''
-    return self.tagsets.items()
+    if not prefix:
+      # use native values, faster
+      return self.tagsets.values()
+    return map(lambda kv: kv[1], self.items(prefix=prefix))
+
+  def items(self, prefix=None):
+    ''' `tagsets.items`
+
+        If the options `prefix` is supplied,
+        yield only those items whose keys start with `prefix`.
+    '''
+    if not prefix:
+      # use native items, faster
+      return self.tagsets.items()
+    return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
 
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
