@@ -1193,8 +1193,9 @@ class FSTags(MultiOpenMixin):
       te = tagged_path.as_TaggedEntity(name=name)
       tes.append(te)
       te_id_map[id(te)] = name, tagged_path, te
-    # now apply any file renames
+    # edit entities, return modified entities
     changed_tes = TaggedEntity.edit_entities(tes)  # verbose-state.verbose
+    # now apply any file renames
     for te in changed_tes:
       old_name, tagged_path, old_te = te_id_map[id(te)]
       assert te is old_te
