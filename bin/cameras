@@ -157,9 +157,10 @@ do
               do
                 [ -d "$date" ] || continue
                 video=$date.mp4
-                ls -ldL "$video" 2>/dev/null && continue
+                ls -ldL "$compiled/$video" 2>/dev/null && continue
                 (
                   set -ue
+                  subxit=0
                   cd "$date"
                   pwd
                   # delete empty files
@@ -181,11 +182,12 @@ do
                     | tee /dev/fd/2 \
                     | awk '{print$3}' | sed 's/+.*//'
                   )
-                  $trace ffmpeg -r 4 -s "$size" -i '%05d.jpg' "$video"
+                  $trace ffmpeg -r 4 -s "$size" -i '%05d.jpg' "$video" || subxit=1
                   # clean out the nnnnn.jpg files
                   rm [0-9][0-9][0-9][0-9][0-9].jpg
                   $trace touch -d "$date" "$video"
                   $trace mv "$video" "$compiled/"
+                  exit $subxit
                 ) || {
                   echo "VIDEO FAILED FOR $video" >&2
                   xit=1
