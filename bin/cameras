@@ -7,9 +7,15 @@
 set -ue
 
 cfg=$HOME/.cameras
-trace=
-[ -t 2 ] && trace=set-x
 once=
+trace=
+vecho=echo
+ff_loglevel=
+if [ -t 2 ]
+then  trace=set-x
+      ff_loglevel=warning
+else  ff_loglevel=error
+fi
 
 cfgnames(){
   [ $# = 1 ] || {
@@ -32,6 +38,8 @@ usage="Usage: $cmd [-1] [-f cfg] [--] op [args...]
   -1        Once. Process or collate only one date.
   -f cfg    Specify the comfig file.
             Default: $cfg
+  -q        Quiet.
+  -v        Verbose.
   Operations:
     collate [names...]
       Move all snapshot images prior to today into subdirectories by day.
@@ -47,6 +55,8 @@ do
   case $1 in
     -1) once=1 ;;
     -f) cfg=$2; shift ;;
+    -q) ff_loglevel=error vecho=: ;;
+    -v) ff_loglevel=info vecho=echo ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -140,7 +150,7 @@ do
               do
                 ddir=$collated/$date
                 [ -d "$ddir" ] || $trace mkdir "$ddir"
-                echo "mv $date-*.jpg $ddir/ ..." >&2
+                $vecho "mv $date-*.jpg $ddir/ ..." >&2
                 mv "$date"-*.jpg "$ddir/"
                 [ $once ] && break
               done
@@ -167,7 +177,7 @@ do
                   find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
                   set -- "$date-"*.jpg
                   [ -s "$1" ] || {
-                    echo "$date: no .jpg files" >&2
+                    $vecho "$date: no .jpg files" >&2
                     exit 0
                   }
                   # make nnnnn.jpg names for ffmpeg to process
@@ -182,7 +192,9 @@ do
                     | tee /dev/fd/2 \
                     | awk '{print$3}' | sed 's/+.*//'
                   )
-                  $trace ffmpeg -r 4 -s "$size" -i '%05d.jpg' "$video" || subxit=1
+                  $trace ffmpeg -loglevel "$ff_loglevel" \
+                    -r 4 -s "$size" -i '%05d.jpg' \
+                    "$video" || subxit=1
                   # clean out the nnnnn.jpg files
                   rm [0-9][0-9][0-9][0-9][0-9].jpg
                   $trace touch -d "$date" "$video"
