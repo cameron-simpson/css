@@ -11,10 +11,15 @@ set -ue
 : ${TMUX:=''}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+: ${TMPDIR:=''}
 : ${TMUX_TMPDIR:=''}
 
 setup_env='
-    [ -n "$TMPDIR" -a -d "$TMPDIR" ] || [ ! -d "$HOME/tmp" ] || TMPDIR=$HOME/tmp
+    [ -n "$TMPDIR" -a -d "$TMPDIR" ] || \
+    if [ -d "$HOME/tmp" ]
+    then  TMPDIR=$HOME/tmp
+    else  TMPDIR=/tmp
+    fi
     [ -n "$TMUX_TMPDIR" -a -d "$TMUX_TMPDIR" ] || \
     if [ -d "$HOME/var/tmux" ]
     then  TMUX_TMPDIR=$HOME/var/tmux
