@@ -49,7 +49,7 @@ dosync()
   shift; shift
 
   $trace \
-    mrsync -rlptOHCi --delete \
+    mrsync -rlptJOHCi --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.*.swp' \
