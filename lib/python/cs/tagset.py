@@ -146,6 +146,7 @@ from datetime import date, datetime
 import fnmatch
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
+from json.decoder import JSONDecodeError
 import re
 import time
 from types import SimpleNamespace
@@ -634,7 +635,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         else:
           # decode as plain JSON data
           value_part = s[offset:]
-          value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+          try:
+            value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+          except JSONDecodeError as e:
+            raise ValueError(
+                "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+            )
           offset += suboffset
     return value, offset
 
@@ -1212,7 +1218,7 @@ class TagSetNamespace(ExtendedNamespace):
         if member_metadata is None:
           # No metadata? Return the element.
           return element
-        # Return teh metadata for the element.
+        # Return the metadata for the element as a namespace.
         return member_metadata.ns()
     return super().__getitem__(key)
 
