@@ -11,6 +11,7 @@ set -ue
 : ${TMUX:=''}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+: ${TMUX_TMPDIR:=''}
 
 setup_env='
     [ -n "$TMPDIR" -a -d "$TMPDIR" ] || [ ! -d "$HOME/tmp" ] || TMPDIR=$HOME/tmp
