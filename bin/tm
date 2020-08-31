@@ -14,7 +14,8 @@ set -ue
 
 setup_env='
     [ -n "$TMPDIR" -a -d "$TMPDIR" ] || [ ! -d "$HOME/tmp" ] || TMPDIR=$HOME/tmp
-    if [ -d "$HOME/var/tmux/." ]
+    [ -n "$TMUX_TMPDIR" -a -d "$TMUX_TMPDIR" ] || \
+    if [ -d "$HOME/var/tmux" ]
     then  TMUX_TMPDIR=$HOME/var/tmux
     else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
     fi
