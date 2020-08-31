@@ -1212,7 +1212,7 @@ class TagSetNamespace(ExtendedNamespace):
         if member_metadata is None:
           # No metadata? Return the element.
           return element
-        # Return teh metadata for the element.
+        # Return the metadata for the element as a namespace.
         return member_metadata.ns()
     return super().__getitem__(key)
 
