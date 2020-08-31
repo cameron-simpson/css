@@ -593,7 +593,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync -e "$sshcmd" $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
@@ -612,11 +612,10 @@ if [ $symlink_unchanged ] \
 && [ -d "$dest/$lastbackup/." ]
 then
   $vecho "checking for changes to $src from $lastbackup ..."
-  changes=$( dorsync "$src" "$dest/$lastbackup" ${1+"$@"} -niO \
-           | sed -n '/^..         /!{ p; q; }'
-           )
-  if [ -z "$changes" ]
+  if dorsync "$src" "$dest/$lastbackup" -niO ${1+"$@"} | read -r change1
   then
+    $vecho "changes, proceeding with regular backup ..."
+  else
     $vecho "no changes, symlinking last tree"
     ( set -ue
       cd "$dest" || exit 1
@@ -625,8 +624,6 @@ then
       || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
     )
     exit
-  else
-    $vecho "changes, proceeding with regular backup ..."
   fi
 fi
 

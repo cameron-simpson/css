@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Execute preferred python 3 venv instance.
-#   - Cameron Simpson <cs@cskk.id.au> 10mar2015
-#
-
-exec venv 3 python3 ${1+"$@"}

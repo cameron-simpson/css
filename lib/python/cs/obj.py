@@ -14,6 +14,7 @@ import traceback
 from types import SimpleNamespace
 from threading import Lock
 from weakref import WeakValueDictionary
+from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
 __version__ = '20200716-post'
@@ -25,7 +26,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3'],
 }
 
 T_SEQ = 'SEQUENCE'
@@ -57,7 +58,7 @@ class O(SimpleNamespace):
 
   def __init__(self, **kw):
     frame = traceback.extract_stack(None, 2)[0]
-    caller=(frame[0], frame[1])
+    caller = (frame[0], frame[1])
     if caller not in self.callers:
       self.callers.add(caller)
       print(
@@ -207,6 +208,10 @@ def as_dict(o, attr_prefix=None, attr_match=None):
       d[attr] = getattr(o, attr)
   return d
 
+@OBSOLETE("use cs.obj.as_dict")
+def obj_as_dict(o, **kw):
+  return as_dict(o, **kw)
+
 class Proxy(object):
   ''' An extremely simple proxy object
       that passes all unmatched attribute accesses to the proxied object.
@@ -319,14 +324,13 @@ def singleton(registry, key, factory, fargs, fkwargs):
 class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
-      *Note*: this should be the *first* superclass of the subclass
-      in order to intercept `__new__`.
+      *Note*: this mixin overrides `object.__new__`
+      and may not play well with other classes which oeverride `__new__`.
 
       *Warning*: because of the mechanics of `__new__`,
       the instance's `__init__` method will always be called
       after `__new__`,
       even when a preexisting object is returned.
-
       Therefore that method should be sensible
       even for an already initialised
       and probably subsequently modified object.
@@ -348,7 +352,7 @@ class SingletonMixin:
 
       Implementation requirements:
       a subclass should:
-      * provide a class method `_singleton_key(cls,*args,**kwargs)`
+      * provide a method `_singleton_key(*args,**kwargs)`
         returning a key for use in the single registry,
         computed from the positional and keyword arguments
         supplied on instance creation
@@ -365,8 +369,8 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              @classmethod
-              def _singleton_key(cls, foo, bah=3):
+              @staticmethod
+              def _singleton_key(foo, bah=3):
                   return foo, bah
 
               def __init__(self, foo, bah=3):
