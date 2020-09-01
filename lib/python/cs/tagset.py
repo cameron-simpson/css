@@ -1118,7 +1118,8 @@ class TagSetNamespace(ExtendedNamespace):
       subclassing `ExtendedNamespace`.
 
       These are useful within format strings
-      and `str.format` or `str.format_map`.
+      and `str.format` or `str.format_map`
+      (as it implements the `keys` and `__getitem__` methods).
 
       This provides an assortment of special names derived from the `TagSet`.
       See the docstring for `__getattr__` for the special attributes provided
@@ -1130,11 +1131,6 @@ class TagSetNamespace(ExtendedNamespace):
   def from_tagset(cls, tags, pathnames=None):
     ''' Compute and return a presentation of this `TagSet` as a
         nested `TagSetNamespace`.
-
-        `TagSetNamespace`s provide a number of convenience attributes
-        derived from the concrete attributes. a `TagSetNamespace` is also
-        usable as a mapping in `str.format_map` and the like as it
-        implements the `keys` and `__getitem__` methods.
 
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
@@ -1193,6 +1189,9 @@ class TagSetNamespace(ExtendedNamespace):
 
   @pfx_method
   def __getitem__(self, key):
+    ''' If this node has a `._tag` then dereference its `.value`,
+        otherwise fall through to the superclass `__getitem__`.
+    '''
     tag = self.__dict__.get('_tag')
     if tag is not None:
       # This node in the hierarchy is associated with a Tag.
@@ -1245,9 +1244,11 @@ class TagSetNamespace(ExtendedNamespace):
           for the `Tag` associated with this node;
           meaningful if `self._tag.value` has a `keys` method
         * `_meta`: a namespace containing the meta information
-          for the `Tag` associated with this node
+          for the `Tag` associated with this node:
+          `self._tag.metadata.ns()`
         * `_type`: a namespace containing the type definition
-          for the `Tag` associated with this node
+          for the `Tag` associated with this node:
+          `self._tag.typedata.ns()`
         * `_values`: the values within the `Tag.value`
           for the `Tag` associated with this node
         * *baseattr*`_lc`: lowercase and titled forms.
