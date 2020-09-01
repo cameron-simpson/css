@@ -189,7 +189,6 @@ do
                     set -- "$date"-*jpg
                     ls -ld "$1" >&2
                     { gm identify "$1" || identify "$1"; } \
-                    | tee /dev/fd/2 \
                     | awk '{print$3}' | sed 's/+.*//'
                   )
                   $trace ffmpeg -loglevel "$ff_loglevel" \
