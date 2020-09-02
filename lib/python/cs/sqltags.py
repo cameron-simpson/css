@@ -49,8 +49,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagBasedTest, TagSetContainsTest,
-    TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -160,22 +159,6 @@ class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
 
 SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQLTagSetCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
-  ''' A `cs.tagset.TagSetContainsTest` extended with a `.extend_query` method.
-  '''
-
-  def extend_query(self, sqla_query, *, orm):
-    ''' Extend the SQLAlchemy `Query` `sqla_query`.
-        Return the new `Query`.
-    '''
-    tag = self.tag
-    tags_alias = aliased(orm.tags)
-    match = [tags_alias.name == tag.name]
-    isouter = not self.choice
-    return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
-
-SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagSetContainsTest)
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
@@ -544,7 +527,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = self.parse_tag_choices(argv)
+      tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
       raise GetoptError(str(e))
     if badopts:
