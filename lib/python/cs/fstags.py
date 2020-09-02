@@ -135,6 +135,8 @@ XATTR_B = (
 FIND_OUTPUT_FORMAT_DEFAULT = '{filepath.pathname}'
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
 
+# pylint: disable=too-many-locals
+
 def main(argv=None):
   ''' Command line mode.
   '''
@@ -549,7 +551,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return self._cmd_mvcpln(options.fstags.move, argv, options)
 
   @staticmethod
-  def _cmd_mvcpln(attach, argv, options):
+  def _cmd_mvcpln(attach, argv, _):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
@@ -753,7 +755,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = self.parse_tag_choices(argv)
+      tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
       raise GetoptError(str(e))
     if badopts:
@@ -1262,6 +1264,7 @@ class FSTags(MultiOpenMixin):
     '''
     return self.attach_path(shutil.move, srcpath, dstpath, **kw)
 
+  # pylint: disable=too-many-branches
   def attach_path(
       self, attach, srcpath, dstpath, *, force=False, crop_ok=False
   ):
