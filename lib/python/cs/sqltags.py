@@ -232,7 +232,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     sqltags = SQLTags(db_url)
     with stackattrs(options, sqltags=sqltags, verbose=True):
       with sqltags:
-        yield
+        with sqltags.orm.session():
+          yield
 
   @classmethod
   def cmd_edit(cls, argv, options):
