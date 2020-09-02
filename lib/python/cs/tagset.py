@@ -924,11 +924,11 @@ class TagSetCriterion(ABC):
         * an object with `.name` and `.value` attributes;
           this is taken to be `Tag`-like and a positive test is constructed
         * `Tag`: an object with a `.name` and `.value`
-          is equivalent to a positive `TagChoice`
+          is equivalent to a positive equality `TagBasedTest`
         * `(name,value)`: a 2 element sequence
-          is equivalent to a positive `TagChoice`
+          is equivalent to a positive equality `TagBasedTest`
     '''
-    tag_choice_class = getattr(cls, 'TAG_CHOICE_CLASS', TagChoice)
+    tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
     if isinstance(o, (cls, TagSetCriterion)):
       # already suitable
       return o
@@ -939,7 +939,7 @@ class TagSetCriterion(ABC):
       name, value = o
     except (TypeError, ValueError):
       if hasattr(o, 'choice'):
-        # assume TagChoice ducktype
+        # assume TagBasedTest ducktype
         return o
       try:
         name = o.name
@@ -947,13 +947,17 @@ class TagSetCriterion(ABC):
       except AttributeError:
         pass
       else:
-        return tag_choice_class(repr(o), True, tag=Tag(name, value))
+        return tag_based_test_class(
+            repr(o), True, tag=Tag(name, value), comparison='='
+        )
     else:
-      # (name,value) => True TagChoice
-      return tag_choice_class(repr((name, value)), True, tag=Tag(name, value))
+      # (name,value) => True TagBasedTest
+      return tag_based_test_class(
+          repr((name, value)), True, tag=Tag(name, value), comparison='='
+      )
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
-class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag'),
+class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
                    TagSetCriterion):
   ''' A test based on a `Tag`.
 
@@ -962,18 +966,47 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag'),
         possibly `None`
       * `choice`: the apply/reject flag
       * `tag`: the `Tag` representing the criterion
+      * `comparison`: an indication of the test comparison
+
+      The following comparison values are recognised:
+      * `None`: test for the presence of the `Tag`
+      * `'='`: test that the tag value equals `tag.value`
+      * `'<'`: test that the tag value is less than `tag.value`
+      * `'<='`: test that the tag value is less than or equal to `tag.value`
+      * `'>'`: test that the tag value is greater than `tag.value`
+      * `'>='`: test that the tag value is greater than or equal to `tag.value`
+      * '~': test if the tag value is present in `tag.value`
   '''
 
-# TODO: rename to TagEqualityTest
-class TagChoice(TagBasedTest):
-  ''' A "tag choice", an apply/reject flag and a `Tag`,
-      used to apply changes to a `TagSet`
-      or as a criterion for a tag search.
-  '''
+  COMPARISON_FUNCS = {
+      '=': lambda tag_value, cmp_value: tag_value == cmp_value,
+      '<=': lambda tag_value, cmp_value: tag_value <= cmp_value,
+      '<': lambda tag_value, cmp_value: tag_value < cmp_value,
+      '>=': lambda tag_value, cmp_value: tag_value >= cmp_value,
+      '>': lambda tag_value, cmp_value: tag_value > cmp_value,
+      '~': lambda tag_value, cmp_value: cmp_value in tag_value,
+  }
 
-  @staticmethod
-  def parse(s, offset=0, delim=None):
-    ''' Parse *tag_name*[`=`*value*], return `({'tag':Tag},offset)`.
+  # These are ordered so that longer operators
+  # come before shorter operators which are prefixes
+  # so as to recognise '>=' ahead of '>' etc.
+  COMPARISON_OPS = sorted(COMPARISON_FUNCS.keys(), key=len, reverse=True)
+
+  def __str__(self):
+    if self.comparison is None:
+      return self.tag.name
+    return (
+        self.tag.name + self.comparison +
+        self.tag.transcribe_value(self.tag.value)
+    )
+
+  @classmethod
+  def parse(cls, s, offset=0, delim=None):
+    ''' Parse *tag_name*[{`<`|`<=`|'='|'>='|`>`|'~'}*value*]
+        and return `(dict,offset)`
+        where the `dict` contains the following keys and values:
+        * `tag`: a `Tag` embodying the tag name and value
+        * `comparison`: an indication of the test comparison
     '''
     tag_name, offset = get_dotted_identifier(s, offset)
     if not tag_name:
@@ -982,56 +1015,52 @@ class TagChoice(TagBasedTest):
     if offset == len(s) or s[offset].isspace() or (delim
                                                    and s[offset] in delim):
       # just tag_name present
-      return dict(tag=Tag(tag_name)), offset
-    if not s.startswith('=', offset):
-      raise ValueError("expected '='")
+      return dict(tag=Tag(tag_name), comparison=None), offset
+
+    comparison = None
+    for cmp_op in cls.COMPARISON_OPS:
+      if s.startswith(cmp_op, offset):
+        comparison = cmp_op
+        break
+    if comparison is None:
+      raise ValueError("expected one of %r" % (cls.COMPARISON_OPS,))
     # tag_name present with specific value
-    offset += 1
+    offset += len(comparison)
     value, offset = Tag.parse_value(s, offset)
-    return dict(tag=Tag(tag_name, value)), offset
+    return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
   def match(self, tags):
     ''' Test against the `Tag`s in `tags`.
+
+        *Note*: comparisons when `self.tag.name` is not in `tags`
+        always return `False` (possibly inverted by `self.choice`).
     '''
-    return self.tag in tags if self.choice else self.tag not in tags
+    tag_name = self.tag.name
+    comparison = self.comparison
+    if comparison is None:
+      result = tag_name in tags
+    else:
+      try:
+        tag_value = tags[tag_name]
+      except KeyError:
+        # tag not present, base test fails
+        result = False
+      else:
+        assert tag_value is not None
+        cmp_value = self.tag.value
+        comparison_test = self.COMPARISON_FUNCS[comparison]
+        try:
+          result = comparison_test(tag_value, cmp_value)
+        except TypeError as e:
+          warning(
+              "compare tag_value=%r %r cmp_value=%r: %s", tag_value,
+              comparison, cmp_value, e
+          )
+          result = False
+    return result if self.choice else not result
 
-TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagChoice)
-
-# TODO: rename to TagEqualityTest
-class TagSetContainsTest(TagBasedTest):
-  ''' A test for the presense of a `Tag` value in a collection of `Tag`s.
-  '''
-
-  @staticmethod
-  def parse(s, offset=0, delim=None):
-    ''' Parse *tag_name*[`~`*value*], return `({'tag':Tag},offset)`.
-    '''
-    tag_name, offset = get_dotted_identifier(s, offset)
-    if not tag_name:
-      raise ValueError("no tag_name")
-    # end of text?
-    if offset == len(s) or s[offset].isspace() or (delim
-                                                   and s[offset] in delim):
-      # just tag_name present
-      return dict(tag=Tag(tag_name)), offset
-    if not s.startswith('~', offset):
-      raise ValueError("expected '='")
-    # tag_name present with specific value
-    offset += 1
-    value, offset = Tag.parse_value(s, offset)
-    return dict(tag=Tag(tag_name, value)), offset
-
-  def match(self, tags):
-    ''' Test against the `Tag`s in `tags`.
-    '''
-    value = tags.get(self.tag.name)
-    if not value:
-      return not self.choice
-    if self.tag.value in value:
-      return self.choice
-    return not self.choice
-
-TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagSetContainsTest)
+TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
+TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
@@ -1721,27 +1750,27 @@ class TagsCommandMixin:
   '''
 
   @classmethod
-  def parse_tagset_criteria(cls, argv, tag_choice_class=None):
+  def parse_tagset_criteria(cls, argv, tag_based_test_class=None):
     ''' Parse a list of tag specifications `argv` of the form:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
         Return a list of `TagSetCriterion` instances for each `arg` in `argv`.
 
-        The optional parameter `tag_choice_class` is a class
+        The optional parameter `tag_based_test_class` is a class
         with a `.from_str(str)` factory method
         returning a `TagSetCriterion` duck instance.
-        The default `tag_choice_class` is `cls.TAGSET_CRITERION_CLASS`
+        The default `tag_based_test_class` is `cls.TAGSET_CRITERION_CLASS`
         or `TagSetCriterion`.
     '''
-    if tag_choice_class is None:
-      tag_choice_class = getattr(
+    if tag_based_test_class is None:
+      tag_based_test_class = getattr(
           cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
       )
     choices = []
     for arg in argv:
       with Pfx(arg):
-        choices.append(tag_choice_class.from_str(arg))
+        choices.append(tag_based_test_class.from_str(arg))
     return choices
 
 class TaggedEntityMixin(FormatableMixin):

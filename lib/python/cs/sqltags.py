@@ -49,7 +49,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagChoice, TagSetContainsTest,
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagSetContainsTest,
     TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
@@ -121,8 +121,8 @@ class SQLTagSetCriterion(TagSetCriterion):
     '''
     raise NotImplementedError("extend_query")
 
-class SQLTagChoice(TagChoice, SQLTagSetCriterion):
-  ''' A `cs.tagset.TagChoice` extended with a `.extend_query` method.
+class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
+  ''' A `cs.tagset.TagBasedTest` extended with a `.extend_query` method.
   '''
 
   def extend_query(self, sqla_query, *, orm):
@@ -132,6 +132,12 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
     tag = self.tag
     tags_alias = aliased(orm.tags)
     tag_column, tag_test_value = tags_alias.value_test(tag.value)
+    if tag_column is None:
+      test_expr = None
+    else:
+      test_func = self.COMPARISON_FUNCS[self.comparison]
+      test_expr = test_func(tag_column, tag_test_value)
+    # require the tag_name to be our target
     match = [tags_alias.name == tag.name]
     isouter = not self.choice
     if self.choice:
@@ -141,7 +147,7 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
         pass
       else:
         # test for presence and value
-        match.append(tag_column == tag_test_value)
+        match.append(test_expr)
     else:
       # negative test
       if tag_column is None:
@@ -149,11 +155,11 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
         match.append(tags_alias.id is None)
       else:
         # test for absence or incorrect value
-        match.append(or_(tags_alias.id is None, tag_column != tag_test_value))
+        match.append(or_(tags_alias.id is None, not (test_expr)))
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
 
-SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagChoice)
-SQLTagSetCriterion.TAG_CHOICE_CLASS = SQLTagChoice
+SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
+SQLTagSetCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
 class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
   ''' A `cs.tagset.TagSetContainsTest` extended with a `.extend_query` method.
@@ -177,7 +183,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   TAGSET_CRITERION_CLASS = SQLTagSetCriterion
 
-  TAG_CHOICE_CLASS = SQLTagChoice
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
   GETOPT_SPEC = 'f:'
 
@@ -930,8 +936,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       @classmethod
       def value_test(cls, other_value):
-        ''' Return `(column,test_value)` for testing `other_value`
-            where `column` if the appropriate SQLAlchemy column
+        ''' Return `(column,test_value)` for constructing tests against
+            `other_value` where `column` if the appropriate SQLAlchemy column
             and `test_value` is the comparison value for testing.
 
             For most `other_value`s the `test_value`
