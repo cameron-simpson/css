@@ -124,6 +124,7 @@ class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.extend_query` method.
   '''
 
+  @pfx_method
   def extend_query(self, sqla_query, *, orm):
     ''' Extend the SQLAlchemy `Query` `sqla_query`.
         Return the new `Query`.
@@ -131,7 +132,7 @@ class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
     tag = self.tag
     tags_alias = aliased(orm.tags)
     tag_column, tag_test_value = tags_alias.value_test(tag.value)
-    if tag_column is None:
+    if tag_column is None or self.comparison == '~':
       test_expr = None
     else:
       test_func = self.COMPARISON_FUNCS[self.comparison]
@@ -141,10 +142,7 @@ class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
     isouter = not self.choice
     if self.choice:
       # positive test
-      if tag_test_value is None:
-        # just test for presence
-        pass
-      else:
+      if test_expr:
         # test for presence and value
         match.append(test_expr)
     else:
@@ -152,7 +150,7 @@ class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
       if tag_column is None:
         # just test for absence
         match.append(tags_alias.id is None)
-      else:
+      elif test_expr:
         # test for absence or incorrect value
         match.append(or_(tags_alias.id is None, not (test_expr)))
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
