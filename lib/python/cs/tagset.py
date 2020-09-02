@@ -442,7 +442,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     # name should be taglike
     if value is not None:
       raise ValueError(
-          "name(%s) is not a str, value must be None" % (type(name).__name__)
+          "name(%s) is not a str, value must be None" % (type(name).__name__,)
       )
     tag = name
     if not hasattr(tag, 'name'):
@@ -1230,7 +1230,6 @@ class TagSetNamespace(ExtendedNamespace):
         element = value[key]
       except TypeError as e:
         warning("[%r]: %s", key, e)
-        pass
       except KeyError:
         # Leave a visible indication of the unfulfilled dereference.
         return self._path + '[' + repr(key) + ']'
@@ -1263,6 +1262,10 @@ class TagSetNamespace(ExtendedNamespace):
       return None
     return attr_value._tag_value()
 
+  # pylint: disable=too-many-locals
+  # pylint: disable=too-many-return-statements
+  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-statements
   @pfx_method
   def __getattr__(self, attr):
     ''' Look up an indirect node attribute,
@@ -1484,8 +1487,9 @@ class TagsOntology(SingletonMixin):
     '''
     return self[self.type_index(type_name)]
 
-  @require(lambda type_name: Tag.is_valid_name(type_name))
-  def type_index(self, type_name):
+  @staticmethod
+  @require(lambda type_name: Tag.is_valid_name(type_name))  # pylint: disable=unnecessary-lambda
+  def type_index(type_name):
     ''' Return the entry index for the type `type_name`.
     '''
     return 'type.' + type_name
@@ -1543,7 +1547,7 @@ class TagsOntology(SingletonMixin):
 
   @staticmethod
   @pfx
-  @ensure(lambda result: Tag.is_valid_name(result))
+  @ensure(lambda result: Tag.is_valid_name(result))  # pylint: disable=unnecessary-lambda
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
@@ -1661,7 +1665,6 @@ class TagsOntology(SingletonMixin):
       te_old_names[id(te)] = name
     # modify tagsets
     changed_tes = TaggedEntity.edit_entities(tes)
-    return changed_tes
     # rename entries
     for te in changed_tes:
       old_name = te_old_names[id(te)]
@@ -1676,7 +1679,7 @@ class TagsOntology(SingletonMixin):
         old_index = prefix + old_name if prefix else old_name
         self[new_index] = te.tags
         del self[old_index]
-    return changes_tes
+    return changed_tes
 
 class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
@@ -1702,14 +1705,14 @@ class TagsOntologyCommand(BaseCommand):
       # list defined types
       for type_name, tags in ont.types():
         print(type_name, tags)
-      return
+      return 0
     type_name = argv.pop(0)
     with Pfx(type_name):
       tags = ont.type(type_name)
       if not argv:
         for tag in sorted(tags):
           print(tag)
-        return
+        return 0
       subcmd = argv.pop(0)
       with Pfx(subcmd):
         if subcmd == 'edit':
@@ -1729,13 +1732,13 @@ class TagsOntologyCommand(BaseCommand):
                 ont.meta_index(type_name, value) for value in sorted(selected)
             ]
             ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
-          return
+          return 0
         if subcmd == 'list':
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
           for meta_name in sorted(ont.meta_names(type_name=type_name)):
             print(meta_name, ont.meta(type_name, meta_name))
-          return
+          return 0
         raise GetoptError("unrecognised subcommand")
 
 class TagsCommandMixin:
