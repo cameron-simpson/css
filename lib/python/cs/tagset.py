@@ -1773,6 +1773,24 @@ class TagsCommandMixin:
         choices.append(tag_based_test_class.from_str(arg))
     return choices
 
+  @staticmethod
+  def parse_tag_choices(argv):
+    ''' Parse `argv` as an iterable of [`!`]*tag_name*[`=`*tag_value`] `Tag`
+        additions/deletions.
+    '''
+    tag_choices = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          tag_choice = TagBasedTest.from_str(arg)
+        except ValueError as e:
+          raise ValueError("bad tag specifications: %s" % (e,))
+        else:
+          if tag_choice.comparison != '=':
+            raise ValueError("only tag_name or tag_name=value accepted")
+          tag_choices.append(tag_choice)
+    return tag_choices
+
 class TaggedEntityMixin(FormatableMixin):
   ''' A mixin for classes like `TaggedEntity`.
 

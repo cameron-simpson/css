@@ -752,16 +752,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    tag_choices = []
-    for arg in argv:
-      with Pfx(arg):
-        try:
-          tag_choice = TagChoice.from_str(arg)
-        except ValueError as e:
-          warning("bad tag specifications: %s", e)
-          badopts = True
-        else:
-          tag_choices.append(tag_choice)
+    try:
+      tag_choices = self.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e))
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':
