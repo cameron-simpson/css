@@ -9,7 +9,11 @@ X(), for low level debugging
 
 X() is my function for low level ad hoc debug messages.
 It takes a message and optional format arguments for use with `%`.
-It is presented here in its own module for reuse.
+It is presented here in its own module for reuse:
+
+    from cs.x import X
+    ...
+    X("foo: x=%s, a=%r", x, a)
 
 It normally writes directly to `sys.stderr` but accepts an optional
 keyword argument `file` to specify a different filelike object.
@@ -61,9 +65,9 @@ def X(msg, *args, **kw):
         to render the text in that colour.
 
       If `file` is not None, write to it unconditionally;
-      otherwise if X_logger then log a warning to that logger;
-      otherwise if X_via_tty then open /dev/tty and write the message to it;
-      otherwise if X_discard then discard the message;
+      otherwise if `X_logger` then log a warning to that logger;
+      otherwise if `X_via_tty` then open `'/dev/tty'` and write the message to it;
+      otherwise if `X_discard` then discard the message;
       otherwise write the message to sys.stderr.
   '''
   fp = kw.pop('file', None)
