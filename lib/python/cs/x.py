@@ -92,7 +92,7 @@ def X(msg, *args, **kw):
     fp = sys.stderr
   print(msg, file=fp)
 
-if os.environ.get('CS_X_GLOBAL', ''):
+if os.environ.get('CS_X_BUILTIN', ''):
   try:
     import builtins
   except ImportError:
