@@ -6,7 +6,8 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isfunction, ismethod, signature
+    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
+    signature
 )
 from itertools import chain
 from cs.lex import cutprefix, stripped_dedent
@@ -20,7 +21,6 @@ DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py.modules'],
@@ -123,6 +123,8 @@ def module_doc(
             if ismethod(attr) or isfunction(attr):
               method_sig = signature(attr)
               obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
+            elif isdatadescriptor(attr):
+              obj_doc += f'\n\n### Property `{Mname}.{attr_name}`\n\n{attr_doc}'
             elif not callable(attr):
               ##obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
               pass

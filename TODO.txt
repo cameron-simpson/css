@@ -1,4 +1,6 @@
-vbox merge-vdi to merge vdis mad from the same import, so likely to have largely the same blocks
+cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
+vbox: cmd to associate the current default interface before starting vm?
+vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
 does dbdigraph really need T_SEQ and friends? try to push that into cs.hier too
 cs.distinfo: update URLs from bitbcuket to sr.ht
 securer findup: sanity check on ownership or perms to stop walk? tunable?

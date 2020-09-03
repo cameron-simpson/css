@@ -9,7 +9,21 @@ X(), for low level debugging.
 
 X() is my function for low level ad hoc debug messages.
 It takes a message and optional format arguments for use with `%`.
-It is presented here in its own module for reuse.
+It is presented here in its own module for reuse:
+
+    from cs.x import X
+    ...
+    X("foo: x=%s, a=%r", x, a)
+
+It normally writes directly to `sys.stderr` but accepts an optional
+keyword argument `file` to specify a different filelike object.
+If `file` is not specified, its behaviour is further tweaked with
+the globals `X_discard`, `X_logger` and `X_via_tty`:
+if X_logger then log a warning to that logger;
+otherwise if X_via_tty then open /dev/tty and write the message to it;
+otherwise if X_discard then discard the message;
+otherwise write the message to sys.stderr.
+`X_discard`'s default value is `not sys.stderr.isatty()`.
 '''
 
 from __future__ import print_function
@@ -117,7 +131,7 @@ def Xtty(msg, *args, **kw):
 
       which I did _a lot_ to get timely debugging when fixing test failures.
   '''
-  global X_via_tty
+  global X_via_tty  # pylint: disable=global-statement
   old = X_via_tty
   X_via_tty = True
   X(msg, *args, **kw)

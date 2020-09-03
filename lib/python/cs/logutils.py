@@ -245,12 +245,15 @@ def setup_logging(
     upd = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
-    upd = None
+    upd = Upd()
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
-  main_handler.setFormatter(PfxFormatter(format))
-  root_logger.addHandler(main_handler)
+  if loginfo is None:
+    # only do this the first time
+    # TODO: fix this clumsy hack, some kind of stackable state?
+    main_handler.setFormatter(PfxFormatter(format))
+    root_logger.addHandler(main_handler)
 
   if trace_mode:
     # enable tracing in the thread that called setup_logging
@@ -301,10 +304,10 @@ def setup_logging(
       module_names=module_names,
       function_names=function_names,
       cmd=cmd_name,
+      upd=upd,
       upd_mode=upd_mode,
       ansi_mode=ansi_mode,
       format=format,
-      upd=upd,
   )
 
   return loginfo

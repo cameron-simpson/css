@@ -16,7 +16,7 @@
       tags can be automatically acquired merely by arranging your file tree
 
     Tags are stored in the file `.fstags` in each directory;
-    there is a line for each entry in the directory with tags
+    there is a line for each entry in the directory
     consisting of the directory entry name and the associated tags.
 
     Tags may be "bare", or have a value.
@@ -71,8 +71,8 @@
 
 from collections import defaultdict, namedtuple
 from configparser import ConfigParser
+from contextlib import contextmanager
 import csv
-from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 import json
@@ -83,7 +83,6 @@ from os.path import (
     samefile, splitext
 )
 from pathlib import PurePath
-import re
 import shutil
 import sys
 import threading
@@ -92,21 +91,21 @@ from icontract import require
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
-from cs.edit import edit_strings
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    get_nonwhite, cutsuffix, get_ini_clause_entryname, FormatableMixin,
+    cutsuffix, get_nonwhite, get_ini_clause_entryname, FormatableMixin,
     FormatAsError
 )
-from cs.logutils import error, warning, info, ifverbose
+from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagChoice, TagsOntology, TaggedEntity, TagsCommandMixin
+    TagSet, Tag, TagChoice, TagsOntology, TagsOntologyCommand, TaggedEntity,
+    TagsCommandMixin, RegexpTagRule
 )
 from cs.threads import locked, locked_property
-from cs.upd import Upd
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 __version__ = '20200717.1-post'
 
@@ -120,8 +119,8 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.edit', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
+        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
+        'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
         'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
     ],
 }
@@ -162,13 +161,18 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
-  GETOPT_SPEC = ''
-  USAGE_FORMAT = '''Usage: {cmd} subcommand [...]'''
-
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
     options.fstags = FSTags()
+
+  @staticmethod
+  @contextmanager
+  def run_context(argv, options):
+    ''' Push the `FSTags`.
+    '''
+    with options.fstags:
+      yield
 
   @staticmethod
   def cmd_autotag(argv, options):
@@ -176,38 +180,38 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           Tag paths based on rules from the rc file.
     '''
     fstags = options.fstags
+    U = options.upd
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
     with stackattrs(state, verbose=True):
-      with fstags:
-        with Upd(sys.stderr) as U:
-          for top_path in argv:
-            for isdir, path in rpaths(top_path, yield_dirs=True):
-              U.out(path)
-              with Pfx(path):
-                ont = fstags.ontology(path)
-                tagged_path = fstags[path]
-                direct_tags = tagged_path.direct_tags
-                all_tags = tagged_path.merged_tags()
-                for autotag in tagged_path.infer_from_basename(filename_rules):
-                  U.out(path + ' ' + str(autotag))
-                  if ont:
-                    autotag = ont.convert_tag(autotag)
-                  if autotag not in all_tags:
-                    direct_tags.add(autotag, verbose=state.verbose)
-                if not isdir:
-                  try:
-                    S = os.stat(path)
-                  except OSError:
-                    pass
-                  else:
-                    direct_tags.add('filesize', S.st_size, ontology=ont)
-                # update the
-                all_tags = tagged_path.merged_tags()
-                for tag in fstags.cascade_tags(all_tags):
-                  if tag.name not in direct_tags:
-                    direct_tags.add(tag)
+      for top_path in argv:
+        for isdir, path in rpaths(top_path, yield_dirs=True):
+          spath = shortpath(path)
+          U.out(spath)
+          with Pfx(spath):
+            ont = fstags.ontology(path)
+            tagged_path = fstags[path]
+            direct_tags = tagged_path.direct_tags
+            all_tags = tagged_path.merged_tags()
+            for autotag in tagged_path.infer_from_basename(filename_rules):
+              U.out(spath + ' ' + str(autotag))
+              if ont:
+                autotag = ont.convert_tag(autotag)
+              if autotag not in all_tags:
+                direct_tags.add(autotag, verbose=state.verbose)
+            if not isdir:
+              try:
+                S = os.stat(path)
+              except OSError:
+                pass
+              else:
+                direct_tags.add('filesize', S.st_size)
+            # update the
+            all_tags = tagged_path.merged_tags()
+            for tag in fstags.cascade_tags(all_tags):
+              if tag.name not in direct_tags:
+                direct_tags.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options):
@@ -220,10 +224,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     directories_like_files = False
     xit = 0
-    options, argv = getopt(argv, 'd')
-    for option, _ in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'd')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
     if not argv:
       path = '.'
@@ -232,13 +236,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       if argv:
         raise GetoptError("extra arguments after path: %r" % (argv,))
     with stackattrs(state, verbose=True):
-      with fstags:
-        with Pfx(path):
-          if directories_like_files or not isdirpath(path):
-            tags = fstags[path].direct_tags
-            tags.edit(verbose=state.verbose)
-          elif not fstags.edit_dirpath(path):
-            xit = 1
+      with Pfx(path):
+        if directories_like_files or not isdirpath(path):
+          tags = fstags[path].direct_tags
+          tags.edit(verbose=state.verbose)
+        elif not fstags.edit_dirpath(path):
+          xit = 1
     return xit
 
   @classmethod
@@ -258,12 +261,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     badopts = False
     all_paths = False
     use_direct_tags = False
-    options, argv = getopt(argv, 'a', longopts=['direct'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '-a':
-          all_paths = true
-        elif option == '--direct':
+    opts, argv = getopt(argv, 'a', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-a':
+          all_paths = True
+        elif opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unimplemented option")
@@ -273,7 +276,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       path = argv.pop(0)
       try:
-        tag_choices = cls.parse_tag_choices(argv)
+        tag_choices = cls.parse_tagset_criteria(argv)
       except ValueError as e:
         warning("bad tag specifications: %s", e)
         badopts = True
@@ -307,14 +310,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     use_direct_tags = False
     as_rsync_includes = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'o:', longopts=['direct', 'for-rsync'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '--direct':
+    opts, argv = getopt(argv, 'o:', longopts=['direct', 'for-rsync'])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '--direct':
           use_direct_tags = True
-        elif option == '--for-rsync':
+        elif opt == '--for-rsync':
           as_rsync_includes = True
-        elif option == '-o':
+        elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
@@ -328,14 +331,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
-    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    U = options.upd
     filepaths = fstags.find(
         realpath(path), tag_choices, use_direct_tags=use_direct_tags, U=U
     )
@@ -344,19 +347,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         print(include)
     else:
       for filepath in filepaths:
-        if U:
-          oldU = U.out('')
-        try:
-          output = fstags[filepath].format_as(
-              output_format, error_sep='\n  ', direct=use_direct_tags
-          )
-        except FormatAsError as e:
-          error(str(e))
-          xit = 1
-          continue
-        print(output)
-        if U:
-          U.out(oldU)
+        with Pfx(filepath):
+          try:
+            output = fstags[filepath].format_as(
+                output_format, error_sep='\n  ', direct=use_direct_tags
+            )
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output)
     return xit
 
   @staticmethod
@@ -420,10 +420,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = None
     json_path = None
     badopts = False
-    options, argv = getopt(argv, '', longopts=['prefix='])
-    for option, value in options:
-      with Pfx(option):
-        if option == '--prefix':
+    opts, argv = getopt(argv, '', longopts=['prefix='])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '--prefix':
           tag_prefix = value
         else:
           raise RuntimeError("unimplemented option")
@@ -461,16 +461,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       error("JSON data do not specify a dict: %s", type(dict))
       return 1
     with stackattrs(state, verbose=True):
-      with fstags:
-        for path in paths:
-          with Pfx(path):
-            ont = fstags.ontology(path)
-            tagged_path = fstags[path]
-            for key, value in data.items():
-              tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
-              tagged_path.direct_tags.add(
-                  Tag(tag_name, value, ontology=ont), verbose=verbose
-              )
+      for path in paths:
+        with Pfx(path):
+          ont = fstags.ontology(path)
+          tagged_path = fstags[path]
+          for key, value in data.items():
+            tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
+            tagged_path.direct_tags.add(
+                Tag(tag_name, value, ontology=ont), verbose=verbose
+            )
     return 0
 
   @staticmethod
@@ -488,14 +487,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     directories_like_files = False
     use_direct_tags = False
     output_format = LS_OUTPUT_FORMAT_DEFAULT
-    options, argv = getopt(argv, 'do:', longopts=['direct'])
-    for option, value in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'do:', longopts=['direct'])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
-        elif option == '--direct':
+        elif opt == '--direct':
           use_direct_tags = True
-        elif option == '-o':
+        elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
           raise RuntimeError("unsupported option")
@@ -555,11 +554,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
-    fstags = options.fstags
     cmd_force = False
     cmd_verbose = False
-    subopts, argv = getopt(argv, 'finv')
-    for subopt, _ in subopts:
+    opts, argv = getopt(argv, 'finv')
+    for subopt, _ in opts:
       if subopt == '-f':
         cmd_force = True
       elif subopt == '-i':
@@ -575,27 +573,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     endpath = argv[-1]
     if isdirpath(endpath):
       with stackattrs(state, verbose=True):
-        with fstags:
-          dirpath = argv.pop()
-          for srcpath in argv:
-            dstpath = joinpath(dirpath, basename(srcpath))
-            try:
-              attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
-            except (ValueError, OSError) as e:
-              print(e, file=sys.stderr)
-              xit = 1
-            else:
-              if cmd_verbose:
-                print(srcpath, '->', dstpath)
-    else:
-      if len(argv) != 2:
-        raise GetoptError(
-            "expected exactly 2 arguments if the last is not a directory, got: %r"
-            % (argv,)
-        )
-      with stackattrs(state, verbose=True):
-        with fstags:
-          srcpath, dstpath = argv
+        dirpath = argv.pop()
+        for srcpath in argv:
+          dstpath = joinpath(dirpath, basename(srcpath))
           try:
             attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
           except (ValueError, OSError) as e:
@@ -604,6 +584,22 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           else:
             if cmd_verbose:
               print(srcpath, '->', dstpath)
+    else:
+      if len(argv) != 2:
+        raise GetoptError(
+            "expected exactly 2 arguments if the last is not a directory, got: %r"
+            % (argv,)
+        )
+      with stackattrs(state, verbose=True):
+        srcpath, dstpath = argv
+        try:
+          attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
+        except (ValueError, OSError) as e:
+          print(e, file=sys.stderr)
+          xit = 1
+        else:
+          if cmd_verbose:
+            print(srcpath, '->', dstpath)
     return xit
 
   @staticmethod
@@ -619,12 +615,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     directories_like_files = False
     use_direct_tags = False
-    options, argv = getopt(argv, 'd', longopts=['direct'])
-    for option, _ in options:
-      with Pfx(option):
-        if option == '-d':
+    opts, argv = getopt(argv, 'd', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-d':
           directories_like_files = True
-        elif option == '--direct':
+        elif opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unsupported option")
@@ -645,31 +641,29 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def cmd_ont(argv, options):
     ''' Ontology operations.
 
-        Usage: {cmd} [subcommand [args...]]
-          With no arguments, locate the ontology.
-          Subcommands:
-            tags tag[=value]...
-              Query ontology information for the specified tags.
+        Usage: {cmd} [-o ontology] [subcommand [args...]]
+          With no arguments, print the ontology.
     '''
-    ont = options.fstags.ontology('.')
+    ont_path = None
+    opts, argv = getopt(argv, 'o:', longopts=['ontology='])
+    for opt, value in opts:
+      with Pfx(opt):
+        if opt in ('-o', '--ontology'):
+          ont_path = value
+        else:
+          raise RuntimeError("unsupported option")
+    if ont_path is None or isdirpath(ont_path):
+      ont = options.fstags.ontology(ont_path or '.')
+    else:
+      raise GetoptError(
+          "unhandled ontology path, expected directory: %r" % (ont_path,)
+      )
     if not argv:
       print(ont)
-      return 0
-    subcmd = argv.pop(0)
-    with Pfx(subcmd):
-      if subcmd == 'tags':
-        if not argv:
-          raise GetoptError("missing tags")
-        for tag_arg in argv:
-          with Pfx(tag_arg):
-            tag = Tag.from_string(tag_arg, ontology=ont)
-            typedata = tag.typedata
-            print(" ", typedata)
-            print(" ", repr(tag.value))
-            print(" ", repr(tag.metadata))
-      else:
-        raise GetoptError("unrecognised subcommand")
-    return 0
+      return
+    with stackattrs(options, ontology=ont):
+      TagsOntologyCommand().run([options.cmd] + argv, options=options)
+    return
 
   @staticmethod
   def cmd_rename(argv, options):
@@ -682,8 +676,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     fstags = options.fstags
     name_format = None
-    subopts, argv = getopt(argv, 'n:')
-    for subopt, value in subopts:
+    opts, argv = getopt(argv, 'n:')
+    for subopt, value in opts:
       if subopt == '-n':
         name_format = fstags.resolve_format_string(value)
       else:
@@ -697,42 +691,38 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     xit = 0
-    U = Upd(sys.stderr) if sys.stderr.isatty() else None
+    U = options.upd
     with stackattrs(state, verbose=True):
-      with fstags:
-        for filepath in paths:
-          if U:
-            oldU = U.out('')
-          with Pfx(filepath):
-            if filepath == '-':
-              warning(
-                  "ignoring name %r: standard input is only supported alone",
-                  filepath
-              )
-              xit = 1
-              continue
-            dirpath = dirname(filepath)
-            base = basename(filepath)
-            try:
-              newbase = fstags[filepath].format_as(
-                  name_format, error_sep='\n  ', direct=False
-              )
-            except FormatAsError as e:
-              error(str(e))
-              xit = 1
-              continue
-            newbase = newbase.replace(os.sep, ':')
-            if base == newbase:
-              continue
-            dstpath = joinpath(dirpath, newbase)
-            verbose("-> %s", dstpath)
-            try:
-              options.fstags.move(filepath, dstpath, crop_ok=True)
-            except OSError as e:
-              error("-> %s: %s", dstpath, e)
-              xit = 1
-    if U:
-      U.out(oldU)
+      for filepath in paths:
+        U.out(filepath)
+        with Pfx(filepath):
+          if filepath == '-':
+            warning(
+                "ignoring name %r: standard input is only supported alone",
+                filepath
+            )
+            xit = 1
+            continue
+          dirpath = dirname(filepath)
+          base = basename(filepath)
+          try:
+            newbase = fstags[filepath].format_as(
+                name_format, error_sep='\n  ', direct=False
+            )
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          newbase = newbase.replace(os.sep, ':')
+          if base == newbase:
+            continue
+          dstpath = joinpath(dirpath, newbase)
+          verbose("-> %s", dstpath)
+          try:
+            options.fstags.move(filepath, dstpath, crop_ok=True)
+          except OSError as e:
+            error("-> %s: %s", dstpath, e)
+            xit = 1
     return xit
 
   @classmethod
@@ -745,9 +735,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing paths")
     with stackattrs(state, verbose=True):
-      with fstags:
-        for path in argv:
-          fstags.scrub(path)
+      for path in argv:
+        fstags.scrub(path)
 
   @classmethod
   def cmd_tag(cls, argv, options):
@@ -764,11 +753,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    try:
-      tag_choices = cls.parse_tag_choices(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
-      badopts = True
+    tag_choices = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          tag_choice = TagChoice.from_str(arg)
+        except ValueError as e:
+          warning("bad tag specifications: %s", e)
+          badopts = True
+        else:
+          tag_choices.append(tag_choice)
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':
@@ -776,8 +770,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = [path]
     with stackattrs(state, verbose=True):
-      with fstags:
-        fstags.apply_tag_choices(tag_choices, paths)
+      fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_tagfile(cls, argv, options):
@@ -806,7 +799,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               raise GetoptError("missing tags")
             badopts = False
             try:
-              tag_choices = cls.parse_tag_choices(argv)
+              tag_choices = cls.parse_tagset_criteria(argv)
             except ValueError as e:
               warning("bad tag specifications: %s", e)
               badopts = True
@@ -840,7 +833,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing tag choice")
     tag_choice = argv.pop(0)
     try:
-      tag_choices = cls.parse_tag_choices([tag_choice])
+      tag_choices = cls.parse_tagset_criteria([tag_choice])
     except ValueError as e:
       warning("bad tag specifications: %s", e)
       badopts = True
@@ -854,8 +847,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     with stackattrs(state, verbose=True):
-      with fstags:
-        fstags.apply_tag_choices(tag_choices, paths)
+      fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
   def cmd_test(cls, argv, options):
@@ -866,10 +858,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     badopts = False
     use_direct_tags = False
-    options, argv = getopt(argv, '', longopts=['direct'])
-    for option, _ in options:
-      with Pfx(option):
-        if option == '--direct':
+    opts, argv = getopt(argv, '', longopts=['direct'])
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '--direct':
           use_direct_tags = True
         else:
           raise RuntimeError("unsupported option")
@@ -883,7 +875,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         badopts = True
       else:
         try:
-          tag_choices = cls.parse_tag_choices(argv)
+          tag_choices = cls.parse_tagset_criteria(argv)
         except ValueError as e:
           warning("bad tag specifications: %s", e)
           badopts = True
@@ -953,6 +945,7 @@ class FSTags(MultiOpenMixin):
     self.sync()
 
   @locked
+  @pfx_method
   def sync(self):
     ''' Flush modified tag files.
     '''
@@ -1166,63 +1159,70 @@ class FSTags(MultiOpenMixin):
     tags = (
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
-    ok = True
-    for _, choice, tag in tag_choices:
-      if choice:
-        # tag_choice not present or not with same nonNone value
-        if tag not in tags:
-          ok = False
-          break
-      else:
-        if tag in tags:
-          ok = False
-          break
-    return ok
+    for tag_choice in tag_choices:
+      if not tag_choice.match(tags):
+        return False
+    return True
 
+  @pfx_method
   def edit_dirpath(self, dirpath):
     ''' Edit the filenames and tags in a directory.
     '''
     ok = True
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
-    names = set(
-        name for name in os.listdir(dirpath)
-        if (name and name not in ('.', '..') and not name.startswith('.'))
+    names = sorted(
+        set(
+            name for name in os.listdir(dirpath)
+            if (name and name not in ('.', '..') and not name.startswith('.'))
+        )
     )
-    lines = [tagfile.tags_line(name, tagfile[name]) for name in sorted(names)]
-    changed = edit_strings(lines)
-    for old_line, new_line in changed:
-      with stackattrs(state, verbose=False):
-        old_name, _ = tagfile.parse_tags_line(old_line)
-        new_name, new_tags = tagfile.parse_tags_line(new_line)
-      with Pfx(old_name):
-        tags = tagsets[old_name]
-        tags.set_from(new_tags, verbose=state.verbose)
-        if old_name != new_name:
-          if new_name in tagsets:
-            warning("new name %r already exists", new_name)
-            new_name = old_name
+    tes = []
+    te_id_map = {}
+    for name in names:
+      if not name or os.sep in name:
+        warning("skip bogus name %r", name)
+        continue
+      path = joinpath(dirpath, name)
+      tagged_path = self[path]
+      te = tagged_path.as_TaggedEntity(name=name)
+      tes.append(te)
+      te_id_map[id(te)] = name, tagged_path, te
+    # edit entities, return modified entities
+    changed_tes = TaggedEntity.edit_entities(tes)  # verbose-state.verbose
+    # now apply any file renames
+    for te in changed_tes:
+      old_name, tagged_path, old_te = te_id_map[id(te)]
+      assert te is old_te
+      new_name = te.name
+      if old_name == new_name:
+        continue
+      with Pfx("%r => %r", old_name, new_name):
+        if not new_name:
+          warning("name removed? ignoring")
+          continue
+        old_path = joinpath(dirpath, old_name)
+        if not existspath(old_path):
+          warning("old path does not exist: %r", old_path)
+          ok = False
+          continue
+        new_path = joinpath(dirpath, new_name)
+        if existspath(new_path):
+          warning("new path exists, not renaming to %r", new_path)
+          ok = False
+          continue
+        with Pfx("os.rename(%r, %r)", old_path, new_path):
+          try:
+            os.rename(old_path, new_path)
+          except OSError as e:
+            warning("%s", e)
             ok = False
+            continue
           else:
-            old_path = joinpath(dirpath, old_name)
-            if existspath(old_path):
-              new_path = joinpath(dirpath, new_name)
-              if existspath(new_path):
-                warning("new path exists, not renaming to %r", new_path)
-                ok = False
-                new_name = old_name
-              else:
-                verbose("=> %r", new_name)
-                with Pfx("rename => %r", new_path):
-                  try:
-                    os.rename(old_path, new_path)
-                  except OSError as e:
-                    warning("%s", e)
-                    ok = False
-                    new_name = old_name
-                  else:
-                    del tagsets[old_name]
-                    tagsets[new_name] = tags
+            ifverbose(True, "renamed")
+        # update tags of new path
+        self.dir_tagfile(dirname(new_path)).tagsets[new_name].set_from(te.tags)
+        del tagsets[old_name]
     return ok
 
   def scrub(self, path):
@@ -1398,21 +1398,38 @@ class TagFile(SingletonMixin):
       self.save()
 
   # Mapping mathods, proxying through to .tagsets.
-  def keys(self):
+  def keys(self, prefix=None):
     ''' `tagsets.keys`
+
+        If the options `prefix` is supplied,
+        yield only those keys starting with `prefix`.
     '''
     ks = self.tagsets.keys()
+    if prefix:
+      ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-  def values(self):
+  def values(self, prefix=None):
     ''' `tagsets.values`
-    '''
-    return self.tagsets.values()
 
-  def items(self):
-    ''' `tagsets.items`
+        If the options `prefix` is supplied,
+        yield only those values whose keys start with `prefix`.
     '''
-    return self.tagsets.items()
+    if not prefix:
+      # use native values, faster
+      return self.tagsets.values()
+    return map(lambda kv: kv[1], self.items(prefix=prefix))
+
+  def items(self, prefix=None):
+    ''' `tagsets.items`
+
+        If the options `prefix` is supplied,
+        yield only those items whose keys start with `prefix`.
+    '''
+    if not prefix:
+      # use native items, faster
+      return self.tagsets.items()
+    return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
 
   def __getitem__(self, name):
     ''' Return the `TagSet` associated with `name`.
@@ -1465,7 +1482,9 @@ class TagFile(SingletonMixin):
 
         This is loaded on demand.
     '''
-    return self.load_tagsets(self.filepath, self.ontology)
+    ts, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    self.unparsed = unparsed
+    return ts
 
   @property
   def names(self):
@@ -1473,48 +1492,20 @@ class TagFile(SingletonMixin):
     '''
     return list(self.tagsets.keys())
 
-  @staticmethod
-  def encode_name(name):
-    ''' Encode `name`.
-
-        If the `name` is not empty and does not start with a double quote
-        and contains no whitespace, return it as-is
-        otherwise JSON encode the name.
-    '''
-    if name and not name.startswith('"'):
-      _, offset = get_nonwhite(name)
-      if offset == len(name):
-        return name
-    return json.dumps(name)
-
-  @staticmethod
-  def decode_name(s, offset=0):
-    ''' Decode the *name* from the string `s` at `offset` (default `0`).
-        Return the *name* and the new offset.
-
-        If the *name* commences with a double quote,
-        decode it as a JSON string value.
-        Otherwise gather up all the available nonwhitespace.
-    '''
-    if s.startswith('"'):
-      name, suboffset = Tag.JSON_DECODER.raw_decode(s[offset:])
-      offset += suboffset
-    else:
-      name, offset = get_nonwhite(s, offset)
-    return name, offset
-
   @classmethod
+  @pfx_method
   def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
-    name, offset = cls.decode_name(line)
+    name, offset = Tag.parse_value(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
       name = line[:offset2]
-      warning(
-          "offset %d: expected whitespace, adjusted name to %r", offset, name
-      )
+      # This is normal.
+      ##warning(
+      ##    "offset %d: expected whitespace, adjusted name to %r", offset, name
+      ##)
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
@@ -1525,51 +1516,70 @@ class TagFile(SingletonMixin):
 
   @classmethod
   def load_tagsets(cls, filepath, ontology):
-    ''' Load `filepath` and return
-        a mapping of `name`=>`tag_name`=>`value`.
+    ''' Load `filepath` and return `(tagsets,unparsed)`.
+
+        The returned `tagsets` are a mapping of `name`=>`tag_name`=>`value`.
+        The returned `unparsed` is a list of `(lineno,line)`
+        for lines which failed the parse (excluding the trailing newline).
     '''
     with Pfx("%r", filepath):
       tagsets = defaultdict(lambda: TagSet(ontology=ontology))
+      unparsed = []
       try:
         with open(filepath) as f:
           with stackattrs(state, verbose=False):
             for lineno, line in enumerate(f, 1):
               with Pfx(lineno):
-                line = line.strip()
-                if not line or line.startswith('#'):
+                line0 = cutsuffix(line, '\n')
+                line = line0.strip()
+                if not line:
                   continue
-                name, tags = cls.parse_tags_line(line, ontology=ontology)
-                tagsets[name] = tags
+                if line.startswith('#'):
+                  unparsed.append((lineno, line0))
+                  continue
+                try:
+                  name, tags = cls.parse_tags_line(line, ontology=ontology)
+                except ValueError as e:
+                  warning("parse error: %s", e)
+                  unparsed.append((lineno, line0))
+                else:
+                  tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-      return tagsets
+      return tagsets, unparsed
 
   @classmethod
   def tags_line(cls, name, tags):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
-    fields = [cls.encode_name(name)]
+    fields = [Tag.transcribe_value(name)]
     for tag in tags:
       fields.append(str(tag))
     return ' '.join(fields)
 
   @classmethod
-  def save_tagsets(cls, filepath, tagsets):
-    ''' Save `tagsets` to `filepath`.
+  @pfx_method
+  def save_tagsets(cls, filepath, tagsets, unparsed):
+    ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
         if missing.
     '''
-    with Pfx("savetags(%r)", filepath):
+    with Pfx(filepath):
       dirpath = dirname(filepath)
       if not isdirpath(dirpath):
         verbose("makedirs(%r)", dirpath)
-        with Pfx("makedirs(%r)", dirpath):
+        with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       try:
         with open(filepath, 'w') as f:
+          for _, line in unparsed:
+            if not line.startswith('#'):
+              f.write('##  ')
+            f.write(line)
+            f.write('\n')
           for name, tags in name_tags:
             if not tags:
               continue
@@ -1591,7 +1601,7 @@ class TagFile(SingletonMixin):
     with self._lock:
       if any(map(lambda tagset: tagset.modified, tagsets.values())):
         # modified TagSets
-        self.save_tagsets(self.filepath, self.tagsets)
+        self.save_tagsets(self.filepath, self.tagsets, self.unparsed)
         for tagset in tagsets.values():
           tagset.modified = False
     if self.find_parent:
@@ -1653,7 +1663,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     return "%s(%s)" % (type(self).__name__, self.filepath)
 
   def __str__(self):
-    return TagFile.encode_name(str(self.filepath)) + ' ' + str(self.all_tags)
+    return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
 
   def __contains__(self, tag):
     ''' Test for the presence of `tag` in the `all_tags`.
@@ -1742,7 +1752,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         Tag('filepath.basename', basename(filepath), ontology=ont),
         Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
         Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', TagFile.encode_name(filepath), ontology=ont),
+        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
     ):
       if pathtag.name not in kwtags:
         kwtags.add(pathtag)
@@ -1940,73 +1950,7 @@ class CascadeRule:
         return Tag(self.target, tagset[tag_name])
     return None
 
-class RegexpTagRule:
-  ''' A regular expression based `Tag` rule.
-  '''
-
-  def __init__(self, regexp):
-    self.regexp_src = regexp
-    self.regexp = re.compile(regexp)
-
-  def __str__(self):
-    return "%s(%r)" % (type(self).__name__, self.regexp_src)
-
-  @pfx_method
-  def infer_tags(self, s):
-    ''' Apply the rule to the string `s`, return a list of `Tag`s.
-    '''
-    # TODO: honour the JSON decode strings
-    tags = []
-    m = self.regexp.search(s)
-    if m:
-      tag_value_queue = list(m.groupdict().items())
-      while tag_value_queue:
-        tag_name, value = tag_value_queue.pop(0)
-        with Pfx(tag_name):
-          if value is None:
-            # unused branch of the regexp?
-            warning("value=None, skipped")
-            continue
-          # special case prefix_strpdate_strptimeformat
-          try:
-            prefix, strptime_format_tplt = tag_name.split('_strpdate_', 1)
-          except ValueError:
-            pass
-          else:
-            tag_name = prefix + '_date'
-            strptime_format = ' '.join(
-                '%' + letter for letter in strptime_format_tplt.split('_')
-            )
-            value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name, value))
-            continue
-          # special case prefix_strptime_strptimeformat
-          try:
-            prefix, strptime_format_tplt = tag_name.split('_strpdatetime_', 1)
-          except ValueError:
-            pass
-          else:
-            tag_name = prefix + '_datetime'
-            strptime_format = ' '.join(
-                '%' + letter for letter in strptime_format_tplt.split('_')
-            )
-            value = datetime.strptime(value, strptime_format)
-            tag_value_queue.insert(0, (tag_name, value))
-            continue
-          # special case *_n
-          tag_name_prefix = cutsuffix(tag_name, '_n')
-          if tag_name is not tag_name_prefix:
-            # numeric rule
-            try:
-              value = int(value)
-            except ValueError:
-              pass
-            else:
-              tag_name = tag_name_prefix
-          tag = Tag(tag_name, value)
-          tags.append(tag)
-    return tags
-
+@pfx
 def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   ''' Recurse over `path`, yielding `(is_dir,subpath)`
       for all selected subpaths.
@@ -2016,7 +1960,8 @@ def rpaths(path, *, yield_dirs=False, name_selector=None, U=None):
   pending = [path]
   while pending:
     dirpath = pending.pop(0)
-    U and U.out(dirpath)
+    if U:
+      U.out(dirpath)
     with Pfx(dirpath):
       with Pfx("scandir"):
         try:
