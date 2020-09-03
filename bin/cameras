@@ -34,12 +34,13 @@ cfgline(){
 }
 
 cmd=$0
-usage="Usage: $cmd [-1] [-f cfg] [--] op [args...]
+usage="Usage: $cmd [options...] [--] op [args...]
   -1        Once. Process or collate only one date.
   -f cfg    Specify the comfig file.
             Default: $cfg
   -q        Quiet.
   -v        Verbose.
+  -x        Trace execution.
   Operations:
     collate [names...]
       Move all snapshot images prior to today into subdirectories by day.
@@ -57,6 +58,7 @@ do
     -f) cfg=$2; shift ;;
     -q) ff_loglevel=error vecho=: ;;
     -v) ff_loglevel=info vecho=echo ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
