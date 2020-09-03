@@ -17,12 +17,19 @@ It is presented here in its own module for reuse:
 
 It normally writes directly to `sys.stderr` but accepts an optional
 keyword argument `file` to specify a different filelike object.
-If `file` is not specified, its behaviour is further tweaked with
-the globals `X_discard`, `X_logger` and `X_via_tty`:
-if X_logger then log a warning to that logger;
-otherwise if X_via_tty then open /dev/tty and write the message to it;
-otherwise if X_discard then discard the message;
-otherwise write the message to sys.stderr.
+
+The following globals are further tune its behaviour,
+absent the `file=` parameter:
+* `X_logger`: if not `None` then log a warning to that logger
+* `X_via_tty`: if true then open `/dev/tty` and write the message to it
+* `X_discard`: if true then discard the message
+Otherwise write the message to `sys.stderr`.
+
+`X_via_tty` defaults to true if the environment variable `$CS_X_VIA_TTY`
+has a nonempty value, false otherwise.
+This is handy for getting debugging out of test suites,
+which often divert `sys.stderr`.
+
 `X_discard`'s default value is `not sys.stderr.isatty()`.
 '''
 
