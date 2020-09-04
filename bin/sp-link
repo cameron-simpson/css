@@ -296,7 +296,8 @@ class SPConfig(SimpleNamespace):
 
   @staticmethod
   def parse_csvfilename(filename):
-    ''' Extract site and dataset name from a CSV filename. Return (site, datasetname, dumptime).
+    ''' Extract site and dataset name from a CSV filename.
+        Return (site, datasetname, dumptime).
     '''
     filebase = basename(filename)
     root, ext = splitext(filebase)
@@ -316,7 +317,8 @@ class SPConfig(SimpleNamespace):
     return site, mkey, dumptime
 
 def cmd_graph(argv, cfg):
-  ''' Run the "graph" command, generating graphs of RRD files associated with CSV data.
+  ''' Run the "graph" command, generating graphs of RRD files
+      associated with CSV data.
   '''
   xit = 0
   days = None
