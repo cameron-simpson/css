@@ -594,9 +594,9 @@ ok=1
   else
     $trace mkdir "$thisbackup" || exit 1
     dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
-      || :
+    || :
   fi
-)
+) || ok=
 
 if [ $copytimes ]
 then
