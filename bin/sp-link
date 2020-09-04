@@ -13,6 +13,7 @@ from os.path import basename, splitext, join as joinpath, exists as pathexists
 import re
 from subprocess import run
 import sys
+from types import SimpleNamespace
 from cs.csvutils import csv_import, csv_reader
 from cs.env import envsub
 from cs.logutils import setup_logging, error, warning
@@ -44,6 +45,8 @@ USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
   -d sitedir
     Directory for RRD file data.
     Default: {basedir}/{site}
+  -s site
+    Default site name. Default the basename of the current directory.
   Ops:
     graph [days] csvfiles...
         Graph the data from the RRD files corresponding to the specified CSVs.
@@ -61,9 +64,10 @@ def main(argv=None):
   usage = USAGE % (cmd,)
   basedir = None
   sitedir = None
+  site = None
   badopts = False
   try:
-    opts, argv = getopt(argv, 'D:d:')
+    opts, argv = getopt(argv, 'D:d:s:')
   except GetoptError as e:
     error("%s", e)
     badopts = True
@@ -73,9 +77,11 @@ def main(argv=None):
         basedir = value
       elif opt == '-d':
         sitedir = value
+      elif opt == '-s':
+        site = value
       else:
         raise RuntimeError("unimplemented option: %s" % (opt,))
-  cfg = SPConfig(basedir=basedir, sitedir=sitedir)
+  cfg = SPConfig(basedir=basedir, sitedir=sitedir, site=site)
   try:
     if not argv:
       raise GetoptError("missing op")
@@ -204,9 +210,20 @@ MAPPINGS = {
     },
 }
 
-class SPConfig(namedtuple('SPConfig', 'basedir sitedir')):
+class SPConfig(SimpleNamespace):
   ''' An embodiment of the sp-link command's options.
   '''
+
+  def __init__(self, basedir=None, sitedir=None, site=None, **kw):
+    if basedir is None:
+      basedir = os.environ.get(ENV_BASEDIR, expandvars(ENV_BASEDIR_DEFAULT))
+    if sitedir is None:
+      if site is None:
+        site = basename(getcwd())
+      sitedir = joinpath(basedir, site)
+    elif site is None:
+      site = basename(sitedir)
+    super().__init__(basedir=basedir, sitedir=sitedir, site=site, **kw)
 
   @prop
   def basepath(self):
