@@ -69,7 +69,7 @@ def main(argv=None):
   ''' Main programme implementing the command line.
   '''
   if argv is None:
-    argv = sys.argv
+    argv = list(sys.argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
   usage = USAGE % (cmd,)
@@ -84,14 +84,15 @@ def main(argv=None):
     badopts = True
   else:
     for opt, value in opts:
-      if opt == '-D':
-        basedir = value
-      elif opt == '-d':
-        sitedir = value
-      elif opt == '-s':
-        site = value
-      else:
-        raise RuntimeError("unimplemented option: %s" % (opt,))
+      with Pfx(opt):
+        if opt == '-D':
+          basedir = value
+        elif opt == '-d':
+          sitedir = value
+        elif opt == '-s':
+          site = value
+        else:
+          raise RuntimeError("unimplemented option")
   cfg = SPConfig(basedir=basedir, sitedir=sitedir, site=site)
   try:
     if not argv:
@@ -297,7 +298,7 @@ class SPConfig(SimpleNamespace):
   @staticmethod
   def parse_csvfilename(filename):
     ''' Extract site and dataset name from a CSV filename.
-        Return (site, datasetname, dumptime).
+        Return `(sitename,datasetname,dumptime)`.
     '''
     filebase = basename(filename)
     root, ext = splitext(filebase)
@@ -388,7 +389,7 @@ def sp_unixtime(sp_ts):
   dt = SP_EPOCH + timedelta(seconds=sp_ts)
   return dt.timestamp()
 
-class DataSet(object):
+class DataSet:
   ''' Data and methods for a CSV file.
   '''
 
