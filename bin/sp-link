@@ -30,6 +30,8 @@ BATTERY_CAPACITY_KWH = 10.0
 
 DEFAULT_GRAPH_DAYS = 28
 
+DEFAULT_DATASET_NAME = 'DetailedData'
+
 RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
 
 # SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
