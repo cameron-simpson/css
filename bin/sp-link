@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
 #
-# Utility script for dealing with SP-Link data.
-# - Cameron Simpson <cs@cskk.id.au> 25apr2018
-#
+
+''' Utility script for dealing with SP-Link data.
+    - Cameron Simpson <cs@cskk.id.au> 25apr2018
+'''
 
 from __future__ import print_function
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from datetime import datetime, timedelta
 from getopt import getopt, GetoptError
 import os
-from os.path import basename, splitext, join as joinpath, exists as pathexists
+from os import getcwd
+from os.path import (
+    basename,
+    splitext,
+    join as joinpath,
+    exists as pathexists,
+    expandvars,
+)
 import re
 from subprocess import run
 import sys
 from types import SimpleNamespace
-from cs.csvutils import csv_import, csv_reader
+from cs.csvutils import csv_import
+from cs.deco import fmtdoc
 from cs.env import envsub
 from cs.logutils import setup_logging, error, warning
 from cs.pfx import Pfx
@@ -37,8 +46,8 @@ RRD_VALID_DS_NAME = re.compile('^[a-zA-Z0-9_]{1,19}$')
 # SP polls default to every 15 minutes, set heartbeat to 20 minutes in case of skew
 RRD_HEARTBEAT = 1200
 
-RRD_STEP = 10           # 10s slot size
-RRD_SLOTS = 3153600     # a year in 10s slots
+RRD_STEP = 10  # 10s slot size
+RRD_SLOTS = 3153600  # a year in 10s slots
 
 USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
   -D basedir
@@ -125,42 +134,78 @@ RRD_DSName = namedtuple('RRD_DSName', 'csv_hdr ds_name ds_type')
 MAPPINGS = {
     'DetailedData': {
         'csv2rrd': {
-            'Date/Time Stamp [Seconds From The Year 2001]': None,
-            'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]': None,
-            'Inverter AC Power (Average) [kW]': 'inverterACPwrKW:GAUGE',
-            'DC Input Accumulated (Sample) [kWh]': 'dcInputCumKWH:DCOUNTER',
-            'DC Output Accumulated (Sample) [kWh]': 'dcOutputCumKWH:DCOUNTER',
-            'Battery In Accumulated (Sample) [kWh]': 'batteryInCumKWH:DCOUNTER',
-            'Battery Out Accumulated (Sample) [kWh]': 'batteryOutCumKWH:DCOUNTER',
-            'DC Voltage (Average) [V DC]': 'dcVoltsAvgVDC:GAUGE',
-            'DC Voltage (Min) [V DC]': 'dcVoltsMinVDC:GAUGE',
-            'DC Voltage (Max) [V DC]': 'dcVoltsMaxVDC:GAUGE',
-            'DC Mid Voltage (Average) [V DC]': 'dcMidVoltsAvgVDC:GAUGE',
-            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]': 'dcMidVoltsMinVDC:GAUGE',
-            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]': 'dcMidVoltsMaxVDC:GAUGE',
-            'Inverter DC Current (Average) [A]': 'invDCCurrentAvgA:GAUGE',
-            'Shunt1 Current (Average) [A]': 'shunt1CurrentA:GAUGE',
-            'Shunt 2 Current (Average) [A]': 'shunt2CurrentA:GAUGE',
-            'Load AC Power (Average) [kW]': 'acLoadPwrAvgKW:GAUGE',
-            'Load AC Power (Max) [kW]': 'acLoadPwrMaxKW:GAUGE',
-            'AC Input Power (Average) [kW]': 'acInputPwrAvgKW:GAUGE',
-            'AC Load Voltage (Average) [V AC]': 'acLoadVoltsAvgVDC:GAUGE',
-            'AC Load Frequency (Average) [Hz]': 'acLoadFreqAvgHz:GAUGE',
-            'Transformer Temperature (Max) [Degrees C]': 'transformerTempMaxC:GAUGE',
-            'Heatsink Temperature (Max) [Degrees C]': 'heatsinkTempMaxC:GAUGE',
-            'Battery Temperature (Max) [Degrees C]': 'batteryTempMaxC:GAUGE',
-            'Internal Temperature (Max) [Degrees C]': 'internalTempMaxC:GAUGE',
-            'Power Module Temperature (Max) [Degrees C]': 'powerModTempMaxC:GAUGE',
-            'State of Charge (Sample) [%]': 'batterySOCPcnt:GAUGE',
-            'AC Input kWh Accumulated (Sample) [kWh]': 'acInputCumKWH:DCOUNTER',
-            'AC Load kWh Accumulated (Sample) [kWh]': 'acLoadCumKWH:DCOUNTER',
-            'Shunt 1 kWh Accumulated (Sample) [kWh]': 'shunt1SampCumKWH:DCOUNTER',
-            'Shunt 2 kWh Accumulated (Sample) [kWh]': 'shunt2SampCumKWH:DCOUNTER',
-            'Analogue In 1 DC Voltage (Average) [V DC]': 'alogIn1VoltsAvgVDC:GAUGE',
-            'Analogue In 2 DC Voltage (Average) [V DC]': 'alogIn2VoltsAvgVDC:GAUGE',
-            'AC Export kWh Accumulated (Sample) [kWh]': 'acExportCumKWH:DCOUNTER',
-            'Total AC Coupled Power (Average) [kW]': 'totACCoupledPwrKW:GAUGE',
-            'Total AC Coupled Energy (Sample) [kWh]': 'totACCoupledEgyKWH:DCOUNTER',
+            'Date/Time Stamp [Seconds From The Year 2001]':
+            None,
+            'Date/Time Stamp [dd/MM/yyyy - HH:mm:ss]':
+            None,
+            'Inverter AC Power (Average) [kW]':
+            'inverterACPwrKW:GAUGE',
+            'DC Input Accumulated (Sample) [kWh]':
+            'dcInputCumKWH:DCOUNTER',
+            'DC Output Accumulated (Sample) [kWh]':
+            'dcOutputCumKWH:DCOUNTER',
+            'Battery In Accumulated (Sample) [kWh]':
+            'batteryInCumKWH:DCOUNTER',
+            'Battery Out Accumulated (Sample) [kWh]':
+            'batteryOutCumKWH:DCOUNTER',
+            'DC Voltage (Average) [V DC]':
+            'dcVoltsAvgVDC:GAUGE',
+            'DC Voltage (Min) [V DC]':
+            'dcVoltsMinVDC:GAUGE',
+            'DC Voltage (Max) [V DC]':
+            'dcVoltsMaxVDC:GAUGE',
+            'DC Mid Voltage (Average) [V DC]':
+            'dcMidVoltsAvgVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Min DC V) [V DC]':
+            'dcMidVoltsMinVDC:GAUGE',
+            'DC Mid Voltage (Sync Sample at Max DC V) [V DC]':
+            'dcMidVoltsMaxVDC:GAUGE',
+            'Inverter DC Current (Average) [A]':
+            'invDCCurrentAvgA:GAUGE',
+            'Shunt1 Current (Average) [A]':
+            'shunt1CurrentA:GAUGE',
+            'Shunt 2 Current (Average) [A]':
+            'shunt2CurrentA:GAUGE',
+            'Load AC Power (Average) [kW]':
+            'acLoadPwrAvgKW:GAUGE',
+            'Load AC Power (Max) [kW]':
+            'acLoadPwrMaxKW:GAUGE',
+            'AC Input Power (Average) [kW]':
+            'acInputPwrAvgKW:GAUGE',
+            'AC Load Voltage (Average) [V AC]':
+            'acLoadVoltsAvgVDC:GAUGE',
+            'AC Load Frequency (Average) [Hz]':
+            'acLoadFreqAvgHz:GAUGE',
+            'Transformer Temperature (Max) [Degrees C]':
+            'transformerTempMaxC:GAUGE',
+            'Heatsink Temperature (Max) [Degrees C]':
+            'heatsinkTempMaxC:GAUGE',
+            'Battery Temperature (Max) [Degrees C]':
+            'batteryTempMaxC:GAUGE',
+            'Internal Temperature (Max) [Degrees C]':
+            'internalTempMaxC:GAUGE',
+            'Power Module Temperature (Max) [Degrees C]':
+            'powerModTempMaxC:GAUGE',
+            'State of Charge (Sample) [%]':
+            'batterySOCPcnt:GAUGE',
+            'AC Input kWh Accumulated (Sample) [kWh]':
+            'acInputCumKWH:DCOUNTER',
+            'AC Load kWh Accumulated (Sample) [kWh]':
+            'acLoadCumKWH:DCOUNTER',
+            'Shunt 1 kWh Accumulated (Sample) [kWh]':
+            'shunt1SampCumKWH:DCOUNTER',
+            'Shunt 2 kWh Accumulated (Sample) [kWh]':
+            'shunt2SampCumKWH:DCOUNTER',
+            'Analogue In 1 DC Voltage (Average) [V DC]':
+            'alogIn1VoltsAvgVDC:GAUGE',
+            'Analogue In 2 DC Voltage (Average) [V DC]':
+            'alogIn2VoltsAvgVDC:GAUGE',
+            'AC Export kWh Accumulated (Sample) [kWh]':
+            'acExportCumKWH:DCOUNTER',
+            'Total AC Coupled Power (Average) [kW]':
+            'totACCoupledPwrKW:GAUGE',
+            'Total AC Coupled Energy (Sample) [kWh]':
+            'totACCoupledEgyKWH:DCOUNTER',
         },
         'graphs': {
             'battery_charge': [
@@ -226,11 +271,13 @@ class SPConfig(SimpleNamespace):
     elif site is None:
       site = basename(sitedir)
     super().__init__(basedir=basedir, sitedir=sitedir, site=site, **kw)
+    X("SPCONFIG: %r", self)
 
   @prop
+  @fmtdoc
   def basepath(self):
     ''' Base directory for RRD file data, containing per-site subdirectories.
-        Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
+        Default: `${ENV_BASEDIR}` or `{ENV_BASEDIR_DEFAULT|r}`
     '''
     base = self.basedir
     if base is None:
@@ -255,16 +302,16 @@ class SPConfig(SimpleNamespace):
     root, ext = splitext(filebase)
     if ext.lower() != '.csv':
       raise ValueError("not a CSV file: %r" % (filename,))
-    found = False
-    for mkey in MAPPINGS.keys():
-      _mkey_ = '_' + mkey + '_'
+    mkey = None
+    for _mkey in MAPPINGS:
+      _mkey_ = '_' + _mkey + '_'
       try:
         site, dumptime = root.split(_mkey_, 1)
       except ValueError:
         continue
-      found = True
+      mkey = _mkey
       break
-    if not found:
+    if not mkey:
       raise ValueError("unrecognised CSV base: %r" % (filebase,))
     return site, mkey, dumptime
 
@@ -358,7 +405,7 @@ class DataSet(object):
   def from_csvfile(cls, csvfile, cfg):
     ''' Construct a DataSet from a CSV file, and load the CSV data. Return the DataSet.
     '''
-    csvfile_site, mapping_name, dumptime = cfg.parse_csvfilename(csvfile)
+    csvfile_site, mapping_name, _ = cfg.parse_csvfilename(csvfile)
     DS = cls(csvfile_site, mapping_name, cfg)
     DS.import_csv(csvfile)
     return DS
@@ -367,11 +414,13 @@ class DataSet(object):
     ''' Read the CSV data file, sotre headers and time-sorted data.
     '''
     with Pfx(csvfile):
-      csvfile_site, mapping_name, dumptime = self.cfg.parse_csvfilename(csvfile)
+      _, mapping_name, _ = self.cfg.parse_csvfilename(csvfile)
       if mapping_name != self.mapping_name:
         raise ValueError(
-            "CSV mapping name %r does not match %s mapping name %r"
-            % (mapping_name, type(self).__name__, self.mapping_name))
+            "CSV mapping name %r does not match %s mapping name %r" %
+            (mapping_name, type(self).__name__, self.mapping_name)
+        )
+
       def preprocess(context, row):
         ''' Convert the CSV values, which are all strings, to numeric values.
         '''
@@ -388,14 +437,16 @@ class DataSet(object):
                   v = 0.0
             row[i] = v
         return row
+
       with open(csvfile) as csvfp:
         row_class, row_data = csv_import(
             csvfp,
             computed={
                 'unixtime':
-                    lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
+                lambda self: sp_unixtime(self[KEY_TIMESTAMP_SECONDS])
             },
-            preprocess=preprocess)
+            preprocess=preprocess
+        )
         X("row_class=%s", row_class)
         self.data.extend(row_data)
     self.data.sort(key=lambda row: row['unixtime'])
@@ -413,7 +464,8 @@ class DataSet(object):
 
   @staticmethod
   def run_argv(pre_argv, argv):
-    ''' Run a command which may be too long for the OS argument limit by breaking it into several commands if necessary.
+    ''' Run a command which may be too long for the OS argument limit
+        by breaking it into several commands if necessary.
     '''
     if argv:
       for argv_group in groupargv(pre_argv, argv):
@@ -448,27 +500,35 @@ class DataSet(object):
     ''' Create the RRD file for this DataSet.
     '''
     start_time = self.data[0]['unixtime']
-    self.run_argv([
-        'rrdtool', 'create', self.rrdfile,
-        '--step', str(RRD_STEP),
-        '--start', str(int(start_time-RRD_STEP*(RRD_SLOTS+1))),
-    ], list(self.rrd_field_defns()))
+    self.run_argv(
+        [
+            'rrdtool',
+            'create',
+            self.rrdfile,
+            '--step',
+            str(RRD_STEP),
+            '--start',
+            str(int(start_time - RRD_STEP * (RRD_SLOTS + 1))),
+        ], list(self.rrd_field_defns())
+    )
 
   def rrd_update(self):
     ''' Update the RRD file with values from this DataSet.
     '''
     pre_argv = [
-        'rrdtool', 'update', self.rrdfile,
-        '--template', ':'.join(rrd_spec.ds_name for rrd_spec in self.rrd_specs()),
-        '--skip-past-updates',
-        '--'
+        'rrdtool', 'update', self.rrdfile, '--template',
+        ':'.join(rrd_spec.ds_name for rrd_spec in self.rrd_specs()),
+        '--skip-past-updates', '--'
     ]
     data_argv = []
     row_time_prev = None
     for row in self.data:
       row_time = row['unixtime']
       if row_time_prev is not None and row_time <= row_time_prev:
-        error("SKIP out of order rows: row_time=%s, row_time_prev=%s", row_time, row_time_prev)
+        error(
+            "SKIP out of order rows: row_time=%s, row_time_prev=%s", row_time,
+            row_time_prev
+        )
         continue
       row_time_prev = row_time
       values = [row_time]
@@ -483,14 +543,24 @@ class DataSet(object):
     for rrd_spec in self.rrd_specs():
       yield f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX'
 
-  def rrdgraph(self, graph_name, graph_argv,
-      start='end-1000000', end=None,
-      width=2048, height=512):
-    graphfile = self.pathto(f"{self.site}_{self.mapping_name}_{graph_name}.png")
+  def rrdgraph(
+      self,
+      graph_name,
+      graph_argv,
+      start='end-1000000',
+      end=None,
+      width=2048,
+      height=512
+  ):
+    ''' Draw a graph, return the graph image filename.
+    '''
+    graphfile = self.pathto(
+        f"{self.site}_{self.mapping_name}_{graph_name}.png"
+    )
     with Pfx(graphfile):
       rrd_argv = [
-          'rrdtool', 'graph', graphfile,
-          f'--width={width}', f'--height={height}'
+          'rrdtool', 'graph', graphfile, f'--width={width}',
+          f'--height={height}'
       ]
       if start is not None:
         rrd_argv.append(f'--start={start}')
@@ -499,6 +569,7 @@ class DataSet(object):
       rrd_argv.extend(self.rrdgraph_ds_defs())
       rrd_argv.extend(graph_argv)
       self.run_argv(rrd_argv, [])
+    return graphfile
 
   def gen_graphs(self, days=None):
     ''' Generate the various graphs defined for this DataSet.
@@ -527,20 +598,29 @@ class DataSet(object):
     graph_argv = []
     for rrd_spec in self.rrd_specs():
       if 'kwh' in rrd_spec.csv_hdr.lower():
-        graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
+        graph_argv.append(
+            f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}'
+        )
     self.rrdgraph('kwh', graph_argv, start=start_spec, end=end_spec)
     graph_argv = []
     for rrd_spec in self.rrd_specs():
-      if 'kw' in rrd_spec.csv_hdr.lower() and 'kwh' not in rrd_spec.csv_hdr.lower():
-        graph_argv.append(f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}')
+      if 'kw' in rrd_spec.csv_hdr.lower(
+      ) and 'kwh' not in rrd_spec.csv_hdr.lower():
+        graph_argv.append(
+            f'LINE1:{rrd_spec.ds_name}:{rrd_spec.csv_hdr} {rrd_spec.ds_name}'
+        )
     self.rrdgraph('kw', graph_argv, start=start_spec, end=end_spec)
     if True:
       # debugging graphs for various parameters
       for rrd_spec in self.rrd_specs():
-        self.rrdgraph(f'ds_{rrd_spec.ds_name}', [
-            f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
-            f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
-        ], start=start_spec, end=end_spec)
+        self.rrdgraph(
+            f'ds_{rrd_spec.ds_name}', [
+                f"DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX",
+                f"LINE1:{rrd_spec.ds_name}#000000:Field {rrd_spec.ds_name} - {rrd_spec.csv_hdr}",
+            ],
+            start=start_spec,
+            end=end_spec
+        )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
