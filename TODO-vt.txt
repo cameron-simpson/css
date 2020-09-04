@@ -1,3 +1,29 @@
+move usage strings to subcommand docstrings
+make config-based Stores singletons, make datadirs singletons on the dir realpath
+completed-indirect-block index supporting efficient indirect-block completion code
+blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
+datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
+blockmap: continues running even after connection shutdown
+OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
+virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
+MMappedDataDir: do not mmap the write file, just pread it
+RawDataDir: do not mmap growing datafile as a remmap voids the memoryviews
+_FilesDir: close idle _rfd entries in DataDir and PlatonicDir to avoid unbounded fds - cannot do for RawDataDir as the mmaps must persist
+DataDirIndexEntry: use cs.binary?
+VTCmd.cmd_mount: pull out into its own BaseCommand
+maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
+http interface: hash based URLs to return a long or infinite expiry as their content is fixed
+http interface: ETag to be the appropriate hashcode with hashtype prefix in double quotes, honour If-None-Match: "hashtype:hashcode" and return 304 not modified on match
+report lmdb use of sys.argv at import time, figure out what it is doing
+cs.vtfuse: fsyncdir: sync this Dir downward, but "unsynced" version of ancestor Dirs?
+vt.1 doc -h option and $VT_HASHCLASS
+vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
+stats on stream packet stuffing/flushing
+streaming Store.pushto method based on hash_of_hashcodes and streaming .add
+Hash_SHA256 or Hash_SHA512 for the exercise and for test coverage, particularly code which may assume the wrong hashclass
+store_test for SocketClientStore
+doco for [clause]archive archive references and proxystore archive paths
+archives to support NDJSON state lines, thus UUIDs and other metadata
 autocreate basic .vtrc, and put one in the vtrc manual entry and vt.1
 .stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
 SHORTLIST:

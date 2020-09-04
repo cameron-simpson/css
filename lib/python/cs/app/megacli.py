@@ -2,73 +2,93 @@
 #
 # Convenience routines to access MegaRAID adapters via the megacli
 # command line tool.
-#       - Cameron Simpson <cs@cskk.id.au> 29jan2013
+# - Cameron Simpson <cs@cskk.id.au> 29jan2013
 #
 
 r'''
-Command line tool to inspect and manipulate LSI MegaRAID adapters, such as used in IBM ServerRAID systems and Dell PowerEdge RAID Controller (PERC).
+Command line tool to inspect and manipulate LSI MegaRAID adapters,
+such as used in IBM ServeRAID systems and Dell PowerEdge RAID Controller (PERC).
 
-Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers, under the name IBM ServerRAID. These controllers are also used by Dell as Dell PowerEdge RAID Controller (PERC).
+Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers, under the name IBM ServerRAID.
+These controllers are also used by Dell as Dell PowerEdge RAID Controller (PERC).
 
-These can be accessed during the machine boot process via the BIOS screens using a conventional BIOS-like text interface or a ghastly and painful to use GUI interface. However, either of these requires the machine OS to be down.
+These can be accessed during the machine boot process via the BIOS screens
+using a conventional BIOS-like text interface or a ghastly and painful to use
+GUI interface. However, either of these requires the machine OS to be down.
 
 The RAID adapters can also be accessed while the machine OS is up.
-For Linux, IBM offer a set of command line tools named MegaCLI_, which are installed in /opt/MegaRAID.
-Unfortunately, their MegaCLI executable is both fiddly to invoke and in its reporting mode, produces a barely human readable report which is quite hostlie to machine parsing.
-I would surmise that someone was told to dump the adapter data in text form, and did so with an ad hoc report; it is pages long and arduous to inspect by eye.
+For Linux, IBM offer a set of command line tools named MegaCLI_, which are installed in `/opt/MegaRAID`.
+Unfortunately, their MegaCLI executable is both fiddly to invoke and, in its reporting mode,
+produces a barely human readable report which is quite hostlie to machine parsing.
+I would surmise that someone was told to dump the adapter data in text form,
+and did so with an ad hoc report; it is pages long and arduous to inspect by eye.
 
-The situation was sufficiently painful that I wrote this module which runs a couple of the report modes and parses their output. It is deliberately python 2.4 compatible so that it can run on RHEL 5 systems.
+The situation was sufficiently painful that I wrote this module
+which runs a couple of the report modes and parses their output.
+It is deliberately python 2.4 compatible so that it can run on RHEL 5 systems.
 
 Report Mode
 -----------
 
-The "report" mode then dumps a short summary report of relevant information which can be eyeballed immediately; RAID configuration and issues are immediately apparent. Here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
+The "report" mode then dumps a short summary report of relevant information
+which can be eyeballed immediately;
+RAID configuration and issues are immediately apparent.
+Here is an example output
+(the "+" tracing lines are on stderr
+and recite the underlying MegaCLI commands used):
 
-  # mcli report
-  + exec py26+ -m cs.app.megacli report
-  + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
-  + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
-  Adapter 0 IBM ServeRAID-MR10i SAS/SATA Controller serial# Pnnnnnnnnn
-    Virtual Drive 0
-      2 drives, size = 278.464GB, raid = Primary-1, Secondary-0, RAID Level Qualifier-0
-        physical drive enc252.devid8 [252:0]
-        physical drive enc252.devid7 [252:1]
-    4 drives:
-      enc252.devid7 [252:1]: VD 0, DG None: 42D0628 279.396 GB, Online, Spun Up
-      enc252.devid8 [252:0]: VD 0, DG None: 81Y9671 279.396 GB, Online, Spun Up
-      enc252.devid2 [252:2]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
-      enc252.devid3 [252:3]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
+    # mcli report
+    + exec py26+ -m cs.app.megacli report
+    + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
+    + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
+    Adapter 0 IBM ServeRAID-MR10i SAS/SATA Controller serial# Pnnnnnnnnn
+      Virtual Drive 0
+        2 drives, size = 278.464GB, raid = Primary-1, Secondary-0, RAID Level Qualifier-0
+          physical drive enc252.devid8 [252:0]
+          physical drive enc252.devid7 [252:1]
+      4 drives:
+        enc252.devid7 [252:1]: VD 0, DG None: 42D0628 279.396 GB, Online, Spun Up
+        enc252.devid8 [252:0]: VD 0, DG None: 81Y9671 279.396 GB, Online, Spun Up
+        enc252.devid2 [252:2]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
+        enc252.devid3 [252:3]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
 
 Status Mode
 -----------
 
-The "status" mode recites the RAID status in a series of terse one line summaries; we use its output in our nagios monitoring. Here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
+The "status" mode recites the RAID status in a series of terse one line summaries;
+we use its output in our nagios monitoring.
+Here is an example output (the "+" tracing lines are on stderr,
+and recite the underlying MegaCLI commands used):
 
-  # mcli status
-  + exec py26+ -m cs.app.megacli status
-  + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
-  + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
-  OK A0
+    # mcli status
+    + exec py26+ -m cs.app.megacli status
+    + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
+    + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
+    OK A0
 
 Locate Mode
 -----------
 
-The "locate" mode prints a MegaCLI command line which can be used to activate or deactivate the location LED on a specific drive. Here is an example output::
+The "locate" mode prints a MegaCLI command line
+which can be used to activate or deactivate the location LED on a specific drive.
+Here is an example output:
 
-  # mcli locate 252:4
-  /opt/MegaRAID/MegaCli/MegaCli64 -PdLocate -start -physdrv[252:4] -a0
+    # mcli locate 252:4
+    /opt/MegaRAID/MegaCli/MegaCli64 -PdLocate -start -physdrv[252:4] -a0
 
-  # mcli locate 252:4 stop
-  /opt/MegaRAID/MegaCli/MegaCli64 -PdLocate -stop -physdrv[252:4] -a0
+    # mcli locate 252:4 stop
+    /opt/MegaRAID/MegaCli/MegaCli64 -PdLocate -stop -physdrv[252:4] -a0
 
 New_RAID Mode
 -------------
-The "new_raid" mode prints a MegaCLI command line which can be used to instruct the adapter to assemble a new RAID set.
+The "new_raid" mode prints a MegaCLI command line
+which can be used to instruct the adapter to assemble a new RAID set.
 
 MegaCLI class
 -------------
 
-The module provides a MegaCLI class which embodies the parsed information from the MegaCLI reporting modes.
+The module provides a MegaCLI class which embodies the parsed information
+from the MegaCLI reporting modes.
 This can be imported and used for special needs.
 
 .. _MegaCLI: http://www-947.ibm.com/support/entry/portal/docdisplay?lndocid=migr-5082327
@@ -78,9 +98,10 @@ import os
 import re
 import sys
 from subprocess import call, Popen, PIPE
+from types import SimpleNamespace as NS
 
 DISTINFO = {
-    'keywords': ["python2", "python3"],
+    'keywords': ["python2"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
@@ -91,6 +112,8 @@ DISTINFO = {
           ],
         },
 }
+
+cmd = __file__
 
 USAGE = '''Usage:
     %s locate enc_slot [{start|stop}]
@@ -108,12 +131,8 @@ mode_PDLIST = 1         # -PDlist mode
 
 re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
 
-def main(argv=None, debug=None):
-  global D, cmd, cmd_old
-  if debug is None:
-    debug = os.environ.get('DEBUG')
-  if not debug:
-    def D(msg, *a): pass
+def main(argv=None):
+  global cmd_old
   if argv is None:
     argv = sys.argv
   argv = list(argv)
@@ -143,14 +162,14 @@ def main(argv=None, debug=None):
         print "Adapter", An, A.product_name, "serial#", A.serial_no
         for Vn, V in A.virtual_drives.items():
           print "  Virtual Drive", Vn
-          print "    %d drives, size = %s%s, raid = %s" % (len(V.physical_disks), V.size, V.size_units, V.raid_level)
+          print "    %s: %d drives, size = %s%s, raid = %s" % (V.state, len(V.physical_disks), V.size, V.size_units, V.raid_level)
           for DRVn, DRV in V.physical_disks.items():
-            print "      physical drive", DRV.id, "[%s]" % (DRV.enc_slot,)
+            print "      physical drive %s[%s] %s" % (DRV.id, DRV.enc_slot, DRV.firmware_state)
         print "  %d drives:" % (len(A.physical_disks),)
         for DRV in A.physical_disks.values():
           print "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
-                                                             getattr(DRV, 'virtual_drive', O(number=None)).number,
-                                                             getattr(DRV, 'disk_group', O(number=None)).number,
+                                                             getattr(DRV, 'virtual_drive', NS(number=None)).number,
+                                                             getattr(DRV, 'disk_group', NS(number=None)).number,
                                                              DRV.fru, DRV.raw_size, DRV.raw_size_units,
                                                              DRV.firmware_state
                                                             ),
@@ -178,7 +197,7 @@ def main(argv=None, debug=None):
       if argv:
         do_start = argv.pop(0)
         if do_start == "start":
-          do_start = true
+          do_start = True
         elif do_start == "stop":
           do_start = False
         else:
@@ -207,7 +226,6 @@ def main(argv=None, debug=None):
         if M.new_raid(level, argv, adapter=adapter) != 0:
           xit = 1
     elif command == "status":
-      status_all = []
       for An in M.adapters:
         adapter_errs = []
         A = M.adapters[An]
@@ -216,7 +234,7 @@ def main(argv=None, debug=None):
           if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
             adapter_errs.append("drive:%s[%s]/VD:%s/%s"
                                 % (DRV.id, DRV.enc_slot,
-                                   getattr(DRV, 'virtual_drive', O(number=None)).number,
+                                   getattr(DRV, 'virtual_drive', NS(number=None)).number,
                                    DRV.firmware_state))
         if adapter_errs:
           print "FAIL A%d %s" % (An, ",".join(adapter_errs))
@@ -232,14 +250,7 @@ def main(argv=None, debug=None):
 
   return xit
 
-class O(object):
-
-  def __init__(self, **kw):
-    for attr, value in kw.items():
-      setattr(self, attr, value)
-    self._O_omit = []
-
-class MegaRAID(O):
+class MegaRAID(NS):
 
   def __init__(self, megacli=None):
     if megacli is None:
@@ -290,17 +301,14 @@ class MegaRAID(O):
         Update 
     '''
     cmd_append("megacli " + " ".join(megacli_args))
-    M = O(adapters={})
-    o = None
+    M = NS(adapters={})
     A = None
     V = None
     SP = None
     DG = None
     DRV = None
     o = None
-    mlineno = 0
-    for line in self.readcmd(*megacli_args):
-      mlineno += 1
+    for mlineno, line in enumerate(self.readcmd(*megacli_args), 1):
       if not line.endswith('\n'):
         raise ValueError("%d: missing newline" % (mlineno,))
       line = line.rstrip()
@@ -326,6 +334,8 @@ class MegaRAID(O):
       elif line.endswith(':'):
         heading = line[:-1]
         info = ''
+      elif ':' in line:
+        heading, info = line.split(':', 1)
       else:
         warning("unparsed line: %s", line)
         continue
@@ -412,7 +422,7 @@ class MegaRAID(O):
       elif attr in ('default_cache_policy', 'current_cache_policy'):
         info = info.split(', ')
       elif attr == 'drives_postion':
-        DPOS = O()
+        DPOS = NS()
         for posinfo in info.split(', '):
           dposk, dposv = posinfo.split(': ')
           setattr(DPOS, dposk.lower(), int(dposv))
@@ -523,7 +533,7 @@ class MegaRAID(O):
       return False
     return self.docmd('-CfgSave', '-f', save_file, '-a%d' % (adapter,))
 
-class Adapter(O):
+class Adapter(NS):
   def DRV_by_enc_slot(self, enc_slot):
     ''' Find first matching drive by enclosure id and slot number.
         Report errors on multiple matches - serious misconfiguration.
@@ -539,17 +549,15 @@ class Adapter(O):
                 self.number, enc_slot, DRV.id, aDRV.id)
     return DRV
 
-class Virtual_Drive(O):
+class Virtual_Drive(NS):
   def __init__(self, **kw):
-    O.__init__(self, **kw)
-    self._O_omit.append('adapter')
-class Disk_Group(O):
+    NS.__init__(self, **kw)
+class Disk_Group(NS):
   def __init__(self, **kw):
-    O.__init__(self, **kw)
-    self._O_omit.append('adapter')
-class Span(O):
+    NS.__init__(self, **kw)
+class Span(NS):
   pass
-class Physical_Disk(O):
+class Physical_Disk(NS):
 
   def __init__(self, **kw):
     self.enclosure_device_id = None
@@ -559,7 +567,7 @@ class Physical_Disk(O):
     self.ibm_fru_cru = None
     self.raw_size = None
     self.raw_size_units = None
-    O.__init__(self, **kw)
+    NS.__init__(self, **kw)
 
   @property
   def id(self):
@@ -577,7 +585,7 @@ class Physical_Disk(O):
   @property
   def fru(self):
     return self.ibm_fru_cru
-class Disk_Port(O):
+class Disk_Port(NS):
   pass
 
 def cmd_append(msg, *a):
@@ -605,8 +613,13 @@ def merge_attrs(o, **kw):
       if ovalue != value:
         D("%s: %s: %r => %r", o, attr, ovalue, value)
 
-def D(msg, *a):
-  message(msg, sys.stderr, "debug", *a)
+debug = os.environ.get('DEBUG')
+if debug:
+  def D(msg, *a):
+    message(msg, sys.stderr, "debug", *a)
+else:
+  def D(msg, *a):
+    pass
 
 def warning(msg, *a):
   message(msg, sys.stderr, "warning", *a)
@@ -621,4 +634,4 @@ def message(msg, fp, prefix, *a):
   print >>fp, cmd+":", prefix+":", msg
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv, debug=None))
+  sys.exit(main(sys.argv))

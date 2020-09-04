@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
-# Use or update email state info.
-#       - Cameron Simpson <cs@cskk.id.au> 04apr2009
+# Operate on my maildb.
+# - Cameron Simpson <cs@cskk.id.au> 27apr2011
 #
 
-exec python3 -m cs.app.maildb ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.maildb import main
+sys.exit(main(sys.argv))

@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3
 #
 # The basic flat file data store for vt blocks.
 # These are kept in a directory accessed by a DataDir class.
@@ -10,19 +10,13 @@
 '''
 
 from enum import IntFlag
-from fcntl import flock, LOCK_EX, LOCK_UN
-import os
-from os import SEEK_END, \
-               O_CREAT, O_EXCL, O_RDONLY, O_WRONLY, O_APPEND, \
-               fstat
-from stat import S_ISREG
 import sys
 from zlib import compress, decompress
+from icontract import require
 from cs.binary import BSUInt, BSData, PacketField
-from cs.fileutils import ReadMixin, datafrom_fd
-from cs.logutils import warning
-from cs.resources import MultiOpenMixin
-from . import Lock
+from cs.buffer import CornuCopyBuffer
+from cs.fileutils import datafrom
+from .block import Block
 
 DATAFILE_EXT = 'vtd'
 DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
@@ -35,23 +29,49 @@ class DataFlag(IntFlag):
   COMPRESSED = 0x01
 
 class DataRecord(PacketField):
-  ''' A data chunk file record.
+  ''' A data chunk file record for storage in a `.vtd` file.
+
+      The record format is:
+      * `flags`: `BSUInt`
+      * `data`: `BSData`
   '''
 
-  TEST_CASES = (
-      (b'', b'\x01\x08x\x9c\x03\x00\x00\x00\x00\x01'),
-  )
+  TEST_CASES = ((b'', b'\x00\x00'),)
 
-  def __init__(self, data, is_compressed=False):
+  def __init__(self, data, is_compressed=None):
+    ''' Initialise a `DataRecord` directly.
+
+        Parameters:
+        * `data`: the data to store
+        * `is_compressed`: whether the data are already compressed
+
+        Note that if `is_compressed` is not set
+        we presume `data` is uncompressed
+        and try to compress it if it is 16 bytes or more;
+        we keep the compressed form if it achieves more than 10% compression.
+    '''
+    if is_compressed is None:
+      if len(data) < 16:
+        is_compressed = False
+      else:
+        zdata = compress(data)
+        if len(zdata) < len(data) * 0.9:
+          data = zdata
+          is_compressed = True
+        else:
+          is_compressed = False
     self._data = data
-    self._is_compressed = is_compressed
+    self.is_compressed = is_compressed
 
   def __str__(self):
-    return "%s(%d-bytes,%s)" % (
+    return "%s(%d-bytes,%s,%r)" % (
         type(self).__name__,
         len(self._data),
-        "compressed" if self._is_compressed else "raw",
+        "compressed" if self.is_compressed else "raw",
+        self._data,
     )
+
+  __repr__ = __str__
 
   def __eq__(self, other):
     return self.data == other.data
@@ -63,172 +83,86 @@ class DataRecord(PacketField):
     flags = BSUInt.value_from_buffer(bfr)
     data = BSData.value_from_buffer(bfr)
     is_compressed = (flags & DataFlag.COMPRESSED) != 0
-    flags &= ~DataFlag.COMPRESSED
+    if is_compressed:
+      flags &= ~DataFlag.COMPRESSED
     if flags:
       raise ValueError("unsupported flags: 0x%02x" % (flags,))
     return cls(data, is_compressed=is_compressed)
 
-  def transcribe(self, uncompressed=False):
+  def transcribe(self):
     ''' Transcribe this data chunk as a data record.
     '''
-    data = self._data
-    is_compressed = self._is_compressed
-    if uncompressed:
-      flags = 0x00
-      if is_compressed:
-        data = decompress(data)
-    else:
-      flags = DataFlag.COMPRESSED
-      if not is_compressed:
-        data = compress(data)
-    yield BSUInt.transcribe_value(flags)
-    yield BSData.transcribe_value(data)
+    yield BSUInt.transcribe_value(self.flags)
+    yield BSData.transcribe_value(self._data)
 
   @property
   def data(self):
     ''' The uncompressed data.
     '''
-    raw_data = self._data
-    if self._is_compressed:
-      raw_data = decompress(raw_data)
-      self._data = raw_data
-      self._is_compressed = False
-    return raw_data
+    data = self._data
+    if self.is_compressed:
+      return decompress(data)
+    return data
 
-class DataFileReader(MultiOpenMixin, ReadMixin):
-  ''' Read access to a data file, storing data chunks in compressed form.
+  @property
+  def flags(self):
+    ''' The flags for this `DataRecord`.
+    '''
+    flags = 0x00
+    if self.is_compressed:
+      flags |= DataFlag.COMPRESSED
+    return flags
+
+  @property
+  def data_offset(self):
+    ''' The offset of the data chunk within the transcribed `DataRecord`.
+    '''
+    return (
+        len(BSUInt.transcribe_value(self.flags)) +
+        BSData.data_offset_for(self._data)
+    )
+
+  @property
+  def raw_data_length(self):
+    ''' The length of the raw data.
+    '''
+    return len(self._data)
+
+class DataFilePushable:
+  ''' Read access to a data file, which stores data chunks in compressed form.
       This is the usual file based persistence layer of a local Store.
   '''
 
-  def __init__(self, pathname, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
+  def __init__(self, pathname):
     self.pathname = pathname
-    self._rfd = None
-    self._rlock = None
 
-  def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
+  @require(lambda self, offset: 0 <= offset <= len(self))
+  def pushto_queue(self, Q, offset=0, runstate=None, progress=None):
+    ''' Push the `Block`s from this `DataFile` to the Queue `Q`.
 
-  def startup(self):
-    ''' Start up the DataFile: open the read and write file descriptors.
-    '''
-    rfd = os.open(self.pathname, O_RDONLY)
-    S = fstat(rfd)
-    if not S_ISREG(S.st_mode):
-      raise RuntimeError(
-          "fd %d: not a regular file: mode=0o%o: %r"
-          % (rfd, S.st_mode, self.pathname))
-    self._rfd = rfd
-    self._rlock = Lock()
-
-  def shutdown(self):
-    ''' Shut down the DataFIle: close read and write file descriptors.
-    '''
-    os.close(self._rfd)
-    self._rfd = None
-    self._rlock = None
-
-  def datafrom(self, offset, readsize=None):
-    ''' Yield data from the file starting at `offset`.
-    '''
-    if readsize is None:
-      # Default read size.
-      # This number is arbitrary, chosen on the basis that the
-      # average size of blocks for random data is around 4093 bytes
-      # (from vt.scan) and the size for parsed data is often much
-      # smaller.
-      readsize = 2048
-    return datafrom_fd(self._rfd, offset, readsize)
-
-  def fetch_record(self, offset):
-    ''' Fetch a DataRecord from the supplied `offset`.
-    '''
-    return DataRecord.from_buffer(self.bufferfrom(offset))
-
-  def fetch(self, offset):
-    ''' Fetch the nucompressed data at `offset`.
-    '''
-    return self.fetch_record(offset).data
-
-  @staticmethod
-  def scanbuffer(bfr):
-    ''' Generator yielding DataRecords and end offsets from a DataFile.
+        Note that if the target store is a DataDirStore
+        it is faster and simpler to move/copy the `.vtd` file
+        into its `data` subdirectory directly.
+        Of course, that may introduce redundant block copies.
 
         Parameters:
-        * `bfr`: the buffer.
-        * `do_decompress`: decompress the scanned data, default False.
+        * `Q`: queue on which to put blocks
+        * `offset`: starting offset, default `0`.
+        * `runstate`: optional `RunState` used to cancel operation.
     '''
-    while True:
-      try:
-        record = DataRecord.from_buffer(bfr)
-      except EOFError:
-        break
-      yield record, bfr.offset
-
-  def scanfrom(self, offset=0):
-    ''' Generator yielding (DataRecord, post_offset) from the
-        DataFile starting from `offset`, default 0.
-    '''
-    return self.scanbuffer(self.bufferfrom(offset))
-
-class DataFileWriter(MultiOpenMixin):
-  ''' Append access to a data file, storing data chunks in compressed form.
-  '''
-
-  def __init__(self, pathname, do_create=False, lock=None):
-    MultiOpenMixin.__init__(self, lock=lock)
-    self.pathname = pathname
-    if do_create:
-      fd = os.open(pathname, O_CREAT | O_EXCL | O_WRONLY)
-      os.close(fd)
-    self._wfd = None
-    self._wlock = None
-
-  def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.pathname,)
-
-  def startup(self):
-    ''' Start up the DataFile: open the read and write file descriptors.
-    '''
-    self._wfd = os.open(self.pathname, O_WRONLY | O_APPEND)
-    self._wlock = Lock()
-
-  def shutdown(self):
-    ''' Shut down the DataFIle: close read and write file descriptors.
-    '''
-    os.close(self._wfd)
-    self._wfd = None
-    self._wlock = None
-
-  def add(self, data):
-    ''' Append a chunk of data to the file, return the store start
-        and end offsets.
-
-        The fcntl.flock function is used to hold an OS level lock
-        for the duration of the write to support shared use of the
-        file.
-    '''
-    bs = bytes(DataRecord(data))
-    wfd = self._wfd
-    with self._wlock:
-      try:
-        flock(wfd, LOCK_EX)
-      except OSError:
-        is_locked = False
-      else:
-        is_locked = True
-      offset = os.lseek(wfd, 0, SEEK_END)
-      written = os.write(wfd, bs)
-      # notice short writes, which should never happen with a regular file...
-      while written < len(bs):
-        warning(
-            "%s: tried to write %d bytes but only wrote %d, retrying",
-            self, len(bs), written)
-        bs = bs[written:]
-        written = os.write(wfd, bs)
-      if is_locked:
-        flock(wfd, LOCK_UN)
-    return offset, offset + len(bs)
+    if progress:
+      progress.total += len(self) - offset
+    with open(self.pathname, 'rb') as f:
+      f.seek(offset)
+      bfr = CornuCopyBuffer(datafrom(f, offset), offset=offset)
+      for DR in DataRecord.parse_buffer(bfr):
+        if runstate and runstate.cancelled:
+          return False
+        data = DR.data
+        Q.put(Block(data=data))
+        if progress:
+          progress += len(data)
+    return True
 
 if __name__ == '__main__':
   from .datafile_tests import selftest

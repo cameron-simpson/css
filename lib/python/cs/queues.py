@@ -14,14 +14,16 @@ import time
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
-from cs.obj import O
 from cs.pfx import Pfx, PfxCallInfo
 from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
+__version__ = '20200718-post'
+
 DISTINFO = {
-    'description': "some Queue subclasses and ducktypes",
+    'description':
+    "some Queue subclasses and ducktypes",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -30,7 +32,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.logutils',
-        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.resources',
@@ -52,9 +53,10 @@ class _QueueIterator(MultiOpenMixin):
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    MultiOpenMixin.__init__(self, finalise_later=True)
     self.q = q
     self.name = name
+    MultiOpenMixin.__init__(self)
+    self.finalise_later = True
     # count of non-sentinel items
     self._item_count = 0
 
@@ -105,7 +107,9 @@ class _QueueIterator(MultiOpenMixin):
     try:
       item = q.get()
     except Queue_Empty as e:
-      warning("%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self)
+      warning(
+          "%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self
+      )
       self._put(self.sentinel)
       self.finalise()
       raise StopIteration("Queue_Empty: %s" % (e,))
@@ -126,7 +130,7 @@ class _QueueIterator(MultiOpenMixin):
     try:
       return next(self)
     except StopIteration as e:
-      raise Queue_Empty("got StopIteration from %s" % (self,))
+      raise Queue_Empty("got %s from %s" % (e, self))
 
   def empty(self):
     ''' Test if the queue is empty.
@@ -143,26 +147,21 @@ class _QueueIterator(MultiOpenMixin):
     '''
     self.q.join()
 
-def IterableQueue(capacity=0, name=None, *args, **kw):
+def IterableQueue(capacity=0, name=None):
   ''' Factory to create an iterable Queue.
   '''
-  if not isinstance(capacity, int):
-    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
-  name = kw.pop('name', name)
-  return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
+  return _QueueIterator(Queue(capacity), name=name).open()
 
-def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+def IterablePriorityQueue(capacity=0, name=None):
   ''' Factory to create an iterable PriorityQueue.
   '''
-  if not isinstance(capacity, int):
-    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
-  name = kw.pop('name', name)
-  return _QueueIterator(PriorityQueue(capacity, *args, **kw), name=name).open()
+  return _QueueIterator(PriorityQueue(capacity), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
+
   def __init__(self):
     self.__readable = Lock()
     self.__readable.acquire()
@@ -250,13 +249,12 @@ class PushQueue(MultiOpenMixin):
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
   def __str__(self):
-    return "PushQueue:%s" % (self.name,)
+    return "%s:%s" % (type(self).__name__, self.name)
 
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
@@ -303,7 +301,6 @@ class NullQueue(MultiOpenMixin):
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
     self._lock = RLock()
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.blocking = blocking
 
@@ -353,12 +350,13 @@ class TimerQueue(object):
   ''' Class to run a lot of "in the future" jobs without using a bazillion
       Timer threads.
   '''
+
   def __init__(self, name=None):
     if name is None:
       name = 'TimerQueue-%d' % (seq(),)
     self.name = name
-    self.Q = PriorityQueue()    # queue of waiting jobs
-    self.pending = None         # or (Timer, when, func)
+    self.Q = PriorityQueue()  # queue of waiting jobs
+    self.pending = None  # or (Timer, when, func)
     self.closed = False
     self._lock = Lock()
     self.mainRunning = False
@@ -377,7 +375,7 @@ class TimerQueue(object):
     self.closed = True
     if self.Q.empty():
       # dummy entry to wake up the main loop
-      self.Q.put( (None, None, None) )
+      self.Q.put((None, None, None))
     if cancel:
       self._cancel()
 
@@ -397,7 +395,7 @@ class TimerQueue(object):
         'func' is the job function, typically made with functools.partial.
     '''
     assert not self.closed, "add() on closed TimerQueue"
-    self.Q.put( (when, seq(), func) )
+    self.Q.put((when, seq(), func))
 
   def join(self):
     ''' Wait for the main loop thread to finish.
@@ -437,8 +435,8 @@ class TimerQueue(object):
             T, Twhen, Tfunc = self.pending
             self.pending[2] = None  # prevent the function from running if racy
             T.cancel()
-            self.pending = None     # nothing pending now
-            T = None                # let go of the cancelled timer
+            self.pending = None  # nothing pending now
+            T = None  # let go of the cancelled timer
             if when < Twhen:
               # push the pending function back onto the queue, but ahead of
               # later-queued funcs with the same timestamp
@@ -479,9 +477,10 @@ class TimerQueue(object):
                 exception("func %s threw exception", Tfunc)
               else:
                 debug("func %s returns %s", Tfunc, retval)
+
           with self._lock:
             T = Timer(delay, partial(doit, self))
-            self.pending = [ T, when, func ]
+            self.pending = [T, when, func]
             T.start()
       self.mainRunning = False
 

@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends.
+Result and friends: various classable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -28,8 +28,8 @@ Trite example::
   R = Result(name="my demo")
 
   Thread 1:
+    # this blocks until the Result is ready
     value = R()
-    # blocks...
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 
@@ -53,47 +53,39 @@ You can also collect multiple Results in completion order using the report() fun
 try:
   from enum import Enum
 except ImportError:
-  try:
-    from enum34 import Enum
-  except ImportError:
-    Enum = None
-from functools import partial
+  from enum34 import Enum  # type: ignore
 import sys
-from threading import Lock
+from threading import Lock, RLock
+from icontract import require
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx, PfxThread as Thread
-from cs.seq import seq
+from cs.pfx import Pfx
+from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
+from cs.seq import seq
+from cs.threads import bg as bg_thread
+
+__version__ = '20200521-post'
 
 DISTINFO = {
-    'description':
-        "Result and friends: callable objects which will receive a value"
-        " at a later point in time.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.seq', 'cs.py3'],
+    'install_requires': [
+        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
+        'cs.threads', 'icontract'
+    ],
 }
 
-if Enum:
-  class ResultState(Enum):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
-else:
-  class ResultState(object):
-    ''' State tokens for Results.
-    '''
-    pending = 'pending'
-    running = 'running'
-    ready = 'ready'
-    cancelled = 'cancelled'
+class ResultState(Enum):
+  ''' State tokens for `Result`s.
+  '''
+  pending = 'pending'
+  running = 'running'
+  ready = 'ready'
+  cancelled = 'cancelled'
 
 # compatability name
 AsynchState = ResultState
@@ -116,13 +108,15 @@ class Result(object):
   '''
 
   def __init__(self, name=None, lock=None, result=None):
-    ''' Base initialiser for Result objects and subclasses.
-        `name`: optional parameter naming this object.
-        `lock`: optional locking object, defaults to a new Lock
-        `result`: if not None, prefill the .result property
+    ''' Base initialiser for `Result` objects and subclasses.
+
+        Parameter:
+        * `name`: optional parameter naming this object.
+        * `lock`: optional locking object, defaults to a new `threading.Lock`.
+        * `result`: if not `None`, prefill the `.result` property.
     '''
     if lock is None:
-      lock = Lock()
+      lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
@@ -137,6 +131,7 @@ class Result(object):
 
   def __str__(self):
     return "%s[%r:%s]" % (type(self).__name__, self.name, self.state)
+
   __repr__ = __str__
 
   def __del__(self):
@@ -156,8 +151,7 @@ class Result(object):
   def ready(self):
     ''' Whether the Result state is ready or cancelled.
     '''
-    state = self.state
-    return state == ResultState.ready or state == ResultState.cancelled
+    return self.state in (ResultState.ready, ResultState.cancelled)
 
   @property
   def cancelled(self):
@@ -189,14 +183,15 @@ class Result(object):
       if state == ResultState.ready:
         # completed - "fail" the cancel, no call to ._complete
         return False
-      if state == ResultState.running or state == ResultState.pending:
+      if state in (ResultState.running, ResultState.pending):
         # in progress or not commenced - change state to cancelled and fall through to ._complete
         self.state = ResultState.cancelled
       else:
         # state error
         raise RuntimeError(
-            "<%s>.state not one of (pending, cancelled, running, ready): %r"
-            % (self, state))
+            "<%s>.state not one of (pending, cancelled, running, ready): %r" %
+            (self, state)
+        )
       self._complete(None, None)
     return True
 
@@ -246,8 +241,8 @@ class Result(object):
       self._complete(None, exc_info)
 
   def raise_(self, exc=None):
-    ''' Convenience wrapper for self.exc_info to store an exception result `exc`.
-        If `exc` is omitted or None, use sys.exc_info().
+    ''' Convenience wrapper for `self.exc_info` to store an exception result `exc`.
+        If `exc` is omitted or `None`, use `sys.exc_info()`.
     '''
     if exc is None:
       self.exc_info = sys.exc_info()
@@ -257,11 +252,13 @@ class Result(object):
       except:
         self.exc_info = sys.exc_info()
 
+  @require(lambda self: self.state == ResultState.pending)
   def call(self, func, *a, **kw):
-    ''' Have the Result call `func(*a,**kw)` and store its values as
-        self.result.
-        If `func` raises an exception, store it as self.exc_info.
+    ''' Have the `Result` call `func(*a,**kw)` and store its return value as
+        `self.result`.
+        If `func` raises an exception, store it as `self.exc_info`.
     '''
+    self.state = ResultState.running
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -273,25 +270,21 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate Thread,
-        returning the Thread.
+    ''' Submit a function to compute the result in a separate `Thread`;
+        returning the `Thread`.
 
-        The Result must be in "pending" state, and transitions to "running".
+        This dispatches a `Thread` to run `self.call(func,*a,**kw)`
+        and as such the `Result` must be in "pending" state,
+        and transitions to "running".
     '''
-    with self._lock:
-      state = self.state
-      if state != ResultState.pending:
-        raise RuntimeError(
-            "<%s>.state is not pending, rejecting background function call of %s"
-            % (self, func))
-      T = Thread(
-          name="<%s>.bg(func=%s,...)" % (self, func),
-          target=self.call,
-          args=[func] + list(a), kwargs=kw)
-      self.state = ResultState.running
-    T.start()
-    return T
+    return bg_thread(
+        self.call, name=self.name, args=[func] + list(a), kwargs=kw
+    )
 
+  @require(
+      lambda self: self.state in
+      (ResultState.pending, ResultState.running, ResultState.cancelled)
+  )
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
@@ -299,14 +292,12 @@ class Result(object):
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
-          "one of (result, exc_info) must be None, got (%r, %r)"
-          % (result, exc_info))
+          "one of (result, exc_info) must be None, got (%r, %r)" %
+          (result, exc_info)
+      )
     state = self.state
-    if (
-        state == ResultState.cancelled
-        or state == ResultState.running
-        or state == ResultState.pending
-    ):
+    if state in (ResultState.cancelled, ResultState.running,
+                 ResultState.pending):
       self._result = result
       self._exc_info = exc_info
       if state != ResultState.cancelled:
@@ -315,14 +306,15 @@ class Result(object):
       if state == ResultState.ready:
         warning(
             "<%s>.state is ResultState.ready, ignoring result=%r, exc_info=%r",
-            self, result, exc_info)
+            self, result, exc_info
+        )
         raise RuntimeError(
-            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r"
-            % (self, result, exc_info)
+            "REPEATED _COMPLETE of %s: result=%r, exc_info=%r" %
+            (self, result, exc_info)
         )
       raise RuntimeError(
-          "<%s>.state is not one of (cancelled, running, pending, ready): %r"
-          % (self, state)
+          "<%s>.state is not one of (cancelled, running, pending, ready): %r" %
+          (self, state)
       )
     self._get_lock.release()
     notifiers = self.notifiers
@@ -333,7 +325,8 @@ class Result(object):
         notifier(self)
       except Exception as e:
         exception(
-            "%s._complete: calling notifier %s: exc=%s", self, notifier, e)
+            "%s._complete: calling notifier %s: exc=%s", self, notifier, e
+        )
       else:
         self.collected = True
 
@@ -364,7 +357,17 @@ class Result(object):
       return result
     return default
 
-  def __call__(self):
+  def __call__(self, *a, **kw):
+    ''' Call the result: wait for it to be ready and then return or raise.
+
+        You can optionally supply a callable and arguments,
+        in which case `callable(*args,**kwargs)` will be called
+        via `Result.call` and the results applied to this Result.
+    '''
+    if a:
+      if not self.pending:
+        raise RuntimeError("calling complete %s" % (type(self).__name__,))
+      self.call(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
       raise CancellationError(self)
@@ -374,6 +377,7 @@ class Result(object):
 
   def notify(self, notifier):
     ''' After the function completes, run notifier(self).
+
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
@@ -388,6 +392,7 @@ class Result(object):
   def with_result(self, submitter, prefix=None):
     ''' On completion without an exception, call `submitter(self.result)` or report exception.
     '''
+
     def notifier(R):
       ''' Wrapper for `submitter`.
       '''
@@ -401,20 +406,23 @@ class Result(object):
       else:
         error("exception: %r", exc_info)
       return None
+
     self.notify(notifier)
 
 def bg(func, *a, **kw):
-  ''' Dispatch a Thread to run `func`, return a Result to collect its value.
+  ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
   '''
-  R = Result()
+  _name = kw.pop('_name', None)
+  R = Result(name=_name)
   R.bg(func, *a, **kw)
   return R
 
 def report(LFs):
-  ''' Generator which yields completed Results.
-      This is a generator that yields Results as they complete, useful
-      for waiting for a sequence of Results that may complete in an
-      arbitrary order.
+  ''' Generator which yields completed `Result`s.
+
+      This is a generator that yields `Result`s as they complete,
+      useful for waiting for a sequence of `Result`s
+      that may complete in an arbitrary order.
   '''
   Q = Queue()
   n = 0
@@ -426,25 +434,31 @@ def report(LFs):
     yield Q.get()
 
 def after(Rs, R, func, *a, **kw):
-  ''' After the completion of `Rs` call `func(*a, **kw)` and return
-      its result via `R`; return the Result object.
+  ''' After the completion of `Rs` call `func(*a,**kw)` and return
+      its result via `R`; return the `Result` object.
 
-      `Rs`: an iterable of Results.
-      `R`: a Result to collect to result of calling `func`. If None,
-           one will be created.
-      `func`, `a`, `kw`: a callable and its arguments.
+      Parameters:
+      * `Rs`: an iterable of Results.
+      * `R`: a `Result` to collect to result of calling `func`.
+        If `None`, one will be created.
+      * `func`, `a`, `kw`: a callable and its arguments.
   '''
   if R is None:
     R = Result("after-%d" % (seq(),))
   elif not isinstance(R, Result):
-    raise TypeError("after(Rs, R, func, ...): expected Result for R, got %r" % (R,))
+    raise TypeError(
+        "after(Rs, R, func, ...): expected Result for R, got %r" % (R,)
+    )
   lock = Lock()
   Rs = list(Rs)
   count = len(Rs)
   if count == 0:
     R.call(func, *a, **kw)
   else:
-    countery = [count]  # to stop "count" looking like a local var inside the closure
+    countery = [
+        count
+    ]  # to stop "count" looking like a local var inside the closure
+
     def count_down(_):
       ''' Notification function to submit `func` after sufficient invocations.
       '''
@@ -458,40 +472,42 @@ def after(Rs, R, func, *a, **kw):
         R.call(func, *a, **kw)
       else:
         raise RuntimeError("count < 0: %d" % (count,))
+
     # submit the notifications
     for subR in Rs:
       subR.notify(count_down)
   return R
 
-class OnDemandFunction(Result):
+class OnDemandResult(Result):
   ''' Wrap a callable, run it when required.
   '''
 
-  def __init__(self, func, *a, **kw):
+  def __init__(self, func, *fargs, **fkwargs):
     Result.__init__(self)
-    if a or kw:
-      func = partial(func, *a, **kw)
     self.func = func
+    self.fargs = fargs
+    self.fkwargs = fkwargs
 
-  def __call__(self):
+  def __str__(self):
+    s = super().__str__() + ":func=%s" % (funcname(self.func),)
+    if self.fargs:
+      s += ":fargs=%r" % (self.fargs,)
+    if self.fkwargs:
+      s += ":fkwargs=%r" % (self.fkwargs,)
+    return s
+
+  def __call__(self, *a, **kw):
+    if a or kw:
+      raise ValueError(
+          "%s.__call__: no parameters expected, received: *%r, **%r" %
+          (self, a, kw)
+      )
     with self._lock:
-      state = self.state
-      if state == ResultState.cancelled:
-        raise CancellationError()
-      if state == ResultState.pending:
-        self.state = ResultState.running
-      else:
-        raise RuntimeError("state should be ResultState.pending but is %s" % (self.state,))
-    result, exc_info = None, None
-    try:
-      result = self.func()
-    except Exception:
-      exc_info = sys.exc_info()
-      self.exc_info = exc_info
-      raise
-    else:
-      self.result = result
-    return result
+      if self.state == ResultState.pending:
+        self.call(self.func, *self.fargs, **self.fkwargs)
+    return super().__call__()
+
+OnDemandFunction = OnDemandResult
 
 if __name__ == '__main__':
   import cs.result_tests

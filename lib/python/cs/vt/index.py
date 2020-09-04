@@ -1,18 +1,22 @@
 #!/usr/bin/python
 #
-# INdex classes.
+# Index classes.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcodes => bytes-records.
+''' An index is a mapping of hashcodes => FileDataIndexEntry.
     This module supports several backends and a mechanism for choosing one.
 '''
 
+from collections import namedtuple
 from contextlib import contextmanager
+from os import pread
 from os.path import exists as pathexists
+from zlib import decompress
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
+from cs.serialise import get_bs, put_bs
 from . import Lock
 from .hash import HashCodeUtilsMixin
 
@@ -44,7 +48,7 @@ def choose(basepath, preferred_indexclass=None):
         preferred_indexclass = None
   indexclasses = list(_CLASSES)
   if preferred_indexclass is not None and preferred_indexclass.is_supported():
-    indexclasses.insert( (preferred_indexclass.NAME, preferred_indexclass) )
+    indexclasses.insert((preferred_indexclass.NAME, preferred_indexclass))
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
@@ -56,25 +60,82 @@ def choose(basepath, preferred_indexclass=None):
       continue
     return indexclass
   raise ValueError(
-      "no supported index classes available: tried %r"
-      % (indexclasses,))
+      "no supported index classes available: tried %r" % (indexclasses,)
+  )
+
+class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
+                                    'filenum data_offset data_length flags')):
+  ''' An index entry describing a data chunk in a `DataDir`.
+
+      This has the following attributes:
+      * `filenum`: the file number of the file containing the block
+      * `data_offset`: the offset within the file of the data chunk
+      * `data_length`: the length of the chunk
+      * `flags`: information about the chunk
+
+      These enable direct access to the raw data component.
+
+      The only defined flag at present is `FLAG_COMPRESSED`,
+      indicating that the raw data should be obtained
+      by uncompressing the chunk using `zlib.uncompress`.
+  '''
+
+  FLAG_COMPRESSED = 0x01
+
+  @property
+  def is_compressed(self):
+    ''' Whether the chunk data are compressed.
+    '''
+    return self.flags & self.FLAG_COMPRESSED
+
+  @classmethod
+  def from_bytes(cls, bs: bytes, offset: int = 0):
+    ''' Parse a binary index entry, return `(FileDataIndexEntry,offset)`.
+    '''
+    filenum, offset = get_bs(bs, offset)
+    data_offset, offset = get_bs(bs, offset)
+    data_length, offset = get_bs(bs, offset)
+    flags, offset = get_bs(bs, offset)
+    return cls(filenum, data_offset, data_length, flags), offset
+
+  def __bytes__(self) -> bytes:
+    ''' Encode to binary form for use as an index entry.
+    '''
+    return b''.join(
+        (
+            put_bs(self.filenum), put_bs(self.data_offset),
+            put_bs(self.data_length), put_bs(self.flags)
+        )
+    )
+
+  def fetch_fd(self, rfd):
+    ''' Fetch the decompressed data from an open binary file.
+    '''
+    bs = pread(rfd, self.data_length, self.data_offset)
+    if len(bs) != self.data_length:
+      raise RuntimeError(
+          "%s.fetch_fd: pread(fd=%s) returned %d bytes, expected %d" %
+          (self, rfd, len(bs), self.data_length)
+      )
+    if self.is_compressed:
+      bs = decompress(bs)
+    return bs
 
 class _Index(HashCodeUtilsMixin, MultiOpenMixin):
+  ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
+  '''
 
-  def __init__(self, basepath, hashclass, decode, lock=None):
+  def __init__(self, basepath, hashclass):
     ''' Initialise an _Index instance.
 
         Parameters:
         * `basepath`: the base path to the index; the index itself
           is at `basepath`.SUFFIX
-        * `decode`: function to decode a binary index record into the
-          return type instance
-        * `lock`: optional mutex, passed to MultiOpenMixin.__init__.
+        * `hashclass`: the hashclass indexed by this index
     '''
-    MultiOpenMixin.__init__(self, lock=lock)
+    MultiOpenMixin.__init__(self)
     self.basepath = basepath
     self.hashclass = hashclass
-    self.decode = decode
 
   @classmethod
   def pathof(cls, basepath):
@@ -88,6 +149,28 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     return self.pathof(self.basepath)
 
+  @staticmethod
+  def decode_binary_record(binary_record):
+    ''' Decode the binary record obtained from the index.
+        Return the `FileDataIndexEntry`.
+    '''
+    record, post_offset = FileDataIndexEntry.from_bytes(binary_record)
+    if post_offset < len(binary_record):
+      warning(
+          "short decode of binary FileDataIndexEntry: record=%s, post_offset=%d, remaining binary_record=%r",
+          record, post_offset, binary_record[post_offset:]
+      )
+    return record
+
+  def get(self, hashcode, default=None):
+    ''' Get the `FileDataIndexEntry` for `hashcode`.
+        Return `default` for a missing `hashcode` (default `None`).
+    '''
+    try:
+      return self[hashcode]
+    except KeyError:
+      return False
+
 class LMDBIndex(_Index):
   ''' LMDB index for a DataDir.
   '''
@@ -96,8 +179,8 @@ class LMDBIndex(_Index):
   SUFFIX = 'lmdb'
   MAP_SIZE = 1024 * 1024 * 1024
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._lmdb = None
     self._resize_needed = False
     # Locking around transaction control logic.
@@ -105,9 +188,18 @@ class LMDBIndex(_Index):
     # Lock preventing activity which cannot occur while a transaction is
     # current. This is primarily for database reopens, as when the
     # LMDB map_size is raised.
-    self._txn_idle = Lock()     # available if no transactions are in progress
+    self._txn_idle = Lock()  # available if no transactions are in progress
     self._txn_blocked = Lock()  # available if new transactions may commence
     self._txn_count = 0
+
+  def __str__(self):
+    return "%s(%r,%s)" % (
+        type(self).__name__, self.basepath, self.hashclass.HASHNAME
+    )
+
+  def __len__(self):
+    db = self._lmdb
+    return None if db is None else db.stat()['entries']
 
   @classmethod
   def is_supported(cls):
@@ -122,7 +214,7 @@ class LMDBIndex(_Index):
   def startup(self):
     ''' Start up the index.
     '''
-    self.map_size = 10240   # self.MAP_SIZE
+    self.map_size = 10240  # self.MAP_SIZE
     self._open_lmdb()
 
   def shutdown(self):
@@ -137,9 +229,12 @@ class LMDBIndex(_Index):
     import lmdb
     self._lmdb = lmdb.Environment(
         self.path,
-        subdir=True, readonly=False,
-        metasync=False, sync=False,
-        writemap=True, map_async=True,
+        subdir=True,
+        readonly=False,
+        metasync=False,
+        sync=False,
+        writemap=True,
+        map_async=True,
         map_size=self.map_size,
     )
 
@@ -198,14 +293,21 @@ class LMDBIndex(_Index):
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
+  def keys(self):
+    ''' Return an iterator yielding hashcodes.
+    '''
+    return iter(self)
+
   def items(self):
     ''' Yield `(hashcode,record)` from index.
     '''
     mkhash = self.hashclass.from_hashbytes
+    mkentry = self.decode_binary_record
     with self._txn() as txn:
       cursor = txn.cursor()
-      for hashcode, record in cursor.iternext(keys=True, values=True):
-        yield mkhash(hashcode), self.decode(record)
+      for binary_hashcode, binary_record in cursor.iternext(keys=True,
+                                                            values=True):
+        yield mkhash(binary_hashcode), mkentry(binary_record)
 
   def _get(self, hashcode):
     with self._txn() as txn:
@@ -215,27 +317,21 @@ class LMDBIndex(_Index):
     return self._get(hashcode) is not None
 
   def __getitem__(self, hashcode):
-    record = self._get(hashcode)
-    if record is None:
-      raise KeyError(hashcode)
-    return self.decode(record)
-
-  def get(self, hashcode, default=None):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
+    ''' Get the `FileDataIndexEntry` for `hashcode`.
+        Raise `KeyError` for a missing hashcode.
     '''
-    entry = self._get(hashcode)
-    if entry is None:
-      return default
-    return self.decode(entry)
+    binary_record = self._get(hashcode)
+    if binary_record is None:
+      raise KeyError(hashcode)
+    return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
     import lmdb
-    record = entry.encode()
+    binary_record = bytes(entry)
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, record, overwrite=True)
+          txn.put(hashcode, binary_record, overwrite=True)
           txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
@@ -250,9 +346,10 @@ class GDBMIndex(_Index):
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._gdbm = None
+    self._gdbm_lock = None
 
   @classmethod
   def is_supported(cls):
@@ -280,7 +377,7 @@ class GDBMIndex(_Index):
     with self._gdbm_lock:
       self._gdbm.close()
       self._gdbm = None
-      del self._gdbm_lock
+      self._gdbm_lock = None
 
   def flush(self):
     ''' Flush the index: sync the gdbm.
@@ -307,23 +404,74 @@ class GDBMIndex(_Index):
 
   def __getitem__(self, hashcode):
     with self._gdbm_lock:
-      entry = self._gdbm[hashcode]
-    return self.decode(entry)
+      binary_record = self._gdbm[hashcode]
+    return self.decode_binary_record(binary_record)
 
-  def get(self, hashcode, default=None):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
+    with self._gdbm_lock:
+      self._gdbm[hashcode] = binary_entry
+      self._written = True
+
+class NDBMIndex(_Index):
+  ''' NDBM index for a DataDir.
+  '''
+
+  NAME = 'ndbm'
+  SUFFIX = 'ndbm'
+
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
+    self._ndbm = None
+    self._ndbm_lock = None
+
+  @classmethod
+  def is_supported(cls):
+    ''' Test whether this index class is supported by the Python environment.
     '''
-    with self._gdbm_lock:
-      entry = self._gdbm.get(hashcode, None)
-    if entry is None:
-      return default
-    return self.decode(entry)
+    try:
+      import dbm.ndbm
+    except ImportError:
+      return False
+    return True
 
-  def __setitem__(self, hashcode, value):
-    entry = value.encode()
-    with self._gdbm_lock:
-      self._gdbm[hashcode] = entry
+  def startup(self):
+    ''' Start the index: open dbm, allocate lock.
+    '''
+    import dbm.ndbm
+    with Pfx(self.path):
+      self._ndbm = dbm.ndbm.open(self.path, 'c')
+    self._ndbm_lock = Lock()
+    self._written = False
+
+  def shutdown(self):
+    ''' Shutdown the index.
+    '''
+    self.flush()
+    with self._ndbm_lock:
+      self._ndbm.close()
+      self._ndbm = None
+      self._ndbm_lock = None
+
+  def flush(self):
+    ''' Flush the index: sync the ndbm.
+    '''
+    # no fast mode, no sycn
+    pass
+
+  def __contains__(self, hashcode):
+    with self._ndbm_lock:
+      return hashcode in self._ndbm
+
+  def __getitem__(self, hashcode):
+    with self._ndbm_lock:
+      binary_record = self._ndbm[hashcode]
+    return self.decode_binary_record(binary_record)
+
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
+    with self._ndbm_lock:
+      self._ndbm[hashcode] = binary_entry
       self._written = True
 
 class KyotoIndex(_Index):
@@ -336,8 +484,8 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, lmdbpathbase, hashclass, decode, lock=None):
-    _Index.__init__(self, lmdbpathbase, hashclass, decode, lock=lock)
+  def __init__(self, lmdbpathbase, hashclass):
+    super().__init__(lmdbpathbase, hashclass)
     self._kyoto = None
 
   @classmethod
@@ -377,23 +525,15 @@ class KyotoIndex(_Index):
   def __contains__(self, hashcode):
     return self._kyoto.check(hashcode) >= 0
 
-  def get(self, hashcode):
-    ''' Get and decode the record for `hashcode`.
-        Return None for missing `hashcode`.
-    '''
-    record = self._kyoto.get(hashcode)
-    if record is None:
-      return None
-    return self.decode(record)
-
   def __getitem__(self, hashcode):
-    entry = self.get(hashcode)
-    if entry is None:
-      raise IndexError(str(hashcode))
-    return entry
+    binary_record = self._kyoto.get(hashcode)
+    if binary_record is None:
+      raise KeyError(hashcode)
+    return self.decode_binary_record(binary_record)
 
-  def __setitem__(self, hashcode, value):
-    self._kyoto[hashcode] = value.encode()
+  def __setitem__(self, hashcode, entry):
+    binary_entry = bytes(entry)
+    self._kyoto[hashcode] = binary_entry
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Generator yielding the keys from the index
@@ -431,13 +571,20 @@ def register(indexclass, indexname=None, priority=False):
   if indexname in _BY_NAME:
     raise ValueError(
         'cannot register index class %s: indexname %r already registered to %s'
-        % (indexclass, indexname, _BY_NAME[indexname]))
+        % (indexclass, indexname, _BY_NAME[indexname])
+    )
   _BY_NAME[indexname] = indexclass
   if priority:
     _CLASSES.insert(0, (indexclass.NAME, indexclass))
   else:
     _CLASSES.append((indexclass.NAME, indexclass))
 
-for klass in LMDBIndex, KyotoIndex, GDBMIndex:
+for klass in LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex:
   if klass.is_supported():
     register(klass)
+
+if not _CLASSES:
+  raise RuntimeError(
+      __name__ +
+      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
+  )

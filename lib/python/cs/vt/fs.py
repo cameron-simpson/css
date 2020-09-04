@@ -8,11 +8,13 @@
 '''
 
 import errno
+from inspect import getmodule
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL, O_NOFOLLOW
 import shlex
 from types import SimpleNamespace as NS
 from uuid import UUID
+from cs.context import stackattrs
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import exception, error, warning, info, debug
@@ -41,18 +43,49 @@ def oserror(errno_, msg, *a):
   assert isinstance(msg, str)
   if a:
     msg = msg % a
-  warning("raise OSError(%s): %s", errno_, msg)
   raise OSError(errno_, msg)
 
-OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
-OS_EFAULT = lambda msg, *a: oserror(errno.EFAULT, msg, *a)
-OS_EINVAL = lambda msg, *a: oserror(errno.EINVAL, msg, *a)
-OS_ELOOP = lambda msg, *a: oserror(errno.ELOOP, msg, *a)
-OS_ENOATTR = lambda msg, *a: oserror(errno.ENOATTR, msg, *a)
-OS_ENOENT = lambda msg, *a: oserror(errno.ENOENT, msg, *a)
-OS_ENOTDIR = lambda msg, *a: oserror(errno.ENOTDIR, msg, *a)
-OS_ENOTSUP = lambda msg, *a: oserror(errno.ENOTSUP, msg, *a)
-OS_EROFS = lambda msg, *a: oserror(errno.EROFS, msg, *a)
+# Generate OS_E* functions to raise custom OSErrors.
+# This generates a suite of functions like this:
+#  OS_EEXIST = lambda msg, *a: oserror(errno.EEXIST, msg, *a)
+# for the known names in the errno module.
+def mkOSfunc(M, Ename):
+  ''' Create a wrapper function for `oserror` from errno value name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to be a valid errno symbol from the `errno` module.
+  '''
+  Evalue = getattr(errno, Ename)
+  setattr(M, 'OS_' + Ename, lambda msg, *a: oserror(Evalue, msg, *a))
+
+# Generate dummy functions for missing symbols which we use.
+def mkOSfuncEINVAL(M, Ename):
+  ''' Create a wrapper function for `oserror` from the name `Ename`
+      and save in in module `M` as `'OS_'+Ename`.
+
+      This requires `Ename` to *not* be a valid errno symbol
+      from the `errno` module, and is to support calls of "foreign"
+      errno symbols;
+      they are translated to `EINVAL` with an indication in the warning message.
+  '''
+  os_funcname = 'OS_' + Ename
+  setattr(
+      M, os_funcname, lambda msg, *a:
+      oserror(errno.EINVAL, '(no %s, using EINVAL) ' + msg, Ename, *a)
+  )
+
+def _prep_osfuncs():
+  ''' Generate the required wrappers for the various `E*` errno symbols.
+  '''
+  M = getmodule(oserror)
+  for Ename in dir(errno):
+    if Ename.startswith('E'):
+      mkOSfunc(M, Ename)
+  for Ename in 'ENOATTR', :
+    if not hasattr(errno, Ename):
+      mkOSfuncEINVAL(M, Ename)
+
+_prep_osfuncs()
 
 class FileHandle:
   ''' Filesystem state for an open file.
@@ -74,7 +107,10 @@ class FileHandle:
 
   def __str__(self):
     fhndx = getattr(self, 'fhndx', None)
-    return "<FileHandle:fhndx=%d:%s>" % (fhndx, self.E,)
+    return "<FileHandle:fhndx=%s:%s>" % (
+        fhndx,
+        self.E,
+    )
 
   def bg(self, func, *a, **kw):
     ''' Function dispatcher.
@@ -89,12 +125,13 @@ class FileHandle:
     self.E.parent.changed = True
     S.open()
     # NB: additional S.open/close around self.E.close
-    R.notify(logexc(lambda _: (
-        defaults.pushStore(S),
-        self.E.close(),
-        defaults.popStore(),
-        S.close()
-    )))
+    @logexc
+    def withR(R):
+      with stackattrs(defaults, S=S):
+        self.E.close()
+      S.close()
+
+    R.notify(withR)
 
   def write(self, data, offset):
     ''' Write data to the file.
@@ -104,8 +141,9 @@ class FileHandle:
       with self._lock:
         if self.for_append and offset != len(f):
           OS_EFAULT(
-              "%s: file open for append but offset(%s) != length(%s)",
-              f, offset, len(f))
+              "%s: file open for append but offset(%s) != length(%s)", f,
+              offset, len(f)
+          )
         f.seek(offset)
         written = f.write(data)
     self.E.touch()
@@ -168,27 +206,29 @@ class Inode(Transcriber, NS):
 
   def __repr__(self):
     return (
-        "%s(inum=%d,refcount=%d,E=%s(%r))"
-        % (
-            type(self).__name__,
-            self.inum,
-            self.refcount,
+        "%s(inum=%d,refcount=%d,E=%s(%r))" % (
+            type(self).__name__, self.inum, self.refcount,
             type(self.E).__name__, self.E.name
         )
     )
 
   def transcribe_inner(self, T, fp):
-    return T.transcribe_mapping({
-        'refcount': self.refcount,
-        'E': self.E,
-    }, fp, T=T)
+    return T.transcribe_mapping(
+        {
+            'refcount': self.refcount,
+            'E': self.E,
+        }, fp, T=T
+    )
 
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     if prefix != cls.transcribe_prefix:
       raise ValueError(
-          "expected prefix=%r, got: %r"
-          % (cls.transcribe_prefix, prefix,))
+          "expected prefix=%r, got: %r" % (
+              cls.transcribe_prefix,
+              prefix,
+          )
+      )
     m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
     return cls(None, m['E'], m['refcount']), offset
 
@@ -210,8 +250,8 @@ class Inodes(object):
   '''
 
   def __init__(self, fs):
-    self.fs = fs                # main filesystem
-    self._allocated = Range()   # range of allocated inode numbers
+    self.fs = fs  # main filesystem
+    self._allocated = Range()  # range of allocated inode numbers
     self._by_inum = {}
     self._by_uuid = {}
     self._by_dirent = {}
@@ -273,7 +313,8 @@ class Inodes(object):
         if inum is not None and I.inum != inum:
           raise ValueError(
               "inum=%d: Dirent already has an Inode with a different inum: %s"
-              % (inum, I))
+              % (inum, I)
+          )
         if uu:
           # opportunisticly update UUID mapping
           # in case the Dirent has acquired a UUID
@@ -322,9 +363,9 @@ class FileSystem(object):
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
-      See the cs.vtfuse module for the StoreFS_LLFUSE class (aliased
-      as StoreFS) and associated mount function which presents a
-      FileSystem as a FUSE mount.
+      See the `cs.vt.fuse` module for the `StoreFS_LLFUSE` class (aliased
+      as `StoreFS`) and associated mount function which presents a
+      `FileSystem` as a FUSE mount.
 
       TODO: medium term: see if this can be made into a VFS layer
       to support non-FUSE operation, for example a VT FTP client
@@ -332,7 +373,8 @@ class FileSystem(object):
   '''
 
   def __init__(
-      self, E,
+      self,
+      E,
       *,
       S=None,
       archive=None,
@@ -389,6 +431,7 @@ class FileSystem(object):
     else:
       mntE = E
     self.mntE = mntE
+    self.is_darwin = os.uname().sysname == 'Darwin'
     self.device_id = -1
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
@@ -405,7 +448,9 @@ class FileSystem(object):
         if fs_inode_dirents:
           inode_dir, offset = _Dirent.from_str(fs_inode_dirents)
           if offset < len(fs_inode_dirents):
-            warning("unparsed text after Dirent: %r", fs_inode_dirents[offset:])
+            warning(
+                "unparsed text after Dirent: %r", fs_inode_dirents[offset:]
+            )
           X("IMPORT INODES:")
           dump_Dirent(inode_dir)
           inodes.load_fs_inode_dirents(inode_dir)
@@ -413,7 +458,7 @@ class FileSystem(object):
           X("NO INODE IMPORT")
         X("FileSystem mntE:")
       with self.S:
-        with defaults.stack('fs', self):
+        with stackattrs(defaults, fs=self):
           dump_Dirent(mntE)
     except Exception as e:
       exception("exception during initial report: %s", e)
@@ -433,8 +478,7 @@ class FileSystem(object):
   def __str__(self):
     if self.subpath:
       return "<%s S=%s /=%s %r=%s>" % (
-          self.__class__.__name__,
-          self.S, self.E, self.subpath, self.mntE
+          self.__class__.__name__, self.S, self.E, self.subpath, self.mntE
       )
     return "%s(S=%s,/=%r)" % (type(self).__name__, self.S, self.E)
 
@@ -509,7 +553,6 @@ class FileSystem(object):
     ''' Return the Dirent associated with the supplied `inum`.
     '''
     I = self._inodes[inum]
-    X("inum %s => %r", inum, I)
     return I.E
 
   def open2(self, P, name, flags):
@@ -540,8 +583,10 @@ class FileSystem(object):
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
     for_trunc = (flags & O_TRUNC) == O_TRUNC
-    debug("for_read=%s, for_write=%s, for_append=%s",
-          for_read, for_write, for_append)
+    debug(
+        "for_read=%s, for_write=%s, for_append=%s", for_read, for_write,
+        for_append
+    )
     if for_trunc and not for_write:
       OS_EINVAL("O_TRUNC requires O_WRONLY or O_RDWR")
     if for_append and not for_write:
@@ -603,8 +648,7 @@ class FileSystem(object):
     with Pfx("access(E=%r,amode=%s,uid=%r,gid=%d)", E, amode, uid, gid):
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
-      return E.meta.access(
-          amode, uid, gid, default_uid=uid, default_gid=gid)
+      return E.meta.access(amode, uid, gid, default_uid=uid, default_gid=gid)
 
   def getxattr(self, inum, xattr_name):
     ''' Get the extended attribute `xattr_name` from `inum`.
@@ -617,13 +661,17 @@ class FileSystem(object):
       if suffix == 'block':
         return str(E.block).encode()
       OS_EINVAL(
-          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
-          inum, xattr_name, XATTR_VT_PREFIX)
+          "getxattr(inum=%s,xattr_name=%r): invalid %r prefixed name", inum,
+          xattr_name, XATTR_VT_PREFIX
+      )
     xattr = E.meta.getxattr(xattr_name, None)
     if xattr is None:
       ##if xattr_name == 'com.apple.FinderInfo':
       ##  OS_ENOTSUP("inum %d: no xattr %r, pretend not supported", inum, xattr_name)
-      OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      if self.is_darwin:
+        OS_ENOATTR("inum %d: no xattr %r", inum, xattr_name)
+      else:
+        OS_ENODATA("inum %d: no xattr %r", inum, xattr_name)
     return xattr
 
   def removexattr(self, inum, xattr_name):
@@ -635,8 +683,9 @@ class FileSystem(object):
     xattr_name = Meta.xattrify(xattr_name)
     if xattr_name.startswith(XATTR_VT_PREFIX):
       OS_EINVAL(
-          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name",
-          inum, xattr_name, XATTR_VT_PREFIX)
+          "removexattr(inum=%s,xattr_name=%r): invalid %r prefixed name", inum,
+          xattr_name, XATTR_VT_PREFIX
+      )
     meta = E.meta
     try:
       meta.delxattr(xattr_name)
@@ -666,9 +715,7 @@ class FileSystem(object):
           block_s = Meta.xattrify(xattr_value)
           B, offset = parse(block_s)
           if offset < len(block_s):
-            OS_EINVAL(
-                "unparsed text after trancription: %r",
-                block_s[offset:])
+            OS_EINVAL("unparsed text after trancription: %r", block_s[offset:])
           if not isBlock(B):
             OS_EINVAL("not a Block transcription")
           info("%s: update .block directly to %r", E, str(B))

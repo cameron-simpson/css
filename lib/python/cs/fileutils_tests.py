@@ -22,18 +22,24 @@ from .logutils import D
 from .timeutils import TimeoutError, sleep
 from .x import X
 
-class TestFileProperty(object):
+class ThingWithFileProperty(object):
+  ''' An object with an `@file_property`.
+  '''
+
   def __init__(self):
     self._test1__filename = 'testfileprop1'
     self._test1_lock = Lock()
     self._test2__filename = 'testfileprop2'
     self._test2_lock = Lock()
+
   def write1(self, data):
     with open(self._test1__filename, "w") as fp:
       fp.write(data)
+
   def write2(self, data):
     with open(self._test2__filename, "w") as fp:
       fp.write(data)
+
   @file_property
   def test1(self, filename):
     with open(filename) as fp:
@@ -41,15 +47,18 @@ class TestFileProperty(object):
     ##D("test1 loads \"%s\" => %s", path, data)
     return data
 
-class TestFilesProperty(object):
-  ''' Tests for watching multiple files.
+class ThingWithFilesProperty(object):
+  ''' An object with an `@files_property`.
   '''
+
   def __init__(self):
     self._test1__filenames = ('testfileprop1',)
     self._test1_lock = Lock()
+
   def write1(self, data):
     with open(self._test1s[0], "w") as fp:
       fp.write(data)
+
   def write2(self, data):
     with open(self._test2s[0], "w") as fp:
       fp.write(data)
@@ -67,6 +76,8 @@ class TestFilesProperty(object):
     return (paths[0],), data
 
 class Test_Misc(unittest.TestCase):
+  ''' Tests.
+  '''
 
   def setUp(self):
     self.proppath = 'cs.fileutils_tests_tstprop'
@@ -77,7 +88,7 @@ class Test_Misc(unittest.TestCase):
     self.filesprop = None
 
   def tearDown(self):
-    tidyup = [ self.proppath, self.lockpath ]
+    tidyup = [self.proppath, self.lockpath]
     if self.fileprop:
       tidyup.append(self.fileprop._test1__filename)
       tidyup.append(self.fileprop._test2__filename)
@@ -103,9 +114,12 @@ class Test_Misc(unittest.TestCase):
           t1data = t1fp.read()
         with open(T2.name) as t2fp:
           t2data = t2fp.read()
-        self.assertEqual( t1data, data, "bad data in %s" % (T1.name,) )
-        self.assertEqual( t2data, data, "bad data in %s" % (T2.name,) )
-        self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
+        self.assertEqual(t1data, data, "bad data in %s" % (T1.name,))
+        self.assertEqual(t2data, data, "bad data in %s" % (T2.name,))
+        self.assertTrue(
+            compare(T1.name, T2.name),
+            "mismatched data in %s and %s" % (T1.name, T2.name)
+        )
 
   def test_rewrite(self):
     olddata = "old data\n"
@@ -115,11 +129,11 @@ class Test_Misc(unittest.TestCase):
       T1.flush()
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      self.assertEqual(t1data, olddata, "bad old data in %s" % (T1.name,))
       rewrite(T1.name, StringIO(newdata), mode='w')
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+      self.assertEqual(t1data, newdata, "bad new data in %s" % (T1.name,))
 
   def test_rewrite_cmgr(self):
     olddata = "old data\n"
@@ -129,15 +143,15 @@ class Test_Misc(unittest.TestCase):
       T1.flush()
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      self.assertEqual(t1data, olddata, "bad old data in %s" % (T1.name,))
       with rewrite_cmgr(T1.name) as tfp:
         tfp.write(newdata)
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
-      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+      self.assertEqual(t1data, newdata, "bad new data in %s" % (T1.name,))
 
   def test_file_property_00(self):
-    PC = self.fileprop = TestFileProperty()
+    PC = self.fileprop = ThingWithFileProperty()
     self.assertTrue(not os.path.exists(PC._test1__filename))
     data1 = PC.test1
     self.assertTrue(data1 is None)
@@ -182,34 +196,36 @@ class Test_Misc(unittest.TestCase):
   def test_Pathname_01_attrs(self):
     home = '/a/b'
     maildir = '/a/b/mail'
-    prefixes = ( ( '$MAILDIR/', '+' ), ( '$HOME/', '~/') )
-    environ = { 'HOME': home, 'MAILDIR': maildir }
+    prefixes = (('$MAILDIR/', '+'), ('$HOME/', '~/'))
+    environ = {'HOME': home, 'MAILDIR': maildir}
     for path, shortpath in (
-          ( "a",                "a" ),
-          ( "a/b",              "a/b" ),
-          ( "a/b/c",            "a/b/c" ),
-          ( "/a/b/c",           "~/c" ),
-          ( "/a/b/mail",        "~/mail" ),
-          ( "/a/b/mail/folder", "+folder" ),
-        ):
+        ("a", "a"),
+        ("a/b", "a/b"),
+        ("a/b/c", "a/b/c"),
+        ("/a/b/c", "~/c"),
+        ("/a/b/mail", "~/mail"),
+        ("/a/b/mail/folder", "+folder"),
+    ):
       P = Pathname(path)
       self._eq(P.dirname, os.path.dirname(path), "%r.dirname" % (path,))
       self._eq(P.basename, os.path.basename(path), "%r.basename" % (path,))
       self._eq(P.abs, os.path.abspath(path), "%r.abs" % (path,))
       self._eq(P.isabs, os.path.isabs(path), "%r.isabs" % (path,))
-      self._eq(P.shorten(environ=environ, prefixes=prefixes),
-                       shortpath,
-                       "%r.shorten(environ=%r, prefixes=%r)"
-                         % (path, environ, prefixes))
+      self._eq(
+          P.shorten(environ=environ, prefixes=prefixes), shortpath,
+          "%r.shorten(environ=%r, prefixes=%r)" % (path, environ, prefixes)
+      )
       for spec, expected in (
-                            ("{!r}", repr(P)),
-                            ("{.basename}", os.path.basename(path)),
-                            ("{.dirname}", os.path.dirname(path)),
-                            ("{.abs}", os.path.abspath(path)),
-                          ):
+          ("{!r}", repr(P)),
+          ("{.basename}", os.path.basename(path)),
+          ("{.dirname}", os.path.dirname(path)),
+          ("{.abs}", os.path.abspath(path)),
+      ):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
 class Test_BackedFile(unittest.TestCase, BackedFile_TestMethods):
+  ''' tests for `BackedFile`.
+  '''
 
   def setUp(self, backing_filename=None):
     if backing_filename is None:

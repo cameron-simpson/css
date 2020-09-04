@@ -8,33 +8,15 @@
 '''
 
 from os.path import isdir
-from subprocess import Popen, PIPE
-from cs.lex import get_identifier, get_qstr, get_qstr_or_identifier
+from cs.lex import (
+    get_identifier,
+    get_other_chars,
+    get_qstr,
+    get_qstr_or_identifier,
+)
+from cs.lex import get_ini_clausename, get_ini_clause_entryname
 from cs.pfx import Pfx
 from .convert import get_integer
-
-def get_clause_spec(s, offset=0):
-  ''' Match `[`*clause_name*`]` at `offset`, return *clause_name*`,`*new_offset*.
-  '''
-  if not s.startswith('[', offset):
-    raise ValueError("missing opening '[' at position %d" % (offset,))
-  offset += 1
-  clause_name, offset = get_qstr_or_identifier(s, offset)
-  if not clause_name:
-    raise ValueError("missing clause_name identifier at position %d" % (offset,))
-  if not s.startswith(']', offset):
-    raise ValueError("missing closing ']' at position %d" % (offset,))
-  return clause_name, offset + 1
-
-def get_clause_archive(s, offset=0):
-  ''' Match `[`*clause_name*`]`*archive_name* at `offset,
-      return *clause_name*`,`*archive_name*`,`*new_offset*.
-  '''
-  clause_name, offset = get_clause_spec(s, offset)
-  archive_name, offset = get_identifier(s, offset)
-  if not archive_name:
-    raise ValueError("missing archive name identifier at position %d" % (offset,))
-  return clause_name, archive_name, offset
 
 def parse_store_specs(s, offset=0):
   ''' Parse the string `s` for a list of Store specifications.
@@ -44,7 +26,7 @@ def parse_store_specs(s, offset=0):
     while offset < len(s):
       with Pfx("offset %d", offset):
         store_text, store_type, params, offset = get_store_spec(s, offset)
-        store_specs.append( (store_text, store_type, params) )
+        store_specs.append((store_text, store_type, params))
       if offset < len(s):
         with Pfx("offset %d", offset):
           sep = s[offset]
@@ -52,9 +34,55 @@ def parse_store_specs(s, offset=0):
           if sep == ',':
             continue
           raise ValueError(
-              "expected comma ',', found unexpected separator: %r"
-              % (sep,))
+              "expected comma ',', found unexpected separator: %r" % (sep,)
+          )
     return store_specs
+
+def get_archive_path_entry(s, offset=0, stopchars=None):
+  ''' Parse `[`*clause_name*`]`*ptn*,
+      return `(`*clause_name*`,`*ptn*`,`*new_offset*`)`.
+
+      Parameters:
+      * `s`: the string to parse.
+      * `offset`: the start position of the parse, default: `0`.
+      * `stopchars`: characters which should terminate the parse,
+        default: `' \t\r\n'`
+  '''
+  if stopchars is None:
+    stopchars = ' \t\t\n'
+  if not s.startswith('[', offset):
+    raise ValueError("missing clause")
+  clause_name, offset = get_ini_clausename(s, offset)
+  ptn, offset = get_other_chars(s, offset=offset, stopchars=stopchars)
+  if not ptn:
+    raise ValueError("missing pattern")
+  return clause_name, ptn, offset
+
+def get_archive_path(s, offset=0, stopchars=None):
+  ''' Parse a comma separated list of archive path entries:
+      `[`*clause_name*`]`*ptn*`,`...
+      and return a list of `(`*clause_name*`,`*ptn*`)`
+      and the new offset.
+
+      Parameters:
+      * `s`: the string to parse.
+      * `offset`: the start position of the parse, default: `0`.
+      * `stopchars`: characters which should terminate the parse,
+        default: `' \t\r\n'`
+  '''
+  if stopchars is None:
+    stopchars = ' \t\t\n'
+  entries = []
+  while offset < len(s):
+    clause_name, ptn, offset = get_archive_path_entry(
+        s, offset=offset, stopchars=stopchars + ','
+    )
+    entries.append((clause_name, ptn))
+    if not s.startswith(',', offset):
+      break
+    while s.startswith(',', offset):
+      offset += 1
+  return entries, offset
 
 def get_store_spec(s, offset=0):
   ''' Get a single Store specification from a string.
@@ -101,7 +129,7 @@ def get_store_spec(s, offset=0):
   elif s.startswith('[', offset):
     # [clause_name]
     store_type = 'config'
-    clause_name, offset = get_clause_spec(s, offset)
+    clause_name, offset = get_ini_clausename(s, offset)
     params = {'clause_name': clause_name}
   elif s.startswith('/', offset) or s.startswith('./', offset):
     path = s[offset:]
@@ -113,9 +141,7 @@ def get_store_spec(s, offset=0):
       store_type = 'datadir'
       params = {'path': path}
     else:
-      raise ValueError(
-          "%r: not a directory or a socket"
-          % (path,))
+      raise ValueError("%r: not a directory or a socket" % (path,))
   elif s.startswith('|', offset):
     # |shell command
     store_type = 'shell'
@@ -125,8 +151,8 @@ def get_store_spec(s, offset=0):
     store_type, offset = get_identifier(s, offset)
     if not store_type:
       raise ValueError(
-          "expected identifier at offset %d, found: %r"
-          % (offset, s[offset:]))
+          "expected identifier at offset %d, found: %r" % (offset, s[offset:])
+      )
     with Pfx(store_type):
       if s.startswith('(', offset):
         params, offset = get_params(s, offset)
@@ -136,12 +162,15 @@ def get_store_spec(s, offset=0):
         if store_type == 'tcp':
           colon2 = s.find(':', offset)
           if colon2 < offset:
-            raise ValueError("missing second colon after offset %d" % (offset,))
+            raise ValueError(
+                "missing second colon after offset %d" % (offset,)
+            )
           hostpart = s[offset:colon2]
           offset = colon2 + 1
           if not isinstance(hostpart, str):
             raise ValueError(
-                "expected hostpart to be a string, got: %r" % (hostpart,))
+                "expected hostpart to be a string, got: %r" % (hostpart,)
+            )
           if not hostpart:
             hostpart = 'localhost'
           params['host'] = hostpart
@@ -164,8 +193,8 @@ def get_params(s, offset):
     param, offset = get_qstr_or_identifier(s, offset)
     if not param:
       raise ValueError(
-          "rejecting empty parameter name at position %d"
-          % (offset,))
+          "rejecting empty parameter name at position %d" % (offset,)
+      )
     if not s.startswith('=', offset):
       raise ValueError("missing '=' at poition %d" % (offset,))
     value, offset = get_token(s, offset)
@@ -176,8 +205,25 @@ def get_params(s, offset):
       offset += 1
   return params, offset + 1
 
-def get_token(s, offset):
+def get_token(s, offset=0):
   ''' Parse an integer value, an identifier or a quoted string.
+      Return the parsed value and the new `offset`.
+
+      Note: because integers may include a unit scale,
+      following whitespace is also consumed if there is no unit.
+
+      Examples:
+
+              >>> get_token('9  ')
+              (9, 3)
+              >>> get_token('99  ')
+              (99, 4)
+              >>> get_token('99k  ')
+              (99000, 3)
+              >>> get_token('fred  ')
+              ('fred', 4)
+              >>> get_token('"joe",')
+              ('joe', 5)
   '''
   if offset == len(s):
     raise ValueError("unexpected end of string, expected token")

@@ -29,18 +29,23 @@ class TestTranscribe(unittest.TestCase):
     T = _TRANSCRIBE
     for o in (
         '',
-        0, 1, 127, '""', '"abc"', '"de\\f"', '"gh\\\"i"',
+        0,
+        1,
+        127,
+        '""',
+        '"abc"',
+        '"de\\f"',
+        '"gh\\\"i"',
         uuid4(),
-        Hash_SHA1.from_chunk(
-            bytes( random.randint(0, 255) for _ in range(100) )
-        ),
+        Hash_SHA1.from_chunk(bytes(random.randint(0, 255)
+                                   for _ in range(100))),
     ):
       s = T.transcribe_s(o, None)
       self.assertIsInstance(s, str)
       o2, offset = T.parse(s)
       self.assertEqual(
-          offset, len(s),
-          "UNPARSED: len(s)=%d, offset=%d" % (len(s), offset))
+          offset, len(s), "UNPARSED: len(s)=%d, offset=%d" % (len(s), offset)
+      )
       self.assertIs(type(o), type(o2))
       ##self.assertEqual(o, o2)
 

@@ -10,26 +10,36 @@ import os
 import os.path
 from cs.edit import edit_strings
 
-USAGE = 'Usage: %s [pathnames...]'
+USAGE = 'Usage: %s [-a] [pathnames...]'
 EDITOR = 'vi'
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
   badopts = False
+  use_all = False
   editor = os.environ.get('EDITOR', EDITOR)
+  if argv and argv[0] == '-a':
+    use_all = True
+    argv.pop(0)
   if argv:
     names = argv
   else:
-    names = sorted( [ name for name in os.listdir('.')
-                      if name and not name.startswith('.')
-                    ] )
+    names = sorted(
+        [
+            name for name in os.listdir('.') if name and name not in
+            ('.', '..') and (use_all or not name.startswith('.'))
+        ]
+    )
     if not names:
       error("%s: no suitable names in the current directory", cmd)
       badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
   xit = 0
   try:
-    for name, newname in edit_strings(names, errors="ignore"):
+    for name, newname in edit_strings(names, editor=editor):
       if newname != name:
         if os.path.exists(newname):
           error("%s: %s => %s: target exists", cmd, name, newname)

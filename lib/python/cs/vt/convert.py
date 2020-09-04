@@ -15,9 +15,7 @@ def get_integer(s, offset):
   ''' Parse an integer followed by an optional scale and return computed value.
   '''
   return multiparse_units(
-      s,
-      (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE),
-      offset
+      s, (BINARY_BYTES_SCALE, DECIMAL_BYTES_SCALE, DECIMAL_SCALE), offset
   )
 
 def scaled_value(s):
@@ -29,6 +27,16 @@ def scaled_value(s):
     raise ValueError("unparsed text: %r" % (s[offset:],))
   return value
 
+def truthy_word(s):
+  ''' Convert a word into `True` or `False`.
+  '''
+  s = s.lower()
+  if s in ('true', 'yes'):
+    return True
+  if s in ('false', 'no'):
+    return False
+  raise ValueError("invalid true/flase value: %r" % (s,))
+
 def convert_param(params, key, *, decoder=None):
   ''' Convert a parameter.
   '''
@@ -38,7 +46,7 @@ def convert_param(params, key, *, decoder=None):
       params[key] = decoder(param)
 
 def convert_param_int(params, key):
-  ''' Convert an integer paramater to an int.
+  ''' Convert an integer parameter to an int.
   '''
   return convert_param(params, key, decoder=int)
 
@@ -46,6 +54,11 @@ def convert_param_scaled_int(params, key):
   ''' Convert a scaled value into an int.
   '''
   return convert_param(params, key, decoder=scaled_value)
+
+def convert_param_bool(params, key):
+  ''' Convert an integer parameter to an bool.
+  '''
+  return convert_param(params, key, decoder=truthy_word)
 
 def expand_path(path, basedir=None):
   ''' Expand a path specification.
@@ -58,4 +71,6 @@ def expand_path(path, basedir=None):
 def convert_param_path(params, key, basedir=None):
   ''' Convert a path parameter to an absolute pathname.
   '''
-  return convert_param(params, key, decoder=partial(expand_path, basedir=basedir))
+  return convert_param(
+      params, key, decoder=partial(expand_path, basedir=basedir)
+  )

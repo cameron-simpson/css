@@ -14,71 +14,39 @@ from os.path import dirname, join as joinpath, exists as pathexists
 from stat import S_ISDIR
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
-from cs.logutils import error, warning
+from cs.logutils import warning
 from cs.pfx import Pfx
-from . import fromtext, PATHSEP
+from . import PATHSEP
+from .transcribe import parse
 
-def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Dirent, such as from
-      Dirent.textencode(), and return the corresponding Dirent.
+def path_resolve(path, do_mkdir=False):
+  ''' Resolve a path with a leading Dirent transcription.
+
+      Parameters:
+      * `path`: a path with a leading Dirent transcription
+      * `do_mkdir`: if true, create missing directory components.
+        Default: `False`.
   '''
-  from .dir import _Dirent
-  data = fromtext(text)
-  E, offset = _Dirent.from_bytes(data)
-  if offset < len(data):
-    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
-                     % (text, E, data[offset:]))
+  E, offset = parse(path)
+  if offset < len(path):
+    subpath = path[offset:]
+    if not E.isdir:
+      raise ValueError("extra path after no-Dir: %r" % (subpath,))
+    if not path.startswith(PATHSEP, offset):
+      raise ValueError(
+          "extra path does not commence with %r: %r" % (PATHSEP, subpath)
+      )
+    E = resolve(E, subpath, do_mkdir=do_mkdir)
   return E
-
-def dirent_dir(direntpath, do_mkdir=False):
-  ''' Convert a direntpath into a Dir.
-  '''
-  D, name, unresolved = dirent_resolve(direntpath, do_mkdir=do_mkdir)
-  if unresolved:
-    raise ValueError("unresolved remaining path: %r" % (unresolved,))
-  if name is not None:
-    if name in D or not do_mkdir:
-      D = D.chdir1(name)
-    else:
-      D = D.mkdir(name)
-  return D
-
-def dirent_file(direntpath, do_create=False):
-  ''' Convert a direntpath into a FileDirent.
-  '''
-  E, name, unresolved = dirent_resolve(direntpath)
-  if unresolved:
-    raise ValueError("unresolved remaining path: %r" % (unresolved,))
-  if name is None:
-    return E
-  if name in E:
-    return E[name]
-  if not do_create:
-    raise ValueError("no such file: %s" % (direntpath,))
-  raise RuntimeError("file creation not yet implemented")
-
-def dirent_resolve(direntpath, do_mkdir=False):
-  ''' Resolve `direntpath`, optionally making missing intermediate directories.
-  '''
-  rootD, tail = get_dirent(direntpath)
-  return resolve(rootD, tail, do_mkdir=do_mkdir)
-
-def get_dirent(direntpath):
-  ''' Take `direntpath` starting with a text transcription of a Dirent and
-      return the Dirent and the remaining path.
-  '''
-  try:
-    hexpart, tail = direntpath.split('/', 1)
-  except ValueError:
-    hexpart = direntpath
-    tail = ''
-  return decode_Dirent_text(hexpart), tail
 
 def path_split(path):
   ''' Split path into components, discarding the empty string and ".".
       The returned subparts are useful for path traversal.
   '''
-  return [ subpath for subpath in path.split('/') if subpath != '' and subpath != '.' ]
+  return [
+      subpath for subpath in path.split(PATHSEP)
+      if subpath != '' and subpath != '.'
+  ]
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
@@ -223,7 +191,7 @@ class DirLike(ABC):
         node = self.parent
         if node is None:
           break
-      node = self.get(part)
+      node = node.get(part)
       if node is None:
         break
     return node
@@ -231,7 +199,7 @@ class DirLike(ABC):
   def walk(self):
     ''' Walk this tree.
     '''
-    pending = [ (self, []) ]
+    pending = [(self, [])]
     while pending:
       node, rparts = pending.pop()
       rpath = PATHSEP.join(rparts)
@@ -250,13 +218,14 @@ class DirLike(ABC):
       for name in dirnames:
         if name not in odirnames:
           warning(
-              "walk(%s): %r: dirname %r not in original set",
-              self, rpath, name)
+              "walk(%s): %r: dirname %r not in original set", self, rpath, name
+          )
           continue
-        node = node.get(name)
-        if node is None:
+        subnode = node.get(name)
+        if subnode is None:
+          warning("walk(%s): %r: dirname %r not in node", self, rapth, name)
           continue
-        pending.append( (node, rparts + [name]) )
+        pending.append((subnode, rparts + [name]))
 
 class FileLike(ABC):
   ''' Facilities offered by file like objects.
@@ -355,7 +324,9 @@ class OSDir(DirLike):
     ''' Create a subdirectory.
     '''
     if not name or PATHSEP in name:
-      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+      raise ValueError(
+          "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
+      )
     subpath = joinpath(self.path, name)
     with Pfx("mkdir(%r)", subpath):
       os.mkdir(subpath)
@@ -365,7 +336,9 @@ class OSDir(DirLike):
     ''' Create a new file from data from a CornuCopyBuffer.
     '''
     if not name or PATHSEP in name:
-      raise ValueError("name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name))
+      raise ValueError(
+          "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
+      )
     subpath = joinpath(self.path, name)
     with open(subpath, 'wb') as f:
       for data in bfr:

@@ -1,8 +1,0 @@
-#!/bin/sh
-#
-# Run pip from my default virtualenv.
-#       - Cameron Simpson <cs@cskk.id.au> 08mar2014
-#
-
-set -uex
-exec venv pip ${1+"$@"}

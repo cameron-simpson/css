@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #
-# Datadir tests.
-# - Cameron Simpson <cs@cskk.id.au>
-#
+
+''' Datadir tests. - Cameron Simpson <cs@cskk.id.au>
+'''
 
 import os
 from os.path import abspath
@@ -11,10 +11,16 @@ import shutil
 import sys
 import tempfile
 import unittest
-from .randutils import rand0, randblock
-from .datadir import DataDir, DataDirIndexEntry
+from cs.logutils import setup_logging
+from cs.randutils import randomish_chunks
+from .datadir import DataDir, RawDataDir
 from .hash import HASHCLASS_BY_NAME
-from .index import class_names as indexclass_names, class_by_name as indexclass_by_name
+from .index import (
+    FileDataIndexEntry, class_names as indexclass_names, class_by_name as
+    indexclass_by_name
+)
+##import cs.x
+##cs.x.X_via_tty = True
 
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
@@ -26,12 +32,12 @@ def mktmpdir(flavour=None):
   if flavour is not None:
     prefix += '-' + flavour
   return abspath(
-      tempfile.mkdtemp(
-          prefix="datadir-test",
-          suffix=".dir",
-          dir='.'))
+      tempfile.mkdtemp(prefix="datadir-test", suffix=".dir", dir='.')
+  )
 
 class TestDataDir(unittest.TestCase):
+  ''' DataDir unit tests.
+  '''
 
   ##MAP_FACTORY = lambda self: DataDir(mktmpdir(), mktmpdir(), self.hashclass, self.indexclass)
 
@@ -40,6 +46,7 @@ class TestDataDir(unittest.TestCase):
     method_name = a.pop()
     if a:
       raise ValueError("unexpected arguments: %r" % (a,))
+    self.datadirclass = None
     self.indexdirpath = None
     self.datadirpath = None
     self.indexclass = None
@@ -64,11 +71,12 @@ class TestDataDir(unittest.TestCase):
     random.seed()
 
   def _open_default_datadir(self):
-    return DataDir(
+    return self.datadirclass(
         self.indexdirpath,
         self.hashclass,
         indexclass=self.indexclass,
-        rollover=self.rollover)
+        rollover=self.rollover
+    )
 
   def tearDown(self):
     self.datadir.close()
@@ -83,17 +91,20 @@ class TestDataDir(unittest.TestCase):
     ''' Test roundtrip of index entry encode/decode.
     '''
     for _ in range(RUN_SIZE):
-      rand_n = random.randint(0, 65536)
-      rand_offset = random.randint(0, 65536)
-      entry = DataDirIndexEntry(rand_n, rand_offset)
-      self.assertEqual(entry.n, rand_n)
-      self.assertEqual(entry.offset, rand_offset)
-      encoded = entry.encode()
+      filenum = random.randint(0, 65536)
+      data_offset = random.randint(0, 7)
+      data_length = random.randint(0, 65536)
+      flags = random.randint(0, 1)
+      entry = FileDataIndexEntry(filenum, data_offset, data_length, flags)
+      self.assertEqual(entry.filenum, filenum)
+      self.assertEqual(entry.data_offset, data_offset)
+      self.assertEqual(entry.data_length, data_length)
+      self.assertEqual(entry.flags, flags)
+      encoded = bytes(entry)
       self.assertIsInstance(encoded, bytes)
-      entry2 = DataDirIndexEntry.from_bytes(encoded)
+      entry2, post_offset = FileDataIndexEntry.from_bytes(encoded)
+      self.assertEqual(post_offset, len(encoded))
       self.assertEqual(entry, entry2)
-      self.assertEqual(entry2.n, rand_n)
-      self.assertEqual(entry2.offset, rand_offset)
 
   def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
@@ -104,9 +115,10 @@ class TestDataDir(unittest.TestCase):
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
+      block_source = randomish_chunks(0, MAX_BLOCK_SIZE + 1)
       for n in range(RUN_SIZE):
         with self.subTest(store_block_n=n):
-          data = randblock(rand0(MAX_BLOCK_SIZE + 1))
+          data = next(block_source)
           if data in by_data:
             continue
           hashcode = hashfunc(data)
@@ -122,6 +134,7 @@ class TestDataDir(unittest.TestCase):
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
           self.assertTrue(hashcode in D)
+          self.assertEqual(D[hashcode], data)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
@@ -130,6 +143,8 @@ class TestDataDir(unittest.TestCase):
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(hashcode in D)
           odata = by_hash[hashcode]
+          odata_hashcode = by_data[odata]
+          self.assertEqual(hashcode, odata_hashcode)
           data = D[hashcode]
           self.assertEqual(data, odata)
     # explicitly close the DataDir and reopen
@@ -151,6 +166,8 @@ class TestDataDir(unittest.TestCase):
           self.assertEqual(data, odata)
 
 def multitest_suite(testcase_class, *a, **kw):
+  ''' Make a test suite from the "test*" methods from a class.
+  '''
   suite = unittest.TestSuite()
   for method_name in dir(testcase_class):
     if method_name.startswith('test'):
@@ -159,12 +176,22 @@ def multitest_suite(testcase_class, *a, **kw):
   return suite
 
 def selftest(argv):
+  ''' Run the units tests permuted over the hash classes and index classes.
+  '''
   suite = unittest.TestSuite()
   for hashname in sorted(HASHCLASS_BY_NAME.keys()):
     hashclass = HASHCLASS_BY_NAME[hashname]
     for indexname in sorted(indexclass_names()):
       indexclass = indexclass_by_name(indexname)
-      suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
+      for datadirclass in DataDir, RawDataDir:
+        suite.addTest(
+            multitest_suite(
+                TestDataDir,
+                datadirclass=datadirclass,
+                hashclass=hashclass,
+                indexclass=indexclass
+            )
+        )
   runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)
   ##if False:
@@ -175,4 +202,5 @@ def selftest(argv):
   ##thread_dump()
 
 if __name__ == '__main__':
+  setup_logging(sys.argv[0])
   selftest(sys.argv)

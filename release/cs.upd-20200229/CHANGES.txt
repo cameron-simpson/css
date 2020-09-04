@@ -1,0 +1,8 @@
+lib/python/cs/upd.py: cs.upd: Upd: can now be used as a context manager, clearing the line on exit
+lib/python/cs/upd.py: cs.upd: Upd.without is now a context manager, returning the outer state, accption optional inner state (default "")
+lib/python/cs/upd.py: cs.upd: autoformat
+lib/python/cs/upd.py: cs.upd: make Upd a singleton factory per id(backend_stream)
+lib/python/cs/upd.py: cs.upd: Upd.__exit__: preserve status line is exiting with an exception
+lib/python/cs/upd.py: cs.upd: Upd.out: tweak cropping logic
+lib/python/cs/upd.py: cs.upd: nl: use "insert line above" mode if supported
+lib/python/cs/upd.py: cs.upd: docstring updates; move .close and .closed to near the top of the class

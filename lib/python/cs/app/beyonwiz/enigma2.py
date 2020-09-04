@@ -4,19 +4,31 @@
 #   - Cameron Simpson <cs@cskk.id.au>
 #
 
+''' Beyonwiz Enigma2 support, their modern recording format.
+'''
+
 import errno
 from collections import namedtuple
 import datetime
 import os.path
 import struct
+from cs.binary import structtuple
 from cs.logutils import warning
-from cs.pfx import Pfx
-from cs.py.func import prop
+from cs.pfx import Pfx, pfx_method
+from cs.py3 import datetime_fromisoformat
 from cs.threads import locked_property
 from cs.x import X
 from . import _Recording, RecordingMetaData
 
+# an "access poiint" record from the .ap file
+Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
+
+# a "cut" record from the .cuts file
+Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+
 class Enigma2MetaData(RecordingMetaData):
+  ''' Metadata for an Enigma2 recording.
+  '''
 
   def __init__(self, raw):
     RecordingMetaData.__init__(self, raw)
@@ -72,10 +84,14 @@ class Enigma2(_Recording):
   def metadata(self):
     ''' The metadata associated with this recording.
     '''
-    return Enigma2MetaData({
-        'meta': self.read_meta(),
-        'file': self.filename_metadata(),
-    })
+    return Enigma2MetaData(
+        {
+            'meta': self.read_meta(),
+            'file': self.filename_metadata(),
+            'cuts': self.read_cuts(),
+            'ap': self.read_ap(),
+        }
+    )
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.
@@ -91,16 +107,17 @@ class Enigma2(_Recording):
       fmeta['channel'] = channel
       fmeta['title'] = title
       time_fields = time_field.split()
-      if (
-          len(time_fields) != 2
-          or not all(_.isdigit() for _ in time_fields)
-          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
-      ):
+      if (len(time_fields) != 2 or not all(_.isdigit() for _ in time_fields)
+          or len(time_fields[0]) != 8 or len(time_fields[1]) != 4):
         warning('mailformed time field: %r', time_field)
       else:
         ymd, hhmm = time_fields
-        fmeta['datetime'] = datetime.datetime.strptime(ymd + hhmm, '%Y%m%d%H%M')
-        fmeta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+        isodate = (
+            ymd[:4] + '-' + ymd[4:6] + '-' + ymd[6:8] + 'T' + hhmm[:2] + ':' +
+            hhmm[2:4] + ':00'
+        )
+        fmeta['datetime'] = datetime_fromisoformat(isodate)
+        fmeta['start_time'] = ':'.join((hhmm[:2], hhmm[2:4]))
     return fmeta
 
   def _parse_path(self):
@@ -115,55 +132,33 @@ class Enigma2(_Recording):
   APInfo = namedtuple('APInfo', 'pts offset')
   CutInfo = namedtuple('CutInfo', 'pts type')
 
+  @staticmethod
+  def scanpath(path, packet_type):
+    ''' Read packets from `path`, yield packets, issue a warning
+        if the file is short or missing.
+    '''
+    with Pfx(path):
+      try:
+        yield from packet_type.parse_file(path)
+      except OSError as e:
+        if e.errno == errno.ENOENT:
+          warning("cannot open: %s", e)
+        raise
+      except EOFError as e:
+        warning("short file: %s", e)
+
+  @pfx_method
   def read_ap(self):
     ''' Read offsets and PTS information from a recording's .ap associated file.
         Return a list of APInfo named tuples.
     '''
-    path = self.appath
-    apdata = []
-    with Pfx("read_ap %r", path):
-      try:
-        with open(path, 'rb') as apfp:
-          while True:
-            data = apfp.read(16)
-            if not data:
-              break
-            if len(data) < 16:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), apfp.tell() - len(data))
-              break
-            pts, offset = struct.unpack('>QQ', data)
-            apdata.append(Enigma2.APInfo(pts, offset))
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          warning("cannot open: %s", e)
-        else:
-          raise
-      return apdata
+    return list(self.scanpath(self.appath, Enigma2APInfo))
 
+  @pfx_method
   def read_cuts(self):
-    path = self.cutpath
-    cuts = []
-    with Pfx("read_cuts %r", path):
-      try:
-        with open(path, 'rb') as cutfp:
-          while True:
-            data = cutfp.read(12)
-            if not data:
-              break
-            if len(data) < 12:
-              warning("incomplete read (%d bytes) at offset %d",
-                      len(data), cutfp.tell() - len(data))
-              break
-            pts, cut_type = struct.unpack('>QL', data)
-            cuts.append(Enigma2.CutInfo(pts, cut_type))
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          warning("cannot open: %s", e)
-        else:
-          raise
-    X("cuts = %r", cuts)
-    return cuts
+    ''' Read the edit cuts and return a list of `Enigma2.CutInfo`s.
+    '''
+    return list(self.scanpath(self.cutpath, Enigma2Cut))
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.

@@ -30,7 +30,6 @@ from os.path import basename, exists as pathexists
 import re
 from signal import signal, SIGHUP, SIGINT, SIGTERM
 import subprocess
-from subprocess import DEVNULL
 import sys
 from threading import RLock
 from time import sleep
@@ -41,6 +40,7 @@ from cs.logutils import setup_logging, info, warning, error
 from cs.pfx import Pfx
 from cs.psutils import pipefrom
 from cs.py.func import prop
+from cs.py3 import DEVNULL
 from cs.sh import quotecmd as shq
 
 DISTINFO = {
@@ -58,12 +58,11 @@ DISTINFO = {
         'cs.pfx',
         'cs.psutils',
         'cs.py.func',
+        'cs.py3',
         'cs.sh',
     ],
     'entry_points': {
-        'console_scripts': [
-            'portfwd = cs.app.portfwd:main'
-        ],
+        'console_scripts': ['portfwd = cs.app.portfwd:main'],
     },
 }
 
@@ -161,11 +160,18 @@ def main(argv=None, environ=None):
         raise GetoptError("%s: missing target" % (opt1,))
       target = argv.pop(0)
       if argv:
-        raise GetoptError("%s: extra arguments after target %r: %s"
-                          % (opt1, target, ' '.join(argv)))
-      PFs = Portfwds(ssh_config=sshcfg, target_list=(target,),
-                     auto_mode=auto_mode, trace=trace, verbose=verbose,
-                     flags=flags)
+        raise GetoptError(
+            "%s: extra arguments after target %r: %s" %
+            (opt1, target, ' '.join(argv))
+        )
+      PFs = Portfwds(
+          ssh_config=sshcfg,
+          target_list=(target,),
+          auto_mode=auto_mode,
+          trace=trace,
+          verbose=verbose,
+          flags=flags
+      )
       print(PFs.forward(target).test_shcmd())
       return 0
     argv.insert(0, opt1)
@@ -187,10 +193,14 @@ def main(argv=None, environ=None):
         else:
           raise RuntimeError('unhandled option')
     if not argv and not auto_mode:
-      raise GetoptError("missing targets; targets or -A (auto) option required")
+      raise GetoptError(
+          "missing targets; targets or -A (auto) option required"
+      )
     target_list = argv
     if once and (auto_mode or len(target_list) != 1):
-      raise GetoptError("once (-1) requires no auto mode (-A) and exactly one target")
+      raise GetoptError(
+          "once (-1) requires no auto mode (-A) and exactly one target"
+      )
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -198,21 +208,28 @@ def main(argv=None, environ=None):
     print(usage, file=sys.stderr)
     return 2
 
-  PFs = Portfwds(ssh_config=sshcfg, target_list=argv,
-                 auto_mode=auto_mode, trace=trace, verbose=verbose,
-                 flags=flags)
+  PFs = Portfwds(
+      ssh_config=sshcfg,
+      target_list=argv,
+      auto_mode=auto_mode,
+      trace=trace,
+      verbose=verbose,
+      flags=flags
+  )
   if not doit:
     for target in sorted(PFs.targets_required()):
       print(PFs.forward(target))
     return 0
 
   running = True
+
   def signal_handler(*_):
     ''' Action on signal receipt: stop the portfwds and wait, then exit(1).
     '''
     PFs.stop()
     PFs.wait()
     sys.exit(1)
+
   signal(SIGHUP, signal_handler)
   signal(SIGINT, signal_handler)
   signal(SIGTERM, signal_handler)
@@ -224,14 +241,34 @@ def main(argv=None, environ=None):
   return 0
 
 class Portfwd(FlaggedMixin):
-  ''' A ssh tunnel built on a SvcD.
+  ''' An ssh tunnel built on a SvcD.
   '''
 
   def __init__(
       self,
-      target, ssh_config=None, conditions=(),
-      test_shcmd=None, trace=False, verbose=False, flags=None
+      target,
+      ssh_config=None,
+      conditions=(),
+      test_shcmd=None,
+      trace=False,
+      verbose=False,
+      flags=None
   ):
+    ''' Initialise the Portfwd.
+
+        Parameters:
+        * `target`: the tunnel name, and also the name of the ssh configuration used
+        * `ssh_config`: ssh configuration file if not the default
+        * `conditions`: an iterable of `Condition`s
+          which must hold before the tunnel is set up;
+          the tunnel also aborts if these cease to hold
+        * `test_shcmd`: a shell command which must succeed
+          before the tunnel is set up;
+          the tunnel also aborts if this command subsequently fails
+        * `trace`: issue tracing messages; default `False`
+        * `verbose`: be verbose; default `False`
+        * `flags`: optional preexisting `Flags` instance
+    '''
     self.name = 'portfwd-' + target
     FlaggedMixin.__init__(self, flags=flags)
     self.test_shcmd = test_shcmd
@@ -288,12 +325,18 @@ class Portfwd(FlaggedMixin):
       argv.append('-v')
     if self.ssh_config:
       argv.extend(['-F', self.ssh_config])
-    argv.extend([
-        '-N', '-T',
-        '-o', 'ExitOnForwardFailure=yes',
-        '-o', 'PermitLocalCommand=yes',
-        '-o', 'LocalCommand=' + self.ssh_localcommand,
-    ])
+    argv.extend(
+        [
+            '-N',
+            '-T',
+            '-o',
+            'ExitOnForwardFailure=yes',
+            '-o',
+            'PermitLocalCommand=yes',
+            '-o',
+            'LocalCommand=' + self.ssh_localcommand,
+        ]
+    )
     if not bare:
       argv.extend(['--', self.target])
     return argv
@@ -306,10 +349,7 @@ class Portfwd(FlaggedMixin):
       argv = self.ssh_argv(bare=True) + ['-G', '--', self.target]
       P = pipefrom(argv)
       options = defaultdict(list)
-      parsed = [
-          line.strip().split(None, 1)
-          for line in P.stdout
-      ]
+      parsed = [line.strip().split(None, 1) for line in P.stdout]
       retcode = P.wait()
       if retcode != 0:
         error("%r: non-zero return code: %s", argv, retcode)
@@ -325,12 +365,15 @@ class Portfwd(FlaggedMixin):
   def ssh_localcommand(self):
     ''' Shell command for ssh to invoke on connection ready.
     '''
-    setflag_argv = [ 'flag', '-w', self.flagname_connected, '1' ]
+    setflag_argv = ['flag', '-w', self.flagname_connected, '1']
     alert_group = self.group_name
     alert_title = self.target.upper()
     alert_message = 'CONNECTED: ' + self.target
-    alert_argv = [ 'alert', '-g', alert_group, '-t', alert_title, '--', alert_message ]
-    shcmd = 'exec </dev/null; ' + shq(setflag_argv) + '; ' + shq(alert_argv) + ' &'
+    alert_argv = [
+        'alert', '-g', alert_group, '-t', alert_title, '--', alert_message
+    ]
+    shcmd = 'exec </dev/null; ' + shq(setflag_argv
+                                      ) + '; ' + shq(alert_argv) + ' &'
     return shcmd
 
   def on_spawn(self):
@@ -352,10 +395,11 @@ class Portfwd(FlaggedMixin):
               raise
           else:
             info("removed")
-    if (
-        options['controlmaster'] == ['true', ]
-        and options['controlpath'] != ['none', ]
-    ):
+    if (options['controlmaster'] == [
+        'true',
+    ] and options['controlpath'] != [
+        'none',
+    ]):
       controlpath, = options['controlpath']
       with Pfx("remove %r", controlpath):
         try:
@@ -376,28 +420,55 @@ class Portfwd(FlaggedMixin):
   def test_func(self):
     ''' Servuice test function: probe all the conditions.
     '''
-    for condition in self.conditions:
-      if not condition.probe():
-        if self.verbose:
-          info('failed precondition: %s', condition)
-        return False
-    if self.test_shcmd:
-      shcmd_ok = os.system(self.test_shcmd) == 0
-      if not shcmd_ok:
-        info('failed shell command: %r', self.test_shcmd)
-        return False
-    return True
+    with Pfx("%s[%s].test_func", type(self).__name__, self.name):
+      for condition in self.conditions:
+        with Pfx("precondition %s", condition):
+          if not condition.probe():
+            if self.verbose:
+              info('FAILED')
+            return False
+      if self.test_shcmd:
+        with Pfx("test_shcmd %r", self.test_shcmd):
+          shcmd_ok = os.system(self.test_shcmd) == 0
+          if not shcmd_ok:
+            info('FAILED')
+            return False
+      return True
 
 class Portfwds(object):
-  ''' A collection of Portfwd instances and associate control methods.
+  ''' A collection of `Portfwd` instances and associated control methods.
   '''
 
-  def __init__(self, ssh_config=None, environ=None, target_list=None,
-               auto_mode=None, trace=False, verbose=False, flags=None):
+  def __init__(
+      self,
+      ssh_config=None,
+      environ=None,
+      target_list=None,
+      auto_mode=None,
+      trace=False,
+      verbose=False,
+      flags=None
+  ):
+    ''' Initialise the `Portfwds` instance.
+
+        Parameters:
+        * `ssh_config`: the ssh configuration file if not the default
+        * `environ`: the environment mapping to use;
+          default: `os.environ`
+        * `target_list`: an iterable of `Portfwd` target names
+        * `auto_mode`: also derive target names
+          from the set of true `PORTFWD_`*name*`_AUTO` flags
+        * `trace`: trace mode, default `False`
+        * `verbose`: verbose mode, default `False`
+        * `flags`: the `cs.app.flags.Flags` instance to use,
+          default is to construct a new one
+    '''
     if environ is None:
       environ = os.environ
     if target_list is None:
       target_list = []
+    else:
+      target_list = list(target_list)
     if auto_mode is None:
       auto_mode = False
     if flags is None:
@@ -431,9 +502,13 @@ class Portfwds(object):
       P = self._forwards[target]
     except KeyError:
       info("instantiate new target %r", target)
-      P = Portfwd(target, ssh_config=self.ssh_config,
-                  trace=self.trace, flags=self.flags,
-                  conditions=self.target_conditions[target])
+      P = Portfwd(
+          target,
+          ssh_config=self.ssh_config,
+          trace=self.trace,
+          flags=self.flags,
+          conditions=self.target_conditions[target]
+      )
       self._forwards[target] = P
     return P
 
@@ -485,11 +560,8 @@ class Portfwds(object):
       targets.update(self.resolve_target_spec(spec))
     if self.auto_mode:
       for flagname in self.flags:
-        if (
-            flagname.startswith('PORTFWD_')
-            and flagname.endswith('_AUTO')
-            and self.flags[flagname]
-        ):
+        if (flagname.startswith('PORTFWD_') and flagname.endswith('_AUTO')
+            and self.flags[flagname]):
           targets.add(lowername(flagname[8:-5]))
     return targets
 
@@ -609,9 +681,7 @@ class _PortfwdCondition(object):
 
   def __str__(self):
     return "%s%s[%s]" % (
-        self.__class__.__name__,
-        '!' if self.invert else '',
-        ','.join(
+        self.__class__.__name__, '!' if self.invert else '', ','.join(
             "%s=%r" % (attr, getattr(self, attr))
             for attr in sorted(self._attrnames)
         )
@@ -670,7 +740,7 @@ class PingCondition(_PortfwdCondition):
   def __init__(self, portfwd, invert, ping_target):
     super().__init__(portfwd, invert)
     self.ping_target = ping_target
-    self.ping_argv = [ 'ping', '-c', '1', '-t', '3', self.ping_target ]
+    self.ping_argv = ['ping', '-c', '1', '-t', '3', self.ping_target]
 
   @prop
   def test_argv(self):
@@ -684,8 +754,8 @@ class PingCondition(_PortfwdCondition):
     if trace:
       info("run %r", self.ping_argv)
     retcode = subprocess.call(
-        self.ping_argv,
-        stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL)
+        self.ping_argv, stdin=DEVNULL, stdout=DEVNULL, stderr=DEVNULL
+    )
     return retcode == 0
 
 if __name__ == '__main__':

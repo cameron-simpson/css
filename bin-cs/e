@@ -27,7 +27,8 @@ else
   if [ $# = 1 ] && [ -d "$1/." ]
   then
     cd "$1"
-    erename
+    fstags edit
+    ##erename -a
   else
     if [ -n "${ITERM_SESSION_ID:-}" ]
     then

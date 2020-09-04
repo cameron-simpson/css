@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Read Apache log lines from stdin, annotate with UNIX time, pipe into
 # sort and de-annotate.

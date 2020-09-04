@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Apply ID3 tags to files based on their pathname.
 #   - Cameron Simpson <cs@cskk.id.au> 24aug2014

@@ -1,0 +1,1 @@
+BaseProgress.bar, progressbar: new optional update_frequency parameter for less frequent updates.

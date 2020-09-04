@@ -4,62 +4,67 @@
 #
 
 '''
-Functions for decomposing nonnegative integers according to various unit scales.
+Functions for decomposing nonnegative integers according to various unit scales
+and also parsing support for values written in scales.
 
 Presupplied scales:
-* `BINARY_BYTES_SCALE`: Units of (B)ytes, KiB, MiB, GiB etc.
-* `DECIMAL_BYTES_SCALE`: Units of (B)ytes, KB, MB, GB etc.
-* `DECIMAL_SCALE`: Unit prefixes K, M, G etc.
+* `BINARY_BYTES_SCALE`: Binary units of (B)ytes, KiB, MiB, GiB etc.
+* `DECIMAL_BYTES_SCALE`: Decimal units of (B)ytes, KB, MB, GB etc.
+* `DECIMAL_SCALE`: Unit suffixes K, M, G etc.
 * `TIME_SCALE`: Units of (s)econds, (m)inutes, (h)ours, (d)ays and (w)eeks.
+* `UNSCALED_SCALE`: no units
 '''
 
-from string import ascii_letters
 from cs.lex import get_chars, get_decimal, skipwhite
 
+__version__ = '20200718-post'
+
 DISTINFO = {
-    'description': "unit suffixes for nonnegative integers; parsing and transcription",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.lex'],
 }
 
+UNSCALED_SCALE = ((0, ''),)
+
 TIME_SCALE = (
-    ( 60, 's' ),
-    ( 60, 'm' ),
-    ( 24, 'h' ),
-    ( 7, 'd' ),
-    ( 0, 'w' ),
+    (60, 's'),
+    (60, 'm'),
+    (24, 'h'),
+    (7, 'd'),
+    (0, 'w'),
 )
 
+# BINARY BYTES CALE
 BINARY_BYTES_SCALE = (
-    ( 1024, 'B' ),
-    ( 1024, 'KiB' ),
-    ( 1024, 'MiB' ),
-    ( 1024, 'GiB' ),
-    ( 1024, 'TiB' ),
-    ( 0, 'PiB' ),
+    (1024, 'B'),
+    (1024, 'KiB'),
+    (1024, 'MiB'),
+    (1024, 'GiB'),
+    (1024, 'TiB'),
+    (0, 'PiB'),
 )
 
 DECIMAL_BYTES_SCALE = (
-    ( 1000, 'B' ),
-    ( 1000, 'KB' ),
-    ( 1000, 'MB' ),
-    ( 1000, 'GB' ),
-    ( 1000, 'TB' ),
-    ( 0, 'PB' ),
+    (1000, 'B'),
+    (1000, 'KB'),
+    (1000, 'MB'),
+    (1000, 'GB'),
+    (1000, 'TB'),
+    (0, 'PB'),
 )
 
 DECIMAL_SCALE = (
-    ( 1000, '' ),
-    ( 1000, 'K' ),
-    ( 1000, 'M' ),
-    ( 1000, 'G' ),
-    ( 1000, 'T' ),
-    ( 0, 'P' ),
+    (1000, ''),
+    (1000, 'K'),
+    (1000, 'M'),
+    (1000, 'G'),
+    (1000, 'T'),
+    (0, 'P'),
 )
 
 def human(n, scale):
@@ -68,17 +73,17 @@ def human(n, scale):
       Parameters:
       * `n`: a nonnegative integer.
       * `scale`: a sequence of `(factor,unit)` where factor is the
-        size factor to the follow scale and `unit` is the designator
-        of the unit.
+        size factor to the following scale item
+        and `unit` is the designator of the unit.
   '''
   components = []
   for factor, unit in scale:
     if factor == 0:
-      components.append( (n, unit) )
+      components.append((n, unit))
       n = 0
       break
     remainder = n % factor
-    components.append( (remainder, unit) )
+    components.append((remainder, unit))
     n //= factor
     if n == 0:
       break
@@ -136,7 +141,8 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   for count, unit in reversed(components):
     if skip_zero and count == 0:
       continue
-    text.append( str(count) + unit )
+    count_i = int(count)
+    text.append( (str(count_i) if count_i == count else "%.1f" % count) + unit )
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
@@ -145,10 +151,12 @@ def transcribe_bytes_geek(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `BINARY_BYTES_SCALE`.
   '''
   return transcribe(n, BINARY_BYTES_SCALE, max_parts=max_parts, **kw)
+
 def transcribe_bytes_human(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `DECIMAL_BYTES_SCALE`.
   '''
   return transcribe(n, DECIMAL_BYTES_SCALE, max_parts=max_parts, **kw)
+
 def transcribe_time(n, max_parts=3, **kw):
   ''' Transcribe a nonnegative integer `n` against `TIME_SCALE`.
   '''
@@ -172,7 +180,7 @@ def parse(s, scale, offset=0):
   value = int(value_s)
   offset = skipwhite(s, offset2)
   if offset < len(s):
-    vunit, offset = get_chars(s, offset, ascii_letters)
+    vunit, offset = get_chars(s, offset, str.isalpha)
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()

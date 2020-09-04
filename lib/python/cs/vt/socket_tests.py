@@ -11,7 +11,6 @@ import errno
 import sys
 import unittest
 from .hash import HashUtilDict
-from .hash_tests import _TestHashCodeUtils
 from .socket import TCPStoreServer, TCPClientStore
 from .store import MappingStore
 from .store_tests import TestStore
@@ -20,9 +19,13 @@ BIND_HOST = '127.0.0.1'
 BASE_PORT = 9999
 
 def make_tcp_store():
+  ''' prepare a TCP based Store.
+  '''
   global BASE_PORT
   base_port = BASE_PORT
-  mapping_S = MappingStore("tcp_tests.make_tcp_store.mapping_S", HashUtilDict())
+  mapping_S = MappingStore(
+      "tcp_tests.make_tcp_store.mapping_S", HashUtilDict()
+  )
   while True:
     bind_addr = (BIND_HOST, base_port)
     try:
@@ -53,23 +56,6 @@ class TestTCPStore(TestStore, unittest.TestCase):
   def tearDown(self):
     self.remote_S.close()
     TestStore.tearDown(self)
-
-class TestHashCodeUtilsTCPStore(_TestHashCodeUtils, unittest.TestCase):
-  ''' Test HashUtils on a TCPStore on a HashUtilDict.
-  '''
-
-  def MAP_FACTORY(self):
-    ''' Return context manager for this test's resources.
-    '''
-    S, remote_S = make_tcp_store()
-    remote_S.open()
-    self.remote_S = remote_S
-    return S
-
-  def tearDown(self):
-    self.remote_S.close()
-    _TestHashCodeUtils.tearDown(self)
-    ##debug_object_shell(self, prompt='%s.tearDown> ' % (self._testMethodName,))
 
 def selftest(argv):
   ''' Run the unit tests with `argv`.

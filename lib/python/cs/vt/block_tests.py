@@ -8,17 +8,19 @@
 '''
 
 import sys
+sys.setrecursionlimit(10000)
 from random import choice
 import unittest
 from cs.binary_tests import _TestPacketFields
-from .randutils import rand0, randblock
-from . import totext, block as block_module
+from cs.randutils import rand0, randomish_chunks
+from . import block as block_module
 from .block import Block, \
     IndirectBlock, \
     RLEBlock, LiteralBlock, SubBlock, \
-    verify_block, BlockType, \
+    BlockType, \
     BlockRecord
 from .store import MappingStore
+from .transcribe import hexify
 
 class TestDataFilePacketFields(_TestPacketFields, unittest.TestCase):
   ''' Hook to test the hash PacketFields.
@@ -37,6 +39,7 @@ class TestAll(unittest.TestCase):
     ''' Make a dict backed MappingStore.
     '''
     self.S = MappingStore("TestAll", {})
+    self.random_chunk_source = randomish_chunks(16, 16384)
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):
@@ -45,16 +48,11 @@ class TestAll(unittest.TestCase):
       BR2, offset = BlockRecord.from_bytes(BRbs)
       self.assertEqual(offset, len(BRbs))
       self.assertEqual(BR, BR2)
-      for err in verify_block(B):
-        raise ValueError("verify_block(%s): %s" % (B, err))
-      errs = list(verify_block(B, **kw))
-      self.assertEqual(errs, [])
+      self.assertTrue(B.fsck(recurse=True))
 
-  def _make_random_Block(self, block_type=None, size=None, leaf_only=False):
-    with self.subTest(
-        task="_make_random_Block",
-        block_type=block_type, size=size, leaf_only=leaf_only
-    ):
+  def _make_random_Block(self, block_type=None, leaf_only=False):
+    with self.subTest(task="_make_random_Block", block_type=block_type,
+                      leaf_only=leaf_only):
       if block_type is None:
         choices = [
             BlockType.BT_HASHCODE,
@@ -65,36 +63,34 @@ class TestAll(unittest.TestCase):
           choices.append(BlockType.BT_SUBBLOCK)
           choices.append(BlockType.BT_INDIRECT)
         block_type = choice(choices)
-      if size is None:
-        size = rand0(16385)
       with self.subTest(
           subtask="instantiate",
-          block_type=block_type, size=size,
+          block_type=block_type,
       ):
         if block_type == BlockType.BT_INDIRECT:
           subblocks = [self._make_random_Block() for _ in range(rand0(8))]
-          B = IndirectBlock(subblocks, force=True)
+          B = IndirectBlock.from_subblocks(subblocks, force=True)
         elif block_type == BlockType.BT_HASHCODE:
-          rs = randblock(size)
+          rs = next(self.random_chunk_source)
           B = Block(data=rs)
           # we can get a literal block back - this is acceptable
           if B.type == BlockType.BT_LITERAL:
             block_type = BlockType.BT_LITERAL
         elif block_type == BlockType.BT_RLE:
           rb = bytes((rand0(256),))
-          B = RLEBlock(size, rb)
+          B = RLEBlock(rand0(65535), rb)
         elif block_type == BlockType.BT_LITERAL:
-          rs = randblock(size)
+          rs = next(self.random_chunk_source)
           B = LiteralBlock(data=rs)
         elif block_type == BlockType.BT_SUBBLOCK:
           B2 = self._make_random_Block()
           self._verify_block(B2)
-          if len(B2) == 0:
-            suboffset = 0
-            subspan = 0
-          else:
+          if B2:
             suboffset = rand0(B2.span)
             subspan = rand0(B2.span - suboffset)
+          else:
+            suboffset = 0
+            subspan = 0
           B = SubBlock(B2, suboffset, subspan)
           # SubBlock returns an empty literal for an empty subblock
           if subspan == 0:
@@ -102,9 +98,11 @@ class TestAll(unittest.TestCase):
         else:
           raise ValueError("unknow block type")
         self.assertEqual(
-            B.type, block_type,
-            "new Block is wrong type: %r, should be %r"
-            % (B.type, block_type,))
+            B.type, block_type, "new Block is wrong type: %r, should be %r" % (
+                B.type,
+                block_type,
+            )
+        )
         self._verify_block(B)
       return B
 
@@ -113,9 +111,8 @@ class TestAll(unittest.TestCase):
     '''
     with self.S:
       for _ in range(16):
-        size = rand0(16385)
-        rs = randblock(size)
-        self.assertEqual(len(rs), size)
+        rs = next(self.random_chunk_source)
+        size = len(rs)
         B = Block(data=rs)
         self._verify_block(B)
         self.assertEqual(len(B), size)
@@ -138,23 +135,25 @@ class TestAll(unittest.TestCase):
             total_length += B.span
             chunks.append(B.get_spanned_data())
           fullblock = b''.join(chunks)
-          IB = IndirectBlock(subblocks=subblocks, force=True)
+          IB = IndirectBlock.from_subblocks(subblocks=subblocks, force=True)
           self._verify_block(IB, recurse=True)
           IBspan = IB.span
           self.assertEqual(
               IBspan, total_length,
-              "IBspan(%d) != total_length(%d)" % (IB.span, total_length))
+              "IBspan(%d) != total_length(%d)" % (IB.span, total_length)
+          )
           IBH = IB.superblock.hashcode
           IBdata = IB.get_spanned_data()
           self.assertEqual(len(IBdata), total_length)
           self.assertEqual(IBdata, fullblock)
           # refetch block by hashcode
-          IB2 = IndirectBlock(hashcode=IBH, span=len(IBdata))
+          IB2 = IndirectBlock.from_hashcode(hashcode=IBH, span=len(IBdata))
           self._verify_block(IB2, recurse=True)
           IB2data = IB2.get_spanned_data()
           self.assertEqual(
               IBdata, IB2data,
-              "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
+              "IB:  %s\nIB2: %s" % (hexify(IBdata), hexify(IB2data))
+          )
           for _ in range(32):
             with self.subTest(loop2=_):
               start = rand0(len(IB) + 1)
@@ -167,12 +166,14 @@ class TestAll(unittest.TestCase):
                 self.assertEqual(len(chunk1a), length)
                 self.assertEqual(
                     chunk1, chunk1a,
-                    "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end))
+                    "IB[%d:%d] != fullblock[%d:%d]" % (start, end, start, end)
+                )
                 chunk2 = IB2[start:end]
                 self.assertEqual(len(chunk2), length)
                 self.assertEqual(
                     chunk1, chunk2,
-                    "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end))
+                    "IB[%d:%d] != IB2[%d:%d]" % (start, end, start, end)
+                )
 
   def test02RoundTripSingleBlock(self):
     ''' Generate various block types, serialise then deserialise each.
@@ -189,16 +190,17 @@ class TestAll(unittest.TestCase):
           B2, offset = BlockRecord.value_from_bytes(Bserial)
           self.assertEqual(
               offset, len(Bserial),
-              "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial)))
+              "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial))
+          )
           self._verify_block(B2)
           if block_type != BlockType.BT_INDIRECT:
             self.assertEqual(B.type, B2.type, "block types differ")
             self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
           self.assertEqual(B.span, B2.span, "span lengths differ")
           self.assertEqual(
-                  B.get_spanned_data(),
-                  B2.get_spanned_data(),
-                  "spanned data differ")
+              B.get_spanned_data(), B2.get_spanned_data(),
+              "spanned data differ"
+          )
           Btype = B2.type
           if Btype == BlockType.BT_INDIRECT:
             self.assertTrue(B.indirect)
@@ -216,7 +218,8 @@ class TestAll(unittest.TestCase):
               self._verify_block(B2.superblock)
             else:
               raise unittest.SkipTest(
-                  "no type specific tests for Block type %r" % (block_type,))
+                  "no type specific tests for Block type %r" % (block_type,)
+              )
 
 def selftest(argv):
   ''' Run the unit tests.

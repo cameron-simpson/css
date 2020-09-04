@@ -1,0 +1,2 @@
+New env_no_color() test function honouring the $NO_COLOUR envvar per https://no-color.org/
+colourise: get the "normal" default from the global NORMAL_COLOUR.

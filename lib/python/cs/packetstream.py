@@ -24,7 +24,16 @@ from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.result import Result
 from cs.seq import seq, Seq
-from cs.threads import locked
+from cs.threads import locked, bg as bg_thread
+
+def tick_fd_2(bs):
+  ''' A low level tick function to write a short binary tick
+      to the standard error file descriptor.
+
+      This may be called by the send and receive workers to give
+      an indication of activity type.
+  '''
+  os.write(2, bs)
 
 DISTINFO = {
     'description': "general purpose bidirectional packet stream connection",
@@ -35,7 +44,20 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: System :: Networking",
     ],
-    'install_requires': ['cs.logutils', 'cs.pfx'],
+    'install_requires': [
+        'cs.binary',
+        'cs.buffer',
+        'cs.excutils',
+        'cs.later',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.predicate',
+        'cs.queues',
+        'cs.resources',
+        'cs.result',
+        'cs.seq',
+        'cs.threads'
+    ]
 }
 
 # default pause before flush to allow for additional packet data to arrive
@@ -135,7 +157,10 @@ class PacketConnection(object):
   # special packet indicating end of stream
   EOF_Packet = Packet(True, 0, 0, 0, 0, b'')
 
-  def __init__(self, recv, send, request_handler=None, name=None):
+  def __init__(self,
+      recv, send,
+      request_handler=None, name=None,
+      packet_grace=None, tick=None):
     ''' Initialise the PacketConnection.
 
         Parameters:
@@ -150,6 +175,12 @@ class PacketConnection(object):
           For a file descriptor sending is done via an os.dup() of
           the supplied descriptor, so the caller remains responsible
           for closing the original descriptor.
+        * `packet_grace`:
+          default pause in the packet sending worker
+          to allow another packet to be queued
+          before flushing the output stream.
+          Default: `DEFAULT_PACKET_GRACE`s.
+          A value of `0` will flush immediately if the queue is empty.
         * `request_handler`: an optional callable accepting
           (`rq_type`, `flags`, `payload`).
           The request_handler may return one of 5 values on success:
@@ -161,6 +192,10 @@ class PacketConnection(object):
           * `(int, bytes)`: Specify flags and payload for response.
           An unsuccessful request should raise an exception, which
           will cause a failure response packet.
+        * `tick`: optional tick parameter, default `None`.
+          If `None`, do nothing.
+          If a Boolean, call `tick_fd_2` if true, otherwise do nothing.
+          Otherwise `tick` should be a callable accepting a byteslike value.
     '''
     if name is None:
       name = str(seq())
@@ -175,7 +210,18 @@ class PacketConnection(object):
       self._send = os.fdopen(os.dup(send), 'wb')
     else:
       self._send = send
+    if packet_grace is None:
+      packet_grace = DEFAULT_PACKET_GRACE
+    if tick is None:
+      tick = lambda bs: None
+    elif isinstance(tick, bool):
+      if tick:
+        tick = tick_fd_2
+      else:
+        tick = lambda bs: None
+    self.packet_grace = packet_grace
     self.request_handler = request_handler
+    self.tick = tick
     # tags of requests in play against the local system
     self._channel_request_tags = {0: set()}
     self.notify_recv_eof = set()
@@ -193,18 +239,11 @@ class PacketConnection(object):
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
-    self.packet_grace = DEFAULT_PACKET_GRACE
     # dispatch Thread to process received packets
-    self._recv_thread = Thread(
-        target=self._receive_loop,
-        name="%s[_receive_loop]" % (self.name,))
-    self._recv_thread.start()
+    self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
-    self._send_thread = Thread(
-        target=self._send_loop,
-        name="%s[_send]" % (self.name,))
-    self._send_thread.start()
+    self._send_thread = bg_thread(self._send_loop, name="%s[_send]" % (self.name,))
     # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()
     self.__send_queued = set()
@@ -397,14 +436,15 @@ class PacketConnection(object):
         self._respond(channel, tag, result_flags, result_payload)
       self._channel_request_tags[channel].remove(tag)
 
-  @logexc
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
+    XX = self.tick
     with PrePfx("_RECEIVE [%s]", self):
       with post_condition( ("_recv is None", lambda: self._recv is None) ):
         while True:
           try:
+            XX(b'<')
             packet = Packet.from_buffer(self._recv)
           except EOFError:
             break
@@ -487,35 +527,39 @@ class PacketConnection(object):
         self._recv = None
         self.shutdown()
 
-  @logexc
   def _send_loop(self):
     ''' Send packets upstream.
         Write every packet directly to self._send.
         Flush whenever the queue is empty.
     '''
+    XX = self.tick
     ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
       with post_condition( ("_send is None", lambda: self._send is None) ):
         fp = self._send
         Q = self._sendQ
+        grace = self.packet_grace
         for P in Q:
           sig = (P.channel, P.tag, P.is_request)
           if sig in self.__sent:
             raise RuntimeError("second send of %s" % (P,))
           self.__sent.add(sig)
           try:
+            XX(b'>')
             for bs in P.transcribe_flat():
               fp.write(bs)
             if Q.empty():
               # no immediately ready further packets: flush the output buffer
-              grace = self.packet_grace
               if grace > 0:
                 # allow a little time for further Packets to queue
+                XX(b'Sg')
                 sleep(grace)
                 if Q.empty():
                   # still nothing
+                  XX(b'F')
                   fp.flush()
               else:
+                XX(b'F')
                 fp.flush()
           except OSError as e:
             if e.errno == errno.EPIPE:
@@ -523,6 +567,7 @@ class PacketConnection(object):
               break
             raise
         try:
+          XX(b'>EOF')
           for bs in self.EOF_Packet.transcribe_flat():
             fp.write(bs)
           fp.close()

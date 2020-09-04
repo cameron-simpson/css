@@ -7,7 +7,7 @@ from functools import lru_cache
 import sqlite3
 from threading import RLock
 from cs.dbutils import TableSpace, Table, Row
-from cs.deco import cached
+from cs.deco import cachedmethod
 from cs.logutils import setup_logging, warning
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -261,7 +261,7 @@ class TagTable(MetadataTable):
     return ' '.join(tagname.strip().lower().split())
 
   @prop
-  @cached
+  @cachedmethod
   def default_root(self):
     root, = self.rows_where(name=None, parent_id=None)
     return root
@@ -302,7 +302,7 @@ class TagRow(MetadataRow):
     return self.id if self.parent_id is None else self.root_id
 
   @prop
-  @cached
+  @cachedmethod
   def parent(self):
     ''' Parent TagnodeRow or None.
     '''

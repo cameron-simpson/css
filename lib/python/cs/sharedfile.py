@@ -25,7 +25,8 @@ from cs.range import Range
 from cs.timeutils import TimeoutError
 
 DISTINFO = {
-    'description': "facilities for shared access to files",
+    'description':
+    "facilities for shared access to files",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -69,15 +70,16 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
   lockpath = path + ext
   while True:
     try:
-      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+      lockfd = os.open(lockpath, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0)
     except OSError as e:
       if e.errno != errno.EEXIST:
         raise
       if timeout is not None and timeout <= 0:
         # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
+        raise TimeoutError(
+            "cs.fileutils.lockfile: pid %d timed out on lockfile %r" %
+            (os.getpid(), lockpath), timeout
+        )
       now = time.time()
       # post: timeout is None or timeout > 0
       if start is None:
@@ -87,8 +89,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
       else:
         if now - complaint_last >= complaint_interval:
-          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
-                  os.getpid(), now - start, lockpath)
+          warning(
+              "cs.fileutils.lockfile: pid %d waited %ds for %r", os.getpid(),
+              now - start, lockpath
+          )
           complaint_last = now
           complaint_interval *= 2
       # post: start is set
@@ -98,9 +102,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         sleep_for = min(poll_interval, start + timeout - now)
       # test for timeout
       if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
-                           % (os.getpid(), lockpath),
-                           timeout)
+        raise TimeoutError(
+            "cs.fileutils.lockfile: pid %d timed out on lockfile %r" %
+            (os.getpid(), lockpath), timeout
+        )
       time.sleep(sleep_for)
       continue
     else:
@@ -135,9 +140,17 @@ class SharedAppendFile(object):
       received data into their natural records.
   '''
 
-  def __init__(self, pathname,
-               read_only=False, write_only=False, binary=False, newline=None,
-               lock_ext=None, lock_timeout=None, poll_interval=None):
+  def __init__(
+      self,
+      pathname,
+      read_only=False,
+      write_only=False,
+      binary=False,
+      newline=None,
+      lock_ext=None,
+      lock_timeout=None,
+      poll_interval=None
+  ):
     ''' Initialise this SharedAppendFile.
 
         Parameters:
@@ -255,10 +268,12 @@ class SharedAppendFile(object):
             with self._lockfile():
                 ... write data ...
     '''
-    return lockfile(self.pathname,
-                    ext=self.lock_ext,
-                    poll_interval=self.poll_interval,
-                    timeout=self.lock_timeout)
+    return lockfile(
+        self.pathname,
+        ext=self.lock_ext,
+        poll_interval=self.poll_interval,
+        timeout=self.lock_timeout
+    )
 
   @contextmanager
   def open(self):
@@ -343,8 +358,7 @@ class SharedAppendLines(SharedAppendFile):
   def __init__(self, *a, **kw):
     if 'binary' in kw:
       raise ValueError('may not specify binary=')
-    else:
-      kw['binary'] = False
+    kw['binary'] = False
     super().__init__(*a, **kw)
 
   def __iter__(self):
@@ -365,9 +379,8 @@ class SharedCSVFile(SharedAppendLines):
   def __iter__(self):
     ''' Yield csv rows.
     '''
-    for row in csv.reader( (line for line in super().__iter__()),
-                           dialect=self.dialect,
-                           **self.fmtparams):
+    for row in csv.reader((line for line in super().__iter__()),
+                          dialect=self.dialect, **self.fmtparams):
       yield row
 
   @contextmanager
@@ -376,6 +389,49 @@ class SharedCSVFile(SharedAppendLines):
     '''
     with self.open() as wfp:
       yield csv.writer(wfp, dialect=self.dialect, **self.fmtparams)
+
+class SharedWriteable(object):
+  ''' Wrapper for a writable file with supported mutex based cooperation.
+
+      This is mostly a proxy for the wrapped file
+      exceptthat all `.write` calls are serialised
+      and when used as a context manager
+      other writers are blocked.
+
+      This is to support shared use of an output stream
+      where certain outputs should be contiguous,
+      such as a standard error stream used to maintain a status line
+      or multiline messages.
+  '''
+
+  def __init__(self, f):
+    self.f = f
+    self._lock = RLock()
+
+  def __enter__(self):
+    ''' Take the lock and return.
+    '''
+    self._lock.acquire()
+    return self
+
+  def __exit__(self, *_):
+    ''' Release the lock and proceed.
+    '''
+    self._lock.release()
+    return False
+
+  def __getattr__(self, attr):
+    ''' This object is mostly a proxy for the wrapped file.
+    '''
+    with Pfx("%s.%s from self.f<%s>.%s", type(self).__name__, attr,
+             type(self.f).__name__, attr):
+      return getattr(self.f, attr)
+
+  def write(self, s):
+    ''' Obtain the lock and then run the wrapped `.write` method.
+    '''
+    with self._lock:
+      return self.f.write(s)
 
 if __name__ == '__main__':
   import cs.sharedfile_tests

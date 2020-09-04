@@ -1,0 +1,25 @@
+lib/python/cs/fstags.py: cs.fstags: new "json_import" subcommand to import a JSON dict as tags, initial use case to load the metadata from youtube-dl
+lib/python/cs/fstags.py: cs.fstags: new FSTags.scrub method and "scrub" command line operation, to purge tags of paths which do not exist
+lib/python/cs/fstags.py: cs.fstags: docstring tweak
+lib/python/cs/fstags.py: cs.fstags: adjust pfx stuff for less wordy messaging
+lib/python/cs/fstags.py: cs.fstags: use a global thread local StackableValues to keep a "verbose" state governing logging behaviour
+lib/python/cs/fstags.py: cs.fstags: apply the new state.verbose flag to various places
+lib/python/cs/fstags.py: cs.fstags: new FSTags.__getitem__(path) returning a singleton TaggedPath; apply to various places
+lib/python/cs/fstags.py: cs.fstags: FSTags now uses an RLock since it has multiple @locked methods; add the missed FSTags._tagged_paths cache from previous commit
+lib/python/cs/fstags.py: cs.fstags: autoformat
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.__init__: bugfix potentially uninitialiased local `fstags` variable; another minor logic cleanup
+lib/python/cs/fstags.py: cs.fstags: reorder config sections
+lib/python/cs/fstags.py: cs.fstags: cp/ln/mv subcommands and matching FSTags methods
+lib/python/cs/fstags.py: cs.fstags: update usage message for cp/ln/mv
+lib/python/cs/fstags.py: cs.fstags: clean lint
+lib/python/cs/fstags.py: cs.fstags: fix exit value
+lib/python/cs/fstags.py: cs.fstags: bugfix
+lib/python/cs/fstags.py: cs.fstags: report .fstags saves at trace level
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand._cmd_mvcpln: move context managers further in
+lib/python/cs/fstags.py: cs.fstags: bugfix FSTags.attach: remove bogus call to shutil.move left over from old code
+lib/python/cs/fstags.py: cs.fstags: TagFile.save: clear the modified flag on saved TagSets
+lib/python/cs/fstags.py: cs.fstags: cp/ln/mv: implement the -f, -n and -v options
+lib/python/cs/fstags.py: cs.fstags: FSTags.attach_path: bugfix reference to src_taggedpath.direct_tags property
+lib/python/cs/fstags.py: cs.fstags: new "test" command line subcmd and matching FSTags.test method
+lib/python/cs/fstags.py: cs.fstags: autoformat
+lib/python/cs/fstags.py: cs.fstags: fix usage message
