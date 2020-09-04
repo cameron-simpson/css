@@ -106,33 +106,35 @@ class BaseCommand:
 
           the_cmd.run(argv)
 
-      The subclass is customised by overriding the following methods:
+      The subclass is customised by overriding the following
+      attributes and methods:
+      * `GETOPT_SPEC`: only required if the main command accepts options,
+        a getopt option string suitable for `getopt.getopt`
+      * `USAGE_FORMAT`: the basic usage message excluding any subcommands,
+        a formattable string accepting `{cmd}`
+      * `OPTIONS_CLASS`: the class for the `options` object;
+         default is `types.SimpleNamespace`
+      * `SUBCOMMAND_METHOD_PREFIX`:
+        only required if ones wishes to change the subcommand method name prefix;
+        default `'cmd_'`
       * `apply_defaults(options)`:
         prepare the initial state of `options`
         before any command line options are applied
       * `apply_opts(options,opts)`:
         apply the `opts` to `options`.
         `opts` is an `(option,value)` sequence
-        as returned by `getopot.getopt`.
+        as returned by `getopt.getopt`.
       * `cmd_`*subcmd*`(argv,options)`:
-        if the command line options are followed by an argument
-        whose value is *subcmd*,
-        then the method `cmd_`*subcmd*`(argv,options)`
-        will be called where `argv` contains the command line arguments
-        after *subcmd*.
+        if any `cmd_`*subcmd* methods are provided,
+        a subcommand is expected after the main options
+        and the corresponding method is called
+        with the subcommand and following arguments.
       * `main(argv,options)`:
-        if there are no command line aguments after the options
-        or the first argument does not have a corresponding
-        `cmd_`*subcmd* method
-        then method `main(argv,options)`
-        will be called where `argv` contains the command line arguments.
-      * `run_context(argv,options,cmd)`:
+        if there are no `cmd_`*subcmd* methods
+        then this will be called with the command line arguments.
+      * `run_context(argv,options)`:
         a context manager to provide setup or teardown actions
         to occur before and after the command implementation respectively.
-        If the implementation is a `cmd_`*subcmd* method
-        then this is called with `cmd=`*subcmd*;
-        if the implementation is `main`
-        then this is called with `cmd=None`.
 
       To aid recursive use
       it is intended that all the per command state
@@ -145,6 +147,30 @@ class BaseCommand:
       Primarily because when incorrectly invoked
       an argparse command line prints the help/usage messgae
       and aborts the whole programme with `SystemExit`.
+
+      Subcommands:
+      if subcommands are accepted
+      then one method should be provided per subcommand.
+      Example:
+
+          def cmd_something(argv, options):
+             """ Usage: {cmd} -o foo args...
+                   Do something, output to foo.
+             """
+             ... gather up -o option, do something with args ...
+
+      The `argv` parameter will be the subcommand name
+      and any following command line arguments;
+      `options` will be as for `main`.
+
+      Subcommand methods should raise `getopt.GetoptError` if incorrectly invoked,
+      and otherwise return `0` or `None` on success and a nonzero value on failure,
+      just as for a `main` function.
+
+      If the method docstring contains a paragraph commencing with
+      the string `'Usage: '`,
+      that paragraph will be automatically collated into the main command usage message.
+      A `cmd_help` method is provided automatically.
   '''
 
   OPTIONS_CLASS = SimpleNamespace
