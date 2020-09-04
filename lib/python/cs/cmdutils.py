@@ -223,7 +223,7 @@ class BaseCommand:
     usage_message = usage_format.format_map(usage_format_mapping)
     if has_subcmds:
       subusages = []
-      for attr in sorted(subcmds()):
+      for attr in sorted(subcmds):
         with Pfx(attr):
           subusage = cls.subcommand_usage_text(attr)
           if subusage:
