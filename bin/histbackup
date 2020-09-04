@@ -587,20 +587,16 @@ ok=1
 ( cd "$dest" || exit 1
   if [ -n "$lastbackup" ]
   then
-    mklinktree "./$lastbackup" "$thisbackup"
+    mklinktree "./$lastbackup" "$thisbackup" || exit 1
     dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
-    || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
+    || :
   else
-    $trace mkdir "$thisbackup"
-    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
+    $trace mkdir "$thisbackup" || exit 1
+    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
+      || :
   fi
-) \
-|| {
-  # we don't clear $ok, because the link tree is there
-  # and at least somewhat improved over the previous tree
-  echo "$cmd: rsync failed, review errors and check the content of $absdest/$thisbackup" >&2
-  ok=
-}
+)
 
 if [ $copytimes ]
 then
