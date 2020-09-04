@@ -8,7 +8,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from datetime import datetime, timedelta
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 import os
 from os import getcwd
 from os.path import (
@@ -22,10 +22,11 @@ import re
 from subprocess import run
 import sys
 from types import SimpleNamespace
+from cs.cmdutils import BaseCommand
 from cs.csvutils import csv_import
 from cs.deco import fmtdoc
 from cs.env import envsub
-from cs.logutils import setup_logging, error, warning
+from cs.logutils import error, warning
 from cs.pfx import Pfx
 from cs.psutils import groupargv
 from cs.py.func import prop
@@ -49,70 +50,175 @@ RRD_HEARTBEAT = 1200
 RRD_STEP = 10  # 10s slot size
 RRD_SLOTS = 3153600  # a year in 10s slots
 
-USAGE = r'''Usage: %s [-D basedir] [-d sitedir] op [op-args...]
-  -D basedir
-    Base directory for RRD file data, containing per-site subdirectories.
-    Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
-  -d sitedir
-    Directory for RRD file data.
-    Default: {basedir}/{site}
-  -s site
-    Default site name. Default the basename of the current directory.
-  Ops:
-    graph [days] csvfiles...
-        Graph the data from the RRD files corresponding to the specified CSVs.
-    import csvfiles...
-        Import data from the specified CSVs into RRD files.
-    parse csvfiles...'''
-
 def main(argv=None):
-  ''' Main programme implementing the command line.
+  ''' Command line mode.
   '''
-  if argv is None:
-    argv = list(sys.argv)
-  cmd = argv.pop(0)
-  setup_logging(cmd)
-  usage = USAGE % (cmd,)
-  basedir = None
-  sitedir = None
-  site = None
-  badopts = False
-  try:
-    opts, argv = getopt(argv, 'D:d:s:')
-  except GetoptError as e:
-    error("%s", e)
-    badopts = True
-  else:
-    for opt, value in opts:
-      with Pfx(opt):
-        if opt == '-D':
-          basedir = value
-        elif opt == '-d':
-          sitedir = value
-        elif opt == '-s':
-          site = value
+  return SPLinkCommand().run(argv)
+
+class SPConfig(SimpleNamespace):
+  ''' An embodiment of the sp-link command's options.
+  '''
+
+  def __init__(self, basedir=None, sitedir=None, site=None, **kw):
+    if basedir is None:
+      basedir = os.environ.get(ENV_BASEDIR, expandvars(ENV_BASEDIR_DEFAULT))
+    if sitedir is None:
+      if site is None:
+        site = basename(getcwd())
+      sitedir = joinpath(basedir, site)
+    elif site is None:
+      site = basename(sitedir)
+    super().__init__(basedir=basedir, sitedir=sitedir, site=site, **kw)
+    X("SPCONFIG: %r", self)
+
+  @prop
+  @fmtdoc
+  def basepath(self):
+    ''' Base directory for RRD file data, containing per-site subdirectories.
+        Default: `${ENV_BASEDIR}` or `{ENV_BASEDIR_DEFAULT!r}`
+    '''
+    base = self.basedir
+    if base is None:
+      base = os.environ.get(ENV_BASEDIR)
+      if base is None:
+        base = envsub(ENV_BASEDIR_DEFAULT)
+    return base
+
+  def sitepath(self, site):
+    ''' Directory to hold the per-site files such as RRD files.
+    '''
+    sitedir = self.sitedir
+    if sitedir is None:
+      sitedir = joinpath(self.basepath, site)
+    return sitedir
+
+  @staticmethod
+  def parse_csvfilename(filename):
+    ''' Extract site and dataset name from a CSV filename.
+        Return `(sitename,datasetname,dumptime)`.
+    '''
+    filebase = basename(filename)
+    root, ext = splitext(filebase)
+    if ext.lower() != '.csv':
+      raise ValueError("not a CSV file: %r" % (filename,))
+    mkey = None
+    for _mkey in MAPPINGS:
+      _mkey_ = '_' + _mkey + '_'
+      try:
+        site, dumptime = root.split(_mkey_, 1)
+      except ValueError:
+        continue
+      mkey = _mkey
+      break
+    if not mkey:
+      raise ValueError("unrecognised CSV base: %r" % (filebase,))
+    return site, mkey, dumptime
+
+class SPLinkCommand(BaseCommand):
+  ''' sp-link command line implementation
+  '''
+
+  OPTIONS_CLASS = SPConfig
+
+  GETOPT_SPEC = 'D:d:s:'
+
+  USAGE_FORMAT = r'''Usage: {cmd} [-D basedir] [-d sitedir] op [op-args...]
+    -D basedir
+      Base directory for RRD file data, containing per-site subdirectories.
+      Default: $''' + ENV_BASEDIR + ''' or ''' + ENV_BASEDIR_DEFAULT + '''
+    -d sitedir
+      Directory for RRD file data.
+      Default: {{basedir}}/{{site}}
+    -s site
+      Default site name. Default the basename of the current directory.'''
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, val in opts:
+      if opt == '-D':
+        options.basedir = val
+      elif opt == '-d':
+        options.sitedir = val
+      elif opt == '-s':
+        options.site = val
+      else:
+        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+
+  @staticmethod
+  def cmd_graph(argv, cfg):
+    ''' Run the "graph" command, generating graphs of RRD files
+        associated with CSV data.
+
+        Usage: {cmd} [days] csvfiles...
+          Graph the data from the named csvfiles.
+    '''
+    xit = 0
+    days = None
+    if argv:
+      try:
+        days = int(argv[0])
+      except ValueError:
+        pass
+      else:
+        if days > 0:
+          argv.pop(0)
         else:
-          raise RuntimeError("unimplemented option")
-  cfg = SPConfig(basedir=basedir, sitedir=sitedir, site=site)
-  try:
+          days = None
     if not argv:
-      raise GetoptError("missing op")
-    op = argv.pop(0)
-    with Pfx(op):
-      if op == 'graph':
-        return cmd_graph(argv, cfg)
-      if op == 'import':
-        return cmd_import(argv, cfg)
-      if op == 'parse':
-        return cmd_parse(argv, cfg)
-      raise GetoptError("unrecognised op")
-  except GetoptError as e:
-    error("%s", e)
-    badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  return 0
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        dataset.gen_graphs(days=days)
+    return xit
+
+  @staticmethod
+  def cmd_import(argv, cfg):
+    ''' Usage: import csvfiles...
+          Import data from CSV files into RRD files.
+    '''
+    xit = 0
+    if not argv:
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        rrdfile = dataset.rrdfile
+        if not pathexists(rrdfile):
+          dataset.rrd_create()
+        dataset.rrd_update()
+    return xit
+
+  @staticmethod
+  def cmd_parse(argv, cfg):
+    ''' Usage: {cmd} csvfiles...
+          Parse the supplied CSV files.
+    '''
+    if not argv:
+      raise GetoptError("missing csvfiles")
+    for csvfile in argv:
+      with Pfx(csvfile):
+        try:
+          dataset = DataSet.from_csvfile(csvfile, cfg)
+        except ValueError as e:
+          warning("unhandled file: %s" % (e,))
+          continue
+        data = dataset.data
+        hdrs = dataset.data_hdrs
+        print("%s: %d rows of %d columns" % (csvfile, len(data), len(hdrs)))
+        for ndx, hdr in enumerate(hdrs):
+          print(' ', ndx, hdr)
+        print(list(dataset.rrd_field_defns()))
 
 UNIX_EPOCH = datetime(1970, 1, 1)
 SP_EPOCH = datetime(2001, 1, 1).astimezone()
@@ -258,137 +364,13 @@ MAPPINGS = {
     },
 }
 
-class SPConfig(SimpleNamespace):
-  ''' An embodiment of the sp-link command's options.
-  '''
-
-  def __init__(self, basedir=None, sitedir=None, site=None, **kw):
-    if basedir is None:
-      basedir = os.environ.get(ENV_BASEDIR, expandvars(ENV_BASEDIR_DEFAULT))
-    if sitedir is None:
-      if site is None:
-        site = basename(getcwd())
-      sitedir = joinpath(basedir, site)
-    elif site is None:
-      site = basename(sitedir)
-    super().__init__(basedir=basedir, sitedir=sitedir, site=site, **kw)
-    X("SPCONFIG: %r", self)
-
-  @prop
-  @fmtdoc
-  def basepath(self):
-    ''' Base directory for RRD file data, containing per-site subdirectories.
-        Default: `${ENV_BASEDIR}` or `{ENV_BASEDIR_DEFAULT|r}`
-    '''
-    base = self.basedir
-    if base is None:
-      base = os.environ.get(ENV_BASEDIR)
-      if base is None:
-        base = envsub(ENV_BASEDIR_DEFAULT)
-    return base
-
-  def sitepath(self, site):
-    ''' Directory to hold the per-site files such as RRD files.
-    '''
-    sitedir = self.sitedir
-    if sitedir is None:
-      sitedir = joinpath(self.basepath, site)
-    return sitedir
-
-  @staticmethod
-  def parse_csvfilename(filename):
-    ''' Extract site and dataset name from a CSV filename.
-        Return `(sitename,datasetname,dumptime)`.
-    '''
-    filebase = basename(filename)
-    root, ext = splitext(filebase)
-    if ext.lower() != '.csv':
-      raise ValueError("not a CSV file: %r" % (filename,))
-    mkey = None
-    for _mkey in MAPPINGS:
-      _mkey_ = '_' + _mkey + '_'
-      try:
-        site, dumptime = root.split(_mkey_, 1)
-      except ValueError:
-        continue
-      mkey = _mkey
-      break
-    if not mkey:
-      raise ValueError("unrecognised CSV base: %r" % (filebase,))
-    return site, mkey, dumptime
-
-def cmd_graph(argv, cfg):
-  ''' Run the "graph" command, generating graphs of RRD files
-      associated with CSV data.
-  '''
-  xit = 0
-  days = None
-  if argv:
-    try:
-      days = int(argv[0])
-    except ValueError:
-      pass
-    else:
-      if days > 0:
-        argv.pop(0)
-      else:
-        days = None
-  if not argv:
-    raise GetoptError("missing csvfiles")
-  for csvfile in argv:
-    with Pfx(csvfile):
-      try:
-        dataset = DataSet.from_csvfile(csvfile, cfg)
-      except ValueError as e:
-        warning("unhandled file: %s" % (e,))
-        continue
-      dataset.gen_graphs(days=days)
-  return xit
-
-def cmd_import(argv, cfg):
-  ''' Run the "import" command, loading CSV data into RRD files.
-  '''
-  xit = 0
-  if not argv:
-    raise GetoptError("missing csvfiles")
-  for csvfile in argv:
-    with Pfx(csvfile):
-      try:
-        dataset = DataSet.from_csvfile(csvfile, cfg)
-      except ValueError as e:
-        warning("unhandled file: %s" % (e,))
-        continue
-      rrdfile = dataset.rrdfile
-      if not pathexists(rrdfile):
-        dataset.rrd_create()
-      dataset.rrd_update()
-  return xit
-
-def cmd_parse(argv, cfg):
-  ''' Run the "parse" command, reading CSV data files.
-  '''
-  if not argv:
-    raise GetoptError("missing csvfiles")
-  for csvfile in argv:
-    with Pfx(csvfile):
-      try:
-        dataset = DataSet.from_csvfile(csvfile, cfg)
-      except ValueError as e:
-        warning("unhandled file: %s" % (e,))
-        continue
-      data = dataset.data
-      hdrs = dataset.data_hdrs
-      print("%s: %d rows of %d columns" % (csvfile, len(data), len(hdrs)))
-      for ndx, hdr in enumerate(hdrs):
-        print(' ', ndx, hdr)
-      print(list(dataset.rrd_field_defns()))
-
 def sp_unixtime(sp_ts):
   ''' Take an SP LINK timestamp and produce a UNIX timestamp.
   '''
   dt = SP_EPOCH + timedelta(seconds=sp_ts)
   return dt.timestamp()
 
+# pylint: disable=too-many-instance-attributes
 class DataSet:
   ''' Data and methods for a CSV file.
   '''
@@ -546,6 +528,7 @@ class DataSet:
     for rrd_spec in self.rrd_specs():
       yield f'DEF:{rrd_spec.ds_name}={self.rrdfile}:{rrd_spec.ds_name}:MAX'
 
+  # pylint: disable=too-many-arguments
   def rrdgraph(
       self,
       graph_name,
