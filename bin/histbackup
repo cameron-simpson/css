@@ -118,7 +118,6 @@ usage="Usage:
   $cmd [options...] --no-rsync backupdir
   $cmd [options...] [-- [rsyncopts...]]
 
-  -A, --acls    Preserve ACLs. Passed to rsync.
   -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
@@ -171,14 +170,6 @@ datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
 while [ $# -gt 0 ]
 do
   case $1 in
-
-    # =item -A, --acls
-    #
-    # Preserve ACLs. Passed to rsync.
-    #
-    -A|--acls)
-      rsopts="$rsopts $1"
-      ;;
 
     # =item --copy-times
     #
