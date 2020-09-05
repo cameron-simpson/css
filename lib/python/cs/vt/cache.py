@@ -117,16 +117,15 @@ class FileCacheStore(BasicStoreSync):
   def flush(self):
     ''' Dummy flush operation.
     '''
-    pass
 
   def sync(self):
     ''' Dummy sync operation.
     '''
-    pass
 
   def keys(self, hashclass=None):
     if hashclass is None:
       hashclass = self.hashclass
+    # pylint: disable=unidiomatic-typecheck
     return (h for h in self.cache.keys() if type(h) is hashclass)
 
   def __iter__(self):
@@ -214,6 +213,8 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self.runstate.notify_cancel.add(lambda rs: self.close())
 
   def startup(self):
+    ''' Startup the proxy.
+    '''
     self._workQ = IterableQueue()
     self._worker = Thread(name="%s WORKER" % (self,), target=self._work)
     self._worker.start()
@@ -574,6 +575,7 @@ class BlockTempfile:
         bm.filled += written
     X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
+# pylint: disable=too-many-instance-attributes
 class BlockCache:
   ''' A temporary file based cache for whole Blocks.
 
