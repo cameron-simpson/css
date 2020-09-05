@@ -28,10 +28,10 @@ DEFAULT_MAX_CACHEFILES = 3
 
 class FileCacheStore(BasicStoreSync):
   ''' A Store wrapping another Store that provides fast access to
-      previously fetched data and fast storage of new data.
-      asynchronous updates to the backing Store (which may be None).
+      previously fetched data and fast storage of new data,
+      using asynchronous updates to the backing Store (which may be `None`).
 
-      This class is a thin Store shaped shim over a FileDataMappingProxy,
+      This class is a thin Store shaped shim over a `FileDataMappingProxy`,
       which does the heavy lifting of storing data.
   '''
 
@@ -51,11 +51,11 @@ class FileCacheStore(BasicStoreSync):
       runstate=None,
       **kw
   ):
-    ''' Initialise the FileCacheStore.
+    ''' Initialise the `FileCacheStore`.
 
         Parameters:
         * `name`: the Store name
-        * `backend`: the backing Store; this may be None, and the
+        * `backend`: the backing Store; this may be `None`, and the
           property .backend may be switched to another Store at any
           time
         * `dirpath`: directory to hold the cache files
