@@ -239,14 +239,14 @@ class PacketConnection(object):
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
+    # debugging: check for reuse of (channel,tag) etc
+    self.__sent = set()
+    self.__send_queued = set()
     # dispatch Thread to process received packets
     self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
     self._send_thread = bg_thread(self._send_loop, name="%s[_send]" % (self.name,))
-    # debugging: check for reuse of (channel,tag) etc
-    self.__sent = set()
-    self.__send_queued = set()
 
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
