@@ -302,6 +302,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     self.__funcQ = Later(
         self._capacity, name="%s:Later(__funcQ)" % (self.name,)
     )
+    self.__funcQ.open()
     self._worker = SubLater(self.__funcQ)
     self._reaper = self._worker.reaper()
 
@@ -312,7 +313,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     self._worker.close()
     self._reaper.join()
     L = self.__funcQ
-    L.shutdown()
+    L.close()
     L.wait()
     del self.__funcQ
     self.runstate.stop()
