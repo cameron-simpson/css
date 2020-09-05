@@ -235,6 +235,7 @@ class PacketConnection(object):
     self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
+    self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
