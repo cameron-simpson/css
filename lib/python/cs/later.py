@@ -903,6 +903,7 @@ class SubLater(object):
         associated checks.
     '''
     self._later = L
+    self._later.open()
     self._lock = Lock()
     self._deferred = 0
     self._queued = 0
@@ -935,8 +936,8 @@ class SubLater(object):
         self._later.warning("repeated close of %s", self)
       else:
         self.closed = True
-        if self._queued >= self._deferred:
-          self._queue.close()
+        self._queue.close()
+        self._later.close()
 
   def defer(self, func, *a, **kw):
     ''' Defer a function, return its `LateFunction`.
