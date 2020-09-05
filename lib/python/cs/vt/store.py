@@ -303,15 +303,11 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
         self._capacity, name="%s:Later(__funcQ)" % (self.name,)
     )
     self.__funcQ.open()
-    self._worker = SubLater(self.__funcQ)
-    self._reaper = self._worker.reaper()
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.runstate.cancel()
-    self._worker.close()
-    self._reaper.join()
     L = self.__funcQ
     L.close()
     L.wait()
