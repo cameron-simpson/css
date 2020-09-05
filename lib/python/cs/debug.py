@@ -6,18 +6,6 @@
 
 r'''
 Assorted debugging facilities.
-
-* Lock, RLock, Thread: wrappers for threading facilties; simply import from here instead of there
-
-* thread_dump, stack_dump: dump thread and stack state
-
-* @DEBUG: decorator to wrap functions in timing and value debuggers
-
-* @trace: decorator to report call and return from functions
-
-* @trace_caller: decorator to report caller of function
-
-* TracingObject: subclass of cs.obj.Proxy that reports attribute use
 '''
 
 from __future__ import print_function
@@ -68,8 +56,8 @@ DISTINFO = {
 DEBUG_POLL_RATE = 0.25
 
 def Lock():
-  ''' Factory function: if cs.logutils.loginfo.level <= logging.DEBUG
-      then return a DebuggingLock, otherwise a threading.Lock.
+  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
+      then return a `DebuggingLock`, otherwise a `threading.Lock`.
   '''
   if not ifdebug():
     return threading.Lock()
@@ -77,8 +65,8 @@ def Lock():
   return DebuggingLock({'filename': filename, 'lineno': lineno})
 
 def RLock():
-  ''' Factory function: if cs.logutils.loginfo.level <= logging.DEBUG
-      then return a DebuggingRLock, otherwise a threading.RLock.
+  ''' Factory function: if `cs.logutils.loginfo.level<=logging.DEBUG`
+      then return a `DebuggingRLock`, otherwise a `threading.RLock`.
   '''
   if not ifdebug():
     return threading.RLock()
@@ -86,7 +74,7 @@ def RLock():
   return DebuggingRLock({'filename': filename, 'lineno': lineno})
 
 class TimingOutLock(object):
-  ''' A Lock replacement which times out, used for locating deadlock points.
+  ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
   def __init__(self, deadlock_timeout=20.0, recursive=False):
     self._lock = threading.RLock() if recursive else threading.Lock()
@@ -131,8 +119,10 @@ def Thread(*a, **kw):
 
 def thread_dump(Ts=None, fp=None):
   ''' Write thread identifiers and stack traces to the file `fp`.
-      `Ts`: the Threads to dump; if unspecified use threading.enumerate().
-      `fp`: the file to which to write; if unspecified use sys.stderr.
+
+      Parameters:
+      * `Ts`: the `Thread`s to dump; if unspecified use `threading.enumerate()`.
+      * `fp`: the file to which to write; if unspecified use `sys.stderr`.
   '''
   if Ts is None:
     Ts = threading.enumerate()
@@ -152,14 +142,16 @@ def thread_dump(Ts=None, fp=None):
 
 def stack_dump(stack=None, limit=None, logger=None, log_level=None):
   ''' Dump a stack trace to a logger.
-      `stack`: a stack list as returned by traceback.extract_stack.
-               If missing or None, use the result of traceback.extract_stack().
-      `limit`: a limit to the number of stack entries to dump.
-               If missing or None, dump all entries.
-      `logger`: a logger.Logger ducktype or the name of a logger.
-               If missing or None, obtain a logger from logging.getLogger().
-      `log_level`: the logging level for the dump.
-               If missing or None, use cs.logutils.loginfo.level.
+
+      Parameters:
+      * `stack`: a stack list as returned by `traceback.extract_stack`.
+        If missing or `None`, use the result of `traceback.extract_stack()`.
+      * `limit`: a limit to the number of stack entries to dump.
+        If missing or `None`, dump all entries.
+      * `logger`: a `logger.Logger` ducktype or the name of a logger.
+        If missing or `None`, obtain a logger from `logging.getLogger()`.
+      * `log_level`: the logging level for the dump.
+        If missing or `None`, use `cs.logutils.loginfo.level`.
   '''
   if stack is None:
     stack = traceback.extract_stack()
@@ -217,8 +209,9 @@ def _debug_watcher(filename, lineno, n, funcname, R):
 
 def DF(func, *a, **kw):
   ''' Wrapper for a function call to debug its use.
-      Requires rewriting the call from f(*a, *kw) to DF(f, *a, **kw).
-      Alternatively one could rewrite as DEBUG(f)(*a, **kw).
+
+      This requires rewriting the call from `f(*a,*kw)` to `DF(f,*a,**kw)`.
+      Alternatively one could rewrite as `DEBUG(f)(*a,**kw)`.
   '''
   return DEBUG(func, force=True)(*a, **kw)
 
@@ -244,9 +237,10 @@ class DebugWrapper(NS):
     return label
 
 class DebuggingLock(DebugWrapper):
-  ''' Wrapper class for threading.Lock to trace creation and use.
-      cs.threads.Lock() returns on of these in debug mode or a raw
-      threading.Lock otherwise.
+  ''' Wrapper class for `threading.Lock` to trace creation and use.
+
+      `cs.threads.Lock()` returns one of these in debug mode or a raw
+      `threading.Lock` otherwise.
   '''
 
   def __init__(self, dkw, slow=2):
@@ -310,9 +304,10 @@ class DebuggingLock(DebugWrapper):
   def _timed_acquire(self, Q, filename, lineno):
     ''' Block waiting for lock acquisition.
         Report slow acquisition.
-        This would be inline above except that Python 2 Locks do
+
+        This would be inline above except that Python 2 `Lock`s do
         not have a timeout parameter, hence this thread.
-        This probably scales VERY badly if there is a lot of Lock
+        This probably scales VERY badly if there is a lot of `Lock`
         contention.
     '''
     slow = self.slow
@@ -335,8 +330,9 @@ class DebuggingLock(DebugWrapper):
 
 class DebuggingRLock(DebugWrapper):
   ''' Wrapper class for threading.RLock to trace creation and use.
-      cs.threads.RLock() returns on of these in debug mode or a raw
-      threading.RLock otherwise.
+
+      `cs.threads.RLock()` returns on of these in debug mode or a raw
+      `threading.RLock` otherwise.
   '''
 
   def __init__(self, dkw):
@@ -477,9 +473,12 @@ class DummyMap(object):
     return v
 
 def openfiles(substr=None, pid=None):
-  ''' Run lsof(8) against process `pid` returning paths of open files whose paths contain `substr`.
-      `substr`: default substring to select by; default returns all paths.
-      `pid`: process to examine; default from os.getpid().
+  ''' Run lsof(8) against process `pid`
+      returning paths of open files whose paths contain `substr`.
+
+      Parameters:
+      * `substr`: default substring to select by; default returns all paths.
+      * `pid`: process to examine; default from `os.getpid()`.
   '''
   if pid is None:
     pid = os.getpid()
@@ -496,7 +495,7 @@ def openfiles(substr=None, pid=None):
   return paths
 
 class DebugShell(Cmd):
-  ''' An interactive prompt for python statements, attached to /dev/tty by default.
+  ''' An interactive prompt for python statements, attached to `/dev/tty` by default.
   '''
 
   def __init__(self, var_dict, stdin=None, stdout=None):
