@@ -17,7 +17,7 @@ from cs.fileutils import RWFileBlockCache, datafrom_fd
 from cs.logutils import error
 from cs.pfx import pfx_method
 from cs.queues import IterableQueue
-from cs.resources import RunState, RunStateMixin
+from cs.resources import MultiOpenMixin, RunState, RunStateMixin
 from cs.result import Result
 from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
@@ -102,10 +102,16 @@ class FileCacheStore(BasicStoreSync):
       if new_backend:
         new_backend.open()
 
+  def startup(self):
+    super().startup()
+    self.cache.open()
+
   def shutdown(self):
     self.cache.close()
+    self.cache = None
     if self.backend:
       self.backend.close()
+      self.backend = None
     super().shutdown()
 
   def flush(self):
@@ -158,7 +164,7 @@ class CachedData(_CachedData):
     '''
     return self.cachefile.get(self.offset, self.length)
 
-class FileDataMappingProxy(RunStateMixin):
+class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
   ''' Mapping-like class to cache data chunks to bypass gdbm indices and the like.
       Data are saved immediately into an in memory cache and an asynchronous
       worker copies new data into a cache file and also to the backend
@@ -203,12 +209,16 @@ class FileDataMappingProxy(RunStateMixin):
     self._lock = Lock()
     self.cachefiles = []
     self._add_cachefile()
-    self._workQ = IterableQueue()
-    self._worker = Thread(target=self._work)
-    self._worker.start()
+    self._workQ = None
+    self._worker = None
     self.runstate.notify_cancel.add(lambda rs: self.close())
 
-  def close(self):
+  def startup(self):
+    self._workQ = IterableQueue()
+    self._worker = Thread(name="%s WORKER" % (self,), target=self._work)
+    self._worker.start()
+
+  def shutdown(self):
     ''' Shut down the cache.
         Stop the worker, close the file cache.
     '''
