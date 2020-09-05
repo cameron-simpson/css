@@ -316,7 +316,7 @@ class FileDataMappingProxy(RunStateMixin):
       with self._lock:
         if self._getref(h):
           # already in file cache, therefore already sent to backend
-          return
+          continue
       cachefile = self.cachefiles[0]
       offset = cachefile.put(data)
       with self._lock:
@@ -326,8 +326,8 @@ class FileDataMappingProxy(RunStateMixin):
           del self.cached[h]
         except KeyError:
           pass
-        # roll over to new cache file
         if offset + len(data) >= self.max_cachefile_size:
+          # roll over to new cache file
           self._add_cachefile()
       # store into the backend
       if not in_backend:
