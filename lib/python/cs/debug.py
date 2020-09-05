@@ -76,38 +76,52 @@ def RLock():
 class TimingOutLock(object):
   ''' A `Lock` replacement which times out, used for locating deadlock points.
   '''
+
   def __init__(self, deadlock_timeout=20.0, recursive=False):
     self._lock = threading.RLock() if recursive else threading.Lock()
     self._deadlock_timeout = deadlock_timeout
+
   def acquire(self, blocking=True, timeout=-1, name=None):
     if timeout < 0:
       timeout = self._deadlock_timeout
     else:
       timeout = min(timeout, self._deadlock_timeout)
-    ok = self._lock.acquire(timeout=timeout) if blocking else self._lock.acquire(blocking=blocking)
+    ok = (
+        self._lock.acquire(timeout=timeout)
+        if blocking else self._lock.acquire(blocking=blocking)
+    )
     if not ok:
-      raise RuntimeError("TIMEOUT acquiring lock held by %s:%r" % (self.owner, self.owner_name))
+      raise RuntimeError(
+          "TIMEOUT acquiring lock held by %s:%r" %
+          (self.owner, self.owner_name)
+      )
     self.owner = caller()
     self.owner_name = name
     return True
+
   def release(self):
     return self._lock.release()
+
   def __enter__(self):
     self.acquire()
     self.owner = caller()
     return True
+
   def __exit__(self, *a):
     return self._lock.__exit__(*a)
 
 class TraceSuite(object):
   ''' Context manager to trace start and end of a code suite.
   '''
+
   def __init__(self, msg, *a):
     if a:
       msg = msg % a
     self.msg = msg
+
   def __enter__(self):
     X("TraceSuite ENTER %s", self.msg)
+
   def __exit__(self, exc_type, exc_value, exc_tb):
     X("TraceSuite LEAVE %s: exc_value=%s", self.msg, exc_value)
 
@@ -171,16 +185,22 @@ def DEBUG(f, force=False):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
   from cs.result import Result
+
   def inner(*a, **kw):
     if not force and not ifdebug():
       return f(*a, **kw)
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
-    T = threading.Thread(target=_debug_watcher, args=(filename, lineno, n, f.__name__, R))
+    T = threading.Thread(
+        target=_debug_watcher, args=(filename, lineno, n, f.__name__, R)
+    )
     T.daemon = True
     T.start()
-    debug("%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a, kw)
+    debug(
+        "%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a,
+        kw
+    )
     start = time.time()
     try:
       retval = f(*a, **kw)
@@ -188,9 +208,13 @@ def DEBUG(f, force=False):
       error("EXCEPTION from %s(*%s, **%s): %s", f, a, kw, e)
       raise
     end = time.time()
-    debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, retval)
+    debug(
+        "%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n,
+        f.__name__, end - start, retval
+    )
     R.put(retval)
     return retval
+
   return inner
 
 def _debug_watcher(filename, lineno, n, funcname, R):
@@ -199,7 +223,10 @@ def _debug_watcher(filename, lineno, n, funcname, R):
   slowness = 0
   while not R.ready:
     if slowness >= slow:
-      debug("%s:%d: [%d] calling %s, %gs elapsed so far...", filename, lineno, n, funcname, sofar)
+      debug(
+          "%s:%d: [%d] calling %s, %gs elapsed so far...", filename, lineno, n,
+          funcname, sofar
+      )
       # reset report time and complain more slowly next time
       slowness = 0
       slow += 1
@@ -222,7 +249,7 @@ class DebugWrapper(NS):
   def debug(self, msg, *a):
     if a:
       msg = msg % a
-    cs.logutils.debug(': '.join( (self.debug_label, msg) ))
+    cs.logutils.debug(': '.join((self.debug_label, msg)))
 
   @property
   def debug_label(self):
@@ -321,7 +348,10 @@ class DebuggingLock(DebugWrapper):
         sofar += 1
         slowness += 1
         if slowness >= slow:
-          self.debug("from %s:%d: acquire: after %gs, held by %s", filename, lineno, sofar, self.held)
+          self.debug(
+              "from %s:%d: acquire: after %gs, held by %s", filename, lineno,
+              sofar, self.held
+          )
           # complain more slowly next time
           slowness = 0
           slow += 1
@@ -344,10 +374,11 @@ class DebuggingRLock(DebugWrapper):
 
   def __str__(self):
     return "%s%r" % (
-        type(self).__name__,
-        [ "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
-          for f in self.stack
-        ] if self.stack else "NO_STACK")
+        type(self).__name__, [
+            "%s:%s:%s" % (f.filename, f.lineno, f.code_context[0].strip())
+            for f in self.stack
+        ] if self.stack else "NO_STACK"
+    )
 
   def __enter__(self):
     filename, lineno = inspect.stack()[1][1:3]
@@ -406,6 +437,7 @@ class DebuggingThread(threading.Thread, DebugWrapper):
 def trace(func):
   ''' Decorator to report the call and return of a function.
   '''
+
   def subfunc(*a, **kw):
     X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
     try:
@@ -416,19 +448,23 @@ def trace(func):
     else:
       X("CALL %s(): RETURNS %r", funccite(func), retval)
       return retval
+
   subfunc.__name__ = "trace/subfunc/" + func.__name__
   return subfunc
 
 def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
+
   def subfunc(*a, **kw):
     frame = caller()
-    D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
-      func.__name__,
-      func.__code__.co_filename, func.__code__.co_firstlineno,
-      frame.funcname, frame.filename, frame.lineno)
+    D(
+        "CALL %s()<%s:%d> FROM %s()<%s:%d>", func.__name__,
+        func.__code__.co_filename, func.__code__.co_firstlineno,
+        frame.funcname, frame.filename, frame.lineno
+    )
     return func(*a, **kw)
+
   subfunc.__name__ = "trace_caller/subfunc/" + func.__name__
   return subfunc
 
@@ -456,17 +492,21 @@ class TracingObject(Proxy):
     return _proxied(*a, **kw)
 
 class DummyMap(object):
+
   def __init__(self, label, d=None):
     X("new DummyMap labelled %r, d=%r", label, d)
     self.__label = label
     self.__map = {}
     if d:
       self.__map.update(d)
+
   def __str__(self):
     return self.__label
+
   def items(self):
     X("%s.items", self)
     return []
+
   def __getitem__(self, key):
     v = self.__map.get(key)
     X("%s[%r] => %r", self, key, v)
