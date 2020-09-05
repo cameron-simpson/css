@@ -87,11 +87,12 @@ class Maker(MultiOpenMixin):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
+    self._makeQ.open()
 
   def shutdown(self):
     ''' Shut down the make queue and wait for it.
     '''
-    self._makeQ.shutdown()
+    self._makeQ.close()
     self._makeQ.wait()
 
   def report(self, fp=None):
