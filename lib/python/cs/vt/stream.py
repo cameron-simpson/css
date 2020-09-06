@@ -338,10 +338,14 @@ class StreamStore(BasicStoreSync):
       raise StoreError("unexpected payload: %r" % (payload,))
     return found
 
+  @pfx_method
   def flush(self):
-    flags, payload = self.do(FlushRequest())
-    assert flags == 0
-    assert not payload
+    if self._conn is None:
+      pass  # XP("SKIP FLUSH WHEN _conn=None")
+    else:
+      flags, payload = self.do(FlushRequest())
+      assert flags == 0
+      assert not payload
     local_store = self.local_store
     if local_store is not None:
       local_store.flush()
