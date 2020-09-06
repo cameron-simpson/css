@@ -462,10 +462,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
 
         Parameters:
         * `name`: name for this worker instance
-        * `blocks`: an iterable of Blocks or byte-like objects;
-          each item may also be a tuple of (block-or-bytes, length)
+        * `blocks`: an iterable of Blocks or bytes-like objects;
+          each item may also be a tuple of `(block-or-bytes,length)`
           in which case the supplied length will be used for progress reporting
-          instead of the 
+          instead of the default length
     '''
     with Pfx("%s: worker", name):
       lock = Lock()
@@ -626,6 +626,8 @@ class MappingStore(BasicStoreSync):
       return h
 
   def get(self, h, default=None):
+    ''' Get the data for `h` or default (`None`).
+    '''
     try:
       data = self.mapping[h]
     except KeyError:
@@ -633,6 +635,8 @@ class MappingStore(BasicStoreSync):
     return data
 
   def contains(self, h):
+    ''' Test whether `h` is in the mapping.
+    '''
     return h in self.mapping
 
   __contains__ = contains
@@ -645,9 +649,13 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def __len__(self):
+    ''' Return the length of the mapping.
+    '''
     return len(self.mapping)
 
   def keys(self, hashclass=None):
+    ''' Yield the keys of typer `hashclass` (default `self.hashclass`).
+    '''
     if hashclass is None:
       hashclass = self.hashclass
     keys_func = self.mapping.keys
@@ -875,13 +883,11 @@ class ProxyStore(BasicStoreSync):
           e = exc_info[1]
           if isinstance(e, StoreError):
             exc_info = None
-          X("================ exc_info=%r", exc_info)
           error("exception from %s.add: %s", S, e, exc_info=exc_info)
           if ok:
             ok = False
             if self.save2:
               # kick off the fallback saves immediately
-              X("_BG_ADD: dispatch fallback %r", self.save2)
               fallback = list(
                   self._multicall0(self.save2, 'add_bg', (data, hashclass))
               )
@@ -897,7 +903,6 @@ class ProxyStore(BasicStoreSync):
               e = exc_info[1]
               if isinstance(e, StoreError):
                 exc_info = None
-              X("==== ==== ==== exc_info=%r", exc_info)
               error(
                   "exception saving to %s: %s",
                   S,
@@ -928,10 +933,8 @@ class ProxyStore(BasicStoreSync):
             if exc_info:
               error("exception", exc_info=exc_info)
             elif data is not None:
-              ##XP("got %d bytes", len(data))
               if S not in self.read:
                 for copyS in self.copy2:
-                  ##XP("copy to %s", copyS)
                   copyS.add_bg(data)
               return data
       return None
