@@ -250,7 +250,7 @@ class Result(object):
     else:
       try:
         raise exc
-      except:    # pylint: disable=bare-except
+      except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
   @require(lambda self: self.state == ResultState.pending)
