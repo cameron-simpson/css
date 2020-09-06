@@ -371,7 +371,7 @@ class HashCodeUtilsMixin(object):
         hashclass = self.hashclass
       else:
         hashclass = type(start_hashcode)
-    ks = sorted(hashcode for hashcode in self.keys())
+    ks = sorted(self.keys())
     if not ks:
       return
     if start_hashcode is None:
