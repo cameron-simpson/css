@@ -663,7 +663,8 @@ class MappingStore(BasicStoreSync):
       return keys_func(hashclass)
     except TypeError:
       # get all keys and filter by type
-      return (h for h in keys_func() if type(h) is hashclass)
+      # pylint: disable=unidiomatic-typecheck
+      return filter(lambda h: type(h) is hashclass, keys_func())
 
   def __iter__(self):
     ''' Return iterator over the mapping; required for use of HashCodeUtilsMixin.hashcodes_from.
