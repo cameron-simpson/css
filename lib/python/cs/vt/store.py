@@ -425,7 +425,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
     self._blockmapdir = dirpath
 
   @require(lambda capacity: capacity >= 1)
-  def pushto(self, dstS, *, capacity=64, hashclass=None, progress=None):
+  def pushto(self, dstS, *, capacity=64, progress=None):
     ''' Allocate a Queue for Blocks to push from this Store to another Store `dstS`.
         Return `(Q,T)` where `Q` is the new Queue and `T` is the
         Thread processing the Queue.
@@ -513,6 +513,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
           addR = bg_result(add_block, srcS, dstS, block, length, progress)
           with lock:
             pending_blocks[addR] = block
+
           # cleanup function
           @logexc
           def after_add_block(addR):
@@ -616,7 +617,7 @@ class MappingStore(BasicStoreSync):
           with Pfx("EXISTING HASH"):
             try:
               data2 = mapping[h]
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
               error("fetch FAILED: %s", e)
             else:
               if data != data2:
