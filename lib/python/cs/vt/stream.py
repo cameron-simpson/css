@@ -154,6 +154,7 @@ class StreamStore(BasicStoreSync):
     '''
     self.local_store = self.exports[export_name]
 
+  @pfx_method(use_str=True)
   def startup(self):
     ''' Start up the StreamStore.
         Open the `local_store` if not `None`.
@@ -163,18 +164,18 @@ class StreamStore(BasicStoreSync):
     if local_store is not None:
       local_store.open()
 
+  @pfx_method
   def shutdown(self):
     ''' Shut down the StreamStore.
     '''
-    with Pfx("SHUTDOWN %s", self):
-      conn = self._conn
-      if conn:
-        conn.shutdown()
-        self._conn = None
-      local_store = self.local_store
-      if local_store is not None:
-        local_store.close()
-      super().shutdown()
+    conn = self._conn
+    if conn:
+      conn.shutdown()
+      self._conn = None
+    local_store = self.local_store
+    if local_store is not None:
+      local_store.close()
+    super().shutdown()
 
   @pfx_method
   def connection(self):
