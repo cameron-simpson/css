@@ -15,7 +15,9 @@ import random
 import sys
 import tempfile
 import unittest
+from cs.debug import thread_dump
 from cs.logutils import setup_logging
+from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
@@ -27,6 +29,8 @@ from .socket import (
 )
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
+
+##from cs.debug import thread_dump
 
 # test all classes if empty, just the listed classes if not empty
 STORE_CLASS_TESTS = ()  ## (ProxyStore,)
@@ -149,13 +153,17 @@ def multitest(method):
                                       method.__name__):
       if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
         continue
-      with self.subTest(test_store=S, **subtest):
-        self.S = S
-        self.hashclass = subtest['hashclass']
-        S.init()
-        with self.S:
-          method(self)
-          S.flush()
+      with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
+                                     for k, v in sorted(subtest.items())])):
+        with self.subTest(test_store=S, **subtest):
+          self.S = S
+          self.hashclass = subtest['hashclass']
+          S.init()
+          with S:
+            method(self)
+            S.flush()
+          self.S = None
+      S = None
 
   return testMethod
 
@@ -190,6 +198,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.S = None
     self.keys1 = None
 
+  def tearDown(self):
+    Ts = threading.enumerate()
+    if len(Ts) > 1:
+      thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
+
   @multitest
   def test00empty(self):
     ''' Test that a new Store is empty.
@@ -201,9 +214,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
   def test01add_new_block(self):
     ''' Add a block and check that it worked.
     '''
-    n_added = 0
     S = self.S
-    self.assertLen(S, n_added)
     # compute block hash but do not store
     for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
                                                      ):
@@ -211,15 +222,12 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
         size = random.randint(127, 16384)
         data = make_randblock(size)
         h = S.hash(data, hashclass)
-        self.assertLen(S, n_added)
         ok = S.contains(h)
         self.assertFalse(ok)
         self.assertNotIn(h, S)
         # now add the block
         h2 = S.add(data, type(h))
-        n_added += 1
         self.assertEqual(h, h2)
-        self.assertLen(S, n_added)
         ok = S.contains(h)
         self.assertTrue(ok)
         self.assertIn(h, S)
@@ -231,7 +239,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
-    n_added = 0
     for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
                                                      ):
       with self.subTest(hashname=hashname):
@@ -240,10 +247,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           data = make_randblock(size)
           h = S.hash(data, hashclass)
           h2 = S.add(data, type(h))
-          n_added += 1
           self.assertEqual(h, h2)
           random_chunk_map[h] = data
-        self.assertLen(S, n_added)
     for h in random_chunk_map:
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
@@ -262,13 +267,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     KS1.add(h)
-    self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
-    self.assertLen(M1, 2)
     self.assertEqual(set(M1.hashcodes()), KS1)
 
   @multitest
