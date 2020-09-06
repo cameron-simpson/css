@@ -288,8 +288,9 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
   ##
 
   def __enter__(self):
+    MultiOpenMixin.__enter__(self)
     defaults.pushStore(self)
-    return MultiOpenMixin.__enter__(self)
+    return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     defaults.popStore()
