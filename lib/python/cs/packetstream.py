@@ -18,7 +18,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, PrePfx, PfxThread as Thread
+from cs.pfx import Pfx, PrePfx, PfxThread as Thread, pfx_method
 from cs.predicate import post_condition
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
@@ -252,34 +252,34 @@ class PacketConnection(object):
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
 
+  @pfx_method
   def shutdown(self, block=False):
     ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
 
         Parameters:
         `block`: block for outstanding requests, default False.
     '''
-    with Pfx("SHUTDOWN %s", self):
-      with self._lock:
-        if self.closed:
-          # shutdown already called from another thread
-          return
-        # prevent further request submission either local or remote
-        self.closed = True
-      ps = self._pending_states()
-      if ps:
-        warning("PENDING STATES AT SHUTDOWN: %r", ps)
-      # wait for completion of requests we're performing
-      for LF in list(self._running):
-        LF.join()
-      # shut down sender, should trigger shutdown of remote receiver
-      self._sendQ.close(enforce_final_close=True)
-      self._send_thread.join()
-      # we do not wait for the receiver - anyone hanging on outstaning
-      # requests will get them as they come in, and in theory a network
-      # disconnect might leave the receiver hanging anyway
-      self._later.close()
-      if block:
-        self._later.wait()
+    with self._lock:
+      if self.closed:
+        # shutdown already called from another thread
+        return
+      # prevent further request submission either local or remote
+      self.closed = True
+    ps = self._pending_states()
+    if ps:
+      warning("PENDING STATES AT SHUTDOWN: %r", ps)
+    # wait for completion of requests we're performing
+    for LF in list(self._running):
+      LF.join()
+    # shut down sender, should trigger shutdown of remote receiver
+    self._sendQ.close(enforce_final_close=True)
+    self._send_thread.join()
+    # we do not wait for the receiver - anyone hanging on outstaning
+    # requests will get them as they come in, and in theory a network
+    # disconnect might leave the receiver hanging anyway
+    self._later.close()
+    if block:
+      self._later.wait()
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
