@@ -62,11 +62,9 @@ class FileCacheStore(BasicStoreSync):
 
         Other keyword arguments are passed to `BasicStoreSync.__init__`.
     '''
-    if backend:
-      backend.open()
     super().__init__(name, runstate=runstate, **kw)
     self._str_attrs.update(backend=backend)
-    self._backend = backend
+    self._backend = None
     self.cache = FileDataMappingProxy(
         backend,
         dirpath=dirpath,
@@ -78,6 +76,7 @@ class FileCacheStore(BasicStoreSync):
         cachefiles=self.cache.max_cachefiles,
         cachesize=self.cache.max_cachefile_size
     )
+    self.backend = backend
 
   def __getattr__(self, attr):
     return getattr(self.backend, attr)
@@ -97,7 +96,9 @@ class FileCacheStore(BasicStoreSync):
       if old_backend:
         old_backend.close()
       self._backend = new_backend
-      self.cache.backend = new_backend
+      cache = self.cache
+      if cache:
+        cache.backend = new_backend
       self._str_attrs.update(backend=new_backend)
       if new_backend:
         new_backend.open()
@@ -109,9 +110,7 @@ class FileCacheStore(BasicStoreSync):
   def shutdown(self):
     self.cache.close()
     self.cache = None
-    if self.backend:
-      self.backend.close()
-      self.backend = None
+    self.backend = None
     super().shutdown()
 
   def flush(self):
