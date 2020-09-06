@@ -28,6 +28,8 @@ from .socket import (
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
 
+##from cs.debug import thread_dump
+
 # test all classes if empty, just the listed classes if not empty
 STORE_CLASS_TESTS = ()  ## (ProxyStore,)
 
@@ -189,6 +191,9 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     super().__init__(*a, **kw)
     self.S = None
     self.keys1 = None
+
+  def tearDown(self):
+    pass  ##thread_dump(fp=open('/dev/tty', 'w'))
 
   @multitest
   def test00empty(self):
