@@ -36,8 +36,8 @@ def class_by_name(indexname):
 def choose(basepath, preferred_indexclass=None):
   ''' Choose an indexclass from a `basepath` with optional preferred indexclass.
   '''
-  global _CLASSES
-  global _BY_NAME
+  global _CLASSES  # pylint: disable=global-statement
+  global _BY_NAME  # pylint: disable=global-statement
   if preferred_indexclass is not None:
     if isinstance(preferred_indexclass, str):
       indexname = preferred_indexclass
@@ -125,6 +125,9 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
   ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
   '''
 
+  # make a TypeError if used, subclasses provide their own
+  SUFFIX = None
+
   def __init__(self, basepath, hashclass):
     ''' Initialise an _Index instance.
 
@@ -157,8 +160,9 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     record, post_offset = FileDataIndexEntry.from_bytes(binary_record)
     if post_offset < len(binary_record):
       warning(
-          "short decode of binary FileDataIndexEntry: record=%s, post_offset=%d, remaining binary_record=%r",
-          record, post_offset, binary_record[post_offset:]
+          "short decode of binary FileDataIndexEntry:"
+          " record=%s, post_offset=%d, remaining binary_record=%r", record,
+          post_offset, binary_record[post_offset:]
       )
     return record
 
@@ -191,6 +195,7 @@ class LMDBIndex(_Index):
     self._txn_idle = Lock()  # available if no transactions are in progress
     self._txn_blocked = Lock()  # available if new transactions may commence
     self._txn_count = 0
+    self.map_size = None
 
   def __str__(self):
     return "%s(%r,%s)" % (
@@ -206,6 +211,7 @@ class LMDBIndex(_Index):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import lmdb
     except ImportError:
       return False
@@ -226,6 +232,7 @@ class LMDBIndex(_Index):
       self._lmdb = None
 
   def _open_lmdb(self):
+    # pylint: disable=import-error,import-outside-toplevel
     import lmdb
     self._lmdb = lmdb.Environment(
         self.path,
@@ -323,6 +330,7 @@ class LMDBIndex(_Index):
     return self.decode_binary_record(binary_record)
 
   def __setitem__(self, hashcode, entry):
+    # pylint: disable=import-error,import-outside-toplevel
     import lmdb
     binary_record = bytes(entry)
     while True:
@@ -347,12 +355,14 @@ class GDBMIndex(_Index):
     super().__init__(lmdbpathbase, hashclass)
     self._gdbm = None
     self._gdbm_lock = None
+    self._written = False
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import dbm.gnu
     except ImportError:
       return False
@@ -361,6 +371,7 @@ class GDBMIndex(_Index):
   def startup(self):
     ''' Start the index: open dbm, allocate lock.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     import dbm.gnu
     with Pfx(self.path):
       self._gdbm = dbm.gnu.open(self.path, 'cf')
@@ -423,12 +434,14 @@ class NDBMIndex(_Index):
     super().__init__(lmdbpathbase, hashclass)
     self._ndbm = None
     self._ndbm_lock = None
+    self._written = False
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import dbm.ndbm
     except ImportError:
       return False
@@ -437,6 +450,7 @@ class NDBMIndex(_Index):
   def startup(self):
     ''' Start the index: open dbm, allocate lock.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     import dbm.ndbm
     with Pfx(self.path):
       self._ndbm = dbm.ndbm.open(self.path, 'c')
@@ -455,8 +469,7 @@ class NDBMIndex(_Index):
   def flush(self):
     ''' Flush the index: sync the ndbm.
     '''
-    # no fast mode, no sycn
-    pass
+    # no fast mode, no sync
 
   def __contains__(self, hashcode):
     with self._ndbm_lock:
@@ -491,6 +504,7 @@ class KyotoIndex(_Index):
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
+    # pylint: disable=import-error,unused-import,import-outside-toplevel
     try:
       import kyotocabinet
     except ImportError:
@@ -500,6 +514,7 @@ class KyotoIndex(_Index):
   def startup(self):
     ''' Open the index.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     from kyotocabinet import DB
     self._kyoto = DB()
     self._kyoto.open(self.path, DB.OWRITER | DB.OCREATE)
@@ -584,6 +599,6 @@ for klass in LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex:
 
 if not _CLASSES:
   raise RuntimeError(
-      __name__ +
-      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
+      __name__ + ": no index classes available:"
+      " none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
   )
