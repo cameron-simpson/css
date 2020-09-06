@@ -155,9 +155,11 @@ def multitest(method):
         self.S = S
         self.hashclass = subtest['hashclass']
         S.init()
-        with self.S:
+        with S:
           method(self)
           S.flush()
+        self.S = None
+      S = None
 
   return testMethod
 
