@@ -176,6 +176,11 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     except KeyError:
       return default
 
+  def keys(self):
+    ''' Use whatever key iteration method the index provides.
+    '''
+    return iter(self)
+
 class LMDBIndex(_Index):
   ''' LMDB index for a DataDir.
   '''
@@ -297,8 +302,6 @@ class LMDBIndex(_Index):
   def __iter__(self):
     with self._txn() as txn:
       cursor = txn.cursor()
-
-  keys = __iter__
       for hashcode_bs in cursor.iternext(keys=True, values=False):
         yield self._mkhash(hashcode_bs)
 
@@ -404,8 +407,6 @@ class GDBMIndex(_Index):
       self.flush()
       with self._gdbm_lock:
         hashcode = self._gdbm.nextkey(hashcode)
-
-  keys = __iter__
 
   def __contains__(self, hashcode):
     with self._gdbm_lock:
