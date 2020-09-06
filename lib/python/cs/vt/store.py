@@ -324,17 +324,17 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
   ##
 
   def _defer(self, func, *args, **kwargs):
-    ''' Defer a function via the internal Later queue.
+    ''' Defer a function via the internal `Later` queue.
+        Hold opens on `self` to avoid easy shutdown.
     '''
     self.open()
 
-    def deferred():
+    def with_self():
       with self:
-        result = func(*args, **kwargs)
-      return result
+        return func(*args, **kwargs)
 
-    deferred.__name__ = "deferred:" + funcname(func)
-    LF = self._worker.defer(deferred)
+    with_self.__name__ = "with_self:" + funcname(func)
+    LF = self.__funcQ.defer(with_self)
     LF.notify(lambda LF: self.close())
     return LF
 
