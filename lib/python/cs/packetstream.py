@@ -294,10 +294,9 @@ class PacketConnection(object):
     '''
     states = []
     pending = self._pending
-    for channel in sorted(pending.keys()):
-      channel_states = pending[channel]
-      for tag in sorted(channel_states.keys()):
-        states.append( ( (channel, tag), channel_states[tag]) )
+    for channel, channel_states in sorted(pending.items()):
+      for tag, channel_state in sorted(channel_states.items()):
+        states.append( ( (channel, tag), channel_state) )
     return states
 
   @locked
