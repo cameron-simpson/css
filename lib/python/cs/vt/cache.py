@@ -19,7 +19,6 @@ from cs.pfx import pfx_method
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunState, RunStateMixin
 from cs.result import Result
-from cs.x import X
 from . import defaults, MAX_FILE_SIZE, Lock, RLock
 from .store import _BasicStoreCommon, BasicStoreSync, MappingStore
 
@@ -103,10 +102,12 @@ class FileCacheStore(BasicStoreSync):
       if new_backend:
         new_backend.open()
 
+  @pfx_method
   def startup(self):
     super().startup()
     self.cache.open()
 
+  @pfx_method
   def shutdown(self):
     self.cache.close()
     self.cache = None
@@ -218,6 +219,7 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     self._worker = Thread(name="%s WORKER" % (self,), target=self._work)
     self._worker.start()
 
+  @pfx_method
   def shutdown(self):
     ''' Shut down the cache.
         Stop the worker, close the file cache.
@@ -490,7 +492,6 @@ class BlockTempfile:
   '''
 
   def __init__(self, cache, tmpdir, suffix):
-    X("new BlockTemptfile...")
     self.cache = cache
     self.tempfile = TemporaryFile(dir=tmpdir, suffix=suffix)
     self.hashcodes = {}
@@ -537,7 +538,6 @@ class BlockTempfile:
 
         A Thread is dispatched to load the Block data into the temp file.
     '''
-    X("BlockTempfile.append_block(%s)...", block.hashcode)
     h = block.hashcode
     bsize = len(block)
     assert bsize > 0
@@ -572,7 +572,6 @@ class BlockTempfile:
         offset += written
         needed -= written
         bm.filled += written
-    X("BlockTempfile._infill(%s) COMPLETE", block.hashcode)
 
 # pylint: disable=too-many-instance-attributes
 class BlockCache:
