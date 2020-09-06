@@ -41,6 +41,7 @@ class TestPipeline(unittest.TestCase):
     ''' Set up a Later, log to the terminal.
     '''
     self.L = Later(2)
+    self.L.open()
     self.L.logTo("/dev/tty")
 
   def tearDown(self):

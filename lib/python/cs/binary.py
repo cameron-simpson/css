@@ -294,7 +294,7 @@ class PacketField(ABC):
         implementors should implement `value_from_buffer`.
     '''
     value = cls.value_from_buffer(bfr, **kw)
-    return cls(value, **kw)
+    return cls(value)
 
   @classmethod
   def value_from_buffer(cls, bfr, **kw):
@@ -501,8 +501,8 @@ class UTF16NULField(PacketField):
     self.value = value
 
   @classmethod
-  def value_from_buffer(cls, bfr, encoding):
-    ''' Read a NUL terminated UTF-16 string from `bfr`, return field.
+  def from_buffer(cls, bfr, encoding):
+    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
         The mandatory parameter `encoding` specifies the UTF16 encoding to use
         (`'utf_16_be'` or `'utf_16_le'`).
     '''
@@ -520,7 +520,7 @@ class UTF16NULField(PacketField):
       utf16_bs = bfr.take(nul_pos)
       utf16 = utf16_bs.decode(encoding)
     bfr.take(2)
-    return utf16
+    return cls(utf16, encoding=encoding)
 
   def transcribe(self):
     yield from self.transcribe_value(self.value, encoding=self.encoding)
