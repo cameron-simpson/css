@@ -206,6 +206,13 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
       self._blockmapdir = None
       self.block_cache = None
 
+  def init(self):
+    ''' Method provided to support "vt init".
+        For stores requiring some physical setup,
+        for example to create an empty DataDir,
+        that code goes here.
+    '''
+
   def __str__(self):
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
@@ -594,12 +601,10 @@ class MappingStore(BasicStoreSync):
       closemap()
     super().shutdown()
 
-  def init(self):
-    ''' Mapping stores need no static setup.
-    '''
-    pass
-
   def add(self, data, hashclass=None):
+    ''' Add `data` to the mapping, indexed as `hashclass(data)`.
+        The default `hashclass` is `self.hashclass`.
+    '''
     with Pfx("add %d bytes", len(data)):
       mapping = self.mapping
       h = self.hash(data, hashclass)
