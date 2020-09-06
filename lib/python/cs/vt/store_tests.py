@@ -17,6 +17,7 @@ import tempfile
 import unittest
 from cs.debug import thread_dump
 from cs.logutils import setup_logging
+from cs.pfx import Pfx
 from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
