@@ -173,7 +173,7 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     try:
       return self[hashcode]
     except KeyError:
-      return False
+      return default
 
 class LMDBIndex(_Index):
   ''' LMDB index for a DataDir.
