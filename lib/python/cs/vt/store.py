@@ -11,12 +11,11 @@ from __future__ import with_statement
 from abc import ABC, abstractmethod
 from fnmatch import fnmatch
 from functools import partial
-from os.path import expanduser, isabs as isabspath
 import sys
 from threading import Semaphore
 from icontract import require
 from cs.excutils import logexc
-from cs.later import Later, SubLater
+from cs.later import Later
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx
 from cs.progress import Progress
@@ -26,7 +25,6 @@ from cs.resources import MultiOpenMixin, RunStateMixin, RunState
 from cs.result import report, bg as bg_result
 from cs.seq import Seq
 from cs.threads import bg as bg_thread
-from cs.x import X
 from . import defaults, Lock, RLock
 from .datadir import DataDir, RawDataDir, PlatonicDir
 from .hash import (
