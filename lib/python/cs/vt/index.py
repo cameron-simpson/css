@@ -14,7 +14,7 @@ from os import pread
 from os.path import exists as pathexists
 from zlib import decompress
 from cs.logutils import warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
 from . import Lock
@@ -223,12 +223,14 @@ class LMDBIndex(_Index):
       return False
     return True
 
+  @pfx_method
   def startup(self):
     ''' Start up the index.
     '''
     self.map_size = 10240  # self.MAP_SIZE
     self._open_lmdb()
 
+  @pfx_method
   def shutdown(self):
     ''' Shut down the index.
     '''
