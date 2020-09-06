@@ -15,6 +15,7 @@ import random
 import sys
 import tempfile
 import unittest
+from cs.debug import thread_dump
 from cs.logutils import setup_logging
 from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
@@ -195,7 +196,9 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.keys1 = None
 
   def tearDown(self):
-    pass  ##thread_dump(fp=open('/dev/tty', 'w'))
+    Ts = threading.enumerate()
+    if len(Ts) > 1:
+      thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
 
   @multitest
   def test00empty(self):
