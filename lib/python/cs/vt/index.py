@@ -293,10 +293,7 @@ class LMDBIndex(_Index):
       for hashcode in cursor.iternext(keys=True, values=False):
         yield mkhash(hashcode)
 
-  def keys(self):
-    ''' Return an iterator yielding hashcodes.
-    '''
-    return iter(self)
+  keys = __iter__
 
   def items(self):
     ''' Yield `(hashcode,record)` from index.
@@ -397,6 +394,8 @@ class GDBMIndex(_Index):
       self.flush()
       with self._gdbm_lock:
         hashcode = self._gdbm.nextkey(hashcode)
+
+  keys = __iter__
 
   def __contains__(self, hashcode):
     with self._gdbm_lock:
