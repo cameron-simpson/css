@@ -139,6 +139,7 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
     self.hashclass = hashclass
+    self._mkhash = hashclass.from_hashbytes
 
   @classmethod
   def pathof(cls, basepath):
@@ -294,13 +295,12 @@ class LMDBIndex(_Index):
     self._lmdb.sync()
 
   def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
     with self._txn() as txn:
       cursor = txn.cursor()
-      for hashcode in cursor.iternext(keys=True, values=False):
-        yield mkhash(hashcode)
 
   keys = __iter__
+      for hashcode_bs in cursor.iternext(keys=True, values=False):
+        yield self._mkhash(hashcode_bs)
 
   def items(self):
     ''' Yield `(hashcode,record)` from index.
@@ -397,11 +397,10 @@ class GDBMIndex(_Index):
           self._written = False
 
   def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
     with self._gdbm_lock:
       hashcode = self._gdbm.firstkey()
     while hashcode is not None:
-      yield mkhash(hashcode)
+      yield self._mkhash(hashcode)
       self.flush()
       with self._gdbm_lock:
         hashcode = self._gdbm.nextkey(hashcode)
