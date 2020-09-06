@@ -152,14 +152,16 @@ def multitest(method):
                                       method.__name__):
       if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
         continue
-      with self.subTest(test_store=S, **subtest):
-        self.S = S
-        self.hashclass = subtest['hashclass']
-        S.init()
-        with S:
-          method(self)
-          S.flush()
-        self.S = None
+      with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
+                                     for k, v in sorted(subtest.items())])):
+        with self.subTest(test_store=S, **subtest):
+          self.S = S
+          self.hashclass = subtest['hashclass']
+          S.init()
+          with S:
+            method(self)
+            S.flush()
+          self.S = None
       S = None
 
   return testMethod
