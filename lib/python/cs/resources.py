@@ -17,8 +17,6 @@ from cs.obj import Proxy
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-from cs.pfx import XP
-
 __version__ = '20200718-post'
 
 DISTINFO = {
@@ -70,12 +68,12 @@ class MultiOpenMixin(object):
   ''' A mixin to count open and close calls, and to call `.startup`
       on the first `.open` and to call `.shutdown` on the last `.close`.
 
+      If used as a context manager this mixin calls `open()`/`close()` from
+      `__enter__()` and `__exit__()`.
+
       Recommended subclass implementations do as little as possible
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
-
-      If used as a context manager this mixin calls `open()`/`close()` from
-      `__enter__()` and `__exit__()`.
 
       Multithread safe.
 
@@ -91,11 +89,14 @@ class MultiOpenMixin(object):
     ''' Fetch the state object for the mixin,
         something of a hack to avoid providing an __init__.
     '''
+    # used to be self.__mo_state and catch AttributeError, but
+    # something up the MRO weirds this - suspect the ABC base class
     try:
-      return self.__mo_state
-    except AttributeError:
-      state = self.__mo_state = _mom_state()
-      return state
+      state = self.__dict__['_MultiOpenMixin_state']
+    except KeyError:
+      state = self.__dict__['_MultiOpenMixin_state'] = _mom_state()
+      assert state._opens == 0
+    return state
 
   @property
   def finalise_later(self):
@@ -559,8 +560,9 @@ class RunStateMixin(object):
   def __init__(self, runstate=None):
     ''' Initialise the `RunStateMixin`; sets the `.runstate` attribute.
 
-        `runstate`: `RunState` instance or name.
-        If a `str`, a new `RunState` with that name is allocated.
+        Parameters:
+        * `runstate`: optional `RunState` instance or name.
+          If a `str`, a new `RunState` with that name is allocated.
     '''
     if runstate is None:
       runstate = RunState(type(self).__name__)
