@@ -638,21 +638,14 @@ class HashCodeBlock(_Block):
       else:
         raise RuntimeError("SECOND UNEXPECTED")
 
-  def datafrom(self, start=None, end=None):
+  def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
     '''
-    if start is not None and start < 0:
-      raise ValueError("invalid start=%s" % (start,))
-    if end is not None and end < 0:
-      raise ValueError("invalid end=%s" % (end,))
-    bs = self.get_direct_data()
-    if start is None:
-      if end is None:
-        yield bs
-        return
-      raise ValueError("start is None but end=%s" % (end,))
+    if start < 0:
+      raise ValueError("invalid start:%d" % (start,))
     if end is not None and end < start:
-      raise ValueError("end(%s) < start(%s)" % (end, start))
+      raise ValueError("invalid end:%d < start:%d" % (end, start))
+    bs = self.get_direct_data()
     if start == 0:
       if end is None:
         yield bs
@@ -875,11 +868,9 @@ class RLEBlock(_Block):
     '''
     return self.octet * self.span
 
-  def datafrom(self, start=None, end=None):
+  def datafrom(self, start=0, end=None):
     ''' Yield the data from `start` to `end`.
     '''
-    if start is None:
-      start = 0
     if end is None:
       end = self.span
     if end > self.span:
