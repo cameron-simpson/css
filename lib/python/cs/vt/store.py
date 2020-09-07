@@ -124,6 +124,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       self._str_attrs = {}
       self.name = name
       self._capacity = capacity
+      self.__funcQ = None
       self.hashclass = hashclass
       self._config = None
       self.logfp = None
@@ -279,14 +280,15 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     raise NotImplementedError()
 
   @abstractmethod
-  def get(self, h):
+  # pylint: disable=unused-argument
+  def get(self, h, default=None):
     ''' Fetch the data for hashcode `h` from the Store, or `None`.
     '''
     raise NotImplementedError()
 
   @abstractmethod
   def get_bg(self, h):
-    ''' Dispatch the get request in the backgrounmd, return a `Result`.
+    ''' Dispatch the get request in the background, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -298,7 +300,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   @abstractmethod
   def contains_bg(self, h):
-    ''' Dispatch the contains request in the backgrounmd, return a `Result`.
+    ''' Dispatch the contains request in the background, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -310,12 +312,13 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   @abstractmethod
   def flush_bg(self):
-    ''' Dispatch the flush request in the backgrounmd, return a `Result`.
+    ''' Dispatch the flush request in the background, return a `Result`.
     '''
     raise NotImplementedError()
 
   ##########################################################################
   # Archive support.
+  # pylint: disable=unused-argument
   def get_Archive(self, archive_name, missing_ok=False):
     ''' Fetch the named Archive or `None`.
     '''
@@ -412,6 +415,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
             length = None
           sem.acquire()
           # worker function to add a block conditionally
+
           @logexc
           def add_block(srcS, dstS, block, length, progress):
             # add block content if not already present in dstS
@@ -964,17 +968,16 @@ class _PlatonicStore(MappingStore):
       lock = RLock()
     self.lock = lock
     self.topdirpath = topdirpath
-    self._datadir = 
-        PlatonicDir(
-            self.topdirpath,
-            hashclass=hashclass,
-            indexclass=indexclass,
-            follow_symlinks=follow_symlinks,
-            archive=archive,
-            meta_store=meta_store,
-            flags_prefix=flags_prefix,
-            **kw,
-        )
+    self._datadir = PlatonicDir(
+        self.topdirpath,
+        hashclass=hashclass,
+        indexclass=indexclass,
+        follow_symlinks=follow_symlinks,
+        archive=archive,
+        meta_store=meta_store,
+        flags_prefix=flags_prefix,
+        **kw,
+    )
     super().__init__(name, self._datadir, hashclass=hashclass, **kw)
     self.readonly = True
 
@@ -1018,6 +1021,7 @@ class _ProgressStoreTemplateMapping:
 
 class ProgressStore(BasicStoreSync):
   ''' A shim for another Store to do progress reporting.
+
       TODO: planning to redo basic store methods as shims, with
       implementations supplying _foo methods across the board
       instead.
