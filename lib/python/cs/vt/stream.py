@@ -288,12 +288,12 @@ class StreamStore(BasicStoreSync):
     return rq.do(self)
 
   @pfx_method
-  def add(self, data, hashclass=None):
-    h = self.hash(data, hashclass)
+  def add(self, data):
+    h = self.hash(data)
     if self.mode_addif:
       if self.contains(h):
         return h
-    flags, payload = self.do(AddRequest(data, type(h)))
+    flags, payload = self.do(AddRequest(data, self.hashclass))
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise StoreError(
@@ -302,13 +302,13 @@ class StreamStore(BasicStoreSync):
     assert flags == 0
     if h != h2:
       raise RuntimeError(
-          "hashclass=%s: precomputed hash %s:%s != hash from .add %s:%s" %
-          (hashclass, type(h), h, type(h2), h2)
+          "precomputed hash %s:%s != hash from .add %s:%s" %
+          (type(h), h, type(h2), h2)
       )
     return h
 
   @pfx_method
-  def get(self, h):
+  def get(self, h, default=None):
     try:
       flags, payload = self.do(GetRequest(h))
     except StoreError as e:
@@ -323,7 +323,7 @@ class StreamStore(BasicStoreSync):
       return payload
     if payload:
       raise ValueError("not found, but payload=%r" % (payload,))
-    return None
+    return default
 
   def contains(self, h):
     ''' Dispatch a contains request, return a `Result` for collection.
@@ -360,18 +360,9 @@ class StreamStore(BasicStoreSync):
       None or isinstance(start_hashcode, hashclass)
   )
   def hashcodes(
-      self,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=False,
-      after=False,
-      length=None
+      self, start_hashcode=None, reverse=False, after=False, length=None
   ):
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
+    hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
@@ -407,18 +398,9 @@ class StreamStore(BasicStoreSync):
       None or isinstance(start_hashcode, hashclass)
   )
   def hash_of_hashcodes(
-      self,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=False,
-      after=False,
-      length=None
+      self, start_hashcode=None, reverse=False, after=False, length=None
   ):
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
+    hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
     if after and start_hashcode is None:
@@ -454,21 +436,15 @@ class StreamStore(BasicStoreSync):
       lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
       None or isinstance(start_hashcode, hashclass)
   )
-  def hashcodes_from(self, start_hashcode=None, hashclass=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Unbounded sequence of hashcodes
         obtained by successive calls to `self.hashcodes`.
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     length = 64
     after = False
     while True:
       hashcodes = self.hashcodes(
           start_hashcode=start_hashcode,
-          hashclass=hashclass,
           reverse=reverse,
           after=after,
           length=length
