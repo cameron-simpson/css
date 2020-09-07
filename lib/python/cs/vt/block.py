@@ -79,6 +79,7 @@ class BlockRecord(PacketField):
   )
 
   @staticmethod
+  # pylint: disable=arguments-differ
   def value_from_buffer(bfr):
     ''' Decode a Block reference from a buffer.
 
@@ -163,6 +164,7 @@ class BlockRecord(PacketField):
     return B
 
   @staticmethod
+  # pylint: disable=arguments-differ
   def transcribe_value(B):
     ''' Transcribe this Block, the inverse of value_from_buffer.
     '''
@@ -376,7 +378,7 @@ class _Block(Transcriber, ABC):
       blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
-      from .blockmap import BlockMap
+      from .blockmap import BlockMap  # pylint: disable=import-outside-toplevel
       if blockmapdir is None:
         blockmapdir = defaults.S.blockmapdir
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
@@ -489,17 +491,17 @@ class _Block(Transcriber, ABC):
     ''' Return a new Block consisting of `self` with the span
         `start:end` replaced by the data from `new_block`.
     '''
-    from .blockify import top_block_for
+    from .blockify import top_block_for  # pylint: disable=import-outside-toplevel
     return top_block_for(self.spliced(start, end, new_block))
 
   def open(self, mode="rb"):
     ''' Open the block as a file.
     '''
+    # pylint: disable=import-outside-toplevel
+    from .file import ROBlockFile, RWBlockFile
     if mode == 'rb':
-      from .file import ROBlockFile
       return ROBlockFile(self)
     if mode == 'w+b':
-      from .file import RWBlockFile
       return RWBlockFile(backing_block=self)
     raise ValueError(
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,)
@@ -607,7 +609,7 @@ class HashCodeBlock(_Block):
         # data obtained already
         continue
       try:
-        h = B.hashcode
+        _ = B.hashcode
       except AttributeError as e:
         if isinstance(B, HashCodeBlock):
           error("need_direct_data: B=%s: %s", B, e)
@@ -641,8 +643,7 @@ class HashCodeBlock(_Block):
             "%s: tried to change .span from %s to %s" %
             (self, self._span, newspan)
         )
-      else:
-        raise RuntimeError("SECOND UNEXPECTED")
+      raise RuntimeError("SECOND UNEXPECTED")
 
   def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
@@ -667,6 +668,7 @@ class HashCodeBlock(_Block):
     return T.transcribe_mapping(m, fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     m, offset = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span', None)
@@ -722,6 +724,9 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
   return B
 
 class IndirectBlock(_Block):
+  ''' An indirect block,
+      whose direct data consists of references to subsidiary Blocks.
+  '''
 
   transcribe_prefix = 'I'
 
@@ -742,6 +747,10 @@ class IndirectBlock(_Block):
 
   @classmethod
   def from_hashcode(cls, hashcode, span):
+    ''' Construct an `IndirectBlock` from the `hashcode`
+        for its direct data and the `span` of bytes
+        covers.
+    '''
     return cls(get_HashCodeBlock(hashcode), span=span)
 
   @classmethod
@@ -789,6 +798,7 @@ class IndirectBlock(_Block):
     T.transcribe(self.superblock, fp=fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     ''' Parse "span:Block"
     '''
@@ -890,6 +900,7 @@ class RLEBlock(_Block):
     return T.transcribe_mapping({'span': self.span, 'octet': self.octet}, fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     m = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span')
@@ -935,6 +946,7 @@ class LiteralBlock(_Block):
     fp.write(hexify(self.data))
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     ''' Parse the interior of the transcription: texthexified data.
     '''
@@ -1044,6 +1056,7 @@ class _SubBlock(_Block):
     )
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     offset, block, suboffset, subspan = T.parse_mapping(
         s, offset, stopchar, required=('block', 'offset', 'span')
