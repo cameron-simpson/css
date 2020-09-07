@@ -992,14 +992,14 @@ class _PlatonicStore(MappingStore):
   def startup(self, **kw):
     ''' Startup: open the internal DataDir.
     '''
-    super().startup(**kw)
     self._datadir.open()
+    super().startup(**kw)
 
   def shutdown(self):
     ''' Shutdown: close the internal DataDir.
     '''
-    self._datadir.close()
     super().shutdown()
+    self._datadir.close()
 
   def get_Archive(self, name=None, missing_ok=False):
     ''' PlatonicStore Archives are associated with the internal DataDir.
