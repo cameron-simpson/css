@@ -61,17 +61,6 @@ class HashCodeField(PacketField):
 decode_buffer = HashCodeField.value_from_buffer
 decode = HashCodeField.value_from_bytes
 
-def hash_of_byteses(bss, hashclass):
-  ''' Compute a `HashCode` from an iterable of bytes.
-
-      This underlies the mechanism for comparing remote Stores,
-      which is based on the `hash_of_hashcodes` method.
-  '''
-  H = hashclass.HASHFUNC()
-  for bs in bss:
-    H.update(bs)
-  return hashclass.from_chunk(H.digest())
-
 class HashCode(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
   '''
@@ -121,8 +110,7 @@ class HashCode(bytes, Transcriber):
     '''
     return HashCodeField.transcribe_value(self)
 
-  # pylint: arguments-differ
-  def encode(self):
+  def encode(self):  # pylint: disable=arguments-differ
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
 
         If we ever have a variable length hash function,
@@ -300,28 +288,29 @@ class HashCodeUtilsMixin:
       * `.hashcodes_missing`: likewise
   '''
 
+  @classmethod
+  def hash_of_byteses(cls, bss):
+    ''' Compute a `HashCode` from an iterable of `bytes`.
+
+        This underlies the mechanism for comparing remote Stores,
+        which is based on the `hash_of_hashcodes` method.
+    '''
+    hashstate = cls.HASHFUNC()
+    for bs in bss:
+      hashstate.update(bs)
+    return cls.from_chunk(hashstate.digest())
+
   @require(
       lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
       None or isinstance(start_hashcode, hashclass)
   )
   def hash_of_hashcodes(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=None,
-      after=False,
-      length=None
+      self, *, start_hashcode=None, reverse=None, after=False, length=None
   ):
     ''' Return a hash of the hashcodes requested and the last
-        hashcode (or None if no hashcodes matched); used for comparing
-        remote Stores.
+        hashcode (or `None` if no hashcodes matched);
+        used for comparing remote Stores.
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
@@ -331,7 +320,6 @@ class HashCodeUtilsMixin:
     hs = list(
         self.hashcodes(
             start_hashcode=start_hashcode,
-            hashclass=hashclass,
             reverse=reverse,
             after=after,
             length=length
@@ -341,24 +329,21 @@ class HashCodeUtilsMixin:
       h_final = hs[-1]
     else:
       h_final = None
-    return hash_of_byteses(hs, hashclass=hashclass), h_final
+    return self.hash_of_byteses(hs), h_final
 
-  def hashcodes_missing(self, other, *, window_size=None, hashclass=None):
+  def hashcodes_missing(self, other, *, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
         Note that a StreamStore overrides this with a call to
         missing_hashcodes_by_checksum to reduce bandwidth.
     '''
-    return missing_hashcodes(
-        self, other, window_size=window_size, hashclass=hashclass
-    )
+    return missing_hashcodes(self, other, window_size=window_size)
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, type(self))
   )
-  def hashcodes_from(
-      self, *, start_hashcode=None, reverse=False, hashclass=None
-  ):
+  # pylint: disable=too-many-branches
+  def hashcodes_from(self, *, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
 
         This implementation starts by fetching and sorting all the
@@ -374,11 +359,6 @@ class HashCodeUtilsMixin:
         * `reverse`: yield hashcodes in reverse order
           (counting down instead of up).
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     ks = sorted(self.keys())
     if not ks:
       return
@@ -420,17 +400,11 @@ class HashCodeUtilsMixin:
         ndx += 1
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, type(self))
   )
   def hashcodes(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=False,
-      after=False,
-      length=None
+      self, *, start_hashcode=None, reverse=False, after=False, length=None
   ):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
@@ -445,11 +419,6 @@ class HashCodeUtilsMixin:
         * `after`: skip the first hashcode if it is equal to `start_hashcode`
         * `length`: the maximum number of hashcodes to yield
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
@@ -466,7 +435,7 @@ class HashCodeUtilsMixin:
         return
     first = True
     for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
-                                        hashclass=hashclass, reverse=reverse):
+                                        reverse=reverse):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -479,24 +448,17 @@ class HashCodeUtilsMixin:
           break
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, type(self))
   )
   def hashcodes_bg(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=None,
-      after=False,
-      length=None
+      self, *, start_hashcode=None, reverse=None, after=False, length=None
   ):
     ''' Background a hashcodes call.
     '''
     return self._defer(
         self.hashcodes,
         start_hashcode=start_hashcode,
-        hashclass=hashclass,
         reverse=reverse,
         after=after,
         length=length
