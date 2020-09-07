@@ -13,6 +13,7 @@ from fnmatch import fnmatch
 from functools import partial
 import sys
 from threading import Semaphore
+from types import MappingProxyType
 from icontract import require
 from cs.excutils import logexc
 from cs.later import Later
@@ -574,11 +575,12 @@ class BasicStoreAsync(_BasicStoreCommon):
   def flush(self):
     return self.flush_bg()()
 
-class MappingStore(BasicStoreSync):
+class MappingStore(MappingProxyType, BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
   def __init__(self, name, mapping, **kw):
+    MappingProxyType.__init__(self, mapping)
     BasicStoreSync.__init__(self, name, **kw)
     self.mapping = mapping
     self._str_attrs.update(mapping=type(mapping).__name__)
@@ -607,40 +609,7 @@ class MappingStore(BasicStoreSync):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
         The default `hashclass` is `self.hashclass`.
     '''
-    with Pfx("add %d bytes", len(data)):
-      mapping = self.mapping
-      h = self.hash(data, hashclass)
-      if h not in mapping:
-        mapping[h] = data
-      else:
-        if False:
-          with Pfx("EXISTING HASH"):
-            try:
-              data2 = mapping[h]
-            except Exception as e:  # pylint: disable=broad-except
-              error("fetch FAILED: %s", e)
-            else:
-              if data != data2:
-                warning(
-                    "data mismatch: .add data=%r, Store data=%r", data, data2
-                )
-      return h
-
-  def get(self, h, default=None):
-    ''' Get the data for `h` or default (`None`).
-    '''
-    try:
-      data = self.mapping[h]
-    except KeyError:
-      return default
-    return data
-
-  def contains(self, h):
-    ''' Test whether `h` is in the mapping.
-    '''
-    return h in self.mapping
-
-  __contains__ = contains
+    return self.mapping.add(data)
 
   def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
@@ -649,29 +618,6 @@ class MappingStore(BasicStoreSync):
     if map_flush is not None:
       map_flush()
 
-  def __len__(self):
-    ''' Return the length of the mapping.
-    '''
-    return len(self.mapping)
-
-  def keys(self, hashclass=None):
-    ''' Yield the keys of typer `hashclass` (default `self.hashclass`).
-    '''
-    if hashclass is None:
-      hashclass = self.hashclass
-    keys_func = self.mapping.keys
-    try:
-      return keys_func(hashclass)
-    except TypeError:
-      # get all keys and filter by type
-      # pylint: disable=unidiomatic-typecheck
-      return filter(lambda h: type(h) is hashclass, keys_func())
-
-  def __iter__(self):
-    ''' Return iterator over the mapping; required for use of HashCodeUtilsMixin.hashcodes_from.
-    '''
-    return iter(self.mapping.keys())
-
   def hashcodes_from(self, **kw):
     ''' Use the mapping's .hashcodes_from if present, otherwise use
         HashCodeUtilsMixin.hashcodes_from.
@@ -679,7 +625,7 @@ class MappingStore(BasicStoreSync):
     try:
       hashcodes_method = self.mapping.hashcodes_from
     except AttributeError:
-      return HashCodeUtilsMixin.hashcodes_from(self, **kw)
+      return super().hashcodes_from(**kw)
     return hashcodes_method(**kw)
 
 class ProxyStore(BasicStoreSync):
