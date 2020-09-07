@@ -49,76 +49,6 @@ class StoreError(Exception):
         s += ":%s=%r" % (k, getattr(self, k))
     return s
 
-class _PerHashclassMapping:
-  ''' A mapping which chooses an underlying mapping based on the type of the key.
-
-      This supports Stores which mediate access to hashclass specific backends.
-  '''
-
-  @require(lambda default_hashclass: issubclass(default_hashclass, HashCode))
-  def __init__(self, factory, default_hashclass, lock):
-    self._lock = lock
-    self.default_hashclass = default_hashclass
-    self._mappings = {}
-    self.factory = factory
-
-  def open(self):
-    ''' Stub open method to match close.
-    '''
-    pass
-
-  def close(self):
-    ''' Close the mapping by closing all the submappings.
-    '''
-    for mapping in self._mappings.values():
-      mapping.close()
-
-  def mapping_for_hashclass(self, hashclass):
-    ''' Return the DataDir for the specified `hashclass`.
-        This proxies to the internal mapping.
-    '''
-    mappings = self._mappings
-    with self._lock:
-      try:
-        mapping = mappings[hashclass]
-      except KeyError:
-        mappings[hashclass] = mapping = self.factory(hashclass)
-        mapping.open()
-    return mapping
-
-  def __getitem__(self, hashcode):
-    return self.mapping_for_hashclass(type(hashcode))[hashcode]
-
-  def __setitem__(self, hashcode, data):
-    self.mapping_for_hashclass(type(hashcode))[hashcode] = data
-
-  def __contains__(self, hashcode):
-    return hashcode in self.mapping_for_hashclass(type(hashcode))
-
-  def keys(self, hashclass=None):
-    ''' Return an iterable of hashcodes of type `hashclass`.
-        This proxies to the internal mapping.
-    '''
-    if hashclass is None:
-      hashclass = self.default_hashclass
-    return self.mapping_for_hashclass(hashclass).keys()
-
-  def __iter__(self):
-    return iter(self.keys())
-
-  def get_Archive(self, name, **kw):
-    ''' Return the `Archive` named `name`.
-        This proxies to the internal mapping.
-    '''
-    return self.mapping_for_hashclass(self.default_hashclass
-                                      ).get_Archive(name, **kw)
-
-  def pathto(self, rpath):
-    ''' Return the full path for `rpath`.
-        This proxies to the internal mapping.
-    '''
-    return self.mapping_for_hashclass(self.default_hashclass).pathto(rpath)
-
 class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
                         RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
@@ -1028,7 +958,7 @@ class _PlatonicStore(MappingStore):
       name,
       topdirpath,
       *,
-      hashclass=None,
+      hashclass,
       indexclass=None,
       follow_symlinks=False,
       archive=None,
@@ -1037,25 +967,24 @@ class _PlatonicStore(MappingStore):
       lock=None,
       **kw
   ):
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
     if lock is None:
       lock = RLock()
     self.lock = lock
     self.topdirpath = topdirpath
-    if hashclass is None:
-      hashclass = DEFAULT_HASHCLASS
-    self._datadir = _PerHashclassMapping(
-        lambda hcls: PlatonicDir(
+    self._datadir = 
+        PlatonicDir(
             self.topdirpath,
-            hcls,
+            hashclass=hashclass,
             indexclass=indexclass,
             follow_symlinks=follow_symlinks,
             archive=archive,
             meta_store=meta_store,
             flags_prefix=flags_prefix,
             **kw,
-        ), hashclass, lock
-    )
-    MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
+        )
+    super().__init__(name, self._datadir, hashclass=hashclass, **kw)
     self.readonly = True
 
   def init(self):
