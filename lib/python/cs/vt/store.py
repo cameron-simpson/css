@@ -91,9 +91,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   _seq = Seq()
 
-  def __init__(
-      self, name, capacity=None, hashclass=None, lock=None, runstate=None
-  ):
+  def __init__(self, name, capacity=None, hashclass=None, runstate=None):
     ''' Initialise the Store.
 
         Parameters:
@@ -103,8 +101,6 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         * `capacity`: a capacity for the internal Later queue, default 4
         * `hashclass`: the hash class to use for this Store,
           default: `DEFAULT_HASHCLASS`
-        * `lock`: an optional lock for managing concurrency,
-          if not supplied a new `threading.RLock` is allocated
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
     '''
