@@ -159,9 +159,7 @@ class DataFileState(SimpleNamespace):
 
 class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
                RunStateMixin, FlaggedMixin, Mapping):
-  ''' Base class indexing locally stored data in files.
-      This class is hashclass specific;
-      the utilising Store maintains one of these for each supported hashclass.
+  ''' Base class indexing locally stored data in files for a specific hashclass.
 
       There are two main subclasses of this at present:
       * `DataDir`: the data are kept in a subdirectory of UUID-named files,
@@ -212,8 +210,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def _singleton_key(
       cls,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       indexclass=None,
       rollover=None,
       flags=None,
@@ -240,8 +238,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def __init__(
       self,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       indexclass=None,
       rollover=None,
       flags=None,
@@ -996,8 +994,8 @@ class PlatonicDir(FilesDir):
   def __init__(
       self,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       exclude_dir=None,
       exclude_file=None,
       follow_symlinks=False,
@@ -1022,7 +1020,7 @@ class PlatonicDir(FilesDir):
         * `meta_store`: an optional Store used to maintain a Dir
           representing the ideal directory; unhashed data blocks
           encountered during scans which are promoted to `HashCodeBlock`s
-          are also stored here
+          are also stored here.
         * `archive`: optional `Archive` ducktype instance with a
           .update(Dirent[,when]) method
 
@@ -1033,7 +1031,7 @@ class PlatonicDir(FilesDir):
     '''
     if meta_store is None:
       raise ValueError("meta_store may not be None")
-    super().__init__(topdirpath, hashclass, **kw)
+    super().__init__(topdirpath, hashclass=hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
