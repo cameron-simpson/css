@@ -1041,12 +1041,7 @@ class ProgressStore(BasicStoreSync):
   ):
     ''' Wrapper for a Store which collects statistics on use.
     '''
-    lock = kw.pop('lock', None)
-    if lock is None:
-      lock = S._lock
-    BasicStoreAsync.__init__(
-        self, "ProgressStore(%s)" % (name,), lock=lock, **kw
-    )
+    BasicStoreAsync.__init__(self, "ProgressStore(%s)" % (name,), **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
