@@ -34,7 +34,7 @@
 '''
 
 from __future__ import print_function
-from abc import ABC
+from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
@@ -323,6 +323,12 @@ class _Block(Transcriber, ABC):
     ''' len(Block) is the length of the encompassed data.
     '''
     return self.span
+
+  @abstractmethod
+  def datafrom(self, start=0):
+    ''' Yield data chuncks from this file.
+    '''
+    raise NotImplementedError("datafrom")
 
   def get_spanned_data(self):
     ''' Collect up all the data of this Block and return a single bytes instance.
