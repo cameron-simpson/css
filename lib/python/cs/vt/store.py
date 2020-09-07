@@ -8,7 +8,7 @@
 '''
 
 from __future__ import with_statement
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, Mapping
 from fnmatch import fnmatch
 from functools import partial
 import sys
@@ -118,8 +118,8 @@ class _PerHashclassMapping:
     '''
     return self.mapping_for_hashclass(self.default_hashclass).pathto(rpath)
 
-class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, RunStateMixin,
-                        ABC):
+class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
+                        RunStateMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
