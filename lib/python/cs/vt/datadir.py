@@ -1018,9 +1018,11 @@ class PlatonicDir(FilesDir):
           whose basename commences with a dot.
         * `follow_symlinks`: follow symbolic links, default False.
         * `meta_store`: an optional Store used to maintain a Dir
-          representing the ideal directory; unhashed data blocks
-          encountered during scans which are promoted to `HashCodeBlock`s
-          are also stored here.
+          representing the ideal directory,
+          which is maintained as changes to the source directory tree
+          are observed.
+          Also, unhashed data blocks encountered during scans
+          which are promoted to `HashCodeBlock`s are stored here.
         * `archive`: optional `Archive` ducktype instance with a
           .update(Dirent[,when]) method
 
