@@ -207,12 +207,12 @@ class PacketField(ABC):
 
       In the simple case subclasses should implement two methods:
       * `value_from_buffer`:
-        parse the value from a `CornuCopyBuffer` and returns the parsed value
+        parse the value from a `CornuCopyBuffer` and return the parsed value
       * `transcribe_value`:
         transcribe the value as bytes
 
       In the more complex case,
-      Sometimes a `PacketField` may not warrant (or perhaps fit)
+      sometimes a `PacketField` may not warrant (or perhaps fit)
       the formality of a `Packet` with its multifield structure.
       One example is the `cs.iso14496.UTF8or16Field` class.
 
