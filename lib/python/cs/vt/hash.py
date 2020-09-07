@@ -78,6 +78,12 @@ class HashCode(bytes, Transcriber):
 
   __slots__ = ()
 
+  # to be defined by subclasses
+  HASHNAME = None
+  HASHENUM = None
+  HASHLEN = None
+  HASHFUNC = None
+
   transcribe_prefix = 'H'
 
   def __str__(self):
@@ -115,6 +121,7 @@ class HashCode(bytes, Transcriber):
     '''
     return HashCodeField.transcribe_value(self)
 
+  # pylint: arguments-differ
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
 
@@ -128,6 +135,7 @@ class HashCode(bytes, Transcriber):
     ''' Factory function returning a HashCode object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
+      # pylint: disable=bad-string-format-type
       raise ValueError(
           "expected %d bytes, received %d: %r" %
           (cls.HASHLEN, len(hashbytes), hashbytes)
@@ -150,14 +158,14 @@ class HashCode(bytes, Transcriber):
     try:
       hashclass = HASHCLASS_BY_NAME[hashname.lower()]
     except KeyError:
-      raise ValueError("unknown hashclass name %r", hashname)
+      raise ValueError("unknown hashclass name %r" % (hashname,))
     return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
   def from_chunk(cls, chunk):
     ''' Factory function returning a HashCode object from a data block.
     '''
-    hashbytes = cls.HASHFUNC(chunk).digest()
+    hashbytes = cls.HASHFUNC(chunk).digest()  # pylint: disable=not-callable
     return cls.from_hashbytes(hashbytes)
 
   @property
@@ -269,8 +277,8 @@ register_hashclass(Hash_SHA256)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
-class HashCodeUtilsMixin(object):
-  ''' Utility methods for classes which use hashcodes as keys.
+class HashCodeUtilsMixin:
+  ''' Utility methods for classes which use `HashCode`s as keys.
 
       Subclasses will generally override `.hashcodes_from`,
       which returns an iterator that yields hashcodes until none remains.
