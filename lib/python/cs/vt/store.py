@@ -8,7 +8,8 @@
 '''
 
 from __future__ import with_statement
-from abc import ABC, abstractmethod, Mapping
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from fnmatch import fnmatch
 from functools import partial
 import sys
@@ -162,13 +163,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   def __hash__(self):
     return id(self)
 
-  def hash(self, data, hashclass=None):
+  def hash(self, data):
     ''' Return a HashCode instance from data bytes.
         NB: this does _not_ store the data.
     '''
-    if hashclass is None:
-      hashclass = self.hashclass
-    return hashclass.from_chunk(data)
+    return self.hashclass.from_chunk(data)
 
   # Stores are equal only to themselves.
   def __eq__(self, other):
@@ -183,10 +182,10 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     '''
     return self.contains(h)
 
-  def keys(self, hashclass=None):
+  def keys(self):
     ''' Return an iterator over the Store's hashcodes.
     '''
-    return self.hashcodes_from(hashclass=hashclass)
+    return self.hashcodes_from()
 
   def __iter__(self):
     ''' Return an iterator over the Store's hashcodes.
@@ -272,14 +271,14 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ##########################################################################
   # Core Store methods, all abstract.
   @abstractmethod
-  def add(self, data, hashclass=None):
+  def add(self, data):
     ''' Add the `data` to the Store, return its hashcode.
     '''
     raise NotImplementedError()
 
   @abstractmethod
-  def add_bg(self, data, hashclass=None):
-    ''' Dispatch the add request in the backgrounmd, return a `Result`.
+  def add_bg(self, data):
+    ''' Dispatch the add request in the background, return a `Result`.
     '''
     raise NotImplementedError()
 
@@ -472,8 +471,8 @@ class BasicStoreSync(_BasicStoreCommon):
   ## Background versions of operations.
   ##
 
-  def add_bg(self, data, hashclass=None):
-    return self._defer(self.add, data, hashclass)
+  def add_bg(self, data):
+    return self._defer(self.add, data)
 
   def get_bg(self, h):
     return self._defer(self.get, h)
@@ -493,8 +492,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   ## Background versions of operations.
   ##
 
-  def add(self, data, hashclass=None):
-    return self.add_bg(data, hashclass)()
+  def add(self, data):
+    return self.add_bg(data)()
 
   def get(self, h):
     return self.get_bg(h)()
@@ -535,7 +534,7 @@ class MappingStore(MappingProxyType, BasicStoreSync):
       closemap()
     super().shutdown()
 
-  def add(self, data, hashclass=None):
+  def add(self, data):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
         The default `hashclass` is `self.hashclass`.
     '''
@@ -718,19 +717,19 @@ class ProxyStore(BasicStoreSync):
       S = LFmap[LF]
       yield S, LF.result, LF.exc_info
 
-  def add(self, data, hashclass=None):
+  def add(self, data):
     ''' Add a data chunk to the save Stores.
         This queues all the saves in the background and returns the
         hashcode received.
     '''
     ch = Channel()
-    self._defer(self._bg_add, data, hashclass, ch)
+    self._defer(self._bg_add, data, ch)
     hashcode = ch.get()
     if hashcode is None:
       raise RuntimeError("no hashcode returned from .add")
     return hashcode
 
-  def _bg_add(self, data, hashclass, ch):
+  def _bg_add(self, data, ch):
     ''' Add a data chunk to the save Stores.
 
         Parameters:
@@ -742,7 +741,7 @@ class ProxyStore(BasicStoreSync):
     try:
       if not self.save:
         # no save - allow add if hashcode already present - dubious
-        hashcode = self.hash(data, hashclass)
+        hashcode = self.hash(data)
         if hashcode in self:
           ch.put(hashcode)
           ch = None
@@ -751,7 +750,7 @@ class ProxyStore(BasicStoreSync):
       ok = True
       fallback = None
       for S, hashcode, exc_info in self._multicall(self.save, 'add_bg',
-                                                   (data, hashclass)):
+                                                   (data,)):
         if exc_info is None:
           assert hashcode is not None, "None from .add of %s" % (S,)
           if ch:
@@ -766,9 +765,7 @@ class ProxyStore(BasicStoreSync):
             ok = False
             if self.save2:
               # kick off the fallback saves immediately
-              fallback = list(
-                  self._multicall0(self.save2, 'add_bg', (data, hashclass))
-              )
+              fallback = list(self._multicall0(self.save2, 'add_bg', (data,)))
             else:
               error("no fallback Stores")
           continue
@@ -834,14 +831,12 @@ class ProxyStore(BasicStoreSync):
     for _ in self._multicall(self.save, 'flush_bg', ()):
       pass
 
-  def keys(self, hashclass=None):
-    if hashclass is None:
-      hashclass = self.hashclass
+  def keys(self):
     seen = set()
     Q = IterableQueue()
 
     def keys_from(S):
-      for h in S.keys(hashclass):
+      for h in S.keys():
         Q.put(h)
       Q.put(None)
 
