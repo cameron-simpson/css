@@ -695,7 +695,7 @@ class HashCodeBlock(_Block):
           if len(self) != len(data):
             error("len(self)=%d, len(data)=%d", len(self), len(data))
             ok = False
-          h = S.hash(data, type(hashcode))
+          h = S.hash(data)
           if h != hashcode:
             error("hash(data):%s != self.hashcode:%s", h, hashcode)
             ok = False
