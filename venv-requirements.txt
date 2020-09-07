@@ -10,5 +10,6 @@ pylint
 sqlalchemy
 twine
 typeguard
+watchdog
 yapf
 youtube-dl
