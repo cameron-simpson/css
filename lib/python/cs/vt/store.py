@@ -1132,7 +1132,7 @@ class _PlatonicStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
-class _ProgressStoreTemplateMapping(object):
+class _ProgressStoreTemplateMapping:
 
   def __init__(self, PS):
     self.PS = PS

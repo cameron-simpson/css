@@ -98,7 +98,7 @@ def dump_Store(S, indent=''):
 
 _LockContext = namedtuple("LockContext", "caller thread")
 
-class DebuggingLock(object):
+class DebuggingLock:
   ''' A wrapper for a threading Lock or RLock
       to notice contention and report contending uses.
   '''

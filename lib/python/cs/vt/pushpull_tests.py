@@ -13,7 +13,7 @@ from cs.x import X
 import cs.x
 cs.x.X_via_tty = True
 
-class _TestMissingHashCodes(object):
+class _TestMissingHashCodes:
   ''' Base class for testing missing hashcodes.
   '''
 
