@@ -8,6 +8,9 @@
     and capable of transcribing themselves in binary form
     (trivially via `bytes(instance)` and also otherwise).
 
+    See `cs.iso14496` for an ISO 14496 (eg MPEG4) parser
+    built using this module.
+
     Terminology used below:
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
@@ -107,8 +110,8 @@
     The leaves of this hierarchy will be `PacketField`s,
     whose attributes are ordinary Python types.
 
-    By contrast, a `PacketField`'s attributes are expected to be "flat" values:
-    the plain post-parse value, such as a `str` or an `int`
+    By contrast, a `PacketField`'s attributes are expected to be "flat" values
+    i.e. the plain post-parse value such as a `str` or an `int`
     or some other conventional Python type.
 
     The base case for `PacketField`
@@ -195,19 +198,21 @@ def flatten(chunks):
 class PacketField(ABC):
   ''' A record for an individual packet field.
 
-      This normally holds a single value, such as an int of a particular size
-      or a string.
+      This normally holds a single value,
+      for example an int of a particular size or a string.
 
-      There are 2 basic ways to implement a `PacketField` subclass.
+      There are 2 basic ways to implement a `PacketField` subclass:
+      * simple: implement `value_from_buffer` and `transcribe_value`
+      * complex: implement `from_buffer` and `transcribe`
 
-      For the simple case subclasses should implement two methods:
+      In the simple case subclasses should implement two methods:
       * `value_from_buffer`:
         parse the value from a `CornuCopyBuffer` and returns the parsed value
       * `transcribe_value`:
         transcribe the value as bytes
 
-      Sometimes a `PacketField` may be more complex
-      while still not warranting (or perhaps fitting)
+      In the more complex case,
+      Sometimes a `PacketField` may not warrant (or perhaps fit)
       the formality of a `Packet` with its multifield structure.
       One example is the `cs.iso14496.UTF8or16Field` class.
 
@@ -224,7 +229,7 @@ class PacketField(ABC):
         it then returns the new `UTF8or16Field`
         initialised from these values via `cls(text, bom=bom)`.
       * `transcribe`:
-        to transcribe the option BOM and suitably encoded string.
+        to transcribe the optional BOM and suitably encoded string.
       The instance method `transcribe` is required because the transcription
       requires knowledge of the BOM, an attribute of an instance.
   '''
@@ -1138,7 +1143,10 @@ class ListField(PacketField):
 _multi_struct_fields = {}
 
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
-  ''' Factory for `PacketField` subclasses build around complex `struct` formats.
+  ''' A class factory for `PacketField` subclasses built around complex `struct` formats.
+
+      See also the convenience class factory `structtuple`
+      which is usually easier to work with.
 
       Parameters:
       * `struct_format`: the `struct` format string
@@ -1213,7 +1221,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   return MultiStructField
 
 def structtuple(class_name, struct_format, subvalue_names):
-  ''' Convenience wrapper for multi_struct_field.
+  ''' Convenience wrapper for `multi_struct_field`.
 
       Example:
 
