@@ -164,17 +164,17 @@ def blocked_chunks_of(
 
       Parameters:
       * `chunks`: a source iterable of data chunks, handed to `scanner`
-      * `scanner`: optional callable accepting a CornuCopyBuffer and
-        returning an iterable of ints, such as a generator. `scanner`
-        may be None, in which case only the rolling hash is used
+      * `scanner`: optional callable accepting a `CornuCopyBuffer` and
+        returning an iterable of `int`s, such as a generator. `scanner`
+        may be `None`, in which case only the rolling hash is used
         to locate boundaries.
       * `min_block`: the smallest amount of data that will be used
-        to create a Block, default MIN_BLOCKSIZE
+        to create a Block, default `MIN_BLOCKSIZE`
       * `max_block`: the largest amount of data that will be used to
-        create a Block, default MAX_BLOCKSIZE
-      * `histogram`: if not None, a defaultdict(int) to collate counts.
+        create a Block, default `MAX_BLOCKSIZE`
+      * `histogram`: if not `None`, a `defaultdict(int)` to collate counts.
         Integer indices count block sizes and string indices are used
-        for 'bytes_total' and 'bytes_hash_scanned'.
+        for `'bytes_total'` and `'bytes_hash_scanned'`.
 
       The iterable returned from `scanner(chunks)` yields ints which are
       considered desirable block boundaries.
