@@ -14,6 +14,7 @@ from os.path import join as joinpath
 import random
 import sys
 import tempfile
+import threading
 import unittest
 from cs.debug import thread_dump
 from cs.logutils import setup_logging
