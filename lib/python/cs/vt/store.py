@@ -14,7 +14,6 @@ from fnmatch import fnmatch
 from functools import partial
 import sys
 from threading import Semaphore
-from types import MappingProxyType
 from icontract import require
 from cs.excutils import logexc
 from cs.later import Later
@@ -504,12 +503,11 @@ class BasicStoreAsync(_BasicStoreCommon):
   def flush(self):
     return self.flush_bg()()
 
-class MappingStore(MappingProxyType, BasicStoreSync):
+class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
   def __init__(self, name, mapping, **kw):
-    MappingProxyType.__init__(self, mapping)
     BasicStoreSync.__init__(self, name, **kw)
     self.mapping = mapping
     self._str_attrs.update(mapping=type(mapping).__name__)
@@ -538,7 +536,9 @@ class MappingStore(MappingProxyType, BasicStoreSync):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
         The default `hashclass` is `self.hashclass`.
     '''
-    return self.mapping.add(data)
+    h = self.hash(data)
+    self.mapping[h] = data
+    return h
 
   def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
@@ -556,6 +556,29 @@ class MappingStore(MappingProxyType, BasicStoreSync):
     except AttributeError:
       return super().hashcodes_from(**kw)
     return hashcodes_method(**kw)
+
+  def __len__(self):
+    return len(self.mapping)
+
+  def __contains__(self, h):
+    return h in self.mapping
+
+  contains = __contains__
+
+  def keys(self):
+    ''' Proxy to `self.mapping.keys`.
+    '''
+    return self.mapping.keys()
+
+  def __getitem__(self, h):
+    ''' Proxy to `self.mapping[h]`.
+    '''
+    return self.mapping[h]
+
+  def get(self, h, default=None):
+    ''' Proxy to `self.mapping.get`.
+    '''
+    return self.mapping.get(h, default=default)
 
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
