@@ -468,10 +468,11 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
 
-  def __init__(self):
+  def __init__(self, hashclass=None):
     dict.__init__(self)
-    MultiOpenMixin.__init__(self)
-    self.hashclass = DEFAULT_HASHCLASS
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
 
   def __str__(self):
     return '<%s:%d-entries>' % (self.__class__.__name__, len(self))
