@@ -301,8 +301,8 @@ class HashCodeUtilsMixin:
     return hashclass.from_chunk(hashstate.digest())
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      type(start_hashcode) is self.hashclass
   )
   def hash_of_hashcodes(
       self, *, start_hashcode=None, reverse=None, after=False, length=None
@@ -340,11 +340,13 @@ class HashCodeUtilsMixin:
 
   @require(
       lambda self, start_hashcode: start_hashcode is None or
-      isinstance(start_hashcode, type(self))
+      type(start_hashcode) is self.hashclass
   )
   # pylint: disable=too-many-branches
   def hashcodes_from(self, *, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
+
+        See the `hashcodes()` method for a wrapper with more features.
 
         This implementation starts by fetching and sorting all the
         keys, so for large mappings this implementation is memory
@@ -401,7 +403,7 @@ class HashCodeUtilsMixin:
 
   @require(
       lambda self, start_hashcode: start_hashcode is None or
-      isinstance(start_hashcode, type(self))
+      type(start_hashcode) is self.hashclass
   )
   def hashcodes(
       self, *, start_hashcode=None, reverse=False, after=False, length=None
