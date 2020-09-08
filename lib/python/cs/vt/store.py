@@ -923,7 +923,10 @@ class DataDirStore(MappingStore):
     self.rollover = rollover
     datadirclass = RawDataDir if raw else DataDir
     self._datadir = datadirclass(
-        self.topdirpath, hashclass, indexclass=indexclass, rollover=rollover
+        self.topdirpath,
+        hashclass=hashclass,
+        indexclass=indexclass,
+        rollover=rollover
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
