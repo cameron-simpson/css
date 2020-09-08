@@ -63,7 +63,7 @@ class TestDataDir(unittest.TestCase):
   def _open_default_datadir(self):
     return self.datadirclass(
         self.indexdirpath,
-        self.hashclass,
+        hashclass=self.hashclass,
         indexclass=self.indexclass,
         rollover=self.rollover
     )
