@@ -109,7 +109,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
             "initial `name` argument must be a str, got %s" % (type(name),)
         )
       if name is None:
-        name = "%s%d" % (type(self).__name__, next(_BasicStoreCommon._seq()))
+        name = "%s%d" % (type(self).__name__, next(self._seq()))
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
       elif isinstance(hashclass, str):
@@ -322,7 +322,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     ''' Fetch the named Archive or `None`.
     '''
     warning("no get_Archive for %s", type(self).__name__)
-    return None
+    return None  # pylint: disable=useless-return
 
   @prop
   def config(self):
@@ -494,8 +494,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   def add(self, data):
     return self.add_bg(data)()
 
-  def get(self, h):
-    return self.get_bg(h)()
+  def get(self, h, default=None):
+    return self.get_bg(h, default=default)()
 
   def contains(self, h):
     return self.contains_bg(h)()
@@ -534,7 +534,7 @@ class MappingStore(BasicStoreSync):
 
   def add(self, data):
     ''' Add `data` to the mapping, indexed as `hashclass(data)`.
-        The default `hashclass` is `self.hashclass`.
+        Return the hashcode.
     '''
     h = self.hash(data)
     self.mapping[h] = data
@@ -715,7 +715,7 @@ class ProxyStore(BasicStoreSync):
     super().shutdown()
 
   @staticmethod
-  def _multicall0(stores, method_name, args):
+  def _multicall0(stores, method_name, args, kwargs=None):
     ''' Basic multicall of _bg methods yielding (LF, S) pairs in the order submitted.
     '''
     assert method_name.endswith('_bg')
@@ -723,23 +723,26 @@ class ProxyStore(BasicStoreSync):
     for S in stores:
       with Pfx("%s.%s()", S, method_name):
         with S:
-          LF = getattr(S, method_name)(*args)
+          LF = getattr(S, method_name)(*args, **kwargs)
       yield LF, S  # outside Pfx because this is a generator
 
-  def _multicall(self, stores, method_name, args):
-    ''' Generator yielding (S, result, exc_info) for each call to
-        S.method_name(args) in the order completed.
+  def _multicall(self, stores, method_name, args, kwargs=None):
+    ''' Generator yielding `(S,result,exc_info)` for each call to
+        `S.method_name(*args,**kwargs)` in the order completed.
 
         The method_name should be one of the *_bg names which return
-        LateFunctions.
+        `LateFunction`s.
         Methods are called in parallel and values returned as
-        completed, so the (S, LateFUnction) returns may not be in the same
+        completed, so the return tuples may not be in the same
         order as the supplied `stores`.
-        `stores`: iterable of Stores on which to call `method_name`
-        `method_name`: name of Store method
-        `args`: positional arguments for the method call
+
+        Parameters:
+        * `stores`: iterable of Stores on which to call `method_name`
+        * `method_name`: name of Store method
+        * `args`: positional arguments for the method call
+        * `kwargs`: optional keyword arguments for the method call
     '''
-    LFmap = dict(self._multicall0(stores, method_name, args))
+    LFmap = dict(self._multicall0(stores, method_name, args, kwargs=kwargs))
     for LF in report(LFmap.keys()):
       # locate the corresponding store for context
       S = LFmap[LF]
@@ -826,7 +829,7 @@ class ProxyStore(BasicStoreSync):
         ch = None
         ch.close()
 
-  def get(self, h):
+  def get(self, h, default=None):
     ''' Fetch a block from the first Store which has it.
     '''
     with Pfx("%s.get", type(self).__name__):
@@ -840,7 +843,7 @@ class ProxyStore(BasicStoreSync):
                 for copyS in self.copy2:
                   copyS.add_bg(data)
               return data
-      return None
+      return default
 
   def contains(self, h):
     ''' Test whether the hashcode `h` is in any of the read Stores.
@@ -1105,10 +1108,10 @@ class ProgressStore(BasicStoreSync):
     progress['bytes_stored'] += size
     return LF()
 
-  def get(self, h):
+  def get(self, h, default=None):
     progress = self._progress
     progress['requests'] += 1
-    LF = self.S.get_bg(h)
+    LF = self.S.get_bg(h, default=default)
     progress['gets'] += 1
     data = LF()
     progress['bytes_fetched'] += len(data)
