@@ -62,7 +62,7 @@ def missing_hashcodes(S1, S2, window_size=None):
     window_size = DEFAULT_WINDOW_SIZE
   hashcodes1 = None
   last_hashcode1 = None
-  hashcodes2 = list(S2.hashcodes_from(length=window_size))
+  hashcodes2 = list(S2.hashcodes(length=window_size))
   while hashcodes2 and (hashcodes1 is None or hashcodes1):
     # note end of S2 window so that we can fetch the next window
     last_hashcode2 = hashcodes2[-1]
@@ -72,7 +72,7 @@ def missing_hashcodes(S1, S2, window_size=None):
         # past the end of S1 hashcode window
         # fetch new window starting at current hashcode
         hashcodes1 = list(
-            S1.hashcodes_from(start_hashcode=hashcode, length=window_size)
+            S1.hashcodes(start_hashcode=hashcode, length=window_size)
         )
         if not hashcodes1:
           # no more S1 hashcodes, cease scan
@@ -90,7 +90,7 @@ def missing_hashcodes(S1, S2, window_size=None):
       break
     # fetch next batch of hashcodes from S2
     hashcodes2 = list(
-        S2.hashcodes_from(
+        S2.hashcodes(
             start_hashcode=last_hashcode2, length=window_size, after=True
         )
     )
@@ -102,7 +102,7 @@ def missing_hashcodes(S1, S2, window_size=None):
     if hashcode is None:
       break
     # fetch next bunch of hashcodes
-    hashcodes2 = S2.hashcodes_from(
+    hashcodes2 = S2.hashcodes(
         start_hashcode=hashcode, length=window_size, after=True
     )
 
@@ -154,7 +154,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       continue
     # fetch the actual hashcodes
     hashcodes2 = list(
-        S2.hashcodes_from(
+        S2.hashcodes(
             start_hashcode=start_hashcode, length=window_size, after=after
         )
     )
@@ -162,7 +162,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       # maybe some entires removed? - anyway, no more S2 so return
       return
     hashcodes1 = set(
-        S1.hashcodes_from(
+        S1.hashcodes(
             start_hashcode=start_hashcode, length=window_size, after=after
         )
     )
@@ -178,7 +178,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       if hashcodes1 and h_final1 < hashcode:
         # hashcodes1 does not cover this point in hashcodes2, fetch more
         hashcodes1 = set(
-            S1.hashcodes_from(
+            S1.hashcodes(
                 start_hashcode=hashcode, length=len(hashcodes2) - ndx
             )
         )
@@ -194,7 +194,7 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
   # collect all following S2 hashcodes
   while True:
     hashcodes2 = list(
-        S2.hashcodes_from(
+        S2.hashcodes(
             start_hashcode=start_hashcode, length=window_size, after=after
         )
     )
