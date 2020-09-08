@@ -288,17 +288,17 @@ class HashCodeUtilsMixin:
       * `.hashcodes_missing`: likewise
   '''
 
-  @classmethod
-  def hash_of_byteses(cls, bss):
+  def hash_of_byteses(self, bss):
     ''' Compute a `HashCode` from an iterable of `bytes`.
 
         This underlies the mechanism for comparing remote Stores,
         which is based on the `hash_of_hashcodes` method.
     '''
-    hashstate = cls.HASHFUNC()
+    hashclass = self.hashclass
+    hashstate = hashclass.HASHFUNC()
     for bs in bss:
       hashstate.update(bs)
-    return cls.from_chunk(hashstate.digest())
+    return hashclass.from_chunk(hashstate.digest())
 
   @require(
       lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
