@@ -9,7 +9,7 @@ from icontract import require
 from cs.deco import fmtdoc
 from cs.result import OnDemandFunction
 
-INITIAL_WINDOW_SIZE = 1024
+DEFAULT_WINDOW_SIZE = 1024
 
 @require(lambda S1, S2: S1.hashclass is S2.hashclass)
 def pull_hashcode(S1, S2, hashcode):
@@ -53,13 +53,13 @@ def missing_hashcodes(S1, S2, window_size=None):
 
       Parameters:
       * `window_size`: number of hashcodes to fetch at a time for comparison,
-        default from `INITIAL_WINDOW_SIZE` (`{INITIAL_WINDOW_SIZE}`).
+        default from `DEFAULT_WINDOW_SIZE` (`{DEFAULT_WINDOW_SIZE}`).
 
       This relies on both Stores supporting the `.hashcodes` method;
       dumb unordered Stores do not.
   '''
   if window_size is None:
-    window_size = 1024
+    window_size = DEFAULT_WINDOW_SIZE
   hashcodes1 = None
   last_hashcode1 = None
   hashcodes2 = list(S2.hashcodes_from(length=window_size))
@@ -107,16 +107,19 @@ def missing_hashcodes(S1, S2, window_size=None):
     )
 
 # pylint: disable=too-many-branches
+@fmtdoc
 @require(lambda S1, S2: S1.hashclass is S2.hashclass)
 def missing_hashcodes_by_checksum(S1, S2, window_size=None):
   ''' Scan Stores `S1` and `S2` and yield hashcodes in `S2` but not in `S1`.
       This relies on both Stores supporting the .hashcodes and
       .hash_of_hashcodes methods; dumb unordered Stores do not.
-      `window_size`: intial number of hashcodes to fetch at a time for comparison,
-                     default 1024.
+
+      Parameters:
+      * `window_size`: intial number of hashcodes to fetch at a time for comparison,
+        default from `DEFAULT_WINDOW_SIZE` (`{DEFAULT_WINDOW_SIZE}`)
   '''
   if window_size is None:
-    window_size = 1024
+    window_size = DEFAULT_WINDOW_SIZE
   # latest hashcode already compared
   start_hashcode = None
   after = False
