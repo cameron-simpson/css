@@ -1,3 +1,4 @@
+@OBSOLETE(PfxThread) and replace uses with cs.threads.bg
 cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
 vbox: cmd to associate the current default interface before starting vm?
 vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
