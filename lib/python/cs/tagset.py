@@ -1023,7 +1023,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     if offset == len(s) or s[offset].isspace() or (delim
                                                    and s[offset] in delim):
       # just tag_name present
-      return dict(tag=Tag(tag_name), comparison=None), offset
+      return dict(tag=Tag(tag_name), comparison='='), offset
 
     comparison = None
     for cmp_op in cls.COMPARISON_OPS:
