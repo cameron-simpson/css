@@ -18,7 +18,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, PrePfx, PfxThread as Thread
+from cs.pfx import Pfx, PrePfx, PfxThread as Thread, pfx_method
 from cs.predicate import post_condition
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
@@ -235,50 +235,51 @@ class PacketConnection(object):
     self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
+    self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
     self._lock = Lock()
     self.closed = False
+    # debugging: check for reuse of (channel,tag) etc
+    self.__sent = set()
+    self.__send_queued = set()
     # dispatch Thread to process received packets
     self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
     self._send_thread = bg_thread(self._send_loop, name="%s[_send]" % (self.name,))
-    # debugging: check for reuse of (channel,tag) etc
-    self.__sent = set()
-    self.__send_queued = set()
 
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
 
+  @pfx_method
   def shutdown(self, block=False):
     ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
 
         Parameters:
         `block`: block for outstanding requests, default False.
     '''
-    with Pfx("SHUTDOWN %s", self):
-      with self._lock:
-        if self.closed:
-          # shutdown already called from another thread
-          return
-        # prevent further request submission either local or remote
-        self.closed = True
-      ps = self._pending_states()
-      if ps:
-        warning("PENDING STATES AT SHUTDOWN: %r", ps)
-      # wait for completion of requests we're performing
-      for LF in list(self._running):
-        LF.join()
-      # shut down sender, should trigger shutdown of remote receiver
-      self._sendQ.close(enforce_final_close=True)
-      self._send_thread.join()
-      # we do not wait for the receiver - anyone hanging on outstaning
-      # requests will get them as they come in, and in theory a network
-      # disconnect might leave the receiver hanging anyway
-      self._later.close()
-      if block:
-        self._later.wait()
+    with self._lock:
+      if self.closed:
+        # shutdown already called from another thread
+        return
+      # prevent further request submission either local or remote
+      self.closed = True
+    ps = self._pending_states()
+    if ps:
+      warning("PENDING STATES AT SHUTDOWN: %r", ps)
+    # wait for completion of requests we're performing
+    for LF in list(self._running):
+      LF.join()
+    # shut down sender, should trigger shutdown of remote receiver
+    self._sendQ.close(enforce_final_close=True)
+    self._send_thread.join()
+    # we do not wait for the receiver - anyone hanging on outstaning
+    # requests will get them as they come in, and in theory a network
+    # disconnect might leave the receiver hanging anyway
+    self._later.close()
+    if block:
+      self._later.wait()
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -293,10 +294,9 @@ class PacketConnection(object):
     '''
     states = []
     pending = self._pending
-    for channel in sorted(pending.keys()):
-      channel_states = pending[channel]
-      for tag in sorted(channel_states.keys()):
-        states.append( ( (channel, tag), channel_states[tag]) )
+    for channel, channel_states in sorted(pending.items()):
+      for tag, channel_state in sorted(channel_states.items()):
+        states.append( ( (channel, tag), channel_state) )
     return states
 
   @locked
@@ -403,7 +403,7 @@ class PacketConnection(object):
   @not_closed
   def do(self, *a, **kw):
     ''' Synchronous request.
-        Calls the `Result` returned from the request.
+        Submits the request, then calls the `Result` returned from the request.
     '''
     return self.request(*a, **kw)()
 

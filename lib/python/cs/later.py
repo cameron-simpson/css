@@ -44,6 +44,7 @@ from cs.logutils import error, warning, info, debug, exception, D
 from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.queues import IterableQueue, TimerQueue
+from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread
@@ -62,6 +63,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.queues',
+        'cs.resources',
         'cs.result',
         'cs.seq',
         'cs.threads',
@@ -285,7 +287,7 @@ class LateFunction(Result):
         error("%s", e, exc_info=exc_info)
     Result._complete(self, result, exc_info)
 
-class Later(object):
+class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
 
       Methods are provided for submitting functions to run ASAP or
@@ -346,7 +348,9 @@ class Later(object):
     self._priority = (0,)
     self._timerQ = None  # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self.closed = False
+    self._finished = None
+
+  def startup(self):
     self._finished = Event()
 
   @pfx_method
@@ -358,18 +362,11 @@ class Later(object):
         - dispatch a Thread to wait for completion and fire the
           _finished Event
     '''
-    if not self.closed:
-      self.close()
     if self._timerQ:
       self._timerQ.close()
       self._timerQ.join()
     # queue actions to detect activity completion
     bg_thread(self._finished.set)
-
-  def close(self):
-    ''' Close the Later, preventing further task submission.
-    '''
-    self.closed = True
 
   def _try_dispatch(self):
     ''' Try to dispatch the next LateFunction.
@@ -906,6 +903,7 @@ class SubLater(object):
         associated checks.
     '''
     self._later = L
+    self._later.open()
     self._lock = Lock()
     self._deferred = 0
     self._queued = 0
@@ -938,8 +936,8 @@ class SubLater(object):
         self._later.warning("repeated close of %s", self)
       else:
         self.closed = True
-        if self._queued >= self._deferred:
-          self._queue.close()
+        self._queue.close()
+        self._later.close()
 
   def defer(self, func, *a, **kw):
     ''' Defer a function, return its `LateFunction`.

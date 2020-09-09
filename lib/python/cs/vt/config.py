@@ -28,7 +28,7 @@ from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, XP, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG
+from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG_MAP
 from .archive import Archive, FilePathArchive
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
@@ -65,24 +65,30 @@ class Config(SingletonMixin):
   '''
 
   @staticmethod
-  @require(lambda config_map: isinstance(config_map, (str, dict)))
+  @require(
+      lambda config_map: config_map is None or
+      isinstance(config_map, (str, dict))
+  )
   @require(
       lambda default_config:
       (default_config is None or isinstance(default_config, dict))
   )
-  def _singleton_key(config_map, environ=None, default_config=None):
+  def _singleton_key(config_map=None, environ=None, default_config=None):
+    if config_map is None:
+      config_map = DEFAULT_CONFIG_MAP
     return (
         config_map if isinstance(config_map, str) else id(config_map),
-        id(DEFAULT_CONFIG) if default_config is None else id(default_config)
+        id(DEFAULT_CONFIG_MAP)
+        if default_config is None else id(default_config)
     )
 
-  def __init__(self, config_map, environ=None, default_config=None):
-    if hasattr(self, 'map'):
-      return
+  def __init__(self, config_map=None, environ=None, default_config=None):
+    if config_map is None:
+      config_map = DEFAULT_CONFIG_MAP
     if environ is None:
       environ = os.environ
     if default_config is None:
-      default_config = DEFAULT_CONFIG
+      default_config = DEFAULT_CONFIG_MAP
     self.environ = environ
     config = ConfigParser()
     if isinstance(config_map, str):
@@ -102,6 +108,7 @@ class Config(SingletonMixin):
         warning("falling back to default configuration")
         config.read_dict(default_config)
     else:
+      self.path = None
       config.read_dict(config_map)
     self.map = config
     self._clause_stores = {}  # clause_name => Result->Store
@@ -176,6 +183,15 @@ class Config(SingletonMixin):
     ''' The default location for local archives and stores.
     '''
     return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
+
+  @property
+  def blockmapdir(self):
+    ''' The global blockmapdir.
+        Falls back to `{self.basedir}/blockmaps`.
+    '''
+    return longpath(
+        self.get_default('blockmapdir', joinpath(self.basedir, 'blockmaps'))
+    )
 
   @property
   def mountdir(self):
