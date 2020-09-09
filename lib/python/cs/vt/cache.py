@@ -122,6 +122,9 @@ class FileCacheStore(BasicStoreSync):
     ''' Dummy sync operation.
     '''
 
+  def __len__(self):
+    return len(self.backend)
+
   def keys(self, hashclass=None):
     if hashclass is None:
       hashclass = self.hashclass
