@@ -49,8 +49,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagChoice, TagSetContainsTest,
-    TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TaggedEntity
 )
 from cs.threads import locked
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -121,10 +120,11 @@ class SQLTagSetCriterion(TagSetCriterion):
     '''
     raise NotImplementedError("extend_query")
 
-class SQLTagChoice(TagChoice, SQLTagSetCriterion):
-  ''' A `cs.tagset.TagChoice` extended with a `.extend_query` method.
+class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
+  ''' A `cs.tagset.TagBasedTest` extended with a `.extend_query` method.
   '''
 
+  @pfx_method
   def extend_query(self, sqla_query, *, orm):
     ''' Extend the SQLAlchemy `Query` `sqla_query`.
         Return the new `Query`.
@@ -132,44 +132,31 @@ class SQLTagChoice(TagChoice, SQLTagSetCriterion):
     tag = self.tag
     tags_alias = aliased(orm.tags)
     tag_column, tag_test_value = tags_alias.value_test(tag.value)
+    if tag_column is None or self.comparison == '~':
+      test_expr = None
+    else:
+      test_func = self.COMPARISON_FUNCS[self.comparison]
+      test_expr = test_func(tag_column, tag_test_value)
+    # require the tag_name to be our target
     match = [tags_alias.name == tag.name]
     isouter = not self.choice
     if self.choice:
       # positive test
-      if tag_test_value is None:
-        # just test for presence
-        pass
-      else:
+      if test_expr:
         # test for presence and value
-        match.append(tag_column == tag_test_value)
+        match.append(test_expr)
     else:
       # negative test
       if tag_column is None:
         # just test for absence
         match.append(tags_alias.id is None)
-      else:
+      elif test_expr:
         # test for absence or incorrect value
-        match.append(or_(tags_alias.id is None, tag_column != tag_test_value))
+        match.append(or_(tags_alias.id is None, not (test_expr)))
     return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
 
-SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagChoice)
-SQLTagSetCriterion.TAG_CHOICE_CLASS = SQLTagChoice
-
-class SQLTagSetContainsTest(TagSetContainsTest, SQLTagSetCriterion):
-  ''' A `cs.tagset.TagSetContainsTest` extended with a `.extend_query` method.
-  '''
-
-  def extend_query(self, sqla_query, *, orm):
-    ''' Extend the SQLAlchemy `Query` `sqla_query`.
-        Return the new `Query`.
-    '''
-    tag = self.tag
-    tags_alias = aliased(orm.tags)
-    match = [tags_alias.name == tag.name]
-    isouter = not self.choice
-    return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
-
-SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagSetContainsTest)
+SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
+SQLTagSetCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
@@ -177,7 +164,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   TAGSET_CRITERION_CLASS = SQLTagSetCriterion
 
-  TAG_CHOICE_CLASS = SQLTagChoice
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
   GETOPT_SPEC = 'f:'
 
@@ -226,7 +213,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     sqltags = SQLTags(db_url)
     with stackattrs(options, sqltags=sqltags, verbose=True):
       with sqltags:
-        yield
+        with sqltags.orm.session():
+          yield
 
   @classmethod
   def cmd_edit(cls, argv, options):
@@ -536,16 +524,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     name = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    tag_choices = []
-    for arg in argv:
-      with Pfx(arg):
-        try:
-          tag_choice = TagChoice.from_str(arg)
-        except ValueError as e:
-          warning("bad tag specifications: %s", e)
-          badopts = True
-        else:
-          tag_choices.append(tag_choice)
+    try:
+      tag_choices = cls.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e))
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
@@ -930,8 +912,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       @classmethod
       def value_test(cls, other_value):
-        ''' Return `(column,test_value)` for testing `other_value`
-            where `column` if the appropriate SQLAlchemy column
+        ''' Return `(column,test_value)` for constructing tests against
+            `other_value` where `column` if the appropriate SQLAlchemy column
             and `test_value` is the comparison value for testing.
 
             For most `other_value`s the `test_value`
