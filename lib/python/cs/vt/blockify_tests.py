@@ -28,7 +28,7 @@ cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
-SCANNERS = (scan_text, scan_mp3, scan_mp4)
+SCANNERS = scan_text, scan_mp3, scan_mp4
 SCAN_TESTFILES = {
     scan_text: ('CS_VT_BLOCKIFY_TESTS__TESTFILE_TEXT', __file__),
     scan_mp3: ('CS_VT_BLOCKIFY_TESTS__TESTFILE_MP3', 'TEST.mp3'),
@@ -86,12 +86,7 @@ class TestAll(unittest.TestCase):
   def test02blocked_chunks_of(self):
     ''' Blockify some input sources.
     '''
-    for scanner in (
-        None,
-        scan_text,
-        scan_mp3,
-        scan_mp4,
-    ):
+    for scanner in [None] + list(SCANNERS):
       testfilename = None if scanner is None else scanner_testfile(scanner)
       if testfilename is None:
         self._test_blocked_chunks_of(
