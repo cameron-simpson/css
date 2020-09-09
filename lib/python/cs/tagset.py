@@ -1793,7 +1793,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagBasedTest.from_str(arg)
+          tag_choice = TagSetCriterion.from_str(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,))
         else:
