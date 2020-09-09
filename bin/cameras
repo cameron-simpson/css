@@ -6,16 +6,23 @@
 
 set -ue
 
-cfg=$HOME/.cameras
-once=
-trace=
-vecho=echo
-ff_loglevel=
+exec 9>/dev/null
+iout=1  # info messages
+vout=1  # verbose messages
+vecho(){
+  echo "$*" >&$vout
+}
+
 if [ -t 2 ]
 then  trace=set-x
       ff_loglevel=warning
-else  ff_loglevel=error
+else  trace=
+      ff_loglevel=error
+      vout=9
 fi
+
+once=
+cfg=$HOME/.cameras
 
 cfgnames(){
   [ $# = 1 ] || {
@@ -34,12 +41,13 @@ cfgline(){
 }
 
 cmd=$0
-usage="Usage: $cmd [-1] [-f cfg] [--] op [args...]
+usage="Usage: $cmd [options...] [--] op [args...]
   -1        Once. Process or collate only one date.
   -f cfg    Specify the comfig file.
             Default: $cfg
   -q        Quiet.
   -v        Verbose.
+  -x        Trace execution.
   Operations:
     collate [names...]
       Move all snapshot images prior to today into subdirectories by day.
@@ -55,8 +63,9 @@ do
   case $1 in
     -1) once=1 ;;
     -f) cfg=$2; shift ;;
-    -q) ff_loglevel=error vecho=: ;;
-    -v) ff_loglevel=info vecho=echo ;;
+    -q) ff_loglevel=error iout=9 vout=9 ;;
+    -v) ff_loglevel=info iout=1 vout=1 ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -150,7 +159,7 @@ do
               do
                 ddir=$collated/$date
                 [ -d "$ddir" ] || $trace mkdir "$ddir"
-                $vecho "mv $date-*.jpg $ddir/ ..." >&2
+                vecho "mv $date-*.jpg $ddir/ ..."
                 mv "$date"-*.jpg "$ddir/"
                 [ $once ] && break
               done
@@ -167,7 +176,7 @@ do
               do
                 [ -d "$date" ] || continue
                 video=$date.mp4
-                ls -ldL "$compiled/$video" 2>/dev/null && continue
+                ls -ldL "$compiled/$video" 2>&$vout && continue
                 (
                   set -ue
                   subxit=0
@@ -177,7 +186,7 @@ do
                   find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
                   set -- "$date-"*.jpg
                   [ -s "$1" ] || {
-                    $vecho "$date: no .jpg files" >&2
+                    vecho "$date: no .jpg files"
                     exit 0
                   }
                   # make nnnnn.jpg names for ffmpeg to process
@@ -189,7 +198,6 @@ do
                     set -- "$date"-*jpg
                     ls -ld "$1" >&2
                     { gm identify "$1" || identify "$1"; } \
-                    | tee /dev/fd/2 \
                     | awk '{print$3}' | sed 's/+.*//'
                   )
                   $trace ffmpeg -loglevel "$ff_loglevel" \

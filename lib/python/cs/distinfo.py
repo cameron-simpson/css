@@ -956,7 +956,7 @@ class Module(object):
                 info("create %s", mddst)
                 with Pfx(mddst):
                   with open(mddst, 'w') as mddstf:
-                    runcmd(['md2man-roff', mdsrc], stdout=mddstf)
+                    runcmd(['md2man-roff', subpath], stdout=mddstf)
               mf.write('include ' + subpath + '\n')
               mf.write('include ' + prefix + '\n')
           elif ext == '.c':

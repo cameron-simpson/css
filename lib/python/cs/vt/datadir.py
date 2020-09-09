@@ -327,7 +327,6 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def startup(self):
     ''' Start up the FilesDir: take locks, start worker threads etc.
     '''
-    X("STARTUP %s ...", type(self).__name__)
     self.initdir()
     self._rfds = {}
     self._unindexed = {}
