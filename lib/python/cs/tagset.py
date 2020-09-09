@@ -1001,11 +1001,11 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
   COMPARISON_OPS = sorted(COMPARISON_FUNCS.keys(), key=len, reverse=True)
 
   def __str__(self):
-    if self.comparison is None:
-      return self.tag.name
-    return (
-        self.tag.name + self.comparison +
-        self.tag.transcribe_value(self.tag.value)
+    return ('' if self.choice else '!') + (
+        self.tag.name if self.comparison is None else (
+            self.tag.name + self.comparison +
+            self.tag.transcribe_value(self.tag.value)
+        )
     )
 
   @classmethod
