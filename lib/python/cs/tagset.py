@@ -906,7 +906,7 @@ class TagSetCriterion(ABC):
       for crit_cls in cls.CRITERION_PARSE_CLASSES:
         with Pfx(crit_cls.__name__):
           parse = crit_cls.parse
-          with Pfx("parse(%r,offset=%d)", s, offset):
+          with Pfx("%s.parse(%r,offset=%d)", crit_cls.__name__, s, offset):
             try:
               params, offset = parse(s, offset, delim)
             except ValueError:
