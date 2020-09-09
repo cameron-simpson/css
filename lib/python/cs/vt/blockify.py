@@ -11,9 +11,10 @@ from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning, exception
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.seq import tee
+from cs.threads import bg as bg_thread
 from .block import Block, IndirectBlock
 from .scan import scanbuf
 
@@ -239,7 +240,7 @@ def blocked_chunks_of(
         # end of offsets and chunks
         parseQ.close()
 
-      PfxThread(target=run_parser).run()
+      bg_thread(run_parser)
     # inbound chunks and offsets
     in_offsets = []  # heap of unprocessed edge offsets
     # prime `available_chunk` with the first data chunk, ready for get_next_chunk
