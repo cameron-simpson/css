@@ -1795,11 +1795,10 @@ class TagsCommandMixin:
         try:
           tag_choice = TagSetCriterion.from_str(arg)
         except ValueError as e:
-          raise ValueError("bad tag specifications: %s" % (e,))
-        else:
-          if tag_choice.comparison != '=':
-            raise ValueError("only tag_name or tag_name=value accepted")
-          tag_choices.append(tag_choice)
+          raise ValueError("bad tag specifications: %s" % (e,)) from e
+        if tag_choice.comparison != '=':
+          raise ValueError("only tag_name or tag_name=value accepted")
+        tag_choices.append(tag_choice)
     return tag_choices
 
 class TaggedEntityMixin(FormatableMixin):
