@@ -16,7 +16,7 @@ from threading import Semaphore, Thread, current_thread, Lock
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, warning, debug, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, prefix
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
@@ -45,6 +45,7 @@ DISTINFO = {
     ],
 }
 
+# pylint: disable=too-many-arguments
 def bg(
     func,
     daemon=None,
@@ -62,9 +63,9 @@ def bg(
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
+      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -74,16 +75,19 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
+  thread_prefix = prefix() + ': ' + name
+
   def thread_body():
-    with Pfx(name):
+    with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = Thread(name=name, target=thread_body)
+  T = Thread(name=thread_prefix, target=thread_body)
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:
     T.daemon = daemon
-  no_start or T.start()
+  if not no_start:
+    T.start()
   return T
 
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
@@ -119,7 +123,6 @@ class WorkerThreadPool(MultiOpenMixin):
   def startup(self):
     ''' Start the pool.
     '''
-    pass
 
   def shutdown(self):
     ''' Shut down the pool.
@@ -218,7 +221,7 @@ class WorkerThreadPool(MultiOpenMixin):
         debug("%s: worker thread: running task...", self)
         result = func()
         debug("%s: worker thread: ran task: result = %s", self, result)
-      except Exception:
+      except Exception:  # pylint: disable=broad-except
         exc_info = sys.exc_info()
         log_func = (
             exception
@@ -425,6 +428,7 @@ class LockableMixin(object):
   def __enter__(self):
     self._lock.acquire()
 
+  # pylint: disable=unused-argument
   def __exit(self, exc_type, exc_value, traceback):
     self._lock.release()
 
