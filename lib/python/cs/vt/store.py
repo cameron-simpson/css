@@ -725,6 +725,8 @@ class ProxyStore(BasicStoreSync):
     '''
     assert method_name.endswith('_bg')
     stores = list(stores)
+    if kwargs is None:
+      kwargs = {}
     for S in stores:
       with Pfx("%s.%s()", S, method_name):
         with S:
