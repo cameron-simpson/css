@@ -714,6 +714,11 @@ class ProxyStore(BasicStoreSync):
       S.close()
     super().shutdown()
 
+  def __len__(self):
+    ''' The size of the store is the sum of the read stores.
+    '''
+    return sum(map(len, self.read))
+
   @staticmethod
   def _multicall0(stores, method_name, args, kwargs=None):
     ''' Basic multicall of _bg methods yielding (LF, S) pairs in the order submitted.
