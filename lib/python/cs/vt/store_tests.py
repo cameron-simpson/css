@@ -230,21 +230,18 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     '''
     S = self.S
     # compute block hash but do not store
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
-                                                     ):
-      with self.subTest(hashname=hashname):
-        size = random.randint(127, 16384)
-        data = make_randblock(size)
-        h = S.hash(data, hashclass)
-        ok = S.contains(h)
-        self.assertFalse(ok)
-        self.assertNotIn(h, S)
-        # now add the block
-        h2 = S.add(data, type(h))
-        self.assertEqual(h, h2)
-        ok = S.contains(h)
-        self.assertTrue(ok)
-        self.assertIn(h, S)
+    size = random.randint(127, 16384)
+    data = make_randblock(size)
+    h = S.hash(data)
+    ok = S.contains(h)
+    self.assertFalse(ok)
+    self.assertNotIn(h, S)
+    # now add the block
+    h2 = S.add(data)
+    self.assertEqual(h, h2)
+    ok = S.contains(h)
+    self.assertTrue(ok)
+    self.assertIn(h, S)
 
   @multitest
   def test02add_get(self):
@@ -253,16 +250,13 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
-                                                     ):
-      with self.subTest(hashname=hashname):
-        for _ in range(16):
-          size = random.randint(127, 16384)
-          data = make_randblock(size)
-          h = S.hash(data, hashclass)
-          h2 = S.add(data, type(h))
-          self.assertEqual(h, h2)
-          random_chunk_map[h] = data
+    for _ in range(16):
+      size = random.randint(127, 16384)
+      data = make_randblock(size)
+      h = S.hash(data)
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
+      random_chunk_map[h] = data
     for h in random_chunk_map:
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
