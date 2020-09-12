@@ -499,40 +499,38 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def _queue_index_flush(self):
     self._indexQ.put(None)
 
-  @logexc
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from `.indexQ` and store it.
     '''
-    with Pfx("%s._index_updater", self):
-      index = self.index
-      unindexed = self._unindexed
-      filemap = self._filemap
-      old_DFstate = None
-      indexQ = self._indexQ
-      for item in indexQ:
-        # dummy item to sync state
-        if item is None:
-          if old_DFstate is not None:
-            filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-            old_DFstate = None
-          continue
-        hashcode, entry, post_offset = item
-        with self._lock:
-          index[hashcode] = entry
-          try:
-            del unindexed[hashcode]
-          except KeyError:
-            # this can happen when the same key is indexed twice
-            # entirely plausible if a new datafile is added to the datadir
-            pass
-        DFstate = filemap[entry.filenum]
-        if DFstate is not old_DFstate:
-          if old_DFstate is not None:
-            filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-          old_DFstate = DFstate
-        DFstate.indexed_to = post_offset
-      if old_DFstate is not None:
-        filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+    index = self.index
+    unindexed = self._unindexed
+    filemap = self._filemap
+    old_DFstate = None
+    indexQ = self._indexQ
+    for item in indexQ:
+      # dummy item to sync state
+      if item is None:
+        if old_DFstate is not None:
+          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+          old_DFstate = None
+        continue
+      hashcode, entry, post_offset = item
+      with self._lock:
+        index[hashcode] = entry
+        try:
+          del unindexed[hashcode]
+        except KeyError:
+          # this can happen when the same key is indexed twice
+          # entirely plausible if a new datafile is added to the datadir
+          pass
+      DFstate = filemap[entry.filenum]
+      if DFstate is not old_DFstate:
+        if old_DFstate is not None:
+          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+        old_DFstate = DFstate
+      DFstate.indexed_to = post_offset
+    if old_DFstate is not None:
+      filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
 
   @locked
   def flush(self):
