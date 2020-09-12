@@ -578,7 +578,7 @@ class MappingStore(BasicStoreSync):
   def get(self, h, default=None):
     ''' Proxy to `self.mapping.get`.
     '''
-    return self.mapping.get(h, default=default)
+    return self.mapping.get(h, default)
 
 class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
