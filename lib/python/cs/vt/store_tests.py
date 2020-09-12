@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from cs.context import stackkeys
 from cs.debug import thread_dump
 from cs.logutils import setup_logging
 from cs.pfx import Pfx
@@ -40,110 +41,122 @@ def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
   '''
   # test all Store types against all the hash classes
+  subtest = {}
   for hashclass_name in sorted(HASHCLASS_BY_NAME.keys()):
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
-    # MappingStore
-    subtest = {'hashclass': hashclass}
-    yield subtest, MappingStore('MappingStore', mapping={}, **subtest)
-    # MemoryCacheStore
-    yield subtest, MemoryCacheStore(
-        'MemoryCacheStore', 1024 * 1024 * 1024, **subtest
-    )
-    # DataDirStore
-    for index_name in get_index_names():
-      indexclass = get_index_by_name(index_name)
-      subtest = {
-          'hashclass': hashclass,
-          'indexclass': indexclass,
-          'rollover': 200000,
-      }
-      T = tempfile.TemporaryDirectory(prefix=prefix)
-      with T as tmpdirpath:
-        yield subtest, DataDirStore('DataDirStore', tmpdirpath, **subtest)
-    subtest = {
-        'hashclass': hashclass,
-    }
-    # FileCacheStore
-    T = tempfile.TemporaryDirectory(prefix=prefix)
-    with T as tmpdirpath:
-      yield subtest, FileCacheStore(
-          'FileCacheStore', MappingStore('MappingStore', {}), tmpdirpath,
-          **subtest
-      )
-    # StreamStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      upstream_rd, upstream_wr = os.pipe()
-      downstream_rd, downstream_wr = os.pipe()
-      remote_S = StreamStore(
-          "remote_S",
-          upstream_rd,
-          downstream_wr,
-          local_store=local_store,
-          addif=addif,
-          hashclass=hashclass
-      )
-      S = StreamStore(
-          "S", downstream_rd, upstream_wr, addif=addif, hashclass=hashclass
-      )
-      with local_store:
-        with remote_S:
-          yield subtest, S
-    # TCPClientStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      base_port = 9999
-      while True:
-        bind_addr = ('127.0.0.1', base_port)
-        try:
-          remote_S = TCPStoreServer(bind_addr, local_store=local_store)
-        except OSError as e:
-          if e.errno == errno.EADDRINUSE:
-            base_port += 1
-          else:
-            raise
-        else:
-          break
-      S = TCPClientStore(None, bind_addr, **subtest)
-      with local_store:
-        with remote_S:
-          yield subtest, S
-    # UNIXSocketClientStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      T = tempfile.TemporaryDirectory(prefix=prefix)
-      with T as tmpdirpath:
-        socket_path = joinpath(tmpdirpath, 'sock')
-        remote_S = UNIXSocketStoreServer(socket_path, local_store=local_store)
-        S = UNIXSocketClientStore(None, socket_path, **subtest)
-        with local_store:
-          with remote_S:
-            yield subtest, S
-    # ProxyStore
-    subtest = {
-        "hashclass": hashclass,
-    }
-    main1 = MappingStore("main1", {}, hashclass=hashclass)
-    main2 = MappingStore("main2", {}, hashclass=hashclass)
-    save2 = MappingStore("save2", {}, hashclass=hashclass)
-    S = ProxyStore(
-        "ProxyStore", (main1, main2), (main2, save2),
-        hashclass=hashclass,
-        save2=(save2,)
-    )
-    yield subtest, S
+    with stackkeys(subtest, hashname=hashclass_name, hashclass=hashclass):
+      # MappingStore
+      with stackkeys(subtest, storetype=MappingStore):
+        yield subtest, MappingStore(
+            'MappingStore', mapping={}, hashclass=hashclass
+        )
+      # MemoryCacheStore
+      with stackkeys(subtest, storetype=MemoryCacheStore):
+        yield subtest, MemoryCacheStore(
+            'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
+        )
+      # DataDirStore
+      with stackkeys(subtest, storetype=DataDirStore):
+        for index_name in get_index_names():
+          indexclass = get_index_by_name(index_name)
+          with stackkeys(subtest, indexname=index_name, indexclass=indexclass):
+            for rollover in 200000, :
+              with stackkeys(subtest, rollover=rollover):
+                T = tempfile.TemporaryDirectory(prefix=prefix)
+                with T as tmpdirpath:
+                  yield subtest, DataDirStore(
+                      'DataDirStore',
+                      tmpdirpath,
+                      hashclass=hashclass,
+                      indexclass=indexclass,
+                      rollover=rollover
+                  )
+      # FileCacheStore
+      with stackkeys(subtest, storetype=FileCacheStore):
+        T = tempfile.TemporaryDirectory(prefix=prefix)
+        with T as tmpdirpath:
+          yield subtest, FileCacheStore(
+              'FileCacheStore',
+              MappingStore('MappingStore', {}),
+              tmpdirpath,
+              hashclass=hashclass
+          )
+      # StreamStore
+      with stackkeys(subtest, storetype=StreamStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            upstream_rd, upstream_wr = os.pipe()
+            downstream_rd, downstream_wr = os.pipe()
+            remote_S = StreamStore(
+                "remote_S",
+                upstream_rd,
+                downstream_wr,
+                local_store=local_store,
+                addif=addif,
+                hashclass=hashclass
+            )
+            S = StreamStore(
+                "S",
+                downstream_rd,
+                upstream_wr,
+                addif=addif,
+                hashclass=hashclass
+            )
+            with local_store:
+              with remote_S:
+                yield subtest, S
+      # TCPClientStore
+      with stackkeys(subtest, storetype=TCPClientStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            base_port = 9999
+            while True:
+              bind_addr = ('127.0.0.1', base_port)
+              try:
+                remote_S = TCPStoreServer(bind_addr, local_store=local_store)
+              except OSError as e:
+                if e.errno == errno.EADDRINUSE:
+                  base_port += 1
+                else:
+                  raise
+              else:
+                break
+            S = TCPClientStore(
+                None, bind_addr, addif=addif, hashclass=hashclass
+            )
+            with local_store:
+              with remote_S:
+                yield subtest, S
+      # UNIXSocketClientStore
+      with stackkeys(subtest, storetype=UNIXSocketClientStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            T = tempfile.TemporaryDirectory(prefix=prefix)
+            with T as tmpdirpath:
+              socket_path = joinpath(tmpdirpath, 'sock')
+              remote_S = UNIXSocketStoreServer(
+                  socket_path, local_store=local_store
+              )
+              S = UNIXSocketClientStore(
+                  None, socket_path, addif=addif, hashclass=hashclass
+              )
+              with local_store:
+                with remote_S:
+                  yield subtest, S
+      # ProxyStore
+      with stackkeys(subtest, storetype=ProxyStore):
+        main1 = MappingStore("main1", {}, hashclass=hashclass)
+        main2 = MappingStore("main2", {}, hashclass=hashclass)
+        save2 = MappingStore("save2", {}, hashclass=hashclass)
+        S = ProxyStore(
+            "ProxyStore", (main1, main2), (main2, save2),
+            hashclass=hashclass,
+            save2=(save2,)
+        )
+        yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
