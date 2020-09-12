@@ -664,7 +664,7 @@ class ProxyStore(BasicStoreSync):
     assert len(all_stores) > 0
     hashclasses = [S.hashclass for S in all_stores]
     self.hashclass = hashclass0 = hashclasses[0]
-    assert all(map(lambda S: S.hashclass is hashclass0, hashclasses))
+    assert all(map(lambda hashclass: hashclass is hashclass0, hashclasses))
     self.archive_path = tuple(archives)
     for S, _ in self.archive_path:
       if not hasattr(S, 'get_Archive'):
