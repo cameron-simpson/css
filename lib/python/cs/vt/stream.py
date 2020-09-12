@@ -571,7 +571,7 @@ class AddRequest(VTPacket):
     yield BSData.transcribe_value(self.data)
 
   def do(self, stream):
-    ''' Add data to the local store, return hashcode.
+    ''' Add data to the local store, return serialised hashcode.
     '''
     local_store = stream._local_store
     if local_store is None:
@@ -625,7 +625,7 @@ class ContainsRequest(VTPacket):
     return self.value.encode()
 
   def do(self, stream):
-    ''' Return data from the local store by hashcode.
+    ''' Test for hashcode, return `1` for present, `0` otherwise.
     '''
     local_store = stream._local_store
     if local_store is None:
@@ -654,7 +654,7 @@ class FlushRequest(VTPacket):
 
   @staticmethod
   def do(stream):
-    ''' Return data from the local store by hashcode.
+    ''' Flush the `local_store`.
     '''
     local_store = stream._local_store
     if local_store is None:
@@ -736,7 +736,7 @@ class HashCodesRequest(Packet):
     )
 
   def do(self, stream):
-    ''' Return hashcodes from the local store.
+    ''' Return serialised hashcodes from the local store.
     '''
     local_store = stream._local_store
     if local_store is None:
