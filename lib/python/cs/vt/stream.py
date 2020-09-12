@@ -576,7 +576,13 @@ class AddRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    return local_store.add(self.data, self.hashclass).encode()
+    if self.hashclass is not local_store.hashclass:
+      raise ValueError(
+          "request hashclass=%s but local store %s.hashclass=%s" %
+          (self.hashclass, local_store, local_store.hashclass)
+      )
+    # return the serialised hashcode of the added data
+    return local_store.add(self.data).encode()
 
 class GetRequest(VTPacket):
   ''' A get(hashcode) request, returning the associated bytes.
