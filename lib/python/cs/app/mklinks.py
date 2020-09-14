@@ -4,7 +4,7 @@
 # improve the algorithm.
 #       - Cameron Simpson <cs@cskk.id.au> 21may2006
 #
-# 27dec2017: recode again: prefer younger files over older file, cleaner logic.
+# 27dec2017: recode again: prefer younger files over older files, cleaner logic.
 #
 
 r'''
@@ -29,10 +29,15 @@ from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
 from cs.cmdutils import BaseCommand
-from cs.fileutils import read_from
-from cs.logutils import info, status, track, warning, error
+from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.logutils import status, warning, error
+from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
+from cs.units import BINARY_BYTES_SCALE
+from cs.upd import Upd, print
+
+from cs.x import X
 
 DISTINFO = {
     'description':
@@ -45,10 +50,13 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
-        'cs.fileutils',
+        'cs.fileutils>=20200914',
         'cs.logutils',
         'cs.pfx',
+        'cs.progress>=20200718.3',
         'cs.py.func',
+        'cs.units',
+        'cs.upd>=20200914',
     ],
     'entry_points': {
         'console_scripts': ['mklinks = cs.app.mklinks:main'],
@@ -58,8 +66,6 @@ DISTINFO = {
 def main(argv=None):
   ''' Main command line programme.
   '''
-  if argv is None:
-    argv = sys.argv
   return MKLinksCmd().run(argv)
 
 class MKLinksCmd(BaseCommand):
@@ -75,11 +81,14 @@ class MKLinksCmd(BaseCommand):
     if not argv:
       raise GetoptError("missing paths")
     linker = Linker()
-    # scan the supplied paths
-    for path in argv:
-      with Pfx(path):
-        linker.scan(path)
-    linker.merge()
+    with options.upd.insert(1) as step:
+      # scan the supplied paths
+      for path in argv:
+        step("scan " + path + ' ...')
+        with Pfx(path):
+          linker.scan(path)
+      step("merge ...")
+      linker.merge()
 
 class FileInfo(object):
   ''' Information about a particular inode.
@@ -127,16 +136,27 @@ class FileInfo(object):
     csum = self._checksum
     if csum is None:
       path = self.path
+      U = Upd()
+      pathspace = U.columns - 64
+      label = "csum " + (path if len(path) < pathspace else '...'+path[-(pathspace-3):])
       with Pfx("checksum %r", path):
         csum = hashfunc()
         with open(path, 'rb') as fp:
+          length = os.fstat(fp.fileno()).st_size
           read_len = 0
-          for data in read_from(fp):
+          for data in progressbar(read_from(fp),
+              label=label,
+              total=length,
+              units_scale=BINARY_BYTES_SCALE,
+              itemlenfunc=len,
+              update_frequency=128,
+              upd=U,
+              ):
             csum.update(data)
             read_len += len(data)
           assert read_len == self.size
-        csum = csum.digest()
-        self._checksum = csum
+      csum = csum.digest()
+      self._checksum = csum
     return csum
 
   def same_dev(self, other):
@@ -154,35 +174,44 @@ class FileInfo(object):
     '''
     ok = True
     path = self.path
-    with Pfx(path):
-      if self is other or self.same_file(other):
-        # already assimilated
-        return ok
-      assert self.same_dev(other)
-      for opath in sorted(other.paths):
-        with Pfx(opath):
-          if opath in self.paths:
-            warning("already assimilated")
-            continue
-          info("link")
-          odir = dirname(opath)
-          with NamedTemporaryFile(dir=odir) as tfp:
-            with Pfx("unlink(%s)", tfp.name):
-              os.unlink(tfp.name)
-            with Pfx("rename(%s, %s)", opath, tfp.name):
-              os.rename(opath, tfp.name)
-            with Pfx("link(%s, %s)", path, opath):
-              try:
-                os.link(path, opath)
-              except OSError as e:
-                error("%s", e)
-                ok = False
-                # try to restore the previous file
-                with Pfx("restore: link(%r, %r)", tfp.name, opath):
-                  os.link(tfp.name, opath)
-              else:
-                self.paths.add(opath)
-                other.paths.remove(opath)
+    opaths = other.paths
+    pathprefix = common_path_prefix(path, *opaths)
+    vpathprefix = shortpath(pathprefix)
+    pathsuffix = path[len(pathprefix):]
+    with Upd().insert(1) as proxy:
+      proxy("%s%s <= %r", vpathprefix, pathsuffix, list(map(lambda opath: opath[len(pathprefix):], sorted(opaths))))
+      with Pfx(path):
+        if self is other or self.same_file(other):
+          # already assimilated
+          return ok
+        assert self.same_dev(other)
+        for opath in sorted(opaths):
+          with Pfx(opath):
+            if opath in self.paths:
+              warning("already assimilated")
+              continue
+            if vpathprefix:
+              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
+            else:
+              print("%s: %s => %s" % (vpathprefix, opath[len(pathprefix):], pathsuffix))
+            odir = dirname(opath)
+            with NamedTemporaryFile(dir=odir) as tfp:
+              with Pfx("unlink(%s)", tfp.name):
+                os.unlink(tfp.name)
+              with Pfx("rename(%s, %s)", opath, tfp.name):
+                os.rename(opath, tfp.name)
+              with Pfx("link(%s, %s)", path, opath):
+                try:
+                  os.link(path, opath)
+                except OSError as e:
+                  error("%s", e)
+                  ok = False
+                  # try to restore the previous file
+                  with Pfx("restore: link(%r, %r)", tfp.name, opath):
+                    os.link(tfp.name, opath)
+                else:
+                  self.paths.add(opath)
+                  opaths.remove(opath)
     return ok
 
 class Linker(object):
@@ -229,14 +258,13 @@ class Linker(object):
   def merge(self):
     ''' Merge files with equivalent content.
     '''
-    for size in reversed(sorted(self.sizemap.keys())):
-      FIs = sorted(
-          self.sizemap[size].values(),
-          key=lambda FI: (FI.size, FI.mtime, FI.path),
-          reverse=True
-      )
+    # process FileInfo groups by size, largest to smallest
+    for _, FImap in sorted(self.sizemap.items(), reverse=True):
+      # order FileInfos by mtime (newest first) and then path
+      FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
       for i, FI in enumerate(FIs):
         # skip FileInfos with no paths
+        # this happens when a FileInfo has been assimilated
         if not FI.paths:
           continue
         for FI2 in FIs[i + 1:]:
@@ -251,7 +279,6 @@ class Linker(object):
             # different content, skip
             continue
           # FI2 is the younger, keep it
-          track("link %r => %r", FI2.path, FI.paths)
           FI.assimilate(FI2)
 
 if __name__ == '__main__':
