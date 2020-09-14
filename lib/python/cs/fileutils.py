@@ -42,7 +42,7 @@ from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 
-__version__ = '20200517-post'
+__version__ = '20200914'
 
 DISTINFO = {
     'description':
