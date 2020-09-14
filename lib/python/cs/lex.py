@@ -20,6 +20,7 @@ import sys
 from textwrap import dedent
 from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
+from cs.seq import common_prefix_length, common_suffix_length
 
 __version__ = '20200718-post'
 
@@ -30,7 +31,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3', 'cs.seq>=20200914'],
 }
 
 unhexify = binascii.unhexlify
@@ -908,6 +909,34 @@ def cutsuffix(s, suffix):
   if suffix and s.endswith(suffix):
     return s[:-len(suffix)]
   return s
+
+def common_prefix(*strs):
+  ''' Return the common prefix of the strings `strs`.
+
+      Examples:
+
+          >>> common_prefix('abc', 'def')
+          ''
+          >>> common_prefix('abc', 'abd')
+          'ab'
+          >>> common_prefix('abc', 'abcdef')
+          'abc'
+          >>> common_prefix('abc', 'abcdef', 'abz')
+          'ab'
+          >>> # contrast with cs.fileutils.common_path_prefix
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
+  '''
+  return strs[0][:common_prefix_length(*strs)]
+
+def common_suffix(*strs):
+  ''' Return the common suffix of the strings `strs`.
+  '''
+  length = common_suffix_length(*strs)
+  if not length:
+    # catch 0 length suffix specially, because -0 == 0
+    return ''
+  return strs[0][-length:]
 
 def cropped_repr(s, max_length=32, offset=0):
   ''' If the length of the sequence `s` after `offset` (default `0`)
