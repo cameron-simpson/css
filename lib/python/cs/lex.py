@@ -12,6 +12,8 @@ Generally the get_* functions accept a source string and an offset
 raising `ValueError` on failed tokenisation.
 '''
 
+# pylint: disable=too-many-lines
+
 import binascii
 from functools import partial
 import os
@@ -19,7 +21,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
 from cs.deco import fmtdoc
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
+from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
 __version__ = '20200718-post'
@@ -46,6 +48,7 @@ else:
 
 ord_space = ord(' ')
 
+# pylint: disable=too-many-branches
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
@@ -509,6 +512,8 @@ def slosh_mapper(c, charmap=None):
     charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
+# pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+# pylint: disable=too-many-statements,too-many-arguments
 def get_sloshed_text(
     s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None
 ):
@@ -696,6 +701,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
+# pylint: disable=too-many-arguments
 def get_qstr(
     s, offset=0, q='"', environ=None, default=None, env_specials=None
 ):
@@ -771,6 +777,7 @@ def get_tokens(s, offset, getters):
         a `.end()` method returning the offset of the end of the match
   '''
   tokens = []
+  # pylint: disable=cell-var-from-loop
   for getter in getters:
     args = ()
     kwargs = {}
@@ -1031,7 +1038,7 @@ def format_as(format_s, format_mapping, error_sep=None):
 
 _format_as = format_as
 
-class FormatableMixin(object):
+class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes with an
       existing `format_kwargs` method.
 
