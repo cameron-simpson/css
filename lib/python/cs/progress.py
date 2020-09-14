@@ -216,7 +216,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2, sep=' '):
+  def format_counter(self, value, scale=None, max_parts=2, sep=','):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
