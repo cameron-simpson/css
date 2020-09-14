@@ -30,7 +30,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
-from cs.lex import as_lines, cutsuffix
+from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread
@@ -55,7 +55,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
-        'cs.lex',
+        'cs.lex>=20200914',
         'cs.logutils',
         'cs.pfx',
         'cs.py3',
@@ -829,6 +829,67 @@ def longpath(path, environ=None, prefixes=None):
       break
   path = envsub(path, environ)
   return path
+
+def common_path_prefix(*paths):
+  ''' Return the common path prefix of the `paths`.
+
+      Note that the common prefix of `'/a/b/c1'` and `'/a/b/c2'`
+      is `'/a/b/'`, _not_ `'/a/b/c'`.
+
+      Callers may find it useful to preadjust the supplied paths
+      with `normpath`, `abspath` or `realpath` from `os.path`;
+      see the `os.path` documentation for the various caveats
+      which go with those functions.
+
+      Examples:
+
+          >>> # the obvious
+          >>> common_path_prefix('', '')
+          ''
+          >>> common_path_prefix('/', '/')
+          '/'
+          >>> common_path_prefix('a', 'a')
+          'a'
+          >>> common_path_prefix('a', 'b')
+          ''
+          >>> # nonempty directory path prefixes end in os.sep
+          >>> common_path_prefix('/', '/a')
+          '/'
+          >>> # identical paths include the final basename
+          >>> common_path_prefix('p/a', 'p/a')
+          'p/a'
+          >>> # the comparison does not normalise paths
+          >>> common_path_prefix('p//a', 'p//a')
+          'p//a'
+          >>> common_path_prefix('p//a', 'p//b')
+          'p//'
+          >>> common_path_prefix('p//a', 'p/a')
+          'p/'
+          >>> common_path_prefix('p/a', 'p/b')
+          'p/'
+          >>> # the comparison strip complete unequal path components
+          >>> common_path_prefix('p/a1', 'p/a2')
+          'p/'
+          >>> common_path_prefix('p/a/b1', 'p/a/b2')
+          'p/a/'
+          >>> # contrast with cs.lex.common_prefix
+          >>> common_prefix('abc/def', 'abc/def1')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1')
+          'abc/'
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/'
+  '''
+  prefix = common_prefix(*paths)
+  if not prefix.endswith(os.sep):
+    path0 = paths[0]
+    if not all(map(lambda path: path == path0, paths)):
+      # strip basename from prefix
+      base = basename(prefix)
+      prefix = prefix[:-len(base)]
+  return prefix
 
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
