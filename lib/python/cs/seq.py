@@ -15,7 +15,7 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition
-from cs.logutils import warning
+from cs.gimmicks import warning
 
 DISTINFO = {
     'description': "Stuff to do with counters, sequences and iterables.",
@@ -25,7 +25,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils'],
+    'install_requires': ['cs.gimmicks'],
 }
 
 class Seq(object):
@@ -229,6 +229,25 @@ def isordered(s, reverse=False, strict=False):
     prev = item
     is_first = False
   return True
+
+def common_prefix_length(*seqs):
+  ''' Return the length of the common prefix of sequences `seqs`.
+  '''
+  if not seqs:
+    return 0
+  if len(seqs) == 1:
+    return len(seqs[0])
+  for i, items in enumerate(zip(*seqs)):
+    item0 = items[0]
+    if not all(map(lambda item: item == item0, items)):
+      return i
+  # return the length of the shorted sequence
+  return len(min(*seqs, key=len))
+
+def common_suffix_length(*seqs):
+  ''' Return the length of the common suffix of sequences `seqs`.
+  '''
+  return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
