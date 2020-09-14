@@ -17,6 +17,8 @@ import itertools
 from threading import Lock, Condition
 from cs.gimmicks import warning
 
+__version__ = '20200914'
+
 DISTINFO = {
     'description':
     "Stuff to do with counters, sequences and iterables.",
