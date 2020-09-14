@@ -140,7 +140,7 @@ instances = []
 def cleanupAtExit():
   ''' Cleanup function called at programme exit to clear the status line.
   '''
-  global instances
+  global instances  # pylint: disable=global-statement
   for i in instances:
     i.close()
   instances = ()
@@ -155,6 +155,7 @@ def out(msg, *a, **outkw):
   '''
   return Upd().out(msg, *a, **outkw)
 
+# pylint: disable=redefined-builtin
 def print(*a, **kw):
   ''' Wrapper for the builtin print function
       to call it inside `Upd.above()` and enforce a flush.
@@ -186,12 +187,14 @@ def nl(msg, *a, **kw):
     kw['file'] = sys.stderr
   print(msg, **kw)
 
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
       The default backend is `sys.stderr`.
   '''
 
+  # pylint: disable=unused-argument
   @classmethod
   def _singleton_key(cls, backend=None, columns=None, disabled=False):
     if backend is None:
@@ -225,7 +228,7 @@ class Upd(SingletonMixin):
     self._current_slot = 0
     self._above = None
     self._lock = RLock()
-    global instances
+    global instances  # pylint: disable=global-statement
     instances.append(self)
 
   def __str__(self):
@@ -754,7 +757,7 @@ class Upd(SingletonMixin):
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")
-        return
+        return None
       if self._disabled or self._backend is None:
         # just remote the data entries
         del slots[index]
@@ -866,7 +869,7 @@ class UpdProxy(object):
     '''
     upd = self.upd
     if upd is not None:
-      with upd._lock:
+      with upd._lock:  # pylint: disable=protected-access
         index = self.index
         if index is not None:
           txt = upd.normalise(self.prefix + txt)
