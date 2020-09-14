@@ -876,7 +876,7 @@ def common_path_prefix(*paths):
           'p/'
           >>> common_path_prefix('p/a', 'p/b')
           'p/'
-          >>> # the comparison strip complete unequal path components
+          >>> # the comparison strips complete unequal path components
           >>> common_path_prefix('p/a1', 'p/a2')
           'p/'
           >>> common_path_prefix('p/a/b1', 'p/a/b2')
