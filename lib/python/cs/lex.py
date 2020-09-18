@@ -53,12 +53,17 @@ def unctrl(s, tabsize=8):
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
   '''
+  if tabsize < 1:
+    raise ValueError("tabsize(%r) < 1" % (tabsize,))
   s2 = ''
   sofar = 0
   for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
-      pass
+      if sofar < i:
+        s2 += s[sofar:i]
+        sofar = i
+      ch2 = ' ' * (tabsize - (len(s2) % tabsize))
     elif ch == '\f':
       ch2 = '\\f'
     elif ch == '\n':
