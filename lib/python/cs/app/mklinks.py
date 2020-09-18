@@ -35,9 +35,7 @@ from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print
-
-from cs.x import X
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'description':
@@ -161,20 +159,23 @@ class FileInfo(object):
       path = self.path
       U = Upd()
       pathspace = U.columns - 64
-      label = "csum " + (path if len(path) < pathspace else '...'+path[-(pathspace-3):])
+      label = "csum " + (
+          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]
+      )
       with Pfx("checksum %r", path):
         csum = hashfunc()
         with open(path, 'rb') as fp:
           length = os.fstat(fp.fileno()).st_size
           read_len = 0
-          for data in progressbar(read_from(fp),
+          for data in progressbar(
+              read_from(fp),
               label=label,
               total=length,
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
               update_frequency=128,
               upd=U,
-              ):
+          ):
             csum.update(data)
             read_len += len(data)
           assert read_len == self.size
@@ -202,7 +203,10 @@ class FileInfo(object):
     vpathprefix = shortpath(pathprefix)
     pathsuffix = path[len(pathprefix):]
     with Upd().insert(1) as proxy:
-      proxy("%s%s <= %r", vpathprefix, pathsuffix, list(map(lambda opath: opath[len(pathprefix):], sorted(opaths))))
+      proxy(
+          "%s%s <= %r", vpathprefix, pathsuffix,
+          list(map(lambda opath: opath[len(pathprefix):], sorted(opaths)))
+      )
       with Pfx(path):
         if self is other or self.same_file(other):
           # already assimilated
@@ -216,7 +220,10 @@ class FileInfo(object):
             if vpathprefix:
               print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
             else:
-              print("%s: %s => %s" % (vpathprefix, opath[len(pathprefix):], pathsuffix))
+              print(
+                  "%s: %s => %s" %
+                  (vpathprefix, opath[len(pathprefix):], pathsuffix)
+              )
             if no_action:
               continue
             odir = dirname(opath)
