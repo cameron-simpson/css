@@ -159,7 +159,7 @@ class FileInfo(object):
       path = self.path
       U = Upd()
       pathspace = U.columns - 64
-      label = "csum " + (
+      label = "scan " + (
           path if len(path) < pathspace else '...' + path[-(pathspace - 3):]
       )
       with Pfx("checksum %r", path):
