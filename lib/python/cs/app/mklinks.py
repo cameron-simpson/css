@@ -72,11 +72,34 @@ class MKLinksCmd(BaseCommand):
   ''' Main programme command line class.
   '''
 
-  USAGE_FORMAT = 'Usage: {cmd} paths...'
+  USAGE_FORMAT = r'''Usage: {cmd} paths...
+          Hard link files with identical contents.
+          -n    No action. Report proposed actions.'''
+
+  GETOPT_SPEC = 'n'
+
+  @staticmethod
+  def apply_defaults(options):
+    ''' Set up the default values in `options`.
+    '''
+    options.no_action = False
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-n':
+          options.no_action = True
+        else:
+          raise RuntimeError("unhandled option")
 
   @staticmethod
   def main(argv, options):
-    ''' Usage: mklinks paths...
+    ''' Usage: mklinks [-n] paths...
+          Hard link files with identical contents.
+          -n    No action. Report proposed actions.
     '''
     if not argv:
       raise GetoptError("missing paths")
@@ -88,7 +111,7 @@ class MKLinksCmd(BaseCommand):
         with Pfx(path):
           linker.scan(path)
       step("merge ...")
-      linker.merge()
+      linker.merge(no_action=options.no_action)
 
 class FileInfo(object):
   ''' Information about a particular inode.
@@ -169,7 +192,7 @@ class FileInfo(object):
     '''
     return self.key == other.key
 
-  def assimilate(self, other):
+  def assimilate(self, other, no_action=False):
     ''' Link our primary path to all the paths from `other`. Return success.
     '''
     ok = True
@@ -194,6 +217,8 @@ class FileInfo(object):
               print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
             else:
               print("%s: %s => %s" % (vpathprefix, opath[len(pathprefix):], pathsuffix))
+            if no_action:
+              continue
             odir = dirname(opath)
             with NamedTemporaryFile(dir=odir) as tfp:
               with Pfx("unlink(%s)", tfp.name):
@@ -255,7 +280,7 @@ class Linker(object):
         self.sizemap[S.st_size][key] = FI
 
   @pfx_method
-  def merge(self):
+  def merge(self, no_action=False):
     ''' Merge files with equivalent content.
     '''
     # process FileInfo groups by size, largest to smallest
@@ -279,7 +304,7 @@ class Linker(object):
             # different content, skip
             continue
           # FI2 is the younger, keep it
-          FI.assimilate(FI2)
+          FI.assimilate(FI2, no_action=no_action)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
