@@ -8,6 +8,7 @@
     This module supports several backends and a mechanism for choosing one.
 '''
 
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
 from os import pread
@@ -121,7 +122,7 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
       bs = decompress(bs)
     return bs
 
-class _Index(HashCodeUtilsMixin, MultiOpenMixin):
+class _Index(HashCodeUtilsMixin, MultiOpenMixin, ABC):
   ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
   '''
 
@@ -169,6 +170,12 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __iter__(self):
     return map(self._mkhash, self._raw_iter())
+
+  @abstractmethod
+  def _raw_iter(self):
+    ''' Iterator returns `bytes` instances, for promote to `HashCode` instances.
+    '''
+    raise NotImplementedError("not implemented")
 
   keys = __iter__
 
