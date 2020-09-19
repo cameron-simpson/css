@@ -438,8 +438,8 @@ class NDBMIndex(_Index):
   NAME = 'ndbm'
   SUFFIX = 'ndbm'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase, hashclass):
+    super().__init__(nmdbpathbase, hashclass)
     self._ndbm = None
     self._ndbm_lock = None
     self._written = False
@@ -507,8 +507,8 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase, hashclass):
+    super().__init__(nmdbpathbase, hashclass)
     self._kyoto = None
 
   @classmethod
