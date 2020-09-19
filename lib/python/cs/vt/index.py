@@ -402,7 +402,7 @@ class GDBMIndex(_Index):
           self._gdbm.sync()
           self._written = False
 
-  def __iter__(self):
+  def _raw_iter(self):
     with self._gdbm_lock:
       hashcode = self._gdbm.firstkey()
     while hashcode is not None:
@@ -473,6 +473,9 @@ class NDBMIndex(_Index):
     ''' Flush the index: sync the ndbm.
     '''
     # no fast mode, no sync
+
+  def _raw_iter(self):
+    return iter(self._ndbm.keys())
 
   def __contains__(self, hashcode):
     with self._ndbm_lock:
