@@ -167,6 +167,11 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
       )
     return record
 
+  def __iter__(self):
+    return map(self._mkhash, self._raw_iter())
+
+  keys = __iter__
+
   def get(self, hashcode, default=None):
     ''' Get the `FileDataIndexEntry` for `hashcode`.
         Return `default` for a missing `hashcode` (default `None`).
@@ -175,11 +180,6 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
       return self[hashcode]
     except KeyError:
       return default
-
-  def keys(self):
-    ''' Use whatever key iteration method the index provides.
-    '''
-    return iter(self)
 
 class LMDBIndex(_Index):
   ''' LMDB index for a DataDir.
@@ -302,7 +302,7 @@ class LMDBIndex(_Index):
     # no force=True param?
     self._lmdb.sync()
 
-  def __iter__(self):
+  def _raw_iter(self):
     with self._txn() as txn:
       cursor = txn.cursor()
       for hashcode_bs in cursor.iternext(keys=True, values=False):
