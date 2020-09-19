@@ -247,7 +247,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     ''' Trivial test adding 2 blocks.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
@@ -267,7 +267,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     '''
     # fill map1 with 16 random data blocks
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     for _ in range(16):
       data = make_randblock(rand0(8193))
       h = M1.add(data)
@@ -309,7 +309,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     ''' Various tests.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
       data = make_randblock(rand0(8193))
@@ -317,7 +317,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertIn(h, M1)
       self.assertNotIn(h, KS1)
       KS1.add(h)
-      self.assertIn(h, KS1)
+      sleep(0.1)
       self.assertLen(M1, n + 1)
       self.assertEqual(len(KS1), n + 1)
       self.assertEqual(set(iter(M1)), KS1)
@@ -398,7 +398,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     ''' Test the hashcodes_missing function.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     for _ in range(16):
       data = make_randblock(rand0(8193))
       h = M1.add(data)
