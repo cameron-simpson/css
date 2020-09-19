@@ -570,6 +570,9 @@ class MappingStore(BasicStoreSync):
     '''
     return self.mapping.keys()
 
+  def __iter__(self):
+    return iter(self.keys())
+
   def __getitem__(self, h):
     ''' Proxy to `self.mapping[h]`.
     '''
