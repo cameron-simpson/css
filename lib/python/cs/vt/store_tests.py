@@ -34,15 +34,17 @@ from .stream import StreamStore
 
 ##from cs.debug import thread_dump
 
-# test all classes if empty, just the listed classes if not empty
-STORE_CLASS_TESTS = ()  ## (ProxyStore,)
+# constraint the tests if not empty, try every permutation if empty
+HASHCLASS_NAMES = ('sha1',)
+INDEXCLASS_NAMES = ()  ## ('lmdb',)  ## ('ndbm',)
+STORE_CLASS_TESTS = (DataDirStore,)
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
   '''
   # test all Store types against all the hash classes
   subtest = {}
-  for hashclass_name in sorted(HASHCLASS_BY_NAME.keys()):
+  for hashclass_name in HASHCLASS_NAMES or sorted(HASHCLASS_BY_NAME.keys()):
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
     with stackkeys(subtest, hashname=hashclass_name, hashclass=hashclass):
       # MappingStore
@@ -57,7 +59,7 @@ def get_test_stores(prefix):
         )
       # DataDirStore
       with stackkeys(subtest, storetype=DataDirStore):
-        for index_name in get_index_names():
+        for index_name in INDEXCLASS_NAMES or get_index_names():
           indexclass = get_index_by_name(index_name)
           with stackkeys(subtest, indexname=index_name, indexclass=indexclass):
             for rollover in 200000, :
