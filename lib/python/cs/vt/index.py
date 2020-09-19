@@ -209,8 +209,9 @@ class LMDBIndex(_Index):
     )
 
   def __len__(self):
-    db = self._lmdb
-    return None if db is None else db.stat()['entries']
+    with self._txn_lock:
+      db = self._lmdb
+      return None if db is None else db.stat()['entries']
 
   @classmethod
   def is_supported(cls):
