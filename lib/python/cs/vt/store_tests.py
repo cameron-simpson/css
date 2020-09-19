@@ -15,6 +15,7 @@ import random
 import sys
 import tempfile
 import threading
+from time import sleep
 import unittest
 from cs.context import stackkeys
 from cs.debug import thread_dump
