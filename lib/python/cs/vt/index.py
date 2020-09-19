@@ -322,7 +322,7 @@ class LMDBIndex(_Index):
   def items(self):
     ''' Yield `(hashcode,record)` from index.
     '''
-    mkhash = self.hashclass.from_hashbytes
+    mkhash = self._mkhash
     mkentry = self.decode_binary_record
     with self._txn() as txn:
       cursor = txn.cursor()
@@ -415,12 +415,12 @@ class GDBMIndex(_Index):
 
   def _raw_iter(self):
     with self._gdbm_lock:
-      hashcode = self._gdbm.firstkey()
-    while hashcode is not None:
-      yield self._mkhash(hashcode)
+      hashcode_bs = self._gdbm.firstkey()
+    while hashcode_bs is not None:
+      yield hashcode_bs
       self.flush()
       with self._gdbm_lock:
-        hashcode = self._gdbm.nextkey(hashcode)
+        hashcode_bs = self._gdbm.nextkey(hashcode_bs)
 
   def __contains__(self, hashcode):
     with self._gdbm_lock:
