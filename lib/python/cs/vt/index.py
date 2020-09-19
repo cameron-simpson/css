@@ -243,7 +243,7 @@ class LMDBIndex(_Index):
   def _open_lmdb(self):
     # pylint: disable=import-error,import-outside-toplevel
     import lmdb
-    self._lmdb = lmdb.Environment(
+    db = self._lmdb = lmdb.Environment(
         self.path,
         subdir=True,
         readonly=False,
@@ -253,6 +253,7 @@ class LMDBIndex(_Index):
         map_async=True,
         map_size=self.map_size,
     )
+    return db
 
   def _reopen_lmdb(self):
     with self._txn_lock:
