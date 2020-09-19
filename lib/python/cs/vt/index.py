@@ -310,8 +310,7 @@ class LMDBIndex(_Index):
   def _raw_iter(self):
     with self._txn() as txn:
       cursor = txn.cursor()
-      for hashcode_bs in cursor.iternext(keys=True, values=False):
-        yield self._mkhash(hashcode_bs)
+      yield from cursor.iternext(keys=True, values=False)
 
   def items(self):
     ''' Yield `(hashcode,record)` from index.
