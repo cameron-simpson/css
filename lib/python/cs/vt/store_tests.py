@@ -183,28 +183,6 @@ def multitest(method):
 
   return testMethod
 
-def hcutest(method):
-  ''' Decorator to perform additional setup for HashCodeUtils test methods.
-  '''
-
-  def testHCUMethod(self):
-    self.maxDiff = 16384
-    self.keys1 = set()
-    try:
-      keys_method = self.S.keys
-    except AttributeError:
-      self.has_keys = False
-    else:
-      try:
-        _ = keys_method()
-      except NotImplementedError:
-        self.has_keys = False
-      else:
-        self.has_keys = True
-    method(self)
-
-  return testHCUMethod
-
 class TestStore(unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
@@ -265,7 +243,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertEqual(chunk, random_chunk_map[h])
 
   @multitest
-  @hcutest
   def testhcu00first(self):
     ''' Trivial test adding 2 blocks.
     '''
@@ -285,7 +262,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.assertEqual(set(M1.hashcodes()), KS1)
 
   @multitest
-  @hcutest
   def testhcu01test_hashcodes_from(self):
     ''' Test the hashcodes_from method.
     '''
@@ -329,7 +305,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           self.assertEqual(hs, hs2)
 
   @multitest
-  @hcutest
   def testhcu02hashcodes(self):
     ''' Various tests.
     '''
@@ -419,7 +394,6 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
         self.assertEqual(sorted_keys, sorted(seen))
 
   @multitest
-  @hcutest
   def testhcu03hashcodes_missing(self):
     ''' Test the hashcodes_missing function.
     '''
