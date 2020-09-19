@@ -566,7 +566,10 @@ class KyotoIndex(_Index):
     binary_entry = bytes(entry)
     self._kyoto[hashcode] = binary_entry
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  def __iter__(self):
+    return self.hashcodes_from()
+
+  def hashcodes_from(self, *, start_hashcode=None, reverse=False):
     ''' Generator yielding the keys from the index
         in order starting with optional `start_hashcode`.
 
