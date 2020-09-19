@@ -254,6 +254,9 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     # add one block
     data = make_randblock(rand0(8193))
     h = M1.add(data)
+    self.assertIn(h, M1)
+    hcodes = list(M1.hashcodes())
+    self.assertIn(h, M1.hashcodes())
     KS1.add(h)
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
