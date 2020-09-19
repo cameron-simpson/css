@@ -254,15 +254,19 @@ class LMDBIndex(_Index):
         map_size=self.map_size,
     )
 
+  def _reopen_lmdb(self):
+    with self._txn_lock:
+      self._lmdb.sync()
+      self._lmdb.close()
+      return self._open_lmdb()
+
   def _embiggen_lmdb(self, new_map_size=None):
     if new_map_size is None:
       new_map_size = self.map_size * 2
     self.map_size = new_map_size
     info("change LMDB map_size to %d", self.map_size)
     # reopen the database
-    self._lmdb.sync()
-    self._lmdb.close()
-    self._open_lmdb()
+    return self._reopen_lmdb()
 
   @contextmanager
   def _txn(self, write=False):
