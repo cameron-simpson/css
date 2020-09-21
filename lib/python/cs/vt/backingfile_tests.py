@@ -26,7 +26,7 @@ class TestBackingFile(unittest.TestCase):
           with NamedTemporaryFile(dir='.', prefix=cls.__name__ + '-') as T:
             blocks = {}
             total_length = 0
-            bf = cls(T.name, hashclass=hashclass, binary_index={})
+            bf = cls(T.name, hashclass=hashclass, index={})
             for n in range(RUN_SIZE):
               data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
               h = bf.add(data)
