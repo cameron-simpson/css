@@ -13,6 +13,9 @@ from cs.fileutils import shortpath
 from cs.lex import cropped_repr
 from cs.pfx import pfx_method
 from .hash import HashCode
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_method, XP
+from cs.resources import MultiOpenMixin
 from .util import openfd_append, openfd_read
 
 class BackingFileIndexEntry(PacketField):
@@ -44,7 +47,7 @@ class BackingFileIndexEntry(PacketField):
     yield BSUInt.transcribe_value(self.offset)
     yield BSUInt.transcribe_value(self.length)
 
-class BaseBackingFile(Mapping):
+class BaseBackingFile(Mapping, MultiOpenMixin):
   ''' The basics of a data backing file.
 
       These store data chunks persistently
@@ -79,6 +82,37 @@ class BaseBackingFile(Mapping):
     )
 
   __repr__ = __str__
+
+  @pfx_method
+  def startup(self):
+    ''' Open index.
+    '''
+    index = self.index
+    with Pfx("open %s", index):
+      try:
+        index_open = index.open
+      except AttributeError:
+        warning("no .open method")
+      else:
+        open_index()
+
+  @pfx_method
+  def shutdown(self):
+    ''' Close the index, close the file.
+    '''
+    for fd_name in '_rfd', '_wfd':
+      fd = self.__dict__.get(fd_name)
+      if fd is not None:
+        closefd(fd)
+        del self.__dict__[fd_name]
+    index = self.index
+    with Pfx("close %d", index):
+      try:
+        index_close = index.close
+      except AttributeError:
+        warning("no .close method")
+      else:
+        index_close()
 
   def __len__(self):
     return len(self.index)
