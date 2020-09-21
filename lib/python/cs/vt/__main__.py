@@ -46,7 +46,7 @@ from cs.tty import ttysize
 from cs.upd import Upd, print
 import cs.x
 from cs.x import X
-from . import defaults, DEFAULT_CONFIG_PATH
+from . import common, defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
