@@ -48,14 +48,14 @@ class BaseBackingFile(Mapping):
   ''' The basics of a data backing file.
 
       These store data chunks persistently
-      and keep a *binary* index of their locations.
+      and keep an index of their `(offset,length)` locations.
   '''
 
   @pfx_method
   ##@typechecked
   def __init__(
       self, path: str, *, hashclass: HashCode, data_record_class: PacketField,
-      binary_index: Mapping
+      index: Mapping
   ):
     ''' Initialise the file.
 
@@ -64,17 +64,16 @@ class BaseBackingFile(Mapping):
         * `hashclass`: the `HashCode` subclass
         * `data_record_class`: a `PacketField` subclass
           encoding the data for storage in the file
-        * `binary_index`: a `bytes`->`bytes` mapping
-          of data hashcodes to index entry binary transcriptions
+        * `index`: a `HashCode`->`(offset,length)` mapping
     '''
     self.path = path
     self.hashclass = hashclass
     self.data_record_class = data_record_class
-    self.index = binary_index
+    self.index = index
     self._lock = RLock()
 
   def __str__(self):
-    return "%s:%s:%s(%r,binary_index=%s)" % (
+    return "%s:%s:%s(%r,index=%s)" % (
         type(self).__name__, self.hashclass.HASHNAME,
         self.data_record_class.__name__, shortpath(self.path), self.index
     )
@@ -98,15 +97,11 @@ class BaseBackingFile(Mapping):
     '''
     index = self.index
     h = self.hashclass(data)
-    if h in index:
-      return h
-    data_record = self.data_record_class(data)
-    data_record_bs = bytes(data_record)
-    record_offset = self._append(data_record_bs)
-    index_entry = BackingFileIndexEntry(
-        offset=record_offset, length=len(data_record_bs)
-    )
-    index[h] = bytes(index_entry)
+    if h not in index:
+      data_record = self.data_record_class(data)
+      data_record_bs = bytes(data_record)
+      offset = self._append(data_record_bs)
+      index[h] = offset, len(data_record_bs)
     return h
 
   def _append(self, data_record_bs: bytes):
@@ -141,31 +136,16 @@ class BaseBackingFile(Mapping):
       return wfd
     raise AttributeError(attr)
 
-  def index_for(self, h):
-    ''' Obtain the `BackingFileIndexEntry` for a `HashCode`.
-    '''
-    index_entry_bs = self.index[h]
-    index_entry, post_offset = BackingFileIndexEntry.from_bytes(index_entry_bs)
-    if post_offset < len(index_entry_bs):
-      raise ValueError(
-          "BackingFileIndexEntry.from_bytes(%r) ==> %s,%d: extra data after post_offset: %r"
-          % (
-              index_entry_bs, index_entry, post_offset,
-              index_entry_bs[post_offset:]
-          )
-      )
-    return index_entry
-
   def data_record_for(self, h):
     ''' Obtain the data record for a `HashCode`.
     '''
-    index_entry = self.index_for(h)
+    offset, length = self.index[h]
     rfd = self._rfd
-    data_record_bs = pread(rfd, index_entry.length, index_entry.offset)
-    if len(data_record_bs) != index_entry.length:
+    data_record_bs = pread(rfd, length, offset)
+    if len(data_record_bs) != length:
       raise ValueError(
           "short pread from fd %d: asked for %d, got %d" %
-          (rfd, index_entry.length, len(data_record_bs))
+          (rfd, length, len(data_record_bs))
       )
     data_record, post_offset = self.data_record_class.from_bytes(
         data_record_bs
