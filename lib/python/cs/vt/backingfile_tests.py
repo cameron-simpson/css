@@ -25,19 +25,23 @@ class TestBackingFile(unittest.TestCase):
         with self.subTest(cls=cls, hashclass=hashclass):
           with NamedTemporaryFile(dir='.', prefix=cls.__name__ + '-') as T:
             blocks = {}
+            index = {}
             total_length = 0
-            bf = cls(T.name, hashclass=hashclass, index={})
-            for n in range(RUN_SIZE):
-              data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
-              h = bf.add(data)
-              blocks[h] = data
-              total_length += len(data)
-            # retrieve in random order
-            hashcodes = list(blocks.keys())
-            random.shuffle(hashcodes)
-            for h in hashcodes:
-              data = bf[h]
-              self.assertEqual(data, blocks[h])
+            # open and save data
+            with cls(T.name, hashclass=hashclass, index=index) as bf:
+              for n in range(RUN_SIZE):
+                data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
+                h = bf.add(data)
+                blocks[h] = data
+                total_length += len(data)
+            # reopen and retrieve
+            with cls(T.name, hashclass=hashclass, index=index) as bf:
+              # retrieve in random order
+              hashcodes = list(blocks.keys())
+              random.shuffle(hashcodes)
+              for h in hashcodes:
+                data = bf[h]
+                self.assertEqual(data, blocks[h])
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
