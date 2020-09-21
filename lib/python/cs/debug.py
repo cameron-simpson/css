@@ -22,7 +22,7 @@ from types import SimpleNamespace as NS
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
-from cs.pfx import Pfx
+from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
@@ -438,18 +438,21 @@ def trace(func):
   ''' Decorator to report the call and return of a function.
   '''
 
+  citation = funccite(func)
+
   def subfunc(*a, **kw):
-    X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
+    XP("CALL %s(a=%r,kw=%r)...", citation, a, kw)
     try:
       retval = func(*a, **kw)
     except Exception as e:
-      X("CALL %s(): RAISES %r", funccite(func), e)
+      XP("CALL %s(): RAISES %r", citation, e)
       raise
     else:
-      X("CALL %s(): RETURNS %r", funccite(func), retval)
+      XP("CALL %s(): RETURNS %r", citation, retval)
       return retval
 
-  subfunc.__name__ = "trace/subfunc/" + func.__name__
+  subfunc.__name__ = "@trace(%s)" % (citation,)
+  subfunc.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
   return subfunc
 
 def trace_caller(func):
