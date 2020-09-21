@@ -3,8 +3,8 @@
 ''' The base classes for files storing data.
 '''
 
-from collections.abc import Mapping
 from os import SEEK_END, lseek, write, pread
+from collections.abc import Mapping, MutableMapping
 from threading import RLock
 from zlib import compress, decompress
 from typeguard import typechecked
@@ -47,7 +47,7 @@ class BackingFileIndexEntry(PacketField):
     yield BSUInt.transcribe_value(self.offset)
     yield BSUInt.transcribe_value(self.length)
 
-class BaseBackingFile(Mapping, MultiOpenMixin):
+class BaseBackingFile(MutableMapping, MultiOpenMixin):
   ''' The basics of a data backing file.
 
       These store data chunks persistently
@@ -137,6 +137,20 @@ class BaseBackingFile(Mapping, MultiOpenMixin):
       offset = self._append(data_record_bs)
       index[h] = offset, len(data_record_bs)
     return h
+
+  def __setitem__(self, h, data):
+    ''' Assignment form of `add(data)`.
+    '''
+    h2 = self.add(data)
+    if h != h2:
+      raise ValueError(
+          "%s.__setitem__(h=%s,data=%d-bytes): self.add(data) returned %s" %
+          (type(self).__name__, h, len(data), h2)
+      )
+    return h2
+
+  def __delitem__(self, h):
+    raise NotImplementedError("cannot delete")
 
   def _append(self, data_record_bs: bytes):
     ''' Append the binary record `data_record_bs` to the file,
