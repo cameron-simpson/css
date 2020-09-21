@@ -28,6 +28,7 @@ import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
 from time import sleep
+from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -535,6 +536,7 @@ class VTCmd(BaseCommand):
       args.pop(0)
     if not args:
       raise GetoptError("missing dirrefs")
+    xit = 0
     first = True
     for path in args:
       with Pfx(path):
@@ -542,9 +544,17 @@ class VTCmd(BaseCommand):
           first = False
         else:
           print()
-        D = parse(path)
+        D, offset = parse(path)
+        if offset < len(path):
+          warning("unparsed text: %r, skipping", path[offset:])
+          xit = 1
+          continue
+        if not isinstance(D, Dir):
+          warning("not a Dir specification, got: %s:%r", type(D).__name__, D)
+          xit = 1
+          continue
         ls(path, D, recurse, sys.stdout)
-    return 0
+    return xit
 
   @staticmethod
   def cmd_mount(args, options):
@@ -1040,7 +1050,8 @@ def lsDirent(fp, E, name):
       (('d' if E.isdir else 'f'), detail, t, st_size, name)
   )
 
-def ls(path, D, recurse, fp=None):
+@typechecked
+def ls(path: str, D: Dir, recurse: bool, fp=None):
   ''' Do an ls style directory listing with optional recursion.
   '''
   if fp is None:
