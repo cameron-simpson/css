@@ -50,7 +50,7 @@
       for `struct` formats with multiple value fields.
       These classes are `namedtuple` subclasses
       supporting trivial access to the parsed values.
-    * `SingleStructBinary`: a factory for making `PacketField` classes
+    * `BinarySingleStruct`: a factory for making `PacketField` classes
       from `struct` formats with a single value field.
 
     Here's an example of a `structtuple`:
@@ -932,9 +932,9 @@ class BytesRunField(PacketField):
     if length > 0:
       yield bs256[:length]
 
-_SingleStructBinarys = {}
+_BinarySingleStructs = {}
 
-def SingleStructBinary(struct_format, class_name):
+def BinarySingleStruct(struct_format, class_name):
   ''' Factory for `BinarySingleValue` subclasses built around a single struct format.
 
       Parameters:
@@ -944,7 +944,7 @@ def SingleStructBinary(struct_format, class_name):
 
       Example:
 
-          >>> UInt16BE = SingleStructBinary('>H', class_name='UInt16BE')
+          >>> UInt16BE = BinarySingleStruct('>H', class_name='UInt16BE')
           >>> UInt16BE.__name__
           'UInt16BE'
           >>> UInt16BE.format
@@ -960,7 +960,7 @@ def SingleStructBinary(struct_format, class_name):
           515
   '''
   key = (struct_format, class_name)
-  StructField = _SingleStructBinarys.get(key)
+  StructField = _BinarySingleStructs.get(key)
   if not StructField:
     struct = Struct(struct_format)
 
@@ -992,18 +992,18 @@ def SingleStructBinary(struct_format, class_name):
     )
     StructField.struct = struct
     StructField.format = struct_format
-    _SingleStructBinarys[key] = StructField
+    _BinarySingleStructs[key] = StructField
   return StructField
 
-SingleStructBinary = SingleStructBinary
+BinarySingleStruct = BinarySingleStruct
 
 # various common values
-UInt8 = SingleStructBinary('B', 'UInt8')
+UInt8 = BinarySingleStruct('B', 'UInt8')
 UInt8.TEST_CASES = (
     (0, b'\0'),
     (65, b'A'),
 )
-Int16BE = SingleStructBinary('>h', 'Int16BE')
+Int16BE = BinarySingleStruct('>h', 'Int16BE')
 Int16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1011,7 +1011,7 @@ Int16BE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x80\x00'),
 )
-Int16LE = SingleStructBinary('<h', 'Int16LE')
+Int16LE = BinarySingleStruct('<h', 'Int16LE')
 Int16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1019,7 +1019,7 @@ Int16LE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x00\x80'),
 )
-Int32BE = SingleStructBinary('>l', 'Int32BE')
+Int32BE = BinarySingleStruct('>l', 'Int32BE')
 Int32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1027,7 +1027,7 @@ Int32BE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x80\x00\x00\x00'),
 )
-Int32LE = SingleStructBinary('<l', 'Int32LE')
+Int32LE = BinarySingleStruct('<l', 'Int32LE')
 Int32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1035,7 +1035,7 @@ Int32LE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x00\x00\x00\x80'),
 )
-UInt16BE = SingleStructBinary('>H', 'UInt16BE')
+UInt16BE = BinarySingleStruct('>H', 'UInt16BE')
 UInt16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1043,7 +1043,7 @@ UInt16BE.TEST_CASES = (
     (32768, b'\x80\x00'),
     (65535, b'\xff\xff'),
 )
-UInt16LE = SingleStructBinary('<H', 'UInt16LE')
+UInt16LE = BinarySingleStruct('<H', 'UInt16LE')
 UInt16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1051,7 +1051,7 @@ UInt16LE.TEST_CASES = (
     (32768, b'\x00\x80'),
     (65535, b'\xff\xff'),
 )
-UInt32BE = SingleStructBinary('>L', 'UInt32BE')
+UInt32BE = BinarySingleStruct('>L', 'UInt32BE')
 UInt32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1060,7 +1060,7 @@ UInt32BE.TEST_CASES = (
     (4294967294, b'\xff\xff\xff\xfe'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt32LE = SingleStructBinary('<L', 'UInt32LE')
+UInt32LE = BinarySingleStruct('<L', 'UInt32LE')
 UInt32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1069,7 +1069,7 @@ UInt32LE.TEST_CASES = (
     (4294967294, b'\xfe\xff\xff\xff'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt64BE = SingleStructBinary('>Q', 'UInt64BE')
+UInt64BE = BinarySingleStruct('>Q', 'UInt64BE')
 UInt64BE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\0\0\0\0\0\0\0\1'),
@@ -1082,7 +1082,7 @@ UInt64BE.TEST_CASES = (
     (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-UInt64LE = SingleStructBinary('<Q', 'UInt64LE')
+UInt64LE = BinarySingleStruct('<Q', 'UInt64LE')
 UInt64LE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\1\0\0\0\0\0\0\0'),
@@ -1095,12 +1095,12 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-Float64BE = SingleStructBinary('>d', 'Float64BE')
+Float64BE = BinarySingleStruct('>d', 'Float64BE')
 Float64BE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
 )
-Float64LE = SingleStructBinary('<d', 'Float64LE')
+Float64LE = BinarySingleStruct('<d', 'Float64LE')
 Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
@@ -1300,7 +1300,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   '''
   # we memoise the class definitions
   key = (struct_format, subvalue_names, class_name)
-  MultiStructField = _SingleStructBinarys.get(key)
+  MultiStructField = _BinarySingleStructs.get(key)
   if not MultiStructField:
     # new class
     struct = Struct(struct_format)
@@ -1626,7 +1626,7 @@ class Packet(PacketField):
     assert isinstance(bfr, CornuCopyBuffer
                       ), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if isinstance(factory, str):
-      from_buffer = SingleStructBinary(factory, 'SingleStructBinary').parse
+      from_buffer = BinarySingleStruct(factory, 'BinarySingleStruct').parse
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).from_buffer
     elif isinstance(factory, type):
