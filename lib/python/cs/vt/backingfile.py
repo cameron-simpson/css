@@ -100,7 +100,7 @@ class BaseBackingFile(MutableMapping, MultiOpenMixin):
       except AttributeError:
         warning("no .open method")
       else:
-        open_index()
+        index_open()
 
   @pfx_method
   def shutdown(self):
