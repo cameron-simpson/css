@@ -141,6 +141,7 @@ from collections import namedtuple
 from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
+from cs.gimmicks import warning
 
 __version__ = '20200229'
 
@@ -154,25 +155,11 @@ DISTINFO = {
     'install_requires': ['cs.buffer'],
 }
 
-# maybe monkey patch this with cs.logutils.warning if importable
-def warning(msg, *a, f=None):
-  ''' Issue a formatted warning message.
-  '''
-  if f is None:
-    f = sys.stderr
-  if a:
-    msg = msg % a
-  print('WARNING:', msg, file=f)
-
-if sys.version_info[0] < 3:
+if (sys.version_info.major < 3
+    or (sys.version_info.major == 3 and sys.version_info.major.minor < 6)):
   warning(
-      "module %r requires Python 3 and recommends 3.6, but version_info=%r",
+      "module %r requires Python 3 and recommends 3.6, but version_info=%s",
       __name__, sys.version_info
-  )
-elif sys.version_info[0] == 3 and sys.version_info[1] < 6:
-  warning(
-      "module %r recommends Python 3.6, but version_info=%r", __name__,
-      sys.version_info
   )
 
 def flatten(chunks):
