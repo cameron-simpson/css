@@ -3,19 +3,22 @@
 ''' The base classes for files storing data.
 '''
 
-from os import SEEK_END, lseek, write, pread
 from collections.abc import Mapping, MutableMapping
+from os import SEEK_END, lseek, write, pread, close as closefd
+from os.path import isfile as isfilepath, splitext
 from threading import RLock
 from zlib import compress, decompress
 from typeguard import typechecked
+from icontract import require
 from cs.binary import PacketField, BSUInt, BSData
 from cs.fileutils import shortpath
 from cs.lex import cropped_repr
-from cs.pfx import pfx_method
-from .hash import HashCode
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
+from .hash import HashCode, HashCodeUtilsMixin, DEFAULT_HASHCLASS
+from .index import choose as choose_indexclass
+from .store import MappingStore
 from .util import openfd_append, openfd_read
 
 class BackingFileIndexEntry(PacketField):
@@ -53,6 +56,7 @@ class BackingFileIndexEntry(PacketField):
     yield BSUInt.transcribe_value(self.offset)
     yield BSUInt.transcribe_value(self.length)
 
+# pylint: disable=too-many-ancestors
 class BaseBackingFile(MutableMapping, MultiOpenMixin):
   ''' The basics of a data backing file.
 
