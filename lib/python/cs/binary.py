@@ -273,7 +273,7 @@ class BinaryMixin:
     return instance
 
   @classmethod
-  def from_file(cls, f, offset=0, length=None):
+  def from_file(cls, f, **kw):
     ''' Factory to parse an instance from the binary file `f`.
         Returns the new instance.
 
@@ -282,7 +282,7 @@ class BinaryMixin:
 
         This relies on the `cls.parse` method for the parse.
     '''
-    bfr = CornuCopyBuffer.from_file(f)
+    bfr = CornuCopyBuffer.from_file(f, **kw)
     instance = cls.parse(bfr)
     if not bfr.at_eof():
       raise ValueError("unparsed data at offset %d" % (bfr.offset,))
