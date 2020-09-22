@@ -266,7 +266,7 @@ class BinaryMixin:
         bytes `bs` starting at `offset`.
         Returns the new instance.
 
-        Raises `ValueError` if `bs` is not enitrely consumed.
+        Raises `ValueError` if `bs` is not entirely consumed.
         Raises `EOFError` if `bs` has insufficient data.
 
         The parameters `offset` and `length` are passed to the
@@ -298,7 +298,7 @@ class BinaryMixin:
     ''' Factory to parse an instance from the binary file `f`.
         Returns the new instance.
 
-        Raises `ValueError` if `f` is not enitrely consumed.
+        Raises `ValueError` if `f` is not entirely consumed.
         Raises `EOFError` if `f` has insufficient data.
 
         This relies on the `cls.parse` method for the parse.
