@@ -303,7 +303,7 @@ class AbstractBinary(ABC, BinaryMixin):
     '''
     raise NotImplementedError("transcribe")
 
-class SingleValueBinary(AbstractBinary):
+class BinarySingleValue(AbstractBinary):
   ''' A representation of a single value as the attribute `.value`.
 
       Subclasses must implement:
@@ -678,7 +678,7 @@ class UTF16NULField(PacketField):
     yield value.encode(encoding)
     yield b'\0\0'
 
-class BytesField(SingleValueBinary):
+class BytesField(BinarySingleValue):
   ''' A field of bytes.
   '''
 
@@ -935,7 +935,7 @@ class BytesRunField(PacketField):
 _SingleStructBinarys = {}
 
 def SingleStructBinary(struct_format, class_name):
-  ''' Factory for `SingleValueBinary` subclasses built around a single struct format.
+  ''' Factory for `BinarySingleValue` subclasses built around a single struct format.
 
       Parameters:
       * `struct_format`: the struct format string, specifying a
@@ -964,7 +964,7 @@ def SingleStructBinary(struct_format, class_name):
   if not StructField:
     struct = Struct(struct_format)
 
-    class StructField(SingleValueBinary):
+    class StructField(BinarySingleValue):
       ''' A `PacketField` subclass using a `struct.Struct` for parse and transcribe.
       '''
 
@@ -1106,7 +1106,7 @@ Float64LE.TEST_CASES = (
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
 
-class BSUInt(SingleValueBinary):
+class BSUInt(BinarySingleValue):
   ''' A binary serialised unsigned int.
 
       This uses a big endian byte encoding where continuation octets
@@ -1154,7 +1154,7 @@ class BSUInt(SingleValueBinary):
       n >>= 7
     return bytes(reversed(bs))
 
-class BSData(SingleValueBinary):
+class BSData(BinarySingleValue):
   ''' A run length encoded data chunk, with the length encoded as a `BSUInt`.
   '''
 
@@ -1195,7 +1195,7 @@ class BSData(SingleValueBinary):
     '''
     return BSData(bs).data_offset
 
-class BSString(SingleValueBinary):
+class BSString(BinarySingleValue):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
 
