@@ -678,7 +678,7 @@ class UTF16NULField(PacketField):
     yield value.encode(encoding)
     yield b'\0\0'
 
-class BytesField(PacketField):
+class BytesField(SingleValueBinary):
   ''' A field of bytes.
   '''
 
@@ -687,13 +687,21 @@ class BytesField(PacketField):
   )
 
   @property
-  def value_s(self):
-    ''' The repr() of the bytes.
+  def data(self):
+    ''' Alias for the `.value` attribute.
     '''
-    bs = self.value
-    if not isinstance(bs, bytes):
-      bs = bytes(bs)
-    return repr(bs)
+    return self.value
+
+  @property
+  def length(self):
+    ''' Convenient length attribute.
+    '''
+    return len(self.value)
+
+  def __len__(self):
+    ''' The length is the length of the data.
+    '''
+    return len(self.value)
 
   @classmethod
   def value_from_buffer(cls, bfr, length=None):
@@ -703,11 +711,11 @@ class BytesField(PacketField):
       raise ValueError("length(%d) < 0" % (length,))
     return bfr.take(length)
 
-  def transcribe(self):
+  @staticmethod
+  def transcribe_value(value):
     ''' A `BytesField` is its own transcription.
     '''
-    assert isinstance(self.value, (bytes, memoryview))
-    return self.value
+    return value
 
 def fixed_bytes_field(length, class_name=None):
   ''' Factory for `BytesField` subclasses built from fixed length byte strings.
