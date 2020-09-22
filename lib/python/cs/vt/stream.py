@@ -52,6 +52,7 @@ class RqType(IntEnum):
   ARCHIVE_LAST = 6  # archive_name -> (when,E)
   ARCHIVE_UPDATE = 7  # (archive_name,when,E)
   ARCHIVE_LIST = 8  # (count,archive_name) -> (when,E)...
+  LENGTH = 9  # () -> remote-store-length
 
 class StreamStore(BasicStoreSync):
   ''' A Store connected to a remote Store via a `PacketConnection`.
@@ -286,6 +287,19 @@ class StreamStore(BasicStoreSync):
       raise ValueError("no local_store, request rejected")
     rq = self.decode_request(rq_type, flags, payload)
     return rq.do(self)
+
+  @pfx_method
+  def __len__(self):
+    try:
+      flags, payload = self.do(LengthRequest())
+    except StoreError as e:
+      error("h=%s: %s", h, e)
+      return None
+    assert flags == 0
+    length, offset = BSUInt.value_from_bytes(payload)
+    if offset < len(payload):
+      warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
+    return length
 
   @pfx_method
   def add(self, data):
@@ -667,6 +681,34 @@ class FlushRequest(VTPacket):
       raise ValueError("no local_store, request rejected")
     local_store.flush()
 
+class LengthRequest(VTPacket):
+  ''' Request the length (number of indexed Blocks) of the remote Store.
+  '''
+
+  RQTYPE = RqType.LENGTH
+
+  @require(lambda value: value is None)
+  def __init__(self, value=None):
+    super().__init__(None)
+
+  @staticmethod
+  def value_from_buffer(bfr, flags=0):
+    if flags:
+      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
+    return None
+
+  def transcribe(self):
+    pass
+
+  @staticmethod
+  def do(stream):
+    ''' Return the number of indexed blocks in `local_store`.
+    '''
+    local_store = stream._local_store
+    if local_store is None:
+      raise ValueError("no local_store, request rejected")
+    return bytes(BSUInt(len(local_store)))
+
 class HashCodesRequest(Packet):
   ''' A request for remote hashcodes.
   '''
@@ -885,6 +927,7 @@ RqType.HASHCODES_HASH.request_class = HashOfHashCodesRequest
 RqType.ARCHIVE_LAST.request_class = ArchiveLastRequest
 RqType.ARCHIVE_LIST.request_class = ArchiveListRequest
 RqType.ARCHIVE_UPDATE.request_class = ArchiveUpdateRequest
+RqType.LENGTH.request_class = LengthRequest
 
 def CommandStore(shcmd, addif=False):
   ''' Factory to return a StreamStore talking to a command.
