@@ -272,6 +272,22 @@ class BinaryMixin:
       raise ValueError("unparsed data at offset %d" % (bfr.offset,))
     return instance
 
+  @classmethod
+  def from_file(cls, f, offset=0, length=None):
+    ''' Factory to parse an instance from the binary file `f`.
+        Returns the new instance.
+
+        Raises `ValueError` if `f` is not enitrely consumed.
+        Raises `EOFError` if `f` has insufficient data.
+
+        This relies on the `cls.parse` method for the parse.
+    '''
+    bfr = CornuCopyBuffer.from_file(f)
+    instance = cls.parse(bfr)
+    if not bfr.at_eof():
+      raise ValueError("unparsed data at offset %d" % (bfr.offset,))
+    return instance
+
 class AbstractBinary(ABC, BinaryMixin):
   
   @abstractclassmethod
