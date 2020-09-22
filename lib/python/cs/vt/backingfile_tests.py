@@ -4,12 +4,14 @@
 ''' BackingFile tests.
 '''
 
+import os
 import random
 import sys
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 import unittest
+from cs.pfx import XP
 from cs.randutils import rand0, make_randblock
-from .backingfile import RawBackingFile, CompressibleBackingFile
+from .backingfile import RawBackingFile, CompressibleBackingFile, VTDStore
 from .hash import HASHCLASS_BY_NAME
 
 RUN_SIZE = 128
@@ -41,6 +43,33 @@ class TestBackingFile(unittest.TestCase):
               random.shuffle(hashcodes)
               for h in hashcodes:
                 data = bf[h]
+                self.assertEqual(data, blocks[h])
+
+  def test_shuffled_randomblocks_vtd(self):
+    ''' Like test_shuffled_randomblocks but using a .vtd file and binary index file:
+        save RUN_SIZE random blocks, close, retrieve in random order.
+    '''
+    for hashclass_name, hashclass in sorted(HASHCLASS_BY_NAME.items()):
+      with self.subTest(hashclass=hashclass):
+        with TemporaryDirectory(dir='.') as TDname:
+          with NamedTemporaryFile(dir=TDname, prefix='VTDStore-',
+                                  suffix='.vtd') as T:
+            blocks = {}
+            total_length = 0
+            # open and save data
+            with VTDStore(T.name, T.name, hashclass=hashclass) as S:
+              for n in range(RUN_SIZE):
+                data = make_randblock(rand0(MAX_BLOCK_SIZE + 1))
+                h = S.add(data)
+                blocks[h] = data
+                total_length += len(data)
+            # reopen and retrieve
+            with VTDStore(T.name, T.name, hashclass=hashclass) as S:
+              # retrieve in random order
+              hashcodes = list(blocks.keys())
+              random.shuffle(hashcodes)
+              for h in hashcodes:
+                data = S[h]
                 self.assertEqual(data, blocks[h])
 
 def selftest(argv):
