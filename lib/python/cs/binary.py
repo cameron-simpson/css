@@ -142,6 +142,7 @@ from struct import Struct
 import sys
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning
+from cs.pfx import Pfx
 
 __version__ = '20200229'
 
@@ -1092,6 +1093,65 @@ Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
+
+_binary_multi_struct_classes = {}
+
+def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
+  ''' A class factory for `AbstractBinary` `namedtuple` subclasses
+      built around complex `struct` formats.
+
+      Parameters:
+      * `class_name`: name for the generated class
+      * `struct_format`: the `struct` format string
+      * `field_names`: field name list
+  '''
+  with Pfx("BinaryMultiStruct(%r,%r,%r)", class_name, struct_format,
+           field_names):
+    # we memoise the class definitions
+    key = (struct_format, field_names, class_name)
+    struct_class = _binary_multi_struct_classes.get(key)
+    if struct_class:
+      return struct_class
+    # construct new class
+    struct = Struct(struct_format)
+    for field_name in field_names:
+      with Pfx(field_name):
+        if field_name in ('length', 'struct', 'format') or hasattr(
+            AbstractBinary, field_name):
+          raise ValueError(
+              "field name conflicts with AbstractBinary.%s" % (field_name,)
+          )
+    tuple_type = namedtuple(class_name or "StructSubValues", field_names)
+
+    class struct_class(tuple_type, AbstractBinary):
+      ''' A struct field for a complex struct format.
+      '''
+
+      @classmethod
+      def parse(cls, bfr):
+        ''' Parse from `bfr` via `struct.unpack`.
+        '''
+        bs = bfr.take(struct.size)
+        values = struct.unpack(bs)
+        return cls(*values)
+
+      def transcribe(self):
+        ''' Transcribe via `struct.pack`.
+        '''
+        return struct.pack(*self)
+
+      struct_class.__name__ = class_name
+      struct_class.__doc__ = (
+          ''' An `AbstractBinary` `namedtuple` which parses and transcribes
+              the struct format `%r` and presents the attributes %r.
+          ''' % (struct_format, field_names)
+      )
+
+    struct_class.struct = struct
+    struct_class.format = struct_format
+    struct_class.length = struct.size
+    _binary_multi_struct_classes[key] = struct_class
+    return struct_class
 
 class BSUInt(BinarySingleValue):
   ''' A binary serialised unsigned int.
