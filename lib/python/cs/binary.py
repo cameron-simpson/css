@@ -157,7 +157,7 @@ DISTINFO = {
 }
 
 if (sys.version_info.major < 3
-    or (sys.version_info.major == 3 and sys.version_info.major.minor < 6)):
+    or (sys.version_info.major == 3 and sys.version_info.minor < 6)):
   warning(
       "module %r requires Python 3 and recommends 3.6, but version_info=%s",
       __name__, sys.version_info
