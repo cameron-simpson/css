@@ -32,6 +32,12 @@ class BackingFileIndexEntry(PacketField):
         type(self).__name__, self.offset, self.length
     )
 
+  @classmethod
+  def from_value(cls, value):
+    ''' Construct an instance from an `(offset,length)` tuple.
+    '''
+    return cls(*value)
+
   # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(cls, bfr):
