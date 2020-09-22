@@ -122,25 +122,22 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
       bs = decompress(bs)
     return bs
 
-  ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
 class BinaryIndex(MultiOpenMixin, ABC):
+  ''' The base class for indices mapping `bytes`->`bytes`.
   '''
 
   # make a TypeError if used, subclasses provide their own
   SUFFIX = None
 
-  def __init__(self, basepath, hashclass):
-    ''' Initialise an _Index instance.
+  def __init__(self, basepath):
+    ''' Initialise an `BinaryIndex` instance.
 
         Parameters:
         * `basepath`: the base path to the index; the index itself
           is at `basepath`.SUFFIX
-        * `hashclass`: the hashclass indexed by this index
     '''
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
-    self.hashclass = hashclass
-    self._mkhash = hashclass.from_hashbytes
 
   @classmethod
   def pathof(cls, basepath):
@@ -154,37 +151,15 @@ class BinaryIndex(MultiOpenMixin, ABC):
     '''
     return self.pathof(self.basepath)
 
-  @staticmethod
-  def decode_binary_record(binary_record):
-    ''' Decode the binary record obtained from the index.
-        Return the `FileDataIndexEntry`.
-    '''
-    record, post_offset = FileDataIndexEntry.from_bytes(binary_record)
-    if post_offset < len(binary_record):
-      warning(
-          "short decode of binary FileDataIndexEntry:"
-          " record=%s, post_offset=%d, remaining binary_record=%r", record,
-          post_offset, binary_record[post_offset:]
-      )
-    return record
-
   def __iter__(self):
-    return map(self._mkhash, self._raw_iter())
+    return self.keys()
 
-  @abstractmethod
-  def _raw_iter(self):
-    ''' Iterator returns `bytes` instances, for promote to `HashCode` instances.
-    '''
-    raise NotImplementedError("not implemented")
-
-  keys = __iter__
-
-  def get(self, hashcode, default=None):
-    ''' Get the `FileDataIndexEntry` for `hashcode`.
-        Return `default` for a missing `hashcode` (default `None`).
+  def get(self, key, default=None):
+    ''' Get the `FileDataIndexEntry` for `key`.
+        Return `default` for a missing `key` (default `None`).
     '''
     try:
-      return self[hashcode]
+      return self[key]
     except KeyError:
       return default
 
@@ -196,8 +171,8 @@ class LMDBIndex(BinaryIndex):
   SUFFIX = 'lmdb'
   MAP_SIZE = 1024 * 1024 * 1024
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, lmdbpathbase):
+    super().__init__(lmdbpathbase)
     self._lmdb = None
     self._resize_needed = False
     # Locking around transaction control logic.
@@ -211,9 +186,7 @@ class LMDBIndex(BinaryIndex):
     self.map_size = None
 
   def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__, self.basepath, self.hashclass.HASHNAME
-    )
+    return "%s(%r)" % (type(self).__name__, self.basepath)
 
   def __len__(self):
     with self._txn_lock:
@@ -312,46 +285,42 @@ class LMDBIndex(BinaryIndex):
     # no force=True param?
     self._lmdb.sync()
 
-  def _raw_iter(self):
+  def keys(self):
     with self._txn() as txn:
       cursor = txn.cursor()
       yield from cursor.iternext(keys=True, values=False)
 
   def items(self):
-    ''' Yield `(hashcode,record)` from index.
+    ''' Yield `(key,record)` from index.
     '''
-    mkhash = self._mkhash
-    mkentry = self.decode_binary_record
     with self._txn() as txn:
       cursor = txn.cursor()
-      for binary_hashcode, binary_record in cursor.iternext(keys=True,
-                                                            values=True):
-        yield mkhash(binary_hashcode), mkentry(binary_record)
+      for binary_key, binary_entry in cursor.iternext(keys=True, values=True):
+        yield binary_key, binary_entry
 
-  def _get(self, hashcode):
+  def _get(self, key):
     with self._txn() as txn:
-      return txn.get(hashcode)
+      return txn.get(key)
 
-  def __contains__(self, hashcode):
-    return self._get(hashcode) is not None
+  def __contains__(self, key):
+    return self._get(key) is not None
 
-  def __getitem__(self, hashcode):
-    ''' Get the `FileDataIndexEntry` for `hashcode`.
-        Raise `KeyError` for a missing hashcode.
+  def __getitem__(self, key):
+    ''' Get the `FileDataIndexEntry` for `key`.
+        Raise `KeyError` for a missing key.
     '''
-    binary_record = self._get(hashcode)
-    if binary_record is None:
-      raise KeyError(hashcode)
-    return self.decode_binary_record(binary_record)
+    binary_entry = self._get(key)
+    if binary_entry is None:
+      raise KeyError(key)
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
+  def __setitem__(self, key: bytes, binary_entry: bytes):
     # pylint: disable=import-error,import-outside-toplevel
     import lmdb
-    binary_record = bytes(entry)
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, binary_record, overwrite=True)
+          txn.put(key, binary_entry, overwrite=True)
           txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
@@ -366,8 +335,8 @@ class GDBMIndex(BinaryIndex):
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, lmdbpathbase):
+    super().__init__(lmdbpathbase)
     self._gdbm = None
     self._gdbm_lock = None
     self._written = False
@@ -411,28 +380,28 @@ class GDBMIndex(BinaryIndex):
           self._gdbm.sync()
           self._written = False
 
-  def _raw_iter(self):
+  def keys(self):
     with self._gdbm_lock:
-      hashcode_bs = self._gdbm.firstkey()
-    while hashcode_bs is not None:
-      yield hashcode_bs
+      key = self._gdbm.firstkey()
+    while key is not None:
+      yield key
       self.flush()
       with self._gdbm_lock:
-        hashcode_bs = self._gdbm.nextkey(hashcode_bs)
+        key = self._gdbm.nextkey(key)
 
-  def __contains__(self, hashcode):
+  def __contains__(self, key):
     with self._gdbm_lock:
-      return hashcode in self._gdbm
+      return key in self._gdbm
 
-  def __getitem__(self, hashcode):
+  def __getitem__(self, key):
     with self._gdbm_lock:
-      binary_record = self._gdbm[hashcode]
-    return self.decode_binary_record(binary_record)
+      binary_entry = self._gdbm[key]
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
+  def __setitem__(self, key, entry):
     binary_entry = bytes(entry)
     with self._gdbm_lock:
-      self._gdbm[hashcode] = binary_entry
+      self._gdbm[key] = binary_entry
       self._written = True
 
 class NDBMIndex(BinaryIndex):
@@ -442,8 +411,8 @@ class NDBMIndex(BinaryIndex):
   NAME = 'ndbm'
   SUFFIX = 'ndbm'
 
-  def __init__(self, nmdbpathbase, hashclass):
-    super().__init__(nmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase):
+    super().__init__(nmdbpathbase)
     self._ndbm = None
     self._ndbm_lock = None
     self._written = False
@@ -483,22 +452,21 @@ class NDBMIndex(BinaryIndex):
     '''
     # no fast mode, no sync
 
-  def _raw_iter(self):
+  def keys(self):
     return iter(self._ndbm.keys())
 
-  def __contains__(self, hashcode):
+  def __contains__(self, key):
     with self._ndbm_lock:
-      return hashcode in self._ndbm
+      return key in self._ndbm
 
-  def __getitem__(self, hashcode):
+  def __getitem__(self, key):
     with self._ndbm_lock:
-      binary_record = self._ndbm[hashcode]
-    return self.decode_binary_record(binary_record)
+      return self._ndbm[key]
 
-  def __setitem__(self, hashcode, entry):
+  def __setitem__(self, key, entry):
     binary_entry = bytes(entry)
     with self._ndbm_lock:
-      self._ndbm[hashcode] = binary_entry
+      self._ndbm[key] = binary_entry
       self._written = True
 
 class KyotoIndex(BinaryIndex):
@@ -511,8 +479,8 @@ class KyotoIndex(BinaryIndex):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, nmdbpathbase, hashclass):
-    super().__init__(nmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase):
+    super().__init__(nmdbpathbase)
     self._kyoto = None
 
   @classmethod
@@ -551,44 +519,41 @@ class KyotoIndex(BinaryIndex):
   def __len__(self):
     return self._kyoto.count()
 
-  def __contains__(self, hashcode):
-    return self._kyoto.check(hashcode) >= 0
+  def __contains__(self, key):
+    return self._kyoto.check(key) >= 0
 
-  def __getitem__(self, hashcode):
-    binary_record = self._kyoto.get(hashcode)
-    if binary_record is None:
-      raise KeyError(hashcode)
-    return self.decode_binary_record(binary_record)
+  def __getitem__(self, key):
+    binary_entry = self._kyoto.get(key)
+    if binary_entry is None:
+      raise KeyError(key)
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
-    binary_entry = bytes(entry)
-    self._kyoto[hashcode] = binary_entry
+  def __setitem__(self, key, binary_entry):
+    self._kyoto[key] = binary_entry
 
-  def __iter__(self):
-    return self.hashcodes_from()
-
-  def hashcodes_from(self, *, start_hashcode=None, reverse=False):
+  def keys(self, *, start_key=None, reverse=False):
     ''' Generator yielding the keys from the index
-        in order starting with optional `start_hashcode`.
+        in order starting with optional `start_key`.
 
         Parameters:
-        * `start_hashcode`: the starting hashcode; if missing or None,
+        * `start_key`: the starting key; if missing or None,
           iteration starts with the first key in the index
         * `reverse`: iterate backward if true, otherwise forward
     '''
-    hashclass = self.hashclass
     cursor = self._kyoto.cursor()
     if reverse:
-      if cursor.jump_back(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
+      if cursor.jump_back(start_key):
+        yield cursor.get_key()
         while cursor.step_back():
-          yield hashclass.from_hashbytes(cursor.get_key())
+          yield cursor.get_key()
     else:
-      if cursor.jump(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
+      if cursor.jump(start_key):
+        yield cursor.get_key()
         while cursor.step():
-          yield hashclass.from_hashbytes(cursor.get_key())
+          yield cursor.get_key()
     cursor.disable()
+
+  __iter__ = keys
 
 def register(indexclass, indexname=None, priority=False):
   ''' Register a new `indexclass`, making it known.
