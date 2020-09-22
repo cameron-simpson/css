@@ -1259,9 +1259,9 @@ class ListField(PacketField):
     for item in value:
       yield item.transcribe()
 
-_multi_single_structs = {}
+_multi_struct_fields = {}
 
-def multi_single_struct(struct_format, subvalue_names=None, class_name=None):
+def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   ''' A class factory for `PacketField` subclasses built around complex `struct` formats.
 
       See also the convenience class factory `structtuple`
@@ -1283,7 +1283,7 @@ def multi_single_struct(struct_format, subvalue_names=None, class_name=None):
     if subvalue_names:
       if 'length' in subvalue_names:
         warning(
-            "conflicting field 'length' in multi_single_struct(class_name=%s) subvalue_names %r",
+            "conflicting field 'length' in multi_struct_field(class_name=%s) subvalue_names %r",
             class_name, subvalue_names
         )
       subvalues_type = namedtuple(
@@ -1336,11 +1336,11 @@ def multi_single_struct(struct_format, subvalue_names=None, class_name=None):
     MultiStructField.format = struct_format
     if subvalue_names:
       MultiStructField.subvalue_names = subvalue_names
-    _multi_single_structs[key] = MultiStructField
+    _multi_struct_fields[key] = MultiStructField
   return MultiStructField
 
 def structtuple(class_name, struct_format, subvalue_names):
-  ''' Convenience wrapper for `multi_single_struct`.
+  ''' Convenience wrapper for `multi_struct_field`.
 
       Example:
 
@@ -1349,7 +1349,7 @@ def structtuple(class_name, struct_format, subvalue_names):
       which is a record with big-endian unsigned 64 and 32 fields
       named `pts` and `type`.
   '''
-  return multi_single_struct(
+  return multi_struct_field(
       struct_format, subvalue_names=subvalue_names, class_name=class_name
   )
 
