@@ -193,7 +193,9 @@ class BaseBackingFile(MutableMapping, MultiOpenMixin):
   def data_record_for(self, h):
     ''' Obtain the data record for a `HashCode`.
     '''
-    offset, length = self.index[h]
+    index_entry = self.index[h]
+    offset = index_entry.offset
+    length = index_entry.length
     rfd = self._rfd
     data_record_bs = pread(rfd, length, offset)
     if len(data_record_bs) != length:
