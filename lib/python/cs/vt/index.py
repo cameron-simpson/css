@@ -122,8 +122,8 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
       bs = decompress(bs)
     return bs
 
-class _Index(HashCodeUtilsMixin, MultiOpenMixin, ABC):
   ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
+class BinaryIndex(MultiOpenMixin, ABC):
   '''
 
   # make a TypeError if used, subclasses provide their own
@@ -188,7 +188,7 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin, ABC):
     except KeyError:
       return default
 
-class LMDBIndex(_Index):
+class LMDBIndex(BinaryIndex):
   ''' LMDB index for a DataDir.
   '''
 
@@ -359,7 +359,7 @@ class LMDBIndex(_Index):
       else:
         return
 
-class GDBMIndex(_Index):
+class GDBMIndex(BinaryIndex):
   ''' GDBM index for a DataDir.
   '''
 
@@ -435,7 +435,7 @@ class GDBMIndex(_Index):
       self._gdbm[hashcode] = binary_entry
       self._written = True
 
-class NDBMIndex(_Index):
+class NDBMIndex(BinaryIndex):
   ''' NDBM index for a DataDir.
   '''
 
@@ -501,7 +501,7 @@ class NDBMIndex(_Index):
       self._ndbm[hashcode] = binary_entry
       self._written = True
 
-class KyotoIndex(_Index):
+class KyotoIndex(BinaryIndex):
   ''' Kyoto Cabinet index.
       Notably this uses a B+ tree for the index and thus one can
       traverse from one key forwards and backwards, which supports
