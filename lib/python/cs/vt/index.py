@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Index classes.
+# Binary index classes.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
@@ -25,7 +25,7 @@ _CLASSES = []
 _BY_NAME = {}
 
 def class_names():
-  ''' Return the index class names.
+  ''' Return an iterable of the index class names.
   '''
   return _BY_NAME.keys()
 
@@ -36,6 +36,7 @@ def class_by_name(indexname):
 
 def choose(basepath, preferred_indexclass=None):
   ''' Choose an indexclass from a `basepath` with optional preferred indexclass.
+      This prefers an existing index if present.
   '''
   global _CLASSES  # pylint: disable=global-statement
   global _BY_NAME  # pylint: disable=global-statement
@@ -50,12 +51,14 @@ def choose(basepath, preferred_indexclass=None):
   indexclasses = list(_CLASSES)
   if preferred_indexclass is not None and preferred_indexclass.is_supported():
     indexclasses.insert((preferred_indexclass.NAME, preferred_indexclass))
+  # look for a preexisting index
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
     indexpath = indexclass.pathof(basepath)
     if pathexists(indexpath):
       return indexclass
+  # otherwise choose the first supported index
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
