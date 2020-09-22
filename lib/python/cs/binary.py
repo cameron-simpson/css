@@ -244,6 +244,23 @@ class BinaryMixin:
     return flatten(self.transcribe())
 
   @classmethod
+  def parse_bytes(cls, bs, offset=0, length=None):
+    ''' Factory to parse an instance from the
+        bytes `bs` starting at `offset`.
+        Returns the new instance and the post offset.
+
+        Raises `EOFError` if `bs` has insufficient data.
+
+        The parameters `offset` and `length` are passed to the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.parse` method for the parse.
+    '''
+    bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
+    instance = cls.parse(bfr)
+    return instance, bfr.offset
+
+  @classmethod
   def from_bytes(cls, bs, offset=0, length=None):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
@@ -257,11 +274,24 @@ class BinaryMixin:
 
         This relies on the `cls.parse` method for the parse.
     '''
-    bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    instance = cls.parse(bfr)
-    if not bfr.at_eof():
-      raise ValueError("unparsed data at offset %d" % (bfr.offset,))
+    instance, offset = cls.parse_bytes(bs, offset=offset, length=length)
+    if offset < len(bs):
+      raise ValueError(
+          "unparsed data at offset %d: %r" % (offset, bs[offset:])
+      )
     return instance
+
+  @classmethod
+  def parse_file(cls, f, **kw):
+    ''' Factory to parse an instance from the binary file `f`.
+        Returns the new instance.
+
+        Raises `EOFError` if `f` has insufficient data.
+
+        This relies on the `cls.parse` method for the parse.
+    '''
+    bfr = CornuCopyBuffer.from_file(f, **kw)
+    return cls.parse(bfr)
 
   @classmethod
   def from_file(cls, f, **kw):
