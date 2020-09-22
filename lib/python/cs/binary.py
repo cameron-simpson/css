@@ -136,7 +136,7 @@
 '''
 
 from __future__ import print_function
-from abc import ABC
+from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from struct import Struct
 import sys
@@ -194,6 +194,125 @@ def flatten(chunks):
     for subchunk in chunks:
       for chunk in flatten(subchunk):
         yield chunk
+
+class BinaryMixin:
+  ''' Presupplied helper methods for binary objects.
+  '''
+
+  def __bytes__(self):
+    ''' The binary transcription as a single `bytes` object.
+    '''
+    return b''.join(flatten(self.transcribe()))
+
+  def __len__(self):
+    ''' Compute the length by running a transcription and measuring it.
+    '''
+    return sum(len(bs) for bs in flatten(self.transcribe()))
+
+  @classmethod
+  def from_bytes(cls, bs, offset=0, length=None):
+    ''' Factory to parse an instance parsed from the
+        bytes `bs` starting at `offset`.
+        Returns the new instance.
+
+        Raises `ValueError` if `bs` is not enitrely consumed.
+        Raises `EOFError` is `bs` has insufficient data.
+
+        The parameters `offset` and `length` are passed to the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.parse` method for the parse.
+    '''
+    bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
+    instance = cls.parse(bfr)
+    if not bfr.at_eof():
+      raise ValueError("unparsed data at offset %d" % (bfr.offset,))
+    return instance
+
+  @classmethod
+  def scan_with_offsets(cls, bfr):
+    ''' Function to scan the buffer `bfr` for repeated instances of `cls`
+        until end of input,
+        yielding `(offset,instance,post_offset)` tuples
+        where `offset` if the buffer offset where the instance commenced
+        and `post_offset` is the buffer offset after the instance.
+    '''
+    offset = bfr.offset
+    while not bfr.at_eof():
+      post_offset = bfr.offset
+      yield offset, cls.from_buffer(bfr), post_offset
+      offset = post_offset
+
+  @classmethod
+  def scan(cls, bfr, **kw):
+    ''' Function to scan the buffer `bfr` for repeated instances of `cls`
+        until end of input,
+        yielding instances of `cls`.
+    '''
+    return map(lambda offset, obj, post_offset: obj, cls.parse_buffer_with_offsets(bfr, **kw))
+
+  @classmethod
+  def scan_file(cls, f):
+    ''' Function to scan the file `f` for repeated instances of `cls`
+        until end of input,
+        yields instances of `f`.
+
+        Parameters:
+        * `f`: the binary file object to parse;
+          if `f` is a string, that pathname is opened for binary read.
+    '''
+    if isinstance(f, str):
+      with open(f, 'rb') as f2:
+        yield from cls.scan_file(f2)
+    else:
+      yield from cls.scan(CornuCopyBuffer.from_file(f))
+
+  def transcribe_flat(self):
+    ''' Return a flat iterable of chunks transcribing this field.
+    '''
+    return flatten(self.transcribe())
+
+class AbstractBinary(ABC, BinaryMixin):
+  
+  @abstractclassmethod
+  def parse(cls, bfr):
+    ''' Parse an instance of `cls` from the buffrr `bfr`.
+    '''
+    raise NotImplementedError("parse")
+
+  @abstractmethod
+  def transcribe(self):
+    ''' Return or yield `bytes`, `None` or iterables
+        comprising the binary form of this instance.
+    '''
+    raise NotImplementedError("transcribe")
+
+class SingleValueBinary(AbstractBinary):
+  ''' A representation of a single value as the attribute `.value`.
+
+      Subclasses must implement:
+      * `parse` or `value_from_buffer`
+      * `transcribe` or `transcribe_value`
+  '''
+
+  def __init__(self, value):
+    self.value = value
+
+  @classmethod
+  def parse(cls, bfr):
+    value = cls.value_from_buffer(buf)
+    return cls(value)
+
+  @classmethod
+  def value_from_buffer(cls, bfr):
+    return cls.parse(bfr).value
+
+  def transcribe(self):
+    return self.transcribe_value(self.value)
+
+  @classmethod
+  def transcribe_value(value):
+    return cls(value).transcribe()
 
 class PacketField(ABC):
   ''' A record for an individual packet field.
