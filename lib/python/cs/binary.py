@@ -153,7 +153,7 @@ DISTINFO = {
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.buffer'],
+    'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.pfx'],
 }
 
 if (sys.version_info.major < 3
@@ -217,7 +217,10 @@ class BinaryMixin:
         until end of input,
         yielding instances of `cls`.
     '''
-    return map(lambda offset, obj, post_offset: obj, cls.parse_buffer_with_offsets(bfr, **kw))
+    return map(
+        lambda offset, obj, post_offset: obj,
+        cls.parse_buffer_with_offsets(bfr, **kw)
+    )
 
   @classmethod
   def scan_file(cls, f):
@@ -277,7 +280,11 @@ class BinaryMixin:
     return instance
 
 class AbstractBinary(ABC, BinaryMixin):
-  
+  ''' Abstract class for all `Binary`* implementations,
+      specifying the `parse` and `transcribe` methods
+      and providing the methods from `BinaryMixin`.
+  '''
+
   @abstractclassmethod
   def parse(cls, bfr):
     ''' Parse an instance of `cls` from the buffrr `bfr`.
@@ -295,7 +302,7 @@ class BinarySingleValue(AbstractBinary):
   ''' A representation of a single value as the attribute `.value`.
 
       Subclasses must implement:
-      * `parse` or `value_from_buffer`
+      * `parse` or `parse_value`
       * `transcribe` or `transcribe_value`
   '''
 
@@ -310,18 +317,34 @@ class BinarySingleValue(AbstractBinary):
 
   @classmethod
   def parse(cls, bfr):
-    value = cls.value_from_buffer(buf)
+    ''' Parse an instance from `bfr`.
+
+        Subclasses must implement this method or `parse_value`.
+    '''
+    value = cls.parse_value(bfr)
     return cls(value)
 
   @classmethod
-  def value_from_buffer(cls, bfr):
+  def parse_value(cls, bfr):
+    ''' Parse a value from `bfr` based on this class.
+
+        Subclasses must implement this method or `parse`.
+    '''
     return cls.parse(bfr).value
 
   def transcribe(self):
+    ''' Transcribe this instance as bytes.
+
+        Subclasses must implement this method or `transcribe_value`.
+    '''
     return self.transcribe_value(self.value)
 
   @classmethod
-  def transcribe_value(value):
+  def transcribe_value(cls, value):
+    ''' Transcribe `value` as bytes based on this class.
+
+        Subclasses must implement this method or `transcribe`.
+    '''
     return cls(value).transcribe()
 
 class PacketField(ABC):
@@ -983,8 +1006,6 @@ def BinarySingleStruct(struct_format, class_name):
     _BinarySingleStructs[key] = StructField
   return StructField
 
-BinarySingleStruct = BinarySingleStruct
-
 # various common values
 UInt8 = BinarySingleStruct('B', 'UInt8')
 UInt8.TEST_CASES = (
@@ -1116,13 +1137,14 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
     struct = Struct(struct_format)
     for field_name in field_names:
       with Pfx(field_name):
-        if field_name in ('length', 'struct', 'format') or hasattr(
-            AbstractBinary, field_name):
+        if (field_name in ('length', 'struct', 'format')
+            or hasattr(AbstractBinary, field_name)):
           raise ValueError(
               "field name conflicts with AbstractBinary.%s" % (field_name,)
           )
     tuple_type = namedtuple(class_name or "StructSubValues", field_names)
 
+    # pylint: disable=function-redefined
     class struct_class(tuple_type, AbstractBinary):
       ''' A struct field for a complex struct format.
       '''
@@ -1221,18 +1243,20 @@ class BSData(BinarySingleValue):
     ''' The length of the length indicator,
         useful for computing the location of the raw data.
     '''
-    return len(BSUInt(len(self.data)))
+    return len(BSUInt(len(self.value)))
 
   @classmethod
-  def value_from_buffer(cls, bfr):
+  def parse_value(cls, bfr):
+    ''' Parse the data from `bfr`.
+    '''
     data_length = BSUInt.value_from_buffer(bfr)
     data = bfr.take(data_length)
     return cls(data)
 
-  def transcribe(self):
+  @staticmethod
+  def transcribe_value(data):
     ''' Transcribe the payload length and then the payload.
     '''
-    data = self.data
     yield BSUInt.transcribe_value(len(data))
     yield data
 
@@ -1544,7 +1568,7 @@ class Packet(PacketField):
       type_name = type(self).__name__
       try:
         packet_str = str(self)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         warning("%s.self_check: str(self) fails: %s", type_name, e)
         packet_str = "%d:no-str()" % (id(self),)
       return warning(
@@ -1675,7 +1699,7 @@ class Packet(PacketField):
     if isinstance(factory, str):
       from_buffer = BinarySingleStruct(factory, 'BinarySingleStruct').parse
     elif isinstance(factory, int):
-      from_buffer = fixed_bytes_field(factory).from_buffer
+      from_buffer = fixed_bytes_field(factory).parse
     elif isinstance(factory, type):
       from_buffer = factory.from_buffer
     else:
