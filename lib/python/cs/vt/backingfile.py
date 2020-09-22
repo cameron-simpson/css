@@ -355,3 +355,106 @@ def CompressibleBackingFile(path: str, **kw):
       the format used for `.vtd` files.
   '''
   return BaseBackingFile(path, data_record_class=CompressibleDataRecord, **kw)
+
+# pylint: disable=too-many-ancestors
+class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
+  ''' A thin wrapper for an arbitrary `bytes`->`bytes` mapping
+      used to map `HashCode`s to index entries.
+  '''
+
+  @pfx_method
+  @require(
+      lambda hashclass: issubclass(hashclass, HashCode) and hashclass is
+      not HashCode
+  )
+  def __init__(self, *, hashclass, binary_index, index_entry_class):
+    ''' Initialise the index.
+
+        Parameters:
+        * `hashclass`: the `HashCode` subclass to index
+        * `binary_index`: a mapping of `bytes`->`bytes`
+          to map hashcode bytes to index entry binary records
+        * `index_entry_class`: a class for index entries
+          with a `.from_value(*value)` method
+          and a `__bytes__()` method
+    '''
+    self.binary_index = binary_index
+    self.hashclass = hashclass
+    self.index_entry_class = index_entry_class
+
+  def __str__(self):
+    return "%s(hashclass=%s,index_entry_class=%s,binary_index=%s)" % (
+        type(self).__name__, self.hashclass.HASHNAME,
+        type(self.index_entry_class).__name__, self.binary_index
+    )
+
+  def startup(self):
+    ''' Open the binary index.
+    '''
+    self.binary_index.open()
+
+  def shutdown(self):
+    ''' Close the binary index.
+    '''
+    self.binary_index.close()
+
+  def __len__(self):
+    return len(self.binary_index)
+
+  def keys(self):
+    return map(self.hashclass.from_hashbytes, self.binary_index.keys())
+
+  __iter__ = keys
+
+  def __getitem__(self, hashcode):
+    ''' Retrieve the index entry for `hashcode`.
+    '''
+    index_entry_bs = self.binary_index[hashcode]
+    index_entry, offset = self.index_entry_class.from_bytes(index_entry_bs)
+    if offset < len(index_entry_bs):
+      raise ValueError(
+          "%s[%s]: incomplete parse of index entry => %s, %r" %
+          (self, hashcode, index_entry, index_entry_bs[offset:])
+      )
+    return index_entry
+
+  @pfx_method
+  def __setitem__(self, hashcode, index_entry):
+    ''' Index `index_entry` against a `hashcode`.
+
+        `index_entry` may be either in instance of `self.index_entry_class`
+        or a value acceptable to `self.index_entry_class.from_value()`.
+    '''
+    index_entry_class = self.index_entry_class
+    if not isinstance(index_entry, index_entry_class):
+      index_entry = index_entry_class.from_value(index_entry)
+    self.binary_index[hashcode] = bytes(index_entry)
+
+@pfx_method
+def VTDStore(name, path, *, hashclass, preferred_indexclass=None):
+  ''' Factory to return a `MappingStore` using a `BackingFile`
+      using a single `.vtd` file.
+  '''
+  if hashclass is None:
+    hashclass = DEFAULT_HASHCLASS
+  with Pfx(path):
+    if not path.endswith('.vtd'):
+      warning("does not end with .vtd")
+    if not isfilepath(path):
+      raise ValueError("missing path %r" % (path,))
+    pathbase, _ = splitext(path)
+    index_basepath = f"{pathbase}-index-{hashclass.HASHNAME}"
+    indexclass = choose_indexclass(
+        index_basepath, preferred_indexclass=preferred_indexclass
+    )
+    binary_index = indexclass(index_basepath)
+    index = BinaryHashCodeIndex(
+        hashclass=hashclass,
+        binary_index=binary_index,
+        index_entry_class=BackingFileIndexEntry
+    )
+    return MappingStore(
+        name,
+        CompressibleBackingFile(path, hashclass=hashclass, index=index),
+        hashclass=hashclass
+    )
