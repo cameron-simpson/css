@@ -1171,7 +1171,7 @@ class BSData(SingleValueBinary):
     '''
     return BSData(bs).data_offset
 
-class BSString(PacketField):
+class BSString(SingleValueBinary):
   ''' A run length encoded string, with the length encoded as a BSUInt.
   '''
 
@@ -1188,7 +1188,8 @@ class BSString(PacketField):
   def value_from_buffer(bfr, encoding='utf-8', errors='strict'):
     ''' Parse a run length encoded string from `bfr`.
     '''
-    bs = bfr.take(BSUInt.value_from_buffer(bfr))
+    strlen = BSUInt.value_from_buffer(bfr)
+    bs = bfr.take(strlen)
     if isinstance(bs, memoryview):
       bs = bs.tobytes()
     return bs.decode(encoding=encoding, errors=errors)
