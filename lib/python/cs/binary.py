@@ -50,7 +50,7 @@
       for `struct` formats with multiple value fields.
       These classes are `namedtuple` subclasses
       supporting trivial access to the parsed values.
-    * `struct_field`: a factory for making `PacketField` classes
+    * `single_struct`: a factory for making `PacketField` classes
       from `struct` formats with a single value field.
 
     Here's an example of a `structtuple`:
@@ -297,6 +297,12 @@ class SingleValueBinary(AbstractBinary):
 
   def __init__(self, value):
     self.value = value
+
+  def __str__(self):
+    return str(self.value)
+
+  def __repr__(self):
+    return "%s(%r)" % (type(self).__name__, self.value)
 
   @classmethod
   def parse(cls, bfr):
@@ -902,10 +908,10 @@ class BytesRunField(PacketField):
     if length > 0:
       yield bs256[:length]
 
-_struct_fields = {}
+_single_structs = {}
 
-def struct_field(struct_format, class_name):
-  ''' Factory for `PacketField` subclasses built around a single struct format.
+def single_struct(struct_format, class_name):
+  ''' Factory for `SingleValueBinary` subclasses built around a single struct format.
 
       Parameters:
       * `struct_format`: the struct format string, specifying a
@@ -914,7 +920,7 @@ def struct_field(struct_format, class_name):
 
       Example:
 
-          >>> UInt16BE = struct_field('>H', class_name='UInt16BE')
+          >>> UInt16BE = single_struct('>H', class_name='UInt16BE')
           >>> UInt16BE.__name__
           'UInt16BE'
           >>> UInt16BE.format
@@ -930,19 +936,13 @@ def struct_field(struct_format, class_name):
           515
   '''
   key = (struct_format, class_name)
-  StructField = _struct_fields.get(key)
+  StructField = _single_structs.get(key)
   if not StructField:
     struct = Struct(struct_format)
 
-    class StructField(PacketField):
+    class StructField(SingleValueBinary):
       ''' A `PacketField` subclass using a `struct.Struct` for parse and transcribe.
       '''
-
-      def __str__(self):
-        return str(self.value)
-
-      def __repr__(self):
-        return "%s(%r)" % (type(self).__name__, self.value)
 
       length = struct.size
 
@@ -968,16 +968,18 @@ def struct_field(struct_format, class_name):
     )
     StructField.struct = struct
     StructField.format = struct_format
-    _struct_fields[key] = StructField
+    _single_structs[key] = StructField
   return StructField
 
+single_struct = single_struct
+
 # various common values
-UInt8 = struct_field('B', 'UInt8')
+UInt8 = single_struct('B', 'UInt8')
 UInt8.TEST_CASES = (
     (0, b'\0'),
     (65, b'A'),
 )
-Int16BE = struct_field('>h', 'Int16BE')
+Int16BE = single_struct('>h', 'Int16BE')
 Int16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -985,7 +987,7 @@ Int16BE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x80\x00'),
 )
-Int16LE = struct_field('<h', 'Int16LE')
+Int16LE = single_struct('<h', 'Int16LE')
 Int16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -993,7 +995,7 @@ Int16LE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x00\x80'),
 )
-Int32BE = struct_field('>l', 'Int32BE')
+Int32BE = single_struct('>l', 'Int32BE')
 Int32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1001,7 +1003,7 @@ Int32BE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x80\x00\x00\x00'),
 )
-Int32LE = struct_field('<l', 'Int32LE')
+Int32LE = single_struct('<l', 'Int32LE')
 Int32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1009,7 +1011,7 @@ Int32LE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x00\x00\x00\x80'),
 )
-UInt16BE = struct_field('>H', 'UInt16BE')
+UInt16BE = single_struct('>H', 'UInt16BE')
 UInt16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1017,7 +1019,7 @@ UInt16BE.TEST_CASES = (
     (32768, b'\x80\x00'),
     (65535, b'\xff\xff'),
 )
-UInt16LE = struct_field('<H', 'UInt16LE')
+UInt16LE = single_struct('<H', 'UInt16LE')
 UInt16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1025,7 +1027,7 @@ UInt16LE.TEST_CASES = (
     (32768, b'\x00\x80'),
     (65535, b'\xff\xff'),
 )
-UInt32BE = struct_field('>L', 'UInt32BE')
+UInt32BE = single_struct('>L', 'UInt32BE')
 UInt32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1034,7 +1036,7 @@ UInt32BE.TEST_CASES = (
     (4294967294, b'\xff\xff\xff\xfe'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt32LE = struct_field('<L', 'UInt32LE')
+UInt32LE = single_struct('<L', 'UInt32LE')
 UInt32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1043,7 +1045,7 @@ UInt32LE.TEST_CASES = (
     (4294967294, b'\xfe\xff\xff\xff'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt64BE = struct_field('>Q', 'UInt64BE')
+UInt64BE = single_struct('>Q', 'UInt64BE')
 UInt64BE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\0\0\0\0\0\0\0\1'),
@@ -1056,7 +1058,7 @@ UInt64BE.TEST_CASES = (
     (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-UInt64LE = struct_field('<Q', 'UInt64LE')
+UInt64LE = single_struct('<Q', 'UInt64LE')
 UInt64LE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\1\0\0\0\0\0\0\0'),
@@ -1069,12 +1071,12 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-Float64BE = struct_field('>d', 'Float64BE')
+Float64BE = single_struct('>d', 'Float64BE')
 Float64BE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
 )
-Float64LE = struct_field('<d', 'Float64LE')
+Float64LE = single_struct('<d', 'Float64LE')
 Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
@@ -1259,9 +1261,9 @@ class ListField(PacketField):
     for item in value:
       yield item.transcribe()
 
-_multi_struct_fields = {}
+_multi_single_structs = {}
 
-def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
+def multi_single_struct(struct_format, subvalue_names=None, class_name=None):
   ''' A class factory for `PacketField` subclasses built around complex `struct` formats.
 
       See also the convenience class factory `structtuple`
@@ -1276,14 +1278,14 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   '''
   # we memoise the class definitions
   key = (struct_format, subvalue_names, class_name)
-  MultiStructField = _struct_fields.get(key)
+  MultiStructField = _single_structs.get(key)
   if not MultiStructField:
     # new class
     struct = Struct(struct_format)
     if subvalue_names:
       if 'length' in subvalue_names:
         warning(
-            "conflicting field 'length' in multi_struct_field(class_name=%s) subvalue_names %r",
+            "conflicting field 'length' in multi_single_struct(class_name=%s) subvalue_names %r",
             class_name, subvalue_names
         )
       subvalues_type = namedtuple(
@@ -1336,11 +1338,11 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
     MultiStructField.format = struct_format
     if subvalue_names:
       MultiStructField.subvalue_names = subvalue_names
-    _multi_struct_fields[key] = MultiStructField
+    _multi_single_structs[key] = MultiStructField
   return MultiStructField
 
 def structtuple(class_name, struct_format, subvalue_names):
-  ''' Convenience wrapper for `multi_struct_field`.
+  ''' Convenience wrapper for `multi_single_struct`.
 
       Example:
 
@@ -1349,7 +1351,7 @@ def structtuple(class_name, struct_format, subvalue_names):
       which is a record with big-endian unsigned 64 and 32 fields
       named `pts` and `type`.
   '''
-  return multi_struct_field(
+  return multi_single_struct(
       struct_format, subvalue_names=subvalue_names, class_name=class_name
   )
 
@@ -1602,7 +1604,7 @@ class Packet(PacketField):
     assert isinstance(bfr, CornuCopyBuffer
                       ), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if isinstance(factory, str):
-      from_buffer = struct_field(factory, 'struct_field').from_buffer
+      from_buffer = single_struct(factory, 'single_struct').from_buffer
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).from_buffer
     elif isinstance(factory, type):
