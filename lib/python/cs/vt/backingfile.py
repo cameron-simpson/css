@@ -136,7 +136,7 @@ class BaseBackingFile(MutableMapping, MultiOpenMixin):
         Note: if the data are already present, do not append to the file.
     '''
     index = self.index
-    h = self.hashclass(data)
+    h = self.hashclass.from_chunk(data)
     if h not in index:
       data_record = self.data_record_class(data)
       data_record_bs = bytes(data_record)
