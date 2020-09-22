@@ -1130,8 +1130,8 @@ class BSUInt(SingleValueBinary):
       n >>= 7
     return bytes(reversed(bs))
 
-class BSData(PacketField):
-  ''' A run length encoded data chunk, with the length encoded as a BSUInt.
+class BSData(SingleValueBinary):
+  ''' A run length encoded data chunk, with the length encoded as a `BSUInt`.
   '''
 
   TEST_CASES = (
@@ -1139,27 +1139,24 @@ class BSData(PacketField):
       (b'A', b'\x01A'),
   )
 
-  def __init__(self, data, data_offset=None):
-    if data_offset is None:
-      data_offset = len(BSUInt(len(data)))
-    else:
-      assert data_offset == len(BSUInt(len(data)))
-    self.data = data
-    self.data_offset = data_offset
-
-  @classmethod
-  def from_buffer(cls, bfr):
-    offset0 = bfr.offset
-    data_length = BSUInt.value_from_buffer(bfr)
-    data_offset = bfr.offset - offset0
-    data = bfr.take(data_length)
-    return cls(data, data_offset=data_offset)
+  @property
+  def data(self):
+    ''' An alias for the `v.alue` attribute.
+    '''
+    return self.value
 
   @property
-  def value(self):
-    ''' The "value", `self.data`.
+  def data_offset(self):
+    ''' The length of the length indicator,
+        useful for computing the location of the raw data.
     '''
-    return self.data
+    return len(BSUInt(len(self.data)))
+
+  @classmethod
+  def value_from_buffer(cls, bfr):
+    data_length = BSUInt.value_from_buffer(bfr)
+    data = bfr.take(data_length)
+    return cls(data)
 
   def transcribe(self):
     ''' Transcribe the payload length and then the payload.
@@ -1172,7 +1169,7 @@ class BSData(PacketField):
   def data_offset_for(bs):
     ''' Compute the `data_offset` which would obtain for the bytes `bs`.
     '''
-    return len(BSUInt.transcribe_value(len(bs)))
+    return BSData(bs).data_offset
 
 class BSString(PacketField):
   ''' A run length encoded string, with the length encoded as a BSUInt.
