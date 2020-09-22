@@ -30,6 +30,7 @@ from cs.pfx import Pfx, XP, pfx_method
 from cs.result import OnDemandResult
 from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG_MAP
 from .archive import Archive, FilePathArchive
+from .backingfile import VTDStore
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
     parse_store_specs,
@@ -392,6 +393,32 @@ class Config(SingletonMixin):
     if isinstance(raw, str):
       raw = truthy_word(raw)
     return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
+
+  def datafile_Store(
+      self,
+      store_name,
+      clause_name,
+      *,
+      path=None,
+      basedir=None,
+      hashclass=None,
+  ):
+    ''' Construct a VTDStore from a "datafile" clause.
+    '''
+    if basedir is None:
+      basedir = self.get_default('basedir')
+    if path is None:
+      path = clause_name
+    path = longpath(path)
+    if not isabspath(path):
+      if path.startswith('./'):
+        path = abspath(path)
+      else:
+        if basedir is None:
+          raise ValueError('relative path %r but no basedir' % (path,))
+        basedir = longpath(basedir)
+        path = joinpath(basedir, path)
+    return VTDStore(store_name, path, hashclass=hashclass)
 
   def filecache_Store(
       self,
