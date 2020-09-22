@@ -1080,7 +1080,7 @@ Float64LE.TEST_CASES = (
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
 
-class BSUInt(PacketField):
+class BSUInt(SingleValueBinary):
   ''' A binary serialised unsigned int.
 
       This uses a big endian byte encoding where continuation octets
