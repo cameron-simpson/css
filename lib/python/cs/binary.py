@@ -345,6 +345,9 @@ class BinarySingleValue(AbstractBinary):
   def __repr__(self):
     return "%s(%r)" % (type(self).__name__, self.value)
 
+  def __eq__(self, other):
+    return self.value == other.value
+
   @classmethod
   def parse(cls, bfr):
     ''' Parse an instance from `bfr`.
