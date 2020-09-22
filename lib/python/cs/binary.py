@@ -1015,7 +1015,7 @@ def BinarySingleStruct(struct_format, class_name):
       length = struct.size
 
       @classmethod
-      def value_from_buffer(cls, bfr):
+      def parse_value(cls, bfr):
         ''' Parse a value from the bytes `bs` at `offset`, default 0.
             Return a `PacketField` instance and the new offset.
         '''
@@ -1227,7 +1227,7 @@ class BSUInt(BinarySingleValue):
   )
 
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_value(bfr):
     ''' Parse an extensible byte serialised unsigned int from a buffer.
 
         Continuation octets have their high bit set.
@@ -1282,9 +1282,9 @@ class BSData(BinarySingleValue):
   def parse_value(cls, bfr):
     ''' Parse the data from `bfr`.
     '''
-    data_length = BSUInt.value_from_buffer(bfr)
+    data_length = BSUInt.parse_value(bfr)
     data = bfr.take(data_length)
-    return cls(data)
+    return data
 
   @staticmethod
   def transcribe_value(data):
@@ -1313,10 +1313,10 @@ class BSString(BinarySingleValue):
     self.encoding = encoding
 
   @staticmethod
-  def value_from_buffer(bfr, encoding='utf-8', errors='strict'):
+  def parse_value(bfr, encoding='utf-8', errors='strict'):
     ''' Parse a run length encoded string from `bfr`.
     '''
-    strlen = BSUInt.value_from_buffer(bfr)
+    strlen = BSUInt.parse_value(bfr)
     bs = bfr.take(strlen)
     if isinstance(bs, memoryview):
       bs = bs.tobytes()
@@ -1342,7 +1342,7 @@ class BSSFloat(PacketField):
   def value_from_buffer(cls, bfr, **kw):
     ''' Parse a BSSFloat from a buffer and return the float.
     '''
-    s = BSString.value_from_buffer(bfr, **kw)
+    s = BSString.parse_value(bfr, **kw)
     return float(s)
 
   @staticmethod
