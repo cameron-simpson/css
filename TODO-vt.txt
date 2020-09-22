@@ -1,3 +1,4 @@
+HashCode in clude metaclass to autoregister subclasses, and move the registry into the superclass
 hashcodeutils pure mixin, rely on self.hashclass
 drop ALL multihashclass support - everything is given a specific hashclass on instantiation
 big refactor: ALL stores to subclass mappings eg dict or filesdir etc or the Mapping ABC - basicstore etc to become pure mixins, same for indexes
