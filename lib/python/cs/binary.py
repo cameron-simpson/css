@@ -1618,7 +1618,7 @@ class Packet(PacketField):
     assert isinstance(bfr, CornuCopyBuffer
                       ), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if isinstance(factory, str):
-      from_buffer = SingleStructBinary(factory, 'SingleStructBinary').from_buffer
+      from_buffer = SingleStructBinary(factory, 'SingleStructBinary').parse
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).from_buffer
     elif isinstance(factory, type):
