@@ -57,7 +57,7 @@ class BackingFileIndexEntry(PacketField):
     yield BSUInt.transcribe_value(self.length)
 
 # pylint: disable=too-many-ancestors
-class BaseBackingFile(MutableMapping, MultiOpenMixin):
+class BackingFile(MutableMapping, MultiOpenMixin):
   ''' The basics of a data backing file.
 
       These store data chunks persistently
@@ -247,7 +247,7 @@ class RawDataRecord(PacketField):
 def RawBackingFile(path: str, **kw):
   ''' Return a backing file for raw data.
   '''
-  return BaseBackingFile(path, data_record_class=RawDataRecord, **kw)
+  return BackingFile(path, data_record_class=RawDataRecord, **kw)
 
 class CompressibleDataRecord(PacketField):
   ''' A data chunk file record for storage in a `.vtd` file.
@@ -358,7 +358,7 @@ def CompressibleBackingFile(path: str, **kw):
   ''' Return a `BackingFile` for `CompressibleDataRecord`s,
       the format used for `.vtd` files.
   '''
-  return BaseBackingFile(path, data_record_class=CompressibleDataRecord, **kw)
+  return BackingFile(path, data_record_class=CompressibleDataRecord, **kw)
 
 # pylint: disable=too-many-ancestors
 class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
