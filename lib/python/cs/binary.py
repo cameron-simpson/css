@@ -1314,7 +1314,7 @@ class BSString(BinarySingleValue):
     payload = s.encode(encoding)
     return b''.join((BSUInt.transcribe_value(len(payload)), payload))
 
-class BSSFloat(PacketField):
+class BSSFloat(BinarySingleValue):
   ''' A float transcribed as a BSString of str(float).
   '''
 
@@ -1324,10 +1324,10 @@ class BSSFloat(PacketField):
   )
 
   @classmethod
-  def value_from_buffer(cls, bfr, **kw):
+  def parse_value(cls, bfr):
     ''' Parse a BSSFloat from a buffer and return the float.
     '''
-    s = BSString.parse_value(bfr, **kw)
+    s = BSString.parse_value(bfr)
     return float(s)
 
   @staticmethod
