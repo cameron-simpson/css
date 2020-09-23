@@ -989,6 +989,12 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
   '''
   with Pfx("BinaryMultiStruct(%r,%r,%r)", class_name, struct_format,
            field_names):
+    if isinstance(field_names, str):
+      field_names = field_names.split()
+    if not isinstance(field_names, tuple):
+      field_names = tuple(field_names)
+    if len(set(field_names)) != len(field_names):
+      raise ValueError("field names not unique")
     # we memoise the class definitions
     key = (struct_format, field_names, class_name)
     struct_class = _binary_multi_struct_classes.get(key)
