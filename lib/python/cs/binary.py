@@ -772,7 +772,7 @@ def fixed_bytes_field(length, class_name=None):
     '''
 
     @classmethod
-    def value_from_buffer(cls, bfr):
+    def parse_value(cls, bfr):
       ''' Obtain fixed bytes from the buffer.
       '''
       return bfr.take(length)
@@ -1062,24 +1062,22 @@ def BinarySingleStruct(class_name, struct_format):
       for `struct_format`s with a single field.
 
       Parameters:
+      * `class_name`: the class name for the generated class
       * `struct_format`: the struct format string, specifying a
         single struct field
-      * `class_name`: the class name for the generated class
 
       Example:
 
-          >>> UInt16BE = BinarySingleStruct('>H', class_name='UInt16BE')
+          >>> UInt16BE = BinarySingleStruct(class_name='UInt16BE', '>H')
           >>> UInt16BE.__name__
           'UInt16BE'
           >>> UInt16BE.format
           '>H'
           >>> UInt16BE.struct   #doctest: +ELLIPSIS
           <Struct object at ...>
-          >>> field, offset = UInt16BE.from_bytes(bytes((2,3,4)))
+          >>> field = UInt16BE.from_bytes(bytes((2,3)))
           >>> field
           UInt16BE(515)
-          >>> offset
-          2
           >>> field.value
           515
   '''
