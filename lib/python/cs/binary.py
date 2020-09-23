@@ -140,6 +140,7 @@ from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from struct import Struct
 import sys
+from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning
 from cs.pfx import Pfx
@@ -1334,6 +1335,146 @@ class BSSFloat(PacketField):
     ''' Transcribe a float.
     '''
     return BSString.transcribe_value(str(f))
+
+class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
+  ''' The base class underlying classes constructed by `BinaryMultiValue`.
+  '''
+
+  FIELD_ORDER = ()
+  FIELD_PARSERS = {}
+  FIELD_TRANSCRIBERS = {}
+
+  @classmethod
+  def parse(cls, bfr):
+    ''' Default parse: parse each field from the buffer in order.
+    '''
+    fields = {}
+    for field_name in cls.FIELD_ORDER:
+      parse = cls.FIELD_PARSERS[field_name]
+      fields[field_name] = parse(bfr)
+    return cls(**fields)
+
+  def transcribe(self):
+    ''' Default transcribe: yield each field's transcription in order.
+    '''
+    for field_name in self.FIELD_ORDER:
+      field_value = getattr(self, field_name)
+      transcribe = self.FIELD_TRANSCRIBERS[field_name]
+      yield transcribe(field_value)
+
+def BinaryMultiValue(class_name, field_map, field_order=None):
+  ''' Construct an `AbstractBinary` subclass named `class_name`
+      whose fields are specified by the mapping `field_map`.
+
+      The `field_map` is a mapping of field name to buffer parsers and transcribers.
+
+      *Note*:
+      if `field_order` is not specified
+      the default `.parse` and `.transcribe` methods
+      rely on the mapping being ordered,
+      in that iterating over its keys
+      will consider the fields in the correct order.
+
+      For a fixed record structure the defaults will suffice.
+      Subclasses with variable records should override
+      the `.parse` and `.transcribe` methods.
+
+      The `field_map` is a mapping of field name
+      to a specification of the parse and transcribe functions.
+      Each specification may be one of:
+      * an object with `.parse` and `.transcribe` callable attributes,
+        usually a subclass of `AbstractBinary`
+      * a tuple of `(parse,transcribe)`
+
+      Here is an example exhibiting various ways of defining each field:
+      * `n1`: defined with the *`_value` methods of `UInt8`,
+        which return or transcribe the `int` from an unsigned 8 bit value;
+        this stores an `int`
+      * `n2`: defined from the `UInt8` class,
+        which parses an unsigned 8 bit value;
+        this stores an `UInt8` instance
+      * `n3`: defined with the `parse` and `transcribe` methods of `UInt8`,
+        which return or transcribe ` UInt8` instance;
+        this also stores an `UInt8` instance
+      * `data1`: defined with the *`_value` methods of `BSData`,
+        which return or transcribe the data `bytes`
+        from a run length encoded data chunk;
+        this stores the `bytes` value
+      * `data2`: defined from the `BSData` class
+        which parses a run length encoded data chunk;
+        this stores a `BSData` instance
+
+          >>> BMV = BinaryMultiValue("BMV", {
+          ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
+          ...         'n2': UInt8,
+          ...         'n3': (UInt8.parse, UInt8.transcribe),
+          ...         'data1': (
+          ...             BSData.parse_value,
+          ...             BSData.transcribe_value,
+          ...         ),
+          ...         'data2': BSData,
+          ... })
+          >>> BMV.FIELD_ORDER
+          ('n1', 'n2', 'n3', 'data1', 'data2')
+          >>> bmv = BMV.from_bytes(b'\x11\x22\x77\x02AB\x04DEFG')
+          >>> bmv
+          BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119))
+          >>> bmv.n1
+          17
+          >>> bmv.n2
+          UInt8(value=34)
+          >>> bmv.n3
+          UInt8(value=119)
+          >>> bmv.data1
+          b'AB'
+          >>> bmv.data2
+          BSData(b'DEFG')
+          >>> bytes(bmv)
+          b'\\x11"w\\x02AB\\x04DEFG'
+          >>> list(bmv.transcribe_flat())
+          [b'\\x11', b'"', b'w', b'\\x02', b'AB', b'\\x04', b'DEFG']
+  '''
+  with Pfx("BinaryMultiValue(%r,...)", class_name):
+    if not field_order:
+      field_order = tuple(field_map)
+      if (sys.version_info.major, sys.version_info.minor) < (3, 6):
+        warning(
+            "Python version %s < 3.6: dicts are not ordered,"
+            " and the inferred field order may not be correct: %r",
+            sys.version, field_order
+        )
+    else:
+      field_order = tuple(
+          field_order.split() if isinstance(field_order, str) else field_order
+      )
+    if not field_order:
+      raise ValueError("empty field order: %r" % (field_order,))
+
+    class bmv_class(BaseBinaryMultiValue):
+      ''' `BaseBinaryMultiValue` subclass implementation.
+      '''
+
+      FIELD_ORDER = field_order
+      FIELD_PARSERS = {}
+      FIELD_TRANSCRIBERS = {}
+
+      for field_name in field_order:
+        pt = field_map[field_name]
+        try:
+          func_parse = pt.parse
+          func_transcribe = pt.transcribe
+        except AttributeError:
+          func_parse, func_transcribe = pt
+        FIELD_PARSERS[field_name] = func_parse
+        FIELD_TRANSCRIBERS[field_name] = func_transcribe
+
+    bmv_class.__name__ = class_name
+    bmv_class.__doc__ = (
+        ''' An `AbstractBinary` `SimpleNamespace` which parses and transcribes
+            the the fields `%r`.
+        ''' % (field_order,)
+    )
+    return bmv_class
 
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
