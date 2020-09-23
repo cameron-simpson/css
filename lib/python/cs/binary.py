@@ -1069,7 +1069,7 @@ def BinarySingleStruct(class_name, struct_format):
 
       Example:
 
-          >>> UInt16BE = BinarySingleStruct(class_name='UInt16BE', '>H')
+          >>> UInt16BE = BinarySingleStruct('UInt16BE', '>H')
           >>> UInt16BE.__name__
           'UInt16BE'
           >>> UInt16BE.format
@@ -1078,7 +1078,7 @@ def BinarySingleStruct(class_name, struct_format):
           <Struct object at ...>
           >>> field = UInt16BE.from_bytes(bytes((2,3)))
           >>> field
-          UInt16BE(515)
+          UInt16BE(value=515)
           >>> field.value
           515
   '''
