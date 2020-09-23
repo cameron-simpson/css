@@ -1388,7 +1388,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   '''
   # we memoise the class definitions
   key = (struct_format, subvalue_names, class_name)
-  MultiStructField = _BinarySingleStructs.get(key)
+  MultiStructField = _multi_struct_fields.get(key)
   if not MultiStructField:
     # new class
     struct = Struct(struct_format)
