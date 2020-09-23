@@ -203,7 +203,7 @@ class BinaryMixin:
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input,
         yielding `(offset,instance,post_offset)` tuples
-        where `offset` if the buffer offset where the instance commenced
+        where `offset` is the buffer offset where the instance commenced
         and `post_offset` is the buffer offset after the instance.
     '''
     offset = bfr.offset
@@ -318,14 +318,33 @@ class AbstractBinary(ABC, BinaryMixin):
 
   @abstractclassmethod
   def parse(cls, bfr):
-    ''' Parse an instance of `cls` from the buffrr `bfr`.
+    ''' Parse an instance of `cls` from the buffer `bfr`.
     '''
     raise NotImplementedError("parse")
 
   @abstractmethod
   def transcribe(self):
-    ''' Return or yield `bytes`, `None` or iterables
+    ''' Return or yield `bytes`, ASCII string, `None` or iterables
         comprising the binary form of this instance.
+
+        This aims for maximum convenience
+        when transcribing a data structure.
+
+        This may be implemented as a generator, yielding parts of the structure.
+
+        This may be implemented as a normal function, returning:
+        * `None`: no bytes of data,
+          for example for an omitted or empty structure
+        * a `bytes`-like object: the full data bytes for the structure
+        * an ASCII compatible string:
+          this will be encoded with the `'ascii'` encoding to make `bytes`
+        * an iterable:
+          the components of the structure,
+          including substranscriptions which themselves
+          adhere to this protocol - they may be `None`, `bytes`-like objects,
+          ASCII compatible strings or iterables.
+          This supports directly returning or yielding the result of a field's
+          `.transcribe` method.
     '''
     raise NotImplementedError("transcribe")
 
@@ -1252,7 +1271,7 @@ class BSData(BinarySingleValue):
 
   @property
   def data(self):
-    ''' An alias for the `v.alue` attribute.
+    ''' An alias for the `.value` attribute.
     '''
     return self.value
 
@@ -1363,21 +1382,24 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
       yield transcribe(field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
-  ''' Construct an `AbstractBinary` subclass named `class_name`
+  ''' Construct an `AbstractBinary` `SimpleNamespace` subclass named `class_name`
       whose fields are specified by the mapping `field_map`.
 
       The `field_map` is a mapping of field name to buffer parsers and transcribers.
 
       *Note*:
       if `field_order` is not specified
-      the default `.parse` and `.transcribe` methods
-      rely on the mapping being ordered,
-      in that iterating over its keys
-      will consider the fields in the correct order.
+      it is constructed by iterating over `field_map`.
+      Prior to Python 3.6, `dict`s do not provide a reliable order
+      and should be accompanied by an explicit `field_order`.
+      From 4.6 onward a `dict` is enough and its insertion order
+      will dicate the default `field_order`.
 
-      For a fixed record structure the defaults will suffice.
+      For a fixed record structure
+      the default `.parse` and `.transcribe` methods will suffice.
       Subclasses with variable records should override
-      the `.parse` and `.transcribe` methods.
+      the `.parse` and `.transcribe` methods
+      accordingly.
 
       The `field_map` is a mapping of field name
       to a specification of the parse and transcribe functions.
