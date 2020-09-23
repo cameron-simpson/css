@@ -1717,6 +1717,9 @@ class Packet(PacketField):
       from_buffer = BinarySingleStruct('BinarySingleStruct', factory).parse
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).parse
+    elif issubclass(factory, AbstractBinary):
+      X("from_buffer = %s.parse", factory)
+      from_buffer = factory.parse
     elif isinstance(factory, type):
       from_buffer = factory.from_buffer
     else:
