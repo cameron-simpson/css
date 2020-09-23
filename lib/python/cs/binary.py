@@ -976,10 +976,84 @@ class BytesRunField(PacketField):
     if length > 0:
       yield bs256[:length]
 
-_BinarySingleStructs = {}
+_binary_multi_struct_classes = {}
+
+def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
+  ''' A class factory for `AbstractBinary` `namedtuple` subclasses
+      built around complex `struct` formats.
+
+      Parameters:
+      * `class_name`: name for the generated class
+      * `struct_format`: the `struct` format string
+      * `field_names`: field name list
+  '''
+  with Pfx("BinaryMultiStruct(%r,%r,%r)", class_name, struct_format,
+           field_names):
+    # we memoise the class definitions
+    key = (struct_format, field_names, class_name)
+    struct_class = _binary_multi_struct_classes.get(key)
+    if struct_class:
+      return struct_class
+    # construct new class
+    struct = Struct(struct_format)
+    for field_name in field_names:
+      with Pfx(field_name):
+        if (field_name in ('length', 'struct', 'format')
+            or hasattr(AbstractBinary, field_name)):
+          raise ValueError(
+              "field name conflicts with AbstractBinary.%s" % (field_name,)
+          )
+    tuple_type = namedtuple(class_name or "StructSubValues", field_names)
+
+    # pylint: disable=function-redefined
+    class struct_class(tuple_type, AbstractBinary):
+      ''' A struct field for a complex struct format.
+      '''
+
+      @classmethod
+      def parse(cls, bfr):
+        ''' Parse from `bfr` via `struct.unpack`.
+        '''
+        bs = bfr.take(struct.size)
+        values = struct.unpack(bs)
+        return cls(*values)
+
+      def transcribe(self):
+        ''' Transcribe via `struct.pack`.
+        '''
+        return struct.pack(*self)
+
+      if len(field_names) == 1:
+
+        @classmethod
+        def parse_value(cls, bfr):
+          ''' Parse a value from `bfr`, return the value.
+          '''
+          bs = bfr.take(struct.size)
+          value, = struct.unpack(bs)
+          return value
+
+        @staticmethod
+        def transcribe_value(value):
+          ''' Transcribe a value back into bytes.
+          '''
+          return struct.pack(value)
+
+    struct_class.__name__ = class_name
+    struct_class.__doc__ = (
+        ''' An `AbstractBinary` `namedtuple` which parses and transcribes
+            the struct format `%r` and presents the attributes %r.
+        ''' % (struct_format, field_names)
+    )
+    struct_class.struct = struct
+    struct_class.format = struct_format
+    struct_class.length = struct.size
+    _binary_multi_struct_classes[key] = struct_class
+    return struct_class
 
 def BinarySingleStruct(class_name, struct_format):
-  ''' Factory for `BinarySingleValue` subclasses built around a single struct format.
+  ''' A convenience wrapper for `BinaryMultiStruct`
+      for `struct_format`s with a single field.
 
       Parameters:
       * `struct_format`: the struct format string, specifying a
@@ -1003,41 +1077,7 @@ def BinarySingleStruct(class_name, struct_format):
           >>> field.value
           515
   '''
-  key = (struct_format, class_name)
-  StructField = _BinarySingleStructs.get(key)
-  if not StructField:
-    struct = Struct(struct_format)
-
-    class StructField(BinarySingleValue):
-      ''' A `PacketField` subclass using a `struct.Struct` for parse and transcribe.
-      '''
-
-      length = struct.size
-
-      @classmethod
-      def parse_value(cls, bfr):
-        ''' Parse a value from the bytes `bs` at `offset`, default 0.
-            Return a `PacketField` instance and the new offset.
-        '''
-        bs = bfr.take(struct.size)
-        value, = struct.unpack(bs)
-        return value
-
-      @staticmethod
-      def transcribe_value(value):
-        ''' Transcribe a value back into bytes.
-        '''
-        return struct.pack(value)
-
-    StructField.__name__ = class_name
-    StructField.__doc__ = (
-        'A `PacketField` which parses and transcribes the struct format `%r`.'
-        % (struct_format,)
-    )
-    StructField.struct = struct
-    StructField.format = struct_format
-    _BinarySingleStructs[key] = StructField
-  return StructField
+  return BinaryMultiStruct(class_name, struct_format, 'value')
 
 # various common values
 UInt8 = BinarySingleStruct('UInt8', 'B')
@@ -1147,66 +1187,6 @@ Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
 )
-
-_binary_multi_struct_classes = {}
-
-def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
-  ''' A class factory for `AbstractBinary` `namedtuple` subclasses
-      built around complex `struct` formats.
-
-      Parameters:
-      * `class_name`: name for the generated class
-      * `struct_format`: the `struct` format string
-      * `field_names`: field name list
-  '''
-  with Pfx("BinaryMultiStruct(%r,%r,%r)", class_name, struct_format,
-           field_names):
-    # we memoise the class definitions
-    key = (struct_format, field_names, class_name)
-    struct_class = _binary_multi_struct_classes.get(key)
-    if struct_class:
-      return struct_class
-    # construct new class
-    struct = Struct(struct_format)
-    for field_name in field_names:
-      with Pfx(field_name):
-        if (field_name in ('length', 'struct', 'format')
-            or hasattr(AbstractBinary, field_name)):
-          raise ValueError(
-              "field name conflicts with AbstractBinary.%s" % (field_name,)
-          )
-    tuple_type = namedtuple(class_name or "StructSubValues", field_names)
-
-    # pylint: disable=function-redefined
-    class struct_class(tuple_type, AbstractBinary):
-      ''' A struct field for a complex struct format.
-      '''
-
-      @classmethod
-      def parse(cls, bfr):
-        ''' Parse from `bfr` via `struct.unpack`.
-        '''
-        bs = bfr.take(struct.size)
-        values = struct.unpack(bs)
-        return cls(*values)
-
-      def transcribe(self):
-        ''' Transcribe via `struct.pack`.
-        '''
-        return struct.pack(*self)
-
-      struct_class.__name__ = class_name
-      struct_class.__doc__ = (
-          ''' An `AbstractBinary` `namedtuple` which parses and transcribes
-              the struct format `%r` and presents the attributes %r.
-          ''' % (struct_format, field_names)
-      )
-
-    struct_class.struct = struct
-    struct_class.format = struct_format
-    struct_class.length = struct.size
-    _binary_multi_struct_classes[key] = struct_class
-    return struct_class
 
 class BSUInt(BinarySingleValue):
   ''' A binary serialised unsigned int.
