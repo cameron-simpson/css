@@ -978,7 +978,7 @@ class BytesRunField(PacketField):
 
 _BinarySingleStructs = {}
 
-def BinarySingleStruct(struct_format, class_name):
+def BinarySingleStruct(class_name, struct_format):
   ''' Factory for `BinarySingleValue` subclasses built around a single struct format.
 
       Parameters:
@@ -1040,12 +1040,12 @@ def BinarySingleStruct(struct_format, class_name):
   return StructField
 
 # various common values
-UInt8 = BinarySingleStruct('B', 'UInt8')
+UInt8 = BinarySingleStruct('UInt8', 'B')
 UInt8.TEST_CASES = (
     (0, b'\0'),
     (65, b'A'),
 )
-Int16BE = BinarySingleStruct('>h', 'Int16BE')
+Int16BE = BinarySingleStruct('Int16BE', '>h')
 Int16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1053,7 +1053,7 @@ Int16BE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x80\x00'),
 )
-Int16LE = BinarySingleStruct('<h', 'Int16LE')
+Int16LE = BinarySingleStruct('Int16LE', '<h')
 Int16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1061,7 +1061,7 @@ Int16LE.TEST_CASES = (
     (-1, b'\xff\xff'),
     (-32768, b'\x00\x80'),
 )
-Int32BE = BinarySingleStruct('>l', 'Int32BE')
+Int32BE = BinarySingleStruct('Int32BE', '>l')
 Int32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1069,7 +1069,7 @@ Int32BE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x80\x00\x00\x00'),
 )
-Int32LE = BinarySingleStruct('<l', 'Int32LE')
+Int32LE = BinarySingleStruct('Int32LE', '<l')
 Int32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1077,7 +1077,7 @@ Int32LE.TEST_CASES = (
     (-1, b'\xff\xff\xff\xff'),
     (-2147483648, b'\x00\x00\x00\x80'),
 )
-UInt16BE = BinarySingleStruct('>H', 'UInt16BE')
+UInt16BE = BinarySingleStruct('UInt16BE', '>H')
 UInt16BE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\0\1'),
@@ -1085,7 +1085,7 @@ UInt16BE.TEST_CASES = (
     (32768, b'\x80\x00'),
     (65535, b'\xff\xff'),
 )
-UInt16LE = BinarySingleStruct('<H', 'UInt16LE')
+UInt16LE = BinarySingleStruct('UInt16LE', '<H')
 UInt16LE.TEST_CASES = (
     (0, b'\0\0'),
     (1, b'\1\0'),
@@ -1093,7 +1093,7 @@ UInt16LE.TEST_CASES = (
     (32768, b'\x00\x80'),
     (65535, b'\xff\xff'),
 )
-UInt32BE = BinarySingleStruct('>L', 'UInt32BE')
+UInt32BE = BinarySingleStruct('UInt32BE', '>L')
 UInt32BE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\0\0\0\1'),
@@ -1102,7 +1102,7 @@ UInt32BE.TEST_CASES = (
     (4294967294, b'\xff\xff\xff\xfe'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt32LE = BinarySingleStruct('<L', 'UInt32LE')
+UInt32LE = BinarySingleStruct('UInt32LE', '<L')
 UInt32LE.TEST_CASES = (
     (0, b'\0\0\0\0'),
     (1, b'\1\0\0\0'),
@@ -1111,7 +1111,7 @@ UInt32LE.TEST_CASES = (
     (4294967294, b'\xfe\xff\xff\xff'),
     (4294967295, b'\xff\xff\xff\xff'),
 )
-UInt64BE = BinarySingleStruct('>Q', 'UInt64BE')
+UInt64BE = BinarySingleStruct('UInt64BE', '>Q')
 UInt64BE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\0\0\0\0\0\0\0\1'),
@@ -1124,7 +1124,7 @@ UInt64BE.TEST_CASES = (
     (18446744073709551614, b'\xff\xff\xff\xff\xff\xff\xff\xfe'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-UInt64LE = BinarySingleStruct('<Q', 'UInt64LE')
+UInt64LE = BinarySingleStruct('UInt64LE', '<Q')
 UInt64LE.TEST_CASES = (
     (0, b'\0\0\0\0\0\0\0\0'),
     (1, b'\1\0\0\0\0\0\0\0'),
@@ -1137,12 +1137,12 @@ UInt64LE.TEST_CASES = (
     (18446744073709551614, b'\xfe\xff\xff\xff\xff\xff\xff\xff'),
     (18446744073709551615, b'\xff\xff\xff\xff\xff\xff\xff\xff'),
 )
-Float64BE = BinarySingleStruct('>d', 'Float64BE')
+Float64BE = BinarySingleStruct('Float64BE', '>d')
 Float64BE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'?\xf0\x00\x00\x00\x00\x00\x00'),
 )
-Float64LE = BinarySingleStruct('<d', 'Float64LE')
+Float64LE = BinarySingleStruct('Float64LE', '<d')
 Float64LE.TEST_CASES = (
     (0.0, b'\0\0\0\0\0\0\0\0'),
     (1.0, b'\x00\x00\x00\x00\x00\x00\xf0?'),
@@ -1730,7 +1730,7 @@ class Packet(PacketField):
     assert isinstance(bfr, CornuCopyBuffer
                       ), "bfr not a CornuCopyBuffer: %r" % (bfr,)
     if isinstance(factory, str):
-      from_buffer = BinarySingleStruct(factory, 'BinarySingleStruct').parse
+      from_buffer = BinarySingleStruct('BinarySingleStruct', factory).parse
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).parse
     elif isinstance(factory, type):
