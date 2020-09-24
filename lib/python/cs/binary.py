@@ -1406,6 +1406,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       Each specification may be one of:
       * an object with `.parse` and `.transcribe` callable attributes,
         usually a subclass of `AbstractBinary`
+      * a 2-tuple of `(struct_format,field_names)`
       * a tuple of `(parse,transcribe)`
 
       Here is an example exhibiting various ways of defining each field:
@@ -1430,6 +1431,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
           ...         'n2': UInt8,
           ...         'n3': (UInt8.parse, UInt8.transcribe),
+          ...         'nd': ('>H4s', 'short bs'),
           ...         'data1': (
           ...             BSData.parse_value,
           ...             BSData.transcribe_value,
@@ -1437,24 +1439,30 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...         'data2': BSData,
           ... })
           >>> BMV.FIELD_ORDER
-          ('n1', 'n2', 'n3', 'data1', 'data2')
-          >>> bmv = BMV.from_bytes(b'\x11\x22\x77\x02AB\x04DEFG')
+          ('n1', 'n2', 'n3', 'nd', 'data1', 'data2')
+          >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
           >>> bmv
-          BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119))
+          BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'))
           >>> bmv.n1
           17
           >>> bmv.n2
           UInt8(value=34)
           >>> bmv.n3
           UInt8(value=119)
+          >>> bmv.nd
+          nd(short=33154, bs=b'zyxw')
+          >>> bmv.nd.bs
+          b'zyxw'
+          >>> bytes(bmv.nd)
+          b'\x81\x82zyxw'
           >>> bmv.data1
           b'AB'
           >>> bmv.data2
           BSData(b'DEFG')
           >>> bytes(bmv)
-          b'\\x11"w\\x02AB\\x04DEFG'
+          b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
           >>> list(bmv.transcribe_flat())
-          [b'\\x11', b'"', b'w', b'\\x02', b'AB', b'\\x04', b'DEFG']
+          [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
   '''
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if not field_order:
@@ -1486,7 +1494,20 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           func_parse = pt.parse
           func_transcribe = pt.transcribe
         except AttributeError:
-          func_parse, func_transcribe = pt
+          if isinstance(pt[0], str) and isinstance(pt[1], str):
+            struct_format, struct_field_names = pt
+            X(
+                "struct_format=%r, struct_field_names=%r", struct_format,
+                struct_field_names
+            )
+            bms = BinaryMultiStruct(
+                field_name, struct_format, struct_field_names
+            )
+            X("bms=%s", bms)
+            func_parse = bms.parse
+            func_transcribe = bms.transcribe
+          else:
+            func_parse, func_transcribe = pt
         FIELD_PARSERS[field_name] = func_parse
         FIELD_TRANSCRIBERS[field_name] = func_transcribe
 
