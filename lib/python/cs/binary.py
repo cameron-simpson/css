@@ -25,14 +25,39 @@
       but in principle also things like `bytearray`.
 
     Note: this module requires Python 3 and recommends Python 3.6+
-    because it uses `abc.ABC`, because a Python 2 bytes object is too
-    weak (just a `str`) as also is my `cs.py3.bytes` hack class and
-    because the keyword based `Packet` initiialisation benefits from
-    keyword argument ordering.
+    because having a predictable order on `dict`s is very useful.
 
-    The functions and classes in this module include the following:
+    Deprecation: the `Packet` and `PacketField` classes were unnecessarily hard to use
+    and are deprecated in favour of the `Binary`* suite of classes and factories.
 
-    The two base classes for binary data:
+    There are 4 main classes on which an implementor should base their data structures:
+    * `BinarySingleStruct`: a factory for classes based
+      on a `struct.struct` format string with a single value;
+      this builds a `namedtuple` subclass
+    * `BinaryMultiStruct`: a factory for classes based
+      on a `struct.struct` format string with multiple values;
+      this also builds a `namedtuple` subclass
+    * `BinarySingleValue`: a base class for subclasses
+      parsing and transcribing a single value
+    * `BinaryMultiValue`: a base class for subclasses
+      parsing and transcribing a multiple values
+
+    All the classes derived from the above inherit all the methods
+    of `BinaryMixin`.
+    Amongst other things, this means that the binary transcription
+    can be had simply from `bytes(instance)`,
+    although there are more transcription methods provided
+    when greater flexibility is desired.
+    It also means that all classes have `parse`* methods
+    for parsing binary data streams.
+    You can also instantiate objects directly;
+    there's no requirement for the source information to be binary.
+
+    There are several presupplied subclasses for common basic types
+    such as `UInt32BE` (an unsigned 32 bit big endian integer).
+
+    == Deprecated Interfaces ==
+
     * `PacketField`: an abstract class for a binary field, with a
       factory method to parse it, a transcription method to transcribe
       it back out in binary form and usually a `.value` attribute
@@ -41,9 +66,6 @@
       `PacketField`s into a larger structure with ordered named
       fields.
       The fields themselves may be `Packet`s for complex structures.
-
-    There are several presupplied subclasses for common basic types
-    such as `UInt32BE` (an unsigned 32 bit big endian integer).
 
     Classes built from `struct` format strings:
     * `structtuple`: a factory for `PacketField` subclasses
