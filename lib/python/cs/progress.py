@@ -63,6 +63,7 @@ class BaseProgress(object):
     self.name = name
     self.start_time = start_time
     self.units_scale = units_scale
+    self._warned = set()
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -174,10 +175,12 @@ class BaseProgress(object):
       return None
     remaining = total - self.position
     if remaining < 0:
-      warning(
-          "%s.remaining_time: self.position(%s) > self.total(%s)", self,
-          self.position, self.total
-      )
+      if "position>total" not in self._warned:
+        self._warned.add("position>total")
+        warning(
+            "%s.remaining_time: self.position(%s) > self.total(%s)", self,
+            self.position, self.total
+        )
       return None
     throughput = self.throughput
     if throughput is None or throughput == 0:
