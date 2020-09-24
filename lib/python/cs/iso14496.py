@@ -39,8 +39,7 @@ from cs.binary import (
     BytesRunField,
     EmptyField,
     EmptyPacketField,
-    multi_struct_field,
-    structtuple,
+    BinaryMultiStruct,
     deferred_field,
 )
 from cs.buffer import CornuCopyBuffer
@@ -363,6 +362,10 @@ def deref_box(B, path):
           raise IndexError("no match")
         B = nextB
     return B
+
+Matrix9Long = BinaryMultiStruct(
+    'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
+)
 
 class UTF8or16Field(PacketField):
   ''' An ISO14496 UTF8 or UTF16 encoded string.
@@ -1260,7 +1263,7 @@ class PDINBoxBody(FullBoxBody):
   )
 
   # field names for the tuples in a PDINBoxBody
-  PDInfo = structtuple('PDInfo', '>LL', 'rate initial_delay')
+  PDInfo = BinaryMultiStruct('PDInfo', '>LL', 'rate initial_delay')
 
   def parse_buffer(self, bfr, **kw):
     ''' Gather the (rate, initial_delay) pairs of the data section as the `pdinfo` field.
@@ -1345,7 +1348,7 @@ class MVHDBoxBody(FullBoxBody):
     self.add_from_buffer('rate_long', bfr, Int32BE)
     self.add_from_buffer('volume_short', bfr, Int16BE)
     self.add_from_buffer('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
-    self.add_from_buffer('matrix', bfr, multi_struct_field('>lllllllll'))
+    self.add_from_buffer('matrix', bfr, Matrix9Long),
     self.add_from_buffer('predefined1', bfr, 24)  # 6x4 predefined
     self.add_from_buffer('next_track_id', bfr, UInt32BE)
 
@@ -1370,7 +1373,10 @@ add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 class TKHDBoxBody(FullBoxBody):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
-  TKHDMatrix = multi_struct_field('>lllllllll', class_name='TKHDMatrix')
+
+  TKHDMatrix = BinaryMultiStruct(
+      'TKHDMatrix', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
+  )
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
@@ -1701,10 +1707,10 @@ def add_generic_sample_boxbody(
     struct_format_v1 = struct_format_v0
   class_name = box_type.decode('ascii').upper() + 'BoxBody'
   sample_class_name = class_name + 'Sample'
-  sample_type_v0 = structtuple(
+  sample_type_v0 = BinaryMultiStruct(
       sample_class_name + 'V0', struct_format_v0, sample_fields
   )
-  sample_type_v1 = structtuple(
+  sample_type_v1 = BinaryMultiStruct(
       sample_class_name + 'V1', struct_format_v1, sample_fields
   )
 
@@ -1794,6 +1800,18 @@ class CSLGBoxBody(FullBoxBody):
   ''' A 'cslg' Composition to Decode box - section 8.6.1.4.
   '''
 
+  CSLG_PARAM_NAMES = (
+      'compositionToDTSShift', 'leastDecodeToDisplayDelta',
+      'greatestDecodeToDisplayDelta', 'compositionStartTime',
+      'compositionEndTime'
+  )
+  CSLGParamsLong = BinaryMultiStruct(
+      'CSLGParamsLong', '>lllll', CSLG_PARAM_NAMES
+  )
+  CSLGParamsQuad = BinaryMultiStruct(
+      'CSLGParamsLong', '>qqqqq', CSLG_PARAM_NAMES
+  )
+
   def parse_buffer(self, bfr, **kw):
     ''' Gather the compositionToDTSShift`, `leastDecodeToDisplayDelta`,
         `greatestDecodeToDisplayDelta`, `compositionStartTime` and
@@ -1801,52 +1819,21 @@ class CSLGBoxBody(FullBoxBody):
     '''
     super().parse_buffer(bfr, **kw)
     if self.version == 0:
-      struct_format = '>lllll'
+      param_type = self.CSLGParamsLong
     elif self.version == 1:
-      struct_format = '>qqqqq'
+      param_type = self.CSLGParamsQuad
     else:
       warning("unsupported version %d, treating like version 1")
-      struct_format = '>qqqqq'
-    self.add_field(
-        'fields',
-        multi_struct_field(
-            struct_format, (
-                'compositionToDTSShift', 'leastDecodeToDisplayDelta',
-                'greatestDecodeToDisplayDelta', 'compositionStartTime',
-                'compositionEndTime'
-            )
-        )
-    )
+      param_type = self.CSLGParamsQuad
+    self.add_field('params', param_type)
 
-  @property
-  def compositionToDTSShift(self):
-    ''' Obtain the composition to DTSS shift.
+  def __getattr__(self, attr):
+    ''' Present the `params` attributes at the top level.
     '''
-    return self.fields.compositionToDTSShift
-
-  @property
-  def leastDecodeToDisplayDelta(self):
-    ''' Obtain the least decode to display delta.
-    '''
-    return self.fields.leastDecodeToDisplayDelta
-
-  @property
-  def greatestDecodeToDisplayDelta(self):
-    ''' Obtain the greatest decode to display delta.
-    '''
-    return self.fields.greatestDecodeToDisplayDelta
-
-  @property
-  def compositionStartTime(self):
-    ''' Obtain the composition start time.
-    '''
-    return self.fields.compositionStartTime
-
-  @property
-  def compositionEndTime(self):
-    ''' Obtain the composition end time.
-    '''
-    return self.fields.compositionEndTime
+    try:
+      return getattr(self.params, attr)
+    except AttributeError:
+      return super().__getattr__(attr)
 
 add_body_class(CSLGBoxBody)
 
@@ -1976,7 +1963,7 @@ class STSCBoxBody(FullBoxBody):
       ##entries=ListField,
   )
 
-  STSCEntry = structtuple(
+  STSCEntry = BinaryMultiStruct(
       'STSCEntry', '>LLL',
       'first_chunk samples_per_chunk sample_description_index'
   )
@@ -2447,7 +2434,7 @@ class VMHDBoxBody(FullBoxBody):
   ''' A 'vmhd' Video Media Headerbox - section 12.1.2.
   '''
 
-  OpColor = multi_struct_field('>HHH', class_name='OpColor')
+  OpColor = BinaryMultiStruct('OpColor', '>HHH', 'red green blue')
 
   PACKET_FIELDS = dict(
       FullBoxBody.PACKET_FIELDS,
