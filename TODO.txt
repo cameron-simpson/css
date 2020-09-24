@@ -1,3 +1,4 @@
+cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
 cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
 a facility to do things just once, particularly warnings - then port cs.progress to it
 use common_prefix in cs.upd for line change comparison?
