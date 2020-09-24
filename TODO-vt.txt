@@ -1,3 +1,4 @@
+is PEP590 - vector call - applicable to _scan.c?
 HashCode in clude metaclass to autoregister subclasses, and move the registry into the superclass
 hashcodeutils pure mixin, rely on self.hashclass
 drop ALL multihashclass support - everything is given a specific hashclass on instantiation
