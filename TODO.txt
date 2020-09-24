@@ -1,3 +1,4 @@
+cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
 a facility to do things just once, particularly warnings - then port cs.progress to it
 use common_prefix in cs.upd for line change comparison?
 use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
