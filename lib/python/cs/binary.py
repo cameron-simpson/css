@@ -47,7 +47,7 @@
     Amongst other things, this means that the binary transcription
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
-    when greater flexibility is desired.
+    for when greater flexibility is desired.
     It also means that all classes have `parse`* methods
     for parsing binary data streams.
     You can also instantiate objects directly;
