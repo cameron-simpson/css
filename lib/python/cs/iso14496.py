@@ -1120,6 +1120,12 @@ class OverBox(Packet):
         return boxes
     return super().__getattr__(attr)
 
+  @property
+  def length(self):
+    ''' The `OverBox` is as long as the subsidary Boxes.
+    '''
+    return sum(map(len, self.boxes))
+
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, **kw):
     ''' Parse all the Boxes from the input `bfr`.
