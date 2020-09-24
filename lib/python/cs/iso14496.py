@@ -1171,10 +1171,10 @@ class FullBoxBody(BoxBody):
 
   def parse_buffer(self, bfr, **kw):
     super().parse_buffer(bfr, **kw)
-    self.add_field('version', UInt8.from_buffer(bfr))
-    self.add_field('flags0', UInt8.from_buffer(bfr))
-    self.add_field('flags1', UInt8.from_buffer(bfr))
-    self.add_field('flags2', UInt8.from_buffer(bfr))
+    self.add_field('version', UInt8.parse(bfr))
+    self.add_field('flags0', UInt8.parse(bfr))
+    self.add_field('flags1', UInt8.parse(bfr))
+    self.add_field('flags2', UInt8.parse(bfr))
 
   @property
   def flags(self):
@@ -2191,14 +2191,14 @@ class ILSTBoxBody(ContainerBoxBody):
     '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
-    )(attribute_name, UInt32BE.value_from_buffer, UInt32BE.transcribe_value)
+    )(attribute_name, UInt32BE.parse_value, UInt32BE.transcribe_value)
 
   def ILSTUInt8Schema(attribute_name):
     ''' Namedtuple type for ILST UInt8BE schema.
     '''
     return namedtuple(
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
-    )(attribute_name, UInt8.value_from_buffer, UInt8.transcribe_value)
+    )(attribute_name, UInt8.parse_value, UInt8.transcribe_value)
 
   def ILSTAofBSchema(attribute_name):
     ''' Namedtuple type for ILST "A of B" schema.
@@ -2207,7 +2207,7 @@ class ILSTBoxBody(ContainerBoxBody):
         'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
     )(
         attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
-        (UInt32BE.value_from_buffer(bfr), UInt32BE.value_from_buffer(bfr)),
+        (UInt32BE.parse_value(bfr), UInt32BE.parse_value(bfr)),
         lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE
         .transcribe_value(member_n_of.total)
     )
