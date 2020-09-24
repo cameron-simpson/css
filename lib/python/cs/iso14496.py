@@ -1377,7 +1377,7 @@ add_body_class(MVHDBoxBody)
 add_body_subclass(ContainerBoxBody, 'trak', '8.3.1', 'Track')
 
 class TKHDBoxBody(FullBoxBody):
-  ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
+  ''' A 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
   TKHDMatrix = BinaryMultiStruct(
