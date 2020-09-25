@@ -304,34 +304,6 @@ class BinaryMixin:
       )
     return instance
 
-  @classmethod
-  def parse_file(cls, f, **kw):
-    ''' Factory to parse an instance from the binary file `f`.
-        Returns the new instance.
-
-        Raises `EOFError` if `f` has insufficient data.
-
-        This relies on the `cls.parse` method for the parse.
-    '''
-    bfr = CornuCopyBuffer.from_file(f, **kw)
-    return cls.parse(bfr)
-
-  @classmethod
-  def from_file(cls, f, **kw):
-    ''' Factory to parse an instance from the binary file `f`.
-        Returns the new instance.
-
-        Raises `ValueError` if `f` is not entirely consumed.
-        Raises `EOFError` if `f` has insufficient data.
-
-        This relies on the `cls.parse` method for the parse.
-    '''
-    bfr = CornuCopyBuffer.from_file(f, **kw)
-    instance = cls.parse(bfr)
-    if not bfr.at_eof():
-      raise ValueError("unparsed data at offset %d" % (bfr.offset,))
-    return instance
-
 class AbstractBinary(ABC, BinaryMixin):
   ''' Abstract class for all `Binary`* implementations,
       specifying the `parse` and `transcribe` methods
