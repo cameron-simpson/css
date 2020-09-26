@@ -4,15 +4,7 @@
 '''
 
 from contextlib import contextmanager
-try:
-  from contextlib import nullcontext
-except ImportError:
-
-  @contextmanager
-  def nullcontext():
-    ''' A simple `nullcontext` for older Pythons
-    '''
-    yield None
+import threading
 
 __version__ = '20200725.1-post'
 
@@ -133,6 +125,56 @@ def stackattrs(o, **attr_values):
     yield old_values
   finally:
     popattrs(o, attr_values.keys(), old_values)
+
+class StackableState(threading.local):
+  ''' An object which can be called as a context manager
+      to push changes to its attributes.
+
+      Example:
+
+          >>> state = StackableState(a=1, b=2)
+          >>> state.a
+          1
+          >>> state.b
+          2
+          >>> state
+          StackableState(a=1,b=2)
+          >>> with state(a=3, x=4):
+          ...     print(state)
+          ...     print("a", state.a)
+          ...     print("b", state.b)
+          ...     print("x", state.x)
+          ...
+          StackableState(a=3,b=2,x=4)
+          a 3
+          b 2
+          x 4
+          >>> state.a
+          1
+          >>> state
+          StackableState(a=1,b=2)
+  '''
+
+  def __init__(self, **kw):
+    super().__init__()
+    for k, v in kw.items():
+      setattr(self, k, v)
+
+  def __str__(self):
+    return "%s(%s)" % (
+        type(self).__name__,
+        ','.join(["%s=%s" % (k, v) for k, v in sorted(self.__dict__.items())])
+    )
+
+  __repr__ = __str__
+
+  @contextmanager
+  def __call__(self, **kw):
+    ''' Calling an instance is a context manager yielding `self`
+        with attributes modified by `kw`.
+    '''
+    with stackattrs(self, **kw):
+      yield self
 
 def pushkeys(d, **key_values):
   ''' The "push" part of `stackkeys`.
