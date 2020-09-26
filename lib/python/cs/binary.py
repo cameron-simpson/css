@@ -8,6 +8,9 @@
     and capable of transcribing themselves in binary form
     (trivially via `bytes(instance)` and also otherwise).
 
+    Note: this module requires Python 3.6+ because various default
+    behaviours rely on `dict`s preserving their insert order.
+
     See `cs.iso14496` for an ISO 14496 (eg MPEG4) parser
     built using this module.
 
@@ -177,12 +180,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.pfx'],
+    'python_requires':
+    '>=3.6',
 }
 
 if (sys.version_info.major < 3
     or (sys.version_info.major == 3 and sys.version_info.minor < 6)):
   warning(
-      "module %r requires Python 3 and recommends 3.6, but version_info=%s",
+      "module %r requires Python 3.6 for reliable field ordering but version_info=%s",
       __name__, sys.version_info
   )
 
