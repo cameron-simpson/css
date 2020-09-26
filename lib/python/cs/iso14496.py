@@ -44,6 +44,7 @@ from cs.binary import (
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
+from cs.context import StackableState
 from cs.fstags import FSTags, TaggedPath, rpaths
 from cs.lex import get_identifier, get_decimal_value
 from cs.logutils import debug, warning, error
@@ -78,6 +79,8 @@ DISTINFO = {
         'cs.upd',
     ],
 }
+
+PARSE_MODE = StackableState(copy_boxes=False, discard_data=False)
 
 def main(argv=None):
   ''' Command line mode.
@@ -120,22 +123,22 @@ class MP4Command(BaseCommand):
           out(path)
           with Pfx(path):
             tagged_path = fstags[path]
-            try:
-              for box, tags in parse_tags(path, tag_prefix=tag_prefix,
-                                          discard_data=True):
-                for tag in tags:
-                  if no_action:
-                    tag_s = str(tag)
-                    if len(tag_s) > 32:
-                      tag_s = tag_s[:29] + '...'
-                    print(path, '+', tag_s)
-                  else:
-                    tagged_path.add(tag)
-            except (TypeError, NameError, AttributeError, AssertionError):
-              raise
-            except Exception as e:
-              warning("%s: %s", type(e).__name__, e)
-              xit = 1
+            with PARSE_MODE(discard_data=True):
+              try:
+                for box, tags in parse_tags(path, tag_prefix=tag_prefix):
+                  for tag in tags:
+                    if no_action:
+                      tag_s = str(tag)
+                      if len(tag_s) > 32:
+                        tag_s = tag_s[:29] + '...'
+                      print(path, '+', tag_s)
+                    else:
+                      tagged_path.add(tag)
+              except (TypeError, NameError, AttributeError, AssertionError):
+                raise
+              except Exception as e:
+                warning("%s: %s", type(e).__name__, e)
+                xit = 1
     return xit
 
   @staticmethod
@@ -222,7 +225,8 @@ class MP4Command(BaseCommand):
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
-        over_box, = parse(parsee, discard_data=True)
+        with PARSE_MODE(discard_data=True):
+          over_box = parse(parsee)
         print(spec + ":")
         for top_box in over_box:
           for box, tags in top_box.gather_metadata():
@@ -267,10 +271,10 @@ class MP4Command(BaseCommand):
     with fstags:
       out(path)
       with Pfx(path):
-        for box, tags in parse_tags(path, tag_prefix=tag_prefix,
-                                    discard_data=True):
-          for tag in tags:
-            print(tag)
+        with PARSE_MODE(discard_data=True):
+          for box, tags in parse_tags(path, tag_prefix=tag_prefix):
+            for tag in tags:
+              print(tag)
     return xit
 
   @staticmethod
