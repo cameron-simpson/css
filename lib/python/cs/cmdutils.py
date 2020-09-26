@@ -17,7 +17,7 @@ from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext, SimpleNamespace as NS
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
@@ -25,7 +25,9 @@ __version__ = '20200615-post'
 
 DISTINFO = {
     'description':
-    "convenience functions for working with the Cmd module, a BaseCommand class for constructing command lines and other command line related stuff",
+    "convenience functions for working with the Cmd module,"
+    " a BaseCommand class for constructing command lines"
+    " and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -76,7 +78,7 @@ def docmd(dofunc):
         warning("%s", e)
         self.do_help(argv0)
         return None
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception("%s", e)
         return None
 
@@ -193,7 +195,7 @@ class BaseCommand:
     usage_message = usage_format.format_map(usage_format_mapping)
     if has_subcmds:
       subusages = []
-      for attr, method in sorted(subcmds.items()):
+      for attr in sorted(subcmds):
         with Pfx(attr):
           subusage = cls.subcommand_usage_text(attr)
           if subusage:
@@ -259,6 +261,15 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `options`.
     '''
 
+  def apply_opts(self, opts, options):
+    ''' The `apply_opts` method is required
+        if the subclass defines a nonempty `GETOPT_SPEC` attribute.
+        It should apply `opts` (the result of `getopt.getopt`)
+        to `options`.
+    '''
+    raise NotImplementedError("%s.apply_opts" % (type(self).__name__,))
+
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, argv=None, options=None, cmd=None):
     ''' Run a command from `argv`.
         Returns the exit status of the command.
@@ -382,7 +393,7 @@ class BaseCommand:
       raise
 
   @staticmethod
-  def getopt_error_handler(cmd, options, e, usage):
+  def getopt_error_handler(cmd, options, e, usage):  # pylint: disable=unused-argument
     ''' The `getopt_error_handler` method
         is used to control the handling of `GetoptError`s raised
         during the command line parse
@@ -419,7 +430,7 @@ class BaseCommand:
 
   @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(argv, options):  # pylint: disable=unused-argument
     ''' Stub context manager which surrounds `main` or `cmd_`*subcmd*.
     '''
     # redundant try/finally to remind subclassers of correct structure
@@ -429,7 +440,7 @@ class BaseCommand:
       pass
 
   @classmethod
-  def cmd_help(cls, argv, options):
+  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.
