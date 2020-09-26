@@ -12,9 +12,9 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
-from types import SimpleNamespace as NS
-from cs.context import nullcontext, stackattrs
+from cs.context import stackattrs
 from cs.deco import cachedmethod
+from cs.gimmicks import nullcontext, SimpleNamespace as NS
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, XP
