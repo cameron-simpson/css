@@ -1579,6 +1579,37 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         continue
       yield self.transcribe_field(field_name, field_value)
 
+  @pfx_method
+  def transcribe_field(self, field_name, field_value):
+    ''' Transcribe a field named `field_name` with value `field_value`.
+
+        The transcribe function is chosen from the following in order:
+        * `field_value.transcribe`
+        * `self.FIELD_TRANSCRIBERS[field_name]`
+        * `field_value` if `field_value` is `None` or a `bytes`-like object
+        * `field_value.encode('ascii')` if `field_value` is a `str`
+
+        A `ValueError` is raised if no transcription can be chosen.
+    '''
+    with Pfx("%s=%r", field_name, field_value):
+      try:
+        transcribe = field_value.transcribe
+      except AttributeError:
+        try:
+          transcribe = self.FIELD_TRANSCRIBERS[field_name]
+        except KeyError:
+          if (field_value is None or isinstance(field_value,
+                                                (bytes, memoryview))):
+            transcribe = lambda value: value
+          elif isinstance(field_value, str):
+            transcribe = lambda s: s.encode(encoding='ascii')
+          else:
+            raise ValueError(
+                "no .transcribe method, no FIELD_TRANSCRIBERS entry,"
+                " and neither None nor bytes nor str"
+            )
+    return transcribe(field_value)
+
 def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct an `AbstractBinary` `SimpleNamespace` subclass named `class_name`
       whose fields are specified by the mapping `field_map`.
