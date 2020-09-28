@@ -1491,6 +1491,82 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     return self
 
   def transcribe(self):
+  @pfx_method
+  def parse_field(self, field_name, bfr, parse=None):
+    ''' Parse a field named `field_name` from `bfr`.
+        Apply the parsed value to `self` as the attribute `field_name`.
+
+        Parameters:
+        * `field_name`: the name of the field to add
+        * `bfr`: a `CornuCopyBuffer` from which to parse
+        * `parse`: an optional parse/transcribe specification as for `pt_spec()`
+
+        If `parse` is omitted or `None`,
+        the parser is obtained from `self.FIELD_PARSERS[field_name]`,
+        which is defined from the `field_map` supplied at class creation.
+        Otherwise, `parse` is obtained from the `(parse,transcribe)` tuple
+        returned by `pt_spec(parse)`.
+
+        The field value is the obtained from `parse(bfr)`.
+
+        Note that if `parse` is some `AbstractBinary` subclass
+        you can rewrite:
+
+            self.parse_field(field_name, bfr, binary_class)
+
+        as:
+
+            self.field_name = binary_class.parse(bfr)
+
+        if that feels more readable.
+        For many simple fields
+        it is reasonable to write:
+
+            self.field_name = binary_class.parse_value(bfr)
+
+        at the expense of having to use:
+
+            yield binary_class.transcribe_value(self.field_name)
+
+        in the `transcribe` method.
+        This allows you to use the field directly in calculations
+        instead of indirecting through `.value` attribute
+        and also saves some memory.
+
+        A `parse(bfr)` method for a flexible structure
+        may expect some subfields only in certain circumstances
+        and use `parse_field` to parse them as required.
+        Example:
+
+            def parse(cls, bfr):
+              """ Read a leading unsigned 8 bit integer
+                  holding a structure version.
+                  If the version is 0,
+                  read 7 raw bytes into the `.v0data` field;
+                  if the version is 1,
+                  read a `V1DataType` in the `.v1data` field;
+                  otherwise raise a `ValueError` for an unsupported version byte.
+              """
+              self = cls()
+              self.parse_field('version', UInt8.parse_value)
+              if version == 0:
+                self.parse_field('v0data', 7)
+              elif self.version == 1:
+                self.parse_field('v1data', V1DataType)
+              else:
+                raise ValueError("unsupported version %d" % (self.version,))
+              return self
+    '''
+    if hasattr(self, field_name):
+      raise ValueError("attribute .%s already defined" % (field_name,))
+    if parse is None:
+      # infer the parser from the defined FIELD_PARSERS
+      parse = self.FIELD_PARSERS[field_name]
+    else:
+      parse, transcribe = pt_spec(parse)
+    value = parse(bfr)
+    setattr(self, field_name, value)
+
     ''' Default transcribe: yield each field's transcription in order.
     '''
     for field_name, field_value in self.__dict__.items():
