@@ -220,7 +220,7 @@ class BinaryMixin:
     offset = bfr.offset
     while not bfr.at_eof():
       post_offset = bfr.offset
-      yield offset, cls.from_buffer(bfr), post_offset
+      yield offset, cls.parse(bfr), post_offset
       offset = post_offset
 
   @classmethod
@@ -230,8 +230,7 @@ class BinaryMixin:
         yielding instances of `cls`.
     '''
     return map(
-        lambda offset, obj, post_offset: obj,
-        cls.parse_buffer_with_offsets(bfr, **kw)
+        lambda offset, obj, post_offset: obj, cls.scan_with_offsets(bfr, **kw)
     )
 
   @classmethod
