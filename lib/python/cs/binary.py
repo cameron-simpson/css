@@ -389,6 +389,104 @@ class BinarySingleValue(AbstractBinary):
     '''
     return cls(value).transcribe()
 
+class BinaryByteses(AbstractBinary):
+  ''' A list of `bytes` parsed directly from the native iteration of the buffer.
+  '''
+
+  def __init__(self):
+    self.values = []
+
+  def __repr__(self):
+    return "%s:%r" % (type(self).__name__, self.values)
+
+  @classmethod
+  def parse(cls, bfr):
+    self = cls()
+    self.values.extend(bfr)
+    return self
+
+  def transcribe(self):
+    yield from iter(self.values)
+
+class BinaryListValues(AbstractBinary):
+
+  def __init__(self):
+    self.values = []
+
+  def __str__(self):
+    return "%s%r" % (type(self).__name__, self.values)
+
+  __repr__ = __str__
+
+  def __iter__(self):
+    return iter(self.values)
+
+  @classmethod
+  def parse(
+      cls,
+      bfr,
+      count=None,
+      *,
+      end_offset=None,
+      min_count=None,
+      max_count=None,
+      pt
+  ):
+    ''' Read values from `bfr`. Return ` BinaryListValue` containing the values.
+
+        Parameters:
+        * `count`: optional count of values to read;
+          if specified, exactly this many values are expected.
+        * `end_offset`: an optional bounding end offset of the buffer.
+        * `min_count`: the least acceptable number of values.
+        * `max_count`: the most acceptable number of values.
+        * `pt`: a parse/transcribe specification
+          as implemented by the `pt_spec()` function.
+          The values will be returned by its parse function.
+    '''
+    if end_offset is not None:
+      with bfr.subbuffer(end_offset) as subbfr:
+        return cls.parse(
+            subbfr, count=count, min_count=min_count, max_count=max_count
+        )
+    if count is not None:
+      if min_count is None:
+        min_count = count
+      elif min_count < count:
+        raise ValueError("min_count(%s) < count(%s)" % (min_count, count))
+      if max_count is None:
+        max_count = count
+      elif max_count > count:
+        raise ValueError("max_count(%s) > count(%s)" % (max_count, count))
+    if (min_count is not None and max_count is not None
+        and min_count > max_count):
+      raise ValueError(
+          "min_count(%s) > max_count(%s)" % (min_count, max_count)
+      )
+    self = cls()
+    values = self.values
+    func_parse, _ = pt_spec(pt)
+    while max_count is None or len(values) < max_count:
+      try:
+        value = func_parse(bfr)
+      except EOFError:
+        break
+      values.append(value)
+    if min_count is not None and len(values) < min_count:
+      raise ValueError(
+          "unsuffient instances of %r found: required at least %s, found %d" %
+          (pt, min_count, len(values))
+      )
+    return self
+
+  def transcribe(self):
+    ''' Transcribe all the values.
+    '''
+    return map(
+        lambda value: value
+        if isinstance(value, bytes) else value.transcribe(), self.values
+    )
+
 class PacketField(ABC):
   ''' A record for an individual packet field.
 
