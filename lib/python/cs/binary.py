@@ -1169,7 +1169,7 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
     _binary_multi_struct_classes[key] = struct_class
     return struct_class
 
-def BinarySingleStruct(class_name, struct_format):
+def BinarySingleStruct(class_name, struct_format, field_name=None):
   ''' A convenience wrapper for `BinaryMultiStruct`
       for `struct_format`s with a single field.
 
@@ -1177,6 +1177,8 @@ def BinarySingleStruct(class_name, struct_format):
       * `class_name`: the class name for the generated class
       * `struct_format`: the struct format string, specifying a
         single struct field
+      * `field_name`: optional field name for the value,
+        default `'value'`
 
       Example:
 
@@ -1193,7 +1195,9 @@ def BinarySingleStruct(class_name, struct_format):
           >>> field.value
           515
   '''
-  return BinaryMultiStruct(class_name, struct_format, 'value')
+  if field_name is None:
+    field_name = 'value'
+  return BinaryMultiStruct(class_name, struct_format, field_name)
 
 # various common values
 UInt8 = BinarySingleStruct('UInt8', 'B')
