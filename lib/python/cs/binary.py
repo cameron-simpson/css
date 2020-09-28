@@ -1492,24 +1492,24 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
 
   def transcribe(self):
   @pfx_method
-  def parse_field(self, field_name, bfr, parse=None):
+  def parse_field(self, field_name, bfr, pt=None):
     ''' Parse a field named `field_name` from `bfr`.
         Apply the parsed value to `self` as the attribute `field_name`.
 
         Parameters:
         * `field_name`: the name of the field to add
         * `bfr`: a `CornuCopyBuffer` from which to parse
-        * `parse`: an optional parse/transcribe specification as for `pt_spec()`
+        * `pt`: an optional parse/transcribe specification as for `pt_spec()`
 
-        If `parse` is omitted or `None`,
+        If `pt` is omitted or `None`,
         the parser is obtained from `self.FIELD_PARSERS[field_name]`,
         which is defined from the `field_map` supplied at class creation.
         Otherwise, `parse` is obtained from the `(parse,transcribe)` tuple
-        returned by `pt_spec(parse)`.
+        returned by `pt_spec(pt)`.
 
         The field value is the obtained from `parse(bfr)`.
 
-        Note that if `parse` is some `AbstractBinary` subclass
+        Note that if `pt` is some `AbstractBinary` subclass
         you can rewrite:
 
             self.parse_field(field_name, bfr, binary_class)
@@ -1559,11 +1559,11 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     '''
     if hasattr(self, field_name):
       raise ValueError("attribute .%s already defined" % (field_name,))
-    if parse is None:
+    if pt is None:
       # infer the parser from the defined FIELD_PARSERS
       parse = self.FIELD_PARSERS[field_name]
     else:
-      parse, transcribe = pt_spec(parse)
+      parse, transcribe = pt_spec(pt)
     value = parse(bfr)
     setattr(self, field_name, value)
 
