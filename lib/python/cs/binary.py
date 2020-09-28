@@ -1468,8 +1468,10 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
             [
                 "%s=%s" % (
                     k, (
-                        (repr(v[:16]) + '...' if len(v) > 16 else repr(v))
-                        if isinstance(v, bytes) else v
+                        (
+                            repr(v[:crop_length]) +
+                            '...' if len(v) > crop_length else repr(v)
+                        ) if isinstance(v, bytes) else v
                     )
                 ) for k, v in sorted(self.__dict__.items()) if choose_name(k)
             ]
