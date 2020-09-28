@@ -490,6 +490,9 @@ class BinaryListValues(AbstractBinary):
 class PacketField(ABC):
   ''' A record for an individual packet field.
 
+      *DEPRECATED*:
+      please adopt one of the `BinarySingle`* classes instead.
+
       This normally holds a single value,
       for example an int of a particular size or a string.
 
@@ -506,6 +509,7 @@ class PacketField(ABC):
       In the more complex case,
       sometimes a `PacketField` may not warrant (or perhaps fit)
       the formality of a `Packet` with its multifield structure.
+
       One example is the `cs.iso14496.UTF8or16Field` class.
 
       `UTF8or16Field` supports an ISO14496 UTF8 or UTF16 string field,
@@ -1092,7 +1096,8 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
       Parameters:
       * `class_name`: name for the generated class
       * `struct_format`: the `struct` format string
-      * `field_names`: field name list
+      * `field_names`: field name list,
+        a space separated string or an interable of strings
   '''
   with Pfx("BinaryMultiStruct(%r,%r,%r)", class_name, struct_format,
            field_names):
@@ -1452,7 +1457,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
 
   @classmethod
   def parse(cls, bfr):
-    ''' Default parse: parse each field from the buffer in order.
+    ''' Default parse: parse each predefined field from the buffer in order.
     '''
     fields = {}
     for field_name in cls.FIELD_ORDER:
@@ -1489,7 +1494,8 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       accordingly.
 
       The `field_map` is a mapping of field name
-      to a specification of the parse and transcribe functions.
+      to a specification of the parse and transcribe functions
+      as implemented by the `pt_spec()` function.
       Each specification may be one of:
       * an object with `.parse` and `.transcribe` callable attributes,
         usually a subclass of `AbstractBinary`
@@ -1575,6 +1581,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       FIELD_PARSERS = {}
       FIELD_TRANSCRIBERS = {}
 
+      # collate the parse-transcribe functions for each predefined field
       for field_name in field_order:
         pt = field_map[field_name]
         try:
@@ -1601,7 +1608,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
     bmv_class.__name__ = class_name
     bmv_class.__doc__ = (
         ''' An `AbstractBinary` `SimpleNamespace` which parses and transcribes
-            the the fields `%r`.
+            the fields `%r`.
         ''' % (field_order,)
     )
     return bmv_class
@@ -1753,6 +1760,9 @@ _TestStructTuple.TEST_CASES = (
 
 class Packet(PacketField):
   ''' Base class for compound objects derived from binary data.
+
+      *DEPRECATED*:
+      please adopt one of the `BinaryMutli`* classes instead.
   '''
 
   def __init__(self, **fields):
@@ -1989,7 +1999,6 @@ class Packet(PacketField):
     elif isinstance(factory, int):
       from_buffer = fixed_bytes_field(factory).parse
     elif issubclass(factory, AbstractBinary):
-      X("from_buffer = %s.parse", factory)
       from_buffer = factory.parse
     elif isinstance(factory, type):
       from_buffer = factory.from_buffer
