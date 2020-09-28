@@ -1657,7 +1657,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
         which parses a run length encoded data chunk;
         this stores a `BSData` instance
 
-          >>> BMV = BinaryMultiValue("BMV", {
+          >>> class BMV(BinaryMultiValue("BMV", {
           ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
           ...         'n2': UInt8,
           ...         'n3': (UInt8.parse, UInt8.transcribe),
@@ -1667,7 +1667,8 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...             BSData.transcribe_value,
           ...         ),
           ...         'data2': BSData,
-          ... })
+          ... })):
+          ...     pass
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
           >>> bmv
           BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'))
@@ -1675,6 +1676,8 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           17
           >>> bmv.n2
           UInt8(value=34)
+          >>> bmv.n2.value
+          34
           >>> bmv.n3
           UInt8(value=119)
           >>> bmv.nd
