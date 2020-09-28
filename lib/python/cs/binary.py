@@ -108,8 +108,7 @@ def flatten(chunks):
     yield chunks.encode('ascii')
   else:
     for subchunk in chunks:
-      for chunk in flatten(subchunk):
-        yield chunk
+      yield from flatten(subchunk)
 
 class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
