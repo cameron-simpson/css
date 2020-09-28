@@ -342,11 +342,17 @@ class BinarySingleValue(AbstractBinary):
   def __init__(self, value):
     self.value = value
 
+  def __repr__(self):
+    return "%s(%r)" % (type(self).__name__, self.value)
+
   def __str__(self):
     return str(self.value)
 
-  def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.value)
+  def __int__(self):
+    return int(self.value)
+
+  def __float__(self):
+    return float(self.value)
 
   def __eq__(self, other):
     return self.value == other.value
