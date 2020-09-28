@@ -1455,7 +1455,6 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   ''' The base class underlying classes constructed by `BinaryMultiValue`.
   '''
 
-  FIELD_ORDER = ()
   FIELD_PARSERS = {}
   FIELD_TRANSCRIBERS = {}
 
@@ -1463,19 +1462,20 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   def parse(cls, bfr):
     ''' Default parse: parse each predefined field from the buffer in order.
     '''
-    fields = {}
-    for field_name in cls.FIELD_ORDER:
-      parse = cls.FIELD_PARSERS[field_name]
-      fields[field_name] = parse(bfr)
-    return cls(**fields)
+    self = cls()
+    for field_name, parse in cls.FIELD_PARSERS.items():
+      self.parse_field(field_name, parse)
+    return self
 
   def transcribe(self):
     ''' Default transcribe: yield each field's transcription in order.
     '''
-    for field_name in self.FIELD_ORDER:
-      field_value = getattr(self, field_name)
-      transcribe = self.FIELD_TRANSCRIBERS[field_name]
-      yield transcribe(field_value)
+    for field_name, field_value in self.__dict__.items():
+      if field_name.startswith('_'):
+        continue
+      if field_name in exclude_names:
+        continue
+      yield self.transcribe_field(field_name, field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct an `AbstractBinary` `SimpleNamespace` subclass named `class_name`
@@ -1535,8 +1535,6 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...         ),
           ...         'data2': BSData,
           ... })
-          >>> BMV.FIELD_ORDER
-          ('n1', 'n2', 'n3', 'nd', 'data1', 'data2')
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
           >>> bmv
           BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'))
@@ -1581,7 +1579,6 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       ''' `BaseBinaryMultiValue` subclass implementation.
       '''
 
-      FIELD_ORDER = field_order
       FIELD_PARSERS = {}
       FIELD_TRANSCRIBERS = {}
 
