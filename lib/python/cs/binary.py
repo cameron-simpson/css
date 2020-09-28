@@ -1713,6 +1713,35 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
     )
     return bmv_class
 
+def pt_spec(pt, field_name=None):
+  ''' Convert a parse/transcribe specification `pt`
+      into a tuple `(func_parse,func_transcribe)`
+      being a parse and transcribe function.
+
+      Each specification `pt` may be one of:
+      * an object with `.parse` and `.transcribe` callable attributes,
+        usually a subclass of `AbstractBinary`
+      * a 2-tuple of `(struct_format,field_names)`
+      * a tuple of `(parse,transcribe)`
+  '''
+  try:
+    func_parse = pt.parse
+    func_transcribe = pt.transcribe
+  except AttributeError:
+    if isinstance(pt, int):
+      func_parse = lambda bfr: bfr.take(pt)
+      func_transcribe = lambda bs: bs
+    elif isinstance(pt[0], str) and isinstance(pt[1], str):
+      struct_format, struct_field_names = pt
+      bms = BinaryMultiStruct(
+          field_name or struct_format, struct_format, struct_field_names
+      )
+      func_parse = bms.parse
+      func_transcribe = bms.transcribe
+    else:
+      func_parse, func_transcribe = pt
+  return func_parse, func_transcribe
+
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
   '''
