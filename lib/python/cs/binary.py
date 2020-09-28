@@ -1490,7 +1490,6 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
       self.parse_field(field_name, parse)
     return self
 
-  def transcribe(self):
   @pfx_method
   def parse_field(self, field_name, bfr, pt=None):
     ''' Parse a field named `field_name` from `bfr`.
@@ -1567,7 +1566,11 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     value = parse(bfr)
     setattr(self, field_name, value)
 
+  def transcribe(self, exclude_names=()):
     ''' Default transcribe: yield each field's transcription in order.
+        Fields whose name starts with an underscore are skipped.
+        The transcription is obtained
+        from `self.transcribe_field(field_name,field_value)`.
     '''
     for field_name, field_value in self.__dict__.items():
       if field_name.startswith('_'):
