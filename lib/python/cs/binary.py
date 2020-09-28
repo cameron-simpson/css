@@ -255,7 +255,7 @@ class BinaryMixin:
     return flatten(self.transcribe())
 
   @classmethod
-  def parse_bytes(cls, bs, offset=0, length=None):
+  def parse_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
         Returns the new instance and the post offset.
@@ -265,14 +265,16 @@ class BinaryMixin:
         The parameters `offset` and `length` are passed to the
         `CornuCopyBuffer.from_bytes` factory.
 
+        Other keyword parameters are passed to the `.parse` method.
+
         This relies on the `cls.parse` method for the parse.
     '''
     bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    instance = cls.parse(bfr)
+    instance = cls.parse(bfr, **kw)
     return instance, bfr.offset
 
   @classmethod
-  def from_bytes(cls, bs, offset=0, length=None):
+  def from_bytes(cls, bs, **kw):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
         Returns the new instance.
@@ -280,12 +282,11 @@ class BinaryMixin:
         Raises `ValueError` if `bs` is not entirely consumed.
         Raises `EOFError` if `bs` has insufficient data.
 
-        The parameters `offset` and `length` are passed to the
-        `CornuCopyBuffer.from_bytes` factory.
+        Keyword parameters are passed to the `.parse_bytes` method.
 
         This relies on the `cls.parse` method for the parse.
     '''
-    instance, offset = cls.parse_bytes(bs, offset=offset, length=length)
+    instance, offset = cls.parse_bytes(bs, **kw)
     if offset < len(bs):
       raise ValueError(
           "unparsed data at offset %d: %r" % (offset, bs[offset:])
