@@ -1458,6 +1458,27 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   FIELD_PARSERS = {}
   FIELD_TRANSCRIBERS = {}
 
+  def s(self, *, crop_length=16, choose_name=None):
+    if choose_name is None:
+      choose_name = getattr(
+          self, 'S_CHOOSE_NAME', lambda name: not name.startswith('_')
+      )
+    return "%s(%s)" % (
+        type(self).__name__, ','.join(
+            [
+                "%s=%s" % (
+                    k, (
+                        (repr(v[:16]) + '...' if len(v) > 16 else repr(v))
+                        if isinstance(v, bytes) else v
+                    )
+                ) for k, v in sorted(self.__dict__.items()) if choose_name(k)
+            ]
+        )
+    )
+
+  __str__ = s
+  __repr__ = s
+
   @classmethod
   def parse(cls, bfr):
     ''' Default parse: parse each predefined field from the buffer in order.
