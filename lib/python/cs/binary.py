@@ -207,7 +207,7 @@ class BinaryMixin:
   def __len__(self):
     ''' Compute the length by running a transcription and measuring it.
     '''
-    return sum(len(bs) for bs in flatten(self.transcribe()))
+    return sum(map(len, flatten(self.transcribe())))
 
   @classmethod
   def scan_with_offsets(cls, bfr):
