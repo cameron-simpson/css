@@ -18,17 +18,14 @@
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
       which presents an iterable of bytes-like values
-      via various useful methods
-      and with factory methods to make one from a variety of sources
+      via various useful methods;
+      it also has a few factory methods to make one from a variety of sources
       such as bytes, iterables, binary files, `mmap`ped files,
       TCP data streams, etc.
     * chunk:
       a piece of binary data obeying the buffer protocol,
       almost always a `bytes` instance or a `memoryview`,
       but in principle also things like `bytearray`.
-
-    Note: this module requires Python 3 and recommends Python 3.6+
-    because having a predictable order on `dict`s is very useful.
 
     Deprecation: the `Packet` and `PacketField` classes were unnecessarily hard to use
     and are deprecated in favour of the `Binary`* suite of classes and factories.
@@ -45,6 +42,9 @@
     * `BinaryMultiValue`: a base class for subclasses
       parsing and transcribing a multiple values
 
+    The `BinaryMultiValue` base class is what should be used
+    for complex structures with varying or recursive subfields.
+
     All the classes derived from the above inherit all the methods
     of `BinaryMixin`.
     Amongst other things, this means that the binary transcription
@@ -58,106 +58,6 @@
 
     There are several presupplied subclasses for common basic types
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
-
-    == Deprecated Interfaces ==
-
-    * `PacketField`: an abstract class for a binary field, with a
-      factory method to parse it, a transcription method to transcribe
-      it back out in binary form and usually a `.value` attribute
-      holding the parsed value.
-    * `Packet`: a `PacketField` subclass for parsing multiple
-      `PacketField`s into a larger structure with ordered named
-      fields.
-      The fields themselves may be `Packet`s for complex structures.
-
-    Classes built from `struct` format strings:
-    * `structtuple`: a factory for `PacketField` subclasses
-      for `struct` formats with multiple value fields.
-      These classes are `namedtuple` subclasses
-      supporting trivial access to the parsed values.
-    * `BinarySingleStruct`: a factory for making `PacketField` classes
-      from `struct` formats with a single value field.
-
-    Here's an example of a `structtuple`:
-
-        # a "cut" record from the .cuts file
-        Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
-
-    which makes the `Enigma2Cut` class for a `'>QL'` `struct` definition.
-    Like every such class, it comes with all the parsing and transcription
-    methods from `PacketField`.
-    Here's some code to read these from a file:
-
-        yield from Enigma2Cut.parse_file(pathname)
-
-    You don't need to make fields only from binary source data;
-    because `PacketField.__init__` takes a post parse value,
-    you can also construct `PacketField`s from scratch
-    with their values and later transcribe the resulting binary form.
-
-    Each `PacketField` subclass has the following methods:
-    * `__bytes__`:
-      return an instance as a `bytes` object.
-    * `transcribe`: easily return the binary transcription of this field,
-      either directly as a chunk (or for convenience, also `None` or
-      an ASCII `str`) or by yielding successive binary data.
-    * `from_buffer`: a factory to parse this field from a
-      `cs.buffer.CornuCopyBuffer`.
-    * `from_bytes`: a factory to parse this field from a chunk with
-      an optional starting offset; this is a convenience wrapper for
-      `from_buffer`.
-
-    That may sound a little arcane, but we also supply:
-    * `flatten`: a recursive function to take the return from any
-      `transcribe` method and yield chunks, so copying a packet to
-      a file or elsewhere can always be done by iterating over
-      `flatten(field.transcribe())` or via the convenience
-      `field.transcribe_flat()` method which calls `flatten` itself.
-    * a `CornuCopyBuffer` is an easy to use wrapper for parsing any
-      iterable of chunks, which may come from almost any source.
-      It has a bunch of convenient factories including:
-      `from_bytes`, make a buffer from a chunk;
-      `from_fd`, make a buffer from a file descriptor;
-      `from_file`, make a buffer from a file-like object;
-      `from_mmap`, make a buffer from a file descriptor using a
-      memory map (the `mmap` module) of the file, so that chunks
-      can use the file itself as backing store instead of allocating
-      and copying memory.
-      See the `cs.buffer` module for further detail.
-
-    When parsing a complex structure
-    one must choose between subclassing `PacketField` or `Packet`.
-    An effective guideline is the degree of substructure.
-
-    A `Packet` is designed for deeper structures;
-    all of its attributes are themselves `PacketField`s
-    (or `Packet`s, which are `PacketField` subclasses).
-    The leaves of this hierarchy will be `PacketField`s,
-    whose attributes are ordinary Python types.
-
-    By contrast, a `PacketField`'s attributes are expected to be "flat" values
-    i.e. the plain post-parse value such as a `str` or an `int`
-    or some other conventional Python type.
-
-    The base case for `PacketField`
-    is a single such value, named `.value`,
-    and the natural implementation
-    is to provide a `.value_from_buffer` method
-    which returns the basic single value
-    and the corresponding `.transcribe_value` method
-    to return or yield its binary form
-    (directly or in pieces respectively).
-
-    However,
-    you can handle multiple attributes with this class
-    by instead implementing:
-    * `__init__`: to compose an instance from post-parse values
-      (and thus from scratch rather than parsed from existing binary data)
-    * `from_buffer`: class method to parse the values
-      from a `CornuCopyBuffer` and call the class constructor
-    * `transcribe`: to return or yield the binary form of the attributes
-
-    Cameron Simpson <cs@cskk.id.au> 22jul2018
 '''
 
 from __future__ import print_function
