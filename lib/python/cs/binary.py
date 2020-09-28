@@ -114,6 +114,91 @@ class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
   '''
 
+  @pfx_method
+  def self_check(self):
+    ''' Internal self check. Returns `True` if passed.
+
+        If the structure has a `FIELD_TYPES` attribute, normally a
+        class attribute, then check the fields against it. The
+        `FIELD_TYPES` attribute is a mapping of `field_name` to
+        a specification of `required` and `types`. The specification
+        may take one of 2 forms:
+        * a tuple of `(required, types)`
+        * a single `type`; this is equivalent to `(True, (type,))`
+        Their meanings are as follows:
+        * `required`: a Boolean. If true, the field must be present
+          in the packet `field_map`, otherwise it need not be present.
+        * `types`: a tuple of acceptable field types
+
+        There are some special semantics involved here.
+
+        An implementation of a `Packet` may choose to make some
+        fields plain instance attributes instead of `Field`s in the
+        `field_map` mapping, particularly variable packets such as
+        a `cs.iso14496.BoxHeader`, whose `.length` may be parsed
+        directly from its binary form or computed from other fields
+        depending on the `box_size` value. Therefore, checking for
+        a field is first done via the `field_map` mapping, then by
+        `getattr`, and as such the acceptable `types` may include
+        non-`PacketField` types such as `int`.
+
+        Here is the `BoxHeader.FIELD_TYPES` definition as an example:
+
+          FIELD_TYPES = {
+            'box_size': UInt32BE,
+            'box_type': BytesField,
+            'length': (
+                True,
+                (
+                    type(Ellipsis),
+                    UInt64BE,
+                    UInt32BE,
+                    int
+                ),
+            ),
+          }
+
+        Note that `length` includes some non-`PacketField` types,
+        and that it is written as a tuple of `(True, types)` because
+        it has more than one acceptable type.
+    '''
+    ok = True
+    try:
+      fields_spec = self.FIELD_TYPES
+    except AttributeError:
+      warning("no FIELD_TYPES")
+      ok = False
+    else:
+      for field_name, field_spec in fields_spec.items():
+        if isinstance(field_spec, tuple):
+          required, basetype = field_spec
+        else:
+          required, basetype = True, field_spec
+        try:
+          field = getattr(self, field_name)
+        except AttributeError:
+          if required:
+            warning("field %r missing: __dict__=%r", field_name, self.__dict__)
+            ok = False
+        else:
+          if not isinstance(field, basetype):
+            warning(
+                "field %r should be an instance of %s:%s but is %s:%s: %s",
+                field_name,
+                'tuple' if isinstance(basetype, tuple) else basetype.__name__,
+                basetype,
+                type(field).__name__, type(field), field
+            )
+            ok = False
+      for field_name in self.__dict__:
+        if field_name not in fields_spec:
+          warning(
+              "field %r is present but is not defined in self.FIELD_TYPES: %r",
+              field_name, sorted(fields_spec.keys())
+          )
+          ok = False
+    return ok
+
   def __bytes__(self):
     ''' The binary transcription as a single `bytes` object.
     '''
