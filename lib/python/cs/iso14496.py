@@ -1056,20 +1056,26 @@ class FullBoxBody(BoxBody):
       ISO14496 section 4.2.
   '''
 
-  PACKET_FIELDS = dict(
-      BoxBody.PACKET_FIELDS,
-      version=UInt8,
-      flags0=UInt8,
-      flags1=UInt8,
-      flags2=UInt8,
+  FIELD_TYPES = dict(
+      BoxBody.FIELD_TYPES,
+      version=int,
+      flags0=int,
+      flags1=int,
+      flags2=int,
   )
 
-  def parse_buffer(self, bfr, **kw):
-    super().parse_buffer(bfr, **kw)
-    self.add_field('version', UInt8.parse(bfr))
-    self.add_field('flags0', UInt8.parse(bfr))
-    self.add_field('flags1', UInt8.parse(bfr))
-    self.add_field('flags2', UInt8.parse(bfr))
+  def parse_fields(self, bfr):
+    super().parse_fields(bfr)
+    self.version = UInt8.parse_value(bfr)
+    self.flags0 = UInt8.parse_value(bfr)
+    self.flags1 = UInt8.parse_value(bfr)
+    self.flags2 = UInt8.parse_value(bfr)
+
+  def transcribe(self):
+    yield UInt8.transcribe_value(self.version)
+    yield UInt8.transcribe_value(self.flags0)
+    yield UInt8.transcribe_value(self.flags0)
+    yield UInt8.transcribe_value(self.flags0)
 
   @property
   def flags(self):
