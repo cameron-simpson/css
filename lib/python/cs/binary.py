@@ -1776,6 +1776,117 @@ def BinaryFixedBytes(class_name, length: int):
   '''
   return BinarySingleStruct(class_name, f'>{length}s', 'data')
 
+class BinaryUTF8NUL(BinarySingleValue):
+  ''' A NUL terminated UTF-8 string.
+  '''
+
+  FIELD_TYPES = dict(value=str)
+
+  TEST_CASES = (
+      b'123\0',
+      ('123', {}, b'123\0'),
+  )
+
+  @staticmethod
+  def parse_value(bfr):
+    ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
+    '''
+    # probe for the terminating NUL
+    bs_length = 1
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 1
+      if bfr[nul_pos] == 0:
+        break
+      bs_length += 1
+    if nul_pos == 0:
+      utf8 = ''
+    else:
+      utf8_bs = bfr.take(nul_pos)
+      if not isinstance(utf8_bs, bytes):
+        # transmute memoryview to real bytes object
+        utf8_bs = utf8_bs.tobytes()
+      utf8 = utf8_bs.decode('utf-8')
+    bfr.take(1)
+    return utf8
+
+  @staticmethod
+  def transcribe_value(s):
+    ''' Transcribe the `value` in UTF-8 with a terminating NUL.
+    '''
+    yield s.encode('utf-8')
+    yield b'\0'
+
+class BinaryUTF16NUL(BinarySingleValue):
+  ''' A NUL terminated UTF-16 string.
+  '''
+
+  FIELD_TYPES = dict(encoding=str, value=str)
+
+  TEST_CASES = (
+      ('abc', {
+          'encoding': 'utf_16_le'
+      }, b'a\x00b\x00c\x00\x00\x00'),
+      ('abc', {
+          'encoding': 'utf_16_be'
+      }, b'\x00a\x00b\x00c\x00\x00'),
+  )
+
+  VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
+
+  def __init__(self, value, *, encoding):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
+    if encoding not in self.VALID_ENCODINGS:
+      raise ValueError(
+          'unexpected encoding %r, expected one of %r' %
+          (encoding, self.VALID_ENCODINGS)
+      )
+    self.encoding = encoding
+    self.value = value
+
+  @classmethod
+  def parse(cls, bfr, *, encoding):
+    ''' Parse the encoding and value and construct an instance.
+    '''
+    value = cls.parse_value(bfr, encoding=encoding)
+    return cls(value, encoding=encoding)
+
+  @staticmethod
+  def parse_value(bfr, *, encoding):
+    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
+        The mandatory parameter `encoding` specifies the UTF16 encoding to use
+        (`'utf_16_be'` or `'utf_16_le'`).
+    '''
+    # probe for the terminating NUL
+    bs_length = 2
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 2
+      if bfr[nul_pos] == 0 and bfr[nul_pos + 1] == 0:
+        break
+      bs_length += 2
+    if nul_pos == 0:
+      utf16 = ''
+    else:
+      utf16_bs = bfr.take(nul_pos)
+      utf16 = utf16_bs.decode(encoding)
+    bfr.take(2)
+    return utf16
+
+  def transcribe(self):
+    ''' Transcribe `self.value` in UTF-16 with a terminating NUL.
+    '''
+    yield from self.transcribe_value(self.value, encoding=self.encoding)
+
+  @staticmethod
+  def transcribe_value(value, encoding='utf-16'):
+    ''' Transcribe `value` in UTF-16 with a terminating NUL.
+    '''
+    yield value.encode(encoding)
+    yield b'\0\0'
+
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
   '''
