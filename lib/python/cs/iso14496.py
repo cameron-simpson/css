@@ -1219,41 +1219,55 @@ class MVHDBoxBody(FullBoxBody):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       creation_time=(True, (TimeStamp32, TimeStamp64)),
       modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
       duration=(True, (UInt32BE, UInt64BE)),
       rate_long=Int32BE,
       volume_short=Int16BE,
-      reserved1=BytesField,
-      matrix=PacketField,
-      predefined1=BytesField,
+      reserved1=bytes,
+      matrix=Matrix9Long,
+      predefined1=bytes,
       next_track_id=UInt32BE,
   )
 
-  def parse_buffer(self, bfr, **kw):
-    super().parse_buffer(bfr, **kw)
+  def parse_fields(self, bfr):
+    super().parse_fields(bfr)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, TimeStamp32)
-      self.add_from_buffer('modification_time', bfr, TimeStamp32)
-      self.add_from_buffer('timescale', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt32BE)
+      self.parse_field('creation_time', bfr, TimeStamp32)
+      self.parse_field('modification_time', bfr, TimeStamp32)
+      self.parse_field('timescale', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, TimeStamp64)
-      self.add_from_buffer('modification_time', bfr, TimeStamp64)
-      self.add_from_buffer('timescale', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt64BE)
+      self.parse_field('creation_time', bfr, TimeStamp64)
+      self.parse_field('modification_time', bfr, TimeStamp64)
+      self.parse_field('timescale', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt64BE)
     else:
       raise ValueError("MVHD: unsupported version %d" % (self.version,))
-    self.add_from_buffer('rate_long', bfr, Int32BE)
-    self.add_from_buffer('volume_short', bfr, Int16BE)
-    self.add_from_buffer('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
-    self.add_from_buffer('matrix', bfr, Matrix9Long),
-    self.add_from_buffer('predefined1', bfr, 24)  # 6x4 predefined
-    self.add_from_buffer('next_track_id', bfr, UInt32BE)
+    self.parse_field('rate_long', bfr, Int32BE)
+    self.parse_field('volume_short', bfr, Int16BE)
+    self.parse_field('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
+    self.parse_field('matrix', bfr, Matrix9Long),
+    self.parse_field('predefined1', bfr, 24)  # 6x4 predefined
+    self.parse_field('next_track_id', bfr, UInt32BE)
+    return self
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.creation_time.transcribe()
+    yield self.modification_time.transcribe()
+    yield self.timescale.transcribe()
+    yield self.duration.transcribe()
+    yield self.rate_long.transcribe()
+    yield self.volume_short.transcribe()
+    yield self.reserved1
+    yield self.matrix.transcribe()
+    yield self.predefined1
+    yield self.next_track_id.transcribe()
 
   @prop
   def rate(self):
