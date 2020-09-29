@@ -1193,31 +1193,19 @@ class PDINBoxBody(FullBoxBody):
 add_body_class(PDINBoxBody)
 
 class ContainerBoxBody(BoxBody):
-  ''' A base class for pure container boxes.
-  '''
 
-  PACKET_FIELDS = dict(
-      BoxBody.PACKET_FIELDS,
-      boxes=SubBoxesField,
-  )
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=BinaryListValues)
+
+  @pfx_method
+  def parse_fields(self, bfr):
+    super().parse_fields(bfr)
+    self.boxes = BinaryListValues.parse(bfr, pt=Box)
+
+  def transcribe(self):
+    return self.boxes.transcribe()
 
   def __iter__(self):
     return iter(self.boxes)
-
-  def parse_buffer(self, bfr, default_type=None, **kw):
-    ''' Gather the `boxes` field.
-    '''
-    # parse the BoxBody
-    super().parse_buffer(bfr, **kw)
-    # gather following boxes as .boxes
-    self.add_from_buffer(
-        'boxes',
-        bfr,
-        SubBoxesField,
-        end_offset=Ellipsis,
-        default_type=default_type,
-        parent=self.box
-    )
 
 class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
