@@ -1295,8 +1295,8 @@ class TKHDBoxBody(FullBoxBody):
       'TKHDMatrix', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
   )
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       creation_time=(True, (TimeStamp32, TimeStamp64)),
       modification_time=(True, (TimeStamp32, TimeStamp64)),
       track_id=UInt32BE,
@@ -1313,32 +1313,49 @@ class TKHDBoxBody(FullBoxBody):
       height=UInt32BE,
   )
 
-  def parse_buffer(self, bfr, **kw):
-    super().parse_buffer(bfr, **kw)
+  def parse_fields(self, bfr, **kw):
+    super().parse_fields(bfr, **kw)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, TimeStamp32)
-      self.add_from_buffer('modification_time', bfr, TimeStamp32)
-      self.add_from_buffer('track_id', bfr, UInt32BE)
-      self.add_from_buffer('reserved1', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt32BE)
+      self.parse_field('creation_time', bfr, TimeStamp32)
+      self.parse_field('modification_time', bfr, TimeStamp32)
+      self.parse_field('track_id', bfr, UInt32BE)
+      self.parse_field('reserved1', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, TimeStamp64)
-      self.add_from_buffer('modification_time', bfr, TimeStamp64)
-      self.add_from_buffer('track_id', bfr, UInt32BE)
-      self.add_from_buffer('reserved1', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt64BE)
+      self.parse_field('creation_time', bfr, TimeStamp64)
+      self.parse_field('modification_time', bfr, TimeStamp64)
+      self.parse_field('track_id', bfr, UInt32BE)
+      self.parse_field('reserved1', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt64BE)
     else:
       raise ValueError("TRHD: unsupported version %d" % (self.version,))
-    self.add_from_buffer('reserved2', bfr, UInt32BE)
-    self.add_from_buffer('reserved3', bfr, UInt32BE)
-    self.add_from_buffer('layer', bfr, Int16BE)
-    self.add_from_buffer('alternate_group', bfr, Int16BE)
-    self.add_from_buffer('volume', bfr, Int16BE)
-    self.add_from_buffer('reserved4', bfr, UInt16BE)
-    self.add_from_buffer('matrix', bfr, TKHDBoxBody.TKHDMatrix)
-    self.add_from_buffer('width', bfr, UInt32BE)
-    self.add_from_buffer('height', bfr, UInt32BE)
+    self.parse_field('reserved2', bfr, UInt32BE)
+    self.parse_field('reserved3', bfr, UInt32BE)
+    self.parse_field('layer', bfr, Int16BE)
+    self.parse_field('alternate_group', bfr, Int16BE)
+    self.parse_field('volume', bfr, Int16BE)
+    self.parse_field('reserved4', bfr, UInt16BE)
+    self.parse_field('matrix', bfr, TKHDBoxBody.TKHDMatrix)
+    self.parse_field('width', bfr, UInt32BE)
+    self.parse_field('height', bfr, UInt32BE)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.creation_time.transcribe()
+    yield self.modification_time.transcribe()
+    yield self.track_id.transcribe()
+    yield self.reserved1.transcribe()
+    yield self.duration.transcribe()
+    yield self.reserved2.transcribe()
+    yield self.reserved3.transcribe()
+    yield self.layer.transcribe()
+    yield self.alternate_group.transcribe()
+    yield self.volume.transcribe()
+    yield self.reserved4.transcribe()
+    yield self.matrix.transcribe()
+    yield self.width.transcribe()
+    yield self.height.transcribe()
 
   @prop
   def track_enabled(self):
