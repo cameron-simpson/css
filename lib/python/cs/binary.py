@@ -515,606 +515,6 @@ class BinaryListValues(AbstractBinary):
         if isinstance(value, bytes) else value.transcribe(), self.values
     )
 
-class PacketField(ABC):
-  ''' A record for an individual packet field.
-
-      *DEPRECATED*:
-      please adopt one of the `BinarySingle`* classes instead.
-
-      This normally holds a single value,
-      for example an int of a particular size or a string.
-
-      There are 2 basic ways to implement a `PacketField` subclass:
-      * simple: implement `value_from_buffer` and `transcribe_value`
-      * complex: implement `from_buffer` and `transcribe`
-
-      In the simple case subclasses should implement two methods:
-      * `value_from_buffer`:
-        parse the value from a `CornuCopyBuffer` and return the parsed value
-      * `transcribe_value`:
-        transcribe the value as bytes
-
-      In the more complex case,
-      sometimes a `PacketField` may not warrant (or perhaps fit)
-      the formality of a `Packet` with its multifield structure.
-
-      One example is the `cs.iso14496.UTF8or16Field` class.
-
-      `UTF8or16Field` supports an ISO14496 UTF8 or UTF16 string field,
-      as as such has 2 attributes:
-      * `value`: the string itself
-      * `bom`: a UTF16 byte order marker or `None`;
-        `None` indicates that the string should be encoded as UTF-8
-        and otherwise the BOM indicates UTF16 big endian or little endian.
-
-      To make this subclass it defines these methods:
-      * `from_buffer`:
-        to read the optional BOM and then the following encoded string;
-        it then returns the new `UTF8or16Field`
-        initialised from these values via `cls(text, bom=bom)`.
-      * `transcribe`:
-        to transcribe the optional BOM and suitably encoded string.
-      The instance method `transcribe` is required because the transcription
-      requires knowledge of the BOM, an attribute of an instance.
-  '''
-
-  def __init__(self, value=None):
-    ''' Initialise the `PacketField`.
-        If omitted the inial field `value` will be `None`.
-    '''
-    self.value = value
-
-  @property
-  def value_s(self):
-    ''' The preferred string representation of the value.
-    '''
-    return str(self.value)
-
-  def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.value_s)
-
-  def __eq__(self, other):
-    return type(self) is type(other) and self.value == other.value
-
-  def __bytes__(self):
-    return b''.join(flatten(self.transcribe()))
-
-  def __len__(self):
-    ''' Compute the length by running a transcription and measuring it.
-    '''
-    return sum(len(bs) for bs in flatten(self.transcribe()))
-
-  @classmethod
-  def from_bytes(cls, bs, offset=0, length=None, **kw):
-    ''' Factory to return a `PacketField` instance parsed from the
-        bytes `bs` starting at `offset`.
-        Returns the new `PacketField` and the post parse offset.
-
-        The parameters `offset` and `length` are as for the
-        `CornuCopyBuffer.from_bytes` factory.
-
-        This relies on the `cls.from_buffer` method for the parse.
-    '''
-    bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
-    field = cls.from_buffer(bfr, **kw)
-    post_offset = offset + bfr.offset
-    return field, post_offset
-
-  @classmethod
-  def value_from_bytes(cls, bs, offset=0, length=None, **kw):
-    ''' Return a value parsed from the bytes `bs` starting at `offset`.
-        Returns the new value and the post parse offset.
-
-        The parameters `offset` and `length` are as for the
-        `CornuCopyBuffer.from_bytes` factory.
-
-        This relies on the `cls.from_bytes` method for the parse.
-    '''
-    field, offset = cls.from_bytes(bs, offset=offset, length=length, **kw)
-    return field.value, offset
-
-  @classmethod
-  def from_buffer(cls, bfr, **kw):
-    ''' Factory to return a `PacketField` instance from a `CornuCopyBuffer`.
-
-        This default implementation is for single value `PacketField`s
-        and instantiates the instance from the value returned
-        by `cls.value_from_buffer(bfr, **kw)`;
-        implementors should implement `value_from_buffer`.
-    '''
-    value = cls.value_from_buffer(bfr, **kw)
-    return cls(value)
-
-  @classmethod
-  def value_from_buffer(cls, bfr, **kw):
-    ''' Function to parse and return the core value from a `CornuCopyBuffer`.
-
-        For single value fields it is enough to implement this method.
-
-        For multiple value fields it is better to implement `cls.from_buffer`.
-    '''
-    packet = cls.from_buffer(bfr, **kw)
-    return packet.value
-
-  @classmethod
-  def parse_buffer_with_offsets(cls, bfr, **kw):
-    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
-        until end of input.
-        Yields `(offset,instance,post_offset)`
-        where `offset` if the buffer offset where the instance commenced
-        and `post_offset` is the buffer offset after the instance.
-    '''
-    offset = bfr.offset
-    while not bfr.at_eof():
-      post_offset = bfr.offset
-      yield offset, cls.from_buffer(bfr, **kw), post_offset
-      offset = post_offset
-
-  @classmethod
-  def parse_buffer(cls, bfr, **kw):
-    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
-        until end of input.
-    '''
-    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
-      yield obj
-
-  @classmethod
-  def parse_buffer_values(cls, bfr, **kw):
-    ''' Function to parse repeated instances of `cls.value`
-        from the buffer `bfr` until end of input.
-    '''
-    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
-      yield obj.value
-
-  @classmethod
-  def parse_file(cls, f, **kw):
-    ''' Function to parse repeated instances of `cls` from the file `f`
-        until end of input.
-
-        Parameters:
-        * `f`: the binary file object to parse;
-          if `f` is a string, that pathname is opened for binary read.
-    '''
-    if isinstance(f, str):
-      with open(f, 'rb') as f2:
-        yield from cls.parse_file(f2, **kw)
-    else:
-      yield from cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
-
-  def transcribe(self):
-    ''' Return or yield the bytes transcription of this field.
-
-        This may directly return:
-        * a `bytes` or `memoryview` holding the binary data
-        * `None`: indicating no binary data
-        * `str`: indicating the ASCII encoding of the string
-        * an iterable of these things (including further iterables)
-          to support trivially transcribing via other fields'
-          `transcribe` methods
-
-        Callers will usually call `flatten` on the output of this
-        method, or use the convenience `transcribe_flat` method
-        which calls `flatten` for them.
-
-        This default implementation is for single value fields and
-        just calls `self.transcribe_value(self.value)`.
-    '''
-    yield self.transcribe_value(self.value)
-
-  @classmethod
-  def transcribe_value(cls, value, **kw):
-    ''' For simple `PacketField`s, return a bytes transcription of a
-        value suitable for the `.value` attribute.
-
-        For example, the `BSUInt` subclass stores a `int` as its
-        `.value` and exposes its serialisation method, suitable for
-        any `int`, as `transcribe_value`.
-
-        Note that this calls the class `transcribe` method, which
-        may return an iterable.
-        Use the `value_as_bytes` method to get a single flat `bytes` result.
-    '''
-    return cls(value, **kw).transcribe()
-
-  @classmethod
-  def value_as_bytes(cls, value, **kw):
-    ''' For simple `PacketField`s, return a transcription of a
-        value suitable for the `.value` attribute
-        as a single `bytes` value.
-
-        This flattens and joins the transcription returned by
-        `transcribe_value`.
-    '''
-    return b''.join(flatten(cls.transcribe_value(value, **kw)))
-
-  def transcribe_flat(self):
-    ''' Return a flat iterable of chunks transcribing this field.
-    '''
-    return flatten(self.transcribe())
-
-  @classmethod
-  def transcribe_value_flat(cls, value):
-    ''' Return a flat iterable of chunks transcribing `value`.
-    '''
-    return flatten(cls.transcribe_value(value))
-
-class EmptyPacketField(PacketField):
-  ''' An empty data field, used as a placeholder for optional
-      fields when they are not present.
-
-      The singleton `EmptyField` is a predefined instance.
-  '''
-
-  TEST_CASES = (
-      b'',
-      ({}, b''),
-  )
-
-  def __init__(self):
-    super().__init__(None)
-
-  @classmethod
-  def from_buffer(cls, bfr):
-    return cls()
-
-  def transcribe(self):
-    pass
-
-# singleton empty field
-EmptyField = EmptyPacketField()
-
-class UTF8NULField(PacketField):
-  ''' A NUL terminated UTF-8 string.
-  '''
-
-  TEST_CASES = (
-      b'123\0',
-      ('123', {}, b'123\0'),
-  )
-
-  @classmethod
-  def value_from_buffer(cls, bfr):
-    ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
-    '''
-    # probe for the terminating NUL
-    bs_length = 1
-    while True:
-      bfr.extend(bs_length)
-      nul_pos = bs_length - 1
-      if bfr[nul_pos] == 0:
-        break
-      bs_length += 1
-    if nul_pos == 0:
-      utf8 = ''
-    else:
-      utf8_bs = bfr.take(nul_pos)
-      if not isinstance(utf8_bs, bytes):
-        # transmute memoryview to real bytes object
-        utf8_bs = utf8_bs.tobytes()
-      utf8 = utf8_bs.decode('utf-8')
-    bfr.take(1)
-    return utf8
-
-  @staticmethod
-  def transcribe_value(s):
-    ''' Transcribe the `value` in UTF-8 with a terminating NUL.
-    '''
-    yield s.encode('utf-8')
-    yield b'\0'
-
-class UTF16NULField(PacketField):
-  ''' A NUL terminated UTF-16 string.
-  '''
-
-  TEST_CASES = (
-      ('abc', {
-          'encoding': 'utf_16_le'
-      }, b'a\x00b\x00c\x00\x00\x00'),
-      ('abc', {
-          'encoding': 'utf_16_be'
-      }, b'\x00a\x00b\x00c\x00\x00'),
-  )
-
-  VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
-
-  def __init__(self, value, *, encoding):
-    ''' Initialise the `PacketField`.
-        If omitted the inial field `value` will be `None`.
-    '''
-    if encoding not in self.VALID_ENCODINGS:
-      raise ValueError(
-          'unexpected encoding %r, expected one of %r' %
-          (encoding, self.VALID_ENCODINGS)
-      )
-    self.encoding = encoding
-    self.value = value
-
-  @classmethod
-  def from_buffer(cls, bfr, encoding):
-    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
-        The mandatory parameter `encoding` specifies the UTF16 encoding to use
-        (`'utf_16_be'` or `'utf_16_le'`).
-    '''
-    # probe for the terminating NUL
-    bs_length = 2
-    while True:
-      bfr.extend(bs_length)
-      nul_pos = bs_length - 2
-      if bfr[nul_pos] == 0 and bfr[nul_pos + 1] == 0:
-        break
-      bs_length += 2
-    if nul_pos == 0:
-      utf16 = ''
-    else:
-      utf16_bs = bfr.take(nul_pos)
-      utf16 = utf16_bs.decode(encoding)
-    bfr.take(2)
-    return cls(utf16, encoding=encoding)
-
-  def transcribe(self):
-    yield from self.transcribe_value(self.value, encoding=self.encoding)
-
-  @staticmethod
-  def transcribe_value(value, encoding='utf-16'):
-    ''' Transcribe `value` in UTF-16 with a terminating NUL.
-    '''
-    yield value.encode(encoding)
-    yield b'\0\0'
-
-class BytesField(BinarySingleValue):
-  ''' A field of bytes.
-  '''
-
-  TEST_CASES = (
-      ##(b'1234', {'length': 4}, b'1234'),
-  )
-
-  @property
-  def data(self):
-    ''' Alias for the `.value` attribute.
-    '''
-    return self.value
-
-  @property
-  def length(self):
-    ''' Convenient length attribute.
-    '''
-    return len(self.value)
-
-  def __len__(self):
-    ''' The length is the length of the data.
-    '''
-    return len(self.value)
-
-  @classmethod
-  def value_from_buffer(cls, bfr, length=None):
-    ''' Parse a `BytesField` of length `length` from `bfr`.
-    '''
-    if length < 0:
-      raise ValueError("length(%d) < 0" % (length,))
-    return bfr.take(length)
-
-  @staticmethod
-  def transcribe_value(value):
-    ''' A `BytesField` is its own transcription.
-    '''
-    return value
-
-def fixed_bytes_field(length, class_name=None):
-  ''' Factory for `BytesField` subclasses built from fixed length byte strings.
-  '''
-  if length < 1:
-    raise ValueError("length(%d) < 1" % (length,))
-
-  class FixedBytesField(BytesField):
-    ''' A field whose value is simply a fixed length bytes chunk.
-    '''
-
-    @classmethod
-    def parse_value(cls, bfr):
-      ''' Obtain fixed bytes from the buffer.
-      '''
-      return bfr.take(length)
-
-  if class_name is None:
-    class_name = FixedBytesField.__name__ + '_' + str(length)
-  FixedBytesField.__name__ = class_name
-  FixedBytesField.__doc__ = (
-      'A `PacketField` which fetches and transcribes a fixed with bytes chunk of length %d.'
-      % (length,)
-  )
-  return FixedBytesField
-
-class BytesesField(PacketField):
-  ''' A field containing a list of bytes chunks.
-
-      The following attributes are defined:
-      * `value`: the gathered data as a list of bytes instances,
-        or None if the field was gathered with `discard_data` true.
-      * `offset`: the starting offset of the data.
-      * `end_offset`: the ending offset of the data.
-
-      The `offset` and `end_offset` values are recorded during the
-      parse, and may become irrelevant if the field's contents are
-      changed.
-  '''
-
-  def __str__(self):
-    return "%s(%d:%d:%s)" % (
-        type(self).__name__, self.offset, self.end_offset,
-        "NO_DATA" if self.value is None else "bytes[%d]" % len(self.value)
-    )
-
-  def __len__(self):
-    return self.length
-
-  def __iter__(self):
-    yield from self.value
-
-  @classmethod
-  def from_buffer(
-      cls, bfr, end_offset=None, discard_data=False, short_ok=False
-  ):
-    ''' Create a new `BytesesField` from a buffer
-        by gathering from `bfr` until `end_offset`.
-
-        Parameters:
-        * `bfr`: the input buffer
-        * `end_offset`: the ending buffer offset; if this is Ellipsis
-          then all the remaining data in `bfr` will be collected
-        * `discard_data`: discard the data, keeping only the offset information
-        * `short_ok`: if true, do not raise EOFError if there are
-          insufficient data; the field's .end_offset value will be
-          less than `end_offset`; the default is False
-
-        Note that this method also sets the following attributes
-        on the new `BytesesField`:
-        * `offset`: the starting offset of the gathered bytes
-        * `end_offset`: the ending offset after the gathered bytes
-        * `length`: the length of the data
-    '''
-    if end_offset is None:
-      raise ValueError("missing end_offset")
-    offset0 = bfr.offset
-    byteses = None if discard_data else []
-    if end_offset is Ellipsis:
-      # special case: gather up all the remaining data
-      bfr_end_offset = bfr.end_offset
-      if discard_data:
-        if bfr_end_offset is not None:
-          # we can skip to the end
-          bfr.skipto(bfr_end_offset)
-        else:
-          # TODO: try hinting in increasing powers of 2?
-          for _ in bfr:
-            pass
-      else:
-        # gather up all the data left in the buffer
-        if bfr_end_offset is not None:
-          bfr.hint(bfr_end_offset - bfr.offset)
-        byteses.extend(bfr)
-    else:
-      # otherwise gather up a bounded range of bytes
-      if end_offset < offset0:
-        raise ValueError(
-            "end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset)
-        )
-      bfr.skipto(
-          end_offset,
-          copy_skip=(None if discard_data else byteses.append),
-          short_ok=short_ok
-      )
-    offset = bfr.offset
-    if end_offset is not Ellipsis and offset < end_offset and not short_ok:
-      raise EOFError(
-          "%s.from_buffer: insufficient input data: end_offset=%d"
-          " but final bfr.offset=%d" % (cls, end_offset, bfr.offset)
-      )
-    field = cls(byteses)
-    field.offset = offset0
-    field.end_offset = offset
-    field.length = offset - offset0
-    return field
-
-  transcribe = __iter__
-
-class BytesRunField(PacketField):
-  ''' A field containing a continuous run of a single bytes value.
-
-      The following attributes are defined:
-      * `length`: the length of the run
-      * `bytes_value`: the repeated bytes value
-
-      The property `value` is computed on the fly on every reference
-      and returns a value obeying the buffer protocol: a bytes or
-      memoryview object.
-  '''
-
-  def __init__(self, length, bytes_value):
-    if length < 0:
-      raise ValueError("invalid length(%r), should be >= 0" % (length,))
-    if len(bytes_value) != 1:
-      raise ValueError(
-          "only single byte bytes_value is supported, received: %r" %
-          (bytes_value,)
-      )
-    self.length = length
-    self.bytes_value = bytes_value
-
-  def __str__(self):
-    return "%s(%d*%r)" % (type(self).__name__, self.length, self.bytes_value)
-
-  # A cache of 256 length runs of assorted bytes values as memoryviews
-  # as a mapping of bytes=>memoryview.
-  # In normal use these will be based on single byte bytes values.
-  _bytes_256s = {}
-
-  @staticmethod
-  def _bytes_256(bytes_value):
-    bs = BytesRunField._bytes_256s.get(bytes_value)
-    if bs is None:
-      bs = BytesRunField._bytes_256s[bytes_value] = bytes_value * 256
-    return bs
-
-  @property
-  def value(self):
-    ''' The run of bytes, computed on the fly.
-
-        Values where length <= 256 are cached.
-    '''
-    length = self.length
-    if length == 0:
-      return b''
-    bytes_value = self.bytes_value
-    if length == 1:
-      return bytes_value
-    if length <= 256:
-      bs = self._bytes_256(bytes_value)
-      if length < 256:
-        bs = bs[:length]
-      return bs
-    return bytes_value * length
-
-  @classmethod
-  def from_buffer(cls, bfr, end_offset=None, bytes_value=b'\0'):
-    ''' Parse a BytesRunField by just skipping the specified number of bytes.
-
-        Note: this *does not* check that the skipped bytes contain `bytes_value`.
-
-        Parameters:
-        * `bfr`: the buffer to scan
-        * `end_offset`: the end offset of the scan, which may be
-          an int or Ellipsis to indicate a scan to the end of the
-          buffer
-        * `bytes_value`: the bytes value to replicate, default
-          `b'\0'`; if this is an int then a single byte of that value
-          is used
-    '''
-    if end_offset is None:
-      raise ValueError("missing end_offset")
-    if isinstance(bytes_value, int):
-      bytes_value = bytes((bytes_value,))
-    offset0 = bfr.offset
-    if end_offset is Ellipsis:
-      for _ in bfr:
-        pass
-    else:
-      bfr.skipto(end_offset, discard_data=True)
-    field = cls(bfr.offset - offset0, bytes_value)
-    return field
-
-  def transcribe(self):
-    ''' Transcribe the BytesRunField in 256 byte chunks.
-    '''
-    length = self.length
-    bytes_value = self.bytes_value
-    bs256 = self._bytes_256(bytes_value)
-    while length >= 256:
-      yield bs256
-      length -= 256
-    if length > 0:
-      yield bs256[:length]
-
 _binary_multi_struct_classes = {}
 
 def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
@@ -1887,6 +1287,606 @@ class BinaryUTF16NUL(BinarySingleValue):
 #############################################################################
 ## DEPRECATED CLASSES BELOW.
 ##
+
+class PacketField(ABC):
+  ''' A record for an individual packet field.
+
+      *DEPRECATED*:
+      please adopt one of the `BinarySingle`* classes instead.
+
+      This normally holds a single value,
+      for example an int of a particular size or a string.
+
+      There are 2 basic ways to implement a `PacketField` subclass:
+      * simple: implement `value_from_buffer` and `transcribe_value`
+      * complex: implement `from_buffer` and `transcribe`
+
+      In the simple case subclasses should implement two methods:
+      * `value_from_buffer`:
+        parse the value from a `CornuCopyBuffer` and return the parsed value
+      * `transcribe_value`:
+        transcribe the value as bytes
+
+      In the more complex case,
+      sometimes a `PacketField` may not warrant (or perhaps fit)
+      the formality of a `Packet` with its multifield structure.
+
+      One example is the `cs.iso14496.UTF8or16Field` class.
+
+      `UTF8or16Field` supports an ISO14496 UTF8 or UTF16 string field,
+      as as such has 2 attributes:
+      * `value`: the string itself
+      * `bom`: a UTF16 byte order marker or `None`;
+        `None` indicates that the string should be encoded as UTF-8
+        and otherwise the BOM indicates UTF16 big endian or little endian.
+
+      To make this subclass it defines these methods:
+      * `from_buffer`:
+        to read the optional BOM and then the following encoded string;
+        it then returns the new `UTF8or16Field`
+        initialised from these values via `cls(text, bom=bom)`.
+      * `transcribe`:
+        to transcribe the optional BOM and suitably encoded string.
+      The instance method `transcribe` is required because the transcription
+      requires knowledge of the BOM, an attribute of an instance.
+  '''
+
+  def __init__(self, value=None):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
+    self.value = value
+
+  @property
+  def value_s(self):
+    ''' The preferred string representation of the value.
+    '''
+    return str(self.value)
+
+  def __str__(self):
+    return "%s(%s)" % (type(self).__name__, self.value_s)
+
+  def __eq__(self, other):
+    return type(self) is type(other) and self.value == other.value
+
+  def __bytes__(self):
+    return b''.join(flatten(self.transcribe()))
+
+  def __len__(self):
+    ''' Compute the length by running a transcription and measuring it.
+    '''
+    return sum(len(bs) for bs in flatten(self.transcribe()))
+
+  @classmethod
+  def from_bytes(cls, bs, offset=0, length=None, **kw):
+    ''' Factory to return a `PacketField` instance parsed from the
+        bytes `bs` starting at `offset`.
+        Returns the new `PacketField` and the post parse offset.
+
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_buffer` method for the parse.
+    '''
+    bfr = CornuCopyBuffer.from_bytes(bs, offset=offset, length=length)
+    field = cls.from_buffer(bfr, **kw)
+    post_offset = offset + bfr.offset
+    return field, post_offset
+
+  @classmethod
+  def value_from_bytes(cls, bs, offset=0, length=None, **kw):
+    ''' Return a value parsed from the bytes `bs` starting at `offset`.
+        Returns the new value and the post parse offset.
+
+        The parameters `offset` and `length` are as for the
+        `CornuCopyBuffer.from_bytes` factory.
+
+        This relies on the `cls.from_bytes` method for the parse.
+    '''
+    field, offset = cls.from_bytes(bs, offset=offset, length=length, **kw)
+    return field.value, offset
+
+  @classmethod
+  def from_buffer(cls, bfr, **kw):
+    ''' Factory to return a `PacketField` instance from a `CornuCopyBuffer`.
+
+        This default implementation is for single value `PacketField`s
+        and instantiates the instance from the value returned
+        by `cls.value_from_buffer(bfr, **kw)`;
+        implementors should implement `value_from_buffer`.
+    '''
+    value = cls.value_from_buffer(bfr, **kw)
+    return cls(value)
+
+  @classmethod
+  def value_from_buffer(cls, bfr, **kw):
+    ''' Function to parse and return the core value from a `CornuCopyBuffer`.
+
+        For single value fields it is enough to implement this method.
+
+        For multiple value fields it is better to implement `cls.from_buffer`.
+    '''
+    packet = cls.from_buffer(bfr, **kw)
+    return packet.value
+
+  @classmethod
+  def parse_buffer_with_offsets(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+        Yields `(offset,instance,post_offset)`
+        where `offset` if the buffer offset where the instance commenced
+        and `post_offset` is the buffer offset after the instance.
+    '''
+    offset = bfr.offset
+    while not bfr.at_eof():
+      post_offset = bfr.offset
+      yield offset, cls.from_buffer(bfr, **kw), post_offset
+      offset = post_offset
+
+  @classmethod
+  def parse_buffer(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls` from the buffer `bfr`
+        until end of input.
+    '''
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj
+
+  @classmethod
+  def parse_buffer_values(cls, bfr, **kw):
+    ''' Function to parse repeated instances of `cls.value`
+        from the buffer `bfr` until end of input.
+    '''
+    for _, obj, _ in cls.parse_buffer_with_offsets(bfr, **kw):
+      yield obj.value
+
+  @classmethod
+  def parse_file(cls, f, **kw):
+    ''' Function to parse repeated instances of `cls` from the file `f`
+        until end of input.
+
+        Parameters:
+        * `f`: the binary file object to parse;
+          if `f` is a string, that pathname is opened for binary read.
+    '''
+    if isinstance(f, str):
+      with open(f, 'rb') as f2:
+        yield from cls.parse_file(f2, **kw)
+    else:
+      yield from cls.parse_buffer(CornuCopyBuffer.from_file(f), **kw)
+
+  def transcribe(self):
+    ''' Return or yield the bytes transcription of this field.
+
+        This may directly return:
+        * a `bytes` or `memoryview` holding the binary data
+        * `None`: indicating no binary data
+        * `str`: indicating the ASCII encoding of the string
+        * an iterable of these things (including further iterables)
+          to support trivially transcribing via other fields'
+          `transcribe` methods
+
+        Callers will usually call `flatten` on the output of this
+        method, or use the convenience `transcribe_flat` method
+        which calls `flatten` for them.
+
+        This default implementation is for single value fields and
+        just calls `self.transcribe_value(self.value)`.
+    '''
+    yield self.transcribe_value(self.value)
+
+  @classmethod
+  def transcribe_value(cls, value, **kw):
+    ''' For simple `PacketField`s, return a bytes transcription of a
+        value suitable for the `.value` attribute.
+
+        For example, the `BSUInt` subclass stores a `int` as its
+        `.value` and exposes its serialisation method, suitable for
+        any `int`, as `transcribe_value`.
+
+        Note that this calls the class `transcribe` method, which
+        may return an iterable.
+        Use the `value_as_bytes` method to get a single flat `bytes` result.
+    '''
+    return cls(value, **kw).transcribe()
+
+  @classmethod
+  def value_as_bytes(cls, value, **kw):
+    ''' For simple `PacketField`s, return a transcription of a
+        value suitable for the `.value` attribute
+        as a single `bytes` value.
+
+        This flattens and joins the transcription returned by
+        `transcribe_value`.
+    '''
+    return b''.join(flatten(cls.transcribe_value(value, **kw)))
+
+  def transcribe_flat(self):
+    ''' Return a flat iterable of chunks transcribing this field.
+    '''
+    return flatten(self.transcribe())
+
+  @classmethod
+  def transcribe_value_flat(cls, value):
+    ''' Return a flat iterable of chunks transcribing `value`.
+    '''
+    return flatten(cls.transcribe_value(value))
+
+class EmptyPacketField(PacketField):
+  ''' An empty data field, used as a placeholder for optional
+      fields when they are not present.
+
+      The singleton `EmptyField` is a predefined instance.
+  '''
+
+  TEST_CASES = (
+      b'',
+      ({}, b''),
+  )
+
+  def __init__(self):
+    super().__init__(None)
+
+  @classmethod
+  def from_buffer(cls, bfr):
+    return cls()
+
+  def transcribe(self):
+    pass
+
+# singleton empty field
+EmptyField = EmptyPacketField()
+
+class UTF8NULField(PacketField):
+  ''' A NUL terminated UTF-8 string.
+  '''
+
+  TEST_CASES = (
+      b'123\0',
+      ('123', {}, b'123\0'),
+  )
+
+  @classmethod
+  def value_from_buffer(cls, bfr):
+    ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
+    '''
+    # probe for the terminating NUL
+    bs_length = 1
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 1
+      if bfr[nul_pos] == 0:
+        break
+      bs_length += 1
+    if nul_pos == 0:
+      utf8 = ''
+    else:
+      utf8_bs = bfr.take(nul_pos)
+      if not isinstance(utf8_bs, bytes):
+        # transmute memoryview to real bytes object
+        utf8_bs = utf8_bs.tobytes()
+      utf8 = utf8_bs.decode('utf-8')
+    bfr.take(1)
+    return utf8
+
+  @staticmethod
+  def transcribe_value(s):
+    ''' Transcribe the `value` in UTF-8 with a terminating NUL.
+    '''
+    yield s.encode('utf-8')
+    yield b'\0'
+
+class UTF16NULField(PacketField):
+  ''' A NUL terminated UTF-16 string.
+  '''
+
+  TEST_CASES = (
+      ('abc', {
+          'encoding': 'utf_16_le'
+      }, b'a\x00b\x00c\x00\x00\x00'),
+      ('abc', {
+          'encoding': 'utf_16_be'
+      }, b'\x00a\x00b\x00c\x00\x00'),
+  )
+
+  VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
+
+  def __init__(self, value, *, encoding):
+    ''' Initialise the `PacketField`.
+        If omitted the inial field `value` will be `None`.
+    '''
+    if encoding not in self.VALID_ENCODINGS:
+      raise ValueError(
+          'unexpected encoding %r, expected one of %r' %
+          (encoding, self.VALID_ENCODINGS)
+      )
+    self.encoding = encoding
+    self.value = value
+
+  @classmethod
+  def from_buffer(cls, bfr, encoding):
+    ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
+        The mandatory parameter `encoding` specifies the UTF16 encoding to use
+        (`'utf_16_be'` or `'utf_16_le'`).
+    '''
+    # probe for the terminating NUL
+    bs_length = 2
+    while True:
+      bfr.extend(bs_length)
+      nul_pos = bs_length - 2
+      if bfr[nul_pos] == 0 and bfr[nul_pos + 1] == 0:
+        break
+      bs_length += 2
+    if nul_pos == 0:
+      utf16 = ''
+    else:
+      utf16_bs = bfr.take(nul_pos)
+      utf16 = utf16_bs.decode(encoding)
+    bfr.take(2)
+    return cls(utf16, encoding=encoding)
+
+  def transcribe(self):
+    yield from self.transcribe_value(self.value, encoding=self.encoding)
+
+  @staticmethod
+  def transcribe_value(value, encoding='utf-16'):
+    ''' Transcribe `value` in UTF-16 with a terminating NUL.
+    '''
+    yield value.encode(encoding)
+    yield b'\0\0'
+
+class BytesField(BinarySingleValue):
+  ''' A field of bytes.
+  '''
+
+  TEST_CASES = (
+      ##(b'1234', {'length': 4}, b'1234'),
+  )
+
+  @property
+  def data(self):
+    ''' Alias for the `.value` attribute.
+    '''
+    return self.value
+
+  @property
+  def length(self):
+    ''' Convenient length attribute.
+    '''
+    return len(self.value)
+
+  def __len__(self):
+    ''' The length is the length of the data.
+    '''
+    return len(self.value)
+
+  @classmethod
+  def value_from_buffer(cls, bfr, length=None):
+    ''' Parse a `BytesField` of length `length` from `bfr`.
+    '''
+    if length < 0:
+      raise ValueError("length(%d) < 0" % (length,))
+    return bfr.take(length)
+
+  @staticmethod
+  def transcribe_value(value):
+    ''' A `BytesField` is its own transcription.
+    '''
+    return value
+
+def fixed_bytes_field(length, class_name=None):
+  ''' Factory for `BytesField` subclasses built from fixed length byte strings.
+  '''
+  if length < 1:
+    raise ValueError("length(%d) < 1" % (length,))
+
+  class FixedBytesField(BytesField):
+    ''' A field whose value is simply a fixed length bytes chunk.
+    '''
+
+    @classmethod
+    def parse_value(cls, bfr):
+      ''' Obtain fixed bytes from the buffer.
+      '''
+      return bfr.take(length)
+
+  if class_name is None:
+    class_name = FixedBytesField.__name__ + '_' + str(length)
+  FixedBytesField.__name__ = class_name
+  FixedBytesField.__doc__ = (
+      'A `PacketField` which fetches and transcribes a fixed with bytes chunk of length %d.'
+      % (length,)
+  )
+  return FixedBytesField
+
+class BytesesField(PacketField):
+  ''' A field containing a list of bytes chunks.
+
+      The following attributes are defined:
+      * `value`: the gathered data as a list of bytes instances,
+        or None if the field was gathered with `discard_data` true.
+      * `offset`: the starting offset of the data.
+      * `end_offset`: the ending offset of the data.
+
+      The `offset` and `end_offset` values are recorded during the
+      parse, and may become irrelevant if the field's contents are
+      changed.
+  '''
+
+  def __str__(self):
+    return "%s(%d:%d:%s)" % (
+        type(self).__name__, self.offset, self.end_offset,
+        "NO_DATA" if self.value is None else "bytes[%d]" % len(self.value)
+    )
+
+  def __len__(self):
+    return self.length
+
+  def __iter__(self):
+    yield from self.value
+
+  @classmethod
+  def from_buffer(
+      cls, bfr, end_offset=None, discard_data=False, short_ok=False
+  ):
+    ''' Create a new `BytesesField` from a buffer
+        by gathering from `bfr` until `end_offset`.
+
+        Parameters:
+        * `bfr`: the input buffer
+        * `end_offset`: the ending buffer offset; if this is Ellipsis
+          then all the remaining data in `bfr` will be collected
+        * `discard_data`: discard the data, keeping only the offset information
+        * `short_ok`: if true, do not raise EOFError if there are
+          insufficient data; the field's .end_offset value will be
+          less than `end_offset`; the default is False
+
+        Note that this method also sets the following attributes
+        on the new `BytesesField`:
+        * `offset`: the starting offset of the gathered bytes
+        * `end_offset`: the ending offset after the gathered bytes
+        * `length`: the length of the data
+    '''
+    if end_offset is None:
+      raise ValueError("missing end_offset")
+    offset0 = bfr.offset
+    byteses = None if discard_data else []
+    if end_offset is Ellipsis:
+      # special case: gather up all the remaining data
+      bfr_end_offset = bfr.end_offset
+      if discard_data:
+        if bfr_end_offset is not None:
+          # we can skip to the end
+          bfr.skipto(bfr_end_offset)
+        else:
+          # TODO: try hinting in increasing powers of 2?
+          for _ in bfr:
+            pass
+      else:
+        # gather up all the data left in the buffer
+        if bfr_end_offset is not None:
+          bfr.hint(bfr_end_offset - bfr.offset)
+        byteses.extend(bfr)
+    else:
+      # otherwise gather up a bounded range of bytes
+      if end_offset < offset0:
+        raise ValueError(
+            "end_offset(%d) < bfr.offset(%d)" % (end_offset, bfr.offset)
+        )
+      bfr.skipto(
+          end_offset,
+          copy_skip=(None if discard_data else byteses.append),
+          short_ok=short_ok
+      )
+    offset = bfr.offset
+    if end_offset is not Ellipsis and offset < end_offset and not short_ok:
+      raise EOFError(
+          "%s.from_buffer: insufficient input data: end_offset=%d"
+          " but final bfr.offset=%d" % (cls, end_offset, bfr.offset)
+      )
+    field = cls(byteses)
+    field.offset = offset0
+    field.end_offset = offset
+    field.length = offset - offset0
+    return field
+
+  transcribe = __iter__
+
+class BytesRunField(PacketField):
+  ''' A field containing a continuous run of a single bytes value.
+
+      The following attributes are defined:
+      * `length`: the length of the run
+      * `bytes_value`: the repeated bytes value
+
+      The property `value` is computed on the fly on every reference
+      and returns a value obeying the buffer protocol: a bytes or
+      memoryview object.
+  '''
+
+  def __init__(self, length, bytes_value):
+    if length < 0:
+      raise ValueError("invalid length(%r), should be >= 0" % (length,))
+    if len(bytes_value) != 1:
+      raise ValueError(
+          "only single byte bytes_value is supported, received: %r" %
+          (bytes_value,)
+      )
+    self.length = length
+    self.bytes_value = bytes_value
+
+  def __str__(self):
+    return "%s(%d*%r)" % (type(self).__name__, self.length, self.bytes_value)
+
+  # A cache of 256 length runs of assorted bytes values as memoryviews
+  # as a mapping of bytes=>memoryview.
+  # In normal use these will be based on single byte bytes values.
+  _bytes_256s = {}
+
+  @staticmethod
+  def _bytes_256(bytes_value):
+    bs = BytesRunField._bytes_256s.get(bytes_value)
+    if bs is None:
+      bs = BytesRunField._bytes_256s[bytes_value] = bytes_value * 256
+    return bs
+
+  @property
+  def value(self):
+    ''' The run of bytes, computed on the fly.
+
+        Values where length <= 256 are cached.
+    '''
+    length = self.length
+    if length == 0:
+      return b''
+    bytes_value = self.bytes_value
+    if length == 1:
+      return bytes_value
+    if length <= 256:
+      bs = self._bytes_256(bytes_value)
+      if length < 256:
+        bs = bs[:length]
+      return bs
+    return bytes_value * length
+
+  @classmethod
+  def from_buffer(cls, bfr, end_offset=None, bytes_value=b'\0'):
+    ''' Parse a BytesRunField by just skipping the specified number of bytes.
+
+        Note: this *does not* check that the skipped bytes contain `bytes_value`.
+
+        Parameters:
+        * `bfr`: the buffer to scan
+        * `end_offset`: the end offset of the scan, which may be
+          an int or Ellipsis to indicate a scan to the end of the
+          buffer
+        * `bytes_value`: the bytes value to replicate, default
+          `b'\0'`; if this is an int then a single byte of that value
+          is used
+    '''
+    if end_offset is None:
+      raise ValueError("missing end_offset")
+    if isinstance(bytes_value, int):
+      bytes_value = bytes((bytes_value,))
+    offset0 = bfr.offset
+    if end_offset is Ellipsis:
+      for _ in bfr:
+        pass
+    else:
+      bfr.skipto(end_offset, discard_data=True)
+    field = cls(bfr.offset - offset0, bytes_value)
+    return field
+
+  def transcribe(self):
+    ''' Transcribe the BytesRunField in 256 byte chunks.
+    '''
+    length = self.length
+    bytes_value = self.bytes_value
+    bs256 = self._bytes_256(bytes_value)
+    while length >= 256:
+      yield bs256
+      length -= 256
+    if length > 0:
+      yield bs256[:length]
 
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
