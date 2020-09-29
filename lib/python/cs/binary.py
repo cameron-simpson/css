@@ -1592,9 +1592,9 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         A `ValueError` is raised if no transcription can be chosen.
     '''
     with Pfx("%s=%r", field_name, field_value):
-      try:
-        transcribe = field_value.transcribe
-      except AttributeError:
+      if hasattr(field_value, 'transcribe'):
+        transcribe = lambda field_value: field_value.transcribe()
+      else:
         try:
           transcribe = self.FIELD_TRANSCRIBERS[field_name]
         except KeyError:
