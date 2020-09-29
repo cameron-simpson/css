@@ -626,21 +626,22 @@ class BoxBody(BaseBinaryMultiValue, ABC):
         return class_prefix.replace('_', ' ').lower().encode('ascii')
     raise AttributeError("no automatic box type for %s" % (cls,))
 
-class Box(Packet):
+class Box(BaseBinaryMultiValue):
   ''' Base class for all boxes - ISO14496 section 4.2.
 
-      This has the following `PacketField`s:
+      This has the following fields:
       * `header`: a `BoxHeader`
       * `body`: a `BoxBody` instance, usually a specific subclass
-      * `unparsed`: if there are unconsumed bytes from the `Box` they
-        are stored as here as a `BytesesField`; note that this field
-        is not present if there were no unparsed bytes
+      * `unparsed`: any unconsumed bytes from the `Box` are stored as here
   '''
 
-  PACKET_FIELDS = {
+  FIELD_TYPES = {
       'header': BoxHeader,
-      'body': (True, (BoxBody, EmptyPacketField)),
-      'unparsed': (True, (BytesesField, EmptyPacketField)),
+      'body': (True, (BoxBody, BinaryByteses)),
+      'unparsed': BinaryByteses,
+      'offset': int,
+      'unparsed_offset': int,
+      'end_offset': int,
   }
 
   def __init__(self, parent=None):
@@ -652,38 +653,36 @@ class Box(Packet):
     try:
       body = self.body
     except AttributeError:
-      s = "%s[%d]:NO_BODY" % (
-          type_name,
-          self.length,
-      )
+      s = "%s[%d]:NO_BODY" % (type_name, len(self))
     else:
-      s = "%s[%d]:%s" % (type_name, self.length, body)
-    unparsed = self.unparsed
-    if unparsed and unparsed != b'\0':
-      s += ":unparsed=%r" % (unparsed[:16],)
+      length = len(self)
+      s = "%s[%d]:%s" % (type_name, len(self), body)
+    unparsed_bs = self.unparsed_bs
+    if unparsed_bs and unparsed_bs != b'\0':
+      s += ":unparsed=%r" % (unparsed_bs[:16],)
     return s
 
   __repr__ = __str__
 
   def __getattr__(self, attr):
-    ''' If there is no direct attribute from `Packet.__getattr__`,
+    ''' If there is no direct attribute from `BaseBinaryMultiValue.__getattr__`,
         have a look in the `.header` and `.body`.
     '''
+    if attr in ('header', 'body'):
+      raise AttributeError("%s.%s: not present" % (type(self).__name__, attr))
     try:
-      value = super().__getattr__(attr)
+      value = getattr(self.header, attr)
     except AttributeError:
-      if attr in ('header', 'body'):
-        raise AttributeError("%s.%s: not present", type(self).__name__, attr)
       try:
-        value = getattr(self.header, attr)
+        value = getattr(self.body, attr)
       except AttributeError:
-        try:
-          value = getattr(self.body, attr)
-        except AttributeError:
-          raise AttributeError(
-              "%s.%s: not present via the Packet %r or the .header or .body fields"
-              % (type(self).__name__, attr, sorted(self.field_map.keys()))
-          )
+        raise AttributeError(
+            "%s.%s: not present via %r or the .header or .body fields" % (
+                type(self).__name__, attr,
+                ",".join(map(lambda cls: cls.__name__,
+                             type(self).__mro__))
+            )
+        )
     return value
 
   def __iter__(self):
@@ -697,38 +696,88 @@ class Box(Packet):
       return
     yield from iter(self.body)
 
-  def transcribe(self):
-    ''' Transcribe the Box.
+  @classmethod
+  def parse(cls, bfr):
+    ''' Decode a Box from `bfr` and return it.
+    '''
+    self = cls()
+    self.offset = bfr.offset
+    header = self.header = BoxHeader.parse(bfr)
+    length = header.box_size
+    if length is Ellipsis:
+      end_offset = Ellipsis
+      bfr_tail = bfr
+      warning("Box.parse_buffer: Box %s has no length", header)
+    else:
+      end_offset = self.offset + length
+      bfr_tail = bfr.bounded(end_offset)
+    body_class = pick_boxbody_class(header.type)
+    self.body = body_class.parse(bfr_tail, box=self)
+    self.unparsed_offset = bfr_tail.offset
+    self.unparsed = BinaryByteses.parse(bfr_tail)
+    if bfr_tail is not bfr:
+      assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
+    self.end_offset = bfr.offset
+    self.self_check()
+    bfr.report_offset(self.offset)
+    copy_boxes = PARSE_MODE.copy_boxes
+    if copy_boxes:
+      copy_boxes(self)
+    return self
 
-        Before transcribing the data, we compute the length from the
-        lengths of the current header, body and unparsed components,
-        then set the header length if that has changed. Since setting
-        the header length can change its representation we compute
-        the length again and abort if it isn't stable. Otherwise
-        we proceeed with a regular transcription.
+  @property
+  def parse_length(self):
+    ''' The length of the box as consumed from the buffer,
+        computed as `self.end_offset-self.offset`.
+    '''
+    return self.end_offset - self.offset
+
+  @property
+  def unparsed_bs(self):
+    ''' The unparsed data as a single `bytes` instance.
+    '''
+    return b''.join(self.unparsed_bss)
+
+  @property
+  def unparsed_bss(self):
+    ''' The `bytes` instances comprising `.unparsed`.
+    '''
+    return self.unparsed.values
+
+  def transcribe(self):
+    ''' Transcribe the `Box`.
+
+        Before transcribing the data, we compute the total box_size
+        from the lengths of the current header, body and unparsed
+        components, then set the header length if that has changed.
+        Since setting the header length can change its representation
+        we compute the length again and abort if it isn't stable.
+        Otherwise we proceeed with a regular transcription.
     '''
     header = self.header
-    length = header.length
-    if length is Ellipsis:
-      body = self.body
-      unparsed = self.unparsed
+    body = self.body
+    unparsed = self.unparsed
+    new_length = len(header) + len(body) + len(unparsed)
+    box_size = header.box_size
+    if box_size is Ellipsis or box_size != new_length:
+      # change the box_size
+      header.box_size = new_length
       # Recompute the length from the header, body and unparsed
       # components, then set it on the header to get the prepare
       # transcription.
-      new_length = len(header) + len(body) + len(unparsed)
-      # set the header and then check that it matches
-      header.length = new_length
-      if new_length != len(header) + len(body) + len(unparsed):
+      new_length2 = len(header) + len(body) + len(unparsed)
+      if new_length2 != header.box_size:
         # the header has changed size because we changed the length, try again
-        new_length = len(header) + len(body) + len(unparsed)
-        # set the header and then check that it matches
-        header.length = new_length
-        if new_length != len(header) + len(body) + len(unparsed):
+        header.box_size = new_length2
+        new_length3 = len(header) + len(body) + len(unparsed)
+        if new_length3 != header.box_size:
           # the header has changed size again, unstable, need better algorithm
           raise RuntimeError(
               "header size unstable, maybe we need a header mode to force the representation"
           )
-    return super().transcribe()
+    yield self.header.transcribe()
+    yield self.body.transcribe()
+    yield self.unparsed.transcribe()
 
   def self_check(self):
     ''' Sanity check this Box.
@@ -762,106 +811,6 @@ class Box(Packet):
       if parent is not None and not isinstance(parent, Box):
         warning("parent should be a Box, but is %r", type(self))
 
-  @classmethod
-  def from_buffer(
-      cls, bfr, discard_data=False, default_type=None, copy_boxes=None
-  ):
-    ''' Decode a Box from `bfr` and return it.
-
-        Parameters:
-        * `bfr`: the input CornuCopyBuffer
-        * `discard_data`: if false (default), keep the unparsed data portion as
-          a list of data chunks in the field .unparsed; if true, discard the
-          unparsed data
-        * `default_type`: default Box body type if no class is
-          registered for the header box type.
-        * `copy_boxes`: optional callable for reporting new Box instances
-
-        This provides the Packet.from_buffer method, but offloads
-        the actual parse to the method `parse_buffer`, which is
-        overridden by subclasses.
-    '''
-    B = cls()
-    B.offset = bfr.offset
-    try:
-      B.parse_buffer(bfr, discard_data=discard_data, default_type=default_type)
-    except EOFError as e:
-      error("%s.parse_buffer: EOF parsing buffer: %s", type(B), e)
-    B.end_offset = bfr.offset
-    B.self_check()
-    bfr.report_offset(B.offset)
-    if copy_boxes:
-      copy_boxes(B)
-    return B
-
-  def parse_buffer(self, bfr, default_type=None, copy_boxes=None, **kw):
-    ''' Parse the Box from `bfr`.
-
-        Parameters:
-        * `bfr`: the input CornuCopyBuffer
-          unparsed data
-        * `default_type`: default Box body type if no class is
-          registered for the header box type.
-        * `copy_boxes`: optional callable for reporting new Box instances
-        Other parameters are passed to the inner parse calls.
-
-        This method should be overridden by subclasses (if any,
-        since the actual subclassing happens with the BoxBody base
-        class).
-    '''
-    header = self.add_from_buffer('header', bfr, BoxHeader)
-    length = header.length
-    if length is Ellipsis:
-      end_offset = Ellipsis
-      bfr_tail = bfr
-      warning("Box.parse_buffer: Box %s has no length", header)
-    else:
-      end_offset = self.offset + length
-      bfr_tail = bfr.bounded(end_offset)
-    body_class = pick_boxbody_class(header.type, default_type=default_type)
-    with Pfx("parse(%s:%s)", body_class.__name__, self.box_type_s):
-      if bfr_tail.at_eof():
-        if self.box_type not in (b'free', b'skip'):
-          error(
-              "no Box body data parsing %s (box_type=%r)", body_class.__name__,
-              self.box_type
-          )
-        self.add_field('body', EmptyField)
-      else:
-        try:
-          self.add_from_buffer(
-              'body',
-              bfr_tail,
-              body_class,
-              box=self,
-              copy_boxes=copy_boxes,
-              end_offset=Ellipsis,
-              **kw
-          )
-        except EOFError as e:
-          # TODO: recover the data already collected but lost
-          debug(
-              "EOFError parsing %s: %s at bfr_tail.offset=%d",
-              body_class.__name__, e, bfr_tail.offset
-          )
-          self.add_field('body', EmptyField)
-      # advance over the remaining data, optionally keeping it
-      self.unparsed_offset = bfr_tail.offset
-      if (not bfr_tail.at_eof()
-          if end_offset is Ellipsis else end_offset > bfr_tail.offset):
-        # there are unparsed data, stash it away and emit a warning
-        self.add_from_buffer(
-            'unparsed', bfr_tail, BytesesField, end_offset=Ellipsis, **kw
-        )
-        debug(
-            "%s:%s: unparsed data: %d bytes",
-            type(self).__name__, self.box_type_s, len(self['unparsed'])
-        )
-      else:
-        self.add_field('unparsed', EmptyField)
-      if bfr_tail is not bfr:
-        bfr_tail.flush()
-
   @contextmanager
   def reparse_buffer(self):
     ''' Context manager for continuing a parse from the `unparsed` field.
@@ -871,13 +820,11 @@ class Box(Packet):
         then pushes the `unparsed` field again
         with the remaining contents of the buffer.
     '''
-    field_name, unparsed = self.pop_field()
-    assert field_name == 'unparsed', "field_name(%r) is not 'unparsed'" % (
-        field_name,
-    )
-    bfr = CornuCopyBuffer(unparsed.value)
+    unparsed = self.unparsed
+    self.unparsed = BinaryByteses()
+    bfr = CornuCopyBuffer(unparsed.values)
     yield bfr
-    self.add_from_buffer('unparsed', bfr, BytesesField, end_offset=Ellipsis)
+    self.unparsed = BinaryByteses.parse(bfr)
 
   @property
   def box_type(self):
