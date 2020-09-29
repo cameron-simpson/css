@@ -948,6 +948,11 @@ BoxBody.FIELD_TYPES['parent'] = Box
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
+class FallbackBoxBody(BoxBody):
+
+  def transcribe(self):
+    pass
+
 def add_body_class(klass):
   ''' Register a box body class in KNOWN_BOXBODY_CLASSES.
   '''
