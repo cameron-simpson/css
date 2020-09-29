@@ -1535,9 +1535,9 @@ class ELNGBoxBody(FullBoxBody):
   ''' A ELNGBoxBody is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
-      extended_language=UTF8NULField,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
+      extended_language=BinaryUTF8NUL,
   )
 
   def parse_fields(self, bfr):
@@ -1545,7 +1545,7 @@ class ELNGBoxBody(FullBoxBody):
     '''
     super().parse_fields(bfr)
     # extended language based on RFC4646
-    self.add_from_buffer('extended_language', bfr, UTF8NULField)
+    self.parse_field('extended_language', bfr, BinaryUTF8NUL)
 
 add_body_class(ELNGBoxBody)
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
