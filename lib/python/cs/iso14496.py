@@ -983,10 +983,9 @@ def add_body_subclass(superclass, box_type, section, desc):
       another.  Returns the new class.
   '''
   if isinstance(box_type, bytes):
-    classname = box_type.decode('ascii').upper() + 'BoxBody'
-  else:
-    classname = box_type.upper() + 'BoxBody'
-    box_type = box_type.encode('ascii')
+    box_type = box_type.decode('ascii')
+  classname = box_type.upper() + 'BoxBody'
+  box_type = box_type.encode('ascii')
   K = type(classname, (superclass,), {})
   K.__doc__ = (
       "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
