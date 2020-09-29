@@ -1770,6 +1770,12 @@ def pt_spec(pt, field_name=None):
       func_parse, func_transcribe = pt
   return func_parse, func_transcribe
 
+def BinaryFixedBytes(class_name, length: int):
+  ''' Factory for an `AbstractBinary` subclass matching `length` bytes of data.
+      The bytes are saved as the attribute `.data`.
+  '''
+  return BinarySingleStruct(class_name, f'>{length}s', 'data')
+
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
   '''
