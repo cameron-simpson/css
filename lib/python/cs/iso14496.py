@@ -2160,6 +2160,70 @@ class METABoxBody(FullBoxBody):
 
 add_body_class(METABoxBody)
 
+def ILSTRawSchema(attribute_name):
+  ''' Namedtuple type for ILST raw schema.
+  '''
+  return namedtuple('ILSTRawSchema', 'attribute_name parse transcribe')(
+      attribute_name, lambda bfr: bfr.take(...), lambda bs: bs
+  )
+
+def ILSTTextSchema(attribute_name):
+  ''' Namedtuple type for ILST text schema.
+  '''
+  return namedtuple('ILSTTextSchema', 'attribute_name parse transcribe')(
+      attribute_name, lambda bfr: bfr.take(...).decode(),
+      lambda text: text.encode()
+  )
+
+def ILSTUInt32BESchema(attribute_name):
+  ''' Namedtuple type for ILST UInt32BE schema.
+  '''
+  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
+      attribute_name, UInt32BE.parse_value, UInt32BE.transcribe_value
+  )
+
+def ILSTUInt8Schema(attribute_name):
+  ''' Namedtuple type for ILST UInt8BE schema.
+  '''
+  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
+      attribute_name, UInt8.parse_value, UInt8.transcribe_value
+  )
+
+def ILSTAofBSchema(attribute_name):
+  ''' Namedtuple type for ILST "A of B" schema.
+  '''
+  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
+      attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
+      (UInt32BE.parse_value(bfr), UInt32BE.parse_value(bfr)),
+      lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE.
+      transcribe_value(member_n_of.total)
+  )
+
+def ILSTISOFormatSchema(attribute_name):
+  ''' Namedtuple type for ILST ISO format schema.
+  '''
+  return namedtuple('ILSTISOFormatSchema', 'attribute_name parse transcribe')(
+      attribute_name,
+      lambda bfr: datetime.fromisoformat(bfr.take(...).decode()),
+      lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
+  )
+
+itunes_media_type = namedtuple('itunes_media_type', 'type stik')
+
+def decode_itunes_date_field(data):
+  ''' The iTunes 'Date' meta field: a year or an ISO timestamp.
+  '''
+  try:
+    value = datetime.fromisoformat(data)
+  except ValueError:
+    value = datetime(int(data), 1, 1)
+  return value
+
+itunes_store_country_code = namedtuple(
+    'itunes_store_country_code',
+    'country_name iso_3166_1_code itunes_store_code'
+)
+
 class ILSTBoxBody(ContainerBoxBody):
   ''' iTunes Information List, container for iTunes metadata fields.
 
@@ -2173,59 +2237,10 @@ class ILSTBoxBody(ContainerBoxBody):
           https://github.com/sergiomb2/libmp4v2/wiki/iTunesMetadata
   '''
 
-  def ILSTRawSchema(attribute_name):
-    ''' Namedtuple type for ILST raw schema.
-    '''
-    return namedtuple(
-        'ILSTRawSchema', 'attribute_name from_buffer transcribe_value'
-    )(attribute_name, lambda bfr: bfr.take(...), lambda bs: bs)
-
-  def ILSTTextSchema(attribute_name):
-    ''' Namedtuple type for ILST text schema.
-    '''
-    return namedtuple(
-        'ILSTTextSchema', 'attribute_name from_buffer transcribe_value'
-    )(
-        attribute_name, lambda bfr: bfr.take(...).decode(),
-        lambda text: text.encode()
-    )
-
-  def ILSTUInt32BESchema(attribute_name):
-    ''' Namedtuple type for ILST UInt32BE schema.
-    '''
-    return namedtuple(
-        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
-    )(attribute_name, UInt32BE.parse_value, UInt32BE.transcribe_value)
-
-  def ILSTUInt8Schema(attribute_name):
-    ''' Namedtuple type for ILST UInt8BE schema.
-    '''
-    return namedtuple(
-        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
-    )(attribute_name, UInt8.parse_value, UInt8.transcribe_value)
-
-  def ILSTAofBSchema(attribute_name):
-    ''' Namedtuple type for ILST "A of B" schema.
-    '''
-    return namedtuple(
-        'ILSTUInt8Schema', 'attribute_name from_buffer transcribe_value'
-    )(
-        attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
-        (UInt32BE.parse_value(bfr), UInt32BE.parse_value(bfr)),
-        lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE
-        .transcribe_value(member_n_of.total)
-    )
-
-  def ILSTISOFormatSchema(attribute_name):
-    ''' Namedtuple type for ILST ISO format schema.
-    '''
-    return namedtuple(
-        'ILSTISOFormatSchema', 'attribute_name from_buffer transcribe_value'
-    )(
-        attribute_name,
-        lambda bfr: datetime.fromisoformat(bfr.take(...).decode()),
-        lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
-    )
+  FIELD_TYPES = dict(
+      ContainerBoxBody.FIELD_TYPES,
+      tags=TagSet,
+  )
 
   SUBBOX_SCHEMA = {
       b'\xa9alb': ILSTTextSchema('album_title'),
@@ -2272,11 +2287,6 @@ class ILSTBoxBody(ContainerBoxBody):
       b'tvsn': ILSTUInt32BESchema('tv_season'),
   }
 
-  itunes_store_country_code = namedtuple(
-      'itunes_store_country_code',
-      'country_name iso_3166_1_code itunes_store_code'
-  )
-
   SFID_ISO_3166_1_ALPHA_3_CODE = {
       iscc.itunes_store_code: iscc
       for iscc in (
@@ -2304,17 +2314,6 @@ class ILSTBoxBody(ContainerBoxBody):
           itunes_store_country_code('United States', 'USA', 143441),
       )
   }
-
-  itunes_media_type = namedtuple('itunes_media_type', 'type stik')
-
-  def decode_itunes_date_field(data):
-    ''' The iTunes 'Date' meta field: a year or an ISO timestamp.
-    '''
-    try:
-      value = datetime.fromisoformat(data)
-    except ValueError:
-      value = datetime(int(data), 1, 1)
-    return value
 
   STIK_MEDIA_TYPES = {
       imt.stik: imt
