@@ -1887,6 +1887,10 @@ class BinaryUTF16NUL(BinarySingleValue):
     yield value.encode(encoding)
     yield b'\0\0'
 
+#############################################################################
+## DEPRECATED CLASSES BELOW.
+##
+
 class ListField(PacketField):
   ''' A field which is itself a list of other `PacketField`s.
   '''
