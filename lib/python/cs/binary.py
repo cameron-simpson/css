@@ -114,7 +114,6 @@ class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
   '''
 
-  @pfx_method
   def self_check(self):
     ''' Internal self check. Returns `True` if passed.
 
@@ -1496,7 +1495,6 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
       self.parse_field(field_name, bfr, pt=(parse, None))
     return self
 
-  @pfx_method
   def parse_field(self, field_name, bfr, pt=None):
     ''' Parse a field named `field_name` from `bfr`.
         Apply the parsed value to `self` as the attribute `field_name`.
@@ -1585,7 +1583,6 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         continue
       yield self.transcribe_field(field_name, field_value)
 
-  @pfx_method
   def transcribe_field(self, field_name, field_value):
     ''' Transcribe a field named `field_name` with value `field_value`.
 
