@@ -371,9 +371,14 @@ Matrix9Long = BinaryMultiStruct(
     'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
 )
 
-class UTF8or16Field(PacketField):
+class UTF8or16Field(BaseBinaryMultiValue):
   ''' An ISO14496 UTF8 or UTF16 encoded string.
   '''
+
+  FIELD_TYPES = {
+      'bom': bytes,
+      'text': str,
+  }
 
   TEST_CASES = (
       b'\0',
@@ -387,39 +392,41 @@ class UTF8or16Field(PacketField):
       b'\xff\xfe': 'utf_16_be',
   }
 
-  def __init__(self, value, *, bom):
-    super().__init__(value)
-    self.bom = bom
-
   @classmethod
-  def from_buffer(cls, bfr):
+  def parse(cls, bfr):
     ''' Gather optional BOM and then UTF8 or UTF16 string.
     '''
+    self = cls()
     bfr.extend(1)
     if bfr[0] == 0:
-      bom = None
-      text = UTF8NULField.value_from_buffer(bfr)
+      # empty sting, no BOM
+      bom = b''
+      text = BinaryUTF8NUL.parse_value(bfr)
     else:
       bom = bfr.take(2)
       encoding = cls.BOM_ENCODING.get(bom)
       if encoding is None:
+        # not a BOM, presume UTF8
         bfr.push(bom)
-        bom = None
-        text = UTF8NULField.value_from_buffer(bfr)
+        bom = b''
+        text = BinaryUTF8NUL.parse_value(bfr)
       else:
-        text = UTF16NULField.value_from_buffer(bfr, encoding=encoding)
-    return cls(text, bom=bom)
+        # UTF16
+        text = BinaryUTF16NUL.parse_value(bfr, encoding=encoding)
+    self.bom = bom
+    self.text = text
+    return self
 
   def transcribe(self):
     ''' Transcribe the field suitably encoded.
     '''
-    if self.bom is None:
-      yield UTF8NULField.transcribe_value(self.value)
-    else:
+    if self.bom:
       yield self.bom
       yield UTF16NULField.transcribe_value(
-          self.value, encoding=self.BOM_ENCODING[self.bom]
+          self.text, encoding=self.BOM_ENCODING[self.bom]
       )
+    else:
+      yield BinaryUTF8NUL.transcribe_value(self.text)
 
 class TimeStampMixin:
   ''' Methods to assist with ISO14496 timestamps.
