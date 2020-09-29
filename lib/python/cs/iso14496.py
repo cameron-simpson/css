@@ -1109,20 +1109,29 @@ class FREEBoxBody(BoxBody):
       Note the length and discard the data portion.
   '''
 
-  PACKET_FIELDS = dict(
-      BoxBody.PACKET_FIELDS,
-      padding=BytesRunField,
+  FIELD_TYPES = dict(
+      BoxBody.FIELD_TYPES,
+      free_size=int,
   )
 
   BOX_TYPES = (b'free', b'skip')
 
-  def parse_buffer(self, bfr, end_offset=Ellipsis, **kw):
+  def parse_fields(self, bfr, end_offset=Ellipsis, **kw):
     ''' Gather the `padding` field.
     '''
-    super().parse_buffer(bfr, **kw)
+    super().parse_fields(bfr, **kw)
     offset0 = bfr.offset
-    self.add_from_buffer('padding', bfr, BytesRunField, end_offset=end_offset)
-    self.free_size = bfr.offset - offset0
+    self.free_size = bfr.end_offset - bfr.offset
+    bfr.skipto(bfr.end_offset)
+
+  def transcribe(self):
+    free_size = self.free_size
+    n256 = len(B0_256)
+    while free_size >= n256:
+      yield B0_256
+      free_size -= n256
+    if free_size > 0:
+      yield bytes(free_size)
 
 add_body_class(FREEBoxBody)
 
