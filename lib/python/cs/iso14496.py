@@ -1093,7 +1093,11 @@ class MDATBoxBody(BoxBody):
     ''' Gather all data to the end of the field.
     '''
     super().parse_fields(bfr)
-    self.data = BinaryByteses.parse(bfr)
+    if PARSE_MODE.discard_data:
+      self.data = None
+      bfr.skipto(bfr.end_offset)
+    else:
+      self.data = BinaryByteses.parse(bfr)
 
   def transcribe(self):
     return self.data.transcribe()
