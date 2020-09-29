@@ -1433,8 +1433,8 @@ class TrackGroupTypeBoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `track_group_id` field.
     '''
-    self.add_from_buffer('track_group_id', bfr, UInt32BE)
     super().parse_fields(bfr)
+    self.parse_field('track_group_id', bfr, UInt32BE)
 
 add_body_subclass(
     TrackGroupTypeBoxBody, 'msrc', '8.3.4.3',
