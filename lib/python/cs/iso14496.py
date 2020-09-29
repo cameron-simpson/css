@@ -1173,26 +1173,22 @@ class FTYPBoxBody(BoxBody):
 add_body_class(FTYPBoxBody)
 
 class PDINBoxBody(FullBoxBody):
-  ''' An 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
+  ''' A 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       pdinfo=ListField,
   )
 
   # field names for the tuples in a PDINBoxBody
   PDInfo = BinaryMultiStruct('PDInfo', '>LL', 'rate initial_delay')
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr, **kw):
     ''' Gather the (rate, initial_delay) pairs of the data section as the `pdinfo` field.
     '''
-    super().parse_buffer(bfr, **kw)
-    # obtain box data after version and flags decode
-    pdinfo = []
-    while not bfr.at_eof():
-      pdinfo.append(PDINBoxBody.PDInfo.from_buffer(bfr))
-    self.add_field('pdinfo', ListField(pdinfo))
+    super().parse_fields(bfr, **kw)
+    self.pdinfo = BinaryListValues.parse(bfr, pt=PDINBoxBody.PDInfo)
 
 add_body_class(PDINBoxBody)
 
