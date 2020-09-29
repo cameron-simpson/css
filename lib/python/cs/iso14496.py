@@ -151,7 +151,7 @@ class MP4Command(BaseCommand):
         parsee = sys.stdin.fileno()
       else:
         parsee = spec
-      over_box, = parse(parsee)
+      over_box = parse(parsee)
       over_box.dump()
       for path in argv:
         with Pfx(path):
@@ -246,7 +246,7 @@ class MP4Command(BaseCommand):
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
-        over_box, = parse(parsee)
+        over_box = parse(parsee)
         over_box.dump(crop_length=None)
 
   def cmd_tags(self, argv, options):
