@@ -1140,21 +1140,26 @@ class FTYPBoxBody(BoxBody):
       Decode the major_brand, minor_version and compatible_brands.
   '''
 
-  PACKET_FIELDS = dict(
-      BoxBody.PACKET_FIELDS,
-      major_brand=BytesField,
-      minor_version=UInt32BE,
-      brands_bs=BytesField,
+  FIELD_TYPES = dict(
+      BoxBody.FIELD_TYPES,
+      major_brand=bytes,
+      minor_version=int,
+      brands_bs=bytes,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr, **kw):
     ''' Gather the `major_brand`, `minor_version` and `brand_bs` fields.
     '''
-    super().parse_buffer(bfr, **kw)
-    self.add_from_buffer('major_brand', bfr, 4)
-    self.add_from_buffer('minor_version', bfr, UInt32BE)
-    brands_bs = b''.join(bfr)
-    self.add_field('brands_bs', BytesField(brands_bs))
+    super().parse_fields(bfr, **kw)
+    self.major_brand = bfr.take(4)
+    self.minor_version = UInt32BE.parse_value(bfr)
+    self.brands_bs = b''.join(bfr)
+
+  @pfx_method
+  def transcribe(self):
+    yield self.major_brand
+    yield UInt32BE.transcribe_value(self.minor_version)
+    yield self.brands_bs
 
   @property
   def compatible_brands(self):
