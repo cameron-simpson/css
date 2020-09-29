@@ -1729,24 +1729,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       # collate the parse-transcribe functions for each predefined field
       for field_name in field_order:
         pt = field_map[field_name]
-        try:
-          func_parse = pt.parse
-          func_transcribe = pt.transcribe
-        except AttributeError:
-          if isinstance(pt[0], str) and isinstance(pt[1], str):
-            struct_format, struct_field_names = pt
-            X(
-                "struct_format=%r, struct_field_names=%r", struct_format,
-                struct_field_names
-            )
-            bms = BinaryMultiStruct(
-                field_name, struct_format, struct_field_names
-            )
-            X("bms=%s", bms)
-            func_parse = bms.parse
-            func_transcribe = bms.transcribe
-          else:
-            func_parse, func_transcribe = pt
+        func_parse, func_transcribe = pt_spec(pt, field_name=field_name)
         FIELD_PARSERS[field_name] = func_parse
         FIELD_TRANSCRIBERS[field_name] = func_transcribe
 
