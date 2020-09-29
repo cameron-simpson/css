@@ -709,18 +709,18 @@ class CornuCopyBuffer(object):
             >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
             >>> bfr.offset
             0
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'ab'
             >>> bfr.offset
             2
             >>> subbfr = bfr.bounded(5)
             >>> subbfr.offset
             2
             >>> for bs in subbfr:
-            ...   print(len(bs))
+            ...   print(bs)
             ...
-            1
-            2
+            b'c'
+            b'de'
             >>> subbfr.offset
             5
             >>> subbfr.take(2)
@@ -730,8 +730,8 @@ class CornuCopyBuffer(object):
             >>> subbfr.flush()
             >>> bfr.offset
             5
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'fg'
 
         *WARNING*: if the bounded buffer is not completely consumed
         then it is critical to call the new CornuCopyBuffer's `.flush`
