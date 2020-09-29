@@ -472,80 +472,56 @@ class TimeStamp64(UInt64BE, TimeStampMixin):
   def __str__(self):
     return str(self.datetime) or str(self.value)
 
-class BoxHeader(Packet):
+class BoxHeader(BinaryMultiValue('BoxHeader', {
+    'box_size': UInt32BE,
+})):
   ''' An ISO14496 Box header packet.
   '''
 
   # speculative max size that will fit in the UInt32BE box_size
   # with room for bigger sizes in the optional UInt64BE length field
-
-  PACKET_FIELDS = {
-      'box_size': UInt32BE,
-      'box_type': BytesField,
-      'length': (
-          True,
-          (
-              UInt64BE,
-              EmptyPacketField,
-          ),
-      ),
-  }
   MAX_BOX_SIZE_32 = 2**32 - 8
 
   @classmethod
-  def from_buffer(cls, bfr):
-    ''' Decode a box header from the CornuCopyBuffer `bfr`.
+  def parse(cls, bfr):
+    ''' Decode a box header from `bfr`.
     '''
-    header = cls()
+    self = cls()
     # note start of header
-    header.offset = bfr.offset
-    box_size = header.add_from_buffer('box_size', bfr, UInt32BE)
-    box_type = header.add_from_buffer('box_type', bfr, 4)
+    self.offset = bfr.offset
+    box_size = UInt32BE.parse_value(bfr)
+    box_type = self.box_type = bfr.take(4)
     if box_size == 0:
       # box extends to end of data/file
-      header._length = Ellipsis
-      header.add_field('length', EmptyField)
+      self.box_size = Ellipsis
     elif box_size == 1:
       # 64 bit length
-      header._length = header.add_from_buffer('length', bfr, UInt64BE)
+      self.box_size = UInt64BE.parse_value(bfr)
     else:
       # other box_size values are the length
-      header._length = box_size
-      header.add_field('length', EmptyField)
+      self.box_size = box_size
     if box_type == b'uuid':
       # user supplied 16 byte type
-      header.add_from_buffer('user_type', bfr, 16)
+      self.user_type = bfr.take(16)
     else:
-      header.user_type = None
-    # note end of header
-    header.end_offset = bfr.offset
-    header.type = box_type
-    header.self_check()
-    return header
+      self.user_type = None
+    # note end of self
+    self.end_offset = bfr.offset
+    self.type = box_type
+    return self
 
-  @property
-  def length(self):
-    ''' The overall packet length.
-    '''
-    return self._length
-
-  @length.setter
-  def length(self, new_length):
-    ''' Set a new length value, and configure the associated
-        PacketFields to match.
-    '''
-    if new_length is Ellipsis:
-      self.set_field('box_size', UInt32BE(0))
-      self.set_field('length', EmptyField)
-    elif new_length > self.MAX_BOX_SIZE_32:
-      self.set_field('box_size', UInt32BE(new_length))
-      self.set_field('length', EmptyField)
-    elif new_length >= 1:
-      self.set_field('box_size', UInt32BE(1))
-      self.set_field('length', UInt64BE(new_length))
-    else:
-      raise ValueError("invalid new_length %r" % (new_length,))
-    self._length = new_length
+  def transcribe(self):
+    box_size = self.box_size
+    if box_size is Ellipsis:
+      box_size = 0
+    elif box_size > self.MAX_BOX_SIZE_32:
+      box_size = 1
+    yield UInt32BE.transcribe_value(box_size)
+    yield self.box_type
+    if self.box_size is not Ellipsis and self.box_size > self.MAX_BOX_SIZE_32:
+      yield UInt64BE.transcribe_value(self.box_size)
+    if self.box_type == b'uuid':
+      yield self.user_type
 
 class BoxBody(Packet):
   ''' Abstract basis for all `Box` bodies.
