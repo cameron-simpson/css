@@ -924,22 +924,41 @@ def cropped(
       s = s[:max_length - len(ellipsis)] + ellipsis
   return s
 
-def cropped_repr(o, max_length=32, roffset=0):
+def cropped_repr(o, max_length=32, inner_max_length=None, roffset=0):
   ''' Compute a cropped `repr(o)` as for `cropped()`.
 
-      If `o` is a list or tuple
+      If `o` is a `list` or `tuple` or `dict`
       apply the cropping to its members,
       then crop the result.
+
+      Parameters:
+      * `o`: the object to represent
+      * `max_length`: the maximum length of the representation, default `32`
+      * `inner_max_length`: the maximum length of the representations
+        of members of `o`, default `max_length//2`
+      * `roffset`: the number of trailing characters to preserve, default `1`
   '''
+  if inner_max_length is None:
+    inner_max_length = max_length // 2
   if isinstance(o, (tuple, list)):
     left = '(' if isinstance(o, tuple) else '['
     right = ')' if isinstance(o, tuple) else ']'
     o_repr = left + ','.join(
         map(
-            lambda m: cropped_repr(m, max_length=max_length, roffset=roffset),
-            o
+            lambda m:
+            cropped_repr(m, max_length=inner_max_length, roffset=roffset), o
         )
     ) + right
+  elif isinstance(o, dict):
+    o_repr = '{' + ','.join(
+        map(
+            lambda kv: cropped_repr(
+                kv[0], max_length=inner_max_length, roffset=roffset
+            ) + ':' +
+            cropped_repr(kv[1], max_length=inner_max_length, roffset=roffset),
+            o.items()
+        )
+    ) + '}'
   else:
     o_repr = repr(o)
   return cropped(o_repr, max_length=max_length, roffset=roffset)
