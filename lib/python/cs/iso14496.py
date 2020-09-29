@@ -1400,7 +1400,7 @@ add_body_class(TREFBoxBody)
 class TrackReferenceTypeBoxBody(BoxBody):
   ''' A TrackReferenceTypeBoxBody contains references to other tracks - ISO14496 section 8.3.3.2.
   '''
-  PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, track_ids=ListField)
 
   BOX_TYPES = (
       b'hint',
@@ -1417,10 +1417,8 @@ class TrackReferenceTypeBoxBody(BoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `track_ids` field.
     '''
-    track_ids = []
-    while not bfr.at_eof():
-      track_ids.append(UInt32BE.from_buffer(bfr))
-    self.add_field('track_ids', ListField(track_ids))
+    super().parse_fields(bfr)
+    self.track_ids = BinaryListValues.parse(bfr, pt=UInt32BE)
 
 add_body_class(TrackReferenceTypeBoxBody)
 add_body_subclass(ContainerBoxBody, 'trgr', '8.3.4', 'Track Group')
