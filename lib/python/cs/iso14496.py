@@ -1514,12 +1514,12 @@ class HDLRBoxBody(FullBoxBody):
     # NB: handler_type is supposed to be an unsigned long, but in
     # practice seems to be 4 ASCII bytes, so we load it as a string
     # for readability
-    self.add_from_buffer('pre_defined', bfr, UInt32BE)
-    self.add_from_buffer('handler_type_long', bfr, UInt32BE)
-    self.add_from_buffer('reserved1', bfr, UInt32BE)
-    self.add_from_buffer('reserved2', bfr, UInt32BE)
-    self.add_from_buffer('reserved3', bfr, UInt32BE)
-    self.add_from_buffer('name', bfr, UTF8NULField)
+    self.parse_field('pre_defined', bfr, UInt32BE)
+    self.parse_field('handler_type_long', bfr, UInt32BE)
+    self.parse_field('reserved1', bfr, UInt32BE)
+    self.parse_field('reserved2', bfr, UInt32BE)
+    self.parse_field('reserved3', bfr, UInt32BE)
+    self.parse_field('name', bfr, BinaryUTF8NUL)
 
   @property
   def handler_type(self):
