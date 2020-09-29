@@ -523,14 +523,17 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     if self.box_type == b'uuid':
       yield self.user_type
 
-class BoxBody(Packet):
+class BoxBody(BaseBinaryMultiValue, ABC):
   ''' Abstract basis for all `Box` bodies.
   '''
 
-  PACKET_FIELDS = {}
+  FIELD_TYPES = dict(offset=int, post_offset=int)
 
-  def __str__(self):
-    return Packet.__str__(self, skip_fields=['boxes'])
+  @staticmethod
+  def S_CHOOSE_NAME(name):
+    ''' Tweak the str/repr output a bit.
+    '''
+    return not name.startswith('_') and name != 'parent'
 
   def __getattr__(self, attr):
     ''' The following virtual attributes are defined:
@@ -573,40 +576,44 @@ class BoxBody(Packet):
             return None
           box, = boxes
           return box
-    return super().__getattr__(attr)
+    raise AttributeError("%s.%s" % (type(self).__name__, attr))
 
   def __iter__(self):
     yield from ()
 
   @classmethod
-  def from_buffer(cls, bfr, box=None, **kw):
-    ''' Create a BoxBody and fill it in via its `parse_buffer` method.
+  def parse(cls, bfr, *, box):
+    ''' Create an emtpy `BoxBody` and fill it in via its `parse_fields`
+        method.
 
         Note that this function is expected to be called from
-        `Box.from_buffer` and therefore that `bfr` is expected to
-        be a bounded CornuCopyBuffer if the Box length is specified.
-        Various BoxBodies gather some data "until the end of the
-        Box", and we rely on this bound rather than keeping a close
-        eye on some unsupplied "end offset" value.
+        `Box.parse` and therefore that `bfr` is expected to
+        be a bounded `CornuCopyBuffer` if the `Box` length is specified.
+        Various `BoxBody` subclasses gather some data "until the end of the
+        `Box`", and we rely on this bound rather than keeping a close eye on
+        some unsupplied "end offset" value.
     '''
-    B = cls()
-    B.box = box
-    B.offset = bfr.offset
-    B.parse_buffer(bfr, **kw)
-    B.self_check()
-    return B
+    self = cls()
+    self.parent = box
+    self.offset = bfr.offset
+    self.parse_fields(bfr)
+    self.post_offset = bfr.offset
+    self.self_check()
+    return self
 
-  def parse_buffer(
-      self, bfr, end_offset=None, discard_data=False, copy_boxes=None, **kw
-  ):
+  def parse_fields(self, bfr):
     ''' Gather the Box body fields from `bfr`.
 
         A generic BoxBody has no additional fields. Subclasses call
         their superclass' `parse_buffer` and then gather their
         specific fields.
     '''
-    if kw:
-      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+
+  @abstractmethod
+  def transcribe(self):
+    raise NotImplementedError(
+        "class %s requires a .transcribe method" % (type(self),)
+    )
 
   @classmethod
   def boxbody_type_from_klass(cls):
