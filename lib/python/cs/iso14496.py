@@ -1446,8 +1446,8 @@ class MDHDBoxBody(FullBoxBody):
   ''' A MDHDBoxBody is a Media Header box - ISO14496 section 8.4.2.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       creation_time=(True, (TimeStamp32, TimeStamp64)),
       modification_time=(True, (TimeStamp32, TimeStamp64)),
       timescale=UInt32BE,
@@ -1463,19 +1463,19 @@ class MDHDBoxBody(FullBoxBody):
     super().parse_fields(bfr)
     # obtain box data after version and flags decode
     if self.version == 0:
-      self.add_from_buffer('creation_time', bfr, TimeStamp32)
-      self.add_from_buffer('modification_time', bfr, TimeStamp32)
-      self.add_from_buffer('timescale', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt32BE)
+      self.parse_field('creation_time', bfr, TimeStamp32)
+      self.parse_field('modification_time', bfr, TimeStamp32)
+      self.parse_field('timescale', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt32BE)
     elif self.version == 1:
-      self.add_from_buffer('creation_time', bfr, TimeStamp64)
-      self.add_from_buffer('modification_time', bfr, TimeStamp64)
-      self.add_from_buffer('timescale', bfr, UInt32BE)
-      self.add_from_buffer('duration', bfr, UInt64BE)
+      self.parse_field('creation_time', bfr, TimeStamp64)
+      self.parse_field('modification_time', bfr, TimeStamp64)
+      self.parse_field('timescale', bfr, UInt32BE)
+      self.parse_field('duration', bfr, UInt64BE)
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
-    self.add_from_buffer('language_short', bfr, UInt16BE)
-    self.add_from_buffer('pre_defined', bfr, UInt16BE)
+    self.parse_field('language_short', bfr, UInt16BE)
+    self.parse_field('pre_defined', bfr, UInt16BE)
 
   @prop
   def language(self):
