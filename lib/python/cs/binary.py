@@ -440,6 +440,9 @@ class BinaryByteses(AbstractBinary):
     yield from iter(self.values)
 
 class BinaryListValues(AbstractBinary):
+  ''' A list of values with a common parse specification,
+      such as sample or Boxes in an ISO14496 Box structure.
+  '''
 
   def __init__(self):
     self.values = []
@@ -452,6 +455,7 @@ class BinaryListValues(AbstractBinary):
   def __iter__(self):
     return iter(self.values)
 
+  # pylint: disable=arguments-differ
   @classmethod
   def parse(
       cls,
@@ -478,7 +482,11 @@ class BinaryListValues(AbstractBinary):
     if end_offset is not None:
       with bfr.subbuffer(end_offset) as subbfr:
         return cls.parse(
-            subbfr, count=count, min_count=min_count, max_count=max_count
+            subbfr,
+            count=count,
+            min_count=min_count,
+            max_count=max_count,
+            pt=pt
         )
     if count is not None:
       if min_count is None:
@@ -781,6 +789,7 @@ class BSUInt(BinarySingleValue):
       n = (n << 7) | (b & 0x7f)
     return n
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(n):
     ''' Encode an unsigned int as an entensible byte serialised octet
@@ -823,6 +832,7 @@ class BSData(BinarySingleValue):
     data = bfr.take(data_length)
     return data
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(data):
     ''' Transcribe the payload length and then the payload.
@@ -849,6 +859,7 @@ class BSString(BinarySingleValue):
     super().__init__(s)
     self.encoding = encoding
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def parse_value(bfr, encoding='utf-8', errors='strict'):
     ''' Parse a run length encoded string from `bfr`.
@@ -859,6 +870,7 @@ class BSString(BinarySingleValue):
       bs = bs.tobytes()
     return bs.decode(encoding=encoding, errors=errors)
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(s, encoding='utf-8'):
     ''' Transcribe a string.
@@ -882,6 +894,7 @@ class BSSFloat(BinarySingleValue):
     s = BSString.parse_value(bfr)
     return float(s)
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(f):
     ''' Transcribe a float.
@@ -896,6 +909,14 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   FIELD_TRANSCRIBERS = {}
 
   def s(self, *, crop_length=16, choose_name=None):
+    ''' Common implementation of `__str__` and `__repr__`.
+        Transcribe type and attributes, cropping long values
+        and omitting private values.
+
+        Parameters:
+        * `crop_length`: maximum length of values before cropping, default `16`
+        * `choose_name`: test for names to include, default excludes `_`*
+    '''
     if choose_name is None:
       choose_name = getattr(
           self, 'S_CHOOSE_NAME', lambda name: not name.startswith('_')
@@ -998,10 +1019,11 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
       # infer the parser from the defined FIELD_PARSERS
       parse = self.FIELD_PARSERS[field_name]
     else:
-      parse, transcribe = pt_spec(pt)
+      parse, _ = pt_spec(pt)
     value = parse(bfr)
     setattr(self, field_name, value)
 
+  # pylint: disable=arguments-differ
   def transcribe(self, exclude_names=()):
     ''' Default transcribe: yield each field's transcription in order.
         Fields whose name starts with an underscore are skipped.
@@ -1131,7 +1153,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
           >>> list(bmv.transcribe_flat())
           [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
-  '''
+  '''  # pylint: disable=line-too-long
   with Pfx("BinaryMultiValue(%r,...)", class_name):
     if not field_order:
       field_order = tuple(field_map)
@@ -1210,6 +1232,7 @@ class BinaryUTF8NUL(BinarySingleValue):
     bfr.take(1)
     return utf8
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
@@ -1234,6 +1257,7 @@ class BinaryUTF16NUL(BinarySingleValue):
 
   VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
 
+  # pylint: disable=super-init-not-called
   def __init__(self, value, *, encoding):
     ''' Initialise the `PacketField`.
         If omitted the inial field `value` will be `None`.
@@ -1246,6 +1270,7 @@ class BinaryUTF16NUL(BinarySingleValue):
     self.encoding = encoding
     self.value = value
 
+  # pylint: disable=arguments-differ
   @classmethod
   def parse(cls, bfr, *, encoding):
     ''' Parse the encoding and value and construct an instance.
@@ -1253,6 +1278,7 @@ class BinaryUTF16NUL(BinarySingleValue):
     value = cls.parse_value(bfr, encoding=encoding)
     return cls(value, encoding=encoding)
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def parse_value(bfr, *, encoding):
     ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
@@ -1280,6 +1306,7 @@ class BinaryUTF16NUL(BinarySingleValue):
     '''
     yield from self.transcribe_value(self.value, encoding=self.encoding)
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(value, encoding='utf-16'):
     ''' Transcribe `value` in UTF-16 with a terminating NUL.
@@ -1529,6 +1556,7 @@ class EmptyPacketField(PacketField):
   def __init__(self):
     super().__init__(None)
 
+  # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(cls, bfr):
     return cls()
@@ -1548,6 +1576,7 @@ class UTF8NULField(PacketField):
       ('123', {}, b'123\0'),
   )
 
+  # pylint: disable=arguments-differ
   @classmethod
   def value_from_buffer(cls, bfr):
     ''' Read a NUL terminated UTF-8 string from `bfr`, return field.
@@ -1571,6 +1600,7 @@ class UTF8NULField(PacketField):
     bfr.take(1)
     return utf8
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(s):
     ''' Transcribe the `value` in UTF-8 with a terminating NUL.
@@ -1593,6 +1623,7 @@ class UTF16NULField(PacketField):
 
   VALID_ENCODINGS = ('utf_16_le', 'utf_16_be')
 
+  # pylint: disable=super-init-not-called
   def __init__(self, value, *, encoding):
     ''' Initialise the `PacketField`.
         If omitted the inial field `value` will be `None`.
@@ -1605,6 +1636,7 @@ class UTF16NULField(PacketField):
     self.encoding = encoding
     self.value = value
 
+  # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(cls, bfr, encoding):
     ''' Read a NUL terminated UTF-16 string from `bfr`, return a `UTF16NULField`..
@@ -1630,6 +1662,7 @@ class UTF16NULField(PacketField):
   def transcribe(self):
     yield from self.transcribe_value(self.value, encoding=self.encoding)
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(value, encoding='utf-16'):
     ''' Transcribe `value` in UTF-16 with a terminating NUL.
@@ -1727,6 +1760,7 @@ class BytesesField(PacketField):
   def __iter__(self):
     yield from self.value
 
+  # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(
       cls, bfr, end_offset=None, discard_data=False, short_ok=False
@@ -1787,6 +1821,7 @@ class BytesesField(PacketField):
           " but final bfr.offset=%d" % (cls, end_offset, bfr.offset)
       )
     field = cls(byteses)
+    # pylint: disable=attribute-defined-outside-init
     field.offset = offset0
     field.end_offset = offset
     field.length = offset - offset0
@@ -1806,6 +1841,7 @@ class BytesRunField(PacketField):
       memoryview object.
   '''
 
+  # pylint: disable=super-init-not-called
   def __init__(self, length, bytes_value):
     if length < 0:
       raise ValueError("invalid length(%r), should be >= 0" % (length,))
@@ -1851,6 +1887,7 @@ class BytesRunField(PacketField):
       return bs
     return bytes_value * length
 
+  # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(cls, bfr, end_offset=None, bytes_value=b'\0'):
     ''' Parse a BytesRunField by just skipping the specified number of bytes.
@@ -1912,6 +1949,7 @@ class ListField(PacketField):
     '''
     return iter(self.value)
 
+  # pylint: disable=arguments-differ
   @classmethod
   def from_buffer(cls, bfr):
     ''' ListFields do not know enough to parse a buffer.
@@ -1920,6 +1958,7 @@ class ListField(PacketField):
         "%s cannot be parsed directly from a buffer" % (cls,)
     )
 
+  # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(value):
     ''' Transcribe each item in `value`.
@@ -1931,6 +1970,8 @@ _multi_struct_fields = {}
 
 def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
   ''' A class factory for `PacketField` subclasses built around complex `struct` formats.
+
+      **Deprecated**: see the `BinaryMultiValue` factory instead.
 
       See also the convenience class factory `structtuple`
       which is usually easier to work with.
@@ -1969,6 +2010,7 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
 
       length = struct.size
 
+      # pylint: disable=arguments-differ
       @classmethod
       def from_buffer(cls, bfr):
         ''' Parse via `struct.unpack`.
@@ -2219,6 +2261,7 @@ class Packet(PacketField):
       if field is not None:
         yield field.transcribe()
 
+  # pylint: disable=too-many-arguments
   def add_from_bytes(
       self, field_name, bs, factory, offset=0, length=None, **kw
   ):
@@ -2295,6 +2338,7 @@ class Packet(PacketField):
       ''' A `PacketField` with a single `.value` and no parser.
       '''
 
+      # pylint: disable=arguments-differ
       @staticmethod
       def transcribe_value(value):
         ''' Transcribe the value as bytes.
