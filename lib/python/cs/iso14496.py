@@ -1395,10 +1395,10 @@ class TREFBoxBody(ContainerBoxBody):
   ''' Track Reference BoxBody, container for trackReferenceTypeBoxes - ISO14496 section 8.3.3.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr, **kw):
     ''' Arrange that `default_type=TrackReferenceTypeBoxBody` in `TREFBoxBody` parses.
     '''
-    super().parse_buffer(bfr, default_type=TrackReferenceTypeBoxBody, **kw)
+    super().parse_fields(bfr, default_type=TrackReferenceTypeBoxBody, **kw)
 
 add_body_class(TREFBoxBody)
 
