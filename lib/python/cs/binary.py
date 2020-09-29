@@ -14,6 +14,12 @@
     See `cs.iso14496` for an ISO 14496 (eg MPEG4) parser
     built using this module.
 
+    **Deprecation**: the `Packet` and `PacketField` classes
+    were unnecessarily hard to use and are deprecated
+    in favour of the `Binary`* suite of classes and factories.
+    All the *`Field` classes and other subclasses
+    derived from `Packet` and `PacketField` are also deprecated.
+
     Terminology used below:
     * buffer:
       an instance of `cs.buffer.CornuCopyBuffer`,
@@ -26,9 +32,6 @@
       a piece of binary data obeying the buffer protocol,
       almost always a `bytes` instance or a `memoryview`,
       but in principle also things like `bytearray`.
-
-    Deprecation: the `Packet` and `PacketField` classes were unnecessarily hard to use
-    and are deprecated in favour of the `Binary`* suite of classes and factories.
 
     There are 4 main classes on which an implementor should base their data structures:
     * `BinarySingleStruct`: a factory for classes based
