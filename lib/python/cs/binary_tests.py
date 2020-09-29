@@ -68,7 +68,7 @@ class _TestPacketFields(object):
               "bytes(%s) != %r (got %r)" % (P, transcription, bs2)
           )
         if issubclass(cls, AbstractBinary):
-          P2 = cls.from_bytes(bs2)
+          P2 = cls.from_bytes(bs2, **kwargs)
         else:
           P2, offset = cls.from_bytes(bs2, **kwargs)
           self.assertEqual(
