@@ -993,52 +993,6 @@ def add_body_subclass(superclass, box_type, section, desc):
   add_body_class(K)
   return K
 
-class SubBoxesField(ListField):
-  ''' A field which is itself a list of Boxes.
-  '''
-
-  @classmethod
-  def from_buffer(
-      cls,
-      bfr,
-      end_offset=None,
-      max_boxes=None,
-      default_type=None,
-      copy_boxes=None,
-      parent=None,
-      **kw
-  ):
-    ''' Read Boxes from `bfr`, return a new `SubBoxesField` instance.
-
-        Parameters:
-        * `bfr`: the buffer
-        * `end_offset`: the ending offset of the input data, be an offset or
-          `Ellipsis` indicating "consume to end of buffer"; default: `Ellipsis`
-        * `max_boxes`: optional maximum number of Boxes to parse
-        * `default`: a default `Box` subclass for `box_type`s without a
-          registered subclass
-        * `copy_boxes`: optional callable to receive parsed `Box`es
-        * `parent`: optional parent `Box` to record against parsed `Box`es
-    '''
-    if end_offset is None:
-      raise ValueError("SubBoxesField.from_buffer: missing end_offset")
-    boxes = []
-    boxes_field = cls(boxes)
-    while ((max_boxes is None or len(boxes) < max_boxes)
-           and (end_offset is Ellipsis or bfr.offset < end_offset)
-           and not bfr.at_eof()):
-      B = Box.from_buffer(
-          bfr, default_type=default_type, copy_boxes=copy_boxes, **kw
-      )
-      B.parent = parent
-      boxes.append(B)
-    if end_offset is not Ellipsis and bfr.offset > end_offset:
-      raise ValueError(
-          "contained Boxes overran end_offset:%d by %d bytes" %
-          (end_offset, bfr.offset - end_offset)
-      )
-    return boxes_field
-
 class OverBox(Packet):
   ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
   '''
