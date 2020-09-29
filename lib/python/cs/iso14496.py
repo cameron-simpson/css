@@ -1087,22 +1087,16 @@ class MDATBoxBody(BoxBody):
   ''' A Media Data Box - ISO14496 section 8.1.1.
   '''
 
-  PACKET_FIELDS = dict(
-      BoxBody.PACKET_FIELDS,
-      data=BytesesField,
-  )
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, data=BinaryByteses)
 
-  def parse_buffer(self, bfr, end_offset=Ellipsis, discard_data=False, **kw):
+  def parse_fields(self, bfr):
     ''' Gather all data to the end of the field.
     '''
-    super().parse_buffer(bfr, **kw)
-    self.add_from_buffer(
-        'data',
-        bfr,
-        BytesesField,
-        end_offset=end_offset,
-        discard_data=discard_data
-    )
+    super().parse_fields(bfr)
+    self.data = BinaryByteses.parse(bfr)
+
+  def transcribe(self):
+    return self.data.transcribe()
 
 add_body_class(MDATBoxBody)
 
