@@ -909,18 +909,40 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
-def cropped_repr(s, max_length=32, offset=0):
-  ''' If the length of the sequence `s` after `offset` (default `0`)
-      exceeds `max_length` (default `32`)
-      return the `repr` of the leading `max_length-3` characters from `offset`
-      plus `'...'`.
-      Otherwise return the `repr(s[offset:])`.
-
-      This is typically used for `str` values.
+def cropped(
+    s: str, max_length: int = 32, roffset: int = 1, ellipsis: str = '...'
+):
+  ''' If the length of `s` exceeds `max_length` (default `32`),
+      replace enough of the tail with `ellipsis`
+      and the last `roffset` (default `1`) characters of `s`
+      to fit in `max_length` characters.
   '''
-  if len(s) - offset > max_length:
-    return repr(s[offset:offset + max_length - 3]) + '...'
-  return repr(s[offset:])
+  if len(s) > max_length:
+    if roffset > 0:
+      s = s[:max_length - len(ellipsis) - roffset] + ellipsis + s[-roffset:]
+    else:
+      s = s[:max_length - len(ellipsis)] + ellipsis
+  return s
+
+def cropped_repr(o, max_length=32, roffset=0):
+  ''' Compute a cropped `repr(o)` as for `cropped()`.
+
+      If `o` is a list or tuple
+      apply the cropping to its members,
+      then crop the result.
+  '''
+  if isinstance(o, (tuple, list)):
+    left = '(' if isinstance(o, tuple) else '['
+    right = ')' if isinstance(o, tuple) else ']'
+    o_repr = left + ','.join(
+        map(
+            lambda m: cropped_repr(m, max_length=max_length, roffset=roffset),
+            o
+        )
+    ) + right
+  else:
+    o_repr = repr(o)
+  return cropped(o_repr, max_length=max_length, roffset=roffset)
 
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
