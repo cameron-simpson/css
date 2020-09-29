@@ -941,6 +941,10 @@ class Box(BaseBinaryMultiValue):
       if box.box_type in (b'moov', b'trak'):
         yield box, box.metatags()
 
+# patch us in
+Box.FIELD_TYPES['parent'] = (False, (type(None), Box))
+BoxBody.FIELD_TYPES['parent'] = Box
+
 # mapping of known box subclasses for use by factories
 KNOWN_BOXBODY_CLASSES = {}
 
