@@ -953,6 +953,13 @@ class FallbackBoxBody(BoxBody):
   def transcribe(self):
     pass
 
+def pick_boxbody_class(box_type: bytes):
+  ''' Infer a `BoxBody` subclass from the bytes `box_type`.
+
+      * `box_type`: the 4 byte box type
+  '''
+  return KNOWN_BOXBODY_CLASSES.get(box_type, FallbackBoxBody)
+
 def add_body_class(klass):
   ''' Register a box body class in KNOWN_BOXBODY_CLASSES.
   '''
@@ -986,18 +993,6 @@ def add_body_subclass(superclass, box_type, section, desc):
   )
   add_body_class(K)
   return K
-
-def pick_boxbody_class(box_type, default_type=None):
-  ''' Infer a Python BoxBody subclass from the bytes `box_type`.
-
-      * `box_type`: the 4 byte box type
-      * `default_type`: the default BoxBody subclass if there is no
-        specific mapping, default None; if None, use BoxBody.
-  '''
-  global KNOWN_BOXBODY_CLASSES
-  if default_type is None:
-    default_type = BoxBody
-  return KNOWN_BOXBODY_CLASSES.get(box_type, default_type)
 
 class SubBoxesField(ListField):
   ''' A field which is itself a list of Boxes.
