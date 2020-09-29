@@ -1671,12 +1671,14 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...     pass
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
           >>> bmv
-          BMV(data1=b'AB', data2=BSData(b'DEFG'), n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'))
+          BMV(data1=b'AB',data2=b'DEFG',n1=17,n2=UInt8(value=34),n3=UInt8(value=119),nd=nd(short=33154, bs=b'zyxw'))
           >>> bmv.n1
           17
           >>> bmv.n2
           UInt8(value=34)
           >>> bmv.n2.value
+          34
+          >>> int(bmv.n2)
           34
           >>> bmv.n3
           UInt8(value=119)
