@@ -993,13 +993,7 @@ def add_body_subclass(superclass, box_type, section, desc):
   add_body_class(K)
   return K
 
-class OverBox(Packet):
-  ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
-  '''
-
-  PACKET_FIELDS = {
-      'boxes': SubBoxesField,
-  }
+class HasBoxesMixin:
 
   def __iter__(self):
     return iter(self.boxes)
@@ -1016,30 +1010,33 @@ class OverBox(Packet):
         box_type = attr4.lower().encode('ascii')
         boxes = [box for box in self.boxes if box.box_type == box_type]
         return boxes
-    return super().__getattr__(attr)
+    raise AttributeError(type(self).__name__ + '.' + attr)
+
+class OverBox(BinaryListValues, HasBoxesMixin):
+  ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
+  '''
+
+  @pfx_method
+  def __len__(self):
+    return sum(map(len, self.values))
+
+  @property
+  def boxes(self):
+    return self.values
+
+  @classmethod
+  def parse(cls, bfr):
+    offset = bfr.offset
+    self = super().parse(bfr, pt=Box)
+    self.offset = offset
+    self.end_offset = bfr.offset
+    return self
 
   @property
   def length(self):
     ''' The `OverBox` is as long as the subsidary Boxes.
     '''
     return sum(map(len, self.boxes))
-
-  @classmethod
-  def from_buffer(cls, bfr, end_offset=None, **kw):
-    ''' Parse all the Boxes from the input `bfr`.
-
-        Parameters:
-        * `end_offset`: optional ending offset for the parse.
-          Default: `Ellipsis`, indicating consumption of all data.
-    '''
-    if end_offset is None:
-      end_offset = Ellipsis
-    box = cls()
-    box.add_from_buffer(
-        'boxes', bfr, SubBoxesField, end_offset=end_offset, **kw
-    )
-    box.self_check()
-    return box
 
   def dump(self, **kw):
     ''' Dump this OverBox.
