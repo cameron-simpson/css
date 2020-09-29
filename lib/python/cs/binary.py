@@ -210,13 +210,16 @@ class BinaryMixin:
           field = getattr(self, field_name)
         except AttributeError:
           if required:
-            warning("field %r missing: __dict__=%r", field_name, self.__dict__)
+            warning(
+                "field %s.%s missing: __dict__=%r",
+                type(self).__name__, field_name, self.__dict__
+            )
             ok = False
         else:
           if not isinstance(field, basetype):
             warning(
-                "field %r should be an instance of %s:%s but is %s:%s: %s",
-                field_name,
+                "field %s.%s should be an instance of %s:%s but is %s:%s: %s",
+                type(self).__name__, field_name,
                 'tuple' if isinstance(basetype, tuple) else basetype.__name__,
                 basetype,
                 type(field).__name__, type(field), field
@@ -225,8 +228,8 @@ class BinaryMixin:
       for field_name in self.__dict__:
         if field_name not in fields_spec:
           warning(
-              "field %r is present but is not defined in self.FIELD_TYPES: %r",
-              field_name, sorted(fields_spec.keys())
+              "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
+              type(self).__name__, field_name, sorted(fields_spec.keys())
           )
           ok = False
     return ok
