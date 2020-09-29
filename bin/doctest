@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-v] [--] test-subjects"
+usage="Usage: $cmd [-f] [-v] [--] test-subjects"
 
 python=python3
 doctest_opts=
@@ -19,7 +19,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -v) doctest_opts="$doctest_opts $1" ;;
+    -f | -v)
+        doctest_opts="$doctest_opts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
