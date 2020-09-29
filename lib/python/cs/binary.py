@@ -71,6 +71,7 @@ import sys
 from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning
+from cs.lex import cropped, cropped_repr
 from cs.pfx import Pfx
 
 __version__ = '20200229'
@@ -82,7 +83,7 @@ DISTINFO = {
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.pfx'],
+    'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx'],
     'python_requires':
     '>=3.6',
 }
@@ -908,13 +909,13 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   FIELD_PARSERS = {}
   FIELD_TRANSCRIBERS = {}
 
-  def s(self, *, crop_length=16, choose_name=None):
+  def s(self, *, crop_length=32, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
         Transcribe type and attributes, cropping long values
         and omitting private values.
 
         Parameters:
-        * `crop_length`: maximum length of values before cropping, default `16`
+        * `crop_length`: maximum length of values before cropping, default `32`
         * `choose_name`: test for names to include, default excludes `_`*
     '''
     if choose_name is None:
@@ -922,17 +923,17 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
           self, 'S_CHOOSE_NAME', lambda name: not name.startswith('_')
       )
     return "%s(%s)" % (
-        type(self).__name__, ','.join(
-            [
-                "%s=%s" % (
-                    k, (
-                        (
-                            repr(v[:crop_length]) +
-                            '...' if len(v) > crop_length else repr(v)
-                        ) if isinstance(v, bytes) else v
-                    )
-                ) for k, v in sorted(self.__dict__.items()) if choose_name(k)
-            ]
+        type(self).__name__,
+        cropped(
+            ','.join(
+                [
+                    "%s=%s" % (k, cropped_repr(v, max_length=crop_length))
+                    for k, v in sorted(self.__dict__.items())
+                    if choose_name(k)
+                ]
+            ),
+            max_length=crop_length,
+            roffset=0
         )
     )
 
