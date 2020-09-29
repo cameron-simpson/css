@@ -36,6 +36,14 @@ class _TestPacketFields(object):
           "incomplete parse, stopped at offset %d: parsed=%r, unparsed=%r" %
           (offset, bs[:offset], bs[offset:])
       )
+    self_check = getattr(P, 'self_check', None)
+    if self_check:
+      self.assertTrue(
+          P.self_check(), "self_check fails on %s:%s" % (
+              type(P),
+              P,
+          )
+      )
     bs2 = bytes(P)
     self.assertEqual(bs, bs2, "bytes->%s->bytes fails" % (P,))
 
