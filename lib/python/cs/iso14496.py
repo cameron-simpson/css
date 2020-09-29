@@ -1414,10 +1414,9 @@ class TrackReferenceTypeBoxBody(BoxBody):
       b'forc',
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `track_ids` field.
     '''
-    super().parse_buffer(bfr, **kw)
     track_ids = []
     while not bfr.at_eof():
       track_ids.append(UInt32BE.from_buffer(bfr))
@@ -1433,11 +1432,11 @@ class TrackGroupTypeBoxBody(FullBoxBody):
   def __init__(self, box_type, box_data):
     FullBoxBody.__init__(self, box_type, box_data)
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `track_group_id` field.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('track_group_id', bfr, UInt32BE)
+    super().parse_fields(bfr)
 
 add_body_subclass(
     TrackGroupTypeBoxBody, 'msrc', '8.3.4.3',
@@ -1459,11 +1458,11 @@ class MDHDBoxBody(FullBoxBody):
       pre_defined=UInt16BE,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `creation_time`, `modification_time`, `timescale`,
         `duration` and `language_short` fields.
     '''
-    super().parse_buffer(bfr, **kw)
+    super().parse_fields(bfr)
     # obtain box data after version and flags decode
     if self.version == 0:
       self.add_from_buffer('creation_time', bfr, TimeStamp32)
@@ -1510,10 +1509,10 @@ class HDLRBoxBody(FullBoxBody):
       name=UTF8NULField,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `handler_type_long` and `name` fields.
     '''
-    super().parse_buffer(bfr, **kw)
+    super().parse_fields(bfr)
     # NB: handler_type is supposed to be an unsigned long, but in
     # practice seems to be 4 ASCII bytes, so we load it as a string
     # for readability
@@ -1543,10 +1542,10 @@ class ELNGBoxBody(FullBoxBody):
       extended_language=UTF8NULField,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `extended_language` field.
     '''
-    super().parse_buffer(bfr, **kw)
+    super().parse_fields(bfr)
     # extended language based on RFC4646
     self.add_from_buffer('extended_language', bfr, UTF8NULField)
 
@@ -1566,10 +1565,10 @@ class _SampleTableContainerBoxBody(FullBoxBody):
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_buffer(self, bfr, copy_boxes=None, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `boxes`.
     '''
-    super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
+    super().parse_fields(bfr)
     # obtain box data after version and flags decode
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     boxes = self.add_from_buffer(
@@ -1595,24 +1594,24 @@ class _SampleEntry(BoxBody):
   ''' Superclass of Sample Entry boxes.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `data_reference_inde` field.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('reserved', bfr, BytesField, length=6)
     self.add_from_buffer('data_reference_index', bfr, UInt16BE)
+    super().parse_fields(bfr)
 
 class BTRTBoxBody(BoxBody):
   ''' BitRateBoxBody - section 8.5.2.2.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `bufferSizeDB`, `maxBitrate` and `avgBitrate` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('bufferSizeDB', bfr, UInt32BE)
     self.add_from_buffer('maxBitrate', bfr, UInt32BE)
     self.add_from_buffer('avgBitRate', bfr, UInt32BE)
+    super().parse_fields(bfr)
 
 add_body_class(BTRTBoxBody)
 add_body_subclass(
@@ -1652,8 +1651,8 @@ def add_generic_sample_boxbody(
         ##samples=ListField,
     )
 
-    def parse_buffer(self, bfr, **kw):
-      super().parse_buffer(bfr, **kw)
+    def parse_fields(self, bfr):
+      super().parse_fields(bfr)
       if self.version == 0:
         sample_type = self.sample_type = sample_type_v0
       elif self.version == 1:
@@ -1741,12 +1740,12 @@ class CSLGBoxBody(FullBoxBody):
       'CSLGParamsLong', '>qqqqq', CSLG_PARAM_NAMES
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the compositionToDTSShift`, `leastDecodeToDisplayDelta`,
         `greatestDecodeToDisplayDelta`, `compositionStartTime` and
         `compositionEndTime` fields.
     '''
-    super().parse_buffer(bfr, **kw)
+    super().parse_fields(bfr)
     if self.version == 0:
       param_type = self.CSLGParamsLong
     elif self.version == 1:
@@ -1794,11 +1793,11 @@ class URL_BoxBody(FullBoxBody):
   ''' An 'url ' Data Entry URL BoxBody - section 8.7.2.1.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `location` field.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('location', bfr, UTF8NULField)
+    super().parse_fields(bfr)
 
 add_body_class(URL_BoxBody)
 
@@ -1806,12 +1805,12 @@ class URN_BoxBody(FullBoxBody):
   ''' An 'urn ' Data Entry URL BoxBody - section 8.7.2.1.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `name` and `location` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('name', bfr, UTF8NULField)
     self.add_from_buffer('location', bfr, UTF8NULField)
+    super().parse_fields(bfr)
 
 add_body_class(URN_BoxBody)
 
@@ -1826,12 +1825,12 @@ class STSZBoxBody(FullBoxBody):
       ##entry_sizes=(False, ListField),
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `sample_size`, `sample_count`, and `entry_sizes` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
+    super().parse_fields(bfr)
     if sample_size == 0:
       # a zero sample size means that each sample's individual size
       # is specified in `entry_sizes`
@@ -1854,15 +1853,15 @@ class STZ2BoxBody(FullBoxBody):
   ''' A 'stz2' Compact Sample Size box - section 8.7.3.3.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `field_size`, `sample_count` and `entry_sizes` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('reserved', bfr, BytesField, length=3)
     field_size = self.add_from_buffer('field_size', bfr, UInt8)
     sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
     entry_sizes = []
     if field_size == 4:
+    super().parse_fields(bfr)
       # nybbles packed into bytes
       for i in range(sample_count):
         if i % 2 == 0:
@@ -1897,14 +1896,14 @@ class STSCBoxBody(FullBoxBody):
       'first_chunk samples_per_chunk sample_description_index'
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `entries` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     self.add_deferred_field(
         'entries', bfr, entry_count * STSCBoxBody.STSCEntry.length
     )
+    super().parse_fields(bfr)
 
   @deferred_field
   def entries(self, bfr):
@@ -1927,14 +1926,14 @@ class STCOBoxBody(FullBoxBody):
       ##chunk_offsets=ListField,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `chunk_offsets` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     self.add_deferred_field(
         'chunk_offsets', bfr, entry_count * UInt32BE.length
     )
+    super().parse_fields(bfr)
 
   @deferred_field
   def chunk_offsets(self, bfr):
@@ -1957,14 +1956,14 @@ class CO64BoxBody(FullBoxBody):
       ##chunk_offsets=ListField,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `chunk_offsets` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     self.add_deferred_field(
         'chunk_offsets', bfr, entry_count * UInt64BE.length
     )
+    super().parse_fields(bfr)
 
   @deferred_field
   def chunk_offsets(self, bfr):
@@ -1985,10 +1984,9 @@ class DREFBoxBody(FullBoxBody):
       boxes=SubBoxesField,
   )
 
-  def parse_buffer(self, bfr, copy_boxes=None, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `boxes` fields.
     '''
-    super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
     self.add_from_buffer(
         'boxes',
@@ -1998,6 +1996,7 @@ class DREFBoxBody(FullBoxBody):
         max_boxes=entry_count,
         parent=self.box,
         copy_boxes=copy_boxes
+    super().parse_fields(bfr)
     )
 
 add_body_class(DREFBoxBody)
@@ -2008,12 +2007,12 @@ class CPRTBoxBody(FullBoxBody):
   ''' A 'cprt' Copyright box - section 8.10.2.
   '''
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `language` and `notice` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('language_packed', UInt16BE)
     self.add_from_buffer('notice', UTF8or16Field)
+    super().parse_fields(bfr)
 
   @property
   def language(self):
@@ -2049,10 +2048,9 @@ class METABoxBody(FullBoxBody):
   def __iter__(self):
     return iter(self.boxes)
 
-  def parse_buffer(self, bfr, copy_boxes=None, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
     '''
-    super().parse_buffer(bfr, copy_boxes=copy_boxes, **kw)
     theHandler = self.add_field('theHandler', Box.from_buffer(bfr))
     theHandler.parent = self.box
     self.add_from_buffer(
@@ -2063,6 +2061,7 @@ class METABoxBody(FullBoxBody):
         parent=self.box,
         copy_boxes=copy_boxes
     )
+    super().parse_fields(bfr)
 
   def __getattr__(self, attr):
     ''' Present the ilst attributes if present.
@@ -2272,8 +2271,8 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
-  def parse_buffer(self, bfr, **kw):
-    super().parse_buffer(bfr, **kw)
+  def parse_fields(self, bfr):
+    super().parse_fields(bfr)
     self.tags = TagSet()
     for subbox in self.boxes:
       subbox_type = bytes(subbox.box_type)
@@ -2370,12 +2369,12 @@ class VMHDBoxBody(FullBoxBody):
       opcolor=OpColor,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `graphicsmode` and `opcolor` fields.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('graphicsmode', bfr, UInt16BE)
     self.add_from_buffer('opcolor', bfr, VMHDBoxBody.OpColor)
+    super().parse_fields(bfr)
 
 add_body_class(VMHDBoxBody)
 
@@ -2389,12 +2388,12 @@ class SMHDBoxBody(FullBoxBody):
       reserved=UInt16BE,
   )
 
-  def parse_buffer(self, bfr, **kw):
+  def parse_fields(self, bfr):
     ''' Gather the `balance` field.
     '''
-    super().parse_buffer(bfr, **kw)
     self.add_from_buffer('balance', bfr, Int16BE)
     self.add_from_buffer('reserved', bfr, UInt16BE)
+    super().parse_fields(bfr)
 
 add_body_class(SMHDBoxBody)
 
