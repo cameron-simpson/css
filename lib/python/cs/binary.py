@@ -1487,7 +1487,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     '''
     self = cls()
     for field_name, parse in cls.FIELD_PARSERS.items():
-      self.parse_field(field_name, parse)
+      self.parse_field(field_name, bfr, pt=(parse, None))
     return self
 
   @pfx_method
