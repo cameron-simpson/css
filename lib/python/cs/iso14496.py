@@ -1497,14 +1497,14 @@ class HDLRBoxBody(FullBoxBody):
   ''' A HDLRBoxBody is a Handler Reference box - ISO14496 section 8.4.3.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       pre_defined=UInt32BE,
       handler_type_long=UInt32BE,
       reserved1=UInt32BE,
       reserved2=UInt32BE,
       reserved3=UInt32BE,
-      name=UTF8NULField,
+      name=BinaryUTF8NUL,
   )
 
   def parse_fields(self, bfr):
