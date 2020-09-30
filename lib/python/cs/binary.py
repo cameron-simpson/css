@@ -98,13 +98,27 @@ if (sys.version_info.major < 3
 def flatten(chunks):
   ''' Flatten `chunks` into an iterable of `bytes` instances.
 
-      This exists to allow subclass methods to easily return ASCII
+      This exists to allow subclass methods to easily return
+      transcribeable things (having a `.transcribe` method), ASCII
       strings or bytes or iterables or even `None`, in turn allowing
       them simply to return their superclass' chunks iterators
       directly instead of having to unpack them.
+
+      An example from the `cs.iso14496.METABoxBody` class:
+
+          def transcribe(self):
+              yield super().transcribe()
+              yield self.theHandler
+              yield self.boxes
+
+      The binary classes `flatten` the result of the `.transcribe`
+      method to obtain `bytes` insteances for the object's bnary
+      transcription.
   '''
   if chunks is None:
     pass
+  elif hasattr(chunks, 'transcribe'):
+    yield from flatten(chunks.transcribe())
   elif isinstance(chunks, (bytes, memoryview)):
     if chunks:
       yield chunks
