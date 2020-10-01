@@ -229,7 +229,7 @@ class CornuCopyBuffer(object):
     '''
     it = (
         SeekableFileIterator(fp, readsize=readsize, offset=offset)
-        if hasattr(self, 'tell') else
+        if hasattr(self, 'seek') else
         FileIterator(fp, readsize=readsize, offset=offset)
     )
     return cls(it, offset=it.offset, **kw)
