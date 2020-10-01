@@ -513,7 +513,7 @@ class CornuCopyBuffer(object):
       return self.take(size)
     # size > self.buflen
     if not one_fetch:
-      self.extend(size)
+      self.extend(size, short_ok=True)
     taken = self.takev(min(size, self.buflen))
     size -= sum(len(buf) for buf in taken)
     if size > 0:
