@@ -227,12 +227,11 @@ class CornuCopyBuffer(object):
           offset
         Other keyword arguments are passed to the buffer constructor.
     '''
-    try:
-      _ = fp.tell
-    except AttributeError:
-      it = FileIterator(fp, readsize=readsize, offset=offset)
-    else:
-      it = SeekableFileIterator(fp, readsize=readsize, offset=offset)
+    it = (
+        SeekableFileIterator(fp, readsize=readsize, offset=offset)
+        if hasattr(self, 'tell') else
+        FileIterator(fp, readsize=readsize, offset=offset)
+    )
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
