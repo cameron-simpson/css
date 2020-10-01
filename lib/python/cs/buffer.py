@@ -185,7 +185,9 @@ class CornuCopyBuffer(object):
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
-    return cls(it, offset=it.offset, **kw)
+    self = cls(it, offset=it.offset, **kw)
+    self.fd = fd
+    return self
 
   @classmethod
   def from_mmap(cls, fd, readsize=None, offset=None, **kw):
