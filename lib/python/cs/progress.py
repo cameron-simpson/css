@@ -367,7 +367,7 @@ class BaseProgress(object):
       update_frequency=None,
       report_print=None,
   ):
-    ''' Iterable prgress bar: a generator yielding values
+    ''' An iterable progress bar: a generator yielding values
         from the iterable `it` while updating a progress bar.
 
         Parameters:
