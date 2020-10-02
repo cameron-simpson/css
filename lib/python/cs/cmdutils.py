@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
-from types import SimpleNamespace as NS
+from types import SimpleNamespace
 from cs.context import nullcontext, stackattrs
 from cs.deco import cachedmethod
 from cs.lex import cutprefix, stripped_dedent
@@ -147,6 +147,7 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  OPTIONS_CLASS = SimpleNamespace
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
@@ -304,7 +305,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     if options is None:
-      options = NS()
+      options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
