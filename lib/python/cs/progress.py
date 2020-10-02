@@ -9,6 +9,7 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import functools
 import time
 from cs.logutils import warning, exception
@@ -287,7 +288,73 @@ class BaseProgress(object):
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
     return left + arrow_field + right
 
-  def bar(  # pylint: disable=blacklisted-name,too-many-arguments
+  # pylint: disable=blacklisted-name,too-many-arguments
+  @contextmanager
+  def bar(
+      self,
+      label=None,
+      upd=None,
+      statusfunc=None,
+      width=None,
+      report_print=None,
+  ):
+    ''' A context manager to create and withdraw a progress bar.
+
+        Parameters:
+        * `label`: a label for the progress bar,
+          default from `self.name`.
+        * `upd`: an optional `cs.upd.Upd` instance,
+          used to produce the progress bar status line.
+          The default `upd` is `cs.upd.Upd()`
+          which uses `sys.stderr` for display.
+        * `statusfunc`: an optional function to compute the progress bar text
+          accepting `(self,label,width)`.
+        * `width`: an optional width expressioning how wide the progress bar
+          text may be.
+          The default comes from the `proxy.width` property.
+        * `report_print`: optional `print` compatible function
+          with which to write a report on completion;
+          this may also be a `bool`, which if true will use `Upd.print`
+          in order to interoperate with `Upd`.
+
+        Example use:
+
+            # display progress reporting during upload_filename()
+            # which updates the supplied Progress instance
+            # during its operation
+            P = Progress(name=label)
+            with P.bar(report_print=True):
+                upload_filename(src, progress=P)
+
+    '''
+    if label is None:
+      label = self.name
+    if upd is None:
+      upd = Upd()
+    if statusfunc is None:
+      statusfunc = lambda P, label, width: P.status(label, width)
+    update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
+    try:
+      proxy = upd.insert(1)
+      proxy(statusfunc(self, label, width or proxy.width))
+      self.notify_update.add(update)
+      start_pos = self.position
+      yield proxy
+    finally:
+      self.notify_update.remove(update)
+      proxy.delete()
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = upd_print
+      report_print(
+          label + ':', self.format_counter(self.position - start_pos), 'in',
+          transcribe(
+              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+          )
+      )
+
+  # pylint: disable=too-many-arguments
+  def iterbar(
       self,
       it,
       label=None,
@@ -300,8 +367,8 @@ class BaseProgress(object):
       update_frequency=None,
       report_print=None,
   ):
-    ''' Generator yielding values from the iterable `it`
-        while updating a progress bar.
+    ''' Iterable prgress bar: a generator yielding values
+        from the iterable `it` while updating a progress bar.
 
         Parameters:
         * `it`: the iterable to consume and yield.
@@ -343,7 +410,7 @@ class BaseProgress(object):
             from cs.units import DECIMAL_SCALE
             rows = [some list of data]
             P = Progress(total=len(rows), units_scale=DECIMAL_SCALE)
-            for row in P.bar(rows, incfirst=True):
+            for row in P.iterbar(rows, incfirst=True):
                 ... do something with each row ...
 
             f = open(data_filename, 'rb')
@@ -355,7 +422,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.bar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -439,7 +506,8 @@ class Progress(BaseProgress):
           my_thing.amount = Progress(my_thing.amount)
   '''
 
-  def __init__( # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments
+  def __init__(
       self,
       position=None,
       name=None,
@@ -788,7 +856,7 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.bar`.
+  ''' Convenience function to construct and run a `Progress.iterbar`.
 
       Parameters:
       * `it`: the iterable to consume
@@ -801,7 +869,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       If `total` is `None` and `it` supports `len()`
       then the `Progress.total` is set from it.
 
-      All arguments are passed through to `Progress.bar`.
+      All arguments are passed through to `Progress.iterbar`.
 
       Example use:
 
@@ -815,7 +883,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       total = None
   yield from Progress(
       name=label, total=total, units_scale=units_scale
-  ).bar(
+  ).iterbar(
       it, label=label, **kw
   )
 
@@ -825,10 +893,11 @@ if __name__ == '__main__':
   lines += lines
   for line in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for line in progressbar(lines, "lines step 100", update_frequency=100, report_print=True):
+  for line in progressbar(lines, "lines step 100", update_frequency=100,
+                          report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for line in P.bar(open(__file__)):
+  for line in P.iterbar(open(__file__)):
     time.sleep(0.005)
   from cs.debug import selftest
   selftest('cs.progress_tests')
