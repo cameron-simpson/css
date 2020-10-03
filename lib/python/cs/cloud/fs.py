@@ -4,11 +4,13 @@
 '''
 
 import os
-from os.path import join as joinpath
+from os.path import dirname, isdir as isdirpath, join as joinpath
 from icontract import require
 from typeguard import typechecked
 from cs.fstags import FSTags
+from cs.logutils import info
 from cs.obj import SingletonMixin, as_dict
+from cs.pfx import Pfx
 from . import Cloud
 
 class FSCloud(SingletonMixin, Cloud):
@@ -77,10 +79,16 @@ class FSCloud(SingletonMixin, Cloud):
         * `progress`: an optional `cs.progress.Progress` instance
     '''
     filename = os.sep + joinpath(bucket_name, path)
+    dirpath = dirname(filename)
+    if not isdirpath(dirpath):
+      info("create directory %r", dirpath)
+      with Pfx("makedirs(%r)", dirpath):
+        os.makedirs(dirpath, 0o777)
     with open(filename, 'wb') as f:
       for bs in bfr:
         f.write(bs)
-        progress += len(bs)
+        if progress is not None:
+          progress += len(bs)
     if file_info or content_type:
       with FSTags() as fstags:
         tags = fstags[filename].direct_tags
@@ -88,4 +96,6 @@ class FSCloud(SingletonMixin, Cloud):
           tags['mime.content_type'] = content_type
         if file_info:
           tags.update(file_info, prefix='file_info')
-    return as_dict(os.stat(filename), 'st_')
+    result = as_dict(os.stat(filename), 'st_')
+    result.update(path=filename)
+    return result
