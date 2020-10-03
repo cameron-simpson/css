@@ -189,12 +189,20 @@ class B2ProgressShim(AbstractProgressListener):
   def __init__(self, progress):
     super().__init__()
     self.progress = progress
+    self.latest_byte_count = 0
 
   def set_total_bytes(self, total_byte_count):
-    self.progress.total = total_byte_count
+    ''' Advance the total upload by `total_byte_count`
+        because the progress may be reused for multiple uploads.
+    '''
+    self.progress.total += total_byte_count
 
   def bytes_completed(self, byte_count):
-    self.progress.position = byte_count
+    ''' Advance the progress position.
+    '''
+    advance = byte_count - self.latest_byte_count
+    self.progress.position += advance
+    self.latest_byte_count = byte_count
 
   def close(self):
     pass
