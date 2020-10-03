@@ -250,25 +250,33 @@ class CornuCopyBuffer(object):
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
-  def from_file(cls, fp, readsize=None, offset=None, **kw):
+  def from_file(cls, f, readsize=None, offset=None, **kw):
     ''' Return a new `CornuCopyBuffer` attached to an open file.
 
         Internally this constructs a `SeekableFileIterator`, which
-        provides the iteration that `CornuCopyBuffer` consumes, but
-        also seek support of the underlying file is seekable.
+        provides the iteration that `CornuCopyBuffer` consumes
+        and also seek support if the underlying file is seekable.
 
         Parameters:
-        * `fp`: the file like object
+        * `f`: the file like object
         * `readsize`: an optional preferred read size
         * `offset`: a starting position for the data; the file
           will seek to this offset, and the buffer will start with this
           offset
         Other keyword arguments are passed to the buffer constructor.
     '''
+    try:
+      foffset = f.tell()
+    except OSError:
+      is_seekable = False
+      foffset = None
+    else:
+      is_seekable = True
+    if offset is None:
+      offset = foffset
     it = (
-        SeekableFileIterator(fp, readsize=readsize, offset=offset)
-        if hasattr(self, 'seek') else
-        FileIterator(fp, readsize=readsize, offset=offset)
+        SeekableFileIterator(f, readsize=readsize, offset=offset)
+        if is_seekable else FileIterator(f, readsize=readsize, offset=offset)
     )
     return cls(it, offset=it.offset, **kw)
 
