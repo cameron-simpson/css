@@ -206,13 +206,12 @@ class CloudAreaFile(SingletonMixin):
   def upload_buffer(self, bfr, *, progress=None):
     ''' Upload a buffer into the cloud to the specified `subpath`.
     '''
-    self.upload_result = self.cloud.upload_buffer(
+    return self.cloud.upload_buffer(
         bfr,
         self.cloud_area.bucket_name,
         joinpath(self.cloud_area.basepath, self.filepath),
         progress=progress
     )
-    return self.upload_result
 
   def upload_filename(self, filename, *, progress=None):
     ''' Upload a local file into the cloud to the specified `subpath`.
