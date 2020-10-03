@@ -16,6 +16,7 @@ from os import fstat, SEEK_SET, SEEK_CUR, SEEK_END
 import mmap
 from stat import S_ISREG
 import sys
+from threading import Thread
 from cs.py3 import pread
 
 __version__ = '20200517-post'
@@ -188,6 +189,41 @@ class CornuCopyBuffer(object):
     self = cls(it, offset=it.offset, **kw)
     self.fd = fd
     return self
+
+  def as_fd(self, maxlength=Ellipsis):
+    ''' Create a pipe and dispatch a `Thread` to copy
+        up to `maxlength` bytes from `bfr` into it.
+        Return the file descriptor of the read end of the pipe.
+
+        The default `maxlength` is `Ellipsis`, meaning to copy all data.
+
+        Note that the thread preemptively consumes from the buffer.
+
+        This is useful for passing buffer data to subprocesses.
+    '''
+    rfd, wfd = os.pipe()
+
+    def copy_buffer():
+      ''' Copy data from the buffer to `wfd`,
+          closing `wfd` when finished.
+      '''
+      try:
+        for bs in self.iter(maxlength):
+          while bs:
+            try:
+              nbs = os.write(wfd, bs)
+            except OSError:
+              # rebuffer uncopied data and reraise
+              self.push(bs)
+              raise
+            bs = bs[nbs:]
+      finally:
+        os.close(wfd)
+
+    Thread(
+        name="%s.copy_to_fd_%d_as_%d" % (self, wfd, rfd), target=copy_buffer
+    ).start()
+    return rfd
 
   @classmethod
   def from_mmap(cls, fd, readsize=None, offset=None, **kw):
