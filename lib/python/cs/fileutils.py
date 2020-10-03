@@ -3,7 +3,7 @@
 # Assorted convenience functions for files and filenames/pathnames.
 # - Cameron Simpson <cs@cskk.id.au>
 
-''' Assorted convenience functions for files and filenames/pathnames.
+''' My grab bag of convenience functions for files and filenames/pathnames.
 '''
 
 # pylint: disable=too-many-lines
@@ -45,8 +45,6 @@ from cs.timeutils import TimeoutError
 __version__ = '20200914-post'
 
 DISTINFO = {
-    'description':
-    "convenience functions and classes for files and filenames/pathnames",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
