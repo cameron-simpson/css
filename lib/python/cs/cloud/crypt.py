@@ -172,6 +172,29 @@ def create_key_pair(dirpath, passphrase):
   )
   return uuid, private_path, public_path
 
+def symencrypt(
+    stdin, password, stdout=None, *, ciphername=None, **openssl_kwargs
+):
+  ''' Symmetricly encrypt `stdin` to `stdout`
+      using the supplied `password` and the symmetic cipher `ciphername`.
+
+      Parameters:
+      * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
+      * `stdout`: any value suitable for `openssl()`'s `stdout` parameter
+      * `ciphername`: a cipher name suitable for `openssl`'s `enc` command
+      Other keyword arguments are passed to `openssl()`
+      and its resulting `Popen` returned.
+  '''
+  if ciphername is None:
+    ciphername = 'aes-256-cbc'
+  return openssl(
+      ['enc', '-' + ciphername, '-e', '-salt'],
+      passphrase_option=('-pass', password),
+      stdin=stdin,
+      stdout=stdout,
+      **openssl_kwargs
+  )
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
