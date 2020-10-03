@@ -27,8 +27,9 @@ from subprocess import Popen, DEVNULL
 import sys
 from uuid import uuid4
 
-OPENSSL_ALGORITHM = 'aes256'
-OPENSSL_KEYSIZE = 2048
+# used when creating RSA keypairs
+DEFAULT_RSA__ALGORITHM = 'aes256'
+DEFAULT_RSA_KEYSIZE = 2048
 
 def openssl(
     openssl_args,
@@ -159,8 +160,8 @@ def create_key_pair(dirpath, passphrase):
   public_path = joinpath(dirpath, uuid_s + '.public.pem')
   run_openssl_filter(
       [
-          'genrsa', '-' + OPENSSL_ALGORITHM, '-out', private_path,
-          str(OPENSSL_KEYSIZE)
+          'genrsa', '-' + DEFAULT_RSA__ALGORITHM, '-out', private_path,
+          str(DEFAULT_RSA_KEYSIZE)
       ],
       passphrase_option=('-passout', passphrase),
   )
