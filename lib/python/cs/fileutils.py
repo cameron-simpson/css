@@ -950,6 +950,18 @@ class Pathname(str):
     '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
+def iter_fd(fd, **kw):
+  ''' Iterate over data from the file descriptor `fd`.
+  '''
+  for bs in CornuCopyBuffer.from_fd(fd, **kw):
+    yield bs
+
+def iter_file(f, **kw):
+  ''' Iterate over data from the file `f`.
+  '''
+  for bs in CornuCopyBuffer.from_file(f, **kw):
+    yield bs
+
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       This does not move the file descriptor position.
