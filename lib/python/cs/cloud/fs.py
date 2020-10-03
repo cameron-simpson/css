@@ -9,11 +9,15 @@ from icontract import require
 from typeguard import typechecked
 from cs.fstags import FSTags
 from cs.obj import SingletonMixin, as_dict
-from cs.pfx import pfx_method, XP
 from . import Cloud
 
 class FSCloud(SingletonMixin, Cloud):
-  ''' A filesystem handle.
+  ''' A filesystem based cloud storage handle.
+
+      In this regime objects are stored at the path
+      `/`*bucket_name*`/`*path*
+      with associated information stored in a `.fstags` file
+      (see the `cs.fstags` module).
   '''
 
   PREFIX = 'fs'
@@ -49,9 +53,10 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     return None, sitepart
 
+  # pylint: disable=too-many-arguments
   @typechecked
-  @staticmethod
   def upload_buffer(
+      self,
       bfr,
       bucket_name: str,
       path: str,
@@ -63,6 +68,13 @@ class FSCloud(SingletonMixin, Cloud):
         which means to the file `/`*bucket_name*`/`*path*.
         Return a `dict` with some relevant information.
 
+        Parameters:
+        * `bfr`: the source buffer
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
     '''
     filename = os.sep + joinpath(bucket_name, path)
     with open(filename, 'wb') as f:
