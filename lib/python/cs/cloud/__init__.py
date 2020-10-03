@@ -105,6 +105,50 @@ class Cloud(ABC):
     class_name = prefix.upper() + 'Cloud'
     return import_module_name(module_name, class_name)
 
+  @abstractmethod
+  def bucketpath(self, bucket_name, credentials=None):
+    ''' Return the path for the supplied `bucket_name`.
+        Include the `credentials` if supplied.
+    '''
+    raise NotImplementedError("bucketpath")
+
+  @abstractclassmethod
+  def parse_sitepart(cls, sitepart):
+    ''' Parse the site part of an fspath, return `(credentials,bucket_name)`.
+    '''
+    raise NotImplementedError("bucketpath")
+
+  @classmethod
+  @typechecked
+  def from_sitepart(cls, sitepart: str):
+    ''' Return a `Cloud` instance from the site part of a cloud path.
+    '''
+    credentials, _ = cls.parse_sitepart(sitepart)
+    return cls(credentials)
+
+  # pylint: disable=too-many-arguments
+  @abstractmethod
+  def upload_buffer(
+      self,
+      bfr,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+  ):
+    ''' Upload bytes from `bfr` to `path` within `bucket_name`.
+
+        Parameters:
+        * `bfr`: the source buffer
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    raise NotImplementedError("upload_buffer")
+
 class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   ''' A storage area in a cloud bucket.
   '''
