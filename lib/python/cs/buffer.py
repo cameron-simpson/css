@@ -386,6 +386,27 @@ class CornuCopyBuffer(object):
 
   next = __next__
 
+  def iter(self, maxlength):
+    ''' Yield chunks from the buffer
+        up to `maxlength` in total
+        or until EOF if `maxlength` is `Ellipsis`.
+    '''
+    if maxlength is not Ellipsis and maxlength < 1:
+      raise ValueError(
+          "maxlength mst be Ellipsis or >=1, got %r" % (maxlength,)
+      )
+    while maxlength is Ellipsis or maxlength > 0:
+      try:
+        bs = next(self)
+      except StopIteration:
+        break
+      if maxlength is not Ellipsis:
+        if maxlength < len(bs):
+          self.push(bs[maxlength:])
+          bs = bs[:maxlength]
+        maxlength -= len(bs)
+      yield bs
+
   def push(self, bs):
     ''' Push the chunk `bs` onto the front of the buffered data.
         Rewinds the logical `.offset` by the length of `bs`.
