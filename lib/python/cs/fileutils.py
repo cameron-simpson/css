@@ -977,7 +977,8 @@ def byteses_as_fd(bss, **kw):
 
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
-      This does not move the file descriptor position.
+      **Note**: This does not move the file descriptor position
+      **if** the file is seekable.
 
       Parameters:
       * `fd`: the file descriptor from which to read.
@@ -989,7 +990,12 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
   if offset is None:
-    offset = os.lseek(fd, 0, SEEK_CUR)
+    try:
+      offset = os.lseek(fd, 0, SEEK_CUR)
+      is_seekable = True
+    except OSError:
+      offset = 0
+      is_seekable = False
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
@@ -998,7 +1004,7 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
     if alignsize > 0:
       if maxlength is not None:
         alignsize = min(maxlength, alignsize)
-      bs = pread(fd, alignsize, offset)
+      bs = pread(fd, alignsize, offset) if is_seekable else read(fd, alignsize)
       if not bs:
         return
       yield bs
@@ -1009,7 +1015,7 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   while maxlength is None or maxlength > 0:
     if maxlength is not None:
       readsize = min(readsize, maxlength)
-    bs = pread(fd, readsize, offset)
+    bs = pread(fd, readsize, offset) if is_seekable else read(fd, readsize)
     if not bs:
       return
     yield bs
