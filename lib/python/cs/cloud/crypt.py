@@ -195,6 +195,29 @@ def symencrypt(
       **openssl_kwargs
   )
 
+def symdecrypt(
+    stdin, password, stdout=None, *, ciphername=None, **openssl_kwargs
+):
+  ''' Symmetricly decrypt `stdin`
+      using the supplied `password` and the symmetic cipher `ciphername`.
+
+      Parameters:
+      * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
+      * `stdout`: any value suitable for `openssl()`'s `stdout` parameter
+      * `ciphername`: a cipher name suitable for `openssl`'s `enc` command
+      Other keyword arguments are passed to `openssl()`
+      and its resulting `Popen` returned.
+  '''
+  if ciphername is None:
+    ciphername = 'aes-256-cbc'
+  return openssl(
+      ['enc', '-' + ciphername, '-d'],
+      passphrase_option=('-pass', password),
+      stdin=stdin,
+      stdout=stdout,
+      **openssl_kwargs
+  )
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
