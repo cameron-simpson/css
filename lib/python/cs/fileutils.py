@@ -1024,8 +1024,8 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
     if maxlength is not None:
       maxlength -= bslen
 
-@strable(open_func=partial(os.open, flags=O_RDONLY))
-def datafrom(f, offset, readsize=None, maxlength=None):
+@strable(open_func=lambda filename: os.open(filename, flags=O_RDONLY))
+def datafrom(f, offset=None, readsize=None, maxlength=None):
   ''' General purpose reader for files yielding data from `offset`.
 
       *WARNING*: this function might move the file pointer.
@@ -1049,7 +1049,8 @@ def datafrom(f, offset, readsize=None, maxlength=None):
     readsize = DEFAULT_READSIZE
   if isinstance(f, int):
     # operating system file descriptor
-    for data in datafrom_fd(f, offset, readsize=readsize, maxlength=maxlength):
+    for data in datafrom_fd(f, offset=offset, readsize=readsize,
+                            maxlength=maxlength):
       yield data
     return
   # see if the file has a fileno; if so use datafrom_fd
@@ -1060,7 +1061,7 @@ def datafrom(f, offset, readsize=None, maxlength=None):
   else:
     fd = get_fileno()
     if stat.S_ISREG(os.fstat(fd).st_mode):
-      for data in datafrom_fd(fd, offset, readsize=readsize,
+      for data in datafrom_fd(fd, offset=offset, readsize=readsize,
                               maxlength=maxlength):
         yield data
       return
