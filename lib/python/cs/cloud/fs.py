@@ -7,6 +7,7 @@ import os
 from os.path import join as joinpath
 from icontract import require
 from typeguard import typechecked
+from cs.fstags import FSTags
 from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method, XP
 from . import Cloud
@@ -62,11 +63,17 @@ class FSCloud(SingletonMixin, Cloud):
         which means to the file `/`*bucket_name*`/`*path*.
         Return a `dict` with some relevant information.
 
-        TODO: apply file_info using fstags.
     '''
     filename = os.sep + joinpath(bucket_name, path)
     with open(filename, 'wb') as f:
       for bs in bfr:
         f.write(bs)
         progress += len(bs)
+    if file_info or content_type:
+      with FSTags() as fstags:
+        tags = fstags[filename].direct_tags
+        if content_type:
+          tags['mime.content_type'] = content_type
+        if file_info:
+          tags.update(file_info, prefix='file_info')
     return as_dict(os.stat(filename), 'st_')
