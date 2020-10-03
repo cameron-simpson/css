@@ -738,8 +738,10 @@ class CornuCopyBuffer(object):
         on exiting the context.
     '''
     subbfr = self.bounded(end_offset)
-    yield subbfr
-    subbfr.flush()
+    try:
+      yield subbfr
+    finally:
+      subbfr.flush()
 
   def bounded(self, end_offset):
     ''' Return a new `CornuCopyBuffer` operating on a bounded view
