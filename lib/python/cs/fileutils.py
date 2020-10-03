@@ -14,7 +14,7 @@ import datetime
 import errno
 from functools import partial
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
 try:
   from os import pread
 except ImportError:
