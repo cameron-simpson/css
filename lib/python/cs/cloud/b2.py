@@ -102,14 +102,7 @@ class B2Cloud(SingletonMixin, Cloud):
     credentials = cls.credentials_from_str(credpart)
     return credentials, bucket_name
 
-  @classmethod
   @typechecked
-  def from_sitepart(cls, sitepart: str):
-    ''' Return a `B2Cloud` instance from the site part of a b2path.
-    '''
-    credentials, _ = cls.parse_sitepart(sitepart)
-    return cls(credentials)
-
   @pfx_method
   def upload_buffer(
       self,

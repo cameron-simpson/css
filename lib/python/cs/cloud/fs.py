@@ -48,14 +48,7 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     return None, sitepart
 
-  @classmethod
   @typechecked
-  def from_sitepart(cls, sitepart: str):
-    ''' Return a `B2Cloud` instance from the site part of a b2path.
-    '''
-    credentials, _ = cls.parse_sitepart(sitepart)
-    return cls(credentials)
-
   @staticmethod
   def upload_buffer(
       bfr,
