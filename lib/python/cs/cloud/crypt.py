@@ -23,9 +23,11 @@
 
 import os
 from os.path import join as joinpath
-from subprocess import Popen, DEVNULL
+from subprocess import Popen, DEVNULL, PIPE
 import sys
 from uuid import uuid4
+from cs.buffer import CornuCopyBuffer
+from cs.fileutils import datafrom_fd
 
 # used when creating RSA keypairs
 DEFAULT_RSA__ALGORITHM = 'aes256'
@@ -330,6 +332,23 @@ def main(argv):
   print(uuid)
   print(private_path)
   print(public_path)
+  per_file_passtext_enc, P = pubencrypt_popen(__file__, public_path)
+  encrypted_bytes = P.stdout.read()
+  print("openssl exit code =", P.wait())
+  print("per_file_passtext_enc=", repr(per_file_passtext_enc))
+  per_file_passtext = decrypt_password(
+      per_file_passtext_enc, private_path, passphrase
+  )
+  print("decrypted passtext =>", repr(per_file_passtext))
+  encrypted_size = len(encrypted_bytes)
+  print(encrypted_size, "bytes of encrypted data")
+  P = pubdecrypt_popen(
+      encrypted_bytes, per_file_passtext_enc, private_path, passphrase
+  )
+  decrypted_bytes = P.stdout.read()
+  print("openssl exit code =", P.wait())
+  print(repr(decrypted_bytes))
+  print(decrypted_bytes.decode())
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
