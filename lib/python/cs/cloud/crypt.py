@@ -159,14 +159,14 @@ def create_key_pair(dirpath, passphrase):
   uuid_s = str(uuid)
   private_path = joinpath(dirpath, uuid_s + '.private.pem')
   public_path = joinpath(dirpath, uuid_s + '.public.pem')
-  run_openssl_filter(
+  run_openssl(
       [
           'genrsa', '-' + DEFAULT_RSA__ALGORITHM, '-out', private_path,
           str(DEFAULT_RSA_KEYSIZE)
       ],
       passphrase_option=('-passout', passphrase),
   )
-  run_openssl_filter(
+  run_openssl(
       ['rsa', '-in', private_path, '-pubout', '-out', public_path],
       passphrase_option=('-passin', passphrase),
   )
