@@ -15,7 +15,7 @@ from b2sdk.v1 import (
 from icontract import require
 from typeguard import typechecked
 from cs.lex import hexify
-from cs.obj import SingletonMixin
+from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method, XP
 from cs.threads import locked_property
 from . import Cloud
@@ -132,7 +132,7 @@ class B2Cloud(SingletonMixin, Cloud):
         progress_listener=progress_listener,
     )
     XP("upload to %r => %s", path, result)
-    return result
+    return as_dict(result)
 
 class B2BufferShim(AbstractUploadSource):
   ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
