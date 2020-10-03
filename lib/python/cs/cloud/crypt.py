@@ -241,6 +241,22 @@ def new_passtext(public_path=None):
     )
   return per_file_passtext, per_file_passtext_enc
 
+def decrypt_password(per_file_passtext_enc, private_path, passphrase):
+  ''' Decrypt the encrypted per file password `per_file_passtext_enc`
+      using the private key stored in `private_path` and the `passphrase`.
+      Return the decrypted password.
+  '''
+  per_file_passtext = run_openssl(
+      ['rsautl', '-decrypt', '-inkey', private_path],
+      passphrase_option=('-passin', passphrase),
+      stdin=per_file_passtext_enc,
+      stdout=bytes
+  ).decode()
+  print(
+      "decrypt_password(%r)=>%r" % (per_file_passtext_enc, per_file_passtext)
+  )
+  return per_file_passtext
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
