@@ -371,11 +371,26 @@ def upload(
 def main(argv):
   ''' Main command line: test stuff.
   '''
+  from cs.logutils import setup_logging
+  setup_logging(argv[0])
+  cloud_area = CloudArea.from_cloudpath(os.environ['CS_CLOUD_AREA'])
+  CAF = cloud_area[__file__.lstrip('/')]
+  print("upload %r => %s" % (__file__, CAF))
   passphrase = input("Passphrase: ")
   uuid, private_path, public_path = create_key_pair('.', passphrase)
   print(uuid)
   print(private_path)
   print(public_path)
+  upload_result = upload(
+      __file__,
+      CAF.cloud,
+      CAF.bucket_name,
+      CAF.bucket_path,
+      public_path=public_path,
+      public_key_name=str(uuid),
+  )
+  print("upload result = %r" % (upload_result,))
+  return
   per_file_passtext_enc, P = pubencrypt_popen(__file__, public_path)
   encrypted_bytes = P.stdout.read()
   print("openssl exit code =", P.wait())
