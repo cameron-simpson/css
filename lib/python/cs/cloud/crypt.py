@@ -289,6 +289,38 @@ def pubencrypt_popen(stdin, public_path, stdout=PIPE):
   P = symencrypt(stdin, per_file_passtext, stdout)
   return per_file_passtext_enc, P
 
+def pubdecrypt_popen(
+    stdin, per_file_passtext_enc, private_path, passphrase, stdout=PIPE
+):
+  ''' Decrypt `stdin` to `stdout`
+      with the per file encrypted password `per_file_passtext_enc`,
+      the private key from the file `private_path`
+      and its associated `passphrase`.
+
+      Parameters:
+      * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
+      * `public_path`: the name of a file containing a public key
+      * `stdout`: any value suitable for `openssl()`'s `stdout` parameter
+
+      The encryption is as per the scheme from:
+
+          https://github.com/Backblaze-B2-Samples/encryption
+
+      The returned `(per_file_passtext_enc,Popen)`
+      comprise the encrypted password (a `bytes` instance)
+      and the `subprocess.Popen` instance for the `openssl` command
+      running the symmetric cipher.
+      The encrypted file data are available
+      as the filelike object `Popen.stdout`.
+  '''
+  # decrypt the encrypted per file password
+  per_file_passtext = decrypt_password(
+      per_file_passtext_enc, private_path, passphrase
+  )
+  # dispatch an openssl command to decrypt the contents of the source
+  # using the per file password
+  return symdecrypt(stdin, per_file_passtext, stdout)
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
