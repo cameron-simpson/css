@@ -102,8 +102,9 @@ class B2Cloud(SingletonMixin, Cloud):
     credentials = cls.credentials_from_str(credpart)
     return credentials, bucket_name
 
-  @typechecked
+  # pylint: disable=too-many-arguments
   @pfx_method
+  @typechecked
   def upload_buffer(
       self,
       bfr,
@@ -114,6 +115,15 @@ class B2Cloud(SingletonMixin, Cloud):
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
+        Return a `dict` containing the B2 `FileInfo` object attribute values.
+
+        Parameters:
+        * `bfr`: the source buffer
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
     '''
     bucket = self.api.get_bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
