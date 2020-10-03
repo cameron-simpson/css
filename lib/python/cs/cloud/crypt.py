@@ -28,6 +28,7 @@ import sys
 from uuid import uuid4
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
+from . import validate_subpath, CloudArea
 
 # used when creating RSA keypairs
 DEFAULT_RSA__ALGORITHM = 'aes256'
@@ -322,6 +323,49 @@ def pubdecrypt_popen(
   # dispatch an openssl command to decrypt the contents of the source
   # using the per file password
   return symdecrypt(stdin, per_file_passtext, stdout)
+
+def upload(
+    stdin,
+    cloud,
+    bucket_name,
+    basepath,
+    *,
+    public_path,
+    public_key_name=None,
+    **upload_kw
+):
+  ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
+      using the public_key from the file named `public_path`,
+      return the upload result.
+
+      Parameters:
+      * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
+      * `cloud`: the `Cloud` instance to store the data
+      * `bucket_name`: the bucket within the cloud
+      * `basepath`: the basis for the paths within the bucket
+      * `public_path`: the name of a file containing a public key
+      * `public_key_name`: an optional name for the public key
+        used to encrypt the per file key
+      Other keyword arguments are passed to `cloud.upload_buffer()`.
+
+      This stores the encrypted `stdin`
+      at the bucket path `basepath+'.data.enc'`
+      and the per file key at the bucket path `basepath+'.key.enc'`.
+      The upload result is that for the `'.data.enc'` upload.
+  '''
+  validate_subpath(basepath)
+  assert public_key_name is None or '/' not in public_key_name
+  per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
+  upload_result = cloud.upload_buffer(
+      CornuCopyBuffer.from_file(P.stdout), bucket_name, basepath + '.data.enc',
+      **upload_kw
+  )
+  cloud.upload_buffer(
+      CornuCopyBuffer([per_file_passtext_enc]), bucket_name, basepath +
+      (f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'),
+      **upload_kw
+  )
+  return upload_result
 
 # pylint: disable=unused-argument
 def main(argv):
