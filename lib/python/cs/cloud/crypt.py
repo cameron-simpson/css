@@ -30,39 +30,117 @@ from uuid import uuid4
 OPENSSL_ALGORITHM = 'aes256'
 OPENSSL_KEYSIZE = 2048
 
-def run_openssl_filter(
+def openssl(
     openssl_args,
-    stdin=DEVNULL,
-    passphrase_option=None,
-    pass_fds=(),
-    **popen_kwargs
+    **kw,
 ):
-  ''' Run openssl as a filter.
+  ''' Construct a `subprocess.Popen` instance to run `openssl` and return it.
+      Note that this actually dispatches the external `openssl` command.
 
-      Note that this presumes that the inputs and outputs are separately supplied,
-      for example from files,
-      and this function only calls `Popen.wait()`.
-      In particular, the `stdin` argument defaults to `subprocess.DEVNULL`.
+      Parameters:
+      * `openssl_args`: the command line arguments
+        to follow the `'openssl'` command itself;
+        the first argument must be an openssl command name
+      * `stdin`: defaults to `subprocess.DEVNULL` to avoid accidents;
+        if an `int` or something with a `.read` attribute
+        it is passed unchanged;
+        if a `bytes` the bytes are delivered on standard input;
+        if a `str` it is taken as a filename to attach to stdin;
+        otherwise it is presumed to be some iterable of `bytes`
+        and presented as a file descriptor driven by a `CornuCopyBuffer`.
+      * `stdout`:
+        if a `str` it is taken as a filename to attach as stdout;
+        otherwise it is passed unchanged
+      * `passphrase_option`: default `None`;
+        otherwise a tuple of `(passphrase_opt,passphrase)`
+        being the command line `'-passin'` or `'-passout'` option
+        and a `str` containing a passphrase or password
+        which will be supplied to `openssl` via a pipe
+      * `pass_fds`: any file descriptors to be passed through
+        to `subprocess.Popen`;
+      All other keyword arguments are passed to `subprocess.Popen`.
   '''
+  # if stdin is a str, presume it is a filename
+  stdin = kw.pop('stdin', DEVNULL)
+  if isinstance(stdin, str):
+    with open(stdin, 'rb') as f:
+      return openssl(openssl_args, stdin=f.fileno(), **kw)
+  # if stdout is a str, presume it is a filename
+  stdout = kw.pop('stdout', None)
+  if isinstance(stdout, str):
+    # presume a filename, open it for write
+    with open(stdout, 'wb') as f:
+      return openssl(openssl_args, stdin=stdin, stdout=f.fileno(), **kw)
   arg1, *argv = list(openssl_args)
   assert arg1 and not arg1.startswith('-')
+  passphrase_option = kw.pop('passphrase_option', None)
+  pass_fds = set(kw.pop('pass_fds', None) or ())
+  close_my_fds = []
+  if isinstance(stdin, int) or hasattr(stdin, 'read'):
+    # ints are file descriptors or the usual subprocess.Popen values
+    # things with read() can be uses as files
+    pass
+  elif isinstance(stdin, (bytes, bytearray, memoryview)):
+    # a bytes like object
+    stdin = CornuCopyBuffer([stdin]).as_fd()
+    close_my_fds.append(stdin)
+  elif isinstance(stdin, CornuCopyBuffer):
+    # a buffer
+    stdin = stdin.as_fd()
+    close_my_fds.append(stdin)
+  else:
+    # presume some iterable of bytes
+    stdin = CornuCopyBuffer(stdin).as_fd()
+    close_my_fds.append(stdin)
   if passphrase_option is not None:
+    # insert the passphrase command line option
     passphrase_opt, passphrase = passphrase_option
     assert passphrase_opt.startswith('-pass')
     assert '\n' not in passphrase
     # stash the passphrase in a pipe
-    rfd, wfd = os.pipe()
-    os.write(wfd, (passphrase + '\n').encode())
-    os.close(wfd)
-    pass_fds = set(pass_fds or ())
-    pass_fds.add(rfd)
-    argv = [passphrase_opt, f"fd:{rfd}"] + argv
+    passphrase_fd = CornuCopyBuffer([(passphrase + '\n').encode()]).as_fd()
+    pass_fds.add(passphrase_fd)
+    close_my_fds.append(passphrase_fd)
+    argv = [passphrase_opt, f"fd:{passphrase_fd}"] + argv
   argv = ['openssl', arg1] + argv
   print('+', repr(argv), file=sys.stderr)
-  P = Popen(argv, stdin=stdin, pass_fds=pass_fds, **popen_kwargs)
-  if passphrase is not None:
-    os.system(f"lsof -p {rfd}")
-    os.close(rfd)
+  P = Popen(argv, stdin=stdin, stdout=stdout, pass_fds=pass_fds, **kw)
+  for fd in close_my_fds:
+    os.close(fd)
+  return P
+
+def run_openssl(openssl_args, stdout=None, **openssl_kwargs):
+  ''' Construct a `subprocess.Popen` instance to run `openssl`
+      via the `openssl()` function.
+      Wait for the subprocess to complete.
+      Return the output bytes if `stdout` is `bytes`,
+      otherwise `None`.
+      Raises `ValueError` if the exit code is not `0`.
+
+      The `stdout` parameter accepts some special values
+      in addition to those for `openssl()`:
+      * if set to the type `bytes`
+        then the command output is collected and returned as a `bytes` instance
+      * if set to a callable
+        then the command output is passed to the callable as received,
+        as `bytes` instances,
+        and a final call made with `None` to indicate end of data
+      Other keyword parameters are passed unchanged to `openssl()`.
+  '''
+  special_stdout = None
+  if stdout is bytes or callable(stdout):
+    special_stdout = stdout
+    stdout = PIPE
+  P = openssl(openssl_args, stdout=stdout, **openssl_kwargs)
+  result = None
+  if special_stdout is not None:
+    if special_stdout is bytes:
+      result = P.stdout.read()
+    elif callable(special_stdout):
+      copy_output = special_stdout
+      for bs in datafrom_fd(P.stdout.file.fileno()):
+        copy_output(bs)
+      copy_output(None)
   exitcode = P.wait()
   if exitcode != 0:
     raise ValueError("openssl failed: %r => %s" % (argv, exitcode))
