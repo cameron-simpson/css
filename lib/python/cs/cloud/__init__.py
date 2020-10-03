@@ -3,16 +3,14 @@
 ''' Stuff for working with cloud storage.
 '''
 
-from abc import ABC
+from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from os.path import join as joinpath
-import sys
 from threading import RLock
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.lex import is_identifier
-from cs.logutils import setup_logging
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.py.modules import import_module_name
@@ -20,10 +18,7 @@ from cs.py.modules import import_module_name
 from cs.x import X
 
 def is_valid_subpath(subpath):
-  ''' True if `subpath` is valid:
-      * not empty
-      * does not start or end with a slash (`'/'`)
-      * does not contain any multiple slashes
+  ''' True if `subpath` is valid per the `validate_subpath()` function.
   '''
   try:
     validate_subpath(subpath)
@@ -32,6 +27,14 @@ def is_valid_subpath(subpath):
   return True
 
 def validate_subpath(subpath):
+  ''' Validate a subpath against `is_valid_subpath`,
+      raise `ValueError` on violations.
+
+      Criteria:
+      * not empty
+      * does not start or end with a slash (`'/'`)
+      * does not contain any multiple slashes
+  '''
   with Pfx("validate_subpath(%r)", subpath):
     if not subpath:
       raise ValueError("empty subpath")
