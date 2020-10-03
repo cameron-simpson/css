@@ -54,10 +54,8 @@ class CloudCmd(BaseCommand):
     label = f"{src} => {CAF}"
     P = Progress(name=label)
     with P.bar(report_print=True):
-      uploaded = CAF.upload_filename(src, progress=P)
-    print("uploaded =>", uploaded)
-    for k, v in uploaded.__dict__.items():
-      print(" ", k, repr(v))
+      upload_result = CAF.upload_filename(src, progress=P)
+    print("uploaded =>", repr(upload_result))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
