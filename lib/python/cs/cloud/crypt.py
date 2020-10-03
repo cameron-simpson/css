@@ -144,7 +144,8 @@ def run_openssl(openssl_args, stdout=None, **openssl_kwargs):
       copy_output(None)
   exitcode = P.wait()
   if exitcode != 0:
-    raise ValueError("openssl failed: %r => %s" % (argv, exitcode))
+    raise ValueError("openssl failed: %r => %s" % (openssl_args, exitcode))
+  return result
 
 def create_key_pair(dirpath, passphrase):
   ''' Generate and save a public/private keypair into the directory `dirpath`
