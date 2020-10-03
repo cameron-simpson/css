@@ -218,6 +218,29 @@ def symdecrypt(
       **openssl_kwargs
   )
 
+def new_passtext(public_path=None):
+  ''' Generate a new password text
+      for use with an symmetric cipher.
+      If `public_path` is not `None`,
+      also generate the encryption of the password
+      using the public key stored in the file `public_path`.
+      Return `(per_file_passtext,per_file_passtext_enc)`.
+  '''
+  # generate per file random password text
+  per_file_passtext = run_openssl(['rand', '-base64', '180'],
+                                  stdout=bytes).decode().replace('\n', '')
+  print("passtext =", per_file_passtext)
+  if public_path is None:
+    per_file_passtext_enc = None
+  else:
+    # encrypt the password using the public key
+    per_file_passtext_enc = run_openssl(
+        ['rsautl', '-encrypt', '-pubin', '-inkey', public_path],
+        stdin=per_file_passtext.encode(),
+        stdout=bytes,
+    )
+  return per_file_passtext, per_file_passtext_enc
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
