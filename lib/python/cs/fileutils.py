@@ -962,6 +962,19 @@ def iter_file(f, **kw):
   for bs in CornuCopyBuffer.from_file(f, **kw):
     yield bs
 
+def byteses_as_fd(bss, **kw):
+  ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
+      Return the file descriptor.
+      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+
+      Example:
+
+         # present a passphrase for use as in input file descrptor
+         # for a subprocess
+         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+  '''
+  return CornuCopyBuffer(bss).as_fd(**kw)
+
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
       This does not move the file descriptor position.
