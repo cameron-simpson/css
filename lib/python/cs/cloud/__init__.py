@@ -201,6 +201,18 @@ class CloudAreaFile(SingletonMixin):
     return self.cloud_area.cloud
 
   @property
+  def bucket_name(self):
+    ''' The cloud bucket name.
+    '''
+    return self.cloud_area.bucket_name
+
+  @property
+  def bucket_path(self):
+    ''' The path within the cloud bucket.
+    '''
+    return joinpath(self.cloud_area.basepath, self.filepath)
+
+  @property
   def cloudpath(self):
     ''' The cloud path for this file.
     '''
@@ -210,10 +222,7 @@ class CloudAreaFile(SingletonMixin):
     ''' Upload a buffer into the cloud to the specified `subpath`.
     '''
     return self.cloud.upload_buffer(
-        bfr,
-        self.cloud_area.bucket_name,
-        joinpath(self.cloud_area.basepath, self.filepath),
-        progress=progress
+        bfr, self.bucket_name, self.bucket_path, progress=progress
     )
 
   def upload_filename(self, filename, *, progress=None):
