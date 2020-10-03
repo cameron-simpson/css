@@ -183,34 +183,32 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
-def as_dict(o, attr_prefix=None, attr_match=None):
+def as_dict(o, selector=None):
   ''' Return a dictionary with keys mapping to the values of the attributes of `o`.
 
       Parameters:
       * `o`: the object to map
-      * `attr_prefix`: optional prefix for interesting attribute names
-      * `attr_match`: optional test for interesting attribute names
+      * `selector`: the optional selection criterion
 
-      It is an error to specify both `attr_prefix` and `attr_match`.
+      If `selector` is omitted or `None`, select "public" attributes,
+      those not commencing with an underscore.
+
+      If `selector` is a `str`, select attributes starting with `selector`.
+
+      Otherwise presume `selector` is callable
+      and select attributes `attr` where `selector(attr)` is true.
   '''
-  if attr_match is None:
-    if attr_prefix is None:
-      match = lambda attr: attr and not attr.startswith('_')
-    else:
-      match = lambda attr: attr.startswith(attr_prefix)
-  elif attr_prefix is None:
-    match = attr_match
+  if selector is None:
+    match = lambda attr: attr and not attrs.startswith('_')
+  elif isinstance(selector, str):
+    match = lambda attr: attr.startswith(selector)
   else:
-    raise ValueError("cannot specify both attr_prefix and attr_match")
-  d = {}
-  for attr in dir(o):
-    if match(attr):
-      d[attr] = getattr(o, attr)
-  return d
+    match = selector
+  return {attr: getattr(o, attr) for attr in dir(o) if match(attr)}
 
 @OBSOLETE("use cs.obj.as_dict")
 def obj_as_dict(o, **kw):
-  return as_dict(o, **kw)
+  raise RuntimeError("please use cs.obj.as_dict")
 
 class Proxy(object):
   ''' An extremely simple proxy object
