@@ -76,7 +76,8 @@ class CornuCopyBuffer(object):
       `.tell` and `.seek` supporting drop in use of the buffer in
       many file contexts. Backward seeks are not supported. `.seek`
       will take advantage of the `input_data`'s .seek method if it
-      has one, otherwise it will use reads.
+      has one, otherwise it will use consume the `input_data`
+      as required.
   '''
 
   def __init__(
@@ -91,17 +92,17 @@ class CornuCopyBuffer(object):
     ''' Prepare the buffer.
 
         Parameters:
-        * `input_data`: an iterable of data chunks (bytes-like instances);
-          if your data source is a file see the .from_file factory;
-          if your data source is a file descriptor see the .from_fd
+        * `input_data`: an iterable of data chunks (`bytes`-like instances);
+          if your data source is a file see the `.from_file` factory;
+          if your data source is a file descriptor see the `.from_fd`
           factory.
         * `buf`: if not `None`, the initial state of the parse buffer
-        * `offset`: logical offset of the start of the buffer, default 0
+        * `offset`: logical offset of the start of the buffer, default `0`
         * `seekable`: whether `input_data` has a working `.seek` method;
-          the default is None meaning that it will be attempted on
+          the default is `None` meaning that it will be attempted on
           the first skip or seek
         * `copy_offsets`: if not `None`, a callable for parsers to
-          report pertinent offsets via the buffer's .report_offset
+          report pertinent offsets via the buffer's `.report_offset`
           method
         * `copy_chunks`: if not `None`, every fetched data chunk is
           copied to this callable
@@ -166,7 +167,7 @@ class CornuCopyBuffer(object):
     ''' Return a new `CornuCopyBuffer` attached to an open file descriptor.
 
         Internally this constructs a `SeekableFDIterator` for regular
-        files or an FDIterator for other files, which provides the
+        files or an `FDIterator` for other files, which provides the
         iteration that `CornuCopyBuffer` consumes, but also seek
         support if the underlying file descriptor is seekable.
 
@@ -334,6 +335,7 @@ class CornuCopyBuffer(object):
 
   def __getitem__(self, index):
     ''' Fetch from the internal buffer.
+        This does not consume data from the internal buffer.
         Note that this is an expensive way to access the buffer,
         particularly if `index` is a slice.
 
@@ -617,16 +619,16 @@ class CornuCopyBuffer(object):
     ''' Compatibility method to allow using the buffer like a file.
         This returns the resulting absolute offset.
 
-        Parameters are as for io.seek except as noted below:
-        * `whence`: (default os.SEEK_SET). This method only supports
-          os.SEEK_SET and os.SEEK_CUR, and does not support seeking to a
+        Parameters are as for `io.seek` except as noted below:
+        * `whence`: (default `os.SEEK_SET`). This method only supports
+          `os.SEEK_SET` and `os.SEEK_CUR`, and does not support seeking to a
           lower offset than the current buffer offset.
-        * `short_ok`: (default False). If true, the seek may not reach
+        * `short_ok`: (default `False`). If true, the seek may not reach
           the target if there are insufficent `input_data` - the
           position will be the end of the `input_data`, and the
           `input_data` will have been consumed; the caller must check
           the returned offset to check that it is as expected. If
-          false, a ValueError will be raised; however, note that the
+          false, a `ValueError` will be raised; however, note that the
           `input_data` will still have been consumed.
     '''
     if whence is None:
@@ -655,7 +657,7 @@ class CornuCopyBuffer(object):
         Parameters:
         * `new_offset`: the target offset.
         * `copy_skip`: callable to receive skipped data.
-        * `short_ok`: default False; f true then skipto may return before
+        * `short_ok`: default `False`; if true then skipto may return before
           `new_offset` if there are insufficient `input_data`.
 
         Return values:
@@ -677,7 +679,7 @@ class CornuCopyBuffer(object):
         Parameters:
         * `toskip`: the distance to advance
         * `copy_skip`: callable to receive skipped data.
-        * `short_ok`: default False; if true then skip may return before
+        * `short_ok`: default `False`; if true then skip may return before
           `skipto` bytes if there are insufficient `input_data`.
     '''
     # consume buffered bytes in buf before the new offset
@@ -802,10 +804,12 @@ class CornuCopyBuffer(object):
             2
 
         *WARNING*: if the bounded buffer is not completely consumed
-        then it is critical to call the new CornuCopyBuffer's `.flush`
+        then it is critical to call the new `CornuCopyBuffer`'s `.flush`
         method to push any unconsumed buffer back into this buffer.
         Recommended practice is to always call `.flush` when finished
         with the new buffer.
+        The `CornuCopyBuffer.subbuffer` method returns a context manager
+        which does this automatically.
 
         Also, because the new buffer may buffer some of the unconsumed
         data from this buffer, use of the original buffer should
@@ -816,8 +820,8 @@ class CornuCopyBuffer(object):
     )
 
     def flush():
-      ''' Flush the contents of bfr2.buf back into self.buf, adjusting
-          the latter's offset accordingly.
+      ''' Flush the contents of `bfr2.buf` back into `self.buf`, adjusting
+          the latter's `.offset` accordingly.
       '''
       for buf in reversed(bfr2.bufs):
         self.push(buf)
@@ -914,7 +918,7 @@ def chunky(bfr_func):
   ''' Decorator for a function accepting a leading `CornuCopyBuffer`
       parameter.
       Returns a function accepting a leading data chunks parameter
-      (bytes instances) and optional `offset` and 'copy_offsets`
+      (`bytes` instances) and optional `offset` and 'copy_offsets`
       keywords parameters.
 
       Example::
