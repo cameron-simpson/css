@@ -152,6 +152,26 @@ class Cloud(ABC):
     '''
     raise NotImplementedError("upload_buffer")
 
+  # pylint: disable=too-many-arguments
+  @abstractmethod
+  def download_buffer(
+      self,
+      bucket_name: str,
+      path: str,
+      progress=None,
+  ):
+    ''' Download from `path` within `bucket_name`,
+        returning `(buffer,file_info)`
+        being a CornuCopyBuffer` presenting the data bytes
+        and the file info uploaded with the file.
+
+        Parameters:
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    raise NotImplementedError("download_buffer")
+
 class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   ''' A storage area in a cloud bucket.
   '''
