@@ -452,6 +452,7 @@ def main(argv):
   print("upload %r => %s" % (__file__, CAF))
   passphrase = input("Passphrase: ")
   uuid, private_path, public_path = create_key_pair('.', passphrase)
+  public_key_name = str(uuid)
   print(uuid)
   print(private_path)
   print(public_path)
@@ -461,7 +462,7 @@ def main(argv):
       CAF.bucket_name,
       CAF.bucket_path,
       public_path=public_path,
-      public_key_name=str(uuid),
+      public_key_name=public_key_name,
   )
   print("upload result = %r" % (upload_result,))
   return
