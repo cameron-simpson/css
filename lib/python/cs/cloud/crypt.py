@@ -26,6 +26,7 @@ from os.path import join as joinpath
 from subprocess import Popen, DEVNULL, PIPE
 import sys
 from uuid import uuid4
+from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
 from . import validate_subpath, CloudArea
@@ -178,9 +179,15 @@ def create_key_pair(dirpath, passphrase):
   )
   return uuid, private_path, public_path
 
+@typechecked
 def symencrypt(
-    stdin, password, stdout=None, *, ciphername=None, **openssl_kwargs
-):
+    stdin,
+    password,
+    stdout=None,
+    *,
+    ciphername=None,
+    **openssl_kwargs
+) -> Popen:
   ''' Symmetricly encrypt `stdin` to `stdout`
       using the supplied `password` and the symmetic cipher `ciphername`.
 
@@ -201,9 +208,15 @@ def symencrypt(
       **openssl_kwargs
   )
 
+@typechecked
 def symdecrypt(
-    stdin, password, stdout=None, *, ciphername=None, **openssl_kwargs
-):
+    stdin,
+    password,
+    stdout=None,
+    *,
+    ciphername=None,
+    **openssl_kwargs
+) -> Popen:
   ''' Symmetricly decrypt `stdin`
       using the supplied `password` and the symmetic cipher `ciphername`.
 
@@ -327,13 +340,14 @@ def pubdecrypt_popen(
   # using the per file password
   return symdecrypt(stdin, per_file_passtext, stdout)
 
+@typechecked
 def upload(
     stdin,
     cloud,
-    bucket_name,
-    basepath,
+    bucket_name: str,
+    basepath: str,
     *,
-    public_path,
+    public_path: str,
     public_key_name=None,
     **upload_kw
 ):
