@@ -80,7 +80,7 @@ def openssl(
   passphrase_option = kw.pop('passphrase_option', None)
   pass_fds = set(kw.pop('pass_fds', None) or ())
   close_my_fds = []
-  if isinstance(stdin, int) or hasattr(stdin, 'read'):
+  if isinstance(stdin, int):
     # ints are file descriptors or the usual subprocess.Popen values
     # things with read() can be uses as files
     pass
@@ -92,6 +92,9 @@ def openssl(
     # a buffer
     stdin = stdin.as_fd()
     close_my_fds.append(stdin)
+  elif hasattr(stdin, 'read'):
+    # presume a file
+    pass
   else:
     # presume some iterable of bytes
     stdin = CornuCopyBuffer(stdin).as_fd()
