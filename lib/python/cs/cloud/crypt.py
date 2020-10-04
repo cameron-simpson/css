@@ -372,14 +372,21 @@ def upload(
   '''
   validate_subpath(basepath)
   assert public_key_name is None or '/' not in public_key_name
+  data_subpath = basepath + '.data.enc'
+  key_subpath = basepath + (
+      f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
+  )
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
   upload_result = cloud.upload_buffer(
-      CornuCopyBuffer.from_file(P.stdout), bucket_name, basepath + '.data.enc',
+      CornuCopyBuffer.from_file(P.stdout),
+      bucket_name,
+      data_subpath,
       progress=progress,
   )
   cloud.upload_buffer(
-      CornuCopyBuffer([per_file_passtext_enc]), bucket_name, basepath +
-      (f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'),
+      CornuCopyBuffer([per_file_passtext_enc]),
+      bucket_name,
+      key_subpath,
       progress=progress,
   )
   return upload_result
