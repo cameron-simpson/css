@@ -445,12 +445,13 @@ def download(
 def main(argv):
   ''' Main command line: test stuff.
   '''
+  # pylint: disable=import-outside-toplevel
   from cs.logutils import setup_logging
   setup_logging(argv[0])
   cloud_area = CloudArea.from_cloudpath(os.environ['CS_CLOUD_AREA'])
   CAF = cloud_area[__file__.lstrip('/')]
   print("upload %r => %s" % (__file__, CAF))
-  passphrase = input("Passphrase: ")
+  passphrase = 'ss'  ## passphrase = input("Passphrase: ")
   uuid, private_path, public_path = create_key_pair('.', passphrase)
   public_key_name = str(uuid)
   print(uuid)
