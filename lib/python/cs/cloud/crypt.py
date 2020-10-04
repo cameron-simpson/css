@@ -391,6 +391,55 @@ def upload(
   )
   return upload_result
 
+@typechecked
+def download(
+    cloud,
+    bucket_name,
+    basepath,
+    *,
+    private_path,
+    passphrase: str,
+    public_key_name=None,
+    progress=None,
+    stdout=PIPE,
+):
+  ''' Download from `cloud` in bucket `bucket_name` at path `basepath`
+      using the private key from the file named `private_path`
+      and the `passphrase`.
+      Return the `Popen` instance.
+
+      Parameters:
+      * `cloud`: the `Cloud` instance to store the data
+      * `bucket_name`: the bucket within the cloud
+      * `basepath`: the basis for the paths within the bucket
+      * `private_path`: the name of a file containing a private key
+        corresponding to the public key used during the upload
+      * `passphrase`: the passphrase for use with the private key
+      * `public_key_name`: an optional name for the public key
+        used to encrypt the per file key
+        during the upload
+      Other keyword arguments are passed to `cloud.upload_buffer()`.
+
+      This fetches the encrypted data
+      from the bucket path `basepath+'.data.enc'`
+      and the per file key from the bucket path `basepath+'.key.enc'`
+      (or `basepath+'.key-`*public_key_name*`.enc'
+      if `public_key_name` was specified).
+  '''
+  validate_subpath(basepath)
+  assert public_key_name is None or '/' not in public_key_name
+  data_subpath = basepath + '.data.enc'
+  key_subpath = basepath + (
+      f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
+  )
+  bfr, _ = cloud.download_buffer(bucket_name, key_subpath, progress=progress)
+  per_file_passtext_enc = b''.join(bfr)
+  per_file_passtext = decrypt_password(
+      per_file_passtext_enc, private_path, passphrase
+  )
+  bfr, _ = cloud.download_buffer(bucket_name, data_subpath, progress=progress)
+  return symdecrypt(bfr, per_file_passtext, stdout=stdout)
+
 # pylint: disable=unused-argument
 def main(argv):
   ''' Main command line: test stuff.
