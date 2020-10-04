@@ -349,7 +349,7 @@ def upload(
     *,
     public_path: str,
     public_key_name=None,
-    **upload_kw
+    progress=None,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
       using the public_key from the file named `public_path`,
@@ -375,12 +375,12 @@ def upload(
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
   upload_result = cloud.upload_buffer(
       CornuCopyBuffer.from_file(P.stdout), bucket_name, basepath + '.data.enc',
-      **upload_kw
+      progress=progress,
   )
   cloud.upload_buffer(
       CornuCopyBuffer([per_file_passtext_enc]), bucket_name, basepath +
       (f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'),
-      **upload_kw
+      progress=progress,
   )
   return upload_result
 
