@@ -352,7 +352,7 @@ def upload(
     progress=None,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
-      using the public_key from the file named `public_path`,
+      using the public key from the file named `public_path`,
       return the upload result.
 
       Parameters:
@@ -363,11 +363,12 @@ def upload(
       * `public_path`: the name of a file containing a public key
       * `public_key_name`: an optional name for the public key
         used to encrypt the per file key
-      Other keyword arguments are passed to `cloud.upload_buffer()`.
 
       This stores the encrypted `stdin`
       at the bucket path `basepath+'.data.enc'`
-      and the per file key at the bucket path `basepath+'.key.enc'`.
+      and the per file key at the bucket path `basepath+'.key.enc'`
+      (or `basepath+'.key-`*public_key_name*`.enc'
+      if `public_key_name` was specified).
       The upload result is that for the `'.data.enc'` upload.
   '''
   validate_subpath(basepath)
