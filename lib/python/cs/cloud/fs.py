@@ -99,3 +99,30 @@ class FSCloud(SingletonMixin, Cloud):
     result = as_dict(os.stat(filename), 'st_')
     result.update(path=filename)
     return result
+
+  # pylint: disable=too-many-arguments
+  @typechecked
+  def download_buffer(
+      self,
+      bucket_name: str,
+      path: str,
+      progress=None,
+  ) -> (CornuCopyBuffer, dict):
+    ''' Download from `path` within `bucket_name`,
+        returning `(buffer,file_info)`
+        being a `CornuCopyBuffer` presenting the data bytes
+        and the file info uploaded with the file.
+
+        Parameters:
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    filename = os.sep + joinpath(bucket_name, path)
+    with Pfx("open(%r)", filename):
+      with open(filename, 'rb') as f:
+        fd2 = os.dup(f.fileno())
+    bfr = CornuCopyBuffer.from_fd(fd2)
+    with FSTags() as fstags:
+      file_info = dict(fstags[filename].direct_tags)
+    return bfr, file_info
