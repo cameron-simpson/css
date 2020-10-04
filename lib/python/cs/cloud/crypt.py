@@ -465,6 +465,17 @@ def main(argv):
       public_key_name=public_key_name,
   )
   print("upload result = %r" % (upload_result,))
+  print("download CAF %s ...", CAF)
+  P = download(
+      CAF.cloud,
+      CAF.bucket_name,
+      CAF.bucket_path,
+      private_path=private_path,
+      passphrase=passphrase,
+      public_key_name=public_key_name,
+  )
+  for bs in CornuCopyBuffer.from_file(P.stdout):
+    print(repr(bs))
   return
   per_file_passtext_enc, P = pubencrypt_popen(__file__, public_path)
   encrypted_bytes = P.stdout.read()
