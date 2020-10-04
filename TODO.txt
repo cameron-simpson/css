@@ -1,3 +1,4 @@
+cs.logutils: warning et all: once=key (or key on the warning format string if True)
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
 cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
 cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
