@@ -1,3 +1,4 @@
+MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
 cs.logutils: warning et all: once=key (or key on the warning format string if True)
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
 cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
