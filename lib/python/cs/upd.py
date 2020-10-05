@@ -286,6 +286,21 @@ class Upd(SingletonMixin):
       self._backend.write(''.join(txts))
       self._backend.flush()
 
+  @property
+  def disabled(self):
+    ''' Whether this `Upd` is currently disabled.
+    '''
+    return self._disabled
+
+  @disabled.setter
+  def disabled(self, new_state):
+    ''' Update the `.disabled` property.
+    '''
+    if new_state:
+      self.disable()
+    else:
+      self.enable()
+
   # Enable/disable. TODO: restore/withdrawn upd display on toggle.
   def enable(self):
     ''' Enable updates.
