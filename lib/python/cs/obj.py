@@ -199,7 +199,7 @@ def as_dict(o, selector=None):
       and select attributes `attr` where `selector(attr)` is true.
   '''
   if selector is None:
-    match = lambda attr: attr and not attrs.startswith('_')
+    match = lambda attr: attr and not attr.startswith('_')
   elif isinstance(selector, str):
     match = lambda attr: attr.startswith(selector)
   else:
