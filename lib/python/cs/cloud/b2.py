@@ -240,22 +240,50 @@ class B2Cloud(SingletonMixin, Cloud):
     )
     return download_dest.bfr, file_info
 
+class B2UploadFileWrapper:
+  ''' A Wrapper for a file-like object which updates a `Progress`.
+  '''
 
-class B2BufferShim(AbstractUploadSource):
+  def __init__(self, f, progress):
+    self.f = f
+    self.progress = progress
+
+  def read(self, size):
+    ''' Read from the file and advance the progress meter.
+    '''
+    bs = self.f.read(size)
+    if self.progress:
+      self.progress += len(bs)
+    return bs
+
+  def seek(self, position, whence):
+    ''' Adjust the position of the file.
+    '''
+    return self.f.seek(position, whence)
+
+  def tell(self):
+    ''' Report position from the file.
+    '''
+    return self.f.tell()
+
+class B2UploadFileShim(AbstractUploadSource):
   ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
   '''
 
-  def __init__(self, bfr, sha1bytes=None):
+  def __init__(self, f, length=None, sha1bytes=None, progress=None):
     super().__init__()
-    self.bfr = bfr
+    self.f = f
+    self.length = length
+    self.progress = progress
     self.sha1bytes = sha1bytes
 
   @contextmanager
   def open(self):
     ''' Just hand the buffer back, it supports reads.
     '''
-    with nullcontext():
-      yield self.bfr
+    if self.length:
+      self.progress.total += self.length
+    yield B2UploadFileWrapper(self.f, self.progress)
 
   def get_content_sha1(self):
     if self.sha1bytes:
@@ -273,18 +301,52 @@ class B2BufferShim(AbstractUploadSource):
     return self.sha1bytes is not None
 
   def get_content_length(self):
+    return self.length
+
+class B2DownloadBufferShimFileShim:
+  ''' Shim to present a write-to-file interface for an `IterableQueue`.
+  '''
+
+  def __init__(self, Q):
+    self.Q = Q
+
+  def write(self, bs):
+    ''' A write puts `bytes` onto the queue.
+    '''
+    self.Q.put(bs)
+
+  def close(self):
+    ''' A close closes the queue.
+    '''
+    self.Q.close()
+
+# pylint: disable=too-few-public-methods
+class B2DownloadBufferShim(AbstractDownloadDestination):
+  ''' Shim to present a writeable object which feeds a buffer.
+  '''
+
+  def __init__(self):
+    self.Q = IterableQueue(1024)
+    self.bfr = CornuCopyBuffer(self.Q)
+
+  # pylint: disable=too-many-arguments
+  @contextmanager
+  def make_file_context(
+      self,
+      file_id,
+      file_name,
+      content_length,
+      content_type,
+      content_sha1,
+      file_info,
+      mod_time_millis,
+      range_=None
+  ):
+    shim = B2DownloadBufferShimFileShim(self.Q)
     try:
-      fd = self.bfr.fd
-    except AttributeError:
-      pass
-    else:
-      try:
-        S = os.fstat(fd)
-      except OSError:
-        pass
-      else:
-        return S.st_size
-    return self.bfr.end_offset
+      yield shim
+    finally:
+      shim.close()
 
 class B2ProgressShim(AbstractProgressListener):
   ''' Shim to present a `Progress` as an `AbstractProgressListener` to B2.
@@ -299,7 +361,7 @@ class B2ProgressShim(AbstractProgressListener):
     ''' Advance the total upload by `total_byte_count`
         because the progress may be reused for multiple uploads.
     '''
-    self.progress.total += total_byte_count
+    self.progress.total = (self.progress.total or 0) + total_byte_count
 
   def bytes_completed(self, byte_count):
     ''' Advance the progress position.
