@@ -136,11 +136,12 @@ class B2Cloud(SingletonMixin, Cloud):
   def upload_buffer(
       self,
       bfr,
+      *,
       bucket_name: str,
       path: str,
-      file_info=None,
-      content_type=None,
+      length=None,
       progress=None,
+      **kw
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileInfo` object attribute values.
@@ -152,6 +153,66 @@ class B2Cloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an option indication of the length of the buffer
+
+        Annoyingly, the B2 stuff expects to seek on the buffer.
+        Therefore we write a scratch file for the upload.
+    '''
+    with NamedTemporaryFile(dir='.') as T:
+      for bs in progressbar(
+          bfr, label=self.bucketpath(bucket_name, path=path) + " scratch file",
+          total=length, itemlenfunc=len, units_scale=BINARY_BYTES_SCALE,
+          report_print=True):
+        T.write(bs)
+      T.flush()
+      return self.upload_filename(
+          T.name, bucket_name=bucket_name, path=path, **kw
+      )
+
+  def upload_file(self, f, *, length=None, bucket_name: str, path: str, **kw):
+    ''' Upload the data from the file `f` to `path` within `bucket_name`.
+        Return a `dict` containing the B2 `FileInfo` object attribute values.
+
+        Note that the b2api expects to be able to seek when given
+        a file, so this copies to a scratch file if given an
+        unseekable file.
+
+        Parameters:
+        * `f`: the seekable file
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an option indication of the length of the buffer
+    '''
+    # test the file for seekability
+    try:
+      # CornuCopyBuffers look a lot like files, but not enough for the b2api.
+      if isinstance(f, CornuCopyBuffer):
+        raise io.UnsupportedOperation(
+            "CornuCopyBuffer does not support backwards seeks"
+        )
+      position = f.tell()
+      f.seek(0)
+      f.seek(position)
+    except io.UnsupportedOperation:
+      # upload via a scratch file
+      bfr = f if isinstance(f,
+                            CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
+      return self.upload_buffer(bfr, **kw)
+    else:
+      file_info = self._b2_upload_file(
+          f,
+          progress_name=self.bucketpath(bucket_name, path=path) + " upload",
+          progress_total=length,
+          length=length,
+          bucket_name=bucket_name,
+          path=path,
+          **kw
+      )
+      return as_dict(file_info)
+
     '''
     bucket = self.api.get_bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
