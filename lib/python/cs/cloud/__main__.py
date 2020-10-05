@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-from getopt import getopt, GetoptError
+''' Command line implementation for the cs.cloud module.
+'''
+
 import os
 import sys
 from threading import RLock
@@ -8,24 +10,28 @@ from types import SimpleNamespace
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
 from cs.progress import Progress
-from cs.upd import Upd, print
+from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.threads import locked_property
 from . import CloudArea
 
 def main(argv=None):
-  ''' Create a VTCmd instance and call its main method.
+  ''' Create a `CloudCommand` instance and call its main method.
   '''
-  return CloudCmd().run(argv)
+  return CloudCommand().run(argv)
 
-class CloudCmd(BaseCommand):
+class CloudCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
+  GETOPTS_SPEC = 'A:'
   USAGE_FORMAT = r'''Usage: {cmd} [-A cloud_area] subcommand [...]
       cloud_area    A cloud storage area of the form prefix://bucket/subpath.
   '''
 
+  # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
+    ''' Options namespace with convenience methods.
+    '''
 
     def __init__(self, **kw):
       super().__init__(**kw)
@@ -46,6 +52,17 @@ class CloudCmd(BaseCommand):
     options.cloud_area_path = os.environ.get('CS_CLOUD_AREA')
 
   @staticmethod
+  def apply_options(options, opts):
+    ''' Apply main command line options.
+    '''
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-A':
+          options.cloud_area_path = val
+        else:
+          raise RuntimeError("unimplemented option")
+
+  @staticmethod
   def cmd_download(argv, options):
     ''' Usage: {cmd} area_subpath dst
     '''
@@ -59,6 +76,9 @@ class CloudCmd(BaseCommand):
           bfr, dl_result = CAF.download_buffer(progress=P)
           for bs in bfr:
             f.write(bs)
+      print(label + ':')
+      for k, v in sorted(dl_result.items()):
+        print(" ", k, v)
 
   @staticmethod
   def cmd_upload(argv, options):
