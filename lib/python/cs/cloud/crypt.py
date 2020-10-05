@@ -172,10 +172,12 @@ def create_key_pair(dirpath, passphrase):
           str(DEFAULT_RSA_KEYSIZE)
       ],
       passphrase_option=('-passout', passphrase),
+      stderr=DEVNULL,
   )
   run_openssl(
       ['rsa', '-in', private_path, '-pubout', '-out', public_path],
       passphrase_option=('-passin', passphrase),
+      stderr=DEVNULL,
   )
   return uuid, private_path, public_path
 
