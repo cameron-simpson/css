@@ -478,11 +478,12 @@ def main(argv):
   '''
   # pylint: disable=import-outside-toplevel
   from cs.logutils import setup_logging
+  from cs.upd import print  # pylint: disable=redefined-builtin
   setup_logging(argv[0])
   cloud_area = CloudArea.from_cloudpath(os.environ['CS_CLOUD_AREA'])
   CAF = cloud_area[__file__.lstrip('/')]
   print("upload %r => %s" % (__file__, CAF))
-  passphrase = 'ss'  ## passphrase = input("Passphrase: ")
+  passphrase = 'ss'  # passphrase = input("Passphrase: ")
   uuid, private_path, public_path = create_key_pair('.', passphrase)
   public_key_name = str(uuid)
   print(uuid)
@@ -497,7 +498,6 @@ def main(argv):
       public_key_name=public_key_name,
   )
   print("upload result = %r" % (upload_result,))
-  print("download CAF %s ...", CAF)
   P = download(
       CAF.cloud,
       CAF.bucket_name,
@@ -506,8 +506,7 @@ def main(argv):
       passphrase=passphrase,
       public_key_name=public_key_name,
   )
-  for bs in CornuCopyBuffer.from_file(P.stdout):
-    print(repr(bs))
+  print(P.stdout.read().decode())
   return
   # pylint: disable=unreachable
   #################################
