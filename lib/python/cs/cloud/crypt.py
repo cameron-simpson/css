@@ -352,6 +352,7 @@ def upload(
     public_path: str,
     public_key_name=None,
     progress=None,
+    length=None,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
       using the public key from the file named `public_path`,
@@ -380,11 +381,40 @@ def upload(
       f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
   )
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
+  # Try to ccompute the length of the encrypted data.
+  # This is desired because the B2 backend at least wants the data length.
+  if length is None:
+    if isinstance(stdin, (tuple, list)):
+      # a list of byteslike objects
+      length = sum(map(len, stdin))
+    else:
+      # check for a filename or file descriptor
+      if isinstance(stdin, str):
+        S = os.stat(stdin)
+      elif isinstance(stdin, int) and stdin >= 0:
+        S = os.fstat(stdin)
+      else:
+        S = None
+      if S and S_ISREG(S.st_mode):
+        length = S.st_size
+  if length is None:
+    encrypted_length = None
+  else:
+    # TODO: this requires special knowledge of the encryption.
+    # It looks like "openssl enc -e -salt" prepends:
+    # 1 byte IV length
+    # 8 bytes IV
+    # 8 bytes salt
+    # (just surmised from some tests)
+    # and pads the result out to 16 bytes.
+    encrypted_length = 17 + length
+    encrypted_length += 16 - encrypted_length % 16
   upload_result = cloud.upload_buffer(
       CornuCopyBuffer.from_file(P.stdout),
       bucket_name,
       data_subpath,
       progress=progress,
+      length=encrypted_length,
   )
   cloud.upload_buffer(
       CornuCopyBuffer([per_file_passtext_enc]),
