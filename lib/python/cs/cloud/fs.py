@@ -57,8 +57,8 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     return None, sitepart
 
-  # pylint: disable=too-many-arguments
-  @auto_progressbar(report_print=True)
+  # pylint: disable=too-many-arguments,arguments-differ
+  @auto_progressbar(report_print=True)  # pylint: disable=no-value-for-parameter
   @typechecked
   def upload_buffer(
       self,
@@ -68,7 +68,7 @@ class FSCloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
+      length=None,  # pylint: disable=unused-argument
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`,
         which means to the file `/`*bucket_name*`/`*path*.
@@ -105,13 +105,13 @@ class FSCloud(SingletonMixin, Cloud):
     result.update(path=filename)
     return result
 
-  # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments,arguments-differ
   @typechecked
   def download_buffer(
       self,
       bucket_name: str,
       path: str,
-      progress=None,
+      progress=None,  # pylint: disable=unused-argument
   ) -> (CornuCopyBuffer, dict):
     ''' Download from `path` within `bucket_name`,
         returning `(buffer,file_info)`
