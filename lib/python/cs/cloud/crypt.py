@@ -421,6 +421,7 @@ def upload(
       bucket_name=bucket_name,
       path=key_subpath,
       progress=progress,
+      length=len(per_file_passtext_enc),
   )
   return upload_result
 
