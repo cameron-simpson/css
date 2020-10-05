@@ -7,9 +7,11 @@ import os
 from os.path import dirname, isdir as isdirpath, join as joinpath
 from icontract import require
 from typeguard import typechecked
+from cs.buffer import CornuCopyBuffer
 from cs.fstags import FSTags
 from cs.logutils import info
 from cs.obj import SingletonMixin, as_dict
+from cs.progress import auto_progressbar
 from cs.pfx import Pfx
 from . import Cloud
 
@@ -56,15 +58,17 @@ class FSCloud(SingletonMixin, Cloud):
     return None, sitepart
 
   # pylint: disable=too-many-arguments
+  @auto_progressbar(report_print=True)
   @typechecked
   def upload_buffer(
       self,
-      bfr,
+      bfr: CornuCopyBuffer,
       bucket_name: str,
       path: str,
       file_info=None,
       content_type=None,
       progress=None,
+      length=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`,
         which means to the file `/`*bucket_name*`/`*path*.
@@ -77,6 +81,7 @@ class FSCloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an option indication of the length of the buffer
     '''
     filename = os.sep + joinpath(bucket_name, path)
     dirpath = dirname(filename)
