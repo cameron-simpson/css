@@ -12,7 +12,9 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import time
+from cs.deco import decorator
 from cs.logutils import warning, exception
+from cs.py.func import funcname
 from cs.seq import seq
 from cs.units import (
     transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
@@ -27,7 +29,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires':
+    ['cs.deco', 'cs.logutils', 'cspy.func', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -886,6 +889,36 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
   ).iterbar(
       it, label=label, **kw
   )
+
+@decorator
+def auto_progressbar(func, label=None, report_print=False):
+  ''' Decorator for function which accept an optional `progress` parameter.
+      If `progress` is `None` and the default `Upd` is not disabled,
+      run the function with a progress bar.
+  '''
+
+  def wrapper(
+      *a,
+      progress=None,
+      progress_name=None,
+      progress_total=None,
+      progress_report_print=None,
+      **kw
+  ):
+    if progress_name is None:
+      progress_name = label or funcname(func)
+    if progress_report_print is None:
+      progress_report_print = report_print
+    if progress is None:
+      upd = Upd()
+      if not upd.disabled:
+        progress = Progress(name=progress_name, total=progress_total)
+        with progress.bar(report_print=progress_report_print):
+          return func(*a, progress=progress, **kw)
+    else:
+      return func(*a, progress=progress, **kw)
+
+  return wrapper
 
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
