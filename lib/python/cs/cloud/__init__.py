@@ -135,7 +135,8 @@ class Cloud(ABC):
   @abstractmethod
   def upload_buffer(
       self,
-      bfr,
+      bfr: CornuCopyBuffer,
+      *,
       bucket_name: str,
       path: str,
       file_info=None,
@@ -157,7 +158,17 @@ class Cloud(ABC):
     raise NotImplementedError("upload_buffer")
 
   @pfx_method
-  def upload_filename(self, filename, length=None, **kw):
+  def upload_filename(
+      self,
+      filename,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+      length=None,
+  ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
 
@@ -183,9 +194,27 @@ class Cloud(ABC):
               "supplied length=%r != os.fstat().st_size=%r", length,
               stat_length
           )
-        return self.upload_file(f, length=length, **kw)
+        return self.upload_file(
+            f,
+            bucket_name=bucket_name,
+            path=path,
+            file_info=file_info,
+            content_type=content_type,
+            progress=progress,
+            length=length
+        )
 
-  def upload_file(self, f, **kw):
+  def upload_file(
+      self,
+      f,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+      length=None,
+  ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
 
@@ -206,6 +235,7 @@ class Cloud(ABC):
   @abstractmethod
   def download_buffer(
       self,
+      *,
       bucket_name: str,
       path: str,
       progress=None,
@@ -292,7 +322,10 @@ class CloudAreaFile(SingletonMixin):
     ''' Upload a buffer into the cloud to the specified `subpath`.
     '''
     return self.cloud.upload_buffer(
-        bfr, self.bucket_name, self.bucket_path, progress=progress
+        bfr,
+        bucket_name=self.bucket_name,
+        path=self.bucket_path,
+        progress=progress
     )
 
   def upload_filename(self, filename, *, progress=None):
