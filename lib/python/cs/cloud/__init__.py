@@ -141,6 +141,7 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
+      length=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
 
@@ -151,6 +152,7 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an option indication of the length of the buffer
     '''
     raise NotImplementedError("upload_buffer")
 
