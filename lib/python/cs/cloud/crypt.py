@@ -23,12 +23,14 @@
 
 import os
 from os.path import join as joinpath
+from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 import sys
 from uuid import uuid4
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
+from cs.logutils import debug
 from . import validate_subpath, CloudArea
 
 # used when creating RSA keypairs
@@ -250,7 +252,6 @@ def new_passtext(public_path=None):
   # generate per file random password text
   per_file_passtext = run_openssl(['rand', '-base64', '180'],
                                   stdout=bytes).decode().replace('\n', '')
-  print("passtext =", per_file_passtext)
   if public_path is None:
     per_file_passtext_enc = None
   else:
@@ -273,9 +274,6 @@ def decrypt_password(per_file_passtext_enc, private_path, passphrase):
       stdin=per_file_passtext_enc,
       stdout=bytes
   ).decode()
-  print(
-      "decrypt_password(%r)=>%r" % (per_file_passtext_enc, per_file_passtext)
-  )
   return per_file_passtext
 
 def pubencrypt_popen(stdin, public_path, stdout=PIPE):
@@ -367,7 +365,7 @@ def upload(
       * `public_key_name`: an optional name for the public key
         used to encrypt the per file key
 
-      This stores the encrypted `stdin`
+      This stores the symmetrically encrypted `stdin`
       at the bucket path `basepath+'.data.enc'`
       and the per file key at the bucket path `basepath+'.key.enc'`
       (or `basepath+'.key-`*public_key_name*`.enc'
@@ -474,7 +472,7 @@ def download(
   bfr, _ = cloud.download_buffer(bucket_name, data_subpath, progress=progress)
   return symdecrypt(bfr, per_file_passtext, stdout=stdout)
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,too-many-locals
 def main(argv):
   ''' Main command line: test stuff.
   '''
@@ -511,6 +509,8 @@ def main(argv):
   for bs in CornuCopyBuffer.from_file(P.stdout):
     print(repr(bs))
   return
+  # pylint: disable=unreachable
+  #################################
   per_file_passtext_enc, P = pubencrypt_popen(__file__, public_path)
   encrypted_bytes = P.stdout.read()
   print("openssl exit code =", P.wait())
