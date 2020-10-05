@@ -5,14 +5,16 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
+import os
 from os.path import join as joinpath
 from threading import RLock
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.lex import is_identifier
+from cs.logutils import warning
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
 
 from cs.x import X
@@ -151,6 +153,35 @@ class Cloud(ABC):
         * `progress`: an optional `cs.progress.Progress` instance
     '''
     raise NotImplementedError("upload_buffer")
+
+  @pfx_method
+  def upload_filename(self, filename, length=None, **kw):
+    ''' Upload the data from the file `f` to `path` within `bucket_name`.
+        Return a `dict` containing the upload result.
+
+        The default implementation calls `self.upload_file()`.
+
+        Parameters:
+        * `bfr`: the source buffer
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an optional indication of the length of the buffer
+    '''
+    with Pfx("open(%r,'rb')", filename):
+      with open(filename, 'rb') as f:
+        stat_length = os.fstat(f.fileno()).st_size
+        if length is None:
+          length = stat_length
+        elif length != stat_length:
+          # warn but do not override the caller
+          warning(
+              "supplied length=%r != os.fstat().st_size=%r", length,
+              stat_length
+          )
+        return self.upload_file(f, length=length, **kw)
 
   # pylint: disable=too-many-arguments
   @abstractmethod
