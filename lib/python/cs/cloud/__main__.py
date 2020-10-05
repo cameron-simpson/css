@@ -26,6 +26,7 @@ class CloudCommand(BaseCommand):
   GETOPTS_SPEC = 'A:'
   USAGE_FORMAT = r'''Usage: {cmd} [-A cloud_area] subcommand [...]
       cloud_area    A cloud storage area of the form prefix://bucket/subpath.
+                    Default from the $CS_CLOUD_AREA environment variable.
   '''
 
   # pylint: disable=too-few-public-methods
