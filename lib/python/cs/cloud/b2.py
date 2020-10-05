@@ -17,6 +17,7 @@ from typeguard import typechecked
 from cs.lex import hexify
 from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method, XP
+from cs.progress import progressbar, auto_progressbar
 from cs.threads import locked_property
 from . import Cloud
 
@@ -104,6 +105,30 @@ class B2Cloud(SingletonMixin, Cloud):
       credpart = f"{keyId}:{apiKey}"
     credentials = cls.credentials_from_str(credpart)
     return credentials, bucket_name
+
+  @auto_progressbar(report_print=True)
+  def _b2_upload_file(
+      self,
+      f,
+      *,
+      bucket_name: str,
+      path: str,
+      progress=None,
+      length=None,
+      **b2_kw,
+  ):
+    ''' Upload a seekable file-like data source `f`
+        to `path` within `bucket_name`.
+        Return the resulting B2 `FileInfo`.
+    '''
+    bucket = self.api.get_bucket_by_name(bucket_name)
+    progress_listener = None if progress is None else B2ProgressShim(progress)
+    return bucket.upload(
+        B2UploadFileShim(f, length=length, progress=progress),
+        file_name=path,
+        progress_listener=progress_listener,
+        **b2_kw,
+    )
 
   # pylint: disable=too-many-arguments
   @pfx_method
