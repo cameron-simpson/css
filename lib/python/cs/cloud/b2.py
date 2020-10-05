@@ -213,18 +213,33 @@ class B2Cloud(SingletonMixin, Cloud):
       )
       return as_dict(file_info)
 
+  # pylint: disable=too-many-arguments
+  @auto_progressbar(report_print=True)
+  @typechecked
+  def download_buffer(
+      self,
+      bucket_name: str,
+      path: str,
+      progress=None,
+  ) -> (CornuCopyBuffer, dict):
+    ''' Download from `path` within `bucket_name`,
+        returning `(buffer,file_info)`
+        being a `CornuCopyBuffer` presenting the data bytes
+        and the file info uploaded with the file.
+
+        Parameters:
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `progress`: an optional `cs.progress.Progress` instance
     '''
     bucket = self.api.get_bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
-    result = bucket.upload(
-        B2BufferShim(bfr),
-        file_name=path,
-        content_type=content_type,
-        file_info=file_info,
-        progress_listener=progress_listener,
+    download_dest = B2DownloadBufferShim()
+    file_info = bucket.download_file_by_name(
+        path, download_dest, progress_listener
     )
-    XP("upload to %r => %s", path, result)
-    return as_dict(result)
+    return download_dest.bfr, file_info
+
 
 class B2BufferShim(AbstractUploadSource):
   ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
