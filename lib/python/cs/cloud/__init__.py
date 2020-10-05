@@ -183,6 +183,23 @@ class Cloud(ABC):
           )
         return self.upload_file(f, length=length, **kw)
 
+  def upload_file(self, f, **kw):
+    ''' Upload the data from the file `f` to `path` within `bucket_name`.
+        Return a `dict` containing the upload result.
+
+        The default implementation calls `self.upload_buffer()`.
+
+        Parameters:
+        * `f`: the seekable file
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+        * `length`: an option indication of the length of the buffer
+    '''
+    return self.upload_buffer(CornuCopyBuffer.from_file(f), **kw)
+
   # pylint: disable=too-many-arguments
   @abstractmethod
   def download_buffer(
