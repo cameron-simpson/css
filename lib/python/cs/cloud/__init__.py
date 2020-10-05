@@ -319,7 +319,7 @@ class CloudAreaFile(SingletonMixin):
     return joinpath(self.cloud_area.cloudpath, self.filepath)
 
   def upload_buffer(self, bfr, *, progress=None):
-    ''' Upload a buffer into the cloud to the specified `subpath`.
+    ''' Upload a buffer into the cloud.
     '''
     return self.cloud.upload_buffer(
         bfr,
@@ -329,8 +329,15 @@ class CloudAreaFile(SingletonMixin):
     )
 
   def upload_filename(self, filename, *, progress=None):
-    ''' Upload a local file into the cloud to the specified `subpath`.
+    ''' Upload a local file into the cloud.
     '''
     with open(filename, 'rb') as f:
       bfr = CornuCopyBuffer.from_fd(f.fileno())
       return self.upload_buffer(bfr, progress=progress)
+
+  def download_buffer(self, *, progress=None):
+    ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.
+    '''
+    return self.cloud.download_buffer(
+        bucket_name=self.bucket_name, path=self.bucket_path, progress=progress
+    )
