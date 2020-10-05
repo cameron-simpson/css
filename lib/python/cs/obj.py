@@ -403,6 +403,8 @@ class SingletonMixin:
           registry = cls._singleton_registry = WeakValueDictionary()
           registry._singleton_lock = Lock()
 
+    # TODO: what happens with fargs and fkwargs? unused yet supplied?
+    # TODO: docstring wrong - there is no _singleton_init any more
     def factory(*fargs, **fkwargs):
       ''' Prepare a new object.
 
