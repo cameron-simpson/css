@@ -4,21 +4,28 @@
 '''
 
 from collections import namedtuple
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
+import io
 import os
+from os.path import join as joinpath
+from tempfile import NamedTemporaryFile
 from b2sdk.v1 import (
     B2Api,
     InMemoryAccountInfo,
     AbstractProgressListener,
     AbstractUploadSource,
+    AbstractDownloadDestination,
 )
 from icontract import require
 from typeguard import typechecked
+from cs.buffer import CornuCopyBuffer
 from cs.lex import hexify
 from cs.obj import SingletonMixin, as_dict
-from cs.pfx import pfx_method, XP
+from cs.pfx import pfx_method
 from cs.progress import progressbar, auto_progressbar
+from cs.queues import IterableQueue
 from cs.threads import locked_property
+from cs.units import BINARY_BYTES_SCALE
 from . import Cloud
 
 class B2Credentials(namedtuple('B2Credentials', 'keyId apiKey')):
