@@ -6,6 +6,7 @@ import sys
 from threading import RLock
 from types import SimpleNamespace
 from cs.cmdutils import BaseCommand
+from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.upd import Upd, print
 from cs.threads import locked_property
@@ -45,12 +46,27 @@ class CloudCmd(BaseCommand):
     options.cloud_area_path = os.environ.get('CS_CLOUD_AREA')
 
   @staticmethod
+  def cmd_download(argv, options):
+    ''' Usage: {cmd} area_subpath dst
+    '''
+    area_subpath, dst = argv
+    CAF = options.cloud_area[area_subpath]
+    label = f"{CAF} => {dst}"
+    with Pfx("%r", dst):
+      with open(dst, 'wb') as f:
+        P = Progress(name=label)
+        with P.bar(report_print=True):
+          bfr, dl_result = CAF.download_buffer(progress=P)
+          for bs in bfr:
+            f.write(bs)
+
+  @staticmethod
   def cmd_upload(argv, options):
-    ''' Usage: upload src dst
+    ''' Usage: upload src area_subpath
           Upload the file src to cloud area subpath dst.
     '''
-    src, dst = argv
-    CAF = options.cloud_area[dst]
+    src, area_subpath = argv
+    CAF = options.cloud_area[area_subpath]
     label = f"{src} => {CAF}"
     P = Progress(name=label)
     with P.bar(report_print=True):
