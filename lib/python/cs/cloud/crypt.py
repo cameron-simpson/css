@@ -411,15 +411,15 @@ def upload(
     encrypted_length += 16 - encrypted_length % 16
   upload_result = cloud.upload_buffer(
       CornuCopyBuffer.from_file(P.stdout),
-      bucket_name,
-      data_subpath,
+      bucket_name=bucket_name,
+      path=data_subpath,
       progress=progress,
       length=encrypted_length,
   )
   cloud.upload_buffer(
       CornuCopyBuffer([per_file_passtext_enc]),
-      bucket_name,
-      key_subpath,
+      bucket_name=bucket_name,
+      path=key_subpath,
       progress=progress,
   )
   return upload_result
