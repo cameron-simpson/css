@@ -17,7 +17,7 @@ do
   n=$(( n + 1 ))
   printf "127.0.0.%d" "$n"
   for name in $names
-  do  print " $name$namesfx"
+  do  printf " $name$namesfx"
   done
   echo
 done | hosts-patch-known -m 'LOCAL ADDRESSES' ${1+"$@"}
