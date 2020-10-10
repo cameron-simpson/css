@@ -154,7 +154,7 @@ class OverYDL:
     self.upd = upd
     self.proxy0 = upd.proxy(0)
     self.fstags = fstags
-    self.all_progress = OverProgress()
+    self.all_progress = all_progress
     self.ydl_opts = ydl_opts
     self.Rs = []
     self.nfetches = 0
