@@ -57,15 +57,16 @@ do
     '' | \#* ) continue ;;
   esac
   necho "$ip $names"
-  case "$name" in
-    *.*);;  # no local entry for things with dots
-    *)
-        for name in $names
-        do  for zone in $localzones
-            do  necho " $name.$zone"
-            done
-        done
-        ;;
-  esac
+  for name in $names
+  do
+    case "$name" in
+      *.*);;  # no local entry for things with dots
+      *)
+          for zone in $localzones
+          do  necho " $name.$zone"
+          done
+          ;;
+    esac
+  done
   echo
 done | rlr -f "^## BEGIN $marker" -t "^## END $marker" "$hosts"
