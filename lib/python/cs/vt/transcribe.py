@@ -107,7 +107,7 @@ class UUIDTranscriber:
     fp.write(str(uu))
 
   @staticmethod
-  def parse_inner(s, offset, stopchar, prefix):
+  def parse_inner(T, s, offset, stopchar, prefix):
     ''' Parse a UUID from `s` at `offset`.
         Return the UUID and the new offset.
     '''
@@ -271,7 +271,8 @@ class Transcribe:
       baseclass = self.prefix_map.get(prefix)
       if baseclass is None:
         raise ValueError("prefix not registered: %r" % (prefix,))
-      o, offset = baseclass.parse_inner(self, s, offset, '}', prefix)
+      with Pfx("baseclass=%s", baseclass.__name__):
+        o, offset = baseclass.parse_inner(self, s, offset, '}', prefix)
       if offset > len(s):
         raise ValueError("parse_inner returns offset beyond text")
       if offset >= len(s) or s[offset] != '}':

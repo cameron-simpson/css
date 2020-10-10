@@ -1,3 +1,12 @@
+MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
+cs.logutils: warning et all: once=key (or key on the warning format string if True)
+Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
+cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
+cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
+a facility to do things just once, particularly warnings - then port cs.progress to it
+use common_prefix in cs.upd for line change comparison?
+use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
+@OBSOLETE(PfxThread) and replace uses with cs.threads.bg
 cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
 vbox: cmd to associate the current default interface before starting vm?
 vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks

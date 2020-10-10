@@ -101,7 +101,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagChoice, TagsOntology, TagsOntologyCommand, TaggedEntity,
+    TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TaggedEntity,
     TagsCommandMixin, RegexpTagRule
 )
 from cs.threads import locked, locked_property
@@ -135,6 +135,8 @@ XATTR_B = (
 
 FIND_OUTPUT_FORMAT_DEFAULT = '{filepath.pathname}'
 LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
+
+# pylint: disable=too-many-locals
 
 def main(argv=None):
   ''' Command line mode.
@@ -550,7 +552,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return self._cmd_mvcpln(options.fstags.move, argv, options)
 
   @staticmethod
-  def _cmd_mvcpln(attach, argv, options):
+  def _cmd_mvcpln(attach, argv, _):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
@@ -753,16 +755,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     path = argv.pop(0)
     if not argv:
       raise GetoptError("missing tags")
-    tag_choices = []
-    for arg in argv:
-      with Pfx(arg):
-        try:
-          tag_choice = TagChoice.from_str(arg)
-        except ValueError as e:
-          warning("bad tag specifications: %s", e)
-          badopts = True
-        else:
-          tag_choices.append(tag_choice)
+    try:
+      tag_choices = cls.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e))
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':
@@ -1066,15 +1062,14 @@ class FSTags(MultiOpenMixin):
 
         Parameters:
         * `tag_choices`:
-          an iterable of `Tag` or `(spec,choice,Tag)`;
-          the former is equivalent to `(None,True,Tag)`.
+          an iterable of `Tag` or an equality `TagBasedTest`.
           Each item applies or removes a `Tag`
           from each path's direct tags.
         * `paths`:
           an iterable of filesystem paths.
     '''
     tag_choices = [
-        TagChoice(str(tag_choice), True, tag_choice)
+        TagBasedTest(str(tag_choice), True, tag_choice, '=')
         if isinstance(tag_choice, Tag) else tag_choice
         for tag_choice in tag_choices
     ]
@@ -1129,38 +1124,38 @@ class FSTags(MultiOpenMixin):
         with Pfx(path):
           self[path].import_xattrs()
 
-  def find(self, path, tag_choices, use_direct_tags=False, U=None):
+  def find(self, path, tag_tests, use_direct_tags=False, U=None):
     ''' Walk the file tree from `path`
-        searching for files matching the supplied `tag_choices`.
+        searching for files matching the supplied `tag_tests`.
         Yield the matching file paths.
 
         Parameters:
         * `path`: the top of the file tree to walk
-        * `tag_choices`: an iterable of `TagChoice`s
+        * `tag_tests`: an iterable of `TagBasedTest`s
         * `use_direct_tags`: test the direct_tags if true,
           otherwise the all_tags.
           Default: `False`
     '''
     for _, filepath in rpaths(path, yield_dirs=use_direct_tags, U=U):
-      if self.test(filepath, tag_choices, use_direct_tags=use_direct_tags):
+      if self.test(filepath, tag_tests, use_direct_tags=use_direct_tags):
         yield filepath
 
-  def test(self, path, tag_choices, use_direct_tags=False):
-    ''' Test a path against `tag_choices`.
+  def test(self, path, tag_tests, use_direct_tags=False):
+    ''' Test a path against `tag_tests`.
 
         Parameters:
         * `path`: path to test
-        * `tag_choices`: an iterable of `TagChoice`s
-        * `use_direct_tags`: test the direct_tags if true,
-          otherwise the all_tags.
+        * `tag_tests`: an iterable of `TagBasedTest`s
+        * `use_direct_tags`: test the `direct_tags` if true,
+          otherwise the `all_tags`.
           Default: `False`
     '''
     tagged_path = self[path]
     tags = (
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
-    for tag_choice in tag_choices:
-      if not tag_choice.match(tags):
+    for tag_test in tag_tests:
+      if not tag_test.match(tags):
         return False
     return True
 
@@ -1270,6 +1265,7 @@ class FSTags(MultiOpenMixin):
     '''
     return self.attach_path(shutil.move, srcpath, dstpath, **kw)
 
+  # pylint: disable=too-many-branches
   def attach_path(
       self, attach, srcpath, dstpath, *, force=False, crop_ok=False
   ):

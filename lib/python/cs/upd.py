@@ -52,56 +52,15 @@ Multiline multithread example:
 ## A note about Upd and terminals
 
 I routinely use an `Upd()` as a progress reporting tool for commands
-running on a terminal. This attaches to `sys.stderr`.
+running on a terminal. This attaches to `sys.stderr` by default.
 However, it is usually not desirable to run an `Upd` display
 if the backend is not a tty/terminal.
 Therefore, an `Upd` has a "disabled" mode
 which performs no output;
-if the backend is not a tty (as tested by `backend.isatty()`)
-this mode activates by default.
-
+the default behaviour is that this mode activates
+if the backend is not a tty (as tested by `backend.isatty()`).
 The constructor has an optional parameter `disabled` to override
 this default behaviour.
-
-The whole purpose of this "disabled" mode is to ease main programme
-implementation.
-Before this mode one had two basic idioms to support "noninteractive" use,
-described below.
-
-The former was to test `sys.stderr.isatty()` and define an `Upd` or not:
-
-    upd = Upd() if sys.stderr.isatty() else None
-
-and to scatter tests throughout the code:
-
-    if upd:
-        upd.out("new status here")
-
-The latter was to work entirely through `UpdProxy` instances
-(which is convenient anyway), like this 2 status line example:
-
-    if sys.stderr.isatty():
-        upd = Upd()
-        status_proxy = upd.proxy(0)
-        progress_proxy = upd.insert(1)
-    else:
-        status_proxy = UpdProxy(None, None)
-        progress_proxy = UpdProxy(None, None)
-
-and to use the proxies thereafter:
-
-    status_proxy.text = "doing task A"
-    ... during task A ...
-    ... progress_proxy.text = progress.status() ...
-
-This works because `UpdProxy` instances support a "detached" mode,
-which is they state they move to when deleted
-in the normal course of operations.
-
-However, because an `Upd` defaults to being "disabled"
-if its backend is not a tty
-the usual main programme can just set one up and use it unconditionally;
-on a nontty there will simply be no output.
 '''
 
 from __future__ import with_statement, print_function
@@ -122,7 +81,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20200716.1-post'
+__version__ = '20200914-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -140,7 +99,7 @@ instances = []
 def cleanupAtExit():
   ''' Cleanup function called at programme exit to clear the status line.
   '''
-  global instances
+  global instances  # pylint: disable=global-statement
   for i in instances:
     i.close()
   instances = ()
@@ -155,6 +114,7 @@ def out(msg, *a, **outkw):
   '''
   return Upd().out(msg, *a, **outkw)
 
+# pylint: disable=redefined-builtin
 def print(*a, **kw):
   ''' Wrapper for the builtin print function
       to call it inside `Upd.above()` and enforce a flush.
@@ -186,12 +146,14 @@ def nl(msg, *a, **kw):
     kw['file'] = sys.stderr
   print(msg, **kw)
 
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class Upd(SingletonMixin):
   ''' A `SingletonMixin` subclass for maintaining a regularly updated status line.
 
       The default backend is `sys.stderr`.
   '''
 
+  # pylint: disable=unused-argument
   @classmethod
   def _singleton_key(cls, backend=None, columns=None, disabled=False):
     if backend is None:
@@ -225,7 +187,7 @@ class Upd(SingletonMixin):
     self._current_slot = 0
     self._above = None
     self._lock = RLock()
-    global instances
+    global instances  # pylint: disable=global-statement
     instances.append(self)
 
   def __str__(self):
@@ -754,7 +716,7 @@ class Upd(SingletonMixin):
       if len(slots) == 1:
         # silently do not delete
         ##raise ValueError("cannot delete the last slot")
-        return
+        return None
       if self._disabled or self._backend is None:
         # just remote the data entries
         del slots[index]
@@ -845,7 +807,7 @@ class UpdProxy(object):
     self.text = msg
 
   def __enter__(self):
-    pass
+    return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.delete()
@@ -866,7 +828,7 @@ class UpdProxy(object):
     '''
     upd = self.upd
     if upd is not None:
-      with upd._lock:
+      with upd._lock:  # pylint: disable=protected-access
         index = self.index
         if index is not None:
           txt = upd.normalise(self.prefix + txt)

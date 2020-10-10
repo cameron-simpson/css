@@ -3,7 +3,10 @@
 # Assorted convenience functions for files and filenames/pathnames.
 # - Cameron Simpson <cs@cskk.id.au>
 
-''' Assorted convenience functions for files and filenames/pathnames.'''
+''' Assorted convenience functions for files and filenames/pathnames.
+'''
+
+# pylint: disable=too-many-lines
 
 from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
@@ -17,8 +20,8 @@ try:
 except ImportError:
   pread = None
 from os.path import (
-    abspath, basename, dirname, isdir, isabs as isabspath,
-    join as joinpath, splitext
+    abspath, basename, dirname, isdir, isabs as isabspath, join as joinpath,
+    splitext
 )
 import shutil
 import stat
@@ -30,16 +33,16 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
-from cs.lex import as_lines, cutsuffix
+from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx
-from cs.py3 import ustr, bytes, pread
+from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
 
-__version__ = '20200517-post'
+__version__ = '20200914-post'
 
 DISTINFO = {
     'description':
@@ -55,7 +58,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
-        'cs.lex',
+        'cs.lex>=20200914',
         'cs.logutils',
         'cs.pfx',
         'cs.py3',
@@ -107,8 +110,8 @@ def trysaferename(oldpath, newpath):
     saferename(oldpath, newpath)
   except OSError:
     return False
-  except Exception:
-    raise
+  ##except Exception:
+  ##  raise
   return True
 
 def compare(f1, f2, mode="rb"):
@@ -125,6 +128,7 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+# pylint: disable=too-many-arguments
 def rewrite(
     filepath,
     data,
@@ -179,6 +183,7 @@ def rewrite(
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
 
+# pylint: disable=too-many-branches,too-many-arguments
 @contextmanager
 def rewrite_cmgr(
     pathname,
@@ -404,6 +409,7 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
+# pylint: disable=too-many-statements
 @fmtdoc
 def make_files_property(
     attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL
@@ -451,6 +457,7 @@ def make_files_property(
       changed state after the load.
   '''
 
+  # pylint: disable=too-many-statements
   def made_files_property(func):
     if attr_name is None:
       attr_value = '_' + func.__name__
@@ -461,6 +468,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
+    # pylint: disable=too-many-statements
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -497,7 +505,7 @@ def make_files_property(
               raise
             except AttributeError:
               raise
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
               new_value = getattr(self, attr_value, unset_object)
               if new_value is unset_object:
                 raise
@@ -524,6 +532,7 @@ def make_files_property(
 
   return made_files_property
 
+# pylint: disable=too-many-branches
 def makelockfile(
     path, ext=None, poll_interval=None, timeout=None, runstate=None
 ):
@@ -645,8 +654,8 @@ def crop_name(name, name_max=255, ext=None):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name %r before ext %r to <=%s"
-        % (name, ext, name_max))
+        "cannot crop name %r before ext %r to <=%s" % (name, ext, name_max)
+    )
   if len(base) <= max_base_len:
     return name
   return base[:max_base_len] + ext
@@ -673,6 +682,7 @@ def max_suffix(dirpath, pfx):
         maxn = n
   return maxn
 
+# pylint: disable=too-many-branches
 def mkdirn(path, sep=''):
   ''' Create a new directory named `path+sep+n`,
       where `n` exceeds any name already present.
@@ -766,8 +776,7 @@ def find(path, select=None, sort_names=True):
       if select(filepath):
         yield filepath
     dirnames[:] = [
-        dirname for dirname in dirnames
-        if select(joinpath(dirpath, dirname))
+        dirname for dirname in dirnames if select(joinpath(dirpath, dirname))
     ]
 
 def findup(path, test, first=False):
@@ -829,6 +838,67 @@ def longpath(path, environ=None, prefixes=None):
       break
   path = envsub(path, environ)
   return path
+
+def common_path_prefix(*paths):
+  ''' Return the common path prefix of the `paths`.
+
+      Note that the common prefix of `'/a/b/c1'` and `'/a/b/c2'`
+      is `'/a/b/'`, _not_ `'/a/b/c'`.
+
+      Callers may find it useful to preadjust the supplied paths
+      with `normpath`, `abspath` or `realpath` from `os.path`;
+      see the `os.path` documentation for the various caveats
+      which go with those functions.
+
+      Examples:
+
+          >>> # the obvious
+          >>> common_path_prefix('', '')
+          ''
+          >>> common_path_prefix('/', '/')
+          '/'
+          >>> common_path_prefix('a', 'a')
+          'a'
+          >>> common_path_prefix('a', 'b')
+          ''
+          >>> # nonempty directory path prefixes end in os.sep
+          >>> common_path_prefix('/', '/a')
+          '/'
+          >>> # identical paths include the final basename
+          >>> common_path_prefix('p/a', 'p/a')
+          'p/a'
+          >>> # the comparison does not normalise paths
+          >>> common_path_prefix('p//a', 'p//a')
+          'p//a'
+          >>> common_path_prefix('p//a', 'p//b')
+          'p//'
+          >>> common_path_prefix('p//a', 'p/a')
+          'p/'
+          >>> common_path_prefix('p/a', 'p/b')
+          'p/'
+          >>> # the comparison strips complete unequal path components
+          >>> common_path_prefix('p/a1', 'p/a2')
+          'p/'
+          >>> common_path_prefix('p/a/b1', 'p/a/b2')
+          'p/a/'
+          >>> # contrast with cs.lex.common_prefix
+          >>> common_prefix('abc/def', 'abc/def1')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1')
+          'abc/'
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/'
+  '''
+  prefix = common_prefix(*paths)
+  if not prefix.endswith(os.sep):
+    path0 = paths[0]
+    if not all(map(lambda path: path == path0, paths)):
+      # strip basename from prefix
+      base = basename(prefix)
+      prefix = prefix[:-len(base)]
+  return prefix
 
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
@@ -1021,6 +1091,7 @@ class ReadMixin(object):
     '''
     return CornuCopyBuffer(self.datafrom(offset), offset=offset)
 
+  # pylint: disable=too-many-branches
   def read(self, size=-1, offset=None, longread=False):
     ''' Read up to `size` bytes, honouring the "single system call"
         spirit unless `longread` is true.
@@ -1238,11 +1309,13 @@ class BackedFile(ReadMixin):
     self.front_range.add_span(start, start + written)
     return written
 
+# pylint: disable=too-few-public-methods,protected-access
 class BackedFile_TestMethods(object):
   ''' Mixin for testing subclasses of BackedFile.
       Tests self.backed_fp.
   '''
 
+  # pylint: disable=no-member
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.
     '''
@@ -1250,10 +1323,11 @@ class BackedFile_TestMethods(object):
     ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
+  # pylint: disable=no-member
   def test_BackedFile(self):
     ''' Test function for a BackedFile to use in unit test suites.
     '''
-    from random import randint
+    from random import randint  # pylint: disable=import-outside-toplevel
     backing_text = self.backing_text
     bfp = self.backed_fp
     # test reading whole file
@@ -1376,7 +1450,6 @@ class NullFile(object):
   def flush(self):
     ''' Flush buffered data to the subsystem.
     '''
-    pass
 
 def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
