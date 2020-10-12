@@ -218,6 +218,14 @@ def scan_ndjson(f, dictclass=dict):
         d = dictclass(d)
     yield d
 
+@strable(open_func=lambda filename: open(filename, 'w'))
+def write_ndjson(f, objs):
+  ''' Transcribe an iterable of objects to a file as newline delimited JSON.
+  '''
+  for lineno, o in enumerate(objs, 1):
+    with Pfx("line %d", lineno):
+      f.write(json.dumps(o, separators=(',', ':')))
+      f.write('\n')
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
