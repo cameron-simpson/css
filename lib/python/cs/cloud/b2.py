@@ -151,13 +151,14 @@ class B2Cloud(SingletonMixin, Cloud):
   @typechecked
   def upload_buffer(
       self,
-      bfr,
+      bfr: CornuCopyBuffer,
       *,
       bucket_name: str,
       path: str,
+      file_info=None,
+      content_type=None,
       length=None,
       progress=None,
-      **kw
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileInfo` object attribute values.
@@ -182,10 +183,26 @@ class B2Cloud(SingletonMixin, Cloud):
         T.write(bs)
       T.flush()
       return self.upload_filename(
-          T.name, bucket_name=bucket_name, path=path, **kw
+          T.name,
+          bucket_name=bucket_name,
+          path=path,
+          file_info=file_info,
+          content_type=content_type,
+          length=length,
+          progress=progress,
       )
 
-  def upload_file(self, f, *, length=None, bucket_name: str, path: str, **kw):
+  def upload_file(
+      self,
+      f,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+      length=None
+  ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileInfo` object attribute values.
 
@@ -216,16 +233,26 @@ class B2Cloud(SingletonMixin, Cloud):
       # upload via a scratch file
       bfr = f if isinstance(f,
                             CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
-      return self.upload_buffer(bfr, **kw)
+      return self.upload_buffer(
+          bfr,
+          bucket_name=bucket_name,
+          path=path,
+          file_info=file_info,
+          content_type=content_type,
+          progress=progress,
+          length=length,
+      )
     else:
       file_info = self._b2_upload_file(
           f,
           progress_name=self.bucketpath(bucket_name, path=path) + " upload",
           progress_total=length,
-          length=length,
           bucket_name=bucket_name,
           path=path,
-          **kw
+          file_info=file_info,
+          content_type=content_type,
+          progress=progress,
+          length=length,
       )
       return as_dict(file_info)
 
@@ -234,6 +261,7 @@ class B2Cloud(SingletonMixin, Cloud):
   @typechecked
   def download_buffer(
       self,
+      *,
       bucket_name: str,
       path: str,
       progress=None,
@@ -260,7 +288,7 @@ class B2UploadFileWrapper:
   ''' A Wrapper for a file-like object which updates a `Progress`.
   '''
 
-  def __init__(self, f, progress):
+  def __init__(self, f, *, progress):
     self.f = f
     self.progress = progress
 
@@ -286,7 +314,7 @@ class B2UploadFileShim(AbstractUploadSource):
   ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
   '''
 
-  def __init__(self, f, length=None, sha1bytes=None, progress=None):
+  def __init__(self, f, *, length=None, sha1bytes=None, progress=None):
     super().__init__()
     self.f = f
     self.length = length
@@ -299,7 +327,7 @@ class B2UploadFileShim(AbstractUploadSource):
     '''
     if self.length:
       self.progress.total += self.length
-    yield B2UploadFileWrapper(self.f, self.progress)
+    yield B2UploadFileWrapper(self.f, progress=self.progress)
 
   def get_content_sha1(self):
     if self.sha1bytes:
