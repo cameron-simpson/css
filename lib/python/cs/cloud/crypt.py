@@ -400,7 +400,7 @@ def upload(
   )
   if not overwrite:
     # if already uploaded then return quickly
-    file_info = cloud.stat(bucket_name, data_subpath)
+    file_info = cloud.stat(bucket_name=bucket_name, path=data_subpath)
     if file_info and cloud.stat(bucket_name, key_subpath):
       # already exists, skip the upload
       return file_info, data_subpath, key_subpath
@@ -464,7 +464,9 @@ def download_passtext(
       and `passphrase`.
       Return the decrypted passtext.
   '''
-  bfr, _ = cloud.download_buffer(bucket_name, passtext_path, progress=progress)
+  bfr, _ = cloud.download_buffer(
+      bucket_name=bucket_name, path=passtext_path, progress=progress
+  )
   per_file_passtext_enc = b''.join(bfr)
   per_file_passtext = decrypt_password(
       per_file_passtext_enc, private_path, passphrase
@@ -519,7 +521,9 @@ def download(
       passphrase=passphrase,
       progress=progress
   )
-  bfr, _ = cloud.download_buffer(bucket_name, data_subpath, progress=progress)
+  bfr, _ = cloud.download_buffer(
+      bucket_name=bucket_name, path=data_subpath, progress=progress
+  )
   return symdecrypt(bfr, per_file_passtext, stdout=stdout)
 
 # pylint: disable=unused-argument,too-many-locals
