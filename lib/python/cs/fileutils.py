@@ -13,6 +13,7 @@ from contextlib import contextmanager
 import datetime
 import errno
 from functools import partial
+import json
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
 try:
@@ -204,6 +205,18 @@ def rewrite_cmgr(filepath, mode='w', **kw):
     yield T
     return rewrite(filepath, mode=mode, **kw)
 
+@strable
+def scan_ndjson(f, dictclass=dict):
+  ''' Read a newline delimited JSON file, yield instances of `dictclass`
+      (default `dict`, otherwise a class which can be instantiated
+      by `dictclass(a_dict)`).
+  '''
+  for lineno, line in enumerate(f, 1):
+    with Pfx("line %d", lineno):
+      d = json.loads(line)
+      if dictclass is not dict:
+        d = dictclass(d)
+    yield d
 
 
 def abspath_from_file(path, from_file):
