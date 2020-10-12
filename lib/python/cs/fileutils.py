@@ -227,6 +227,12 @@ def write_ndjson(f, objs):
       f.write(json.dumps(o, separators=(',', ':')))
       f.write('\n')
 
+@strable(open_func=lambda filename: open(filename, 'a'))
+def append_ndjson(f, objs):
+  ''' Append an iterable of objects to a file as newline delimited JSON.
+  '''
+  return write_ndjson(f, objs)
+
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
