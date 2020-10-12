@@ -302,6 +302,7 @@ class BaseProgress(object):
       report_print=None,
   ):
     ''' A context manager to create and withdraw a progress bar.
+       It yields the `UpdProxy` which displays the progress bar.
 
         Parameters:
         * `label`: a label for the progress bar,
