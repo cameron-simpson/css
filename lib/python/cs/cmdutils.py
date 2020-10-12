@@ -277,7 +277,7 @@ class BaseCommand:
           If not specified a new `SimpleNamespace`
           is allocated for use as `options`,
           and prefilled with `.cmd` set to `cmd`
-          and other values as set by `.apply_default(options)`
+          and other values as set by `.apply_defaults(options)`
           if such a method is provided.
         * `cmd`:
           optional command name for context;
