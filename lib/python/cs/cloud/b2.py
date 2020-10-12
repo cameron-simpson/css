@@ -80,17 +80,14 @@ class B2Cloud(SingletonMixin, Cloud):
 
   __repr__ = __str__
 
-  def bucketpath(self, bucket_name, *, credentials=None, path=None):
+  def bucketpath(self, bucket_name, *, credentials=None):
     ''' Return the path for the supplied `bucket_name`.
         Include the `credentials` if supplied.
     '''
-    bpath = (
+    return (
         f'{self.PREFIX}://{self.credentials.keyId}:{self.credentials.apiKey}@{bucket_name}'
         if credentials else f'{self.PREFIX}://{bucket_name}'
     )
-    if path:
-      bpath = joinpath(bpath, path)
-    return bpath
 
   @classmethod
   def parse_sitepart(cls, sitepart):
