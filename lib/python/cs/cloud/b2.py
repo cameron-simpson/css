@@ -115,7 +115,7 @@ class B2Cloud(SingletonMixin, Cloud):
     ''' Stat `path` within the bucket named `bucket_name`.
     '''
     bucket = self.api.get_bucket_by_name(bucket_name)
-    versions = bucket.list_file_versions(path, count=1)
+    versions = bucket.list_file_versions(path, fetch_count=1)
     try:
       version, = versions
     except ValueError:
