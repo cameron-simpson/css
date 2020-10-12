@@ -124,6 +124,7 @@ class FSCloud(SingletonMixin, Cloud):
   @typechecked
   def download_buffer(
       self,
+      *,
       bucket_name: str,
       path: str,
       progress=None,  # pylint: disable=unused-argument
