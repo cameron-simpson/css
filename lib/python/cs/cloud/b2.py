@@ -111,6 +111,17 @@ class B2Cloud(SingletonMixin, Cloud):
     credentials = cls.credentials_from_str(credpart)
     return credentials, bucket_name
 
+  def stat(self, *, bucket_name: str, path: str):
+    ''' Stat `path` within the bucket named `bucket_name`.
+    '''
+    bucket = self.api.get_bucket_by_name(bucket_name)
+    versions = bucket.list_file_versions(path, count=1)
+    try:
+      version, = versions
+    except ValueError:
+      return None
+    return version.as_dict()
+
   @auto_progressbar(report_print=True)
   def _b2_upload_file(
       self,
