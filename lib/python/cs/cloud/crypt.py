@@ -256,12 +256,19 @@ def new_passtext(public_path=None):
     per_file_passtext_enc = None
   else:
     # encrypt the password using the public key
-    per_file_passtext_enc = run_openssl(
-        ['rsautl', '-encrypt', '-pubin', '-inkey', public_path],
-        stdin=per_file_passtext.encode(),
-        stdout=bytes,
-    )
+    per_file_passtext_enc = encrypt_passtext(per_file_passtext, public_path)
   return per_file_passtext, per_file_passtext_enc
+
+def encrypt_passtext(passtext: str, public_path: str) -> bytes:
+  ''' Encrypt the `passtext` using the public key stored at `public_path`.
+        Return the bytes comprising the encryption.
+    '''
+  passtext_enc = run_openssl(
+      ['rsautl', '-encrypt', '-pubin', '-inkey', public_path],
+      stdin=passtext.encode(),
+      stdout=bytes,
+  )
+  return passtext_enc
 
 def decrypt_password(per_file_passtext_enc, private_path, passphrase):
   ''' Decrypt the encrypted per file password `per_file_passtext_enc`
