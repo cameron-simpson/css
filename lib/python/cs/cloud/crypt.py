@@ -369,6 +369,7 @@ def upload(
     public_key_name=None,
     progress=None,
     length=None,
+    overwrite=False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
       using the public key from the file named `public_path`,
@@ -382,6 +383,8 @@ def upload(
       * `public_path`: the name of a file containing a public key
       * `public_key_name`: an optional name for the public key
         used to encrypt the per file key
+      * `overwrite`: optional flag, default `False`;
+        if true, do the upload even if the content file and key file exist
 
       This stores the symmetrically encrypted `stdin`
       at the bucket path `basepath+'.data.enc'`
@@ -394,6 +397,12 @@ def upload(
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name
   )
+  if not overwrite:
+    # if already uploaded then return quickly
+    file_info = cloud.stat(bucket_name, data_subpath)
+    if file_info and cloud.stat(bucket_name, key_subpath):
+      # already exists, skip the upload
+      return file_info, data_subpath, key_subpath
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
   # Try to ccompute the length of the encrypted data.
   # This is desired because the B2 backend at least wants the data length.
