@@ -236,7 +236,15 @@ class Cloud(ABC):
         * `progress`: an optional `cs.progress.Progress` instance
         * `length`: an option indication of the length of the buffer
     '''
-    return self.upload_buffer(CornuCopyBuffer.from_file(f), **kw)
+    return self.upload_buffer(
+        CornuCopyBuffer.from_file(f),
+        bucket_name=bucket_name,
+        path=path,
+        file_info=file_info,
+        content_type=content_type,
+        progress=progress,
+        length=length
+    )
 
   # pylint: disable=too-many-arguments
   @abstractmethod
