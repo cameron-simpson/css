@@ -15,6 +15,7 @@
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
+import json
 import re
 from cs.lex import isUC_, parseUC_sAttr
 from cs.logutils import warning
@@ -930,3 +931,54 @@ class AttrableMappingMixin(object):
     except KeyError:
       raise AttributeError("%s.%s" % (type(self).__name__, attr))
     return value
+
+class JSONableMappingMixin:
+  ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
+      and `__str__=as_json` and a `__repr__`.
+  '''
+
+  @classmethod
+  def from_json(cls, js):
+    ''' Prepare an dict from JSON text.
+
+      If the class has `json_object_hook` or `json_object_pairs_hook`
+      attributes these are used as the `object_hook` and
+      `object_pairs_hook` parameters respectively of the `json.loads()` call.
+    '''
+    d = cls()
+    d.update(
+        json.loads(
+            js,
+            object_hook=getattr(cls, 'json_object_hook', None),
+            object_pairs_hook=getattr(cls, 'json_object_pairs_hook', None)
+        )
+    )
+    return d
+
+  def as_json(self):
+    ''' The dict transcribed as JSON.
+
+        If the instance's class has `json_default` or `json_separators` these
+        are used for the `default` and `separators` parameters of the `json.dumps()`
+        call.
+        Note that the default value of `separators` is `(',',':')`
+        which produces the most compact JSON form.
+    '''
+    cls = type(self)
+    return json.dumps(
+        self,
+        default=getattr(cls, 'json_default', None),
+        separators=getattr(cls, 'json_separators', (',', ':'))
+    )
+
+  @strable(open_func=lambda filename: open(filename, 'a'))
+  def append_ndjson(self, f):
+    ''' Append this object to `f`, a file or filename, as NDJSON.
+    '''
+    f.write(self.as_json())
+    f.write('\n')
+
+  __str__ = as_json
+
+  def __repr__(self):
+    return type(self).__name__ + str(self)
