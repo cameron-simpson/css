@@ -916,3 +916,17 @@ class StackableValues(object):
       yield
     finally:
       self._values = old_values
+
+# pylint: disable=too-few-public-methods
+class AttrableMappingMixin(object):
+  ''' Provides a `__getattr__` which accesses the mapping value.
+  '''
+
+  def __getattr__(self, attr):
+    ''' Unknown attributes are obtained from the `dict` entries.
+    '''
+    try:
+      value = self[attr]
+    except KeyError:
+      raise AttributeError("%s.%s" % (type(self).__name__, attr))
+    return value
