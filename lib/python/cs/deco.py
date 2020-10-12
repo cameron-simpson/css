@@ -312,7 +312,6 @@ def OBSOLETE(func, suggestion=None):
   wrapped.__doc__ = doc + '\n\n' + funcdoc
   return wrapped
 
-
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
   ''' Former name for @cachedmethod.
@@ -323,7 +322,7 @@ def contextual(func):
   ''' Wrap a simple function as a context manager.
 
       This was written to support users of `@strable`,
-      which requires its `open_func` to be a context manager;
+      which requires its `open_func` to return a context manager;
       this turns an arbitrary function into a context manager.
 
       Example promoting a trivial function:
