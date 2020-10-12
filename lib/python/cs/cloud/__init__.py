@@ -131,6 +131,13 @@ class Cloud(ABC):
     credentials, _ = cls.parse_sitepart(sitepart)
     return cls(credentials)
 
+  @abstractmethod
+  def stat(self, *, bucket_name: str, path: str):
+    ''' Probe the file at `path` in bucket `bucket_name`,
+        return the file information as a `dict` or `None`.
+    '''
+    raise NotImplementedError("stat")
+
   # pylint: disable=too-many-arguments
   @abstractmethod
   def upload_buffer(
