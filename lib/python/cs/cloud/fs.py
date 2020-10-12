@@ -57,6 +57,20 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     return None, sitepart
 
+  def stat(self, *, bucket_name: str, path: str):
+    ''' Stat `/`*bucket_name*`/`*path*.
+    '''
+    filename = os.sep + joinpath(bucket_name, path)
+    try:
+      st = os.stat(filename)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return None
+      raise
+    result = as_dict(st, 'st_')
+    result.update(path=filename)
+    return result
+
   # pylint: disable=too-many-arguments,arguments-differ
   @auto_progressbar(report_print=True)  # pylint: disable=no-value-for-parameter
   @typechecked
