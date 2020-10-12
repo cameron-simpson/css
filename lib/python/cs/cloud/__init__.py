@@ -270,6 +270,14 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
     CP = CloudPath.from_str(path)
     return cls(CP.cloud, CP.bucket_name, CP.subpath)
 
+  def subarea(self, subpath):
+    ''' Return a `CloudArea` which is located within this `CloudArea`.
+    '''
+    validate_subpath(subpath)
+    return type(self)(
+        self.cloud, self.bucket_name, joinpath(self.basepath, subpath)
+    )
+
   @property
   def cloudpath(self):
     ''' The path to this storage area.
