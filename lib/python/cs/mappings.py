@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from functools import partial
 import json
 import re
+from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -35,10 +36,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq', 'cs.sharedfile'],
+    'install_requires': [
+        'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq',
+        'cs.sharedfile'
+    ],
 }
 
+# pylint: disable=too-many-statements
 def named_row_tuple(*column_names, **kw):
   ''' Return a namedtuple subclass factory derived from `column_names`.
 
