@@ -156,7 +156,7 @@ def run_openssl(openssl_args, stdout=None, **openssl_kwargs):
     raise ValueError("openssl failed: %r => %s" % (openssl_args, exitcode))
   return result
 
-def create_key_pair(dirpath, passphrase):
+def create_key_pair(dirpath: str, passphrase: str):
   ''' Generate and save a public/private keypair into the directory `dirpath`
       as the files *uuid*`.private.pem` and *uuid*`.public.pem`
       where *uuid* is a newly generated UUID.
@@ -373,7 +373,8 @@ def upload(
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
       using the public key from the file named `public_path`,
-      return the upload result.
+      return the upload result and the created cloud paths
+      (computed from `basepath`).
 
       Parameters:
       * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
