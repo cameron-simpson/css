@@ -449,6 +449,28 @@ def upload(
   )
   return upload_result
 
+def download_passtext(
+    cloud,
+    bucket_name,
+    passtext_path,
+    *,
+    private_path,
+    passphrase,
+    progress=None
+):
+  ''' Download the encrypted passtext for use with another encrypted file,
+      usually the per-file passtext for an encrypted upload.
+      Decrypt the download with the private key located at `private_path`
+      and `passphrase`.
+      Return the decrypted passtext.
+  '''
+  bfr, _ = cloud.download_buffer(bucket_name, passtext_path, progress=progress)
+  per_file_passtext_enc = b''.join(bfr)
+  per_file_passtext = decrypt_password(
+      per_file_passtext_enc, private_path, passphrase
+  )
+  return per_file_passtext
+
 @typechecked
 def download(
     cloud,
@@ -489,10 +511,13 @@ def download(
   data_subpath, key_subpath = upload_paths(
       basepath, public_key_name=public_key_name
   )
-  bfr, _ = cloud.download_buffer(bucket_name, key_subpath, progress=progress)
-  per_file_passtext_enc = b''.join(bfr)
-  per_file_passtext = decrypt_password(
-      per_file_passtext_enc, private_path, passphrase
+  per_file_passtext = download_passtext(
+      cloud,
+      bucket_name,
+      key_subpath,
+      private_path=private_path,
+      passphrase=passphrase,
+      progress=progress
   )
   bfr, _ = cloud.download_buffer(bucket_name, data_subpath, progress=progress)
   return symdecrypt(bfr, per_file_passtext, stdout=stdout)
