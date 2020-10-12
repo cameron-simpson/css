@@ -3,6 +3,7 @@
 ''' BackBlaze B2 support.
 '''
 
+import errno
 import os
 from os.path import dirname, isdir as isdirpath, join as joinpath
 from icontract import require
@@ -43,7 +44,7 @@ class FSCloud(SingletonMixin, Cloud):
 
   __repr__ = __str__
 
-  def bucketpath(self, bucket_name, credentials=None):
+  def bucketpath(self, bucket_name, *, credentials=None):
     ''' Return the path for the supplied `bucket_name`.
         Include the `credentials` if supplied.
     '''
