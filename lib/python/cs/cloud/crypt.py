@@ -34,7 +34,7 @@ from cs.logutils import debug
 from . import validate_subpath, CloudArea
 
 # used when creating RSA keypairs
-DEFAULT_RSA__ALGORITHM = 'aes256'
+DEFAULT_RSA_ALGORITHM = 'aes256'
 DEFAULT_RSA_KEYSIZE = 2048
 
 def openssl(
@@ -170,7 +170,7 @@ def create_key_pair(dirpath, passphrase):
   public_path = joinpath(dirpath, uuid_s + '.public.pem')
   run_openssl(
       [
-          'genrsa', '-' + DEFAULT_RSA__ALGORITHM, '-out', private_path,
+          'genrsa', '-' + DEFAULT_RSA_ALGORITHM, '-out', private_path,
           str(DEFAULT_RSA_KEYSIZE)
       ],
       passphrase_option=('-passout', passphrase),
