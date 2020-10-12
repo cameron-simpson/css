@@ -187,74 +187,24 @@ def rewrite(
 
 # pylint: disable=too-many-branches,too-many-arguments
 @contextmanager
-def rewrite_cmgr(
-    pathname,
-    mode='w',
-    backup_ext=None,
-    keep_backup=False,
-    do_rename=False,
-    do_diff=None,
-    empty_ok=False,
-    overwrite_anyway=False
-):
+def rewrite_cmgr(filepath, mode='w', **kw):
   ''' Rewrite a file, presented as a context manager.
 
       Parameters:
       * `mode`: file write mode, defaulting to "w" for text.
-      * `backup_ext`: backup extension. `None` means no backup.
-        An empty string generates an extension based on the current time.
-      * `keep_backup`: keep the backup file even if everything works.
-      * `do_rename`: rename the temporary file to the original to update.
-      * `do_diff`: call `do_diff(pathname, tempfile)` before commiting.
-      * `empty_ok`: do not consider empty output an error.
-      * `overwrite_anyway`: do not update the original if the new
-        data are identical.
+
+      Other keyword parameters are passed to `rewrite()`.
 
       Example:
 
           with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
              ... write new content to f ...
   '''
-  if backup_ext is None:
-    backuppath = None
-  else:
-    if not backup_ext:
-      backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
-    backuppath = pathname + backup_ext
-  dirpath = dirname(pathname)
-
-  T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
-  # hand control to caller
-  try:
+  with NamedTemporaryFile(mode=mode) as T:
     yield T
-    T.flush()
-    if not empty_ok and os.fstat(T.fileno()).st_size == 0:
-      raise ValueError("empty file")
-  except Exception as e:
-    # failure from caller or flush or sanity check, clean up
-    try:
-      os.unlink(T.name)
-    except OSError as e2:
-      if e2.errno != errno.ENOENT:
-        warning("%s: unlink: %s", T.name, e2)
-    raise e
+    return rewrite(filepath, mode=mode, **kw)
 
-  # success
-  if not overwrite_anyway and compare(pathname, T.name):
-    # file unchanged, remove temporary
-    os.unlink(T.name)
-    return
 
-  if do_rename:
-    if backuppath is not None:
-      os.rename(pathname, backuppath)
-    os.rename(T.name, pathname)
-  else:
-    if backuppath is not None:
-      shutil.copy2(pathname, backuppath)
-    shutil.copyfile(T.name, pathname)
-  if backuppath and not keep_backup:
-    os.remove(backuppath)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
