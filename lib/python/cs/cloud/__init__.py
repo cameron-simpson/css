@@ -112,7 +112,7 @@ class Cloud(ABC):
     return import_module_name(module_name, class_name)
 
   @abstractmethod
-  def bucketpath(self, bucket_name, credentials=None):
+  def bucketpath(self, bucket_name, *, credentials=None):
     ''' Return the path for the supplied `bucket_name`.
         Include the `credentials` if supplied.
     '''
@@ -149,8 +149,8 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
       length=None,
+      progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
 
