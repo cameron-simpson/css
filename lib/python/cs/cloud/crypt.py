@@ -347,6 +347,17 @@ def pubdecrypt_popen(
   # using the per file password
   return symdecrypt(stdin, per_file_passtext, stdout)
 
+def upload_paths(basepath, public_key_name=None):
+  ''' Return the paths for the encrypted data and per-file private
+      key components derived from `basepath`.
+  '''
+  assert public_key_name is None or '/' not in public_key_name
+  data_subpath = basepath + '.data.enc'
+  key_subpath = basepath + (
+      f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
+  )
+  return data_subpath, key_subpath
+
 @typechecked
 def upload(
     stdin,
@@ -380,10 +391,8 @@ def upload(
       The upload result is that for the `'.data.enc'` upload.
   '''
   validate_subpath(basepath)
-  assert public_key_name is None or '/' not in public_key_name
-  data_subpath = basepath + '.data.enc'
-  key_subpath = basepath + (
-      f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
+  data_subpath, key_subpath = upload_paths(
+      basepath, public_key_name=public_key_name
   )
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
   # Try to ccompute the length of the encrypted data.
@@ -467,9 +476,8 @@ def download(
   '''
   validate_subpath(basepath)
   assert public_key_name is None or '/' not in public_key_name
-  data_subpath = basepath + '.data.enc'
-  key_subpath = basepath + (
-      f'.key-{public_key_name}.enc' if public_key_name else '.key.enc'
+  data_subpath, key_subpath = upload_paths(
+      basepath, public_key_name=public_key_name
   )
   bfr, _ = cloud.download_buffer(bucket_name, key_subpath, progress=progress)
   per_file_passtext_enc = b''.join(bfr)
