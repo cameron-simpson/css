@@ -140,46 +140,50 @@ def rewrite(
   ''' Rewrite the file `filepath` with data from the file object `data`.
 
       Parameters:
-      * `empty_ok`: if not true, raise ValueError if the new data are
+      * `filepath`: the name of the file to rewrite
+      * `data`: the source file containing the new content
+      * `empty_ok`: if not true, raise `ValueError` if the new data are
         empty.
         Default: `False`.
       * `overwrite_anyway`: if true (default `False`),
         skip the content check and overwrite unconditionally.
       * `backup_ext`: if a nonempty string,
         take a backup of the original at `filepath + backup_ext`.
-      * `do_diff`: if not None, call `do_diff(filepath, tempfile)`.
-      * `do_rename`: if true (default False),
+      * `do_diff`: if not `None`, call `do_diff(filepath, tempfile)`.
+      * `do_rename`: if true (default `False`),
         rename the temp file to `filepath`
         after copying the permission bits.
-        Otherwise (default), copy the tempfile to `filepath`.
+        Otherwise (default), copy the tempfile to `filepath`;
+        this preserves the file's inode and permissions etc.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
-    T.flush()
-    if not empty_ok:
-      st = os.stat(T.name)
-      if st.st_size == 0:
-        raise ValueError("no data in temp file")
-    if do_diff or not overwrite_anyway:
-      # need to compare data
-      if compare(T.name, filepath):
-        # data the same, do nothing
-        return
-      if do_diff:
-        # call the supplied differ
-        do_diff(filepath, T.name)
-    if do_rename:
-      # rename new file into old path
-      # tries to preserve perms, but does nothing for other metadata
-      shutil.copymode(filepath, T.name)
-      if backup_ext:
-        os.link(filepath, filepath + backup_ext)
-      os.rename(T.name, filepath)
-    else:
-      # overwrite old file - preserves perms, ownership, hard links
-      if backup_ext:
-        shutil.copy2(filepath, filepath + backup_ext)
-      shutil.copyfile(T.name, filepath)
+  with Pfx("rewrite(%r)", filepath):
+    with NamedTemporaryFile(dir=dirname(filepath), mode=mode) as T:
+      T.write(data.read())
+      T.flush()
+      if not empty_ok:
+        st = os.stat(T.name)
+        if st.st_size == 0:
+          raise ValueError("no data in temp file")
+      if do_diff or not overwrite_anyway:
+        # need to compare data
+        if compare(T.name, filepath):
+          # data the same, do nothing
+          return
+        if do_diff:
+          # call the supplied differ
+          do_diff(filepath, T.name)
+      if do_rename:
+        # rename new file into old path
+        # tries to preserve perms, but does nothing for other metadata
+        shutil.copymode(filepath, T.name)
+        if backup_ext:
+          os.link(filepath, filepath + backup_ext)
+        os.rename(T.name, filepath)
+      else:
+        # overwrite old file - preserves perms, ownership, hard links
+        if backup_ext:
+          shutil.copy2(filepath, filepath + backup_ext)
+        shutil.copyfile(T.name, filepath)
 
 # pylint: disable=too-many-branches,too-many-arguments
 @contextmanager
