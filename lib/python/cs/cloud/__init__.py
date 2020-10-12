@@ -28,7 +28,8 @@ def is_valid_subpath(subpath):
     return False
   return True
 
-def validate_subpath(subpath):
+@typechecked
+def validate_subpath(subpath: str):
   ''' Validate a subpath against `is_valid_subpath`,
       raise `ValueError` on violations.
 
@@ -273,7 +274,7 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
 
   @classmethod
   def from_cloudpath(cls, path: str):
-    ''' Construct a new CloudArea from the cloud path `path`.
+    ''' Construct a new `CloudArea` from the cloud path `path`.
     '''
     CP = CloudPath.from_str(path)
     return cls(CP.cloud, CP.bucket_name, CP.subpath)
