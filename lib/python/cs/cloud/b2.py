@@ -24,7 +24,7 @@ from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method
 from cs.progress import progressbar, auto_progressbar
 from cs.queues import IterableQueue
-from cs.threads import locked_property
+from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 from . import Cloud
 
@@ -67,7 +67,8 @@ class B2Cloud(SingletonMixin, Cloud):
   def __str__(self):
     return f"{self.PREFIX}://{self.credentials.keyId}:*/"
 
-  @locked_property
+  @property
+  @locked
   def api(self):
     ''' The B2API, authorized from `self.credentials`.
     '''
