@@ -840,13 +840,13 @@ class UpdProxy(object):
   __slots__ = {
       'upd': 'The parent Upd instance.',
       'index': 'The index of this slot within the parent Upd.',
-      'prefix': 'The fixed leading prefix for this slot, default "".',
+      '_prefix': 'The fixed leading prefix for this slot, default "".',
   }
 
   def __init__(self, upd, index):
     self.upd = upd
     self.index = index
-    self.prefix = ''
+    self._prefix = ''
 
   def __str__(self):
     return (
@@ -867,6 +867,21 @@ class UpdProxy(object):
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.delete()
+
+  @property
+  def prefix(self):
+    ''' The current prefix string.
+    '''
+    return self._prefix
+
+  @prefix.setter
+  def prefix(self, new_prefix):
+    ''' Change the prefix, redraw the status line.
+    '''
+    old_prefix = self._prefix
+    self._prefix = new_prefix
+    if new_prefix != old_prefix:
+      self.text = self.text
 
   @property
   def text(self):
