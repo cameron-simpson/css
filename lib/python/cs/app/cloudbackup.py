@@ -4,6 +4,7 @@
 '''
 
 from binascii import unhexlify
+from contextlib import contextmanager
 import errno
 from getopt import GetoptError
 from getpass import getpass
@@ -33,6 +34,7 @@ from cs.logutils import warning
 from cs.mappings import (
     AttrableMappingMixin, AttrableMapping, UUIDedDict, UUIDNDJSONMapping
 )
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress
 from cs.seq import splitoff
@@ -465,11 +467,6 @@ def uuidpath(uuid: UUID, *sizes, make_subdir_of=None):
         os.makedirs(dirpath)
   return joinpath(*dirparts, uuid_s)
 
-# TODO: not used? should I bother?
-class UUIDedSubPath(UUIDedDict):
-  ''' A UUID<->subpath association.
-  '''
-
 class BackupRecord(UUIDedDict):
   ''' A `BackupRecord` persists information about a `NamedBackup` backup run.
   '''
@@ -742,11 +739,11 @@ class NamedBackup(SingletonMixin):
         Otherwise upload the file contents against the hashcode
         and return the hashcode.
     '''
+    validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
     backup_area = self.backup_area
     cloud = backup_area.cloud
     bucket_name = backup_area.bucket_name
-    validate_subpath(subpath)
     public_key_name = backup_record.public_key_name
     filename = joinpath(topdir, subpath)
     with Pfx("backup_filename(%r)", filename):
