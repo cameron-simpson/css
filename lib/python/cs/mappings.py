@@ -16,9 +16,13 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import json
+from os.path import exists as existspath, isfile as isfilepath
 import re
+from threading import RLock
+from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr
+from cs.fileutils import scan_ndjson
+from cs.lex import isUC_, parseUC_sAttr, cutprefix
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py3 import StringTypes
@@ -37,8 +41,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.py3', 'cs.seq',
-        'cs.sharedfile'
+        'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py3',
+        'cs.seq',
+        'cs.sharedfile',
     ],
 }
 
@@ -1157,14 +1167,22 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
 class UUIDNDJSONMapping(LoadableMappingMixin):
   ''' A subclass of `LoadableMappingMixin` which maintains records
       from a newline delimited JSON file.
-
-      Instances must provide a `.ndjson_filename` attribute
-      naming the file storing the records.
   '''
 
   loadable_mapping_key = 'uuid'
 
   def __init__(self, filename, dictclass=UUIDedDict, create=False):
+    ''' Initialise the mapping.
+
+        Parameters:
+        * `filename`: the file containing the newline delimited JSON data;
+          this need not yet exist
+        * `dictclass`: a optional `dict` subclass to hold each record,
+          default `UUIDedDict`
+        * `create`: if true, ensure the file exists
+          by transiently opening it for append if it is missing;
+          default `False`
+    '''
     self.__ndjson_filename = filename
     self.__dictclass = dictclass
     if create and not isfilepath(filename):
