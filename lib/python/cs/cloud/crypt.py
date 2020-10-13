@@ -489,7 +489,7 @@ def upload(
       progress=progress,
       length=len(per_file_passtext_enc),
   )
-  return upload_result
+  return upload_result, data_subpath, key_subpath
 
 def download_passtext(
     cloud,
@@ -585,7 +585,7 @@ def main(argv):
   print(uuid)
   print(private_path)
   print(public_path)
-  upload_result = upload(
+  upload_result, data_subpath, key_subpath = upload(
       __file__,
       CAF.cloud,
       CAF.bucket_name,
