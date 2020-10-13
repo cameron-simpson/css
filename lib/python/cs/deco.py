@@ -392,6 +392,9 @@ def strable(func, open_func=None):
           with open_func(arg) as opened:
             for item in func(opened, *a, **kw):
               yield item
+      else:
+        for item in func(arg, *a, **kw):
+          yield item
   else:
 
     def accepts_str(arg, *a, **kw):
