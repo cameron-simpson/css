@@ -609,7 +609,9 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # Backup processes.
 
-  def backup_tree(self, topdir: str, topsubpath: str):
+  def backup_tree(
+      self, backup_record: BackupRecord, topdir: str, topsubpath: str
+  ):
     ''' Back up everything in `topdir/topsubpath`
         recording the results against `backup_record`.
     '''
@@ -623,18 +625,20 @@ class NamedBackup(SingletonMixin):
       for dirpath, dirnames, _ in os.walk(topdirpath):
         walk_proxy("%s/", dirpath)
         subpath = relpath(dirpath, topdirpath)
-        self.backup_single_directory(topdir, subpath)
+        self.backup_single_directory(backup_record, topdir, subpath)
         # walk the children lexically ordered
         dirnames[:] = sorted(dirnames)
 
   # pylint: disable=too-many-branches,too-many-statements
-  def backup_single_directory(self, topdir, subpath):
+  def backup_single_directory(
+      self, backup_record: BackupRecord, topdir, subpath
+  ):
     ''' Backup the immediate contents of a particular subdirectory.
         Return `True` if everything was successfully backed up,
         `False` otherwise.
     '''
     validate_subpath(subpath)
-    backup_uuid = self.uuid
+    backup_uuid = backup_record.uuid
     dirpath = joinpath(topdir, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
       with Pfx("scandir"):
@@ -656,7 +660,7 @@ class NamedBackup(SingletonMixin):
             if name in names:
               warning("repeated")
               continue
-            self.backup_record['count_files_checked'] += 1
+            backup_record['count_files_checked'] += 1
             names.add(name)
             name_backups = dirstate.by_name.get(name)
             if name_backups is None:
@@ -693,12 +697,12 @@ class NamedBackup(SingletonMixin):
                   else:
                     changed = False
               if changed:
-                self.backup_record['count_files_changed'] += 1
+                backup_record['count_files_changed'] += 1
                 rfilepath = joinpath(subpath, name)
                 # we get a fresh stat and hashcode from backup_filename
                 # because the file might change while we're mucking about
                 backedup_hashcode, backedup_stat = self.backup_filename(
-                    topdir, rfilepath, prevstate=prevstate
+                    backup_record, topdir, rfilepath, prevstate=prevstate
                 )
                 name_backups.add_regular_file(
                     backup_uuid=backup_uuid,
@@ -725,7 +729,10 @@ class NamedBackup(SingletonMixin):
 
   # pylint: disable=too-many-locals
   @typechecked
-  def backup_filename(self, topdir: str, subpath: str, *, prevstate):
+  def backup_filename(
+      self, backup_record: BackupRecord, topdir: str, subpath: str, *,
+      prevstate
+  ):
     ''' Back up a single file *topdir*`/`*subpath*,
         return its stat and hashcode.
 
@@ -739,9 +746,8 @@ class NamedBackup(SingletonMixin):
     backup_area = self.backup_area
     cloud = backup_area.cloud
     bucket_name = backup_area.bucket_name
-    public_key_name = self.public_key_name
-    public_path = self.public_key_path
     validate_subpath(subpath)
+    public_key_name = backup_record.public_key_name
     filename = joinpath(topdir, subpath)
     with Pfx("backup_filename(%r)", filename):
       with open(filename, 'rb') as f:
@@ -801,7 +807,7 @@ class NamedBackup(SingletonMixin):
                   old_private_path=other_private_path,
                   old_passphrase=passphrase,
                   new_key_name=public_key_name,
-                  new_public_path=public_path
+                  new_public_path=self.public_key_path(public_key_name),
               )
               return hashcode, fstat
           # no private keys with known passphrases
@@ -819,10 +825,20 @@ class NamedBackup(SingletonMixin):
           # TODO: shared by hashcode set of locks
           P = Progress(name="upload " + filename, total=0)
           with P.bar(insert_pos=-1):
-            self.upload_hashcode_content(fd, hashcode, len(mm), progress=P)
+            self.upload_hashcode_content(
+                backup_record, fd, hashcode, len(mm), progress=P
+            )
         return hashcode, fstat
 
-  def upload_hashcode_content(self, f, hashcode, length, *, progress=None):
+  def upload_hashcode_content(
+      self,
+      backup_record: BackupRecord,
+      f,
+      hashcode,
+      length,
+      *,
+      progress=None
+  ):
     ''' Upload the contents of `f` under the supplied `hashcode`
         into the content area specified the `contentdir_cloudpath`.
     '''
@@ -833,13 +849,15 @@ class NamedBackup(SingletonMixin):
         self.cloud,
         self.bucket_name,
         basepath,
-        public_path=self.public_key_path,
-        public_key_name=self.public_key_name,
+        public_path=self.backup_area.public_key_path(
+            backup_record.public_key_name
+        ),
+        public_key_name=backup_record.public_key_name,
         progress=progress,
         length=length,
     )
-    self.backup_record['count_uploaded_files'] += 1
-    self.backup_record['count_uploaded_bytes'] += length
+    backup_record['count_uploaded_files'] += 1
+    backup_record['count_uploaded_bytes'] += length
 
 class FileBackupState(UUIDedDict):
   ''' A state record for a name within a directory.
@@ -854,9 +872,7 @@ class FileBackupState(UUIDedDict):
         backup to least recent
 
       Each backup state `dict` contains the following keys:
-      * `uuid`: the `BackupRun` UUID for this backup
-        note that for files not present during a backup
-        the mapping value wil be `None` instead of a tuple.
+      * `uuid`: the `BackupRecord` UUID for this backup
       * `stat`: a `dict` with relevant fields from an `os.stat_result`;
         for a regular file this includes `st_mode`, `st_mtime`, `st_size`;
         for a symlink this includes an additional `link` field
