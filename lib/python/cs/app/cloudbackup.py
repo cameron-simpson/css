@@ -562,6 +562,14 @@ class NamedBackup(SingletonMixin):
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
 
+  def init(self):
+    ''' Create the required on disc structures.
+    '''
+    if not isdirpath(self.state_dirpath):
+      print("create", self.state_dirpath)
+      with Pfx("mkdir(%r)", self.state_dirpath):
+        os.mkdir(self.state_dirpath)
+
   @staticmethod
   def hashcode_path(hashcode, *sizes):
     ''' Make a path based on a hashcode.
