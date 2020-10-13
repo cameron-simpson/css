@@ -933,7 +933,10 @@ class AttrableMappingMixin(object):
     try:
       value = self[attr]
     except KeyError:
-      raise AttributeError("%s.%s" % (type(self).__name__, attr))
+      raise AttributeError(
+          "%s.%s (attrs=%s)" %
+          (type(self).__name__, attr, ','.join(sorted(self.keys())))
+      )
     return value
 
 class JSONableMappingMixin:
