@@ -509,12 +509,10 @@ class NamedBackup(SingletonMixin):
 
   def __init__(
       self,
-      uuid=None,
       *,
       backup_area: BackupArea,
       backup_name: str,
       state_dirpath: str,
-      public_key_name: str
   ):
     ''' Initialise a `NamedBackup`.
 
@@ -527,17 +525,10 @@ class NamedBackup(SingletonMixin):
     '''
     if not is_identifier(backup_name):
       raise ValueError("backup_name is not an identifier: %r" % (backup_name,))
-    if uuid is None:
-      uuid = uuid4()
-    else:
-      assert isinstance(uuid, UUID)
     self._lock = RLock()
-    self.uuid = uuid
     self.backup_area = backup_area
     self.backup_name = backup_name
     self.state_dirpath = state_dirpath
-    self.public_key_name = public_key_name
-    self.public_key_path = backup_area.public_key_path(public_key_name)
     # the association of UUIDs with directory subpaths
     self.diruuids = UUIDNDJSONMapping(
         joinpath(self.state_dirpath, 'diruuids.ndjson'), create=True
