@@ -507,6 +507,12 @@ class NamedBackup(SingletonMixin):
   ''' A record encapsulating a named set of backups.
   '''
 
+  @classmethod
+  def _singleton_key(
+      cls, *, backup_area: BackupArea, backup_name: str, state_dirpath: str
+  ):
+    return backup_area, backup_name
+
   def __init__(
       self,
       *,
@@ -523,6 +529,8 @@ class NamedBackup(SingletonMixin):
         * `backup_name`: the name of this backup, an identifier
         * `public_key_name`: the name of the public key used to encrypt uploads
     '''
+    if hasattr(self, 'backup_area'):
+      return
     if not is_identifier(backup_name):
       raise ValueError("backup_name is not an identifier: %r" % (backup_name,))
     self._lock = RLock()
