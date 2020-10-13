@@ -478,7 +478,7 @@ class UC_Sequence(list):
   def __getattr__(self, attr):
     k, plural = parseUC_sAttr(attr)
     if k is None or not plural:
-      return list.__getattr__(self, attr)
+      raise AttributeError(attr)
     values = tuple(self.__attrvals(attr))
     if values and not isNode(values[0]):
       return values
