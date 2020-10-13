@@ -113,7 +113,7 @@ def openssl(
     close_my_fds.append(passphrase_fd)
     argv = [passphrase_opt, f"fd:{passphrase_fd}"] + argv
   argv = ['openssl', arg1] + argv
-  debug('+', repr(argv), file=sys.stderr)
+  ##warning('+ %r', argv)
   P = Popen(argv, stdin=stdin, stdout=stdout, pass_fds=pass_fds, **kw)
   for fd in close_my_fds:
     os.close(fd)

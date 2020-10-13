@@ -101,7 +101,7 @@ class FSCloud(SingletonMixin, Cloud):
     filename = os.sep + joinpath(bucket_name, path)
     dirpath = dirname(filename)
     if not isdirpath(dirpath):
-      info("create directory %r", dirpath)
+      ##warning("create directory %r", dirpath)
       with Pfx("makedirs(%r)", dirpath):
         os.makedirs(dirpath, 0o777)
     with open(filename, 'wb') as f:

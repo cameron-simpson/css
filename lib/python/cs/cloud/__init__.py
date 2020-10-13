@@ -308,7 +308,6 @@ class CloudAreaFile(SingletonMixin):
 
   ##@typechecked
   def __init__(self, cloud_area: CloudArea, filepath: str):
-    X("CAF init cloud_area=%s filepath=%r", cloud_area, filepath)
     if hasattr(self, 'filepath'):
       return
     validate_subpath(filepath)
