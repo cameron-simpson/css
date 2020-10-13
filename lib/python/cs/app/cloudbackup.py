@@ -481,8 +481,6 @@ class BackupRecord(UUIDedDict):
       *,
       public_key_name,
       content_path,
-      timestamp_start=None,
-      timestamp_end=None,
       count_files_checked=0,
       count_files_changed=0,
       count_uploaded_bytes=0,
@@ -492,12 +490,17 @@ class BackupRecord(UUIDedDict):
     super().__init__(**kw)
     self['public_key_name'] = public_key_name
     self['content_path'] = content_path
-    self['timestamp_start'] = timestamp_start
-    self['timestamp_end'] = timestamp_end
     self['count_files_checked'] = count_files_checked
     self['count_files_changed'] = count_files_changed
     self['count_uploaded_bytes'] = count_uploaded_bytes
     self['count_uploaded_files'] = count_uploaded_files
+
+  def __enter__(self):
+    self['timestamp_start'] = time.time()
+    return self
+
+  def __exit__(self, exc_type, exc_value, exc_traceback):
+    self['timestamp_end'] = time.time()
 
 # pylint: disable=too-many-instance-attributes
 class NamedBackup(SingletonMixin):
