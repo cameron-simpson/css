@@ -443,11 +443,10 @@ class BackupArea:
         backup_name=backup_name,
         state_dirpath=per_name_state_dirpath,
     )
-    for subpath in subpaths:
-      backup_run.backup_tree(topdir, subpath)
-    backup_run.backup_record.update(timestamp_end=time.time())
-    backup_records.add_to_mapping(backup_run.backup_record)
-    return backup_run.backup_record
+    with backup.run(public_key_name=public_key_name) as backup_record:
+      for subpath in subpaths:
+        backup.backup_tree(backup_record, topdir, subpath)
+    return backup_record
 
 @typechecked
 def uuidpath(uuid: UUID, *sizes, make_subdir_of=None):
