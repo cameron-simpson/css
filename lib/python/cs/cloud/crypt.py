@@ -443,7 +443,7 @@ def upload(
   if not overwrite:
     # if already uploaded then return quickly
     file_info = cloud.stat(bucket_name=bucket_name, path=data_subpath)
-    if file_info and cloud.stat(bucket_name, key_subpath):
+    if file_info and cloud.stat(bucket_name=bucket_name, path=key_subpath):
       # already exists, skip the upload
       return file_info, data_subpath, key_subpath
   per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
