@@ -179,7 +179,7 @@ class B2Cloud(SingletonMixin, Cloud):
       for bs in progressbar(
           bfr, label=(joinpath(self.bucketpath(bucket_name), path) +
                       " scratch file"), total=length, itemlenfunc=len,
-          units_scale=BINARY_BYTES_SCALE, report_print=True):
+          units_scale=BINARY_BYTES_SCALE):
         T.write(bs)
       T.flush()
       return self.upload_filename(
