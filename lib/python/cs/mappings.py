@@ -986,3 +986,111 @@ class JSONableMappingMixin:
 
   def __repr__(self):
     return type(self).__name__ + str(self)
+
+class LoadableMappingMixin:
+  ''' A base mixin to provide `.by_`* attributes
+      which index records from an autoloaded backing store,
+      which might be a file or might be another related data structure.
+      The records are themselves key->value mappings, such as `dict`s.
+
+      The primary key name is provided by the `.loadable_mapping_key`
+      class attribute, to be provided by subclasses.
+
+      Note that this mixin keeps the entire loadable mapping in memory.
+
+      Note that this does not see subsequent changes to loaded records
+      i.e. changing the value of some record[k]
+      does not update the index associated with the .by_k attribute.
+
+      Subclasses must provide the following attributes and methods:
+      * `loadable_mapping_key`: the name of the primary key;
+        it is an error for a multiple records to have the same primary key
+      * `load_mapping`: a generator method to scan the backing store
+        and yield records, used for the inital load of the mapping
+      * `append_to_mapping(record)`: add a new record to the backing store;
+        this is called from the `.add_to_mapping(record)` method
+        after indexing to persist the record in the backing store
+
+      See `UUIDNDJSONMapping` and `UUIDedDict` for an example subclass
+      indexing records from a newline delimited JSON file.
+  '''
+
+  loadable_mapping_key = ''
+
+  def load_mapping(self):
+    ''' Load the mapping from its backing store,
+        which might be a file or might be another related data structure.
+        Return the loaded mapping.
+    '''
+    raise NotImplementedError("load_mapping")
+
+  def add_to_mapping(self, record, exists_ok=False):
+    ''' Add a record to the mapping.
+
+        This indexes the record against the various `by_`* indices
+        and then calls `self.append_to_mapping(record)`
+        to save the record to the backing store.
+    '''
+    pk_name = self.loadable_mapping_key
+    assert pk_name, "empty .loadable_mapping_key"
+    # ensure the primary mapping is loaded
+    pk_mapping = getattr(self, 'by_' + self.loadable_mapping_key)
+    with self._lock:
+      if not exists_ok and record[pk_name] in pk_mapping:
+        raise KeyError(
+            "self.by_%s: key %r already present" % (pk_name, record[pk_name])
+        )
+      for map_name in self.__indexed:
+        try:
+          k = record[map_name]
+        except KeyError:
+          pass
+        else:
+          by_map = getattr(self, 'by_' + map_name)
+          by_map[k] = record
+      self.append_to_mapping(record)
+
+  def __getattr__(self, attr):
+    field_name = cutprefix(attr, 'by_')
+    if field_name is not attr:
+      by_map = {}
+      with Pfx("%s.%s", type(self).__name__, attr):
+        pk_name = self.loadable_mapping_key
+        assert pk_name, "empty .loadable_mapping_key"
+        by_pk = 'by_' + pk_name
+        indexed = self.__indexed
+        assert field_name not in indexed, "repeated __getattr__ of .%s" % (
+            attr,
+        )
+        warned = set()
+        with self._lock:
+          if field_name == pk_name:
+            records = self.load_mapping()
+          else:
+            records = getattr(self, by_pk).values()
+          # load the
+          for record in records:
+            try:
+              field_value = record[field_name]
+            except KeyError:
+              if field_name == pk_name:
+                warning("no primary key %r: %r", field_name, record)
+              continue
+            if field_value in by_map:
+              if field_value not in warned:
+                ##warning("multiple records for %r", field_value)
+                warned.add(field_value)
+            by_map[field_value] = record
+          setattr(self, attr, by_map)
+          indexed.add(field_name)
+      return by_map
+    if attr == '_LoadableMappingMixin__indexed':
+      # .__indexed
+      indexed = self.__indexed = set()
+      return indexed
+    try:
+      supergetattr = super().__getattr__
+    except AttributeError:
+      return getattr(type(self), attr)
+    else:
+      return supergetattr(attr)
