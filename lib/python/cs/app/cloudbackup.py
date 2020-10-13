@@ -442,7 +442,6 @@ class BackupArea:
         backup_area=self,
         backup_name=backup_name,
         state_dirpath=per_name_state_dirpath,
-        public_key_name=public_key_name
     )
     for subpath in subpaths:
       backup_run.backup_tree(topdir, subpath)
