@@ -65,10 +65,7 @@ class CloudBackupCommand(BaseCommand):
                     existing key pair.
   '''
 
-  # TODO: -s state_dirpath, default from $CLOUDBACKUP_STATE or ~/.cloudbackup
-  # TODO: -K keysdir, default from {state_dirpath}/keys
-  # TODO: newkey => key_name
-  # TODO: backup topdir backup_name [subpaths...]
+  # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
   # TODO: restore [-u backup_uuid] backup_name subpath
   # TODO: recover backup_name [backup_uuid] subpaths...
   # TODO: refilekey -K oldkey backup_name subpaths...
