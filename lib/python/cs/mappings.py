@@ -1094,3 +1094,7 @@ class LoadableMappingMixin:
       return getattr(type(self), attr)
     else:
       return supergetattr(attr)
+
+class AttrableMapping(dict, AttrableMappingMixin):
+  ''' A `dict` subclass using `AttrableMappingMixin`.
+  '''
