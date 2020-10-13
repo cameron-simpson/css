@@ -104,6 +104,8 @@ class FSCloud(SingletonMixin, Cloud):
       ##warning("create directory %r", dirpath)
       with Pfx("makedirs(%r)", dirpath):
         os.makedirs(dirpath, 0o777)
+    if progress is not None and length is not None:
+      progress.total += length
     with open(filename, 'wb') as f:
       for bs in bfr:
         f.write(bs)
