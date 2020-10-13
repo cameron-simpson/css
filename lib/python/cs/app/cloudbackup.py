@@ -533,7 +533,7 @@ class NamedBackup(SingletonMixin):
     self.state_dirpath = state_dirpath
     # the association of UUIDs with directory subpaths
     self.diruuids = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'diruuids.ndjson'), create=True
+        joinpath(self.state_dirpath, 'diruuids.ndjson')
     )
     # the directory holding the DirState files
     self.dirstates_dirpath = joinpath(self.state_dirpath, 'dirstates')
@@ -544,7 +544,7 @@ class NamedBackup(SingletonMixin):
     self.cloud = self.content_area.cloud
     self.bucket_name = self.content_area.bucket_name
     self.backup_records = UUIDNDJSONMapping(
-        joinpath(self.state_dirpath, 'backups.ndjson'), create=True
+        joinpath(self.state_dirpath, 'backups.ndjson')
     )
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
