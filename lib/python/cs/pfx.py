@@ -47,7 +47,7 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
-from cs.deco import decorator, logging_wrapper
+from cs.deco import decorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
@@ -71,7 +71,23 @@ DISTINFO = {
     ],
 }
 
+DEFAULT_SEPARATOR = ': '
+
 cmd = None
+
+@fmtdoc
+def unpfx(s, sep=None):
+  ''' Strip the leading prefix from the string `s`
+      using the prefix delimiter `sep`
+      (default from `DEFAULT_SEPARATOR`: `{DEFAULT_SEPARATOR!r}`).
+
+      This is a simple hack to support reporting error messages
+      which have had a preifx applied,
+      and fails accordingly if the base message itself contains the separator.
+  '''
+  if sep is None:
+    sep = DEFAULT_SEPARATOR
+  return s.rsplit(sep, 1)[-1].strip()
 
 def pfx_iter(tag, iterable):
   ''' Wrapper for iterables to prefix exceptions with `tag`.
@@ -137,7 +153,7 @@ class _PfxThreadState(threading.local):
     if cmd is not None:
       marks.append(cmd)
     marks = reversed(marks)
-    return unicode(': ').join(marks)
+    return unicode(DEFAULT_SEPARATOR).join(marks)
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
@@ -305,16 +321,18 @@ class Pfx(object):
   @classmethod
   def prefixify(cls, text):
     ''' Return `text` with the current prefix prepended.
-        Returns `text` unchanged if it is not a string.
+        Return `text` unchanged if it is not a string.
     '''
     current_prefix = cls._state.prefix
     if not isinstance(text, StringTypes):
       ##X("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
       ##  current_prefix, text.__class__, text, sys.exc_info())
       return text
-    return current_prefix \
-        + ': ' \
-        + ustr(text, errors='replace').replace('\n', '\n  ' + current_prefix + ': ')
+    return (
+        current_prefix + DEFAULT_SEPARATOR +
+        ustr(text, errors='replace'
+             ).replace('\n', '\n  ' + current_prefix + DEFAULT_SEPARATOR)
+    )
 
   @classmethod
   def prefixify_exception(cls, e):
@@ -589,7 +607,7 @@ def XP(msg, *args, **kwargs):
   '''
   if args:
     return X("%s: " + msg, prefix(), *args, **kwargs)
-  return X(prefix() + ': ' + msg, **kwargs)
+  return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):
   ''' Trite wrapper for `XP()` to transiently insert a leading prefix string.
