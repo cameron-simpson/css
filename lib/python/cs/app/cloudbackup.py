@@ -330,6 +330,20 @@ class BackupArea:
     '''
     return self.cloud_area.bucket_name
 
+  def __getitem__(self, index):
+    ''' Indexing by an identifier returns the associated `NamedBackup`.
+    '''
+    # TODO: index by UUID or str(UUID) returns a (NamedBackup,BackupRecord).
+    if is_identifier(index):
+      backup_name = index
+      backup = NamedBackup(
+          backup_area=self,
+          backup_name=backup_name,
+          state_dirpath=self.named_state_dirpath(backup_name),
+      )
+      return backup
+    raise KeyError(index)
+
   ##############################################################
   # Private/public keys.
 
