@@ -430,6 +430,8 @@ class BackupArea:
     '''
     if not subpaths:
       raise ValueError("no subpaths")
+    if not is_identifier(backup_name):
+      raise ValueError("backup_name is not an identifier: %r" % (backup_name,))
     if public_key_name is None:
       public_key_name = self.latest_key_name()
       if public_key_name is None:
@@ -439,24 +441,9 @@ class BackupArea:
     for subpath in subpaths:
       if subpath:
         validate_subpath(subpath)
-    per_name_state_dirpath = self.named_state_dirpath(backup_name)
-    if not isdirpath(per_name_state_dirpath):
-      print("mkdir(%r)", per_name_state_dirpath)
-      with Pfx("mkdir(%r)", per_name_state_dirpath):
-        os.mkdir(per_name_state_dirpath, 0o777)
-    # obtain the backup records
-    try:
-      backup_records = self.per_name_backup_records[backup_name]
-    except KeyError:
-      backup_records = self.per_name_backup_records[
-          backup_name] = UUIDNDJSONMapping(
-              joinpath(per_name_state_dirpath, 'backups.ndjson'), create=True
-          )
-    backup = NamedBackup(
-        backup_area=self,
-        backup_name=backup_name,
-        state_dirpath=per_name_state_dirpath,
-    )
+    backup = self[backup_name]
+    assert isinstance(backup, NamedBackup)
+    backup.init()
     with backup.run(public_key_name=public_key_name) as backup_record:
       for subpath in subpaths:
         backup.backup_tree(backup_record, topdir, subpath)
