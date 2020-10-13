@@ -283,6 +283,48 @@ def decrypt_password(per_file_passtext_enc, private_path, passphrase):
   ).decode()
   return per_file_passtext
 
+def recrypt_passtext(
+    cloud, bucket_name, basepath, *, old_key_name, old_private_path,
+    old_passphrase, new_key_name, new_public_path
+):
+  ''' Add another encryption of a passtext:
+      Fetch an uploaded encrypted passtext and decrypt with the private key
+      stored at `old_private_path` and the passphrase `old_passphrase`.
+      Encrypt the passtext with the public key named `new_key_name`
+      stored at `new_public_path` and upload.
+
+      Parameters:
+      * `cloud`: the `Cloud` instance to fetch and store the passtext
+      * `bucket_name`: the bucket within the cloud
+      * `basepath`: the basis for the paths within the bucket
+      * `old_key_name`: the name of the existing key
+      * `old_private_path`: the path to the private key for decryption
+      * `old_passphrase`: the passphase to use with `old_private_path`
+      * `new_key_name`: the name of the new key
+      * `new_public_path`: the path to the public key for encryption
+
+      This supports providing a new encrypted passtext for an already
+      uploaded file.
+  '''
+  _, old_key_subpath = upload_paths(basepath, public_key_name=old_key_name)
+  # fetch and decrypt the existing passtext
+  passtext = download_passtext(
+      cloud,
+      bucket_name,
+      old_key_subpath,
+      private_path=old_private_path,
+      passphrase=old_passphrase
+  )
+  # encrypt with our key and reupload
+  passtext_enc = encrypt_passtext(passtext, new_public_path)
+  _, new_key_subpath = upload_paths(basepath, public_key_name=new_key_name)
+  cloud.upload_buffer(
+      CornuCopyBuffer([passtext_enc]),
+      bucket_name=bucket_name,
+      path=new_key_subpath,
+      length=len(passtext_enc),
+  )
+
 def pubencrypt_popen(stdin, public_path, stdout=PIPE):
   ''' Encrypt the `stdin` t `stdout`
       using the public key from `public_path`,
