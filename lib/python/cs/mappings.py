@@ -1176,8 +1176,9 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
   def scan_mapping(self):
     ''' Scan the backing file, yield records.
     '''
-    for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
-      yield record
+    if existspath(self.__ndjson_filename):
+      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+        yield record
 
   def append_to_mapping(self, record):
     ''' Append `record` to the backing file.
