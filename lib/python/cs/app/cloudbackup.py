@@ -610,6 +610,60 @@ class NamedBackup(SingletonMixin):
       dirstate.subpath = subpath
     return dirstate
 
+  def walk(self, subpath: str, *, backup_uuid=None, all_backups=False):
+    ''' Walk the backups of `subpath`, yield `(subsubpath,details)`.
+        Only subsubpaths with nondirectory children are yiedled.
+
+        If `all_backups` is true, the `details` are the complete
+        name->backup_states mapping for that directory.
+
+        If `all_backups` is false, the details are the name->backup_state
+        associated with `backup_uuid`.
+        The default `backup_uuid` is that of the latest recorded backup.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    if backup_uuid is None:
+      if not all_backups:
+        backup_record = self.latest_backup_record()
+        if backup_record is None:
+          raise ValueError("%s: no backup records" % (self,))
+        backup_uuid = backup_record.uuid
+    else:
+      if not isinstance(backup_uuid, UUID):
+        raise ValueError("backup_uuid is not a UUID: %r" % (backup_uuid,))
+      if all_backups:
+        raise ValueError(
+            "a backup_uuid may not be specified if all_backups is true: backup_uuid=%r, all_backups=%r"
+            % (backup_uuid, all_backups)
+        )
+    q = [subpath]
+    while q:
+      subpath = q.pop()
+      dirstate = self.dirstate(subpath)
+      subdirpaths = []
+      details = {}
+      for name, file_backups in sorted(dirstate.by_name.items()):
+        if all_backups:
+          details[name] = file_backups
+          continue
+        # locate the records for backup_uuid
+        pathname = joinpath(subpath, name)
+        file_backup = None
+        for each_backup in map(UUIDedDict, file_backups.backups):
+          if each_backup.uuid == backup_uuid:
+            file_backup = each_backup
+            break
+        if file_backup is None:
+          print(pathname, "MISSING", repr(file_backups.backups))
+          continue
+        if S_ISDIR(file_backup.st_mode):
+          q.append(pathname)
+          continue
+        details[name] = file_backup
+      if details:
+        yield subpath, details
+
   ##############################################################
   # Backup processes.
 
