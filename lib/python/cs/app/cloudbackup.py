@@ -547,11 +547,8 @@ class NamedBackup(SingletonMixin):
     self.content_area = self.backup_area.content_area
     self.cloud = self.content_area.cloud
     self.bucket_name = self.content_area.bucket_name
-    # new BackupRecord: note
-    self.backup_record = BackupRecord(
-        public_key_name=public_key_name,
-        content_path=self.content_area.cloudpath,
-        timestamp_start=time.time(),
+    self.backup_records = UUIDNDJSONMapping(
+        joinpath(self.state_dirpath, 'backups.ndjson'), create=True
     )
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
