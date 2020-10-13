@@ -573,6 +573,17 @@ class NamedBackup(SingletonMixin):
     )
     return path
 
+  def latest_backup_record(self):
+    ''' Return the latest completed backup record.
+    '''
+    backup_records = list(self.backup_records.by_uuid.values())
+    if not backup_records:
+      return None
+    return max(
+        self.backup_records.by_uuid.values(),
+        key=lambda backup_record: backup_record.timestamp_end or 0
+    )
+
   ##############################################################
   # DirStates
 
