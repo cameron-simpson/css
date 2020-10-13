@@ -35,7 +35,7 @@ from cs.mappings import (
     AttrableMappingMixin, AttrableMapping, UUIDedDict, UUIDNDJSONMapping
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress
 from cs.seq import splitoff
 from cs.threads import locked
@@ -177,6 +177,69 @@ class CloudBackupCommand(BaseCommand):
         public_key_name=options.key_name
     )
     print("backup run completed ==>", backup)
+
+  @staticmethod
+  def cmd_ls(argv, options):
+    ''' Usage: {cmd} backup_name [subpaths...]
+          List the files in the backup named backup_name.
+    '''
+    # TODO: list backup names if no backup_name
+    # TODO: -A: allbackups=True
+    # TODO: -U backup_uuid
+    badopts = False
+    all_backups = False
+    backup_uuid = None
+    if not argv:
+      warning("missing backup_name")
+      badopts = True
+    else:
+      backup_name = argv.pop(0)
+      if not is_identifier(backup_name):
+        warning("backup_name is not an identifier: %r", backup_name)
+        badopts = True
+    subpaths = argv
+    for subpath in subpaths:
+      with Pfx("subpath %r", subpath):
+        if subpath and subpath != '.':
+          try:
+            validate_subpath(subpath)
+          except ValueError as e:
+            warning("invalid subpath: %r: %s", subpath, unpfx(str(e)))
+            badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
+    subpaths = list(
+        map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
+    )
+    backup_area = options.backup_area
+    backup = backup_area[backup_name]
+    with Upd().insert(0) as proxy:
+      proxy.prefix = f"{backup}: "
+      for subpath in subpaths:
+        if subpath == ".":
+          subpath = ''
+        for subsubpath, details in backup.walk(subpath,
+                                               backup_uuid=backup_uuid,
+                                               all_backups=all_backups):
+          proxy(subsubpath)
+          for name, name_details in sorted(details.items()):
+            pathname = joinpath(subsubpath, name)
+            if all_backups:
+              print(pathname + ":")
+              for backup in name_details.backups:
+                print(" ", repr(backup))
+            else:
+              st_mode = name_details.st_mode
+              assert not S_ISDIR(st_mode)
+              if S_ISREG(st_mode):
+                print(
+                    pathname,
+                    "%d:%s" % (name_details.st_size, name_details.hashcode)
+                )
+              elif S_ISLNK(name_details.st_mode):
+                print(pathname, '->', name_details.link)
+              else:
+                print(pathname, "???", repr(name_details))
 
   @staticmethod
   def cmd_new_key(argv, options):
