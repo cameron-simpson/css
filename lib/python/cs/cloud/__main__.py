@@ -11,7 +11,7 @@ from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
 from cs.progress import Progress
 from cs.upd import print  # pylint: disable=redefined-builtin
-from cs.threads import locked_property
+from cs.threads import locked
 from . import CloudArea
 
 def main(argv=None):
@@ -38,7 +38,8 @@ class CloudCommand(BaseCommand):
       super().__init__(**kw)
       self._lock = RLock()
 
-    @locked_property
+    @property
+    @locked
     def cloud_area(self):
       ''' The `CloudArea`.
       '''

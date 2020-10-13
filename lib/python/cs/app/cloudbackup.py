@@ -38,7 +38,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress
 from cs.seq import splitoff
-from cs.threads import locked, locked_property
+from cs.threads import locked
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from typeguard import typechecked
 
@@ -83,7 +83,8 @@ class CloudBackupCommand(BaseCommand):
       super().__init__(**kw)
       self._lock = RLock()
 
-    @locked_property
+    @property
+    @locked
     def cloud_area(self):
       ''' The `CloudArea`, from the `-A` global option or `$CLOUDBACKUP_AREA`.
       '''
