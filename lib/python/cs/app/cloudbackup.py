@@ -159,13 +159,13 @@ class CloudBackupCommand(BaseCommand):
     if badopts:
       raise GetoptError("bad invocation")
     ##print(
-        "backup %s/%s => %s as %r" % (
-            topdir, (
-                ','.join(subpaths)
-                if len(subpaths) > 1 else subpaths[0] if subpaths else ''
-            ), options.backup_area.cloud_area.cloudpath, backup_name
-        )
-    )
+    ##    "backup %s/%s => %s as %r" % (
+    ##        topdir, (
+    ##            ','.join(subpaths)
+    ##            if len(subpaths) > 1 else subpaths[0] if subpaths else ''
+    ##        ), options.backup_area.cloud_area.cloudpath, backup_name
+    ##    )
+    ##)
     # TODO: a facility to supply passphrases for use when recrypting
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
