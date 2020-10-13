@@ -549,6 +549,9 @@ class NamedBackup(SingletonMixin):
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
 
+  def __str__(self):
+    return "%s[%s]" % (self.backup_area, self.backup_name)
+
   def init(self):
     ''' Create the required on disc structures.
     '''
