@@ -833,7 +833,7 @@ class NamedBackup(SingletonMixin):
         if fstat.st_size == 0:
           # can't mmap empty files, and in any case they're easy
           hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
-          self.upload_hashcode_content(fd, hashcode, 0)
+          self.upload_hashcode_content(backup_record, fd, hashcode, 0)
           return hashcode, fstat
         # compute hashcode from file contents
         hashcode = DEFAULT_HASHCLASS.digester()
