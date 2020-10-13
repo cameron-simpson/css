@@ -396,9 +396,9 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       list of flags.
 
       Examine the in sequence flags to affect the logging level:
-      * `numeric < 1`: `logging.WARNING`
-      * `numeric >= 1 and < 2`: `logging.INFO`
-      * `numeric >= 2`: `logging.DEBUG`
+      * numeric < 1: `logging.WARNING`
+      * numeric >= 1 and < 2: `logging.INFO`
+      * numeric >= 2: `logging.DEBUG`
       * `"DEBUG"`: `logging.DEBUG`
       * `"STATUS"`: `STATUS`
       * `"INFO"`: `logging.INFO`
