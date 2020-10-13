@@ -412,7 +412,7 @@ class BackupArea:
   def run_backup(self, topdir, subpaths, *, backup_name, public_key_name=None):
     ''' Run a new backup of data from `topdir`,
         backing up everything from each `topdir/subpath` downward.
-        Return the `BackupRun`.
+        Return the `NamedBackup`.
     '''
     if not subpaths:
       raise ValueError("no subpaths")
@@ -438,7 +438,7 @@ class BackupArea:
           backup_name] = UUIDNDJSONMapping(
               joinpath(per_name_state_dirpath, 'backups.ndjson'), create=True
           )
-    backup_run = BackupRun(
+    backup = NamedBackup(
         backup_area=self,
         backup_name=backup_name,
         state_dirpath=per_name_state_dirpath,
@@ -473,7 +473,7 @@ class UUIDedSubPath(UUIDedDict):
   '''
 
 class BackupRecord(UUIDedDict):
-  ''' A `BackupRecord` persists information about a `BackupRun`.
+  ''' A `BackupRecord` persists information about a `NamedBackup` backup run.
   '''
 
   def __init__(
@@ -500,8 +500,8 @@ class BackupRecord(UUIDedDict):
     self['count_uploaded_files'] = count_uploaded_files
 
 # pylint: disable=too-many-instance-attributes
-class BackupRun:
-  ''' A record encapsulating a particular backup run.
+class NamedBackup(SingletonMixin):
+  ''' A record encapsulating a named set of backups.
   '''
 
   def __init__(
@@ -513,7 +513,7 @@ class BackupRun:
       state_dirpath: str,
       public_key_name: str
   ):
-    ''' Initialise a `BackupRun`.
+    ''' Initialise a `NamedBackup`.
 
         Parameters:
         * `uuid`: optional UUID for this backup run;
