@@ -1150,3 +1150,35 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     '''
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
+
+class UUIDNDJSONMapping(LoadableMappingMixin):
+  ''' A subclass of `LoadableMappingMixin` which maintains records
+      from a newline delimited JSON file.
+
+      Instances must provide a `.ndjson_filename` attribute
+      naming the file storing the records.
+  '''
+
+  loadable_mapping_key = 'uuid'
+
+  def __init__(self, filename, dictclass=UUIDedDict, create=False):
+    self.__ndjson_filename = filename
+    self.__dictclass = dictclass
+    if create and not isfilepath(filename):
+      # make sure the file exists
+      with open(filename, 'a'):
+        pass
+    self._lock = RLock()
+
+  def load_mapping(self):
+    ''' Scan the backing file, yield records.
+    '''
+    for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+      yield record
+
+  def append_to_mapping(self, record):
+    ''' Append `record` to the backing file.
+    '''
+    with open(self.__ndjson_filename, 'a') as f:
+      f.write(record.as_json())
+      f.write('\n')
