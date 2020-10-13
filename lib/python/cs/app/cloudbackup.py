@@ -558,6 +558,18 @@ class NamedBackup(SingletonMixin):
     # TODO: not using _saved_hashcodes yet
     self._saved_hashcodes = set()
 
+  @contextmanager
+  def run(self, *, public_key_name):
+    ''' Context manager for running a backup.
+    '''
+    backup_record = BackupRecord(
+        public_key_name=public_key_name,
+        content_path=self.content_area.cloudpath
+    )
+    with backup_record:
+      yield backup_record
+    self.backup_records.add_to_mapping(backup_record)
+
   @staticmethod
   def hashcode_path(hashcode, *sizes):
     ''' Make a path based on a hashcode.
