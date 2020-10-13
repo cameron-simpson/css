@@ -709,7 +709,8 @@ class NamedBackup(SingletonMixin):
         Return `True` if everything was successfully backed up,
         `False` otherwise.
     '''
-    validate_subpath(subpath)
+    if subpath:
+      validate_subpath(subpath)
     backup_uuid = backup_record.uuid
     dirpath = joinpath(topdir, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
