@@ -605,9 +605,7 @@ class NamedBackup(SingletonMixin):
       dirstate_path = joinpath(
           self.dirstates_dirpath, dirname(uupath), uu.hex
       ) + '.ndjson'
-      dirstate = UUIDNDJSONMapping(
-          dirstate_path, dictclass=FileBackupState, create=True
-      )
+      dirstate = UUIDNDJSONMapping(dirstate_path, dictclass=FileBackupState)
       dirstate.uuid = uu
       dirstate.subpath = subpath
     return dirstate
