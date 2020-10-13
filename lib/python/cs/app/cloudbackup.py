@@ -401,6 +401,13 @@ class BackupArea:
   ##############################################################
   # Backup processes.
 
+  def named_state_dirpath(self, backup_name):
+    ''' Return the path the the state directory for a named backup.
+    '''
+    if not is_identifier(backup_name):
+      raise ValueError("backup_name not an identifier: %r" % (backup_name,))
+    return joinpath(self.backups_dirpath, backup_name)
+
   @pfx_method
   def run_backup(self, topdir, subpaths, *, backup_name, public_key_name=None):
     ''' Run a new backup of data from `topdir`,
@@ -418,7 +425,7 @@ class BackupArea:
     for subpath in subpaths:
       if subpath:
         validate_subpath(subpath)
-    per_name_state_dirpath = joinpath(self.backups_dirpath, backup_name)
+    per_name_state_dirpath = self.named_state_dirpath(backup_name)
     if not isdirpath(per_name_state_dirpath):
       print("mkdir(%r)", per_name_state_dirpath)
       with Pfx("mkdir(%r)", per_name_state_dirpath):
