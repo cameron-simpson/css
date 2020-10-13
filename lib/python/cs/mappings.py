@@ -1098,3 +1098,55 @@ class LoadableMappingMixin:
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
   '''
+
+class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
+  ''' A handy `dict` subtype providing the basis for mapping classes
+      indexed by `UUID`s.
+
+      The `'uuid'` attribute is always a `UUID` instance.
+  '''
+
+  json_object_pairs_hook = lambda k, v: UUID(v) if k == 'uuid' else v
+  json_default = lambda v: str(v) if isinstance(v, UUID) else v
+
+  def __init__(self, _d=None, **kw):
+    ''' Initialise the `UUIDedDict`,
+        generating a `'uuid'` key value if omitted.
+    '''
+    if _d is None:
+      dict.__init__(self)
+    else:
+      dict.__init__(self, _d)
+    self.update(**kw)
+    try:
+      uu = self['uuid']
+    except KeyError:
+      self['uuid'] = uuid4()
+    else:
+      # force .uuid to be a UUID
+      if isinstance(uu, str):
+        self['uuid'] = UUID(uu)
+      else:
+        assert isinstance(uu, UUID)
+
+  @property
+  def uuid(self):
+    ''' A UUID from `self['uuid']`.
+
+        This does a sanity check that the stored value is a `UUID`,
+        but primarily exists to support the setter,
+        which promotes `str` to `UUID`, thus also validating UUID strings.
+    '''
+    uu = self['uuid']
+    assert isinstance(uu, UUID)
+    return uu
+
+  @uuid.setter
+  def uuid(self, new_uuid):
+    ''' Set the UUID for the dict.
+
+        The `new_uuid` should be either a `UUID` or a valid UUID string,
+        which is converted into a `UUID`.
+    '''
+    uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
+    self['uuid'] = uu
