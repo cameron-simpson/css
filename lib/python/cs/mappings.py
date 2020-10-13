@@ -1008,7 +1008,7 @@ class LoadableMappingMixin:
       Subclasses must provide the following attributes and methods:
       * `loadable_mapping_key`: the name of the primary key;
         it is an error for a multiple records to have the same primary key
-      * `load_mapping`: a generator method to scan the backing store
+      * `scan_mapping`: a generator method to scan the backing store
         and yield records, used for the inital load of the mapping
       * `append_to_mapping(record)`: add a new record to the backing store;
         this is called from the `.add_to_mapping(record)` method
@@ -1020,12 +1020,12 @@ class LoadableMappingMixin:
 
   loadable_mapping_key = ''
 
-  def load_mapping(self):
+  def scan_mapping(self):
     ''' Load the mapping from its backing store,
         which might be a file or might be another related data structure.
         Return the loaded mapping.
     '''
-    raise NotImplementedError("load_mapping")
+    raise NotImplementedError("scan_mapping")
 
   def add_to_mapping(self, record, exists_ok=False):
     ''' Add a record to the mapping.
@@ -1068,7 +1068,7 @@ class LoadableMappingMixin:
         warned = set()
         with self._lock:
           if field_name == pk_name:
-            records = self.load_mapping()
+            records = self.scan_mapping()
           else:
             records = getattr(self, by_pk).values()
           # load the
@@ -1173,7 +1173,7 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
         pass
     self._lock = RLock()
 
-  def load_mapping(self):
+  def scan_mapping(self):
     ''' Scan the backing file, yield records.
     '''
     for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
