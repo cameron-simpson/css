@@ -695,6 +695,8 @@ class NamedBackup(SingletonMixin):
       for dirpath, dirnames, _ in os.walk(topdirpath):
         walk_proxy("%s/", dirpath)
         subpath = relpath(dirpath, topdirpath)
+        if subpath == '.':
+          subpath = ''
         self.backup_single_directory(backup_record, topdir, subpath)
         # walk the children lexically ordered
         dirnames[:] = sorted(dirnames)
