@@ -215,7 +215,7 @@ def scan_ndjson(f, dictclass=dict):
     with Pfx("line %d", lineno):
       d = json.loads(line)
       if dictclass is not dict:
-        d = dictclass(d)
+        d = dictclass(**d)
     yield d
 
 @strable(open_func=lambda filename: open(filename, 'w'))
