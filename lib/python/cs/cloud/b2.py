@@ -284,10 +284,6 @@ class B2Cloud(SingletonMixin, Cloud):
     bucket = self.api.get_bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
     download_dest = B2DownloadBufferShim()
-    file_info = bucket.download_file_by_name(
-        path, download_dest, progress_listener
-    )
-    print("***")
     try:
       file_info = bucket.download_file_by_name(
           path, download_dest, progress_listener
