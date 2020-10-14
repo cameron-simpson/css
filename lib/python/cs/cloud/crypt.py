@@ -510,6 +510,7 @@ def download_passtext(
       bucket_name=bucket_name, path=passtext_path, progress=progress
   )
   per_file_passtext_enc = b''.join(bfr)
+  bfr.close()
   per_file_passtext = decrypt_password(
       per_file_passtext_enc, private_path, passphrase
   )
