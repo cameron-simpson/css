@@ -78,6 +78,7 @@ class CloudCommand(BaseCommand):
           bfr, dl_result = CAF.download_buffer(progress=P)
           for bs in bfr:
             f.write(bs)
+          bfr.close()
       print(label + ':')
       for k, v in sorted(dl_result.items()):
         print(" ", k, v)
