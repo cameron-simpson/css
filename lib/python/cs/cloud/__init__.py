@@ -47,6 +47,8 @@ def validate_subpath(subpath: str):
       raise ValueError("subpath ends with a slash")
     if '//' in subpath:
       raise ValueError("subpath contains a multislash")
+    if any(map(lambda part: part in ('.', '..'), subpath.split('/'))):
+      raise ValueError("subpath contains '.' or '..'")
 
 class CloudPath(namedtuple('CloudPath',
                            'cloudcls credentials bucket_name subpath')):
@@ -356,7 +358,9 @@ class CloudAreaFile(SingletonMixin):
     '''
     with open(filename, 'rb') as f:
       bfr = CornuCopyBuffer.from_fd(f.fileno())
-      return self.upload_buffer(bfr, progress=progress)
+    result = self.upload_buffer(bfr, progress=progress)
+    bfr.close()
+    return result
 
   def download_buffer(self, *, progress=None):
     ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.
