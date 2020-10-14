@@ -9,6 +9,7 @@ import io
 import os
 from os.path import join as joinpath
 from tempfile import NamedTemporaryFile
+from b2sdk.exception import FileNotPresent as B2FileNotPresent
 from b2sdk.v1 import (
     B2Api,
     InMemoryAccountInfo,
@@ -284,6 +285,13 @@ class B2Cloud(SingletonMixin, Cloud):
     file_info = bucket.download_file_by_name(
         path, download_dest, progress_listener
     )
+    print("***")
+    try:
+      file_info = bucket.download_file_by_name(
+          path, download_dest, progress_listener
+      )
+    except B2FileNotPresent as e:
+      raise FileNotFoundError(self.pathfor(bucket_name, path)) from e
     return download_dest.bfr, file_info
 
 class B2UploadFileWrapper:
