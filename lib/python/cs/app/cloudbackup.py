@@ -435,6 +435,8 @@ class CloudBackupCommand(BaseCommand):
                   xit = 1
               elif S_ISLNK(name_details.st_mode):
                 print(pathname, '->', name_details.link)
+                with Pfx("symlink(%r,%r)", name_details.link, fspath):
+                  os.symlink(name_details.link, fspath)
               else:
                 print(pathname, "???", repr(name_details))
     return xit
