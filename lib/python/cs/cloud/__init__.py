@@ -50,7 +50,7 @@ def validate_subpath(subpath: str):
     if any(map(lambda part: part in ('.', '..'), subpath.split('/'))):
       raise ValueError("subpath contains '.' or '..'")
 
-class CloudPath(namedtuple('CloudPath',
+class ParsedCloudPath(namedtuple('ParsedCloudPath',
                            'cloudcls credentials bucket_name subpath')):
   ''' A deconstructed cloud path.
   '''
@@ -83,7 +83,7 @@ class CloudPath(namedtuple('CloudPath',
     return cls(cloudcls, credentials, bucket_name, subpath)
 
   def as_path(self):
-    ''' The `CloudPath` as a string.
+    ''' The `ParsedCloudPath` as a string.
     '''
     return joinpath(
         self.cloud.bucketpath(self.bucket_name), self.subpath or ""
@@ -278,7 +278,7 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   def from_cloudpath(cls, path: str):
     ''' Construct a new `CloudArea` from the cloud path `path`.
     '''
-    CP = CloudPath.from_str(path)
+    CP = ParsedCloudPath.from_str(path)
     return cls(CP.cloud, CP.bucket_name, CP.subpath)
 
   def subarea(self, subpath):

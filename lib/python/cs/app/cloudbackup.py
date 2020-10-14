@@ -32,7 +32,7 @@ import shutil
 import sys
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.cloud import CloudArea, CloudPath, validate_subpath
+from cs.cloud import CloudArea, ParsedCloudPath, validate_subpath
 from cs.cloud.crypt import (
     create_key_pair,
     download as crypt_download,
@@ -353,7 +353,7 @@ class CloudBackupCommand(BaseCommand):
     )
     # TODO: test passphrase against private key
     made_dirs = set()
-    content_subpath = CloudPath.from_str(backup_record.content_path).subpath
+    content_subpath = ParsedCloudPath.from_str(backup_record.content_path).subpath
     xit = 0
     print("mkdir", restore_dirpath)
     with Pfx("mkdir(%r)", restore_dirpath):
