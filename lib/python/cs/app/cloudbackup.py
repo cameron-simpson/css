@@ -438,6 +438,9 @@ class CloudBackupCommand(BaseCommand):
                 with Pfx("symlink(%r,%r)", name_details.link, fspath):
                   os.symlink(name_details.link, fspath)
               else:
+                warning(
+                    "unhandled file type: st_mode=0o%06o", name_details.st_mode
+                )
                 print(pathname, "???", repr(name_details))
     return xit
 
