@@ -1074,6 +1074,8 @@ class FDIterator(_Iterator):
       os.close(self.fd)
       self.fd = None
 
+  __del__ = close
+
   def _fetch(self, readsize):
     return os.read(self.fd, readsize)
 
