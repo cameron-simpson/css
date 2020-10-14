@@ -30,7 +30,6 @@ from uuid import uuid4
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
-from cs.logutils import debug
 from . import validate_subpath, CloudArea
 
 # used when creating RSA keypairs
@@ -400,6 +399,7 @@ def upload_paths(basepath, public_key_name=None):
   )
   return data_subpath, key_subpath
 
+# pylint: disable=too-many-locals
 @typechecked
 def upload(
     stdin,
