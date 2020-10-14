@@ -144,8 +144,7 @@ class FSCloud(SingletonMixin, Cloud):
     filename = os.sep + joinpath(bucket_name, path)
     with Pfx("open(%r)", filename):
       with open(filename, 'rb') as f:
-        fd2 = os.dup(f.fileno())
-    bfr = CornuCopyBuffer.from_fd(fd2)
+        bfr = CornuCopyBuffer.from_fd(f.fileno())
     with FSTags() as fstags:
       file_info = dict(fstags[filename].direct_tags)
     return bfr, file_info
