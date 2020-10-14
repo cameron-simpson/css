@@ -180,9 +180,13 @@ class B2Cloud(SingletonMixin, Cloud):
     '''
     with NamedTemporaryFile(dir='.') as T:
       for bs in progressbar(
-          bfr, label=(joinpath(self.bucketpath(bucket_name), path) +
-                      " scratch file"), total=length, itemlenfunc=len,
-          units_scale=BINARY_BYTES_SCALE):
+          bfr,
+          label=(joinpath(self.bucketpath(bucket_name), path) +
+                 " scratch file"),
+          total=length,
+          itemlenfunc=len,
+          units_scale=BINARY_BYTES_SCALE,
+      ):
         T.write(bs)
       T.flush()
       return self.upload_filename(
