@@ -1,3 +1,4 @@
+try to strip out use of cs.py3.bytes
 replace @locked_proerty with @property @locked throughout to placate linters, then @OBSOLETE @locked_property
 MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
 cs.logutils: warning et all: once=key (or key on the warning format string if True)
