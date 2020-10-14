@@ -254,6 +254,148 @@ class CloudBackupCommand(BaseCommand):
     key_uuid = backup_area.new_key(passphrase)
     print(key_uuid)
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+  @staticmethod
+  def cmd_restore(argv, options):
+    ''' Usage: {cmd} -o outputdir [-U backup_uuid] backup_name [subpaths...]
+          Restore files from the named backup.
+          Options:
+            -o outputdir    Output directory to create to hold the
+                            restored files.
+            -U backup_uuid  The backup UUID from which to restore.
+    '''
+    # TODO: move the core logic into a BackupArea method
+    # TODO: list backup names if no backup_name
+    # TODO: restore file to stdout?
+    # TODO: restore files as tarball to stdout or filename
+    # TODO: rsync-like include/exclude or files-from options?
+    badopts = False
+    backup_uuid = None
+    restore_dirpath = None
+    opts, argv = getopt(argv, 'o:U:')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-o':
+          restore_dirpath = val
+        elif opt == '-U':
+          backup_uuid = val
+        else:
+          raise RuntimeError("unhandled option")
+    if restore_dirpath is None:
+      warning("missing mandatory -o outputdir option")
+      badopts = True
+    else:
+      with Pfx("outputdir %s", restore_dirpath):
+        if existspath(restore_dirpath):
+          warning("already exists")
+          badopts = True
+    if not argv:
+      warning("missing backup_name")
+      badopts = True
+    else:
+      backup_name = argv.pop(0)
+      if not is_identifier(backup_name):
+        warning("backup_name is not an identifier: %r", backup_name)
+        badopts = True
+    subpaths = argv
+    for subpath in subpaths:
+      with Pfx("subpath %r", subpath):
+        if subpath and subpath != '.':
+          try:
+            validate_subpath(subpath)
+          except ValueError as e:
+            warning("invalid subpath: %r: %s", subpath, unpfx(str(e)))
+            badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
+    subpaths = list(
+        map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
+    )
+    backup_area = options.backup_area
+    backup = backup_area[backup_name]
+    if backup_uuid is None:
+      backup_record = backup.latest_backup_record()
+      if backup_record is None:
+        warning("%s: no backups", backup.name)
+        return 1
+      backup_uuid = backup_record.uuid
+    else:
+      backup_uuid = UUID(backup_uuid)
+      backup_record = backup.backup_records.by_uuid[backup_uuid]
+    with Pfx("backup UUID %s", backup_uuid):
+      public_key_name = backup_record.public_key_name
+      with Pfx("key name %s", public_key_name):
+        private_path = backup_area.private_key_path(public_key_name)
+        if not isfilepath(private_path):
+          error("private key file not found: %r", private_path)
+          return 1
+    with Pfx("mkdir(%r)", restore_dirpath):
+      os.mkdir(restore_dirpath, 0o777)
+    passphrase = getpass(
+        "Passphrase for backup %s (key %s): " % (backup_uuid, public_key_name)
+    )
+    # TODO: test passphrase against private key
+    content_subpath = CloudPath.from_str(backup_record.content_path).subpath
+    xit = 0
+    with Upd().insert(0) as proxy:
+      proxy.prefix = f"{backup}: "
+      for subpath in subpaths:
+        if subpath == ".":
+          subpath = ''
+        for subsubpath, details in backup.walk(subpath,
+                                               backup_uuid=backup_uuid):
+          proxy(subsubpath)
+          for name, name_details in sorted(details.items()):
+            pathname = joinpath(subsubpath, name)
+            proxy(pathname)
+            fspath = joinpath(restore_dirpath, pathname)
+            with Pfx(fspath):
+              st_mode = name_details.st_mode
+              assert not S_ISDIR(st_mode)
+              if S_ISREG(st_mode):
+                hashcode_s = name_details.hashcode
+                hashcode = HashCode.from_str(hashcode_s)
+                hashpath = backup.hashcode_path(hashcode)
+                cloudpath = joinpath(content_subpath, hashpath)
+                print(cloudpath, '=>', fspath)
+                length = name_details.st_size
+                P = crypt_download(
+                    backup_area.cloud,
+                    backup_area.bucket_name,
+                    cloudpath,
+                    private_path=private_path,
+                    passphrase=passphrase,
+                    public_key_name=public_key_name
+                )
+                with open(fspath, 'wb') as f:
+                  bfr = CornuCopyBuffer.from_file(P.stdout)
+                  digester = hashcode.digester()
+                  for bs in progressbar(
+                      bfr,
+                      label=pathname,
+                      total=length,
+                      itemlenfunc=len,
+                      units_scale=BINARY_BYTES_SCALE,
+                  ):
+                    digester.update(bs)
+                    f.write(bs)
+                returncode = P.wait()
+                if returncode != 0:
+                  error("exit code %d from decrypter", returncode)
+                  xit = 1
+                retrieved_hashcode = type(hashcode)(digester.digest())
+                if hashcode != retrieved_hashcode:
+                  error(
+                      "integrity error: retrieved data hashcode %s != expected hashcode %s",
+                      retrieved_hashcode, hashcode
+                  )
+                  xit = 1
+              elif S_ISLNK(name_details.st_mode):
+                print(pathname, '->', name_details.link)
+              else:
+                print(pathname, "???", repr(name_details))
+    return xit
+
 class HashCode(bytes):
   ''' The base class for various flavours of hashcodes.
   '''
