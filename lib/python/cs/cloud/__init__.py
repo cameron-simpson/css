@@ -69,7 +69,7 @@ class ParsedCloudPath(namedtuple('ParsedCloudPath',
     except ValueError:
       raise ValueError("missing ://")
     try:
-      cloudcls = Cloud.from_prefix(prefix)
+      cloudcls = Cloud.subclass_from_prefix(prefix)
     except KeyError:
       raise ValueError("unknown cloud service %r" % (prefix,))
     try:
@@ -106,8 +106,8 @@ class Cloud(ABC):
   @staticmethod
   @typechecked
   @require(lambda prefix: is_identifier(prefix))  # pylint: disable=unnecessary-lambda
-  def from_prefix(prefix: str):
-    ''' Return the `Cloud` subclass
+  def subclass_from_prefix(prefix: str):
+    ''' Return the `Cloud` subclass.
     '''
     module_name = __name__ + '.' + prefix
     class_name = prefix.upper() + 'Cloud'
