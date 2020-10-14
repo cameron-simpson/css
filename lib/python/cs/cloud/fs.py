@@ -10,7 +10,6 @@ from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fstags import FSTags
-from cs.logutils import info
 from cs.obj import SingletonMixin, as_dict
 from cs.progress import auto_progressbar
 from cs.pfx import Pfx
