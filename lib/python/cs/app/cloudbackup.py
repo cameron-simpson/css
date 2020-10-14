@@ -347,14 +347,17 @@ class CloudBackupCommand(BaseCommand):
         if not isfilepath(private_path):
           error("private key file not found: %r", private_path)
           return 1
-    with Pfx("mkdir(%r)", restore_dirpath):
-      os.mkdir(restore_dirpath, 0o777)
     passphrase = getpass(
         "Passphrase for backup %s (key %s): " % (backup_uuid, public_key_name)
     )
     # TODO: test passphrase against private key
+    made_dirs = set()
     content_subpath = CloudPath.from_str(backup_record.content_path).subpath
     xit = 0
+    print("mkdir", restore_dirpath)
+    with Pfx("mkdir(%r)", restore_dirpath):
+      os.mkdir(restore_dirpath, 0o777)
+    made_dirs.add(restore_dirpath)
     with Upd().insert(0) as proxy:
       proxy.prefix = f"{backup}: "
       for subpath in subpaths:
@@ -385,6 +388,12 @@ class CloudBackupCommand(BaseCommand):
                     passphrase=passphrase,
                     public_key_name=public_key_name
                 )
+                fsdirpath = dirname(fspath)
+                if fsdirpath not in made_dirs:
+                  print("mkdir", fsdirpath)
+                  with Pfx("makedirs(%r)", fsdirpath):
+                    os.makedirs(fsdirpath, 0o777)
+                  made_dirs.add(fsdirpath)
                 with open(fspath, 'wb') as f:
                   bfr = CornuCopyBuffer.from_file(P.stdout)
                   digester = hashcode.digester()
