@@ -54,6 +54,11 @@ class CornuCopyBuffer(object):
       * `offset`: the logical offset of the buffer; this excludes
         buffered data and unconsumed input data
 
+      *Note*: the initialiser may supply a cleanup function;
+      although this will be called via the buffer's `.__del__` method
+      a prudent user of a buffer should call the `.close()` method
+      when finished with the buffer to ensure prompt cleanup.
+
       The primary methods supporting parsing of data streams are
       `.extend()` and `take()`.
       Calling `.extend(min_size)` arranges that `.buf` contains at least
@@ -87,7 +92,8 @@ class CornuCopyBuffer(object):
       offset=0,
       seekable=None,
       copy_offsets=None,
-      copy_chunks=None
+      copy_chunks=None,
+      close=None,
   ):
     ''' Prepare the buffer.
 
@@ -119,6 +125,9 @@ class CornuCopyBuffer(object):
           if unavailable during initialisation this is presumed to
           be `0`.
         * `end_offset`: the end offset of the iterator if known.
+        * `close`: an optional callable
+          that may be provided for resource cleanup
+          when the user of the buffer calls its `.close()` method.
     '''
     self.bufs = []
     if buf is None or not buf:
@@ -139,6 +148,7 @@ class CornuCopyBuffer(object):
     # to reduce the burden on iterator implementors.
     input_offset = getattr(input_data, 'offset', 0)
     self.input_offset_displacement = input_offset - offset
+    self._close = close
 
   def selfcheck(self, msg=''):
     ''' Integrity check for the buffer, useful during debugging.
@@ -161,6 +171,26 @@ class CornuCopyBuffer(object):
     ''' The first buffer.
     '''
     return self.bufs[0]
+
+  def close(self):
+    ''' Close the buffer.
+        This calls the `close` callable supplied
+        when the buffer was initialised, if any,
+        in order to release resources such as open file descriptors.
+        The callable will be called only on the first `close()` call.
+
+        *Note*: this does *not* prevent subsequent reads or iteration
+        from the buffer; it is only for resource cleanup,
+        though that cleanup might itself break iteration.
+    '''
+    if self._close:
+      self._close()
+      self._close = None
+
+  def __del__(self):
+    ''' Release resources when the object is deleted.
+    '''
+    self.close()
 
   @classmethod
   def from_fd(cls, fd, readsize=None, offset=None, **kw):
