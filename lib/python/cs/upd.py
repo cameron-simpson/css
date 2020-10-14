@@ -694,6 +694,13 @@ class Upd(SingletonMixin):
 
         Return the `UpdProxy` for the new status line.
     '''
+    if index < 0:
+      index0 = index
+      index = len(self) + index
+      if index < 0:
+        raise ValueError(
+            "index %d out of range (len=%d)" % (index0, len(self))
+        )
     slots = self._slot_text
     proxies = self._proxies
     cuu1 = self.ti_str('cuu1')
