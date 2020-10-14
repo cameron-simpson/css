@@ -3,14 +3,23 @@
 ''' An ecnrypted cloud backup tool.
 '''
 
+# pylint: disable=too-many-lines
+
 from binascii import unhexlify
 from contextlib import contextmanager
 import errno
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 from getpass import getpass
 from mmap import mmap, PROT_READ
 from os import readlink, stat_result
-from os.path import (dirname, isdir as isdirpath, join as joinpath, relpath)
+from os.path import (
+    dirname,
+    exists as existspath,
+    isfile as isfilepath,
+    isdir as isdirpath,
+    join as joinpath,
+    relpath,
+)
 from stat import S_ISDIR, S_ISREG, S_ISLNK
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import RLock
@@ -22,23 +31,30 @@ import shutil
 import sys
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.cloud import CloudArea, validate_subpath
+from cs.cloud import CloudArea, CloudPath, validate_subpath
 from cs.cloud.crypt import (
-    create_key_pair, upload as crypt_upload, upload_paths, recrypt_passtext
+    create_key_pair,
+    download as crypt_download,
+    upload as crypt_upload,
+    upload_paths,
+    recrypt_passtext,
 )
 from cs.cmdutils import BaseCommand
 from cs.deco import strable
-from cs.fileutils import rewrite_cmgr
 from cs.lex import cutsuffix, hexify, is_identifier
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.mappings import (
-    AttrableMappingMixin, AttrableMapping, UUIDedDict, UUIDNDJSONMapping
+    AttrableMappingMixin,
+    AttrableMapping,
+    UUIDedDict,
+    UUIDNDJSONMapping,
 )
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.seq import splitoff
 from cs.threads import locked
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from typeguard import typechecked
 
@@ -68,7 +84,7 @@ class CloudBackupCommand(BaseCommand):
   # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
   # TODO: restore [-u backup_uuid] backup_name subpath
   # TODO: recover backup_name [backup_uuid] subpaths...
-  # TODO: refilekey -K oldkey backup_name subpaths...
+  # TODO: rekey -K oldkey backup_name [subpaths...]: add per-file keys for new key
   # TODO: openssl-like -passin option for passphrase
 
   # pylint: disable=too-few-public-methods
@@ -178,12 +194,14 @@ class CloudBackupCommand(BaseCommand):
     )
     print("backup run completed ==>", backup)
 
+  # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
     ''' Usage: {cmd} backup_name [subpaths...]
           List the files in the backup named backup_name.
     '''
     # TODO: list backup names if no backup_name
+    # TODO: list backup_uuids?
     # TODO: -A: allbackups=True
     # TODO: -U backup_uuid
     badopts = False
@@ -402,7 +420,7 @@ class HashCode(bytes):
 
   hashclasses = {}
   hashname = None
-  hashfunc = None
+  hashfunc = lambda: None
 
   def __eq__(self, other):
     ''' Hashcodes are equal ifthey have the same type and data.
@@ -706,6 +724,7 @@ class NamedBackup(SingletonMixin):
   ''' A record encapsulating a named set of backups.
   '''
 
+  # pylint: disable=unused-argument
   @classmethod
   def _singleton_key(
       cls, *, backup_area: BackupArea, backup_name: str, state_dirpath: str
@@ -815,6 +834,7 @@ class NamedBackup(SingletonMixin):
       dirstate.subpath = subpath
     return dirstate
 
+  # pylint: disable=too-many-branches
   def walk(self, subpath: str, *, backup_uuid=None, all_backups=False):
     ''' Walk the backups of `subpath`, yield `(subsubpath,details)`.
         Only subsubpaths with nondirectory children are yiedled.
@@ -839,14 +859,13 @@ class NamedBackup(SingletonMixin):
         raise ValueError("backup_uuid is not a UUID: %r" % (backup_uuid,))
       if all_backups:
         raise ValueError(
-            "a backup_uuid may not be specified if all_backups is true: backup_uuid=%r, all_backups=%r"
-            % (backup_uuid, all_backups)
+            "a backup_uuid may not be specified if all_backups is true:"
+            " backup_uuid=%r, all_backups=%r" % (backup_uuid, all_backups)
         )
     q = [subpath]
     while q:
       subpath = q.pop()
       dirstate = self.dirstate(subpath)
-      subdirpaths = []
       details = {}
       for name, file_backups in sorted(dirstate.by_name.items()):
         if all_backups:
@@ -906,7 +925,7 @@ class NamedBackup(SingletonMixin):
         # walk the children lexically ordered
         dirnames[:] = sorted(dirnames)
 
-  # pylint: disable=too-many-branches,too-many-statements
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def backup_single_directory(
       self, backup_record: BackupRecord, topdir, subpath
   ):
@@ -1085,7 +1104,8 @@ class NamedBackup(SingletonMixin):
                   old_private_path=other_private_path,
                   old_passphrase=passphrase,
                   new_key_name=public_key_name,
-                  new_public_path=self.public_key_path(public_key_name),
+                  new_public_path=self.backup_area
+                  .public_key_path(public_key_name),
               )
               return hashcode, fstat
           # no private keys with known passphrases
