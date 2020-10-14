@@ -27,6 +27,7 @@ from cs.progress import progressbar, auto_progressbar
 from cs.queues import IterableQueue
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from . import Cloud
 
 class B2Credentials(namedtuple('B2Credentials', 'keyId apiKey')):
@@ -74,9 +75,10 @@ class B2Cloud(SingletonMixin, Cloud):
     ''' The B2API, authorized from `self.credentials`.
     '''
     api = B2Api(InMemoryAccountInfo())
-    api.authorize_account(
-        "production", self.credentials.keyId, self.credentials.apiKey
-    )
+    with Upd().insert(1, "authenticate to %s ..." % (self,)) as proxy:
+      api.authorize_account(
+          "production", self.credentials.keyId, self.credentials.apiKey
+      )
     return api
 
   __repr__ = __str__
