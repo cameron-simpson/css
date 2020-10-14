@@ -217,9 +217,7 @@ class CornuCopyBuffer(object):
       it = SeekableFDIterator(fd, readsize=readsize, offset=offset)
     else:
       it = FDIterator(fd, readsize=readsize, offset=offset)
-    self = cls(it, offset=it.offset, **kw)
-    self.fd = fd
-    return self
+    return cls(it, offset=it.offset, close=it.close, **kw)
 
   def as_fd(self, maxlength=Ellipsis):
     ''' Create a pipe and dispatch a `Thread` to copy
