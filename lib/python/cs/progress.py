@@ -300,6 +300,7 @@ class BaseProgress(object):
       statusfunc=None,
       width=None,
       report_print=None,
+      insert_pos=1,
   ):
     ''' A context manager to create and withdraw a progress bar.
        It yields the `UpdProxy` which displays the progress bar.
@@ -320,6 +321,7 @@ class BaseProgress(object):
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
+        * `insert_pos`: where to insert the progress bar, default `1`
 
         Example use:
 
@@ -339,7 +341,7 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(label, width)
     update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
     try:
-      proxy = upd.insert(1)
+      proxy = upd.insert(insert_pos)
       proxy(statusfunc(self, label, width or proxy.width))
       self.notify_update.add(update)
       start_pos = self.position
