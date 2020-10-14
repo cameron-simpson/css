@@ -134,6 +134,18 @@ class Cloud(ABC):
     credentials, _ = cls.parse_sitepart(sitepart)
     return cls(credentials)
 
+  def pathfor(self, bucket_name: str, subpath: str):
+    ''' Return a cloud path string.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    return ParsedCloudPath(
+        cloudcls=type(self),
+        credentials=self.credentials,
+        bucket_name=bucket_name,
+        subpath=subpath
+    ).as_path()
+
   @abstractmethod
   def stat(self, *, bucket_name: str, path: str):
     ''' Probe the file at `path` in bucket `bucket_name`,
