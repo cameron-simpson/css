@@ -7,6 +7,7 @@
 
 from binascii import unhexlify
 from contextlib import contextmanager
+from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
 from getpass import getpass
@@ -406,6 +407,21 @@ class CloudBackupCommand(BaseCommand):
                   ):
                     digester.update(bs)
                     f.write(bs)
+                with Pfx(
+                    "utime(%r,%f:%s)",
+                    fspath,
+                    name_details.st_mtime,
+                    datetime.fromtimestamp(name_details.st_mtime).isoformat(),
+                ):
+                  os.utime(
+                      fspath,
+                      times=(
+                          name_details.get('st_atime')
+                          or name_details.st_mtime,
+                          name_details.st_mtime,
+                      ),
+                      follow_symlinks=False
+                  )
                 returncode = P.wait()
                 if returncode != 0:
                   error("exit code %d from decrypter", returncode)
