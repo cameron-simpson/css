@@ -788,6 +788,7 @@ class NamedBackup(SingletonMixin):
   def hashcode_path(hashcode, *sizes):
     ''' Make a path based on a hashcode.
     '''
+    assert isinstance(hashcode, HashCode)
     if not sizes:
       sizes = 3, 3
     *hashparts, _ = hashcode.path(*sizes)
