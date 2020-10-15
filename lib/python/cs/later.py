@@ -713,9 +713,14 @@ class Later(MultiOpenMixin):
     return self._defer(func, *a, **kw)
 
   def _defer(self, func, *a, **kw):
+    # snapshot the arguments as supplied
+    # note; a shallow snapshot
     if a:
       a = list(a)
+    if kw:
+      kw = dict(kw)
     params = {}
+    # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
         params['name'] = func
