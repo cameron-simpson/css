@@ -25,7 +25,7 @@ from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method
 from cs.progress import progressbar, auto_progressbar
 from cs.queues import IterableQueue
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from . import Cloud
@@ -65,6 +65,7 @@ class B2Cloud(SingletonMixin, Cloud):
     if hasattr(self, 'credentials'):
       return
     super().__init__(credentials)
+    self._buckets_by_name = {}
 
   def __str__(self):
     return f"{self.PREFIX}://{self.credentials.keyId}:*/"
@@ -81,6 +82,15 @@ class B2Cloud(SingletonMixin, Cloud):
     return api
 
   __repr__ = __str__
+  @locked
+  def bucket_by_name(self, bucket_name: str):
+    try:
+      bucket = self._buckets_by_name[bucket_name]
+    except KeyError:
+      with Upd().insert(1, "get_bucket_by_name(%r)..." % (bucket_name,)):
+        bucket = self._buckets_by_name[
+            bucket_name] = self.api.get_bucket_by_name(bucket_name)
+    return bucket
 
   def bucketpath(self, bucket_name, *, credentials=None):
     ''' Return the path for the supplied `bucket_name`.
@@ -116,13 +126,13 @@ class B2Cloud(SingletonMixin, Cloud):
   def stat(self, *, bucket_name: str, path: str):
     ''' Stat `path` within the bucket named `bucket_name`.
     '''
-    bucket = self.api.get_bucket_by_name(bucket_name)
     versions = bucket.list_file_versions(path, fetch_count=1)
     try:
       version, = versions
     except ValueError:
       return None
     return version.as_dict()
+    bucket = self.bucket_by_name(bucket_name)
 
   @auto_progressbar(report_print=True)
   def _b2_upload_file(
@@ -139,7 +149,6 @@ class B2Cloud(SingletonMixin, Cloud):
         to `path` within `bucket_name`.
         Return the resulting B2 `FileInfo`.
     '''
-    bucket = self.api.get_bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
     return bucket.upload(
         B2UploadFileShim(f, length=length, progress=progress),
@@ -147,6 +156,7 @@ class B2Cloud(SingletonMixin, Cloud):
         progress_listener=progress_listener,
         **b2_kw,
     )
+      bucket = self.bucket_by_name(bucket_name)
 
   # pylint: disable=too-many-arguments
   @pfx_method
@@ -284,7 +294,7 @@ class B2Cloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `progress`: an optional `cs.progress.Progress` instance
     '''
-    bucket = self.api.get_bucket_by_name(bucket_name)
+    bucket = self.bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
     download_dest = B2DownloadBufferShim()
     try:
