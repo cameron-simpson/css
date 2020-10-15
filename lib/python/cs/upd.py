@@ -374,7 +374,7 @@ class Upd(SingletonMixin):
     return unctrl(txt.rstrip())
 
   @classmethod
-  def adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
+  def _adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
@@ -418,7 +418,7 @@ class Upd(SingletonMixin):
       difftxts.append('\b' * extlen)
     return difftxts
 
-  def move_to_slot_v(self, from_slot, to_slot):
+  def _move_to_slot_v(self, from_slot, to_slot):
     ''' Compute the text sequences required to move our cursor
         to the end of `to_slot` from `from_slot`.
     '''
@@ -449,7 +449,7 @@ class Upd(SingletonMixin):
         movetxts.append(oldtxt[vpos_cur:])
     return movetxts
 
-  def redraw_line_v(self, txt):
+  def _redraw_line_v(self, txt):
     ''' Compute the text sequences to redraw the specified slot,
         being `CR`, slot text, clear to end of line.
     '''
@@ -464,15 +464,15 @@ class Upd(SingletonMixin):
         txts.append('\b' * pad_len)
     return txts
 
-  def redraw_slot_v(self, slot):
+  def _redraw_slot_v(self, slot):
     ''' Compute the text sequences to redraw the specified slot,
         being `CR`, slot text, clear to end of line.
 
         This presumes the cursor is on the requisite line.
     '''
-    return self.redraw_line_v(self._slot_text[slot])
+    return self._redraw_line_v(self._slot_text[slot])
 
-  def redraw_trailing_slots_v(self, upper_slot, skip_first_vt=False):
+  def _redraw_trailing_slots_v(self, upper_slot, skip_first_vt=False):
     ''' Compute text sequences to redraw the slots from `upper_slot` downward,
         leaving the cursor at the end of the lowest slot.
 
@@ -485,7 +485,7 @@ class Upd(SingletonMixin):
     for slot in range(upper_slot, -1, -1):
       if not first or not skip_first_vt:
         txts.append('\v')
-      txts.extend(self.redraw_slot_v(slot))
+      txts.extend(self._redraw_slot_v(slot))
       first = False
     return txts
 
@@ -498,14 +498,14 @@ class Upd(SingletonMixin):
     if backend is not None:
       backend.flush()
 
-  def update_slot_v(self, slot, newtxt, raw_text=False, redraw=False):
+  def _update_slot_v(self, slot, newtxt, raw_text=False, redraw=False):
     ''' Compute the text sequences to update the status line at `slot` to `newtxt`.
     '''
     # move to target slot and collect reference text
-    txts = self.move_to_slot_v(self._current_slot, slot)
+    txts = self._move_to_slot_v(self._current_slot, slot)
     txts.extend(
         (
-            self.redraw_slot_v(slot) if redraw else self.adjust_text_v(
+            self._redraw_slot_v(slot) if redraw else self._adjust_text_v(
                 self._slot_text[slot],
                 newtxt,
                 self.columns,
@@ -541,7 +541,7 @@ class Upd(SingletonMixin):
       else:
         oldtxt = self._slot_text[slot]
         if oldtxt != txt:
-          txts = self.update_slot_v(slot, txt, raw_text=True, redraw=redraw)
+          txts = self._update_slot_v(slot, txt, raw_text=True, redraw=redraw)
           self._current_slot = slot
           self._slot_text[slot] = txt
           backend.write(''.join(txts))
@@ -586,20 +586,20 @@ class Upd(SingletonMixin):
       top_slot = len(slots) - 1
       if redraw:
         # go to the top slot, overwrite it and then rewrite the slots below
-        txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
-        txts.extend(self.redraw_line_v(''))
+        txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
+        txts.extend(self._redraw_line_v(''))
         txts.append(txt)
-        txts.extend(self.redraw_trailing_slots_v(top_slot))
+        txts.extend(self._redraw_trailing_slots_v(top_slot))
         self._current_slot = 0
       else:
         # make sure insert line does not push the bottom line off the screen
         # by forcing a scroll
-        txts.extend(self.move_to_slot_v(self._current_slot, 0))
+        txts.extend(self._move_to_slot_v(self._current_slot, 0))
         self._current_slot = 0
         txts.append('\v')
         txts.append(cuu1)
         # insert the output line above the top slot
-        txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
+        txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
         txts.append('\r')
         txts.append(il1)
         txts.append(txt)
@@ -726,26 +726,26 @@ class Upd(SingletonMixin):
         if il1:
           # make sure insert line does not push the bottom line off the screen
           # by forcing a scroll
-          txts.extend(self.move_to_slot_v(self._current_slot, 0))
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
           txts.append('\v')
           txts.append(cuu1)
         if index == 0:
           # move to bottom slot, add line below
-          txts.extend(self.move_to_slot_v(self._current_slot, 0))
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           txts.append('\v\r')
           if il1:
             txts.append(il1)
             txts.append(txt)
           else:
-            txts.extend(self.redraw_line_v(txt))
+            txts.extend(self._redraw_line_v(txt))
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
           self._current_slot = 0
         else:
           # move to the line which is to be below the inserted line
-          txts.extend(self.move_to_slot_v(self._current_slot, index - 1))
+          txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
@@ -756,7 +756,7 @@ class Upd(SingletonMixin):
             self._current_slot = index
           else:
             txts.extend(
-                self.redraw_trailing_slots_v(index, skip_first_vt=True)
+                self._redraw_trailing_slots_v(index, skip_first_vt=True)
             )
             self._current_slot = 0
         self._backend.write(''.join(txts))
@@ -789,7 +789,7 @@ class Upd(SingletonMixin):
       else:
         dl1 = self.ti_str('dl1')
         cuu1 = self.ti_str('cuu1')
-        txts = self.move_to_slot_v(self._current_slot, index)
+        txts = self._move_to_slot_v(self._current_slot, index)
         del slots[index]
         proxy = proxies[index]
         proxy.index = None
@@ -801,7 +801,7 @@ class Upd(SingletonMixin):
             txts.append(dl1)
           else:
             # clear the bottom lone
-            txts.extend(self.redraw_line_v(''))
+            txts.extend(self._redraw_line_v(''))
           # move up and to the end of that slot
           txts.append(cuu1)
           txts.append('\r')
@@ -816,10 +816,10 @@ class Upd(SingletonMixin):
           else:
             # no delete line: redraw from here on down then clear the line below
             txts.extend(
-                self.redraw_trailing_slots_v(index, skip_first_vt=True)
+                self._redraw_trailing_slots_v(index, skip_first_vt=True)
             )
             txts.append('\v')
-            txts.extend(self.redraw_line_v(''))
+            txts.extend(self._redraw_line_v(''))
             txts.append(cuu1)
             txts.append(slots[0])
             self._current_slot = 0
