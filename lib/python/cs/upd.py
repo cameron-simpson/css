@@ -273,18 +273,20 @@ class Upd(SingletonMixin):
             exc_val.code, int) else exc_val.code is None))):
       # no exception or SystemExit(0) or SystemExit(None)
       # remove the Upd display
-      while len(slots) > 1:
-        del self[len(slots) - 1]
-      self[0] = ''
+      with self._lock:
+        while len(slots) > 1:
+          del self[len(slots) - 1]
+        self[0] = ''
     elif not self._disabled and self._backend is not None:
       # preserve the display for debugging purposes
       # move to the bottom and emit a newline
-      txts = self.move_to_slot_v(self._current_slot, 0)
-      if slots[0]:
-        # preserve the last status line if not empty
-        txts.append('\n')
-      self._backend.write(''.join(txts))
-      self._backend.flush()
+      with self._lock:
+        txts = self._move_to_slot_v(self._current_slot, 0)
+        if slots[0]:
+          # preserve the last status line if not empty
+          txts.append('\n')
+        self._backend.write(''.join(txts))
+        self._backend.flush()
 
   @property
   def disabled(self):
@@ -637,15 +639,16 @@ class Upd(SingletonMixin):
       yield
     else:
       # go to the top slot, overwrite it and then rewrite the slots below
-      backend = self._backend
-      slots = self._slot_text
-      txts = []
-      top_slot = len(slots) - 1
-      txts.extend(self.move_to_slot_v(self._current_slot, top_slot))
-      txts.extend(self.redraw_line_v(''))
-      backend.write(''.join(txts))
-      backend.flush()
-      self._current_slot = top_slot
+      with self._lock:
+        backend = self._backend
+        slots = self._slot_text
+        txts = []
+        top_slot = len(slots) - 1
+        txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
+        txts.extend(self._redraw_line_v(''))
+        backend.write(''.join(txts))
+        backend.flush()
+        self._current_slot = top_slot
       yield
       txts = []
       if need_newline:
@@ -653,10 +656,14 @@ class Upd(SingletonMixin):
         if clr_eol:
           txts.append(clr_eol)
           txts.append('\v\r')
-      txts.extend(self.redraw_trailing_slots_v(top_slot, skip_first_vt=True))
-      backend.write(''.join(txts))
-      backend.flush()
-      self._current_slot = 0
+      with self._lock:
+        top_slot = len(slots) - 1
+        txts.extend(
+            self._redraw_trailing_slots_v(top_slot, skip_first_vt=True)
+        )
+        backend.write(''.join(txts))
+        backend.flush()
+        self._current_slot = 0
 
   @contextmanager
   def without(self, temp_state='', slot=0):
@@ -694,13 +701,6 @@ class Upd(SingletonMixin):
 
         Return the `UpdProxy` for the new status line.
     '''
-    if index < 0:
-      index0 = index
-      index = len(self) + index
-      if index < 0:
-        raise ValueError(
-            "index %d out of range (len=%d)" % (index0, len(self))
-        )
     slots = self._slot_text
     proxies = self._proxies
     cuu1 = self.ti_str('cuu1')
@@ -712,7 +712,15 @@ class Upd(SingletonMixin):
     il1 = self.ti_str('il1')
     txts = []
     with self._lock:
-      if index < 0 or index > len(self):
+      if index < 0:
+        index0 = index
+        index = len(self) + index
+        if index < 0:
+          raise ValueError(
+              "index should be in the range 0..%d inclusive: got %s" %
+              (len(self), index0)
+          )
+      elif index > len(self):
         raise ValueError(
             "index should be in the range 0..%d inclusive: got %s" %
             (len(self), index)
@@ -894,8 +902,9 @@ class UpdProxy(object):
   def text(self):
     ''' The text of this proxy's slot.
     '''
-    index = self.index
-    return '' if index is None else self.upd[index]
+    with self.upd._lock:  # pylint: disable=protected-access
+      index = self.index
+      return '' if index is None else self.upd[index]
 
   @text.setter
   def text(self, txt):
@@ -932,8 +941,9 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    index = self.index
-    if index is not None:
-      self.upd.delete(index)
+    with self.upd._lock:
+      index = self.index
+      if index is not None:
+        self.upd.delete(index)
 
   __del__ = delete
