@@ -77,7 +77,7 @@ class B2Cloud(SingletonMixin, Cloud):
     ''' The B2API, authorized from `self.credentials`.
     '''
     api = B2Api(InMemoryAccountInfo())
-    with Upd().insert(1, "authenticate to %s ..." % (self,)) as proxy:
+    with Upd().insert(1, "authenticate to %s ..." % (self,)):
       api.authorize_account(
           "production", self.credentials.keyId, self.credentials.apiKey
       )
@@ -127,13 +127,14 @@ class B2Cloud(SingletonMixin, Cloud):
   def stat(self, *, bucket_name: str, path: str):
     ''' Stat `path` within the bucket named `bucket_name`.
     '''
-    versions = bucket.list_file_versions(path, fetch_count=1)
-    try:
-      version, = versions
-    except ValueError:
-      return None
-    return version.as_dict()
     bucket = self.bucket_by_name(bucket_name)
+    with Upd().insert(1, "list_file_versions(%r)..." % (path,)):
+      versions = bucket.list_file_versions(path, fetch_count=1)
+      try:
+        version, = versions
+      except ValueError:
+        return None
+      return version.as_dict()
 
   @auto_progressbar(report_print=True)
   def _b2_upload_file(
@@ -150,14 +151,17 @@ class B2Cloud(SingletonMixin, Cloud):
         to `path` within `bucket_name`.
         Return the resulting B2 `FileInfo`.
     '''
-    progress_listener = None if progress is None else B2ProgressShim(progress)
-    return bucket.upload(
-        B2UploadFileShim(f, length=length, progress=progress),
-        file_name=path,
-        progress_listener=progress_listener,
-        **b2_kw,
-    )
+    with Upd().insert(1, "_b2_upload_file(=>%r)..." % (path,)):
       bucket = self.bucket_by_name(bucket_name)
+      progress_listener = None if progress is None else B2ProgressShim(
+          progress
+      )
+      return bucket.upload(
+          B2UploadFileShim(f, length=length, progress=progress),
+          file_name=path,
+          progress_listener=progress_listener,
+          **b2_kw,
+      )
 
   # pylint: disable=too-many-arguments
   @pfx_method
