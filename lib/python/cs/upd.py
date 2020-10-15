@@ -324,8 +324,12 @@ class Upd(SingletonMixin):
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
+        Returns `None` if `index` if out of range.
     '''
-    return self._proxies[index]
+    try:
+      return self._proxies[index]
+    except IndexError:
+      return None
 
   def _update_proxies(self):
     ''' Update the `UpdProxy` indices.
