@@ -32,7 +32,7 @@ import shutil
 import sys
 import time
 from cs.buffer import CornuCopyBuffer
-from cs.cloud import CloudArea, ParsedCloudPath, validate_subpath
+from cs.cloud import CloudArea, validate_subpath
 from cs.cloud.crypt import (
     create_key_pair,
     download as crypt_download,
@@ -128,7 +128,7 @@ class CloudBackupCommand(BaseCommand):
           options.key_name = val
         else:
           raise RuntimeError("unimplemented option")
-    options.backup_area = BackupArea(options.state_dirpath, options.cloud_area)
+    options.cloud_backup = CloudBackup(options.state_dirpath)
 
   @staticmethod
   def cmd_backup(argv, options):
@@ -180,14 +180,15 @@ class CloudBackupCommand(BaseCommand):
     ##        topdir, (
     ##            ','.join(subpaths)
     ##            if len(subpaths) > 1 else subpaths[0] if subpaths else ''
-    ##        ), options.backup_area.cloud_area.cloudpath, backup_name
+    ##        ), options.cloud_backup.cloud_area.cloudpath, backup_name
     ##    )
     ##)
     # TODO: a facility to supply passphrases for use when recrypting
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
-    options.backup_area.init()
-    backup = options.backup_area.run_backup(
+    options.cloud_backup.init()
+    backup = options.cloud_backup.run_backup(
+        options.cloud_area,
         topdir,
         subpaths or ('',),
         backup_name=backup_name,
@@ -230,8 +231,8 @@ class CloudBackupCommand(BaseCommand):
     subpaths = list(
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
-    backup_area = options.backup_area
-    backup = backup_area[backup_name]
+    cloud_backup = options.cloud_backup
+    backup = cloud_backup[backup_name]
     with Upd().insert(0) as proxy:
       proxy.prefix = f"{backup}: "
       for subpath in subpaths:
@@ -267,10 +268,10 @@ class CloudBackupCommand(BaseCommand):
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    backup_area = options.backup_area
+    cloud_backup = options.cloud_backup
     passphrase = getpass("Passphrase for new key: ")
-    backup_area.init()
-    key_uuid = backup_area.new_key(passphrase)
+    cloud_backup.init()
+    key_uuid = cloud_backup.new_key(passphrase)
     print(key_uuid)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -283,7 +284,7 @@ class CloudBackupCommand(BaseCommand):
                             restored files.
             -U backup_uuid  The backup UUID from which to restore.
     '''
-    # TODO: move the core logic into a BackupArea method
+    # TODO: move the core logic into a CloudBackup method
     # TODO: list backup names if no backup_name
     # TODO: restore file to stdout?
     # TODO: restore files as tarball to stdout or filename
@@ -330,8 +331,8 @@ class CloudBackupCommand(BaseCommand):
     subpaths = list(
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
-    backup_area = options.backup_area
-    backup = backup_area[backup_name]
+    cloud_backup = options.cloud_backup
+    backup = cloud_backup[backup_name]
     if backup_uuid is None:
       backup_record = backup.latest_backup_record()
       if backup_record is None:
@@ -339,12 +340,14 @@ class CloudBackupCommand(BaseCommand):
         return 1
       backup_uuid = backup_record.uuid
     else:
-      backup_uuid = UUID(backup_uuid)
-      backup_record = backup.backup_records.by_uuid[backup_uuid]
+      with Pfx("backup_uuid %r", backup_uuid):
+        backup_uuid = UUID(backup_uuid)
+        backup_record = backup.backup_records.by_uuid[backup_uuid]
+    content_area = CloudArea.from_cloudpath(backup_record.content_path)
     with Pfx("backup UUID %s", backup_uuid):
       public_key_name = backup_record.public_key_name
       with Pfx("key name %s", public_key_name):
-        private_path = backup_area.private_key_path(public_key_name)
+        private_path = cloud_backup.private_key_path(public_key_name)
         if not isfilepath(private_path):
           error("private key file not found: %r", private_path)
           return 1
@@ -353,7 +356,6 @@ class CloudBackupCommand(BaseCommand):
     )
     # TODO: test passphrase against private key
     made_dirs = set()
-    content_subpath = ParsedCloudPath.from_str(backup_record.content_path).subpath
     xit = 0
     print("mkdir", restore_dirpath)
     with Pfx("mkdir(%r)", restore_dirpath):
@@ -378,12 +380,12 @@ class CloudBackupCommand(BaseCommand):
                 hashcode_s = name_details.hashcode
                 hashcode = HashCode.from_str(hashcode_s)
                 hashpath = backup.hashcode_path(hashcode)
-                cloudpath = joinpath(content_subpath, hashpath)
+                cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
                 length = name_details.st_size
                 P = crypt_download(
-                    backup_area.cloud,
-                    backup_area.bucket_name,
+                    cloud_backup.cloud,
+                    cloud_backup.bucket_name,
                     cloudpath,
                     private_path=private_path,
                     passphrase=passphrase,
@@ -515,7 +517,7 @@ HashCode.hashclasses[SHA1HashCode.hashname] = SHA1HashCode
 DEFAULT_HASHCLASS = SHA1HashCode
 
 # pylint: disable=too-many-instance-attributes
-class BackupArea:
+class CloudBackup:
   ''' A named backup area.
 
       Local disc areas:
@@ -525,8 +527,6 @@ class BackupArea:
           backups.ndjson    uuid,timestamp,pubkeyname
           diruuids.ndjson   uuid,subpath
           dirstate          u/u/id.ndjson
-      Cloud areas:
-        cloud_area/content  file uploads by hashcode
   '''
 
   @strable(open_func=CloudArea.from_cloudpath)
@@ -534,27 +534,21 @@ class BackupArea:
   def __init__(
       self,
       state_dirpath: str,
-      cloud_area: CloudArea,
   ):
-    ''' Initialise the `BackupArea`.
+    ''' Initialise the `CloudBackup`.
 
         Parameters:
         * `state_dirpath`: a directory holding global state
-        * `cloud_area`: the cloud storage area
     '''
-    self.cloud_area = cloud_area
     self.state_dirpath = state_dirpath
     self.backups_dirpath = joinpath(state_dirpath, 'backups')
     self.private_key_dirpath = joinpath(state_dirpath, 'private_keys')
     self.public_key_dirpath = joinpath(state_dirpath, 'public_keys')
-    self.content_area = cloud_area.subarea('content')
     self.per_name_backup_records = {}
     self._lock = RLock()
 
   def __str__(self):
-    return "%s(state_dirpath=%r,cloud_area=%s)" % (
-        type(self).__name__, self.state_dirpath, self.cloud_area
-    )
+    return "%s(%r)" % (type(self).__name__, self.state_dirpath)
 
   @pfx_method(use_str=True)
   def init(self):
@@ -571,18 +565,6 @@ class BackupArea:
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath, 0o700)
 
-  @property
-  def cloud(self):
-    ''' The `Cloud` instance.
-    '''
-    return self.cloud_area.cloud
-
-  @property
-  def bucket_name(self):
-    ''' The cloud bucket name.
-    '''
-    return self.cloud_area.bucket_name
-
   def __getitem__(self, index):
     ''' Indexing by an identifier returns the associated `NamedBackup`.
     '''
@@ -590,7 +572,7 @@ class BackupArea:
     if is_identifier(index):
       backup_name = index
       backup = NamedBackup(
-          backup_area=self,
+          cloud_backup=self,
           backup_name=backup_name,
           state_dirpath=self.named_state_dirpath(backup_name),
       )
@@ -676,7 +658,16 @@ class BackupArea:
     return joinpath(self.backups_dirpath, backup_name)
 
   @pfx_method
-  def run_backup(self, topdir, subpaths, *, backup_name, public_key_name=None):
+  @typechecked
+  def run_backup(
+      self,
+      cloud_area: CloudArea,
+      topdir: str,
+      subpaths,
+      *,
+      backup_name,
+      public_key_name=None
+  ):
     ''' Run a new backup of data from `topdir`,
         backing up everything from each `topdir/subpath` downward.
         Return the `NamedBackup`.
@@ -697,7 +688,8 @@ class BackupArea:
     backup = self[backup_name]
     assert isinstance(backup, NamedBackup)
     backup.init()
-    with backup.run(public_key_name=public_key_name) as backup_record:
+    with backup.run(cloud_area=cloud_area,
+                    public_key_name=public_key_name) as backup_record:
       for subpath in subpaths:
         backup.backup_tree(backup_record, topdir, subpath)
     return backup_record
@@ -741,6 +733,7 @@ class BackupRecord(UUIDedDict):
     self['count_files_changed'] = count_files_changed
     self['count_uploaded_bytes'] = count_uploaded_bytes
     self['count_uploaded_files'] = count_uploaded_files
+    self.content_area = CloudArea.from_cloudpath(content_path)
 
   def __enter__(self):
     self['timestamp_start'] = time.time()
@@ -757,14 +750,14 @@ class NamedBackup(SingletonMixin):
   # pylint: disable=unused-argument
   @classmethod
   def _singleton_key(
-      cls, *, backup_area: BackupArea, backup_name: str, state_dirpath: str
+      cls, *, cloud_backup: CloudBackup, backup_name: str, state_dirpath: str
   ):
-    return backup_area, backup_name
+    return cloud_backup, backup_name
 
   def __init__(
       self,
       *,
-      backup_area: BackupArea,
+      cloud_backup: CloudBackup,
       backup_name: str,
       state_dirpath: str,
   ):
@@ -773,16 +766,16 @@ class NamedBackup(SingletonMixin):
         Parameters:
         * `uuid`: optional UUID for this backup run;
           one will be created if omitted
-        * `backup_area`: the `BackupArea` making this run
+        * `cloud_backup`: the `CloudBackup` making this run
         * `backup_name`: the name of this backup, an identifier
         * `public_key_name`: the name of the public key used to encrypt uploads
     '''
-    if hasattr(self, 'backup_area'):
+    if hasattr(self, 'cloud_backup'):
       return
     if not is_identifier(backup_name):
       raise ValueError("backup_name is not an identifier: %r" % (backup_name,))
     self._lock = RLock()
-    self.backup_area = backup_area
+    self.cloud_backup = cloud_backup
     self.backup_name = backup_name
     self.state_dirpath = state_dirpath
     # the association of UUIDs with directory subpaths
@@ -794,9 +787,6 @@ class NamedBackup(SingletonMixin):
     # supports .dirstate() to return the same DirState per subpath
     self._dirstates = {}
     # cloud storage stuff
-    self.content_area = self.backup_area.content_area
-    self.cloud = self.content_area.cloud
-    self.bucket_name = self.content_area.bucket_name
     self.backup_records = UUIDNDJSONMapping(
         joinpath(self.state_dirpath, 'backups.ndjson'), dictclass=BackupRecord
     )
@@ -804,7 +794,7 @@ class NamedBackup(SingletonMixin):
     self._saved_hashcodes = set()
 
   def __str__(self):
-    return "%s[%s]" % (self.backup_area, self.backup_name)
+    return "%s[%s]" % (self.cloud_backup, self.backup_name)
 
   def init(self):
     ''' Create the required on disc structures.
@@ -923,12 +913,14 @@ class NamedBackup(SingletonMixin):
   # Backup processes.
 
   @contextmanager
-  def run(self, *, public_key_name):
+  @typechecked
+  def run(self, *, cloud_area: CloudArea, public_key_name: str):
     ''' Context manager for running a backup.
     '''
+    content_path = cloud_area.subarea('content').cloudpath
     backup_record = BackupRecord(
         public_key_name=public_key_name,
-        content_path=self.content_area.cloudpath
+        content_path=content_path,
     )
     with backup_record:
       yield backup_record
@@ -1072,9 +1064,9 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
-    backup_area = self.backup_area
-    cloud = backup_area.cloud
-    bucket_name = backup_area.bucket_name
+    cloud_backup = self.cloud_backup
+    cloud = backup_record.content_area.cloud
+    bucket_name = backup_record.content_area.bucket_name
     public_key_name = backup_record.public_key_name
     filename = joinpath(topdir, subpath)
     with Pfx("backup_filename(%r)", filename):
@@ -1117,10 +1109,10 @@ class NamedBackup(SingletonMixin):
           # local private keys by iterating over the local private key
           # names
           # look for a private key for which we already have a passphrase to hand
-          for private_key_name in backup_area.private_key_names():
-            passphrase = backup_area._passphrases.get(private_key_name)
+          for private_key_name in cloud_backup.private_key_names():
+            passphrase = cloud_backup._passphrases.get(private_key_name)
             if passphrase is not None:
-              other_private_path = backup_area.private_key_path(
+              other_private_path = cloud_backup.private_key_path(
                   private_key_name
               )
               print(
@@ -1135,7 +1127,7 @@ class NamedBackup(SingletonMixin):
                   old_private_path=other_private_path,
                   old_passphrase=passphrase,
                   new_key_name=public_key_name,
-                  new_public_path=self.backup_area
+                  new_public_path=self.cloud_backup
                   .public_key_path(public_key_name),
               )
               return hashcode, fstat
@@ -1171,14 +1163,14 @@ class NamedBackup(SingletonMixin):
     ''' Upload the contents of `f` under the supplied `hashcode`
         into the content area specified the `contentdir_cloudpath`.
     '''
-    content_area = self.backup_area.content_area
+    content_area = backup_record.content_area
     basepath = joinpath(content_area.basepath, self.hashcode_path(hashcode))
     file_info, *cloudpaths = crypt_upload(
         f,
-        self.cloud,
-        self.bucket_name,
+        content_area.cloud,
+        content_area.bucket_name,
         basepath,
-        public_path=self.backup_area.public_key_path(
+        public_path=self.cloud_backup.public_key_path(
             backup_record.public_key_name
         ),
         public_key_name=backup_record.public_key_name,
