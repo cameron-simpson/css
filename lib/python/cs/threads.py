@@ -388,7 +388,7 @@ def locked_property(
   if prop_name is None:
     prop_name = '_' + func.__name__
 
-  @transmute(AttributeError)
+  @transmute(exc_from=AttributeError)
   def getprop(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset.
