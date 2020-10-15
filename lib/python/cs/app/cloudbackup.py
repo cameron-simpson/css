@@ -384,8 +384,8 @@ class CloudBackupCommand(BaseCommand):
                 print(cloudpath, '=>', fspath)
                 length = name_details.st_size
                 P = crypt_download(
-                    cloud_backup.cloud,
-                    cloud_backup.bucket_name,
+                    content_area.cloud,
+                    content_area.bucket_name,
                     cloudpath,
                     private_path=private_path,
                     passphrase=passphrase,
