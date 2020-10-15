@@ -70,6 +70,8 @@ class B2Cloud(SingletonMixin, Cloud):
   def __str__(self):
     return f"{self.PREFIX}://{self.credentials.keyId}:*/"
 
+  __repr__ = __str__
+
   @locked_property
   def api(self):
     ''' The B2API, authorized from `self.credentials`.
@@ -81,7 +83,6 @@ class B2Cloud(SingletonMixin, Cloud):
       )
     return api
 
-  __repr__ = __str__
   @locked
   def bucket_by_name(self, bucket_name: str):
     try:
