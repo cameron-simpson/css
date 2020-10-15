@@ -1017,10 +1017,12 @@ class NamedBackup(SingletonMixin):
                     changed = True
                   else:
                     prev_backup_uuid = UUID(prevstate['uuid'])
-                    prev_backup_record = backup_records_by_uuid[
-                        prev_backup_uuid]
+                    prev_backup_record = backup_records_by_uuid.get(
+                        prev_backup_uuid
+                    )
                     changed = (
-                        backup_record.content_path !=
+                        prev_backup_record is None
+                        or backup_record.content_path !=
                         prev_backup_record.content_path
                     )
               if changed:
