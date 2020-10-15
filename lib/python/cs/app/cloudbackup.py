@@ -972,6 +972,7 @@ class NamedBackup(SingletonMixin):
           return False
       ok = True
       dirstate = self.dirstate(subpath)
+      backup_records_by_uuid = self.backup_records.by_uuid
       names = set()
       with Upd().insert(1) as file_proxy:
         for name, dir_entry in sorted(dir_entries.items()):
@@ -1015,7 +1016,13 @@ class NamedBackup(SingletonMixin):
                       or stat.st_size != prev_size):
                     changed = True
                   else:
-                    changed = False
+                    prev_backup_uuid = UUID(prevstate['uuid'])
+                    prev_backup_record = backup_records_by_uuid[
+                        prev_backup_uuid]
+                    changed = (
+                        backup_record.content_path !=
+                        prev_backup_record.content_path
+                    )
               if changed:
                 backup_record['count_files_changed'] += 1
                 rfilepath = joinpath(subpath, name)
