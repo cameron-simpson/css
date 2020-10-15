@@ -934,9 +934,8 @@ class UpdProxy(object):
         portion of the text which fits.
     '''
     prefix = self.prefix
-    return (self.upd.columns if self.upd else 80) - 1 - (
-        len(prefix) if prefix else 0
-    )
+    upd = self.upd
+    return (upd.columns if upd else 80) - 1 - (len(prefix) if prefix else 0)
 
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
