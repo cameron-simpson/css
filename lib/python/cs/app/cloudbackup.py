@@ -1033,6 +1033,7 @@ class NamedBackup(SingletonMixin):
             name_backups = dirstate.by_name.get(name)
             if name_backups is None:
               name_backups = FileBackupState(name=name, backups=[])
+              dirstate.add_to_mapping(name_backups)
             stat = dir_entry.stat(follow_symlinks=False)
             if dir_entry.is_symlink():
               try:
