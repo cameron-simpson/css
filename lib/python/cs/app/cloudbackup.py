@@ -46,7 +46,7 @@ from cs.deco import strable
 from cs.fileutils import UUIDNDJSONMapping
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
-from cs.logutils import warning, error
+from cs.logutils import warning, error, exception
 from cs.mappings import (
     AttrableMappingMixin,
     AttrableMapping,
@@ -416,7 +416,7 @@ class CloudBackupCommand(BaseCommand):
                 retcode = P.wait()
                 if retcode != 0:
                   error(
-                      "openssl %r returns exit code $s" % (
+                      "openssl %r returns exit code %s" % (
                           P.args,
                           retcode,
                       )
@@ -442,8 +442,8 @@ class CloudBackupCommand(BaseCommand):
                 retrieved_hashcode = type(hashcode)(digester.digest())
                 if hashcode != retrieved_hashcode:
                   error(
-                      "integrity error: retrieved data hashcode %s != expected hashcode %s",
-                      retrieved_hashcode, hashcode
+                      "integrity error: retrieved data hashcode %s"
+                      " != expected hashcode %s", retrieved_hashcode, hashcode
                   )
                   xit = 1
               elif S_ISLNK(name_details.st_mode):
@@ -677,7 +677,7 @@ class CloudBackup:
       subpaths,
       *,
       backup_name,
-      public_key_name=None
+      public_key_name=None,
   ):
     ''' Run a new backup of data from `topdir`,
         backing up everything from each `topdir/subpath` downward.
