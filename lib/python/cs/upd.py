@@ -655,14 +655,13 @@ class Upd(SingletonMixin):
         backend.write(''.join(txts))
         backend.flush()
         self._current_slot = top_slot
-      yield
-      txts = []
-      if need_newline:
-        clr_eol = self.ti_str('el')
-        if clr_eol:
-          txts.append(clr_eol)
-          txts.append('\v\r')
-      with self._lock:
+        yield
+        txts = []
+        if need_newline:
+          clr_eol = self.ti_str('el')
+          if clr_eol:
+            txts.append(clr_eol)
+            txts.append('\v\r')
         top_slot = len(slots) - 1
         txts.extend(
             self._redraw_trailing_slots_v(top_slot, skip_first_vt=True)
