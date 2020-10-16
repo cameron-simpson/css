@@ -42,13 +42,13 @@ from cs.cloud.crypt import (
 )
 from cs.cmdutils import BaseCommand
 from cs.deco import strable
+from cs.fileutils import UUIDNDJSONMapping
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import warning, error
 from cs.mappings import (
     AttrableMappingMixin,
     AttrableMapping,
     UUIDedDict,
-    UUIDNDJSONMapping,
 )
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
