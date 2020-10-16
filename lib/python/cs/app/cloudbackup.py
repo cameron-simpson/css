@@ -21,6 +21,7 @@ from os.path import (
     join as joinpath,
     relpath,
 )
+import signal
 from stat import S_ISDIR, S_ISREG, S_ISLNK
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from threading import RLock
@@ -53,6 +54,7 @@ from cs.mappings import (
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress, progressbar
+from cs.resources import RunState
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
@@ -696,9 +698,10 @@ class CloudBackup:
     assert isinstance(backup, NamedBackup)
     backup.init()
     with backup.run(cloud_area=cloud_area,
-                    public_key_name=public_key_name) as backup_record:
+                    public_key_name=public_key_name) as (backup_record,
+                                                         runstate):
       for subpath in subpaths:
-        backup.backup_tree(backup_record, topdir, subpath)
+        backup.backup_tree(backup_record, topdir, subpath, runstate=runstate)
     return backup_record
 
 @typechecked
@@ -924,17 +927,39 @@ class NamedBackup(SingletonMixin):
   def run(self, *, cloud_area: CloudArea, public_key_name: str):
     ''' Context manager for running a backup.
     '''
+    runstate = RunState(
+        "%s.run(%s,%s)" % (type(self).__name__, cloud_area, public_key_name)
+    )
     content_path = cloud_area.subarea('content').cloudpath
     backup_record = BackupRecord(
         public_key_name=public_key_name,
         content_path=content_path,
     )
-    with backup_record:
-      yield backup_record
-    self.backup_records.add_to_mapping(backup_record)
+
+    def interrupt(signum, frame):
+      ''' Receive interrupt, cancel the `RunState`, call the prior handler.
+      '''
+      runstate.cancel()
+      ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
+      ##  previous_interrupt(signum, frame)
+      signal.signal(signal.SIGINT, previous_interrupt)
+
+    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+    try:
+      with runstate:
+        with backup_record:
+          yield backup_record, runstate
+        self.backup_records.add_to_mapping(backup_record)
+    finally:
+      signal.signal(signal.SIGINT, previous_interrupt)
 
   def backup_tree(
-      self, backup_record: BackupRecord, topdir: str, topsubpath: str
+      self,
+      backup_record: BackupRecord,
+      topdir: str,
+      topsubpath: str,
+      *,
+      runstate: RunState,
   ):
     ''' Back up everything in `topdir/topsubpath`
         recording the results against `backup_record`.
@@ -947,17 +972,22 @@ class NamedBackup(SingletonMixin):
       topdirpath = topdir
     with Upd().insert(1) as walk_proxy:
       for dirpath, dirnames, _ in os.walk(topdirpath):
+        if runstate.cancelled:
+          warning("backup_tree(%s): cancelled", topdir)
+          break
         walk_proxy("%s/", dirpath)
         subpath = relpath(dirpath, topdirpath)
         if subpath == '.':
           subpath = ''
-        self.backup_single_directory(backup_record, topdir, subpath)
+        self.backup_single_directory(
+            backup_record, topdir, subpath, runstate=runstate
+        )
         # walk the children lexically ordered
         dirnames[:] = sorted(dirnames)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def backup_single_directory(
-      self, backup_record: BackupRecord, topdir, subpath
+      self, backup_record: BackupRecord, topdir, subpath, *, runstate: RunState
   ):
     ''' Backup the immediate contents of a particular subdirectory.
         Return `True` if everything was successfully backed up,
@@ -984,6 +1014,9 @@ class NamedBackup(SingletonMixin):
       with Upd().insert(1) as file_proxy:
         for name, dir_entry in sorted(dir_entries.items()):
           file_proxy(joinpath(dirpath, name))
+          if runstate.cancelled:
+            warning("backup_single_directory(%s): cancelled", dirpath)
+            break
           with Pfx(name):
             if name in names:
               warning("repeated")
