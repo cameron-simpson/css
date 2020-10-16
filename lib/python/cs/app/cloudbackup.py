@@ -409,25 +409,32 @@ class CloudBackupCommand(BaseCommand):
                   ):
                     digester.update(bs)
                     f.write(bs)
-                with Pfx(
-                    "utime(%r,%f:%s)",
-                    fspath,
-                    name_details.st_mtime,
-                    datetime.fromtimestamp(name_details.st_mtime).isoformat(),
-                ):
-                  os.utime(
-                      fspath,
-                      times=(
-                          name_details.get('st_atime')
-                          or name_details.st_mtime,
-                          name_details.st_mtime,
-                      ),
-                      follow_symlinks=False
+                retcode = P.wait()
+                if retcode != 0:
+                  error(
+                      "openssl %r returns exit code $s" % (
+                          P.args,
+                          retcode,
+                      )
                   )
-                returncode = P.wait()
-                if returncode != 0:
-                  error("exit code %d from decrypter", returncode)
                   xit = 1
+                else:
+                  with Pfx(
+                      "utime(%r,%f:%s)",
+                      fspath,
+                      name_details.st_mtime,
+                      datetime.fromtimestamp(name_details.st_mtime
+                                             ).isoformat(),
+                  ):
+                    os.utime(
+                        fspath,
+                        times=(
+                            name_details.get('st_atime')
+                            or name_details.st_mtime,
+                            name_details.st_mtime,
+                        ),
+                        follow_symlinks=False
+                    )
                 retrieved_hashcode = type(hashcode)(digester.digest())
                 if hashcode != retrieved_hashcode:
                   error(
