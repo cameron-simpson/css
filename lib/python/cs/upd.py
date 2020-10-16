@@ -429,7 +429,9 @@ class Upd(SingletonMixin):
         to the end of `to_slot` from `from_slot`.
     '''
     assert from_slot >= 0
+    assert from_slot < len(self)
     assert to_slot >= 0
+    assert to_slot < len(self)
     if from_slot is None:
       from_slot = self._current_slot
     movetxts = []
@@ -807,6 +809,9 @@ class Upd(SingletonMixin):
         proxy.index = None
         del proxies[index]
         self._update_proxies()
+        if self._current_slot >= len(self):
+          assert self._current_slot == len(self)
+          self._current_slot -= 1
         if index == 0:
           if dl1:
             # erase bottom line and move up and then to the end of that slot
