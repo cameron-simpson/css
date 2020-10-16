@@ -1053,16 +1053,19 @@ class NamedBackup(SingletonMixin):
               prevstate = name_backups.latest_backup()
               # pylint: disable=simplifiable-if-statement
               if prevstate is None:
+                print("CHANGED (no prevstate)", pathname)
                 changed = True
               else:
                 prev_mode = prevstate['st_mode']
                 prev_mtime = prevstate['st_mtime']
                 prev_size = prevstate['st_size']
                 if not S_ISREG(prev_mode):
+                  print("CHANGED (not regular file)", pathname)
                   changed = True
                 else:
                   if (stat.st_mtime != prev_mtime
                       or stat.st_size != prev_size):
+                    print("CHANGED (changed size/mtime)", pathname)
                     changed = True
                   else:
                     prev_backup_uuid = UUID(prevstate['uuid'])
@@ -1074,6 +1077,11 @@ class NamedBackup(SingletonMixin):
                         or backup_record.content_path !=
                         prev_backup_record.content_path
                     )
+                    if changed:
+                      print(
+                          "CHANGED (no previous or previous has different content_path)",
+                          pathname
+                      )
               if changed:
                 backup_record['count_files_changed'] += 1
                 rfilepath = joinpath(subpath, name)
@@ -1114,6 +1122,7 @@ class NamedBackup(SingletonMixin):
               exception("file backup fails: %s", e)
               ok = False
             else:
+              print("REGULAR FILE UPLOAD DONE, add to backups")
               name = R.extra.name
               name_backups = dirstate.by_name[name]
               name_backups.add_regular_file(
