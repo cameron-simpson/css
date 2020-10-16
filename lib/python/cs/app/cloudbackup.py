@@ -1025,6 +1025,7 @@ class NamedBackup(SingletonMixin):
             break
           file_proxy("check " + name)
           with Pfx(name):
+            pathname = joinpath(dirpath, name)
             if name in names:
               warning("repeated")
               continue
@@ -1037,7 +1038,7 @@ class NamedBackup(SingletonMixin):
             stat = dir_entry.stat(follow_symlinks=False)
             if dir_entry.is_symlink():
               try:
-                link = readlink(joinpath(dirpath, name))
+                link = readlink(pathname)
               except OSError as e:
                 warning("readlink: %s", e)
                 ok = False
