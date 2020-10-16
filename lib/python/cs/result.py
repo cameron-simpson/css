@@ -58,6 +58,7 @@ import sys
 from threading import Lock, RLock
 from icontract import require
 from cs.logutils import exception, error, warning, debug
+from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
@@ -104,23 +105,30 @@ class CancellationError(Exception):
 # pylint: disable=too-many-instance-attributes
 class Result(object):
   ''' Basic class for asynchronous collection of a result.
-      This is also used to make OnDemandFunctions, LateFunctions and other
+      This is also used to make `OnDemandFunction`s, `LateFunction`s and other
       objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None, lock=None, result=None):
+  def __init__(self, name=None, lock=None, result=None, extra=None):
     ''' Base initialiser for `Result` objects and subclasses.
 
         Parameter:
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
+        * `extra`: a mapping of extra information to associate with the `Result`,
+          useful to provide context when collecting the result;
+          the `Result` has a public attribute `.extra`
+          which is an `AttrableMapping` to hold this information.
     '''
     if lock is None:
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
+    self.extra = AttrableMapping()
+    if extra:
+      self.extra.update(extra)
     self.state = ResultState.pending
     self.notifiers = []
     self.collected = False
