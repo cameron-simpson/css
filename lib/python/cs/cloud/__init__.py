@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 import os
 from os.path import join as joinpath
-from threading import RLock
+from threading import RLock, Semaphore
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
@@ -18,6 +18,8 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
 
 from cs.x import X
+
+DEFAULT_MAX_CONNECTIONS = 64
 
 def is_valid_subpath(subpath):
   ''' True if `subpath` is valid per the `validate_subpath()` function.
@@ -99,9 +101,14 @@ class Cloud(ABC):
   ''' A cloud storage service.
   '''
 
-  def __init__(self, credentials):
+  def __init__(self, credentials, *, max_connections=None):
+    if max_connections is None:
+      max_connections = DEFAULT_MAX_CONNECTIONS
+    elif max_connections < 1:
+      raise ValueError("max_connections:%s < 1" % (max_connections,))
     self.credentials = credentials
     self._lock = RLock()
+    self._conn_sem = Semaphore(max_connections)
 
   @staticmethod
   @typechecked
