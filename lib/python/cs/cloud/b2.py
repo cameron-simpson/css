@@ -78,9 +78,10 @@ class B2Cloud(SingletonMixin, Cloud):
     '''
     api = B2Api(InMemoryAccountInfo())
     with Upd().insert(1, "authenticate to %s ..." % (self,)):
-      api.authorize_account(
-          "production", self.credentials.keyId, self.credentials.apiKey
-      )
+      with self._conn_sem:
+        api.authorize_account(
+            "production", self.credentials.keyId, self.credentials.apiKey
+        )
     return api
 
   @locked
@@ -89,8 +90,9 @@ class B2Cloud(SingletonMixin, Cloud):
       bucket = self._buckets_by_name[bucket_name]
     except KeyError:
       with Upd().insert(1, "get_bucket_by_name(%r)..." % (bucket_name,)):
-        bucket = self._buckets_by_name[
-            bucket_name] = self.api.get_bucket_by_name(bucket_name)
+        with self._conn_sem:
+          bucket = self._buckets_by_name[
+              bucket_name] = self.api.get_bucket_by_name(bucket_name)
     return bucket
 
   def bucketpath(self, bucket_name, *, credentials=None):
@@ -129,7 +131,8 @@ class B2Cloud(SingletonMixin, Cloud):
     '''
     bucket = self.bucket_by_name(bucket_name)
     with Upd().insert(1, "list_file_versions(%r)..." % (path,)):
-      versions = bucket.list_file_versions(path, fetch_count=1)
+      with self._conn_sem:
+        versions = bucket.list_file_versions(path, fetch_count=1)
       try:
         version, = versions
       except ValueError:
@@ -156,12 +159,13 @@ class B2Cloud(SingletonMixin, Cloud):
       progress_listener = None if progress is None else B2ProgressShim(
           progress
       )
-      return bucket.upload(
-          B2UploadFileShim(f, length=length, progress=progress),
-          file_name=path,
-          progress_listener=progress_listener,
-          **b2_kw,
-      )
+      with self._conn_sem:
+        return bucket.upload(
+            B2UploadFileShim(f, length=length, progress=progress),
+            file_name=path,
+            progress_listener=progress_listener,
+            **b2_kw,
+        )
 
   # pylint: disable=too-many-arguments
   @pfx_method
