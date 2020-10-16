@@ -193,6 +193,7 @@ def symencrypt(
 ) -> Popen:
   ''' Symmetricly encrypt `stdin` to `stdout`
       using the supplied `password` and the symmetic cipher `ciphername`.
+      Return the `Popen` object of the encrypting `openssl` command.
 
       Parameters:
       * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
@@ -222,6 +223,7 @@ def symdecrypt(
 ) -> Popen:
   ''' Symmetricly decrypt `stdin`
       using the supplied `password` and the symmetic cipher `ciphername`.
+      Return the `Popen` object of the decrypting `openssl` command.
 
       Parameters:
       * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
@@ -363,6 +365,7 @@ def pubdecrypt_popen(
       with the per file encrypted password `per_file_passtext_enc`,
       the private key from the file `private_path`
       and its associated `passphrase`.
+      Return the `Popen` object of the decrypting `openssl` command.
 
       Parameters:
       * `stdin`: any value suitable for `openssl()`'s `stdin` parameter
@@ -482,6 +485,12 @@ def upload(
       progress=progress,
       length=encrypted_length,
   )
+  retcode = P.wait()
+  if retcode != 0:
+    raise ValueError("openssl %r returns exit code %s" % (
+        P.args,
+        retcode,
+    ))
   cloud.upload_buffer(
       CornuCopyBuffer([per_file_passtext_enc]),
       bucket_name=bucket_name,
