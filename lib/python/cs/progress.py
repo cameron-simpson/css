@@ -301,6 +301,7 @@ class BaseProgress(object):
       width=None,
       report_print=None,
       insert_pos=1,
+      deferred=False,
   ):
     ''' A context manager to create and withdraw a progress bar.
        It yields the `UpdProxy` which displays the progress bar.
@@ -322,6 +323,8 @@ class BaseProgress(object):
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
         * `insert_pos`: where to insert the progress bar, default `1`
+        * `deferred`: optional flag; if true do not create the
+          progress bar until the first update occurs.
 
         Example use:
 
@@ -341,16 +344,27 @@ class BaseProgress(object):
       width = upd.columns
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
+    pproxy = [None]
     update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
+
+    def update(P, datum):
+      proxy = pproxy[0]
+      if proxy is None:
+        proxy = pproxy[0] = upd.insert(insert_pos)
+      proxy(statusfunc(P, label, width or proxy.width))
+
     try:
-      proxy = upd.insert(insert_pos)
-      proxy(statusfunc(self, label, width or proxy.width))
+      if not deferred:
+        proxy = pproxy[0] = upd.insert(insert_pos)
+        proxy(statusfunc(self, label, width or proxy.width))
       self.notify_update.add(update)
       start_pos = self.position
-      yield proxy
+      yield pproxy[0]
     finally:
       self.notify_update.remove(update)
-      proxy.delete()
+      proxy = pproxy[0] = upd.insert(insert_pos)
+      if proxy:
+        proxy.delete()
     if report_print:
       if isinstance(report_print, bool):
         report_print = upd_print
