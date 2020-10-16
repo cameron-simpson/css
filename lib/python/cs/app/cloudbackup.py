@@ -1122,7 +1122,6 @@ class NamedBackup(SingletonMixin):
               exception("file backup fails: %s", e)
               ok = False
             else:
-              print("REGULAR FILE UPLOAD DONE, add to backups")
               name = R.extra.name
               name_backups = dirstate.by_name[name]
               name_backups.add_regular_file(
