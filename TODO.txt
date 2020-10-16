@@ -1,6 +1,6 @@
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
-replace @locked_proerty with @property @locked throughout to placate linters, then @OBSOLETE @locked_property
+replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
 MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
 cs.logutils: warning et all: once=key (or key on the warning format string if True)
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
