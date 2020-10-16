@@ -1029,8 +1029,8 @@ class NamedBackup(SingletonMixin):
             if name in names:
               warning("repeated")
               continue
-            backup_record['count_files_checked'] += 1
             names.add(name)
+            backup_record['count_files_checked'] += 1
             name_backups = dirstate.by_name.get(name)
             if name_backups is None:
               name_backups = FileBackupState(name=name, backups=[])
