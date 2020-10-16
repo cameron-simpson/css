@@ -970,7 +970,8 @@ class NamedBackup(SingletonMixin):
       topdirpath = joinpath(topdir, topsubpath)
     else:
       topdirpath = topdir
-    with Upd().insert(1) as walk_proxy:
+    with Upd().insert(0) as walk_proxy:
+      walk_proxy("os.walk(%r)...", topdirpath)
       for dirpath, dirnames, _ in os.walk(topdirpath):
         if runstate.cancelled:
           warning("backup_tree(%s): cancelled", topdir)
@@ -1007,16 +1008,18 @@ class NamedBackup(SingletonMixin):
         except OSError as e:
           warning(str(e))
           return False
+      upd = Upd()
       ok = True
       dirstate = self.dirstate(subpath)
       backup_records_by_uuid = self.backup_records.by_uuid
       names = set()
-      with Upd().insert(1) as file_proxy:
+      with upd.insert(0) as file_proxy:
+        file_proxy.prefix = dirpath + ": "
         for name, dir_entry in sorted(dir_entries.items()):
-          file_proxy(joinpath(dirpath, name))
           if runstate.cancelled:
             warning("backup_single_directory(%s): cancelled", dirpath)
             break
+          file_proxy("check " + name)
           with Pfx(name):
             if name in names:
               warning("repeated")
