@@ -616,6 +616,11 @@ class Progress(BaseProgress):
             >>> P.position
             12
     '''
+    if new_position < self.latest.position:
+      warning(
+          "%s.update: new position %s < latest position %s", self,
+          new_position, self.latest.position
+      )
     if update_time is None:
       update_time = time.time()
     ##if new_position < self.position:
