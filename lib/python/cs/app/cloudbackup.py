@@ -44,6 +44,7 @@ from cs.cloud.crypt import (
 from cs.cmdutils import BaseCommand
 from cs.deco import strable
 from cs.fileutils import UUIDNDJSONMapping
+from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import warning, error
 from cs.mappings import (
@@ -55,6 +56,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress, progressbar
 from cs.resources import RunState
+from cs.result import report
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
@@ -1015,6 +1017,8 @@ class NamedBackup(SingletonMixin):
       names = set()
       with upd.insert(0) as file_proxy:
         file_proxy.prefix = dirpath + ": "
+        L = Later(32)
+        Rs = []
         for name, dir_entry in sorted(dir_entries.items()):
           if runstate.cancelled:
             warning("backup_single_directory(%s): cancelled", dirpath)
@@ -1071,20 +1075,15 @@ class NamedBackup(SingletonMixin):
               if changed:
                 backup_record['count_files_changed'] += 1
                 rfilepath = joinpath(subpath, name)
-                # we get a fresh stat and hashcode from backup_filename
-                # because the file might change while we're mucking about
-                backedup_hashcode, backedup_stat = self.backup_filename(
-                    backup_record, topdir, rfilepath, prevstate=prevstate
+                R = L.defer(
+                    self.backup_filename,
+                    backup_record,
+                    topdir,
+                    rfilepath,
+                    prevstate=prevstate
                 )
-                name_backups.add_regular_file(
-                    backup_uuid=backup_uuid,
-                    stat=backedup_stat,
-                    hashcode=backedup_hashcode
-                )
-                print(
-                    "backed up %s/%s => %s" %
-                    (dirpath, name, backedup_hashcode)
-                )
+                R.extra.update(name=name)
+                Rs.append(R)
               else:
                 # record the current stat and the previous hashcode
                 name_backups.add_regular_file(
@@ -1097,6 +1096,31 @@ class NamedBackup(SingletonMixin):
               ok = False
               continue
             dirstate.add_to_mapping(name_backups, exists_ok=True)
+        if Rs:
+          nbg = len(Rs)
+          file_proxy("wait for %d background uploads...", nbg)
+          for R in report(Rs):
+            nbg -= 1
+            if runstate.cancelled:
+              warning("cancelled")
+              break
+            try:
+              # we get a fresh stat and hashcode from backup_filename
+              # because the file might change while we're mucking about
+              backedup_hashcode, backedup_stat = R()
+            except Exception as e:
+              exception("file backup fails: %s", e)
+              ok = False
+            else:
+              name = R.extra.name
+              name_backups = dirstate.by_name[name]
+              name_backups.add_regular_file(
+                  backup_uuid=backup_uuid,
+                  stat=backedup_stat,
+                  hashcode=backedup_hashcode
+              )
+              dirstate.add_to_mapping(name_backups, exists_ok=True)
+            file_proxy("wait for %d background uploads...", nbg)
       return ok
 
   # pylint: disable=too-many-locals
