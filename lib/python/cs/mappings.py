@@ -21,7 +21,6 @@ import re
 from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.fileutils import scan_ndjson
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
 from cs.logutils import warning
 from cs.pfx import Pfx
@@ -42,7 +41,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
-        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -1163,44 +1161,3 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     '''
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
-
-class UUIDNDJSONMapping(LoadableMappingMixin):
-  ''' A subclass of `LoadableMappingMixin` which maintains records
-      from a newline delimited JSON file.
-  '''
-
-  loadable_mapping_key = 'uuid'
-
-  def __init__(self, filename, dictclass=UUIDedDict, create=False):
-    ''' Initialise the mapping.
-
-        Parameters:
-        * `filename`: the file containing the newline delimited JSON data;
-          this need not yet exist
-        * `dictclass`: a optional `dict` subclass to hold each record,
-          default `UUIDedDict`
-        * `create`: if true, ensure the file exists
-          by transiently opening it for append if it is missing;
-          default `False`
-    '''
-    self.__ndjson_filename = filename
-    self.__dictclass = dictclass
-    if create and not isfilepath(filename):
-      # make sure the file exists
-      with open(filename, 'a'):
-        pass
-    self._lock = RLock()
-
-  def scan_mapping(self):
-    ''' Scan the backing file, yield records.
-    '''
-    if existspath(self.__ndjson_filename):
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
-        yield record
-
-  def append_to_mapping(self, record):
-    ''' Append `record` to the backing file.
-    '''
-    with open(self.__ndjson_filename, 'a') as f:
-      f.write(record.as_json())
-      f.write('\n')

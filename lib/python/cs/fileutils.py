@@ -21,8 +21,14 @@ try:
 except ImportError:
   pread = None
 from os.path import (
-    abspath, basename, dirname, isdir, isabs as isabspath, join as joinpath,
-    splitext
+    abspath,
+    basename,
+    dirname,
+    exists as existspath,
+    isdir,
+    isabs as isabspath,
+    join as joinpath,
+    splitext,
 )
 import shutil
 import stat
@@ -36,6 +42,7 @@ from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
+from cs.mappings import LoadableMappingMixin, UUIDedDict
 from cs.pfx import Pfx
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
@@ -1628,6 +1635,47 @@ class RWFileBlockCache(object):
     data = os.pread(fd, length, offset)
     assert len(data) == length
     return data
+
+class UUIDNDJSONMapping(LoadableMappingMixin):
+  ''' A subclass of `LoadableMappingMixin` which maintains records
+      from a newline delimited JSON file.
+  '''
+
+  loadable_mapping_key = 'uuid'
+
+  def __init__(self, filename, dictclass=UUIDedDict, create=False):
+    ''' Initialise the mapping.
+
+        Parameters:
+        * `filename`: the file containing the newline delimited JSON data;
+          this need not yet exist
+        * `dictclass`: a optional `dict` subclass to hold each record,
+          default `UUIDedDict`
+        * `create`: if true, ensure the file exists
+          by transiently opening it for append if it is missing;
+          default `False`
+    '''
+    self.__ndjson_filename = filename
+    self.__dictclass = dictclass
+    if create and not isfilepath(filename):
+      # make sure the file exists
+      with open(filename, 'a'):
+        pass
+    self._lock = RLock()
+
+  def scan_mapping(self):
+    ''' Scan the backing file, yield records.
+    '''
+    if existspath(self.__ndjson_filename):
+      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+        yield record
+
+  def append_to_mapping(self, record):
+    ''' Append `record` to the backing file.
+    '''
+    with open(self.__ndjson_filename, 'a') as f:
+      f.write(record.as_json())
+      f.write('\n')
 
 if __name__ == '__main__':
   import cs.fileutils_tests
