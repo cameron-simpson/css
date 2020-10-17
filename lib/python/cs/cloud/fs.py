@@ -99,17 +99,18 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     filename = os.sep + joinpath(bucket_name, path)
     dirpath = dirname(filename)
-    if not isdirpath(dirpath):
-      ##warning("create directory %r", dirpath)
-      with Pfx("makedirs(%r)", dirpath):
-        os.makedirs(dirpath, 0o777)
-    if progress is not None and length is not None:
-      progress.total += length
-    with open(filename, 'wb') as f:
-      for bs in bfr:
-        f.write(bs)
-        if progress is not None:
-          progress += len(bs)
+    with self._conn_sem:
+      if not isdirpath(dirpath):
+        ##warning("create directory %r", dirpath)
+        with Pfx("makedirs(%r)", dirpath):
+          os.makedirs(dirpath, 0o777)
+      if progress is not None and length is not None:
+        progress.total += length
+      with open(filename, 'wb') as f:
+        for bs in bfr:
+          f.write(bs)
+          if progress is not None:
+            progress += len(bs)
     if file_info or content_type:
       with FSTags() as fstags:
         tags = fstags[filename].direct_tags
