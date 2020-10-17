@@ -13,7 +13,7 @@ from contextlib import contextmanager
 import functools
 import time
 from cs.deco import decorator
-from cs.logutils import warning, exception
+from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.seq import seq
 from cs.units import (
@@ -139,7 +139,7 @@ class BaseProgress(object):
     '''
     consumed = self.position - self.start
     if consumed < 0:
-      warning(
+      debug(
           "%s.throughput: self.position(%s) < self.start(%s)", self,
           self.position, self.start
       )
@@ -149,7 +149,7 @@ class BaseProgress(object):
     if elapsed == 0:
       return 0
     if elapsed <= 0:
-      warning(
+      debug(
           "%s.throughput: negative elapsed time since start_time=%s: %s", self,
           self.start_time, elapsed
       )
@@ -181,7 +181,7 @@ class BaseProgress(object):
     if remaining < 0:
       if "position>total" not in self._warned:
         self._warned.add("position>total")
-        warning(
+        debug(
             "%s.remaining_time: self.position(%s) > self.total(%s)", self,
             self.position, self.total
         )
@@ -631,15 +631,12 @@ class Progress(BaseProgress):
             12
     '''
     if new_position < self.latest.position:
-      warning(
+      debug(
           "%s.update: new position %s < latest position %s", self,
           new_position, self.latest.position
       )
     if update_time is None:
       update_time = time.time()
-    ##if new_position < self.position:
-    ##  warning("%s.update: .position going backwards from %s to %s",
-    ##          self, self.position, new_position)
     datum = CheckPoint(update_time, new_position)
     self._positions.append(datum)
     self._flushed = False
@@ -755,11 +752,11 @@ class Progress(BaseProgress):
       return 0
     if low_time >= now:
       # in the future? warn and return 0
-      warning('low_time=%s >= now=%s', low_time, now)
+      debug('low_time=%s >= now=%s', low_time, now)
       return 0
     rate = float(self.position - low_pos) / (now - low_time)
     if rate < 0:
-      warning('rate < 0 (%s)', rate)
+      debug('rate < 0 (%s)', rate)
     return rate
 
 class OverProgress(BaseProgress):
