@@ -1147,7 +1147,6 @@ class NamedBackup(SingletonMixin):
         Rs = []
         for name, dir_entry in sorted(dir_entries.items()):
           if runstate.cancelled:
-            warning("backup_single_directory(%s): cancelled", dirpath)
             break
           proxy("check " + name)
           with Pfx(name):
@@ -1179,19 +1178,19 @@ class NamedBackup(SingletonMixin):
               prevstate = name_backups.latest_backup()
               # pylint: disable=simplifiable-if-statement
               if prevstate is None:
-                print("CHANGED (no prevstate)", pathname)
+                ##print("CHANGED (no prevstate)", pathname)
                 changed = True
               else:
                 prev_mode = prevstate['st_mode']
                 prev_mtime = prevstate['st_mtime']
                 prev_size = prevstate['st_size']
                 if not S_ISREG(prev_mode):
-                  print("CHANGED (not regular file)", pathname)
+                  ##print("CHANGED (not regular file)", pathname)
                   changed = True
                 else:
                   if (stat.st_mtime != prev_mtime
                       or stat.st_size != prev_size):
-                    print("CHANGED (changed size/mtime)", pathname)
+                    ##print("CHANGED (changed size/mtime)", pathname)
                     changed = True
                   else:
                     prev_backup_uuid = UUID(prevstate['uuid'])
@@ -1204,10 +1203,11 @@ class NamedBackup(SingletonMixin):
                         prev_backup_record.content_path
                     )
                     if changed:
-                      print(
-                          "CHANGED (no previous or previous has different content_path)",
-                          pathname
-                      )
+                      ##print(
+                      ##    "CHANGED (no previous or previous has different content_path)",
+                      ##    pathname
+                      ##)
+                      pass
               if changed:
                 backup_record['count_files_changed'] += 1
                 rfilepath = joinpath(subpath, name)
