@@ -224,10 +224,10 @@ class Upd(SingletonMixin):
     self._ti_ready = False
     self._ti_strs = {}
     self._slot_text = ['']
-    self._proxies = [UpdProxy(self, 0)]
     self._current_slot = 0
     self._above = None
     self._lock = RLock()
+    self._proxies = [UpdProxy(self, 0)]
     global instances  # pylint: disable=global-statement
     instances.append(self)
 
