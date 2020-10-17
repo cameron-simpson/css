@@ -239,8 +239,8 @@ class CloudBackupCommand(BaseCommand):
     )
     cloud_backup = options.cloud_backup
     backup = cloud_backup[backup_name]
-    with Upd().insert(0) as proxy:
-      proxy.prefix = f"{backup}: "
+    with Upd().insert(1) as proxy:
+      proxy.prefix = f"{cmd} {backup} "
       for subpath in subpaths:
         if subpath == ".":
           subpath = ''
@@ -367,8 +367,8 @@ class CloudBackupCommand(BaseCommand):
     with Pfx("mkdir(%r)", restore_dirpath):
       os.mkdir(restore_dirpath, 0o777)
     made_dirs.add(restore_dirpath)
-    with Upd().insert(0) as proxy:
-      proxy.prefix = f"{backup}: "
+    with Upd().insert(1) as proxy:
+      proxy.prefix = f"{cmd} {backup} "
       for subpath in subpaths:
         if subpath == ".":
           subpath = ''
@@ -1216,7 +1216,7 @@ class NamedBackup(SingletonMixin):
                     backup_run,
                     topdir,
                     rfilepath,
-                    prevstate=prevstate
+                    prevstate=prevstate,
                 )
                 R.extra.update(name=name, pathname=pathname)
                 Rs.append(R)
@@ -1232,6 +1232,7 @@ class NamedBackup(SingletonMixin):
               ok = False
               continue
             dirstate.add_to_mapping(name_backups, exists_ok=True)
+
         if Rs:
           if runstate.cancelled:
             for R in Rs:
@@ -1278,12 +1279,13 @@ class NamedBackup(SingletonMixin):
   ):
     ''' Back up a single file *topdir*`/`*subpath*,
         return its stat and hashcode.
+        Return `(None,None)` if cancelled.
 
         Checksum the file; if the same as `prevstate.hashcode`
         return the hashcode immediately.
 
         Otherwise upload the file contents against the hashcode
-        and return the hashcode.
+        and return the stat and hashcode.
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
