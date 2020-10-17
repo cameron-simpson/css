@@ -42,6 +42,7 @@ from cs.cloud.crypt import (
     recrypt_passtext,
 )
 from cs.cmdutils import BaseCommand
+from cs.context import pushattrs, popattrs
 from cs.deco import strable
 from cs.fileutils import UUIDNDJSONMapping
 from cs.later import Later
@@ -55,12 +56,13 @@ from cs.mappings import (
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress, progressbar
-from cs.resources import RunState
-from cs.result import report
+from cs.resources import RunState, RunStateMixin
+from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from icontract import require
 from typeguard import typechecked
 
 def main(argv=None):
@@ -753,6 +755,135 @@ class BackupRecord(UUIDedDict):
 
   def __exit__(self, exc_type, exc_value, exc_traceback):
     self['timestamp_end'] = time.time()
+
+class BackupRun(RunStateMixin):
+  ''' State management and display for a multithreaded backup run.
+  '''
+
+  @typechecked
+  @require(lambda folder_parallel: folder_parallel > 0)
+  @require(lambda file_parallel: file_parallel > 0)
+  def __init__(
+      self,
+      named_backup: "NamedBackup",
+      cloud_area: CloudArea,
+      *,
+      public_key_name: str,
+      folder_parallel: int = 4,
+      file_parallel: int = 4,
+  ):
+    ''' Initialise a `BackupRun`.
+
+        Parameters:
+        * `named_backup`: a `NamedBackup` to track the backup state
+        * `cloud_area`: a `CloudArea` to contain the content uploads
+        * `public_key_name`: the name of the public key
+          to use with this backup run
+        * `folder_parallel`: the number of filesystem directories to process
+          in parallel, normally a small number
+        * `file_parallel`: the number of parallel file uploads to support,
+          normally a not so small number, enough to get good throughput
+          allowing for the latency of the cloud upload process
+    '''
+    self.named_backup = named_backup
+    self.cloud_area = cloud_area
+    self.public_key_name = public_key_name
+    self.folder_parallel = folder_parallel
+    self.file_parallel = file_parallel
+    self.runstate = None
+    self.content_path = cloud_area.subarea('content').cloudpath
+    # mention resources here for lint
+    self.backup_record = None
+    self.status_proxy = None
+    self.folder_later = None
+    self.folder_proxies = set()
+    self.file_later = None
+    self.file_proxies = set()
+    self.previous_interrupt = None
+    self._stacked = []
+    self._lock = RLock()
+
+  def __enter__(self):
+    ''' Commence a run, return `self`.
+
+        This allocates display areas 
+    '''
+    upd = Upd()
+    status_proxy = upd.insert(1, 'STATUS')
+    file_proxies = set(
+        upd.insert(1, 'FILE') for _ in range(self.file_parallel)
+    )
+    folder_proxies = set(
+        upd.insert(1, 'FOLDER') for _ in range(self.folder_parallel)
+    )
+
+    def interrupt(signum, frame):
+      ''' Receive interrupt, cancel the `RunState`.
+      '''
+      self.runstate.cancel()
+      ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
+      ##  previous_interrupt(signum, frame)
+
+    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+    self._stacked.append(
+        pushattrs(
+            self,
+            runstate=RunState(
+                "%s.runstate(%s,%s)" %
+                (type(self).__name__, self.cloud_area, self.public_key_name)
+            ),
+            backup_record=BackupRecord(
+                public_key_name=self.public_key_name,
+                content_path=self.content_path,
+            ),
+            status_proxy=status_proxy,
+            folder_later=Later(self.folder_parallel, inboundCapacity=16),
+            folder_proxies=folder_proxies,
+            file_later=Later(self.file_parallel, inboundCapacity=256),
+            file_proxies=file_proxies,
+            previous_interrupt=previous_interrupt,
+        )
+    )
+    self.runstate.start()
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Clean up after a backup run.
+    '''
+    self.named_backup.add_backup_record(self.backup_record)
+    signal.signal(signal.SIGINT, self.previous_interrupt)
+    self.runstate.stop()
+    for proxy in self.file_proxies:
+      proxy.delete()
+    for proxy in self.folder_proxies:
+      proxy.delete()
+    self.status_proxy.delete()
+    old_attrs = self._stacked.pop()
+    popattrs(self, old_attrs.keys(), old_attrs)
+
+  @contextmanager
+  def folder_proxy(self):
+    ''' Allocate and return a folder `UpdProxy` for use by a folder scan.
+    '''
+    with self._lock:
+      proxy = self.folder_proxies.pop()
+    try:
+      yield proxy
+    finally:
+      with self._lock:
+        self.folder_proxies.add(proxy)
+
+  @contextmanager
+  def file_proxy(self):
+    ''' Allocate and return a file `UpdProxy` for use by a file scan.
+    '''
+    with self._lock:
+      proxy = self.file_proxies.pop()
+    try:
+      yield proxy
+    finally:
+      with self._lock:
+        self.file_proxies.add(proxy)
 
 # pylint: disable=too-many-instance-attributes
 class NamedBackup(SingletonMixin):
