@@ -297,6 +297,7 @@ class BaseProgress(object):
       self,
       label=None,
       upd=None,
+      proxy=None,
       statusfunc=None,
       width=None,
       report_print=None,
@@ -309,8 +310,9 @@ class BaseProgress(object):
         Parameters:
         * `label`: a label for the progress bar,
           default from `self.name`.
+        * `proxy`: an optional `UpdProxy` to display the progress bar
         * `upd`: an optional `cs.upd.Upd` instance,
-          used to produce the progress bar status line.
+          used to produce the progress bar status line if not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
         * `statusfunc`: an optional function to compute the progress bar text
@@ -344,26 +346,27 @@ class BaseProgress(object):
       width = upd.columns
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
-    pproxy = [None]
+    pproxy = [proxy]
+    proxy_delete = proxy is None
     update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
 
     def update(P, datum):
       proxy = pproxy[0]
       if proxy is None:
-        proxy = pproxy[0] = upd.insert(insert_pos)
+        proxy = pproxy[0] = upd.insert(insert_pos, 'LABEL=' + label)
       proxy(statusfunc(P, label, width or proxy.width))
 
     try:
       if not deferred:
-        proxy = pproxy[0] = upd.insert(insert_pos)
+        if proxy is None:
+          proxy = pproxy[0] = upd.insert(insert_pos)
         proxy(statusfunc(self, label, width or proxy.width))
       self.notify_update.add(update)
       start_pos = self.position
       yield pproxy[0]
     finally:
       self.notify_update.remove(update)
-      proxy = pproxy[0] = upd.insert(insert_pos)
-      if proxy:
+      if proxy and proxy_delete:
         proxy.delete()
     if report_print:
       if isinstance(report_print, bool):
