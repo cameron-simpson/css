@@ -864,12 +864,14 @@ class UpdProxy(object):
       'upd': 'The parent Upd instance.',
       'index': 'The index of this slot within the parent Upd.',
       '_prefix': 'The fixed leading prefix for this slot, default "".',
+      '_text': 'The text following the prefix for this slot, default "".',
   }
 
   def __init__(self, upd, index):
     self.upd = upd
     self.index = index
     self._prefix = ''
+    self._text = ''
 
   def __str__(self):
     return (
@@ -901,18 +903,15 @@ class UpdProxy(object):
   def prefix(self, new_prefix):
     ''' Change the prefix, redraw the status line.
     '''
-    old_prefix = self._prefix
-    self._prefix = new_prefix
+    old_prefix, self._prefix = self._prefix, new_prefix
     if new_prefix != old_prefix:
-      self.text = self.text
+      self.text = self._text
 
   @property
   def text(self):
-    ''' The text of this proxy's slot.
+    ''' The text of this proxy's slot, without the prefix.
     '''
-    with self.upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      return '' if index is None else self.upd[index]
+    return self._text
 
   @text.setter
   def text(self, txt):
@@ -921,6 +920,7 @@ class UpdProxy(object):
         If the length of `self.prefix+txt` exceeds the available display
         width then the leftmost text is cropped to fit.
     '''
+    self._text = txt
     upd = self.upd
     if upd is not None:
       with upd._lock:  # pylint: disable=protected-access
