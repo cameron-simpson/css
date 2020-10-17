@@ -1243,7 +1243,10 @@ class NamedBackup(SingletonMixin):
               # we get a fresh stat and hashcode from backup_filename
               # because the file might change while we're mucking about
               backedup_hashcode, backedup_stat = R()
-            except Exception as e:
+            except CancellationError:
+              ##warning("backup cancelled: %s", R.extra.pathname)
+              ok = False
+            except Exception as e:  # pylint: disable=broad-except
               exception("file backup fails: %s", e)
               ok = False
             else:
