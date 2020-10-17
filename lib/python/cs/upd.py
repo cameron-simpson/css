@@ -929,7 +929,7 @@ class UpdProxy(object):
           txt = upd.normalise(self.prefix + txt)
           overflow = len(txt) - upd.columns + 1
           if overflow > 0:
-            txt = txt[overflow:]
+            txt = '<' + txt[overflow + 1:]
           self.upd[index] = txt
 
   @property
