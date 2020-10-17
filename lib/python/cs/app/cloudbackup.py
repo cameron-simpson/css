@@ -1218,7 +1218,7 @@ class NamedBackup(SingletonMixin):
                     rfilepath,
                     prevstate=prevstate
                 )
-                R.extra.update(name=name)
+                R.extra.update(name=name, pathname=pathname)
                 Rs.append(R)
               else:
                 # record the current stat and the previous hashcode
