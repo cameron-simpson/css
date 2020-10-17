@@ -698,14 +698,18 @@ class CloudBackup:
     for subpath in subpaths:
       if subpath:
         validate_subpath(subpath)
-    backup = self[backup_name]
-    assert isinstance(backup, NamedBackup)
-    backup.init()
-    with backup.run(cloud_area=cloud_area,
-                    public_key_name=public_key_name) as (backup_record,
-                                                         runstate):
+    named_backup = self[backup_name]
+    assert isinstance(named_backup, NamedBackup)
+    named_backup.init()
+    with BackupRun(named_backup, cloud_area,
+                   public_key_name=public_key_name) as backup_run:
       for subpath in subpaths:
-        backup.backup_tree(backup_record, topdir, subpath, runstate=runstate)
+        named_backup.backup_tree(
+            backup_run,
+            topdir,
+            subpath,
+        )
+      backup_record = backup_run.backup_record
     return backup_record
 
 @typechecked
@@ -1061,44 +1065,12 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # Backup processes.
 
-  @contextmanager
   @typechecked
-  def run(self, *, cloud_area: CloudArea, public_key_name: str):
-    ''' Context manager for running a backup.
-    '''
-    runstate = RunState(
-        "%s.run(%s,%s)" % (type(self).__name__, cloud_area, public_key_name)
-    )
-    content_path = cloud_area.subarea('content').cloudpath
-    backup_record = BackupRecord(
-        public_key_name=public_key_name,
-        content_path=content_path,
-    )
-
-    def interrupt(signum, frame):
-      ''' Receive interrupt, cancel the `RunState`, call the prior handler.
-      '''
-      runstate.cancel()
-      ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
-      ##  previous_interrupt(signum, frame)
-      signal.signal(signal.SIGINT, previous_interrupt)
-
-    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
-    try:
-      with runstate:
-        with backup_record:
-          yield backup_record, runstate
-        self.backup_records.add_to_mapping(backup_record)
-    finally:
-      signal.signal(signal.SIGINT, previous_interrupt)
-
   def backup_tree(
       self,
-      backup_record: BackupRecord,
+      backup_run: BackupRun,
       topdir: str,
       topsubpath: str,
-      *,
-      runstate: RunState,
   ):
     ''' Back up everything in `topdir/topsubpath`
         recording the results against `backup_record`.
@@ -1109,25 +1081,40 @@ class NamedBackup(SingletonMixin):
       topdirpath = joinpath(topdir, topsubpath)
     else:
       topdirpath = topdir
-    with Upd().insert(0) as walk_proxy:
-      walk_proxy("os.walk(%r)...", topdirpath)
-      for dirpath, dirnames, _ in os.walk(topdirpath):
-        if runstate.cancelled:
-          warning("backup_tree(%s): cancelled", topdir)
-          break
-        walk_proxy("%s/", dirpath)
-        subpath = relpath(dirpath, topdirpath)
-        if subpath == '.':
-          subpath = ''
-        self.backup_single_directory(
-            backup_record, topdir, subpath, runstate=runstate
-        )
-        # walk the children lexically ordered
-        dirnames[:] = sorted(dirnames)
+    status_proxy = backup_run.status_proxy
+    status_proxy("os.walk %r ...", topdirpath)
+    Rs = []
+    L = backup_run.folder_later
+    runstate = backup_run.runstate
+    for dirpath, dirnames, _ in os.walk(topdirpath):
+      if runstate.cancelled:
+        break
+      status_proxy("os.walk %s/", dirpath)
+      subpath = relpath(dirpath, topdirpath)
+      if subpath == '.':
+        subpath = ''
+      Rs.append(
+          L.defer(self.backup_single_directory, backup_run, topdir, subpath)
+      )
+      # walk the children lexically ordered
+      dirnames[:] = sorted(dirnames)
+    if Rs:
+      for R in progressbar(report(Rs), total=len(Rs),
+                           label="%s: wait for subdirectories" % (topdir,),
+                           proxy=status_proxy):
+        try:
+          R()
+        except Exception as e:  # pylint: disable=broad-except
+          exception("file backup fails: %s", e)
+    status_proxy('')
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  @typechecked
   def backup_single_directory(
-      self, backup_record: BackupRecord, topdir, subpath, *, runstate: RunState
+      self,
+      backup_run: BackupRun,
+      topdir,
+      subpath,
   ):
     ''' Backup the immediate contents of a particular subdirectory.
         Return `True` if everything was successfully backed up,
@@ -1135,32 +1122,34 @@ class NamedBackup(SingletonMixin):
     '''
     if subpath:
       validate_subpath(subpath)
+    runstate = backup_run.runstate
+    backup_record = backup_run.backup_record
     backup_uuid = backup_record.uuid
     dirpath = joinpath(topdir, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
-      with Pfx("scandir"):
-        try:
-          dir_entries = {
-              dir_entry.name: dir_entry
-              for dir_entry in os.scandir(dirpath)
-          }
-        except OSError as e:
-          warning(str(e))
-          return False
-      upd = Upd()
-      ok = True
-      dirstate = self.dirstate(subpath)
-      backup_records_by_uuid = self.backup_records.by_uuid
-      names = set()
-      with upd.insert(0) as file_proxy:
-        file_proxy.prefix = dirpath + ": "
-        L = Later(32)
+      with backup_run.folder_proxy() as proxy:
+        proxy.prefix = dirpath + ': '
+        with Pfx("scandir"):
+          proxy("scandir")
+          try:
+            dir_entries = {
+                dir_entry.name: dir_entry
+                for dir_entry in os.scandir(dirpath)
+            }
+          except OSError as e:
+            warning(str(e))
+            return False
+        ok = True
+        dirstate = self.dirstate(subpath)
+        backup_records_by_uuid = self.backup_records.by_uuid
+        names = set()
+        L = backup_run.file_later
         Rs = []
         for name, dir_entry in sorted(dir_entries.items()):
           if runstate.cancelled:
             warning("backup_single_directory(%s): cancelled", dirpath)
             break
-          file_proxy("check " + name)
+          proxy("check " + name)
           with Pfx(name):
             pathname = joinpath(dirpath, name)
             if name in names:
@@ -1224,7 +1213,7 @@ class NamedBackup(SingletonMixin):
                 rfilepath = joinpath(subpath, name)
                 R = L.defer(
                     self.backup_filename,
-                    backup_record,
+                    backup_run,
                     topdir,
                     rfilepath,
                     prevstate=prevstate
@@ -1244,13 +1233,12 @@ class NamedBackup(SingletonMixin):
               continue
             dirstate.add_to_mapping(name_backups, exists_ok=True)
         if Rs:
-          nbg = len(Rs)
-          file_proxy("wait for %d background uploads...", nbg)
-          for R in report(Rs):
-            nbg -= 1
-            if runstate.cancelled:
-              warning("cancelled")
-              break
+          if runstate.cancelled:
+            for R in Rs:
+              R.cancel()
+          for R in progressbar(report(Rs), total=len(Rs),
+                               label="%s: wait for uploads" % (dirpath,),
+                               proxy=proxy):
             try:
               # we get a fresh stat and hashcode from backup_filename
               # because the file might change while we're mucking about
@@ -1259,22 +1247,31 @@ class NamedBackup(SingletonMixin):
               exception("file backup fails: %s", e)
               ok = False
             else:
-              name = R.extra.name
-              name_backups = dirstate.by_name[name]
-              name_backups.add_regular_file(
-                  backup_uuid=backup_uuid,
-                  stat=backedup_stat,
-                  hashcode=backedup_hashcode
-              )
-              dirstate.add_to_mapping(name_backups, exists_ok=True)
-            file_proxy("wait for %d background uploads...", nbg)
+              if backedup_hashcode is None:
+                ##warning("backup cancelled: %s", R.extra.pathname)
+                pass
+              else:
+                name = R.extra.name
+                name_backups = dirstate.by_name[name]
+                name_backups.add_regular_file(
+                    backup_uuid=backup_uuid,
+                    stat=backedup_stat,
+                    hashcode=backedup_hashcode
+                )
+                dirstate.add_to_mapping(name_backups, exists_ok=True)
+
+        proxy('')
       return ok
 
   # pylint: disable=too-many-locals
   @typechecked
   def backup_filename(
-      self, backup_record: BackupRecord, topdir: str, subpath: str, *,
-      prevstate
+      self,
+      backup_run: BackupRun,
+      topdir: str,
+      subpath: str,
+      *,
+      prevstate,
   ):
     ''' Back up a single file *topdir*`/`*subpath*,
         return its stat and hashcode.
@@ -1287,92 +1284,126 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
-    cloud_backup = self.cloud_backup
-    cloud = backup_record.content_area.cloud
-    bucket_name = backup_record.content_area.bucket_name
-    public_key_name = backup_record.public_key_name
     filename = joinpath(topdir, subpath)
-    with Pfx("backup_filename(%r)", filename):
-      with open(filename, 'rb') as f:
-        fd = f.fileno()
-        ##fd = os.open(filename, O_RDONLY)
-        fstat = os.fstat(fd)
-        if not S_ISREG(fstat.st_mode):
-          raise ValueError("not a regular file")
-        hasher = DEFAULT_HASHCLASS.digester()
-        if fstat.st_size == 0:
-          # can't mmap empty files, and in any case they're easy
-          hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
-          self.upload_hashcode_content(backup_record, fd, hashcode, 0)
-          return hashcode, fstat
-        # compute hashcode from file contents
-        hashcode = DEFAULT_HASHCLASS.digester()
-        mm = mmap(fd, fstat.st_size, prot=PROT_READ)
-        hasher.update(mm)
-        hashcode = DEFAULT_HASHCLASS(hasher.digest())
-        # compute some crypt-side upload paths
-        basepath = self.hashcode_path(hashcode)
-        data_subpath, key_subpath = upload_paths(
-            basepath, public_key_name=public_key_name
-        )
-        # TODO: a check_uploaded flag?
-        if prevstate and hashcode == prevstate.hashcode:
-          # assume content already uploaded in the previous backup
-          # TODO: check that? cloud.stat?
-          if public_key_name == prevstate.public_key_name:
-            return hashcode, fstat
-          # previous upload used a different key
-          # check if the upload is keyed against the current key
-          if cloud.stat(bucket_name=bucket_name, path=key_subpath):
-            # content already uploaded and keyed against the current key
-            return hashcode, fstat
-          # TODO: not against the current key, can we decrypt a different key?
-          # the fall through here will be if no decryptable key is present
-          # need to enumerate the upstream keys for which we have
-          # local private keys by iterating over the local private key
-          # names
-          # look for a private key for which we already have a passphrase to hand
-          for private_key_name in cloud_backup.private_key_names():
-            passphrase = cloud_backup._passphrases.get(private_key_name)
-            if passphrase is not None:
-              other_private_path = cloud_backup.private_key_path(
-                  private_key_name
-              )
-              print(
-                  f"{filename}: recrypt passtext"
-                  " from {private_key_name} to {public_key_name}..."
-              )
-              recrypt_passtext(
-                  cloud,
-                  bucket_name,
-                  basepath,
-                  old_key_name=private_key_name,
-                  old_private_path=other_private_path,
-                  old_passphrase=passphrase,
-                  new_key_name=public_key_name,
-                  new_public_path=self.cloud_backup
-                  .public_key_path(public_key_name),
-              )
-              return hashcode, fstat
-          # no private keys with known passphrases
-          # TODO: if interactive, offer available keys, request passphrase
-        # need to reupload
-        # copy the file so that what we upload is stable
-        # this includes a second hashcode pass, alas
-        with NamedTemporaryFile() as T:
-          shutil.copy(filename, T.name)
-          mm = mmap(fd, fstat.st_size, prot=PROT_READ)
+    with backup_run.file_proxy() as proxy:
+      proxy.prefix = filename + ': '
+      backup_record = backup_run.backup_record
+      runstate = backup_run.runstate
+      cloud_backup = self.cloud_backup
+      cloud = backup_record.content_area.cloud
+      bucket_name = backup_record.content_area.bucket_name
+      public_key_name = backup_record.public_key_name
+      with Pfx("backup_filename(%r)", filename):
+        if runstate.cancelled:
+          ##warning("cancelled")
+          return None, None
+        with open(filename, 'rb') as f:
+          fd = f.fileno()
+          ##fd = os.open(filename, O_RDONLY)
+          fstat = os.fstat(fd)
+          if not S_ISREG(fstat.st_mode):
+            raise ValueError("not a regular file")
           hasher = DEFAULT_HASHCLASS.digester()
+          if fstat.st_size == 0:
+            # can't mmap empty files, and in any case they're easy
+            hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
+            if runstate.cancelled:
+              ##warning("cancelled")
+              return None, None
+            self.upload_hashcode_content(backup_record, fd, hashcode, 0)
+            return hashcode, fstat
+          # compute hashcode from file contents
+          hashcode = DEFAULT_HASHCLASS.digester()
+          mm = mmap(fd, fstat.st_size, prot=PROT_READ)
+          if runstate.cancelled:
+            ##warning("cancelled")
+            return None, None
           hasher.update(mm)
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
-          # upload the content if not already uploaded
-          # TODO: shared by hashcode set of locks
-          P = Progress(name="upload " + filename, total=0)
-          with P.bar(insert_pos=-1):
-            self.upload_hashcode_content(
-                backup_record, fd, hashcode, len(mm), progress=P
-            )
-        return hashcode, fstat
+          # compute some crypt-side upload paths
+          basepath = self.hashcode_path(hashcode)
+          if runstate.cancelled:
+            ##warning("cancelled")
+            return None, None
+          data_subpath, key_subpath = upload_paths(
+              basepath, public_key_name=public_key_name
+          )
+          # TODO: a check_uploaded flag?
+          if prevstate and hashcode == prevstate.hashcode:
+            # assume content already uploaded in the previous backup
+            # TODO: check that? cloud.stat?
+            if public_key_name == prevstate.public_key_name:
+              return hashcode, fstat
+            # previous upload used a different key
+            # check if the upload is keyed against the current key
+            if runstate.cancelled:
+              ##warning("cancelled")
+              return None, None
+            if cloud.stat(bucket_name=bucket_name, path=key_subpath):
+              # content already uploaded and keyed against the current key
+              return hashcode, fstat
+            # TODO: not against the current key, can we decrypt a different key?
+            # the fall through here will be if no decryptable key is present
+            # need to enumerate the upstream keys for which we have
+            # local private keys by iterating over the local private key
+            # names
+            # look for a private key for which we already have a passphrase to hand
+            for private_key_name in cloud_backup.private_key_names():
+              passphrase = cloud_backup._passphrases.get(private_key_name)
+              if passphrase is not None:
+                other_private_path = cloud_backup.private_key_path(
+                    private_key_name
+                )
+                print(
+                    f"{filename}: recrypt passtext"
+                    " from {private_key_name} to {public_key_name}..."
+                )
+                if runstate.cancelled:
+                  ##warning("cancelled")
+                  return None, None
+                recrypt_passtext(
+                    cloud,
+                    bucket_name,
+                    basepath,
+                    old_key_name=private_key_name,
+                    old_private_path=other_private_path,
+                    old_passphrase=passphrase,
+                    new_key_name=public_key_name,
+                    new_public_path=self.cloud_backup
+                    .public_key_path(public_key_name),
+                )
+                return hashcode, fstat
+            # no private keys with known passphrases
+            # TODO: if interactive, offer available keys, request passphrase
+          # need to reupload
+          # copy the file so that what we upload is stable
+          # this includes a second hashcode pass, alas
+          if runstate.cancelled:
+            ##warning("cancelled")
+            return None, None
+          with NamedTemporaryFile() as T:
+            shutil.copy(filename, T.name)
+            if runstate.cancelled:
+              ##warning("cancelled")
+              return None, None
+            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
+            hasher = DEFAULT_HASHCLASS.digester()
+            if runstate.cancelled:
+              ##warning("cancelled")
+              return None, None
+            hasher.update(mm)
+            hashcode = DEFAULT_HASHCLASS(hasher.digest())
+            # upload the content if not already uploaded
+            # TODO: shared by hashcode set of locks
+            if runstate.cancelled:
+              ##warning("cancelled")
+              return None, None
+            P = Progress(name="upload " + filename, total=0)
+            with P.bar(insert_pos=-1, deferred=True, proxy=proxy):
+              self.upload_hashcode_content(
+                  backup_record, fd, hashcode, len(mm), progress=P
+              )
+          return hashcode, fstat
 
   def upload_hashcode_content(
       self,
