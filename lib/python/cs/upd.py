@@ -954,3 +954,17 @@ class UpdProxy(object):
         self.upd.delete(index)
 
   __del__ = delete
+
+  def insert(self, index, txt=''):
+    ''' Insert a new `UpdProxy` at a position relative to this `UpdProxy`.
+        Return the new proxy.
+
+        This supports the positioning of related status lines.
+    '''
+    upd = self.upd
+    if not upd:
+      raise ValueError("no .upd, cannot create a new proxy")
+    with upd._lock:
+      if self.index is not None:
+        index += self.index
+      return upd.insert(index, txt)
