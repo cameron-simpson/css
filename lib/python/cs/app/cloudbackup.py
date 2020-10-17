@@ -972,6 +972,12 @@ class NamedBackup(SingletonMixin):
         key=lambda backup_record: backup_record.timestamp_end or 0
     )
 
+  @typechecked
+  def add_backup_record(self, backup_record: BackupRecord):
+    ''' Record a new `BackupRecord`.
+    '''
+    self.backup_records.add_to_mapping(backup_record)
+
   ##############################################################
   # DirStates
 
