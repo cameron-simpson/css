@@ -10,6 +10,7 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 import sys
 import time
 import traceback
@@ -312,7 +313,6 @@ def OBSOLETE(func, suggestion=None):
   wrapped.__doc__ = doc + '\n\n' + funcdoc
   return wrapped
 
-
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
   ''' Former name for @cachedmethod.
@@ -323,7 +323,7 @@ def contextual(func):
   ''' Wrap a simple function as a context manager.
 
       This was written to support users of `@strable`,
-      which requires its `open_func` to be a context manager;
+      which requires its `open_func` to return a context manager;
       this turns an arbitrary function into a context manager.
 
       Example promoting a trivial function:
@@ -384,12 +384,25 @@ def strable(func, open_func=None):
   if open_func is None:
     open_func = open
 
-  def accepts_str(arg, *a, **kw):
-    if isinstance(arg, str):
-      with Pfx(arg):
-        with open_func(arg) as opened:
-          return func(opened, *a, **kw)
-    return func(arg, *a, **kw)
+  if isgeneratorfunction(func):
+
+    def accepts_str(arg, *a, **kw):
+      if isinstance(arg, str):
+        with Pfx(arg):
+          with open_func(arg) as opened:
+            for item in func(opened, *a, **kw):
+              yield item
+      else:
+        for item in func(arg, *a, **kw):
+          yield item
+  else:
+
+    def accepts_str(arg, *a, **kw):
+      if isinstance(arg, str):
+        with Pfx(arg):
+          with open_func(arg) as opened:
+            return func(opened, *a, **kw)
+      return func(arg, *a, **kw)
 
   return accepts_str
 

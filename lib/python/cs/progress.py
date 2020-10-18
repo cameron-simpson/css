@@ -9,9 +9,12 @@
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import functools
 import time
-from cs.logutils import warning, exception
+from cs.deco import decorator
+from cs.logutils import debug, exception
+from cs.py.func import funcname
 from cs.seq import seq
 from cs.units import (
     transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
@@ -26,7 +29,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires':
+    ['cs.deco', 'cs.logutils', 'cspy.func', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -135,7 +139,7 @@ class BaseProgress(object):
     '''
     consumed = self.position - self.start
     if consumed < 0:
-      warning(
+      debug(
           "%s.throughput: self.position(%s) < self.start(%s)", self,
           self.position, self.start
       )
@@ -145,7 +149,7 @@ class BaseProgress(object):
     if elapsed == 0:
       return 0
     if elapsed <= 0:
-      warning(
+      debug(
           "%s.throughput: negative elapsed time since start_time=%s: %s", self,
           self.start_time, elapsed
       )
@@ -177,7 +181,7 @@ class BaseProgress(object):
     if remaining < 0:
       if "position>total" not in self._warned:
         self._warned.add("position>total")
-        warning(
+        debug(
             "%s.remaining_time: self.position(%s) > self.total(%s)", self,
             self.position, self.total
         )
@@ -287,7 +291,95 @@ class BaseProgress(object):
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
     return left + arrow_field + right
 
-  def bar(  # pylint: disable=blacklisted-name,too-many-arguments
+  # pylint: disable=blacklisted-name,too-many-arguments
+  @contextmanager
+  def bar(
+      self,
+      label=None,
+      upd=None,
+      proxy=None,
+      statusfunc=None,
+      width=None,
+      report_print=None,
+      insert_pos=1,
+      deferred=False,
+  ):
+    ''' A context manager to create and withdraw a progress bar.
+       It yields the `UpdProxy` which displays the progress bar.
+
+        Parameters:
+        * `label`: a label for the progress bar,
+          default from `self.name`.
+        * `proxy`: an optional `UpdProxy` to display the progress bar
+        * `upd`: an optional `cs.upd.Upd` instance,
+          used to produce the progress bar status line if not supplied.
+          The default `upd` is `cs.upd.Upd()`
+          which uses `sys.stderr` for display.
+        * `statusfunc`: an optional function to compute the progress bar text
+          accepting `(self,label,width)`.
+        * `width`: an optional width expressioning how wide the progress bar
+          text may be.
+          The default comes from the `proxy.width` property.
+        * `report_print`: optional `print` compatible function
+          with which to write a report on completion;
+          this may also be a `bool`, which if true will use `Upd.print`
+          in order to interoperate with `Upd`.
+        * `insert_pos`: where to insert the progress bar, default `1`
+        * `deferred`: optional flag; if true do not create the
+          progress bar until the first update occurs.
+
+        Example use:
+
+            # display progress reporting during upload_filename()
+            # which updates the supplied Progress instance
+            # during its operation
+            P = Progress(name=label)
+            with P.bar(report_print=True):
+                upload_filename(src, progress=P)
+
+    '''
+    if label is None:
+      label = self.name
+    if upd is None:
+      upd = Upd()
+    if width is None:
+      width = upd.columns
+    if statusfunc is None:
+      statusfunc = lambda P, label, width: P.status(label, width)
+    pproxy = [proxy]
+    proxy_delete = proxy is None
+    update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
+
+    def update(P, datum):
+      proxy = pproxy[0]
+      if proxy is None:
+        proxy = pproxy[0] = upd.insert(insert_pos, 'LABEL=' + label)
+      proxy(statusfunc(P, label, width or proxy.width))
+
+    try:
+      if not deferred:
+        if proxy is None:
+          proxy = pproxy[0] = upd.insert(insert_pos)
+        proxy(statusfunc(self, label, width or proxy.width))
+      self.notify_update.add(update)
+      start_pos = self.position
+      yield pproxy[0]
+    finally:
+      self.notify_update.remove(update)
+      if proxy and proxy_delete:
+        proxy.delete()
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = upd_print
+      report_print(
+          label + ':', self.format_counter(self.position - start_pos), 'in',
+          transcribe(
+              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+          )
+      )
+
+  # pylint: disable=too-many-arguments
+  def iterbar(
       self,
       it,
       label=None,
@@ -300,8 +392,8 @@ class BaseProgress(object):
       update_frequency=None,
       report_print=None,
   ):
-    ''' Generator yielding values from the iterable `it`
-        while updating a progress bar.
+    ''' An iterable progress bar: a generator yielding values
+        from the iterable `it` while updating a progress bar.
 
         Parameters:
         * `it`: the iterable to consume and yield.
@@ -343,7 +435,7 @@ class BaseProgress(object):
             from cs.units import DECIMAL_SCALE
             rows = [some list of data]
             P = Progress(total=len(rows), units_scale=DECIMAL_SCALE)
-            for row in P.bar(rows, incfirst=True):
+            for row in P.iterbar(rows, incfirst=True):
                 ... do something with each row ...
 
             f = open(data_filename, 'rb')
@@ -355,7 +447,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.bar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -439,7 +531,8 @@ class Progress(BaseProgress):
           my_thing.amount = Progress(my_thing.amount)
   '''
 
-  def __init__( # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments
+  def __init__(
       self,
       position=None,
       name=None,
@@ -540,11 +633,13 @@ class Progress(BaseProgress):
             >>> P.position
             12
     '''
+    if new_position < self.latest.position:
+      debug(
+          "%s.update: new position %s < latest position %s", self,
+          new_position, self.latest.position
+      )
     if update_time is None:
       update_time = time.time()
-    ##if new_position < self.position:
-    ##  warning("%s.update: .position going backwards from %s to %s",
-    ##          self, self.position, new_position)
     datum = CheckPoint(update_time, new_position)
     self._positions.append(datum)
     self._flushed = False
@@ -660,11 +755,11 @@ class Progress(BaseProgress):
       return 0
     if low_time >= now:
       # in the future? warn and return 0
-      warning('low_time=%s >= now=%s', low_time, now)
+      debug('low_time=%s >= now=%s', low_time, now)
       return 0
     rate = float(self.position - low_pos) / (now - low_time)
     if rate < 0:
-      warning('rate < 0 (%s)', rate)
+      debug('rate < 0 (%s)', rate)
     return rate
 
 class OverProgress(BaseProgress):
@@ -788,7 +883,7 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.bar`.
+  ''' Convenience function to construct and run a `Progress.iterbar`.
 
       Parameters:
       * `it`: the iterable to consume
@@ -801,7 +896,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       If `total` is `None` and `it` supports `len()`
       then the `Progress.total` is set from it.
 
-      All arguments are passed through to `Progress.bar`.
+      All arguments are passed through to `Progress.iterbar`.
 
       Example use:
 
@@ -815,9 +910,39 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       total = None
   yield from Progress(
       name=label, total=total, units_scale=units_scale
-  ).bar(
+  ).iterbar(
       it, label=label, **kw
   )
+
+@decorator
+def auto_progressbar(func, label=None, report_print=False):
+  ''' Decorator for function which accept an optional `progress` parameter.
+      If `progress` is `None` and the default `Upd` is not disabled,
+      run the function with a progress bar.
+  '''
+
+  def wrapper(
+      *a,
+      progress=None,
+      progress_name=None,
+      progress_total=None,
+      progress_report_print=None,
+      **kw
+  ):
+    if progress_name is None:
+      progress_name = label or funcname(func)
+    if progress_report_print is None:
+      progress_report_print = report_print
+    if progress is None:
+      upd = Upd()
+      if not upd.disabled:
+        progress = Progress(name=progress_name, total=progress_total)
+        with progress.bar(report_print=progress_report_print):
+          return func(*a, progress=progress, **kw)
+    else:
+      return func(*a, progress=progress, **kw)
+
+  return wrapper
 
 if __name__ == '__main__':
   from cs.units import DECIMAL_SCALE
@@ -825,10 +950,11 @@ if __name__ == '__main__':
   lines += lines
   for line in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for line in progressbar(lines, "lines step 100", update_frequency=100, report_print=True):
+  for line in progressbar(lines, "lines step 100", update_frequency=100,
+                          report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for line in P.bar(open(__file__)):
+  for line in P.iterbar(open(__file__)):
     time.sleep(0.005)
   from cs.debug import selftest
   selftest('cs.progress_tests')

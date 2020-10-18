@@ -158,12 +158,12 @@ class _Late_context_manager(object):
     '''
 
     def run():
-      ''' This is the placeholder function dispatched by the Later instance.
-          It releases the "commence" lock for __enter__ to acquire,
-          permitting to with-suite to commence.
+      ''' This is the placeholder function dispatched by the `Later` instance.
+          It releases the "commence" lock for `__enter__` to acquire,
+          permitting the with-suite to commence.
           It then blocks waiting to acquire the "completed" lock;
-          __exit__ releases that lock permitting the placeholder to return
-          and release the Later resource.
+          `__exit__` releases that lock permitting the placeholder to return
+          and release the `Later` resource.
       '''
       self.commence.release()
       self.completed.acquire()
@@ -382,10 +382,10 @@ class Later(MultiOpenMixin):
         else:
           LF = pri_entry[-1]
           self.running.add(LF)
-          # NB: set up notify before dispatch so that it cannot
+          # NB: we set up notify before dispatch so that it cannot
           # fire before we release the lock (which would happen if
           # the LF completes really fast - notify fires immediately
-          # in the current thread if the function is already complete.
+          # in the current thread if the function is already complete).
           LF.notify(self._complete_LF)
           debug("LATER: dispatch %s", LF)
           LF._dispatch()
@@ -713,9 +713,14 @@ class Later(MultiOpenMixin):
     return self._defer(func, *a, **kw)
 
   def _defer(self, func, *a, **kw):
+    # snapshot the arguments as supplied
+    # note; a shallow snapshot
     if a:
       a = list(a)
+    if kw:
+      kw = dict(kw)
     params = {}
+    # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
         params['name'] = func

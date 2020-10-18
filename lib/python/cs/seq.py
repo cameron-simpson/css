@@ -387,6 +387,38 @@ class StatefulIterator(object):
     self.state = new_state
     return item
 
+def splitoff(sq, *sizes):
+  ''' Split a sequence into (usually short) prefixes and a tail,
+      for example to construct subdirectory trees based on a UUID.
+
+      Example:
+
+          >>> from uuid import UUID
+          >>> uuid = 'd6d9c510-785c-468c-9aa4-b7bda343fb79'
+          >>> uu = UUID(uuid).hex
+          >>> uu
+          'd6d9c510785c468c9aa4b7bda343fb79'
+          >>> splitoff(uu, 2, 2)
+          ['d6', 'd9', 'c510785c468c9aa4b7bda343fb79']
+  '''
+  if len(sizes) < 1:
+    raise ValueError("no sizes")
+  offset = 0
+  parts = []
+  for size in sizes:
+    if size < 1:
+      raise ValueError("size:%s < 1" % (size,))
+    end_offset = offset + size
+    if end_offset >= len(sq):
+      raise ValueError(
+          "size:%s consumes up to or beyond"
+          " the end of the sequence (length %d)" % (size, len(sq))
+      )
+    parts.append(sq[offset:end_offset])
+    offset = end_offset
+  parts.append(sq[offset:])
+  return parts
+
 if __name__ == '__main__':
   import sys
   import cs.seq_tests

@@ -335,7 +335,7 @@ class AdjustableSemaphore(object):
       self.__value = newvalue
 
 @decorator
-def locked(func, initial_timeout=2.0, lockattr='_lock'):
+def locked(func, initial_timeout=10.0, lockattr='_lock'):
   ''' A decorator for instance methods that must run within a lock.
 
       Decorator keyword arguments:
@@ -381,14 +381,14 @@ def locked_property(
       The lock is taken if the value needs to computed.
 
       The default lock attribute is `._lock`.
-      The default attribute for the cached value is `._`funcname
-      where funcname is `func.__name__`.
+      The default attribute for the cached value is `._`*funcname*
+      where *funcname* is `func.__name__`.
       The default "unset" value for the cache is `None`.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
 
-  @transmute(AttributeError)
+  @transmute(exc_from=AttributeError)
   def getprop(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset.
@@ -398,7 +398,7 @@ def locked_property(
       try:
         lock = getattr(self, lock_name)
       except AttributeError:
-        error("no .%s attribute", lock_name)
+        error("no %s.%s attribute", type(self).__name__, lock_name)
         raise
       with lock:
         p = getattr(self, prop_name, unset_object)
@@ -417,8 +417,8 @@ def locked_property(
   return prop(getprop)
 
 class LockableMixin(object):
-  ''' Trite mixin to control access to an object via its ._lock attribute.
-      Exposes the ._lock as the property .lock.
+  ''' Trite mixin to control access to an object via its `._lock` attribute.
+      Exposes the `._lock` as the property `.lock`.
       Presents a context manager interface for obtaining an object's lock.
   '''
 
