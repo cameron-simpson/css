@@ -260,7 +260,7 @@ class CloudBackupCommand(BaseCommand):
       for subsubpath, details in backup.walk(subpath, backup_uuid=backup_uuid,
                                              all_backups=all_backups):
         for name, name_details in sorted(details.items()):
-          pathname = joinpath(subsubpath, name)
+          pathname = joinpath(subsubpath, name) if subsubpath else name
           if all_backups:
             print(pathname + ":")
             for backup in name_details.backups:
