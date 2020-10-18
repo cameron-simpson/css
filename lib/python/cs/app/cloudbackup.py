@@ -1106,12 +1106,34 @@ class NamedBackup(SingletonMixin):
     ''' Back up everything in `backup_root_dirpath/topsubpath`
         recording the results against `backup_record`.
     '''
-    # TODO: spawn per-folder backups via a Later
-    if topsubpath:
+    if not topsubpath:
+      topdirpath = backup_root_dirpath
+    else:
       validate_subpath(topsubpath)
       topdirpath = joinpath(backup_root_dirpath, topsubpath)
-    else:
-      topdirpath = backup_root_dirpath
+      # ensure the required dirstates exist
+      # otherwise we might backup a/b/c but have no path from '' to a/b/c
+      backup_uuid = backup_run.backup_uuid
+      need_subpath = topsubpath
+      while need_subpath:
+        print("backup_tree: need_subpath =", need_subpath)
+        with Pfx(need_subpath):
+          base = basename(need_subpath)
+          updirpath = dirname(need_subpath)
+          assert updirpath != '.'
+          need_dirpath = joinpath(backup_root_dirpath, need_subpath)
+          with Pfx("lstat(%r)", need_dirpath):
+            S = os.lstat(need_dirpath)
+          if not S_ISDIR(S.st_mode):
+            raise ValueError("not a directory")
+          dirstate = self.dirstate(updirpath)
+          base_backups = dirstate.by_name.get(base)
+          if base_backups is None:
+            base_backups = FileBackupState(name=base, backups=[])
+            dirstate.add_to_mapping(base_backups)
+          base_backups.add_dir(backup_uuid=backup_uuid, stat=S)
+          dirstate.add_to_mapping(base_backups, exists_ok=True)
+        need_subpath = updirpath
     status_proxy = backup_run.status_proxy
     status_proxy("os.walk %r ...", topdirpath)
     Rs = []
