@@ -881,6 +881,7 @@ class BackupRun(RunStateMixin):
     signal.signal(signal.SIGINT, self.previous_interrupt)
     self.runstate.stop()
     self.backup_record.end()
+    self.named_backup.add_backup_record(self.backup_record)
     for proxy in self.file_proxies:
       proxy.delete()
     for proxy in self.folder_proxies:
