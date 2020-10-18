@@ -837,6 +837,10 @@ class BackupRun(RunStateMixin):
     folder_proxies = set(
         upd.insert(1, 'FOLDER') for _ in range(self.folder_parallel)
     )
+    backup_record = BackupRecord(
+        public_key_name=self.public_key_name,
+        content_path=self.content_path,
+    )
 
     def interrupt(signum, frame):
       ''' Receive interrupt, cancel the `RunState`.
@@ -853,10 +857,7 @@ class BackupRun(RunStateMixin):
                 "%s.runstate(%s,%s)" %
                 (type(self).__name__, self.cloud_area, self.public_key_name)
             ),
-            backup_record=BackupRecord(
-                public_key_name=self.public_key_name,
-                content_path=self.content_path,
-            ),
+            backup_record=backup_record,
             status_proxy=status_proxy,
             folder_later=Later(self.folder_parallel, inboundCapacity=16),
             folder_proxies=folder_proxies,
