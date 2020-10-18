@@ -1038,7 +1038,7 @@ class NamedBackup(SingletonMixin):
   # pylint: disable=too-many-branches
   def walk(self, subpath: str, *, backup_uuid=None, all_backups=False):
     ''' Walk the backups of `subpath`, yield `(subsubpath,details)`.
-        Only subsubpaths with nondirectory children are yiedled.
+        Note that only subsubpaths with nondirectory children are yiedled.
 
         If `all_backups` is true, the `details` are the complete
         name->backup_states mapping for that directory.
@@ -1069,11 +1069,15 @@ class NamedBackup(SingletonMixin):
       dirstate = self.dirstate(subpath)
       details = {}
       for name, file_backups in sorted(dirstate.by_name.items()):
+        pathname = joinpath(subpath, name)
         if all_backups:
           details[name] = file_backups
+          for each_backup in map(UUIDedDict, file_backups.backups):
+            if S_ISDIR(each_backup.st_mode):
+              q.append(pathname)
+              break
           continue
         # locate the records for backup_uuid
-        pathname = joinpath(subpath, name)
         file_backup = None
         for each_backup in map(UUIDedDict, file_backups.backups):
           if each_backup.uuid == backup_uuid:
