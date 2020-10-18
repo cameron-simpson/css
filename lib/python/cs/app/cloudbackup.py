@@ -168,23 +168,23 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} /path/to/topdir [subpaths...]
-          For each subpath, back up /path/to/topdir/subpath into the named
-          backup area. If no subpaths are specified, back up all of
-          /path/to/topdir.
+    ''' Usage: {cmd} /path/to/backup_root [subpaths...]
+          For each subpath, back up /path/to/backup_root/subpath into the
+          named backup area. If no subpaths are specified, back up all of
+          /path/to/backup_root.
     '''
     badopts = False
     if not argv:
-      warning("missing topdir")
+      warning("missing backup_root")
       badopts = True
     else:
-      topdir = argv.pop(0)
-      with Pfx("topdir %r", topdir):
-        if not isabspath(topdir):
-          warning("topdir not an absolute path")
+      backup_root_dirpath = argv.pop(0)
+      with Pfx("backup_root %r", backup_root_dirpath):
+        if not isabspath(backup_root_dirpath):
+          warning("backup_root not an absolute path")
           badopts = True
         else:
-          if not isdirpath(topdir):
+          if not isdirpath(backup_root_dirpath):
             warning("not a directory")
             badopts = True
     subpaths = argv
@@ -196,7 +196,7 @@ class CloudBackupCommand(BaseCommand):
           warning(unpfx(str(e)))
           badopts = True
         else:
-          subdirpath = joinpath(topdir, subpath)
+          subdirpath = joinpath(backup_root_dirpath, subpath)
           if not isdirpath(subdirpath):
             warning("not a directory: %r", subdirpath)
             badopts = True
@@ -204,7 +204,7 @@ class CloudBackupCommand(BaseCommand):
       raise GetoptError("bad invocation")
     ##print(
     ##    "backup %s/%s => %s as %r" % (
-    ##        topdir, (
+    ##        backup_root_dirpath, (
     ##            ','.join(subpaths)
     ##            if len(subpaths) > 1 else subpaths[0] if subpaths else ''
     ##        ), options.cloud_backup.cloud_area.cloudpath, backup_name
@@ -218,7 +218,7 @@ class CloudBackupCommand(BaseCommand):
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
-          topdir,
+          backup_root_dirpath,
           subpaths or ('',),
           backup_name=options.backup_name,
           public_key_name=options.key_name
@@ -678,14 +678,14 @@ class CloudBackup:
   def run_backup(
       self,
       cloud_area: CloudArea,
-      topdir: str,
+      backup_root_dirpath: str,
       subpaths,
       *,
       backup_name,
       public_key_name=None,
   ):
-    ''' Run a new backup of data from `topdir`,
-        backing up everything from each `topdir/subpath` downward.
+    ''' Run a new backup of data from `backup_root_dirpath`,
+        backing up everything from each `backup_root_dirpath/subpath` downward.
         Return the `NamedBackup`.
     '''
     if not subpaths:
@@ -696,8 +696,11 @@ class CloudBackup:
       public_key_name = self.latest_key_name()
       if public_key_name is None:
         raise ValueError("no public_key_name and no self.latest_key_name()")
-    if not isdirpath(topdir):
-      raise ValueError("topdir is not a directory: %r" % (topdir,))
+    if not isdirpath(backup_root_dirpath):
+      raise ValueError(
+          "backup_root_dirpath is not a directory: %r" %
+          (backup_root_dirpath,)
+      )
     for subpath in subpaths:
       if subpath:
         validate_subpath(subpath)
@@ -709,7 +712,7 @@ class CloudBackup:
       for subpath in subpaths:
         named_backup.backup_tree(
             backup_run,
-            topdir,
+            backup_root_dirpath,
             subpath,
         )
       backup_record = backup_run.backup_record
@@ -1089,18 +1092,18 @@ class NamedBackup(SingletonMixin):
   def backup_tree(
       self,
       backup_run: BackupRun,
-      topdir: str,
+      backup_root_dirpath: str,
       topsubpath: str,
   ):
-    ''' Back up everything in `topdir/topsubpath`
+    ''' Back up everything in `backup_root_dirpath/topsubpath`
         recording the results against `backup_record`.
     '''
     # TODO: spawn per-folder backups via a Later
     if topsubpath:
       validate_subpath(topsubpath)
-      topdirpath = joinpath(topdir, topsubpath)
+      topdirpath = joinpath(backup_root_dirpath, topsubpath)
     else:
-      topdirpath = topdir
+      topdirpath = backup_root_dirpath
     status_proxy = backup_run.status_proxy
     status_proxy("os.walk %r ...", topdirpath)
     Rs = []
@@ -1110,20 +1113,21 @@ class NamedBackup(SingletonMixin):
       if runstate.cancelled:
         break
       status_proxy("os.walk %s/", dirpath)
-      subpath = relpath(dirpath, topdirpath)
+      subpath = relpath(dirpath, backup_root_dirpath)
       if subpath == '.':
         subpath = ''
       Rs.append(
           L.defer(
-              self.backup_single_directory, backup_run, topdirpath, subpath
+              self.backup_single_directory, backup_run, backup_root_dirpath,
+              subpath
           )
       )
       # walk the children lexically ordered
       dirnames[:] = sorted(dirnames)
     if Rs:
       for R in progressbar(report(Rs), total=len(Rs),
-                           label="%s: wait for subdirectories" % (topdir,),
-                           proxy=status_proxy):
+                           label="%s: wait for subdirectories" %
+                           (backup_root_dirpath,), proxy=status_proxy):
         try:
           R()
         except Exception as e:  # pylint: disable=broad-except
@@ -1135,7 +1139,7 @@ class NamedBackup(SingletonMixin):
   def backup_single_directory(
       self,
       backup_run: BackupRun,
-      topdir,
+      backup_root_dirpath,
       subpath,
   ):
     ''' Backup the immediate contents of a particular subdirectory.
@@ -1147,7 +1151,7 @@ class NamedBackup(SingletonMixin):
     runstate = backup_run.runstate
     backup_record = backup_run.backup_record
     backup_uuid = backup_record.uuid
-    dirpath = joinpath(topdir, subpath)
+    dirpath = joinpath(backup_root_dirpath, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = dirpath + ': '
@@ -1239,7 +1243,7 @@ class NamedBackup(SingletonMixin):
                 R = L.defer(
                     self.backup_filename,
                     backup_run,
-                    topdir,
+                    backup_root_dirpath,
                     rfilepath,
                     prevstate=prevstate,
                 )
@@ -1297,12 +1301,12 @@ class NamedBackup(SingletonMixin):
   def backup_filename(
       self,
       backup_run: BackupRun,
-      topdir: str,
+      backup_root_dirpath: str,
       subpath: str,
       *,
       prevstate,
   ):
-    ''' Back up a single file *topdir*`/`*subpath*,
+    ''' Back up a single file *backup_root_dirpath*`/`*subpath*,
         return its stat and hashcode.
         Return `(None,None)` if cancelled.
 
@@ -1314,7 +1318,7 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
-    filename = joinpath(topdir, subpath)
+    filename = joinpath(backup_root_dirpath, subpath)
     with backup_run.file_proxy() as proxy:
       proxy.prefix = filename + ': '
       backup_record = backup_run.backup_record
