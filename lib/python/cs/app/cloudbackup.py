@@ -14,9 +14,10 @@ from getpass import getpass
 from mmap import mmap, PROT_READ
 from os import readlink, stat_result
 from os.path import (
-    isabs as isabspath,
+    basename,
     dirname,
     exists as existspath,
+    isabs as isabspath,
     isfile as isfilepath,
     isdir as isdirpath,
     join as joinpath,
@@ -683,7 +684,7 @@ class CloudBackup:
       *,
       backup_name,
       public_key_name=None,
-  ):
+  ) -> "BackupRecord":
     ''' Run a new backup of data from `backup_root_dirpath`,
         backing up everything from each `backup_root_dirpath/subpath` downward.
         Return the `NamedBackup`.
@@ -1361,6 +1362,7 @@ class NamedBackup(SingletonMixin):
         if runstate.cancelled:
           ##warning("cancelled")
           return None, None
+        # checksum the file contents
         with open(filename, 'rb') as f:
           fd = f.fileno()
           ##fd = os.open(filename, O_RDONLY)
