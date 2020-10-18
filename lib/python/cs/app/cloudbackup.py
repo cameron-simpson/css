@@ -1014,8 +1014,8 @@ class NamedBackup(SingletonMixin):
     '''
     if subpath:
       validate_subpath(subpath)
-    dirstate = self._dirstates.get(subpath)
-    if dirstate is None:
+    state = self._dirstates.get(subpath)
+    if state is None:
       uu_sp = self.diruuids.by_subpath.get(subpath)
       if uu_sp:
         uu = uu_sp.uuid
@@ -1026,10 +1026,12 @@ class NamedBackup(SingletonMixin):
       dirstate_path = joinpath(
           self.dirstates_dirpath, dirname(uupath), uu.hex
       ) + '.ndjson'
-      dirstate = UUIDNDJSONMapping(dirstate_path, dictclass=FileBackupState)
-      dirstate.uuid = uu
-      dirstate.subpath = subpath
-    return dirstate
+      state = UUIDNDJSONMapping(
+          dirstate_path, dictclass=FileBackupState, create=True
+      )
+      state.uuid = uu
+      state.subpath = subpath
+    return state
 
   # pylint: disable=too-many-branches
   def walk(self, subpath: str, *, backup_uuid=None, all_backups=False):
