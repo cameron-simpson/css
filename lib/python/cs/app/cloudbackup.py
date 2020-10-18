@@ -861,6 +861,7 @@ class BackupRun(RunStateMixin):
                 (type(self).__name__, self.cloud_area, self.public_key_name)
             ),
             backup_record=backup_record,
+            backup_uuid=backup_record.uuid,
             status_proxy=status_proxy,
             folder_later=Later(self.folder_parallel, inboundCapacity=16),
             folder_proxies=folder_proxies,
