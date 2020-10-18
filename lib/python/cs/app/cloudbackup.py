@@ -1114,7 +1114,9 @@ class NamedBackup(SingletonMixin):
       if subpath == '.':
         subpath = ''
       Rs.append(
-          L.defer(self.backup_single_directory, backup_run, topdir, subpath)
+          L.defer(
+              self.backup_single_directory, backup_run, topdirpath, subpath
+          )
       )
       # walk the children lexically ordered
       dirnames[:] = sorted(dirnames)
