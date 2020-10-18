@@ -1202,6 +1202,9 @@ class NamedBackup(SingletonMixin):
               if prevstate is None:
                 ##print("CHANGED (no prevstate)", pathname)
                 changed = True
+              elif not S_ISREG(prevstate.st_mode):
+                ##print("CHANGED (previous not a file)", pathname)
+                changed = True
               else:
                 prev_mode = prevstate['st_mode']
                 prev_mtime = prevstate['st_mtime']
@@ -1356,7 +1359,8 @@ class NamedBackup(SingletonMixin):
               basepath, public_key_name=public_key_name
           )
           # TODO: a check_uploaded flag?
-          if prevstate and hashcode == prevstate.hashcode:
+          if (prevstate and S_ISREG(prevstate.st_mode)
+              and hashcode == prevstate.hashcode):
             # assume content already uploaded in the previous backup
             # TODO: check that? cloud.stat?
             if public_key_name == prevstate.public_key_name:
