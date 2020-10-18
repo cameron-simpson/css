@@ -74,7 +74,7 @@ class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
-  GETOPT_SPEC = 'A:d:k:'
+  GETOPT_SPEC = 'A:d:k:n:'
   USAGE_FORMAT = r'''Usage: {cmd} [options] subcommand [...]
     Encrypted cloud backup utility.
     Options:
@@ -84,8 +84,14 @@ class CloudBackupCommand(BaseCommand):
                     Default: $HOME/.cloudbackup
       -k key_name   Specify the name of the public/private key to
                     use for operations. The default is from the
-                    $CLOUDBACKUP_KEYNAME environment or from the most recent
-                    existing key pair.
+                    $CLOUDBACKUP_KEYNAME environment variable or from the
+                    most recent existing key pair.
+      -n backup_name A named backup area, corresponding to a directory tree
+                    to be backed up.  The default is from the
+                    $CLOUDBACKUP_NAME environment variable.
+                    All the named areas usually share the cloud_area,
+                    providing file-level deduplication.  Backup and restore
+                    subpaths are relative to a named backup area.
   '''
 
   # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
@@ -119,6 +125,7 @@ class CloudBackupCommand(BaseCommand):
     options.cloud_area_path = os.environ.get('CLOUDBACKUP_AREA')
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
+    options.backup_name = os.environ.get('CLOUDBACKUP_NAME')
 
   @staticmethod
   def apply_opts(opts, options):
@@ -132,20 +139,34 @@ class CloudBackupCommand(BaseCommand):
           options.state_dirpath = val
         elif opt == '-k':
           options.key_name = val
+        elif opt == '-n':
+          options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
     options.cloud_backup = CloudBackup(options.state_dirpath)
+    badopts = False
+    if options.backup_name is None:
+      warning("no backup_name specified")
+      print("The follow backup names exist:", file=sys.stderr)
+      for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
+                                                    'backups'))):
+        if is_identifier(backup_name):
+          print(" ", backup_name, file=sys.stderr)
+      badopts = True
+    elif not is_identifier(options.backup_name):
+      warning(
+          "invalid backup name, not an identifier: %r", options.backup_name
+      )
+      badopts = True
+    if badopts:
+      raise GetoptError("bad options")
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} topdir backup_name [subpaths...]
-          For each subpath, back up topdir/subpath into the backup
-          named backup_name. If no subpaths are specified, back up
-          all of topdir.
-          backup_name
-              The name of the backup collection rooted at topdir.
-          subpath
-              A path within topdir to back up.
+    ''' Usage: {cmd} /path/to/topdir [subpaths...]
+          For each subpath, back up /path/to/topdir/subpath into the named
+          backup area. If no subpaths are specified, back up all of
+          /path/to/topdir.
     '''
     badopts = False
     if not argv:
@@ -156,15 +177,6 @@ class CloudBackupCommand(BaseCommand):
       with Pfx("topdir %r", topdir):
         if not isdirpath(topdir):
           warning("not a directory")
-          badopts = True
-    if not argv:
-      warning("missing backup_name")
-      badopts = True
-    else:
-      backup_name = argv.pop(0)
-      with Pfx("backup_name %r", backup_name):
-        if not is_identifier(backup_name):
-          warning("not an identifier")
           badopts = True
     subpaths = argv
     for subpath in subpaths:
@@ -205,8 +217,8 @@ class CloudBackupCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd} backup_name [subpaths...]
-          List the files in the backup named backup_name.
+    ''' Usage: {cmd} [subpaths...]
+          List the files in the backup.
     '''
     # TODO: list backup names if no backup_name
     # TODO: list backup_uuids?
@@ -215,14 +227,6 @@ class CloudBackupCommand(BaseCommand):
     badopts = False
     all_backups = False
     backup_uuid = None
-    if not argv:
-      warning("missing backup_name")
-      badopts = True
-    else:
-      backup_name = argv.pop(0)
-      if not is_identifier(backup_name):
-        warning("backup_name is not an identifier: %r", backup_name)
-        badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -238,7 +242,6 @@ class CloudBackupCommand(BaseCommand):
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
     cloud_backup = options.cloud_backup
-    backup = cloud_backup[backup_name]
     with Upd().insert(1) as proxy:
       proxy.prefix = f"{cmd} {backup} "
       for subpath in subpaths:
@@ -254,6 +257,7 @@ class CloudBackupCommand(BaseCommand):
               print(pathname + ":")
               for backup in name_details.backups:
                 print(" ", repr(backup))
+    backup = cloud_backup[options.backup_name]
             else:
               st_mode = name_details.st_mode
               assert not S_ISDIR(st_mode)
@@ -283,7 +287,7 @@ class CloudBackupCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   @staticmethod
   def cmd_restore(argv, options):
-    ''' Usage: {cmd} -o outputdir [-U backup_uuid] backup_name [subpaths...]
+    ''' Usage: {cmd} -o outputdir [-U backup_uuid] [subpaths...]
           Restore files from the named backup.
           Options:
             -o outputdir    Output directory to create to hold the
@@ -315,14 +319,6 @@ class CloudBackupCommand(BaseCommand):
         if existspath(restore_dirpath):
           warning("already exists")
           badopts = True
-    if not argv:
-      warning("missing backup_name")
-      badopts = True
-    else:
-      backup_name = argv.pop(0)
-      if not is_identifier(backup_name):
-        warning("backup_name is not an identifier: %r", backup_name)
-        badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -338,7 +334,7 @@ class CloudBackupCommand(BaseCommand):
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
     cloud_backup = options.cloud_backup
-    backup = cloud_backup[backup_name]
+    backup = cloud_backup[options.backup_name]
     if backup_uuid is None:
       backup_record = backup.latest_backup_record()
       if backup_record is None:
