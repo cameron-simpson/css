@@ -21,13 +21,13 @@ from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.lex import hexify
+from cs.logutils import warning
 from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method
 from cs.progress import progressbar, auto_progressbar
 from cs.queues import IterableQueue
 from cs.threads import locked, locked_property
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from . import Cloud
 
 class B2Credentials(namedtuple('B2Credentials', 'keyId apiKey')):
@@ -85,6 +85,8 @@ class B2Cloud(SingletonMixin, Cloud):
 
   @locked
   def bucket_by_name(self, bucket_name: str):
+    ''' Caching function to return a B2 `Bucket` instance for `bucket_name`.
+    '''
     try:
       bucket = self._buckets_by_name[bucket_name]
     except KeyError:
