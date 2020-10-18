@@ -756,12 +756,26 @@ class BackupRecord(UUIDedDict):
     self['count_uploaded_files'] = count_uploaded_files
     self.content_area = CloudArea.from_cloudpath(content_path)
 
+  def start(self, when=None):
+    ''' Set `self.timestamp_start` to `when`, default `time.time()`.
+    '''
+    if when is None:
+      when = time.time()
+    self['timestamp_start'] = when
+
   def __enter__(self):
-    self['timestamp_start'] = time.time()
+    self.start()
     return self
 
+  def end(self, when=None):
+    ''' Set `self.timestamp_end` to `when`, default `time.time()`.
+    '''
+    if when is None:
+      when = time.time()
+    self['timestamp_end'] = when
+
   def __exit__(self, exc_type, exc_value, exc_traceback):
-    self['timestamp_end'] = time.time()
+    self.end()
 
 class BackupRun(RunStateMixin):
   ''' State management and display for a multithreaded backup run.
