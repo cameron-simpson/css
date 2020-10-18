@@ -10,7 +10,6 @@
 
 from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
-import datetime
 import errno
 from functools import partial
 import json
@@ -25,8 +24,9 @@ from os.path import (
     basename,
     dirname,
     exists as existspath,
-    isdir,
     isabs as isabspath,
+    isdir,
+    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
