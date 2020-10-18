@@ -189,11 +189,11 @@ class CloudBackupCommand(BaseCommand):
             badopts = True
     subpaths = argv
     for subpath in subpaths:
-      with Pfx("subpath %r"):
+      with Pfx("subpath %r", subpath):
         try:
           validate_subpath(subpath)
         except ValueError as e:
-          warning(str(e))
+          warning(unpfx(str(e)))
           badopts = True
         else:
           subdirpath = joinpath(topdir, subpath)
@@ -236,14 +236,14 @@ class CloudBackupCommand(BaseCommand):
     badopts = False
     all_backups = False
     backup_uuid = None
-    subpaths = argv
+    subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
         if subpath and subpath != '.':
           try:
             validate_subpath(subpath)
           except ValueError as e:
-            warning("invalid subpath: %r: %s", subpath, unpfx(str(e)))
+            warning("invalid subpath: %s", unpfx(str(e)))
             badopts = True
     if badopts:
       raise GetoptError("bad invocation")
@@ -328,14 +328,14 @@ class CloudBackupCommand(BaseCommand):
         if existspath(restore_dirpath):
           warning("already exists")
           badopts = True
-    subpaths = argv
+    subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
         if subpath and subpath != '.':
           try:
             validate_subpath(subpath)
           except ValueError as e:
-            warning("invalid subpath: %r: %s", subpath, unpfx(str(e)))
+            warning("invalid subpath: %s", unpfx(str(e)))
             badopts = True
     if badopts:
       raise GetoptError("bad invocation")
@@ -373,7 +373,7 @@ class CloudBackupCommand(BaseCommand):
       os.mkdir(restore_dirpath, 0o777)
     made_dirs.add(restore_dirpath)
     with Upd().insert(1) as proxy:
-      proxy.prefix = f"{cmd} {backup} "
+      proxy.prefix = f"{options.cmd} {backup} "
       for subpath in subpaths:
         if subpath == ".":
           subpath = ''
