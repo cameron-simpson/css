@@ -14,6 +14,7 @@ from getpass import getpass
 from mmap import mmap, PROT_READ
 from os import readlink, stat_result
 from os.path import (
+    isabs as isabspath,
     dirname,
     exists as existspath,
     isfile as isfilepath,
@@ -179,9 +180,13 @@ class CloudBackupCommand(BaseCommand):
     else:
       topdir = argv.pop(0)
       with Pfx("topdir %r", topdir):
-        if not isdirpath(topdir):
-          warning("not a directory")
+        if not isabspath(topdir):
+          warning("topdir not an absolute path")
           badopts = True
+        else:
+          if not isdirpath(topdir):
+            warning("not a directory")
+            badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r"):
