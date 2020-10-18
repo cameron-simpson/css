@@ -993,7 +993,7 @@ class NamedBackup(SingletonMixin):
       return None
     return max(
         self.backup_records.by_uuid.values(),
-        key=lambda backup_record: backup_record.timestamp_end or 0
+        key=lambda backup_record: backup_record.get('timestamp_end') or 0
     )
 
   @typechecked
