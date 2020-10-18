@@ -16,6 +16,7 @@ from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
+from cs.py.stack import caller
 
 from cs.x import X
 
@@ -53,7 +54,7 @@ def validate_subpath(subpath: str):
       raise ValueError("subpath contains '.' or '..'")
 
 class ParsedCloudPath(namedtuple('ParsedCloudPath',
-                           'cloudcls credentials bucket_name subpath')):
+                                 'cloudcls credentials bucket_name subpath')):
   ''' A deconstructed cloud path.
   '''
 
@@ -220,8 +221,10 @@ class Cloud(ABC):
         elif length != stat_length:
           # warn but do not override the caller
           warning(
-              "supplied length=%r != os.fstat().st_size=%r", length,
-              stat_length
+              "from %s, supplied length=%r != os.fstat().st_size=%r",
+              caller(),
+              length,
+              stat_length,
           )
         return self.upload_file(
             f,
