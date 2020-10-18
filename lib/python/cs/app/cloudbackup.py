@@ -1073,7 +1073,7 @@ class NamedBackup(SingletonMixin):
             file_backup = each_backup
             break
         if file_backup is None:
-          print(pathname, "MISSING", repr(file_backups.backups))
+          ##print(pathname, "MISSING", repr(file_backups.backups))
           continue
         if S_ISDIR(file_backup.st_mode):
           q.append(pathname)
