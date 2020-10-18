@@ -1005,7 +1005,7 @@ class NamedBackup(SingletonMixin):
   def add_backup_record(self, backup_record: BackupRecord):
     ''' Record a new `BackupRecord`.
     '''
-    self.backup_records.add_to_mapping(backup_record)
+    self.backup_records.add_to_mapping(backup_record, exists_ok=True)
 
   ##############################################################
   # DirStates
