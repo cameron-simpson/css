@@ -145,6 +145,10 @@ class CloudBackupCommand(BaseCommand):
           raise RuntimeError("unimplemented option")
     options.cloud_backup = CloudBackup(options.state_dirpath)
     badopts = False
+    if not isdirpath(options.state_dirpath):
+      print(f"{options.cmd}: mkdir {options.state_dirpath}")
+      with Pfx("mkdir(%r)", options.state_dirpath):
+        os.mkdir(options.state_dirpath, 0o777)
     if options.backup_name is None:
       warning("no backup_name specified")
       print("The follow backup names exist:", file=sys.stderr)
