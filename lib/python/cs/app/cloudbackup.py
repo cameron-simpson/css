@@ -253,34 +253,30 @@ class CloudBackupCommand(BaseCommand):
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
     cloud_backup = options.cloud_backup
-    with Upd().insert(1) as proxy:
-      proxy.prefix = f"{cmd} {backup} "
-      for subpath in subpaths:
-        if subpath == ".":
-          subpath = ''
-        for subsubpath, details in backup.walk(subpath,
-                                               backup_uuid=backup_uuid,
-                                               all_backups=all_backups):
-          proxy(subsubpath)
-          for name, name_details in sorted(details.items()):
-            pathname = joinpath(subsubpath, name)
-            if all_backups:
-              print(pathname + ":")
-              for backup in name_details.backups:
-                print(" ", repr(backup))
     backup = cloud_backup[options.backup_name]
+    for subpath in subpaths:
+      if subpath == ".":
+        subpath = ''
+      for subsubpath, details in backup.walk(subpath, backup_uuid=backup_uuid,
+                                             all_backups=all_backups):
+        for name, name_details in sorted(details.items()):
+          pathname = joinpath(subsubpath, name)
+          if all_backups:
+            print(pathname + ":")
+            for backup in name_details.backups:
+              print(" ", repr(backup))
+          else:
+            st_mode = name_details.st_mode
+            assert not S_ISDIR(st_mode)
+            if S_ISREG(st_mode):
+              print(
+                  pathname,
+                  "%d:%s" % (name_details.st_size, name_details.hashcode)
+              )
+            elif S_ISLNK(name_details.st_mode):
+              print(pathname, '->', name_details.link)
             else:
-              st_mode = name_details.st_mode
-              assert not S_ISDIR(st_mode)
-              if S_ISREG(st_mode):
-                print(
-                    pathname,
-                    "%d:%s" % (name_details.st_size, name_details.hashcode)
-                )
-              elif S_ISLNK(name_details.st_mode):
-                print(pathname, '->', name_details.link)
-              else:
-                print(pathname, "???", repr(name_details))
+              print(pathname, "???", repr(name_details))
 
   @staticmethod
   def cmd_new_key(argv, options):
