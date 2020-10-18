@@ -191,6 +191,7 @@ class B2Cloud(SingletonMixin, Cloud):
         Therefore we write a scratch file for the upload.
     '''
     with NamedTemporaryFile(dir='.') as T:
+      nbs = 0
       for bs in progressbar(
           bfr,
           label=(joinpath(self.bucketpath(bucket_name), path) +
@@ -199,8 +200,25 @@ class B2Cloud(SingletonMixin, Cloud):
           itemlenfunc=len,
           units_scale=BINARY_BYTES_SCALE,
       ):
-        T.write(bs)
+        while bs:
+          nwritten = T.write(bs)
+          if nwritten != len(bs):
+            warning(
+                "upload_buffer: %r.write(%d bytes) => %d", T.name, len(bs),
+                nwritten
+            )
+            bs = bs[nwritten:]
+          else:
+            bs = b''
+          nbs += nwritten
+      bfr.close()
       T.flush()
+      if nbs != length:
+        warning(
+            "upload_buffer: given length=%s, wrote %d bytes to %r", length,
+            nbs, T.name
+        )
+        length = nbs
       return self.upload_filename(
           T.name,
           bucket_name=bucket_name,
