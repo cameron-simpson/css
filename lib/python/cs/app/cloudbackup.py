@@ -1384,74 +1384,76 @@ class NamedBackup(SingletonMixin):
             return None, None
           hasher.update(mm)
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
-          # compute some crypt-side upload paths
-          basepath = self.hashcode_path(hashcode)
+        # compute some crypt-side upload paths
+        basepath = self.hashcode_path(hashcode)
+        if runstate.cancelled:
+          ##warning("cancelled")
+          return None, None
+        data_subpath, key_subpath = upload_paths(
+            basepath, public_key_name=public_key_name
+        )
+        # TODO: a check_uploaded flag?
+        if (prevstate and S_ISREG(prevstate.st_mode)
+            and hashcode == prevstate.hashcode):
+          # assume content already uploaded in the previous backup
+          # TODO: check that? cloud.stat?
+          if public_key_name == prevstate.public_key_name:
+            return hashcode, fstat
+          # previous upload used a different key
+          # check if the upload is keyed against the current key
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
-          data_subpath, key_subpath = upload_paths(
-              basepath, public_key_name=public_key_name
-          )
-          # TODO: a check_uploaded flag?
-          if (prevstate and S_ISREG(prevstate.st_mode)
-              and hashcode == prevstate.hashcode):
-            # assume content already uploaded in the previous backup
-            # TODO: check that? cloud.stat?
-            if public_key_name == prevstate.public_key_name:
+          if cloud.stat(bucket_name=bucket_name, path=key_subpath):
+            # content already uploaded and keyed against the current key
+            return hashcode, fstat
+          # TODO: not against the current key, can we decrypt a different key?
+          # the fall through here will be if no decryptable key is present
+          # need to enumerate the upstream keys for which we have
+          # local private keys by iterating over the local private key
+          # names
+          # look for a private key for which we already have a passphrase to hand
+          for private_key_name in cloud_backup.private_key_names():
+            passphrase = cloud_backup._passphrases.get(private_key_name)
+            if passphrase is not None:
+              other_private_path = cloud_backup.private_key_path(
+                  private_key_name
+              )
+              print(
+                  f"{filename}: recrypt passtext"
+                  " from {private_key_name} to {public_key_name}..."
+              )
+              if runstate.cancelled:
+                ##warning("cancelled")
+                return None, None
+              recrypt_passtext(
+                  cloud,
+                  bucket_name,
+                  basepath,
+                  old_key_name=private_key_name,
+                  old_private_path=other_private_path,
+                  old_passphrase=passphrase,
+                  new_key_name=public_key_name,
+                  new_public_path=self.cloud_backup
+                  .public_key_path(public_key_name),
+              )
               return hashcode, fstat
-            # previous upload used a different key
-            # check if the upload is keyed against the current key
-            if runstate.cancelled:
-              ##warning("cancelled")
-              return None, None
-            if cloud.stat(bucket_name=bucket_name, path=key_subpath):
-              # content already uploaded and keyed against the current key
-              return hashcode, fstat
-            # TODO: not against the current key, can we decrypt a different key?
-            # the fall through here will be if no decryptable key is present
-            # need to enumerate the upstream keys for which we have
-            # local private keys by iterating over the local private key
-            # names
-            # look for a private key for which we already have a passphrase to hand
-            for private_key_name in cloud_backup.private_key_names():
-              passphrase = cloud_backup._passphrases.get(private_key_name)
-              if passphrase is not None:
-                other_private_path = cloud_backup.private_key_path(
-                    private_key_name
-                )
-                print(
-                    f"{filename}: recrypt passtext"
-                    " from {private_key_name} to {public_key_name}..."
-                )
-                if runstate.cancelled:
-                  ##warning("cancelled")
-                  return None, None
-                recrypt_passtext(
-                    cloud,
-                    bucket_name,
-                    basepath,
-                    old_key_name=private_key_name,
-                    old_private_path=other_private_path,
-                    old_passphrase=passphrase,
-                    new_key_name=public_key_name,
-                    new_public_path=self.cloud_backup
-                    .public_key_path(public_key_name),
-                )
-                return hashcode, fstat
-            # no private keys with known passphrases
-            # TODO: if interactive, offer available keys, request passphrase
-          # need to reupload
-          # copy the file so that what we upload is stable
-          # this includes a second hashcode pass, alas
+          # no private keys with known passphrases
+          # TODO: if interactive, offer available keys, request passphrase
+        # need to reupload
+        # copy the file so that what we upload is stable
+        # this includes a second hashcode pass, alas
+        if runstate.cancelled:
+          ##warning("cancelled")
+          return None, None
+        with NamedTemporaryFile() as T:
+          shutil.copy(filename, T.name)
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
-          with NamedTemporaryFile() as T:
-            shutil.copy(filename, T.name)
-            if runstate.cancelled:
-              ##warning("cancelled")
-              return None, None
-            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
+          with open(T.name, 'rb') as f2:
+            fd2 = f2.fileno()
+            mm = mmap(fd2, fstat.st_size, prot=PROT_READ)
             hasher = DEFAULT_HASHCLASS.digester()
             if runstate.cancelled:
               ##warning("cancelled")
@@ -1466,9 +1468,9 @@ class NamedBackup(SingletonMixin):
             P = Progress(name="upload " + filename, total=0)
             with P.bar(insert_pos=-1, deferred=True, proxy=proxy):
               self.upload_hashcode_content(
-                  backup_record, fd, hashcode, len(mm), progress=P
+                  backup_record, fd2, hashcode, len(mm), progress=P
               )
-          return hashcode, fstat
+        return hashcode, fstat
 
   def upload_hashcode_content(
       self,
