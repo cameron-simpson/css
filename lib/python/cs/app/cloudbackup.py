@@ -213,14 +213,16 @@ class CloudBackupCommand(BaseCommand):
     # TODO: a facility to supply passphrases for use when recrypting
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
-    options.cloud_backup.init()
-    backup = options.cloud_backup.run_backup(
-        options.cloud_area,
-        topdir,
-        subpaths or ('',),
-        backup_name=backup_name,
-        public_key_name=options.key_name
-    )
+    with Upd().insert(1) as proxy:
+      proxy.prefix = f"{options.cmd} {options.backup_name} "
+      options.cloud_backup.init()
+      backup = options.cloud_backup.run_backup(
+          options.cloud_area,
+          topdir,
+          subpaths or ('',),
+          backup_name=options.backup_name,
+          public_key_name=options.key_name
+      )
     print("backup run completed ==>", backup)
 
   # pylint: disable=too-many-locals,too-many-branches
