@@ -372,7 +372,7 @@ class B2UploadFileShim(AbstractUploadSource):
   def open(self):
     ''' Just hand the buffer back, it supports reads.
     '''
-    if self.length:
+    if self.length and self.progress is not None:
       self.progress.total += self.length
     yield B2UploadFileWrapper(self.f, progress=self.progress)
 
