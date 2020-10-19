@@ -138,7 +138,6 @@ class B2Cloud(SingletonMixin, Cloud):
       return None
     return version.as_dict()
 
-  @auto_progressbar(report_print=True)
   def _b2_upload_file(
       self,
       f,
@@ -290,10 +289,6 @@ class B2Cloud(SingletonMixin, Cloud):
     else:
       file_info = self._b2_upload_file(
           f,
-          progress_name=(
-              joinpath(self.bucketpath(bucket_name), path) + " upload"
-          ),
-          progress_total=length,
           bucket_name=bucket_name,
           path=path,
           file_info=file_info,
