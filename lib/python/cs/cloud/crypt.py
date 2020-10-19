@@ -26,10 +26,12 @@ from os.path import join as joinpath
 from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 import sys
+from tempfile import NamedTemporaryFile
 from uuid import uuid4
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
+from cs.pfx import Pfx
 from . import validate_subpath, CloudArea
 
 # used when creating RSA keypairs
@@ -327,7 +329,7 @@ def recrypt_passtext(
   )
 
 def pubencrypt_popen(stdin, public_path, stdout=PIPE):
-  ''' Encrypt the `stdin` t `stdout`
+  ''' Encrypt the `stdin` to `stdout`
       using the public key from `public_path`,
       return `(per_file_passtext_enc,Popen)`.
 
@@ -449,48 +451,47 @@ def upload(
     if file_info and cloud.stat(bucket_name=bucket_name, path=key_subpath):
       # already exists, skip the upload
       return file_info, data_subpath, key_subpath
-  per_file_passtext_enc, P = pubencrypt_popen(stdin, public_path)
-  # Try to ccompute the length of the encrypted data.
-  # This is desired because the B2 backend at least wants the data length.
-  if length is None:
-    if isinstance(stdin, (tuple, list)):
-      # a list of byteslike objects
-      length = sum(map(len, stdin))
-    else:
-      # check for a filename or file descriptor
-      if isinstance(stdin, str):
-        S = os.stat(stdin)
-      elif isinstance(stdin, int) and stdin >= 0:
-        S = os.fstat(stdin)
-      else:
-        S = None
-      if S and S_ISREG(S.st_mode):
-        length = S.st_size
-  if length is None:
-    encrypted_length = None
-  else:
-    # TODO: this requires special knowledge of the encryption.
-    # It looks like "openssl enc -e -salt" prepends:
-    # 1 byte IV length
-    # 8 bytes IV
-    # 8 bytes salt
-    # (just surmised from some tests)
-    # and pads the result out to 16 bytes.
-    encrypted_length = 17 + length
-    encrypted_length += 16 - encrypted_length % 16
-  upload_result = cloud.upload_buffer(
-      CornuCopyBuffer.from_file(P.stdout),
-      bucket_name=bucket_name,
-      path=data_subpath,
-      progress=progress,
-      length=encrypted_length,
-  )
-  retcode = P.wait()
-  if retcode != 0:
-    raise ValueError("openssl %r returns exit code %s" % (
-        P.args,
-        retcode,
-    ))
+  # Encrypt directly into an upload file.
+  # See if the cloud has a preferred location for upload files.
+  cloud_tmpdir = cloud.tmpdir_for(bucket_name=bucket_name, path=data_subpath)
+  with NamedTemporaryFile(dir=cloud_tmpdir, suffix="enc-for-upload.dat") as T:
+    with Pfx("open(%r,'wb')", T.name):
+      with open(T.name, 'wb') as f:
+        per_file_passtext_enc, P = pubencrypt_popen(
+            stdin, public_path, stdout=f
+        )
+      retcode = P.wait()
+      if retcode != 0:
+        raise ValueError(
+            "openssl %r returns exit code %s" % (
+                P.args,
+                retcode,
+            )
+        )
+    with Pfx("lstat(%r)", T.name):
+      S = os.lstat(T.name)
+      if not S_ISREG(S.st_mode):
+        raise ValueError(
+            "expected a regular file, found st_mode=0o%5o" % (S.st_mode)
+        )
+    encrypted_length = S.st_size
+    # upload directly from the file,
+    # passing as_is=True so that the FSCloud implementation
+    # knows it may try a hard link
+    upload_result = cloud.upload_filename(
+        T.name,
+        bucket_name=bucket_name,
+        path=data_subpath,
+        progress=progress,
+        length=encrypted_length,
+        as_is=True,
+    )
+    retcode = P.wait()
+    if retcode != 0:
+      raise ValueError("openssl %r returns exit code %s" % (
+          P.args,
+          retcode,
+      ))
   cloud.upload_buffer(
       CornuCopyBuffer([per_file_passtext_enc]),
       bucket_name=bucket_name,
