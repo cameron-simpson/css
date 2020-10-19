@@ -156,7 +156,6 @@ class FSCloud(SingletonMixin, Cloud):
               warning(str(e))
           else:
             # success, do admin and return
-            print('LINK', filename, '=>', dst_filename)
             self._apply_file_info(
                 dst_filename, file_info=file_info, content_type=content_type
             )
@@ -164,7 +163,6 @@ class FSCloud(SingletonMixin, Cloud):
             result.update(path=dst_filename)
             return result
     # fall back to the default implementation
-    print("UPLOAD: fall back to super.upload_filename")
     return super().upload_filename(
         filename,
         bucket_name=bucket_name,
