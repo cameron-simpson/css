@@ -1090,6 +1090,44 @@ class NamedBackup(SingletonMixin):
       if details:
         yield subpath, details
 
+  @typechecked
+  def attach_subpath(
+      self, backup_root_dirpath: str, subpath: str, *, backup_uuid: UUID
+  ):
+    ''' Attach the directory at `subpath` to the tree root.
+
+        This is required because it is possible to go directly to
+        a dirstate for a subpath, for example by backing up specific
+        subpaths of a larger area.
+    '''
+    validate_subpath(subpath)
+    backup_uuid_s = str(backup_uuid)
+    while subpath:
+      with Pfx(subpath):
+        base = basename(subpath)
+        updirpath = dirname(subpath)
+        assert updirpath != '.'
+        dirstate = self.dirstate(updirpath)
+        base_backups = dirstate.by_name.get(base)
+        if base_backups is None:
+          base_backups = FileBackupState(name=base, backups=[])
+        record = None
+        for backup in base_backups.backups:
+          if backup['uuid'] == backup_uuid_s:
+            record = backup
+            break
+        if record is None:
+          # not already mentioned under this backup_uuid
+          # stat it, add it, update the dirstate
+          fs_dirpath = joinpath(backup_root_dirpath, subpath)
+          with Pfx("lstat(%r)", fs_dirpath):
+            S = os.lstat(fs_dirpath)
+            if not S_ISDIR(S.st_mode):
+              raise ValueError("not a directory")
+          base_backups.add_dir(backup_uuid=backup_uuid, stat=S)
+          dirstate.add_to_mapping(base_backups, exists_ok=True)
+        subpath = updirpath
+
   ##############################################################
   # Backup processes.
 
@@ -1108,29 +1146,6 @@ class NamedBackup(SingletonMixin):
     else:
       validate_subpath(topsubpath)
       topdirpath = joinpath(backup_root_dirpath, topsubpath)
-      # ensure the required dirstates exist
-      # otherwise we might backup a/b/c but have no path from '' to a/b/c
-      backup_uuid = backup_run.backup_uuid
-      need_subpath = topsubpath
-      while need_subpath:
-        print("backup_tree: need_subpath =", need_subpath)
-        with Pfx(need_subpath):
-          base = basename(need_subpath)
-          updirpath = dirname(need_subpath)
-          assert updirpath != '.'
-          need_dirpath = joinpath(backup_root_dirpath, need_subpath)
-          with Pfx("lstat(%r)", need_dirpath):
-            S = os.lstat(need_dirpath)
-          if not S_ISDIR(S.st_mode):
-            raise ValueError("not a directory")
-          dirstate = self.dirstate(updirpath)
-          base_backups = dirstate.by_name.get(base)
-          if base_backups is None:
-            base_backups = FileBackupState(name=base, backups=[])
-            dirstate.add_to_mapping(base_backups)
-          base_backups.add_dir(backup_uuid=backup_uuid, stat=S)
-          dirstate.add_to_mapping(base_backups, exists_ok=True)
-        need_subpath = updirpath
     status_proxy = backup_run.status_proxy
     status_proxy("os.walk %r ...", topdirpath)
     Rs = []
@@ -1182,6 +1197,10 @@ class NamedBackup(SingletonMixin):
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = dirpath + ': '
+        proxy("attach")
+        self.attach_subpath(
+            backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
+        )
         with Pfx("scandir"):
           proxy("scandir")
           try:
