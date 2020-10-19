@@ -193,15 +193,21 @@ class B2Cloud(SingletonMixin, Cloud):
         Therefore we write a scratch file for the upload.
     '''
     with NamedTemporaryFile(dir='.') as T:
+      # only make a progress bar for "large" files: >=64KiB
+      it = (
+          bfr if length is not None and length < 65536 else progressbar(
+              bfr,
+              label=(
+                  joinpath(self.bucketpath(bucket_name), path) +
+                  " scratch file"
+              ),
+              total=length,
+              itemlenfunc=len,
+              units_scale=BINARY_BYTES_SCALE,
+          )
+      )
       nbs = 0
-      for bs in progressbar(
-          bfr,
-          label=(joinpath(self.bucketpath(bucket_name), path) +
-                 " scratch file"),
-          total=length,
-          itemlenfunc=len,
-          units_scale=BINARY_BYTES_SCALE,
-      ):
+      for bs in it:
         while bs:
           nwritten = T.write(bs)
           if nwritten != len(bs):
