@@ -258,7 +258,7 @@ class B2Cloud(SingletonMixin, Cloud):
         unseekable file.
 
         Parameters:
-        * `f`: the seekable file
+        * `f`: the file, preferably seekable
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
@@ -267,29 +267,23 @@ class B2Cloud(SingletonMixin, Cloud):
         * `length`: an option indication of the length of the buffer
     '''
     # test the file for seekability
-    try:
-      # CornuCopyBuffers look a lot like files, but not enough for the b2api.
-      if isinstance(f, CornuCopyBuffer):
-        raise io.UnsupportedOperation(
-            "CornuCopyBuffer does not support backwards seeks"
-        )
-      position = f.tell()
-      f.seek(0)
-      f.seek(position)
-    except io.UnsupportedOperation:
-      # upload via a scratch file
-      bfr = f if isinstance(f,
-                            CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
-      return self.upload_buffer(
-          bfr,
-          bucket_name=bucket_name,
-          path=path,
-          file_info=file_info,
-          content_type=content_type,
-          progress=progress,
-          length=length,
-      )
-    else:
+    is_seekable = False
+    if not isinstance(f, CornuCopyBuffer):
+      try:
+        seek = f.seek
+        tell = f.tell
+      except AttributeError:
+        pass
+      else:
+        try:
+          position = tell()
+          seek(0)
+          seek(position)
+        except io.UnsupportedOperation:
+          pass
+        else:
+          is_seekable = True
+    if is_seekable:
       file_info = self._b2_upload_file(
           f,
           bucket_name=bucket_name,
@@ -300,6 +294,17 @@ class B2Cloud(SingletonMixin, Cloud):
           length=length,
       )
       return as_dict(file_info)
+    # upload via a scratch file
+    bfr = f if isinstance(f, CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
+    return self.upload_buffer(
+        bfr,
+        bucket_name=bucket_name,
+        path=path,
+        file_info=file_info,
+        content_type=content_type,
+        progress=progress,
+        length=length,
+    )
 
   # pylint: disable=too-many-arguments
   @typechecked
