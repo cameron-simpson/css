@@ -24,7 +24,7 @@ from cs.lex import hexify
 from cs.logutils import warning
 from cs.obj import SingletonMixin, as_dict
 from cs.pfx import pfx_method
-from cs.progress import progressbar, auto_progressbar
+from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.threads import locked, locked_property
 from cs.units import BINARY_BYTES_SCALE

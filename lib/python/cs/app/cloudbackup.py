@@ -1370,6 +1370,7 @@ class NamedBackup(SingletonMixin):
     filename = joinpath(backup_root_dirpath, subpath)
     with backup_run.file_proxy() as proxy:
       proxy.prefix = filename + ': '
+      proxy("check against previous backup")
       backup_record = backup_run.backup_record
       runstate = backup_run.runstate
       cloud_backup = self.cloud_backup
@@ -1389,6 +1390,7 @@ class NamedBackup(SingletonMixin):
             raise ValueError("not a regular file")
           hasher = DEFAULT_HASHCLASS.digester()
           if fstat.st_size == 0:
+            # TODO: why upload empty files at all? back to the "inline small files" issue
             # can't mmap empty files, and in any case they're easy
             hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
             if runstate.cancelled:
@@ -1466,6 +1468,7 @@ class NamedBackup(SingletonMixin):
         if runstate.cancelled:
           ##warning("cancelled")
           return None, None
+        proxy("prepare upload")
         with NamedTemporaryFile() as T:
           shutil.copy(filename, T.name)
           if runstate.cancelled:
