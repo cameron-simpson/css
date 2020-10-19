@@ -1197,10 +1197,11 @@ class NamedBackup(SingletonMixin):
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = dirpath + ': '
-        proxy("attach")
-        self.attach_subpath(
-            backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
-        )
+        if subpath:
+          proxy("attach")
+          self.attach_subpath(
+              backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
+          )
         with Pfx("scandir"):
           proxy("scandir")
           try:
