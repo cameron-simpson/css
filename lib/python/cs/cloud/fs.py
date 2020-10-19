@@ -201,8 +201,8 @@ class FSCloud(SingletonMixin, Cloud):
         * `progress`: an optional `cs.progress.Progress` instance
         * `length`: an option indication of the length of the buffer
     '''
-    filename = os.sep + joinpath(bucket_name, path)
-    dirpath = dirname(filename)
+    dst_filename = os.sep + joinpath(bucket_name, path)
+    dirpath = dirname(dst_filename)
     with self._conn_sem:
       if not isdirpath(dirpath):
         ##warning("create directory %r", dirpath)
@@ -210,20 +210,16 @@ class FSCloud(SingletonMixin, Cloud):
           os.makedirs(dirpath, 0o777)
       if progress is not None and length is not None:
         progress.total += length
-      with open(filename, 'wb') as f:
+      with open(dst_filename, 'wb') as f:
         for bs in bfr:
           f.write(bs)
           if progress is not None:
             progress += len(bs)
-    if file_info or content_type:
-      with FSTags() as fstags:
-        tags = fstags[filename].direct_tags
-        if content_type:
-          tags['mime.content_type'] = content_type
-        if file_info:
-          tags.update(file_info, prefix='file_info')
-    result = as_dict(os.stat(filename), 'st_')
-    result.update(path=filename)
+    self._apply_file_info(
+        dst_filename, file_info=file_info, content_type=content_type
+    )
+    result = as_dict(os.stat(dst_filename), 'st_')
+    result.update(path=dst_filename)
     return result
 
   # pylint: disable=too-many-arguments,arguments-differ
