@@ -51,6 +51,9 @@ class B2Cloud(SingletonMixin, Cloud):
   '''
 
   PREFIX = 'b2'
+
+  DEFAULT_MAX_CONNECTIONS = 32
+
   credentials_from_str = B2Credentials.from_str
 
   @staticmethod
