@@ -795,7 +795,7 @@ class BackupRun(RunStateMixin):
       *,
       public_key_name: str,
       folder_parallel: int = 4,
-      file_parallel: int = 4,
+      file_parallel: int = 16,
   ):
     ''' Initialise a `BackupRun`.
 
@@ -834,13 +834,9 @@ class BackupRun(RunStateMixin):
         This allocates display areas 
     '''
     upd = Upd()
-    status_proxy = upd.insert(1, 'STATUS')
-    file_proxies = set(
-        upd.insert(1, 'FILE') for _ in range(self.file_parallel)
-    )
-    folder_proxies = set(
-        upd.insert(1, 'FOLDER') for _ in range(self.folder_parallel)
-    )
+    status_proxy = upd.insert(1)
+    file_proxies = set(upd.insert(1) for _ in range(self.file_parallel))
+    folder_proxies = set(upd.insert(1) for _ in range(self.folder_parallel))
     backup_record = BackupRecord(
         public_key_name=self.public_key_name,
         content_path=self.content_path,

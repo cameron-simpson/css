@@ -154,6 +154,20 @@ class Cloud(ABC):
         subpath=subpath
     ).as_path()
 
+  def tmpdir_for(self, *, bucket_name: str, path: str):
+    ''' Offer a preferred directory location for scratch files
+        located at `(bucket_name,path)`,
+        suitable for the `dir` parameter of `tempfile.NamedTemporaryFile`.
+
+        This default implementation returns `None`,
+        as the location tends not to matter to most clouds.
+
+        For the `fs` cloud implementation this is the directory of
+        the upload target, allowing the upload itself to be a file
+        rename of the scratch file.
+    '''
+    return None
+
   @abstractmethod
   def stat(self, *, bucket_name: str, path: str):
     ''' Probe the file at `path` in bucket `bucket_name`,
@@ -198,20 +212,30 @@ class Cloud(ABC):
       content_type=None,
       progress=None,
       length=None,
+      as_is: bool = False,
   ):
-    ''' Upload the data from the file `f` to `path` within `bucket_name`.
+    ''' Upload the data from the file named `filename`
+        to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
 
         The default implementation calls `self.upload_file()`.
 
         Parameters:
-        * `bfr`: the source buffer
+        * `filename`: the filename of the file
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
         * `length`: an optional indication of the length of the buffer
+        * `as_is`: an optional flag indicating that the supplied filename
+          refers to a file whose contents will never be modified
+          (though it may be unlinked); default `False`
+
+        The `as_is` flag supports modes which can use the original file
+        in a persistent object. In particular, the `FSCloud` subclass
+        will try to hard link the file into its storage area
+        if this flag is true.
     '''
     with Pfx("open(%r,'rb')", filename):
       with open(filename, 'rb') as f:

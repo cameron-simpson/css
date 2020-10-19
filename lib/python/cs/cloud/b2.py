@@ -298,7 +298,6 @@ class B2Cloud(SingletonMixin, Cloud):
       return as_dict(file_info)
 
   # pylint: disable=too-many-arguments
-  @auto_progressbar(report_print=True)
   @typechecked
   def download_buffer(
       self,
