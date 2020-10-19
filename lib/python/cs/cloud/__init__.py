@@ -20,8 +20,6 @@ from cs.py.stack import caller
 
 from cs.x import X
 
-DEFAULT_MAX_CONNECTIONS = 64
-
 def is_valid_subpath(subpath):
   ''' True if `subpath` is valid per the `validate_subpath()` function.
   '''
@@ -102,9 +100,11 @@ class Cloud(ABC):
   ''' A cloud storage service.
   '''
 
+  DEFAULT_MAX_CONNECTIONS = 32
+
   def __init__(self, credentials, *, max_connections=None):
     if max_connections is None:
-      max_connections = DEFAULT_MAX_CONNECTIONS
+      max_connections = self.DEFAULT_MAX_CONNECTIONS
     elif max_connections < 1:
       raise ValueError("max_connections:%s < 1" % (max_connections,))
     self.credentials = credentials

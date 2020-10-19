@@ -51,6 +51,9 @@ class B2Cloud(SingletonMixin, Cloud):
   '''
 
   PREFIX = 'b2'
+
+  DEFAULT_MAX_CONNECTIONS = 32
+
   credentials_from_str = B2Credentials.from_str
 
   @staticmethod
@@ -138,7 +141,6 @@ class B2Cloud(SingletonMixin, Cloud):
       return None
     return version.as_dict()
 
-  @auto_progressbar(report_print=True)
   def _b2_upload_file(
       self,
       f,
@@ -193,15 +195,21 @@ class B2Cloud(SingletonMixin, Cloud):
         Therefore we write a scratch file for the upload.
     '''
     with NamedTemporaryFile(dir='.') as T:
+      # only make a progress bar for "large" files: >=64KiB
+      it = (
+          bfr if length is not None and length < 65536 else progressbar(
+              bfr,
+              label=(
+                  joinpath(self.bucketpath(bucket_name), path) +
+                  " scratch file"
+              ),
+              total=length,
+              itemlenfunc=len,
+              units_scale=BINARY_BYTES_SCALE,
+          )
+      )
       nbs = 0
-      for bs in progressbar(
-          bfr,
-          label=(joinpath(self.bucketpath(bucket_name), path) +
-                 " scratch file"),
-          total=length,
-          itemlenfunc=len,
-          units_scale=BINARY_BYTES_SCALE,
-      ):
+      for bs in it:
         while bs:
           nwritten = T.write(bs)
           if nwritten != len(bs):
@@ -284,10 +292,6 @@ class B2Cloud(SingletonMixin, Cloud):
     else:
       file_info = self._b2_upload_file(
           f,
-          progress_name=(
-              joinpath(self.bucketpath(bucket_name), path) + " upload"
-          ),
-          progress_total=length,
           bucket_name=bucket_name,
           path=path,
           file_info=file_info,

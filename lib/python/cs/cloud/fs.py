@@ -26,6 +26,8 @@ class FSCloud(SingletonMixin, Cloud):
 
   PREFIX = 'fs'
 
+  DEFAULT_MAX_CONNECTIONS = 8
+
   @staticmethod
   @require(lambda credentials: credentials is None)
   def _singleton_key(credentials):
