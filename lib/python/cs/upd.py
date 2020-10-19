@@ -893,6 +893,12 @@ class UpdProxy(object):
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.delete()
 
+  def reset(self):
+    ''' Clear the proxy: set both the prefix and text to `''`.
+    '''
+    self._prefix = ''
+    self.text = ''
+
   @property
   def prefix(self):
     ''' The current prefix string.
