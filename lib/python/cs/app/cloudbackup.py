@@ -896,6 +896,7 @@ class BackupRun(RunStateMixin):
     try:
       yield proxy
     finally:
+      proxy.reset()
       with self._lock:
         self.folder_proxies.add(proxy)
 
@@ -908,6 +909,7 @@ class BackupRun(RunStateMixin):
     try:
       yield proxy
     finally:
+      proxy.reset()
       with self._lock:
         self.file_proxies.add(proxy)
 
