@@ -154,6 +154,20 @@ class Cloud(ABC):
         subpath=subpath
     ).as_path()
 
+  def tmpdir_for(self, *, bucket_name: str, path: str):
+    ''' Offer a preferred directory location for scratch files
+        located at `(bucket_name,path)`,
+        suitable for the `dir` parameter of `tempfile.NamedTemporaryFile`.
+
+        This default implementation returns `None`,
+        as the location tends not to matter to most clouds.
+
+        For the `fs` cloud implementation this is the directory of
+        the upload target, allowing the upload itself to be a file
+        rename of the scratch file.
+    '''
+    return None
+
   @abstractmethod
   def stat(self, *, bucket_name: str, path: str):
     ''' Probe the file at `path` in bucket `bucket_name`,
