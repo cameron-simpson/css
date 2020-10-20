@@ -44,11 +44,13 @@ from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.mappings import LoadableMappingMixin, UUIDedDict
 from cs.pfx import Pfx
+from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
+from cs.units import BINARY_BYTES_SCALE
 
 __version__ = '20200914-post'
 
@@ -133,6 +135,115 @@ def compare(f1, f2, mode="rb"):
     with open(f2, mode) as f2fp:
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
+
+@contextmanager
+def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
+  ''' A Context manager yielding a temporary copy of `filename`
+      as returned by `NamedTemporaryFile(**kw)`.
+
+      Parameters:
+      * `f`: the name of the file to copy, or an open binary file,
+        or a `CornuCopyBuffer`
+      * `progress`: an optional progress indicator, default `False`;
+        if a `bool`, show a progress bar for the copy phase if true;
+        if an `int`, show a progress bar for the copy phase
+        if the file size equals or exceeds the value;
+        otherwise it should be a `cs.progress.Progress` instance
+      * `progress_label`: option progress bar label,
+        only used if a progress bar is made
+      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+  '''
+  if isinstance(f, str):
+    # copy named file
+    filename = f
+    progress_label = (
+        "copy " + repr(filename) if progress_label is None else progress_label
+    )
+    # should we use shutil.copy() and display no progress?
+    if progress is False:
+      fast_mode = True
+    else:
+      with Pfx("stat(%r)", filename):
+        S = os.stat(filename)
+      fast_mode = stat.S_ISREG(S.st_mode)
+    if fast_mode:
+      with NamedTemporaryFile(**kw) as T:
+        with Pfx("shutil.copy(%r,%r)", filename, T.name):
+          shutil.copy(filename, T.name)
+        yield T
+    else:
+      with Pfx("open(%r)", filename):
+        with open(filename, 'rb') as f2:
+          with NamedTemporaryCopy(f2, progress=progress,
+                                  progress_label=progress_label, **kw) as T:
+            yield T
+    return
+  # prepare the buffer and try to infer the length
+  if isinstance(f, CornuCopyBuffer):
+    length = None
+    bfr = f
+  else:
+    if isinstance(f, int):
+      fd = f
+      bfr = CornuCopyBuffer.from_fd(fd)
+    else:
+      bfr = CornuCopyBuffer.from_file(f)
+      try:
+        fd = f.fileno()
+      except AttributeError:
+        fd = None
+    if fd is None:
+      length = None
+    else:
+      S = os.fstat(fd)
+      length = S.st_size if stat.S_ISREG(S.st_mode) else None
+  # determine whether we need a progress bar
+  if isinstance(progress, bool):
+    need_bar = progress
+    progress = None
+  elif isinstance(progress, int):
+    need_bar = length is None or length >= progress
+    progress = None
+  else:
+    need_bar = False
+    assert isinstance(progress, Progress)
+  with NamedTemporaryFile(**kw) as T:
+    it = (
+        bfr if need_bar else progressbar(
+            bfr,
+            label=progress_label,
+            total=length,
+            itemlenfunc=len,
+            units_scale=BINARY_BYTES_SCALE,
+        )
+    )
+    nbs = 0
+    for bs in it:
+      while bs:
+        nwritten = T.write(bs)
+        if progress is not None:
+          progress += nwritten
+        if nwritten != len(bs):
+          warning(
+              "NamedTemporaryCopy: %r.write(%d bytes) => %d",
+              T.name,
+              len(bs),
+              nwritten,
+          )
+          bs = bs[nwritten:]
+        else:
+          bs = b''
+        nbs += nwritten
+    bfr.close()
+    T.flush()
+    if length is not None and nbs != length:
+      warning(
+          "NamedTemporaryCopy: given length=%s, wrote %d bytes to %r",
+          length,
+          nbs,
+          T.name,
+      )
+    yield T
 
 # pylint: disable=too-many-arguments
 def rewrite(
