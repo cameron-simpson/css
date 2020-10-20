@@ -349,6 +349,7 @@ def locked(func, initial_timeout=10.0, lockattr='_lock'):
         which references the lock object.
         Default `'_lock'`
   '''
+  citation = "@locked(%s)" % (funcname(func),)
 
   def lockfunc(self, *a, **kw):
     ''' Obtain the lock and then call `func`.
@@ -362,14 +363,14 @@ def locked(func, initial_timeout=10.0, lockattr='_lock'):
     else:
       if initial_timeout > 0:
         warning(
-            "timeout after %gs waiting for %s<%s>.%s, continuing to wait",
-            initial_timeout,
+            "%s: timeout after %gs waiting for %s<%s>.%s, continuing to wait",
+            citation, initial_timeout,
             type(self).__name__, self, lockattr
         )
       with lock:
         return func(self, *a, **kw)
 
-  lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
+  lockfunc.__name__ = citation
   lockfunc.__doc__ = getattr(func, '__doc__', '')
   return lockfunc
 
