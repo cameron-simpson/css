@@ -1469,8 +1469,8 @@ class NamedBackup(SingletonMixin):
           ##warning("cancelled")
           return None, None
         proxy("prepare upload")
-        with NamedTemporaryFile() as T:
-          shutil.copy(filename, T.name)
+        with NamedTemporaryCopy(filename, progress=65536,
+                                progress_label="snapshot " + filename) as T:
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
