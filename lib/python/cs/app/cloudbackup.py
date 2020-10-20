@@ -1491,7 +1491,7 @@ class NamedBackup(SingletonMixin):
             P = Progress(name="upload " + filename, total=0)
             with P.bar(insert_pos=-1, deferred=True, proxy=proxy):
               self.upload_hashcode_content(
-                  backup_record, fd2, hashcode, len(mm), progress=P
+                  backup_record, mm, hashcode, progress=P, length=len(mm)
               )
         return hashcode, fstat
 
@@ -1500,9 +1500,9 @@ class NamedBackup(SingletonMixin):
       backup_record: BackupRecord,
       f,
       hashcode,
-      length,
       *,
-      progress=None
+      progress=None,
+      length,
   ):
     ''' Upload the contents of `f` under the supplied `hashcode`
         into the content area specified the `contentdir_cloudpath`.
@@ -1519,7 +1519,6 @@ class NamedBackup(SingletonMixin):
         ),
         public_key_name=backup_record.public_key_name,
         progress=progress,
-        length=length,
     )
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
