@@ -3,6 +3,8 @@
 # Progress counting.
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
+# pylint: disable=(too-many-lines)
+#
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
     also a compound progress meter composed from other progress meters.
@@ -11,15 +13,21 @@
 from collections import namedtuple
 from contextlib import contextmanager
 import functools
+import sys
 import time
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
 from cs.seq import seq
 from cs.units import (
-    transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
+    transcribe_time,
+    transcribe,
+    BINARY_BYTES_SCALE,
+    DECIMAL_SCALE,
+    TIME_SCALE,
+    UNSCALED_SCALE,
 )
-from cs.upd import Upd, print as upd_print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200718.3-post'
 
@@ -376,9 +384,8 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(label, width)
     pproxy = [proxy]
     proxy_delete = proxy is None
-    update = lambda P, datum: proxy(statusfunc(P, label, width or proxy.width))
 
-    def update(P, datum):
+    def update(P, _):
       proxy = pproxy[0]
       if proxy is None:
         proxy = pproxy[0] = upd.insert(insert_pos, 'LABEL=' + label)
@@ -388,6 +395,7 @@ class BaseProgress(object):
       if not deferred:
         if proxy is None:
           proxy = pproxy[0] = upd.insert(insert_pos)
+        status = statusfunc(self, label, width or proxy.width)
         proxy(statusfunc(self, label, width or proxy.width))
       self.notify_update.add(update)
       start_pos = self.position
@@ -398,7 +406,7 @@ class BaseProgress(object):
         proxy.delete()
     if report_print:
       if isinstance(report_print, bool):
-        report_print = upd_print
+        report_print = print
       report_print(
           label + ':', self.format_counter(self.position - start_pos), 'in',
           transcribe(
@@ -509,7 +517,7 @@ class BaseProgress(object):
       proxy(statusfunc(self, label, width or proxy.width))
     if report_print:
       if isinstance(report_print, bool):
-        report_print = upd_print
+        report_print = print
       report_print(
           label + ':', self.format_counter(self.position - start_pos), 'in',
           transcribe(
@@ -614,7 +622,7 @@ class Progress(BaseProgress):
 
   def _updated(self):
     datum = self.latest
-    for notify in self.notify_update:
+    for notify in list(self.notify_update):
       try:
         notify(self, datum)
       except Exception as e:  # pylint: disable=broad-except
@@ -965,24 +973,28 @@ def auto_progressbar(func, label=None, report_print=False):
       upd = Upd()
       if not upd.disabled:
         progress = Progress(name=progress_name, total=progress_total)
-        with progress.bar(report_print=progress_report_print):
+        with progress.bar(upd=upd, report_print=progress_report_print):
           return func(*a, progress=progress, **kw)
-    else:
-      return func(*a, progress=progress, **kw)
+    return func(*a, progress=progress, **kw)
 
   return wrapper
 
-if __name__ == '__main__':
-  from cs.units import DECIMAL_SCALE
+# pylint: disable=unused-argument
+def selftest(argv):
+  ''' Exercise some of the functionality.
+  '''
   lines = open(__file__).readlines()
   lines += lines
-  for line in progressbar(lines, "lines"):
+  for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for line in progressbar(lines, "lines step 100", update_frequency=100,
-                          report_print=True):
+  for _ in progressbar(lines, "lines step 100", update_frequency=100,
+                       report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for line in P.iterbar(open(__file__)):
+  for _ in P.iterbar(open(__file__)):
     time.sleep(0.005)
-  from cs.debug import selftest
-  selftest('cs.progress_tests')
+  from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
+  runtests('cs.progress_tests')
+
+if __name__ == '__main__':
+  sys.exit(selftest(sys.argv))
