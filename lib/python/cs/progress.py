@@ -372,8 +372,6 @@ class BaseProgress(object):
       label = self.name
     if upd is None:
       upd = Upd()
-    if width is None:
-      width = upd.columns
     if statusfunc is None:
       statusfunc = lambda P, label, width: P.status(label, width)
     pproxy = [proxy]
