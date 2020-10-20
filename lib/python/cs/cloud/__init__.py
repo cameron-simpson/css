@@ -5,20 +5,15 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-import os
 from os.path import join as joinpath
 from threading import RLock, Semaphore
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.lex import is_identifier
-from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
-from cs.py.stack import caller
-
-from cs.x import X
 
 def is_valid_subpath(subpath):
   ''' True if `subpath` is valid per the `validate_subpath()` function.
@@ -154,6 +149,7 @@ class Cloud(ABC):
         subpath=subpath
     ).as_path()
 
+  # pylint: disable=no-self-use,unused-argument
   def tmpdir_for(self, *, bucket_name: str, path: str):
     ''' Offer a preferred directory location for scratch files
         located at `(bucket_name,path)`,
@@ -241,7 +237,7 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
-      as_is: bool = False,
+      as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
         to `path` within `bucket_name`.
@@ -292,7 +288,7 @@ class Cloud(ABC):
         The default implementation calls `self.upload_buffer()`.
 
         Parameters:
-        * `f`: the seekable file
+        * `f`: the file
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
