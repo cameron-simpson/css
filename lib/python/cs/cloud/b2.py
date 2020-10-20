@@ -310,12 +310,48 @@ class B2Cloud(SingletonMixin, Cloud):
           progress=progress,
       )
       return file_version.as_dict()
+
+  @pfx_method
+  def upload_filename(
+      self,
+      filename,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+      as_is: bool = False,
+  ):
+    ''' Upload the data from the file named `filename`
+        to `path` within `bucket_name`.
+        Return a `dict` containing the upload result.
+
+        The default implementation calls `self.upload_file()`.
+
+        Parameters:
+        * `filename`: the filename of the file
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+        * `as_is`: an optional flag indicating that the supplied filename
+          refers to a file whose contents will never be modified
+          (though it may be unlinked); default `False`
+
+        The `as_is` flag supports modes which can use the original file
+        in a persistent object. In particular, the `FSCloud` subclass
+        will try to hard link the file into its storage area
+        if this flag is true.
+    '''
+    file_version = self._b2_upload_filename(
+        filename,
         bucket_name=bucket_name,
         path=path,
-        file_info=file_info,
-        content_type=content_type,
         progress=progress,
     )
+    return file_version.as_dict()
 
   # pylint: disable=too-many-arguments
   @typechecked
