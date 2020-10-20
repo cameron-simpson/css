@@ -1,3 +1,4 @@
+cs.logutils,pilfer: drop D_mode and the D function
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
 replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
