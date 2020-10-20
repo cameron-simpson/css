@@ -5,7 +5,7 @@
         https://github.com/Backblaze-B2-Samples/encryption
 
     The essential aspects of this scheme,
-    which were not apparent to me until I had read the above page a few time,
+    which were not apparent to me until I had read the above page a few times,
     are:
     * there is a global public/private keypair
     * each file has its own symmetric encryption key
@@ -24,7 +24,6 @@
 from mmap import mmap
 import os
 from os.path import join as joinpath
-from stat import S_ISREG
 from subprocess import Popen, DEVNULL, PIPE
 import sys
 from tempfile import NamedTemporaryFile
@@ -33,7 +32,7 @@ from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom_fd
 from cs.pfx import Pfx
-from . import validate_subpath, CloudArea
+from . import validate_subpath, Cloud, CloudArea
 
 # used when creating RSA keypairs
 DEFAULT_RSA_ALGORITHM = 'aes256'
@@ -43,13 +42,14 @@ def openssl(
     openssl_args,
     **kw,
 ):
-  ''' Construct a `subprocess.Popen` instance to run `openssl` and return it.
-      Note that this actually dispatches the external `openssl` command.
+  ''' Construct a `subprocess.Popen` instance to run `openssl`.
+      Note that this actually dispatches the external `openssl` command
+      but does not `Popen.wait()` for it.
 
       Parameters:
       * `openssl_args`: the command line arguments
         to follow the `'openssl'` command itself;
-        the first argument must be an openssl command name
+        the first argument must be an `openssl` command name
       * `stdin`: defaults to `subprocess.DEVNULL` to avoid accidents;
         if an `int` or something with a `.read` attribute
         it is passed unchanged;
@@ -361,7 +361,11 @@ def pubencrypt_popen(stdin, public_path, stdout=PIPE):
   return per_file_passtext_enc, P
 
 def pubdecrypt_popen(
-    stdin, per_file_passtext_enc, private_path, passphrase, stdout=PIPE
+    stdin,
+    per_file_passtext_enc: bytes,
+    private_path: str,
+    passphrase: str,
+    stdout=PIPE
 ):
   ''' Decrypt `stdin` to `stdout`
       with the per file encrypted password `per_file_passtext_enc`,
@@ -393,7 +397,7 @@ def pubdecrypt_popen(
   # using the per file password
   return symdecrypt(stdin, per_file_passtext, stdout)
 
-def upload_paths(basepath, public_key_name=None):
+def upload_paths(basepath: str, public_key_name=None):
   ''' Return the paths for the encrypted data and per-file private
       key components derived from `basepath`.
   '''
@@ -408,14 +412,14 @@ def upload_paths(basepath, public_key_name=None):
 @typechecked
 def upload(
     stdin,
-    cloud,
+    cloud: Cloud,
     bucket_name: str,
     basepath: str,
     *,
     public_path: str,
     public_key_name=None,
     progress=None,
-    overwrite=False,
+    overwrite: bool = False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
       using the public key from the file named `public_path`,
@@ -453,6 +457,7 @@ def upload(
   # Encrypt directly into an upload file.
   # See if the cloud has a preferred location for upload files.
   cloud_tmpdir = cloud.tmpdir_for(bucket_name=bucket_name, path=data_subpath)
+  # Create the scratch file in the preferred location (if specified).
   with NamedTemporaryFile(dir=cloud_tmpdir, suffix="enc-for-upload.dat") as T:
     with Pfx("open(%r,'wb')", T.name):
       with open(T.name, 'wb') as f:
@@ -467,9 +472,9 @@ def upload(
                 retcode,
             )
         )
-    # upload directly from the file,
+    # Upload directly from the file,
     # passing as_is=True so that the FSCloud implementation
-    # knows it may try a hard link
+    # knows it may try a hard link.
     upload_result = cloud.upload_filename(
         T.name,
         bucket_name=bucket_name,
@@ -543,7 +548,6 @@ def download(
       * `public_key_name`: an optional name for the public key
         used to encrypt the per file key
         during the upload
-      Other keyword arguments are passed to `cloud.upload_buffer()`.
 
       This fetches the encrypted data
       from the bucket path `basepath+'.data.enc'`
