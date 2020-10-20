@@ -1488,8 +1488,8 @@ class NamedBackup(SingletonMixin):
             if runstate.cancelled:
               ##warning("cancelled")
               return None, None
-            P = Progress(name="upload " + filename, total=0)
-            with P.bar(insert_pos=-1, deferred=True, proxy=proxy):
+            P = Progress(name="crypt upload " + subpath, total=len(mm))
+            with P.bar(proxy=proxy):
               self.upload_hashcode_content(
                   backup_record, mm, hashcode, progress=P, length=len(mm)
               )
