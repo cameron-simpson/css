@@ -271,11 +271,11 @@ class B2Cloud(SingletonMixin, Cloud):
       progress=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
-        Return a `dict` containing the B2 `FileInfo` object attribute values.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
 
-        Note that the b2api expects to be able to seek when given
-        a file, so this copies to a scratch file if given an
-        unseekable file.
+        Note that the b2api expects to be able to seek when given a file so
+        this tries to `mmap.mmap` the file and use the bytes upload
+        interface, falling back to coping to a scratch file.
 
         Parameters:
         * `f`: the file, preferably seekable
@@ -301,11 +301,14 @@ class B2Cloud(SingletonMixin, Cloud):
           content_type=content_type,
           progress=progress,
       )
-      return as_dict(file_info)
-    # upload via a scratch file
-    bfr = f if isinstance(f, CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
-    return self.upload_buffer(
-        bfr,
+    else:
+      file_version = self._b2_upload_bytes(
+          mm,
+          bucket_name=bucket_name,
+          path=path,
+          progress=progress,
+      )
+      return file_version.as_dict()
         bucket_name=bucket_name,
         path=path,
         file_info=file_info,
