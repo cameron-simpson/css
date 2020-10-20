@@ -141,24 +141,49 @@ class B2Cloud(SingletonMixin, Cloud):
       return None
     return version.as_dict()
 
-  def _b2_upload_file(
+  def _b2_upload_bytes(
       self,
-      f,
+      bs,
       *,
       bucket_name: str,
       path: str,
       progress=None,
       **b2_kw,
   ):
-    ''' Upload a seekable file-like data source `f`
-        to `path` within `bucket_name`.
-        Return the resulting B2 `FileInfo`.
+    ''' Upload the bytes `bs` to `path` within `bucket_name`.
+        Return the resulting B2 `FileVersion`.
     '''
     bucket = self.bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
     with self._conn_sem:
-      return bucket.upload(
-          B2UploadFileShim(f, length=length, progress=progress),
+      return bucket.upload_bytes(
+          bs,
+          file_name=path,
+          progress_listener=progress_listener,
+          **b2_kw,
+      )
+
+  def _b2_upload_filename(
+      self,
+      filename,
+      *,
+      bucket_name: str,
+      path: str,
+      progress=None,
+      **b2_kw,
+  ):
+    ''' Upload a local file named `filename`
+        to `path` within `bucket_name`.
+        Return the resulting B2 `FileVersion`.
+
+        This is required for "large" files, a vaguely defined term.
+        So we use it unconditionally if we're given a filename.
+    '''
+    bucket = self.bucket_by_name(bucket_name)
+    progress_listener = None if progress is None else B2ProgressShim(progress)
+    with self._conn_sem:
+      return bucket.upload_local_file(
+          local_file=filename,
           file_name=path,
           progress_listener=progress_listener,
           **b2_kw,

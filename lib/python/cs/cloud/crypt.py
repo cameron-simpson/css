@@ -490,8 +490,8 @@ def upload(
           P.args,
           retcode,
       ))
-  cloud.upload_buffer(
-      CornuCopyBuffer([per_file_passtext_enc]),
+  cloud.upload_bytes(
+      per_file_passtext_enc,
       bucket_name=bucket_name,
       path=key_subpath,
       progress=progress,

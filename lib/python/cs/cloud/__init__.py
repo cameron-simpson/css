@@ -199,6 +199,38 @@ class Cloud(ABC):
     '''
     raise NotImplementedError("upload_buffer")
 
+  # pylint: disable=too-many-arguments
+  def upload_bytes(
+      self,
+      bs,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+  ):
+    ''' Upload bytes from `bs` to `path` within `bucket_name`.
+
+        The default implementation calls `self.upload_buffer()`.
+
+        Parameters:
+        * `bs`: the source `bytes`-like object
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    return self.upload_buffer(
+        CornuCopyBuffer([bs]),
+        bucket_name=bucket_name,
+        path=path,
+        file_info=file_info,
+        content_type=content_type,
+        progress=progress
+    )
+
   @pfx_method
   def upload_filename(
       self,
