@@ -113,7 +113,6 @@ class FSCloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
       as_is: bool = False,
   ):
     ''' Upload the data from the file named `filename`
@@ -129,7 +128,6 @@ class FSCloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an optional indication of the length of the buffer
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -172,7 +170,6 @@ class FSCloud(SingletonMixin, Cloud):
         file_info=file_info,
         content_type=content_type,
         progress=progress,
-        length=length,
         as_is=as_is
     )
 
@@ -186,7 +183,6 @@ class FSCloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,  # pylint: disable=unused-argument
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`,
         which means to the file `/`*bucket_name*`/`*path*.
@@ -199,7 +195,6 @@ class FSCloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     dst_filename = os.sep + joinpath(bucket_name, path)
     dirpath = dirname(dst_filename)
@@ -208,8 +203,6 @@ class FSCloud(SingletonMixin, Cloud):
         ##warning("create directory %r", dirpath)
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath, 0o777)
-      if progress is not None and length is not None:
-        progress.total += length
       with open(dst_filename, 'wb') as f:
         for bs in bfr:
           f.write(bs)

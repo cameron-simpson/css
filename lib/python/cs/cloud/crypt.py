@@ -325,7 +325,6 @@ def recrypt_passtext(
       CornuCopyBuffer([passtext_enc]),
       bucket_name=bucket_name,
       path=new_key_subpath,
-      length=len(passtext_enc),
   )
 
 def pubencrypt_popen(stdin, public_path, stdout=PIPE):
@@ -415,7 +414,6 @@ def upload(
     public_path: str,
     public_key_name=None,
     progress=None,
-    length=None,
     overwrite=False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
@@ -483,7 +481,6 @@ def upload(
         bucket_name=bucket_name,
         path=data_subpath,
         progress=progress,
-        length=encrypted_length,
         as_is=True,
     )
     retcode = P.wait()
@@ -497,7 +494,6 @@ def upload(
       bucket_name=bucket_name,
       path=key_subpath,
       progress=progress,
-      length=len(per_file_passtext_enc),
   )
   return upload_result, data_subpath, key_subpath
 

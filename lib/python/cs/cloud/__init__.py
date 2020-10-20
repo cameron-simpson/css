@@ -185,7 +185,6 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      length=None,
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
@@ -197,7 +196,6 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     raise NotImplementedError("upload_buffer")
 
@@ -211,7 +209,6 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
       as_is: bool = False,
   ):
     ''' Upload the data from the file named `filename`
@@ -227,7 +224,6 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an optional indication of the length of the buffer
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -257,7 +253,6 @@ class Cloud(ABC):
             file_info=file_info,
             content_type=content_type,
             progress=progress,
-            length=length
         )
 
   def upload_file(
@@ -269,7 +264,6 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
@@ -283,7 +277,6 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     return self.upload_buffer(
         CornuCopyBuffer.from_file(f),
@@ -292,7 +285,6 @@ class Cloud(ABC):
         file_info=file_info,
         content_type=content_type,
         progress=progress,
-        length=length
     )
 
   # pylint: disable=too-many-arguments

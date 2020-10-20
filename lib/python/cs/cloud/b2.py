@@ -148,7 +148,6 @@ class B2Cloud(SingletonMixin, Cloud):
       bucket_name: str,
       path: str,
       progress=None,
-      length=None,
       **b2_kw,
   ):
     ''' Upload a seekable file-like data source `f`
@@ -176,7 +175,6 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      length=None,
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
@@ -189,7 +187,6 @@ class B2Cloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
 
         Annoyingly, the B2 stuff expects to seek on the buffer.
         Therefore we write a scratch file for the upload.
@@ -235,7 +232,6 @@ class B2Cloud(SingletonMixin, Cloud):
           path=path,
           file_info=file_info,
           content_type=content_type,
-          length=length,
           progress=progress,
       )
 
@@ -248,7 +244,6 @@ class B2Cloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileInfo` object attribute values.
@@ -264,7 +259,6 @@ class B2Cloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     # test the file for seekability
     is_seekable = False
@@ -291,7 +285,6 @@ class B2Cloud(SingletonMixin, Cloud):
           file_info=file_info,
           content_type=content_type,
           progress=progress,
-          length=length,
       )
       return as_dict(file_info)
     # upload via a scratch file
@@ -303,7 +296,6 @@ class B2Cloud(SingletonMixin, Cloud):
         file_info=file_info,
         content_type=content_type,
         progress=progress,
-        length=length,
     )
 
   # pylint: disable=too-many-arguments
