@@ -216,41 +216,11 @@ class B2Cloud(SingletonMixin, Cloud):
         Annoyingly, the B2 stuff expects to seek on the buffer.
         Therefore we write a scratch file for the upload.
     '''
-    with NamedTemporaryFile(dir='.') as T:
-      # only make a progress bar for "large" files: >=64KiB
-      it = (
-          bfr if length is not None and length < 65536 else progressbar(
-              bfr,
-              label=(
-                  joinpath(self.bucketpath(bucket_name), path) +
-                  " scratch file"
-              ),
-              total=length,
-              itemlenfunc=len,
-              units_scale=BINARY_BYTES_SCALE,
-          )
-      )
-      nbs = 0
-      for bs in it:
-        while bs:
-          nwritten = T.write(bs)
-          if nwritten != len(bs):
-            warning(
-                "upload_buffer: %r.write(%d bytes) => %d", T.name, len(bs),
-                nwritten
-            )
-            bs = bs[nwritten:]
-          else:
-            bs = b''
-          nbs += nwritten
-      bfr.close()
-      T.flush()
-      if nbs != length:
-        warning(
-            "upload_buffer: given length=%s, wrote %d bytes to %r", length,
-            nbs, T.name
-        )
-        length = nbs
+    with NamedTemporaryCopy(
+        bfr, progress=65536,
+        progress_label=(joinpath(self.bucketpath(bucket_name), path) +
+                        " scratch file"),
+        dir=self.tmpdir_for(bucket_name=bucket_name, path=path)) as T:
       return self.upload_filename(
           T.name,
           bucket_name=bucket_name,
