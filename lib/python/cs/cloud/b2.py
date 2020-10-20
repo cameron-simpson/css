@@ -285,26 +285,16 @@ class B2Cloud(SingletonMixin, Cloud):
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
     '''
-    # test the file for seekability
-    is_seekable = False
-    if not isinstance(f, CornuCopyBuffer):
-      try:
-        seek = f.seek
-        tell = f.tell
-      except AttributeError:
-        pass
-      else:
-        try:
-          position = tell()
-          seek(0)
-          seek(position)
-        except io.UnsupportedOperation:
-          pass
-        else:
-          is_seekable = True
-    if is_seekable:
-      file_info = self._b2_upload_file(
-          f,
+    try:
+      fd = f.fileno()
+      mm = mmap(fd, 0, prot=PROT_READ)
+    except (AttributeError, OSError) as e:  # no .fileno, not mmapable
+      warning("f=%s: %s", f, e)
+      # upload via a scratch file
+      bfr = f if isinstance(f,
+                            CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
+      return self.upload_buffer(
+          bfr,
           bucket_name=bucket_name,
           path=path,
           file_info=file_info,
