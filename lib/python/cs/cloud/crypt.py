@@ -21,6 +21,7 @@
     This implementation outsources the crypto to the openssl command.
 '''
 
+from mmap import mmap
 import os
 from os.path import join as joinpath
 from stat import S_ISREG
@@ -88,7 +89,7 @@ def openssl(
     # ints are file descriptors or the usual subprocess.Popen values
     # things with read() can be uses as files
     pass
-  elif isinstance(stdin, (bytes, bytearray, memoryview)):
+  elif isinstance(stdin, (bytes, bytearray, memoryview, mmap)):
     # a bytes like object
     stdin = CornuCopyBuffer([stdin]).as_fd()
     close_my_fds.append(stdin)
