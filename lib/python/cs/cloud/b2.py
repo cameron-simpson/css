@@ -144,6 +144,7 @@ class B2Cloud(SingletonMixin, Cloud):
       bucket_name: str,
       path: str,
       progress=None,
+      file_info=None,
       **b2_kw,
   ):
     ''' Upload the bytes `bs` to `path` within `bucket_name`.
@@ -156,6 +157,7 @@ class B2Cloud(SingletonMixin, Cloud):
           bs,
           file_name=path,
           progress_listener=progress_listener,
+          file_infos=file_info,
           **b2_kw,
       )
 
@@ -166,6 +168,7 @@ class B2Cloud(SingletonMixin, Cloud):
       bucket_name: str,
       path: str,
       progress=None,
+      file_info=None,
       **b2_kw,
   ):
     ''' Upload a local file named `filename`
@@ -182,6 +185,7 @@ class B2Cloud(SingletonMixin, Cloud):
           local_file=filename,
           file_name=path,
           progress_listener=progress_listener,
+          file_infos=file_info,
           **b2_kw,
       )
 
