@@ -385,7 +385,6 @@ class CornuCopyBuffer(object):
     '''
     if isinstance(index, slice):
       # slice the joined up bufs - expensive
-      ##start, end, step = index.indices(self.buflen)
       return b''.join(self.bufs)[index]
     index0 = index
     if index < 0:
