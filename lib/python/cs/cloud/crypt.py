@@ -322,8 +322,8 @@ def recrypt_passtext(
   # encrypt with our key and reupload
   passtext_enc = encrypt_passtext(passtext, new_public_path)
   _, new_key_subpath = upload_paths(basepath, public_key_name=new_key_name)
-  cloud.upload_buffer(
-      CornuCopyBuffer([passtext_enc]),
+  cloud.upload_bytes(
+      passtext_enc,
       bucket_name=bucket_name,
       path=new_key_subpath,
   )
