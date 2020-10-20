@@ -5,29 +5,25 @@
 
 from collections import namedtuple
 from contextlib import contextmanager
-import io
+from mmap import mmap, PROT_READ
 import os
 from os.path import join as joinpath
-from tempfile import NamedTemporaryFile
 from b2sdk.exception import FileNotPresent as B2FileNotPresent
 from b2sdk.v1 import (
     B2Api,
     InMemoryAccountInfo,
     AbstractProgressListener,
-    AbstractUploadSource,
     AbstractDownloadDestination,
 )
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
-from cs.lex import hexify
+from cs.fileutils import NamedTemporaryCopy
 from cs.logutils import warning
-from cs.obj import SingletonMixin, as_dict
+from cs.obj import SingletonMixin
 from cs.pfx import pfx_method
-from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.threads import locked, locked_property
-from cs.units import BINARY_BYTES_SCALE
 from . import Cloud
 
 class B2Credentials(namedtuple('B2Credentials', 'keyId apiKey')):
@@ -141,25 +137,49 @@ class B2Cloud(SingletonMixin, Cloud):
       return None
     return version.as_dict()
 
-  def _b2_upload_file(
+  def _b2_upload_bytes(
       self,
-      f,
+      bs,
       *,
       bucket_name: str,
       path: str,
       progress=None,
-      length=None,
       **b2_kw,
   ):
-    ''' Upload a seekable file-like data source `f`
-        to `path` within `bucket_name`.
-        Return the resulting B2 `FileInfo`.
+    ''' Upload the bytes `bs` to `path` within `bucket_name`.
+        Return the resulting B2 `FileVersion`.
     '''
     bucket = self.bucket_by_name(bucket_name)
     progress_listener = None if progress is None else B2ProgressShim(progress)
     with self._conn_sem:
-      return bucket.upload(
-          B2UploadFileShim(f, length=length, progress=progress),
+      return bucket.upload_bytes(
+          bs,
+          file_name=path,
+          progress_listener=progress_listener,
+          **b2_kw,
+      )
+
+  def _b2_upload_filename(
+      self,
+      filename,
+      *,
+      bucket_name: str,
+      path: str,
+      progress=None,
+      **b2_kw,
+  ):
+    ''' Upload a local file named `filename`
+        to `path` within `bucket_name`.
+        Return the resulting B2 `FileVersion`.
+
+        This is required for "large" files, a vaguely defined term.
+        So we use it unconditionally if we're given a filename.
+    '''
+    bucket = self.bucket_by_name(bucket_name)
+    progress_listener = None if progress is None else B2ProgressShim(progress)
+    with self._conn_sem:
+      return bucket.upload_local_file(
+          local_file=filename,
           file_name=path,
           progress_listener=progress_listener,
           **b2_kw,
@@ -176,11 +196,10 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      length=None,
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
-        Return a `dict` containing the B2 `FileInfo` object attribute values.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
 
         Parameters:
         * `bfr`: the source buffer
@@ -189,56 +208,57 @@ class B2Cloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
 
         Annoyingly, the B2 stuff expects to seek on the buffer.
         Therefore we write a scratch file for the upload.
     '''
-    with NamedTemporaryFile(dir='.') as T:
-      # only make a progress bar for "large" files: >=64KiB
-      it = (
-          bfr if length is not None and length < 65536 else progressbar(
-              bfr,
-              label=(
-                  joinpath(self.bucketpath(bucket_name), path) +
-                  " scratch file"
-              ),
-              total=length,
-              itemlenfunc=len,
-              units_scale=BINARY_BYTES_SCALE,
-          )
-      )
-      nbs = 0
-      for bs in it:
-        while bs:
-          nwritten = T.write(bs)
-          if nwritten != len(bs):
-            warning(
-                "upload_buffer: %r.write(%d bytes) => %d", T.name, len(bs),
-                nwritten
-            )
-            bs = bs[nwritten:]
-          else:
-            bs = b''
-          nbs += nwritten
-      bfr.close()
-      T.flush()
-      if nbs != length:
-        warning(
-            "upload_buffer: given length=%s, wrote %d bytes to %r", length,
-            nbs, T.name
-        )
-        length = nbs
+    with NamedTemporaryCopy(
+        bfr, progress=65536,
+        progress_label=(joinpath(self.bucketpath(bucket_name), path) +
+                        " scratch file"),
+        dir=self.tmpdir_for(bucket_name=bucket_name, path=path)) as T:
       return self.upload_filename(
           T.name,
           bucket_name=bucket_name,
           path=path,
           file_info=file_info,
           content_type=content_type,
-          length=length,
           progress=progress,
       )
 
+  @pfx_method
+  def upload_bytes(
+      self,
+      bs,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+  ):
+    ''' Upload the data from the bytes `bs` to `path` within `bucket_name`.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
+
+        Parameters:
+        * `bs`: the file, preferably seekable
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    file_version = self._b2_upload_bytes(
+        bs,
+        bucket_name=bucket_name,
+        path=path,
+        progress=progress,
+        file_info=file_info,
+        content_type=content_type,
+    )
+    return file_version.as_dict()
+
+  @pfx_method
   def upload_file(
       self,
       f,
@@ -248,14 +268,13 @@ class B2Cloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
-        Return a `dict` containing the B2 `FileInfo` object attribute values.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
 
-        Note that the b2api expects to be able to seek when given
-        a file, so this copies to a scratch file if given an
-        unseekable file.
+        Note that the b2api expects to be able to seek when given a file so
+        this tries to `mmap.mmap` the file and use the bytes upload
+        interface, falling back to coping to a scratch file.
 
         Parameters:
         * `f`: the file, preferably seekable
@@ -264,47 +283,75 @@ class B2Cloud(SingletonMixin, Cloud):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
-    # test the file for seekability
-    is_seekable = False
-    if not isinstance(f, CornuCopyBuffer):
-      try:
-        seek = f.seek
-        tell = f.tell
-      except AttributeError:
-        pass
-      else:
-        try:
-          position = tell()
-          seek(0)
-          seek(position)
-        except io.UnsupportedOperation:
-          pass
-        else:
-          is_seekable = True
-    if is_seekable:
-      file_info = self._b2_upload_file(
-          f,
+    try:
+      fd = f.fileno()
+      mm = mmap(fd, 0, prot=PROT_READ)
+    except (AttributeError, OSError) as e:  # no .fileno, not mmapable
+      warning("f=%s: %s", f, e)
+      # upload via a scratch file
+      bfr = f if isinstance(f,
+                            CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
+      return self.upload_buffer(
+          bfr,
           bucket_name=bucket_name,
           path=path,
           file_info=file_info,
           content_type=content_type,
           progress=progress,
-          length=length,
       )
-      return as_dict(file_info)
-    # upload via a scratch file
-    bfr = f if isinstance(f, CornuCopyBuffer) else CornuCopyBuffer.from_file(f)
-    return self.upload_buffer(
-        bfr,
+    else:
+      file_version = self._b2_upload_bytes(
+          mm,
+          bucket_name=bucket_name,
+          path=path,
+          progress=progress,
+      )
+      return file_version.as_dict()
+
+  @pfx_method
+  def upload_filename(
+      self,
+      filename,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+      as_is: bool = False,  # pylint: disable=unused-argument
+  ):
+    ''' Upload the data from the file named `filename`
+        to `path` within `bucket_name`.
+        Return a `dict` containing the upload result.
+
+        The default implementation calls `self.upload_file()`.
+
+        Parameters:
+        * `filename`: the filename of the file
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+        * `as_is`: an optional flag indicating that the supplied filename
+          refers to a file whose contents will never be modified
+          (though it may be unlinked); default `False`
+
+        The `as_is` flag supports modes which can use the original file
+        in a persistent object. In particular, the `FSCloud` subclass
+        will try to hard link the file into its storage area
+        if this flag is true.
+    '''
+    file_version = self._b2_upload_filename(
+        filename,
         bucket_name=bucket_name,
         path=path,
+        progress=progress,
         file_info=file_info,
         content_type=content_type,
-        progress=progress,
-        length=length,
     )
+    return file_version.as_dict()
 
   # pylint: disable=too-many-arguments
   @typechecked
@@ -361,43 +408,6 @@ class B2UploadFileWrapper:
     ''' Report position from the file.
     '''
     return self.f.tell()
-
-class B2UploadFileShim(AbstractUploadSource):
-  ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
-  '''
-
-  def __init__(self, f, *, length=None, sha1bytes=None, progress=None):
-    super().__init__()
-    self.f = f
-    self.length = length
-    self.progress = progress
-    self.sha1bytes = sha1bytes
-
-  @contextmanager
-  def open(self):
-    ''' Just hand the buffer back, it supports reads.
-    '''
-    if self.length and self.progress is not None:
-      self.progress.total += self.length
-    yield B2UploadFileWrapper(self.f, progress=self.progress)
-
-  def get_content_sha1(self):
-    if self.sha1bytes:
-      return hexify(self.sha1bytes)
-    ##raise NotImplementedError("get_content_sha1 (no sha1bytes attribute)")
-    return None
-
-  def is_upload(self):
-    return True
-
-  def is_copy(self):
-    return False
-
-  def is_sha1_known(self):
-    return self.sha1bytes is not None
-
-  def get_content_length(self):
-    return self.length
 
 class B2DownloadBufferShimFileShim:
   ''' Shim to present a write-to-file interface for an `IterableQueue`.

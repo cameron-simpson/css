@@ -5,20 +5,15 @@
 
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
-import os
 from os.path import join as joinpath
 from threading import RLock, Semaphore
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.lex import is_identifier
-from cs.logutils import warning
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.py.modules import import_module_name
-from cs.py.stack import caller
-
-from cs.x import X
 
 def is_valid_subpath(subpath):
   ''' True if `subpath` is valid per the `validate_subpath()` function.
@@ -154,6 +149,7 @@ class Cloud(ABC):
         subpath=subpath
     ).as_path()
 
+  # pylint: disable=no-self-use,unused-argument
   def tmpdir_for(self, *, bucket_name: str, path: str):
     ''' Offer a preferred directory location for scratch files
         located at `(bucket_name,path)`,
@@ -185,7 +181,6 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      length=None,
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
@@ -197,9 +192,40 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     raise NotImplementedError("upload_buffer")
+
+  # pylint: disable=too-many-arguments
+  def upload_bytes(
+      self,
+      bs,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+  ):
+    ''' Upload bytes from `bs` to `path` within `bucket_name`.
+
+        The default implementation calls `self.upload_buffer()`.
+
+        Parameters:
+        * `bs`: the source `bytes`-like object
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    return self.upload_buffer(
+        CornuCopyBuffer([bs]),
+        bucket_name=bucket_name,
+        path=path,
+        file_info=file_info,
+        content_type=content_type,
+        progress=progress
+    )
 
   @pfx_method
   def upload_filename(
@@ -211,8 +237,7 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
-      as_is: bool = False,
+      as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
         to `path` within `bucket_name`.
@@ -227,7 +252,6 @@ class Cloud(ABC):
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an optional indication of the length of the buffer
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -239,17 +263,6 @@ class Cloud(ABC):
     '''
     with Pfx("open(%r,'rb')", filename):
       with open(filename, 'rb') as f:
-        stat_length = os.fstat(f.fileno()).st_size
-        if length is None:
-          length = stat_length
-        elif length != stat_length:
-          # warn but do not override the caller
-          warning(
-              "from %s, supplied length=%r != os.fstat().st_size=%r",
-              caller(),
-              length,
-              stat_length,
-          )
         return self.upload_file(
             f,
             bucket_name=bucket_name,
@@ -257,7 +270,6 @@ class Cloud(ABC):
             file_info=file_info,
             content_type=content_type,
             progress=progress,
-            length=length
         )
 
   def upload_file(
@@ -269,7 +281,6 @@ class Cloud(ABC):
       file_info=None,
       content_type=None,
       progress=None,
-      length=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
@@ -277,13 +288,12 @@ class Cloud(ABC):
         The default implementation calls `self.upload_buffer()`.
 
         Parameters:
-        * `f`: the seekable file
+        * `f`: the file
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
         * `progress`: an optional `cs.progress.Progress` instance
-        * `length`: an option indication of the length of the buffer
     '''
     return self.upload_buffer(
         CornuCopyBuffer.from_file(f),
@@ -292,7 +302,6 @@ class Cloud(ABC):
         file_info=file_info,
         content_type=content_type,
         progress=progress,
-        length=length
     )
 
   # pylint: disable=too-many-arguments
@@ -402,11 +411,12 @@ class CloudAreaFile(SingletonMixin):
   def upload_filename(self, filename, *, progress=None):
     ''' Upload a local file into the cloud.
     '''
-    with open(filename, 'rb') as f:
-      bfr = CornuCopyBuffer.from_fd(f.fileno())
-    result = self.upload_buffer(bfr, progress=progress)
-    bfr.close()
-    return result
+    return self.cloud.upload_filename(
+        filename,
+        bucket_name=self.bucket_name,
+        path=self.bucket_path,
+        progress=progress
+    )
 
   def download_buffer(self, *, progress=None):
     ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.

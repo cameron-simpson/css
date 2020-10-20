@@ -25,7 +25,7 @@ from os.path import (
 )
 import signal
 from stat import S_ISDIR, S_ISREG, S_ISLNK
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from threading import RLock
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -46,7 +46,7 @@ from cs.cloud.crypt import (
 from cs.cmdutils import BaseCommand
 from cs.context import pushattrs, popattrs
 from cs.deco import strable
-from cs.fileutils import UUIDNDJSONMapping
+from cs.fileutils import UUIDNDJSONMapping, NamedTemporaryCopy
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import warning, error, exception
@@ -1396,7 +1396,9 @@ class NamedBackup(SingletonMixin):
             if runstate.cancelled:
               ##warning("cancelled")
               return None, None
-            self.upload_hashcode_content(backup_record, fd, hashcode, 0)
+            self.upload_hashcode_content(
+                backup_record, fd, hashcode, length=fstat.st_size
+            )
             return hashcode, fstat
           # compute hashcode from file contents
           hashcode = DEFAULT_HASHCLASS.digester()
@@ -1408,9 +1410,6 @@ class NamedBackup(SingletonMixin):
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
         # compute some crypt-side upload paths
         basepath = self.hashcode_path(hashcode)
-        if runstate.cancelled:
-          ##warning("cancelled")
-          return None, None
         data_subpath, key_subpath = upload_paths(
             basepath, public_key_name=public_key_name
         )
@@ -1420,6 +1419,8 @@ class NamedBackup(SingletonMixin):
           # assume content already uploaded in the previous backup
           # TODO: check that? cloud.stat?
           if public_key_name == prevstate.public_key_name:
+            # upload already has a perfile key encrypted
+            # with the current public key
             return hashcode, fstat
           # previous upload used a different key
           # check if the upload is keyed against the current key
@@ -1469,14 +1470,14 @@ class NamedBackup(SingletonMixin):
           ##warning("cancelled")
           return None, None
         proxy("prepare upload")
-        with NamedTemporaryFile() as T:
-          shutil.copy(filename, T.name)
+        with NamedTemporaryCopy(filename, progress=65536,
+                                progress_label="snapshot " + filename) as T:
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
-            mm = mmap(fd2, fstat.st_size, prot=PROT_READ)
+            mm = mmap(fd2, 0, prot=PROT_READ)
             hasher = DEFAULT_HASHCLASS.digester()
             if runstate.cancelled:
               ##warning("cancelled")
@@ -1488,10 +1489,10 @@ class NamedBackup(SingletonMixin):
             if runstate.cancelled:
               ##warning("cancelled")
               return None, None
-            P = Progress(name="upload " + filename, total=0)
-            with P.bar(insert_pos=-1, deferred=True, proxy=proxy):
+            P = Progress(name="crypt upload " + subpath, total=len(mm))
+            with P.bar(proxy=proxy):
               self.upload_hashcode_content(
-                  backup_record, fd2, hashcode, len(mm), progress=P
+                  backup_record, mm, hashcode, progress=P, length=len(mm)
               )
         return hashcode, fstat
 
@@ -1500,9 +1501,9 @@ class NamedBackup(SingletonMixin):
       backup_record: BackupRecord,
       f,
       hashcode,
-      length,
       *,
-      progress=None
+      progress=None,
+      length,
   ):
     ''' Upload the contents of `f` under the supplied `hashcode`
         into the content area specified the `contentdir_cloudpath`.
@@ -1519,7 +1520,6 @@ class NamedBackup(SingletonMixin):
         ),
         public_key_name=backup_record.public_key_name,
         progress=progress,
-        length=length,
     )
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
