@@ -1476,7 +1476,7 @@ class NamedBackup(SingletonMixin):
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
-            mm = mmap(fd2, fstat.st_size, prot=PROT_READ)
+            mm = mmap(fd2, 0, prot=PROT_READ)
             hasher = DEFAULT_HASHCLASS.digester()
             if runstate.cancelled:
               ##warning("cancelled")
