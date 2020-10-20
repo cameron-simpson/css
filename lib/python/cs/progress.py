@@ -263,38 +263,63 @@ class BaseProgress(object):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
-    left = label
+    from cs.upd import print
+    left = ''
     remaining = self.remaining_time
     if remaining:
       remaining = int(remaining)
     throughput = self.throughput_recent(5)
-    if throughput is None:
-      return left
-    if throughput == 0:
-      if self.total is not None and self.position >= self.total:
-        left += ': idle'
-        return left
-      left += ': stalled'
-    else:
-      if throughput >= 10:
-        throughput = int(throughput)
-      left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
+    if throughput is not None:
+      if throughput == 0:
+        if self.total is not None and self.position >= self.total:
+          left = 'idle'
+          return left
+        left = 'stalled'
+      else:
+        if throughput >= 10:
+          throughput = int(throughput)
+        left = self.format_counter(throughput, max_parts=1) + '/s'
     if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
-      right = 'ETA unknown'
+      right = 'ETA ??'
     else:
       right = 'ETA ' + transcribe_time(remaining)
     if self.total is None:
       arrow_field = ' '
     else:
-      arrow_width = width - len(left) - len(right) - 2
+      # how much room for an arrow? we would like:
+      # "label: left arrow right"
+      arrow_width = width - len(left) - len(right) - len(label) - 4
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
       else:
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
-    return left + arrow_field + right
+    status_line = left + arrow_field + right
+    if label:
+      label_width = width - len(status_line)
+      if label_width >= len(label) + 2:
+        prefix = label + ': '
+      elif label_width == len(label) + 1:
+        prefix = label + ':'
+      # label_width<=len(label): need to crop the label
+      elif label_width <= 0:
+        # no room
+        prefix = ''
+      elif label_width == 1:
+        # just indicate the crop
+        prefix = '<'
+      elif label_width == 2:
+        # just indicate the crop
+        prefix = '<:'
+      else:
+        # crop as "<tail-of-label:"
+        prefix = '<' + label[-label_width + 2:] + ':'
+    else:
+      prefix = ''
+    status_line = prefix + status_line
+    return status_line
 
   # pylint: disable=blacklisted-name,too-many-arguments
   @contextmanager
