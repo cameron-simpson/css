@@ -210,6 +210,7 @@ def cachedmethod(
   rev_attr = val_attr + '__revision'
   lastpoll_attr = val_attr + '__lastpoll'
 
+  # pylint: disable=too-many-branches
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
@@ -239,7 +240,7 @@ def cachedmethod(
       if sig_func is not None:
         try:
           sig = sig_func(self)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
           # signature function fails, use the cache
           warning("sig func %s(self): %s", sig_func, e, exc_info=True)
           return value0
@@ -251,7 +252,7 @@ def cachedmethod(
       # compute the current value
       try:
         value = method(self, *a, **kw)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         # computation fails, return cached value
         if value0 is unset_value:
           # no cached value
@@ -461,7 +462,7 @@ def observable_class(property_names, only_unequal=False):
       for observer in self._observable_class__observers[attr]:
         try:
           observer(self, attr, value)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
           warning(
               "%s.%s=%r: observer %s(...) raises: %s",
               self,
@@ -509,6 +510,7 @@ def observable_class(property_names, only_unequal=False):
 
 if __name__ == '__main__':
 
+  # pylint: disable=too-few-public-methods
   class Foo:
     ''' Dummy class.
     '''
