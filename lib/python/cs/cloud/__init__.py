@@ -267,17 +267,6 @@ class Cloud(ABC):
     '''
     with Pfx("open(%r,'rb')", filename):
       with open(filename, 'rb') as f:
-        stat_length = os.fstat(f.fileno()).st_size
-        if length is None:
-          length = stat_length
-        elif length != stat_length:
-          # warn but do not override the caller
-          warning(
-              "from %s, supplied length=%r != os.fstat().st_size=%r",
-              caller(),
-              length,
-              stat_length,
-          )
         return self.upload_file(
             f,
             bucket_name=bucket_name,
