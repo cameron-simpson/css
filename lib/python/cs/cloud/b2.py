@@ -5,29 +5,25 @@
 
 from collections import namedtuple
 from contextlib import contextmanager
-import io
+from mmap import mmap, PROT_READ
 import os
 from os.path import join as joinpath
-from tempfile import NamedTemporaryFile
 from b2sdk.exception import FileNotPresent as B2FileNotPresent
 from b2sdk.v1 import (
     B2Api,
     InMemoryAccountInfo,
     AbstractProgressListener,
-    AbstractUploadSource,
     AbstractDownloadDestination,
 )
 from icontract import require
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
-from cs.lex import hexify
+from cs.fileutils import NamedTemporaryCopy
 from cs.logutils import warning
-from cs.obj import SingletonMixin, as_dict
+from cs.obj import SingletonMixin
 from cs.pfx import pfx_method
-from cs.progress import progressbar
 from cs.queues import IterableQueue
 from cs.threads import locked, locked_property
-from cs.units import BINARY_BYTES_SCALE
 from . import Cloud
 
 class B2Credentials(namedtuple('B2Credentials', 'keyId apiKey')):
@@ -203,7 +199,7 @@ class B2Cloud(SingletonMixin, Cloud):
       progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
-        Return a `dict` containing the B2 `FileInfo` object attribute values.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
 
         Parameters:
         * `bfr`: the source buffer
@@ -257,6 +253,8 @@ class B2Cloud(SingletonMixin, Cloud):
         bucket_name=bucket_name,
         path=path,
         progress=progress,
+        file_info=file_info,
+        content_type=content_type,
     )
     return file_version.as_dict()
 
@@ -321,7 +319,7 @@ class B2Cloud(SingletonMixin, Cloud):
       file_info=None,
       content_type=None,
       progress=None,
-      as_is: bool = False,
+      as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
         to `path` within `bucket_name`.
@@ -350,6 +348,8 @@ class B2Cloud(SingletonMixin, Cloud):
         bucket_name=bucket_name,
         path=path,
         progress=progress,
+        file_info=file_info,
+        content_type=content_type,
     )
     return file_version.as_dict()
 
