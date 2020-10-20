@@ -1369,7 +1369,7 @@ class NamedBackup(SingletonMixin):
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
     filename = joinpath(backup_root_dirpath, subpath)
     with backup_run.file_proxy() as proxy:
-      proxy.prefix = filename + ': '
+      proxy.prefix = subpath + ': '
       proxy("check against previous backup")
       backup_record = backup_run.backup_record
       runstate = backup_run.runstate
@@ -1490,7 +1490,7 @@ class NamedBackup(SingletonMixin):
               ##warning("cancelled")
               return None, None
             P = Progress(name="crypt upload " + subpath, total=len(mm))
-            with P.bar(proxy=proxy):
+            with P.bar(proxy=proxy, label=''):
               self.upload_hashcode_content(
                   backup_record, mm, hashcode, progress=P, length=len(mm)
               )
