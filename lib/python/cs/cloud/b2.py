@@ -230,6 +230,36 @@ class B2Cloud(SingletonMixin, Cloud):
           progress=progress,
       )
 
+  @pfx_method
+  def upload_bytes(
+      self,
+      bs,
+      *,
+      bucket_name: str,
+      path: str,
+      file_info=None,
+      content_type=None,
+      progress=None,
+  ):
+    ''' Upload the data from the bytes `bs` to `path` within `bucket_name`.
+        Return a `dict` containing the B2 `FileVersion` attribute values.
+
+        Parameters:
+        * `bs`: the file, preferably seekable
+        * `bucket_name`: the bucket name
+        * `path`: the subpath within the bucket
+        * `file_info`: an optional mapping of extra information about the file
+        * `content_type`: an optional MIME content type value
+        * `progress`: an optional `cs.progress.Progress` instance
+    '''
+    file_version = self._b2_upload_bytes(
+        bs,
+        bucket_name=bucket_name,
+        path=path,
+        progress=progress,
+    )
+    return file_version.as_dict()
+
   def upload_file(
       self,
       f,
