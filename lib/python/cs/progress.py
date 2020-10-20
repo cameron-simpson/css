@@ -234,22 +234,27 @@ class BaseProgress(object):
     return transcribe(value, scale, max_parts=max_parts, sep=sep)
 
   def text_pos_of_total(
-      self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
+      self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
   ):
-    ''' Return a "position/total" style progress string.
+    ''' Return a "total:position" or "position/total" style progress string.
 
         Parameters:
         * `fmt`: format string interpolating `pos_text` and `total_text`.
-          Default: `"{pos_text}/{total_text}"`
+          Default: `"{pos_text}/{total_text}"` if `pos_first`,
+          otherwise `"{total_text}:{pos_text}"`
         * `fmt_pos`: formatting function for `self.position`,
           default `self.format_counter`
         * `fmt_total`: formatting function for `self.total`,
           default from `fmt_pos`
+        * `pos_first`: put the position first if true (default `False`),
+          only consulted if `fmt` is `None`
     '''
     if fmt_pos is None:
       fmt_pos = self.format_counter
     if fmt_total is None:
       fmt_total = fmt_pos
+    if fmt is None:
+      fmt = "{pos_text}/{total_text}" if pos_first else "{total_text}:{pos_text}"
     pos_text = fmt_pos(self.position)
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
