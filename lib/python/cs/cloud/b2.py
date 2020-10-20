@@ -409,43 +409,6 @@ class B2UploadFileWrapper:
     '''
     return self.f.tell()
 
-class B2UploadFileShim(AbstractUploadSource):
-  ''' Shim to present a `CornuCopyBuffer` as an `AbstractUploadSource` for B2.
-  '''
-
-  def __init__(self, f, *, length=None, sha1bytes=None, progress=None):
-    super().__init__()
-    self.f = f
-    self.length = length
-    self.progress = progress
-    self.sha1bytes = sha1bytes
-
-  @contextmanager
-  def open(self):
-    ''' Just hand the buffer back, it supports reads.
-    '''
-    if self.length and self.progress is not None:
-      self.progress.total += self.length
-    yield B2UploadFileWrapper(self.f, progress=self.progress)
-
-  def get_content_sha1(self):
-    if self.sha1bytes:
-      return hexify(self.sha1bytes)
-    ##raise NotImplementedError("get_content_sha1 (no sha1bytes attribute)")
-    return None
-
-  def is_upload(self):
-    return True
-
-  def is_copy(self):
-    return False
-
-  def is_sha1_known(self):
-    return self.sha1bytes is not None
-
-  def get_content_length(self):
-    return self.length
-
 class B2DownloadBufferShimFileShim:
   ''' Shim to present a write-to-file interface for an `IterableQueue`.
   '''
