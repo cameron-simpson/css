@@ -82,7 +82,7 @@ class B2Cloud(SingletonMixin, Cloud):
       )
     return api
 
-  @locked
+  @locked(initial_timeout=0.0)
   def bucket_by_name(self, bucket_name: str):
     ''' Caching function to return a B2 `Bucket` instance for `bucket_name`.
     '''
