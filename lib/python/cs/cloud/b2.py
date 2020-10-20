@@ -260,6 +260,7 @@ class B2Cloud(SingletonMixin, Cloud):
     )
     return file_version.as_dict()
 
+  @pfx_method
   def upload_file(
       self,
       f,
