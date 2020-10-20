@@ -1198,7 +1198,7 @@ class NamedBackup(SingletonMixin):
     dirpath = joinpath(backup_root_dirpath, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
-        proxy.prefix = dirpath + ': '
+        proxy.prefix = subpath + ': '
         if subpath:
           proxy("attach")
           self.attach_subpath(
@@ -1316,8 +1316,7 @@ class NamedBackup(SingletonMixin):
             for R in Rs:
               R.cancel()
           for R in progressbar(report(Rs), total=len(Rs),
-                               label="%s: wait for uploads" % (dirpath,),
-                               proxy=proxy):
+                               label="wait for uploads", proxy=proxy):
             try:
               # we get a fresh stat and hashcode from backup_filename
               # because the file might change while we're mucking about
