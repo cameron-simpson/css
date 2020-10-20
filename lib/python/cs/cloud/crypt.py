@@ -467,13 +467,6 @@ def upload(
                 retcode,
             )
         )
-    with Pfx("lstat(%r)", T.name):
-      S = os.lstat(T.name)
-      if not S_ISREG(S.st_mode):
-        raise ValueError(
-            "expected a regular file, found st_mode=0o%5o" % (S.st_mode)
-        )
-    encrypted_length = S.st_size
     # upload directly from the file,
     # passing as_is=True so that the FSCloud implementation
     # knows it may try a hard link
