@@ -415,11 +415,12 @@ class CloudAreaFile(SingletonMixin):
   def upload_filename(self, filename, *, progress=None):
     ''' Upload a local file into the cloud.
     '''
-    with open(filename, 'rb') as f:
-      bfr = CornuCopyBuffer.from_fd(f.fileno())
-    result = self.upload_buffer(bfr, progress=progress)
-    bfr.close()
-    return result
+    return self.cloud.upload_filename(
+        filename,
+        bucket_name=self.bucket_name,
+        path=self.bucket_path,
+        progress=progress
+    )
 
   def download_buffer(self, *, progress=None):
     ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.
