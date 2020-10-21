@@ -185,6 +185,7 @@ def setup_logging(
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
+  import cs.pfx  # pylint: disable=import-outside-toplevel
   cs.pfx.cmd = cmd_name
 
   if main_log is None:
