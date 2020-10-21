@@ -51,6 +51,8 @@ from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
+__version__ = '20201021'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
