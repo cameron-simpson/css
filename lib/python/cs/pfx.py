@@ -165,53 +165,6 @@ class _PfxThreadState(threading.local):
     '''
     return self.stack.pop()
 
-def gen(func):
-  ''' Decorator for generators to manage the Pfx stack.
-
-      Before running the generator the current stack height is
-      noted.  After yield, the stack above that height is trimmed
-      and saved, and the value yielded.  On recommencement the saved
-      stack is reapplied to the current stack (which may have
-      changed) and the generator continued.
-  '''
-
-  def wrapper(*a, **kw):
-    if not isgeneratorfunction(func):
-      raise ValueError(
-          "@gen: generatior function required, received %s" % (func,)
-      )
-    # commence the generator
-    g = func(*a, **kw)
-    # note the current Thread's Pfx stack
-    stack = Pfx._state.stack
-    height = len(stack)
-    while True:
-      try:
-        value = next(g)
-      except StopIteration:
-        # clean up and reraise
-        stack[height:] = []
-        return
-      except:
-        # clean up and reraise
-        stack[height:] = []
-        raise
-      # shelve the in-generator Pfx stack and yield
-      saved = stack[height:]
-      stack[height:] = []
-      yield value
-      # note the current Thread's Pfx stack
-      stack = Pfx._state.stack
-      height = len(stack)
-      # reapply the in-generator Pfx stack
-      stack.extend(saved)
-      del saved
-
-  wrapper.__name__ = "@Pfx.gen(%s)" % (func.__name__,)
-  fdoc = func.__doc__
-  wrapper.__doc__ = wrapper.__name__ + ":\n" + fdoc if fdoc else ''
-  return wrapper
-
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
