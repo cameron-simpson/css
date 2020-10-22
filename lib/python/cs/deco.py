@@ -183,7 +183,7 @@ def contextdecorator(cmgrfunc):
 
           @tracecall(provide_context=True):
           def f(ctxt, *a, **kw):
-              """ A function expected the context object as its first argument,
+              """ A function expecting the context object as its first argument,
                   ahead of whatever other arguments it would normally require.
               """
 
