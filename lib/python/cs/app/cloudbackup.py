@@ -63,7 +63,7 @@ from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
 from typeguard import typechecked
 
@@ -214,7 +214,7 @@ class CloudBackupCommand(BaseCommand):
     # TODO: a facility to supply passphrases for use when recrypting
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
-    with Upd().insert(1) as proxy:
+    with UpdProxy() as proxy:
       proxy.prefix = f"{options.cmd} {options.backup_name} "
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
@@ -371,7 +371,7 @@ class CloudBackupCommand(BaseCommand):
     with Pfx("mkdir(%r)", restore_dirpath):
       os.mkdir(restore_dirpath, 0o777)
     made_dirs.add(restore_dirpath)
-    with Upd().insert(1) as proxy:
+    with UpdProxy() as proxy:
       proxy.prefix = f"{options.cmd} {backup} "
       for subpath in subpaths:
         if subpath == ".":
@@ -831,12 +831,13 @@ class BackupRun(RunStateMixin):
   def __enter__(self):
     ''' Commence a run, return `self`.
 
-        This allocates display areas 
+        This allocates display status lines for progress reporting,
+        prepares a new `BackupRecord`, catches `SIGINT`,
+        and commences a backup run.
     '''
-    upd = Upd()
-    status_proxy = upd.insert(1)
-    file_proxies = set(upd.insert(1) for _ in range(self.file_parallel))
-    folder_proxies = set(upd.insert(1) for _ in range(self.folder_parallel))
+    status_proxy = UpdProxy()
+    file_proxies = set(UpdProxy() for _ in range(self.file_parallel))
+    folder_proxies = set(UpdProxy() for _ in range(self.folder_parallel))
     backup_record = BackupRecord(
         public_key_name=self.public_key_name,
         content_path=self.content_path,
@@ -1346,7 +1347,7 @@ class NamedBackup(SingletonMixin):
         proxy('')
       return ok
 
-  # pylint: disable=too-many-locals
+  # pylint: disable=too-many-locals,too-many-return-statements
   @typechecked
   def backup_filename(
       self,
@@ -1411,9 +1412,6 @@ class NamedBackup(SingletonMixin):
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
         # compute some crypt-side upload paths
         basepath = self.hashcode_path(hashcode)
-        data_subpath, key_subpath = upload_paths(
-            basepath, public_key_name=public_key_name
-        )
         # TODO: a check_uploaded flag?
         if (prevstate and S_ISREG(prevstate.st_mode)
             and hashcode == prevstate.hashcode):
@@ -1428,6 +1426,9 @@ class NamedBackup(SingletonMixin):
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
+          _, key_subpath = upload_paths(
+              basepath, public_key_name=public_key_name
+          )
           if cloud.stat(bucket_name=bucket_name, path=key_subpath):
             # content already uploaded and keyed against the current key
             return hashcode, fstat
