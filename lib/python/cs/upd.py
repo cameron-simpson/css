@@ -91,7 +91,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.pfx', 'cs.tty'],
 }
 
 instances = []
@@ -182,11 +182,12 @@ class Upd(SingletonMixin):
     self.columns = columns
     self._ti_ready = False
     self._ti_strs = {}
-    self._slot_text = ['']
-    self._current_slot = 0
+    self._slot_text = []
+    self._current_slot = None
     self._above = None
+    self._proxies = []
     self._lock = RLock()
-    self._proxies = [UpdProxy(self, 0)]
+    self.insert(0)
     global instances  # pylint: disable=global-statement
     instances.append(self)
 
@@ -660,11 +661,13 @@ class Upd(SingletonMixin):
         assert proxy.index == i
     return True
 
-  def insert(self, index, txt=''):
+  def insert(self, index, txt='', proxy=None):
     ''' Insert a new status line at `index`.
 
         Return the `UpdProxy` for the new status line.
     '''
+    if proxy and proxy.upd is not None:
+      raise ValueError("proxy %s already associated with an Upd: %s" % (proxy, self))
     slots = self._slot_text
     proxies = self._proxies
     cuu1 = self.ti_str('cuu1')
@@ -689,22 +692,38 @@ class Upd(SingletonMixin):
             "index should be in the range 0..%d inclusive: got %s" %
             (len(self), index)
         )
-      proxy = UpdProxy(self, index)
+      if proxy is None:
+        # create the proxy, which inserts it
+        return UpdProxy(index, self)
+      # associate the proxy with self
+      assert proxy.upd is None
+      proxy.index = index
+      proxy.upd = self
       if self._disabled or self._backend is None:
-        # just maintain the slot text
+        # just insert the slot
         slots.insert(index, txt)
         proxies.insert(index, proxy)
       else:
+        # adjust the display, insert the slot
+        first_slot = self._current_slot is None
         if il1:
           # make sure insert line does not push the bottom line off the screen
           # by forcing a scroll
-          txts.extend(self._move_to_slot_v(self._current_slot, 0))
+          if first_slot:
+            ll = self.ti_str('ll')  # move to lower left
+            if ll:
+              txts.append(ll)
+            else:
+              txts.append('\r')
+          else:
+            txts.extend(self._move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
           txts.append('\v')
           txts.append(cuu1)
         if index == 0:
           # move to bottom slot, add line below
-          txts.extend(self._move_to_slot_v(self._current_slot, 0))
+          if not first_slot:
+            txts.extend(self._move_to_slot_v(self._current_slot, 0))
           txts.append('\v\r')
           if il1:
             txts.append(il1)
@@ -717,7 +736,8 @@ class Upd(SingletonMixin):
           self._current_slot = 0
         else:
           # move to the line which is to be below the inserted line
-          txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
+          if not first_slot:
+            txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
@@ -826,11 +846,25 @@ class UpdProxy(object):
       '_text': 'The text following the prefix for this slot, default "".',
   }
 
-  def __init__(self, upd, index):
-    self.upd = upd
-    self.index = index
+  def __init__(self, index=1, upd=None, text=None):
+    ''' Initialise a new `UpdProxy` status line.
+
+        Parameters:
+        * `index`: optional position for the new proxy as for `Upd.insert`,
+          default `1` (directly above the bottom status line)
+        * `upd`: the `Upd` instance with which to associate this proxy,
+          default the default `Upd` instance (associated with `sys.stderr`)
+        * `text`: optional initial text fot the new status line
+    '''
+    self.upd = None
+    self.index = None
+    if upd is None:
+      upd = Upd()
+    upd.insert(index, proxy=self)
     self._prefix = ''
     self._text = ''
+    if text:
+      self(text)
 
   def __str__(self):
     return (

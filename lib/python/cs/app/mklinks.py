@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, join as joinpath
+from os.path import dirname, isdir, isfile, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
@@ -250,24 +250,28 @@ class Linker(object):
   ''' The class which links files with identical content.
   '''
 
-  def __init__(self):
+  def __init__(self, min_size=512):
     self.sizemap = defaultdict(dict)  # file_size => FileInfo.key => FileInfo
     self.keymap = {}  # FileInfo.key => FileInfo
+    self.min_size = min_size
 
   @pfx_method
   def scan(self, path):
     ''' Scan the file tree.
     '''
-    if isdir(path):
-      for dirpath, dirnames, filenames in os.walk(path):
-        for filename in sorted(filenames):
-          path = joinpath(dirpath, filename)
-          status(path)
-          if isfile(path):
-            self.addpath(path)
-        dirnames[:] = sorted(dirnames)
-    else:
-      self.addpath(path)
+    with Upd().insert(1) as proxy:
+      proxy.prefix="scan %s: "%(path)
+      if isdir(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+          proxy(relpath(dirpath, path))
+          for filename in sorted(filenames):
+            path = joinpath(dirpath, filename)
+            status(path)
+            if isfile(path):
+              self.addpath(path)
+          dirnames[:] = sorted(dirnames)
+      else:
+        self.addpath(path)
 
   def addpath(self, path):
     ''' Add a new path to the data structures.
@@ -276,6 +280,8 @@ class Linker(object):
       with Pfx("lstat"):
         S = os.lstat(path)
       if not S_ISREG(S.st_mode):
+        return
+      if S.st_size < self.min_size:
         return
       key = FileInfo.stat_key(S)
       FI = self.keymap.get(key)
