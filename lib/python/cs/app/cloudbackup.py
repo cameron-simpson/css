@@ -1347,7 +1347,7 @@ class NamedBackup(SingletonMixin):
         proxy('')
       return ok
 
-  # pylint: disable=too-many-locals
+  # pylint: disable=too-many-locals,too-many-return-statements
   @typechecked
   def backup_filename(
       self,
@@ -1412,9 +1412,6 @@ class NamedBackup(SingletonMixin):
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
         # compute some crypt-side upload paths
         basepath = self.hashcode_path(hashcode)
-        data_subpath, key_subpath = upload_paths(
-            basepath, public_key_name=public_key_name
-        )
         # TODO: a check_uploaded flag?
         if (prevstate and S_ISREG(prevstate.st_mode)
             and hashcode == prevstate.hashcode):
@@ -1429,6 +1426,9 @@ class NamedBackup(SingletonMixin):
           if runstate.cancelled:
             ##warning("cancelled")
             return None, None
+          _, key_subpath = upload_paths(
+              basepath, public_key_name=public_key_name
+          )
           if cloud.stat(bucket_name=bucket_name, path=key_subpath):
             # content already uploaded and keyed against the current key
             return hashcode, fstat
