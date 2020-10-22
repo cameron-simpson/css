@@ -4,6 +4,8 @@
 # Also CornuCopyBuffer for managing a buffer and an input source.
 #   - Cameron Simpson <cs@cskk.id.au> 18mar2017
 #
+# pylint: disable=too-many-lines
+#
 
 ''' Facilities to do with buffers, particularly CornuCopyBuffer,
     an automatically refilling buffer to support parsing of data streams.
@@ -19,7 +21,7 @@ import sys
 from threading import Thread
 from cs.py3 import pread
 
-__version__ = '20200517-post'
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -35,6 +37,7 @@ DEFAULT_READSIZE = 131072
 
 MEMORYVIEW_THRESHOLD = DEFAULT_READSIZE  # tweak if this gets larger
 
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class CornuCopyBuffer(object):
   ''' An automatically refilling buffer intended to support parsing
       of data streams.
@@ -85,6 +88,7 @@ class CornuCopyBuffer(object):
       as required.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self,
       input_data,
@@ -374,10 +378,13 @@ class CornuCopyBuffer(object):
 
         Otherwise `index` should be an `int` and the corresponding
         buffered byte is returned.
+
+        This is usually not a very useful method;
+        its primary use case it to probe the buffer to make a parsing decision
+        instead of taking a byte off and (possibly) pushing it back.
     '''
     if isinstance(index, slice):
       # slice the joined up bufs - expensive
-      start, end, step = index.indices(self.buflen)
       return b''.join(self.bufs)[index]
     index0 = index
     if index < 0:
@@ -391,7 +398,7 @@ class CornuCopyBuffer(object):
           "index %s out of range (buflen=%d)" % (index0, self.buflen)
       )
     buf_offset = 0
-    for i, buf in enumerate(self.bufs):
+    for buf in self.bufs:
       if index < buf_offset + len(buf):
         return buf[index - buf_offset]
       buf_offset += len(buf)
@@ -854,7 +861,7 @@ class CornuCopyBuffer(object):
       for buf in reversed(bfr2.bufs):
         self.push(buf)
 
-    bfr2.flush = flush
+    bfr2.flush = flush  # pylint: disable=attribute-defined-outside-init
     return bfr2
 
 class _BoundedBufferIterator(object):
@@ -924,23 +931,23 @@ class CopyingIterator(object):
   ''' Wrapper for an iterator that copies every item retrieved to a callable.
   '''
 
-  def __init__(self, I, copy_to):
-    ''' Initialise with the iterator `I` and the callable `copy_to`.
+  def __init__(self, it, copy_to):
+    ''' Initialise with the iterator `it` and the callable `copy_to`.
     '''
-    self.I = I
+    self.it = it
     self.copy_to = copy_to
 
   def __iter__(self):
     return self
 
   def __next__(self):
-    item = next(self.I)
+    item = next(self.it)
     self.copy_to(item)
     return item
 
   def __getattr__(self, attr):
     # proxy other attributes from the base iterator
-    return getattr(self.I, attr)
+    return getattr(self.it, attr)
 
 def chunky(bfr_func):
   ''' Decorator for a function accepting a leading `CornuCopyBuffer`
@@ -1046,6 +1053,7 @@ class _Iterator(object):
       self.next_hint = hint
     return data
 
+# pylint: disable=too-few-public-methods
 class SeekableIteratorMixin(object):
   ''' Mixin supplying a logical with a `seek` method.
   '''

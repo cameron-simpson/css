@@ -52,56 +52,15 @@ Multiline multithread example:
 ## A note about Upd and terminals
 
 I routinely use an `Upd()` as a progress reporting tool for commands
-running on a terminal. This attaches to `sys.stderr`.
+running on a terminal. This attaches to `sys.stderr` by default.
 However, it is usually not desirable to run an `Upd` display
 if the backend is not a tty/terminal.
 Therefore, an `Upd` has a "disabled" mode
 which performs no output;
-if the backend is not a tty (as tested by `backend.isatty()`)
-this mode activates by default.
-
+the default behaviour is that this mode activates
+if the backend is not a tty (as tested by `backend.isatty()`).
 The constructor has an optional parameter `disabled` to override
 this default behaviour.
-
-The whole purpose of this "disabled" mode is to ease main programme
-implementation.
-Before this mode one had two basic idioms to support "noninteractive" use,
-described below.
-
-The former was to test `sys.stderr.isatty()` and define an `Upd` or not:
-
-    upd = Upd() if sys.stderr.isatty() else None
-
-and to scatter tests throughout the code:
-
-    if upd:
-        upd.out("new status here")
-
-The latter was to work entirely through `UpdProxy` instances
-(which is convenient anyway), like this 2 status line example:
-
-    if sys.stderr.isatty():
-        upd = Upd()
-        status_proxy = upd.proxy(0)
-        progress_proxy = upd.insert(1)
-    else:
-        status_proxy = UpdProxy(None, None)
-        progress_proxy = UpdProxy(None, None)
-
-and to use the proxies thereafter:
-
-    status_proxy.text = "doing task A"
-    ... during task A ...
-    ... progress_proxy.text = progress.status() ...
-
-This works because `UpdProxy` instances support a "detached" mode,
-which is they state they move to when deleted
-in the normal course of operations.
-
-However, because an `Upd` defaults to being "disabled"
-if its backend is not a tty
-the usual main programme can just set one up and use it unconditionally;
-on a nontty there will simply be no output.
 '''
 
 from __future__ import with_statement, print_function

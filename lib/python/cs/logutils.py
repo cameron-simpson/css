@@ -69,7 +69,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200729-post'
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -94,7 +94,7 @@ assert TRACK < logging.WARNING
 
 # Special status line tracking, above INFO and below TRACK and WARNING
 STATUS = TRACK - 1
-assert STATUS > logging.INFO and STATUS < logging.WARNING
+assert logging.INFO < STATUS < logging.WARNING
 
 loginfo = None
 D_mode = False
@@ -107,6 +107,8 @@ def ifdebug():
     loginfo = setup_logging()
   return loginfo.level <= logging.DEBUG
 
+# pylint: disable=too-many-branches,too-many-statements,too-many-locals
+# pylint: disable=too-many-arguments,redefined-builtin
 def setup_logging(
     cmd_name=None,
     main_log=None,
@@ -183,7 +185,7 @@ def setup_logging(
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  import cs.pfx
+  import cs.pfx  # pylint: disable=import-outside-toplevel
   cs.pfx.cmd = cmd_name
 
   if main_log is None:
@@ -232,9 +234,11 @@ def setup_logging(
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
+    # pylint: disable=import-outside-toplevel
     import signal
     import cs.debug
 
+    # pylint: disable=unused-argument
     def handler(sig, frame):
       cs.debug.thread_dump(None, main_log)
 
@@ -385,6 +389,7 @@ class PfxFormatter(Formatter):
     record.message = s
     return s
 
+# pylint: disable=too-many-branches,too-many-statements
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
       comes from the environment variable `$DEBUG`.
@@ -461,6 +466,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
         level = logging.INFO
       elif uc_flag == 'TRACK':
         level = TRACK
+      # pylint: disable=consider-using-in
       elif uc_flag == 'WARN' or uc_flag == 'WARNING':
         level = logging.WARNING
       elif uc_flag == 'ERROR':
@@ -481,6 +487,7 @@ def D(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# pylint: disable=too-many-arguments,redefined-builtin
 def add_logfile(
     filename,
     logger=None,
@@ -536,7 +543,6 @@ class NullHandler(logging.Handler):
   def emit(self, record):
     ''' Discard the log record.
     '''
-    pass
 
 __logExLock = Lock()
 
@@ -752,6 +758,7 @@ if __name__ == '__main__':
 
   @logging_wrapper
   def test_warning(msg, *a, **kw):
+    'test function for warning'
     warning(msg, *a, **kw)
 
   setup_logging(

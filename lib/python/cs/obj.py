@@ -17,7 +17,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20200716-post'
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,6 +50,7 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
+# pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
   ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
   '''
@@ -140,7 +141,7 @@ def O_str(o, no_recurse=False, seen=None):
   if obj_type in (tuple, int, float, bool, list):
     return str(o)
   if obj_type is dict:
-    o2 = dict([(k, str(v)) for k, v in o.items()])
+    o2 = {k: str(v) for k, v in o.items()}
     return str(o2)
   if obj_type is set:
     return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
@@ -208,6 +209,8 @@ def as_dict(o, selector=None):
 
 @OBSOLETE("use cs.obj.as_dict")
 def obj_as_dict(o, **kw):
+  ''' OBSOLETE convesion of an object to a `dict`. Please us `cs.obj.as_dict`.
+  '''
   raise RuntimeError("please use cs.obj.as_dict")
 
 class Proxy(object):
@@ -319,6 +322,7 @@ def singleton(registry, key, factory, fargs, fkwargs):
     is_new = True
   return is_new, instance
 
+# pylint: disable=too-few-public-methods
 class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
@@ -415,7 +419,7 @@ class SingletonMixin:
 
     okey = cls._singleton_key(*a, **kw)
     with registry._singleton_lock:
-      isnew, instance = singleton(registry, okey, factory, a, kw)
+      _, instance = singleton(registry, okey, factory, a, kw)
     return instance
 
 if __name__ == '__main__':

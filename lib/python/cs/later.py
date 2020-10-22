@@ -1,5 +1,7 @@
 #!/usr/bin/python
 #
+# pylint: disable=too-many-lines
+#
 
 r'''
 Queue functions for execution later in priority and time order.
@@ -48,6 +50,8 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread
+
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -108,7 +112,6 @@ def defer(func, *a, **kw):
 class RetryError(Exception):
   ''' Exception raised by functions which should be resubmitted to the queue.
   '''
-  pass
 
 def retry(retry_interval, func, *a, **kw):
   ''' Call the callable `func` with the supplied arguments.
@@ -135,6 +138,7 @@ class _Late_context_manager(object):
       This permits easy inline scheduled code.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self, L, priority=None, delay=None, when=None, name=None, pfx=None
   ):
@@ -287,6 +291,7 @@ class LateFunction(Result):
         error("%s", e, exc_info=exc_info)
     Result._complete(self, result, exc_info)
 
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
 
@@ -324,7 +329,7 @@ class Later(MultiOpenMixin):
     if name is None:
       name = "Later-%d" % (seq(),)
     if ifdebug():
-      import inspect
+      import inspect  # pylint: disable=import-outside-toplevel
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
     debug(
@@ -351,6 +356,8 @@ class Later(MultiOpenMixin):
     self._finished = None
 
   def startup(self):
+    ''' Initial startup.
+    '''
     self._finished = Event()
 
   @pfx_method
@@ -466,7 +473,7 @@ class Later(MultiOpenMixin):
       self.debug("STATUS: running: %s", LF)
 
   def __enter__(self):
-    global default
+    global default  # pylint: disable=global-statement
     debug("%s: __enter__", self)
     default.push(self)
     return self
@@ -475,7 +482,7 @@ class Later(MultiOpenMixin):
     ''' Exit handler: release the "complete" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    global default
+    global default  # pylint: disable=global-statement
     debug("%s: __exit__: exc_type=%s", self, exc_type)
     default.pop()
     return False
@@ -576,6 +583,7 @@ class Later(MultiOpenMixin):
     '''
     return _Late_context_manager(self, **kwargs)
 
+  # pylint: disable=too-many-arguments
   def submit(
       self, func, priority=None, delay=None, when=None, name=None, pfx=None
   ):
@@ -606,6 +614,7 @@ class Later(MultiOpenMixin):
         func, priority=priority, delay=delay, when=when, name=name, pfx=pfx
     )
 
+  # pylint: disable=too-many-arguments
   def _submit(
       self,
       func,
@@ -802,13 +811,13 @@ class Later(MultiOpenMixin):
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
     return after(LFs, None, lambda: self._defer(put_func))
 
-  def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
+  def defer_iterable(self, it, outQ, test_ready=None):
+    ''' Submit an iterable `it` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         Return a `Result` for final synchronisation.
 
         Parameters:
-        * `I`: the iterable for for asynchronous stepwise iteration
+        * `it`: the iterable for for asynchronous stepwise iteration
         * `outQ`: an `IterableQueue`like object
           with a `.put` method to accept items
           and a `.close` method to indicate the end of items.
@@ -826,10 +835,10 @@ class Later(MultiOpenMixin):
       raise RuntimeError(
           "%s.defer_iterable(...) but not self.submittable" % (self,)
       )
-    return self._defer_iterable(I, outQ=outQ, test_ready=test_ready)
+    return self._defer_iterable(it, outQ=outQ, test_ready=test_ready)
 
-  def _defer_iterable(self, I, outQ, test_ready=None):
-    iterate = partial(next, iter(I))
+  def _defer_iterable(self, it, outQ, test_ready=None):
+    iterate = partial(next, iter(it))
     R = Result()
     iterationss = [0]
 
@@ -847,7 +856,7 @@ class Later(MultiOpenMixin):
       except StopIteration:
         outQ.close()
         R.result = iterationss[0]
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception(
             "defer_iterable: iterate_once: exception during iteration: %s", e
         )
@@ -863,7 +872,7 @@ class Later(MultiOpenMixin):
         self._defer(iterate_once)
 
     iterate_once.__name__ = "%s:next(iter(%s))" % (
-        funcname(iterate_once), getattr(I, '__name__', repr(I))
+        funcname(iterate_once), getattr(it, '__name__', repr(it))
     )
     self._defer(iterate_once)
     return R
@@ -978,7 +987,7 @@ class SubLater(object):
         if handler:
           try:
             handler(LF)
-          except Exception as e:
+          except Exception as e:  # pylint: disable=broad-except
             exception("%s: reap %s: %s", self, LF, e)
 
     T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
@@ -1004,6 +1013,7 @@ class LatePool(object):
             print(result)
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self,
       L=None,

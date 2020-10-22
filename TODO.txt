@@ -1,3 +1,10 @@
+cs.logutils,pilfer: drop D_mode and the D function
+cs.upd: what to do when the number of status lines exceeds the terminal height?
+try to strip out use of cs.py3.bytes
+replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
+MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
+cs.logutils: warning et all: once=key (or key on the warning format string if True)
+Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
 cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
 cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
 a facility to do things just once, particularly warnings - then port cs.progress to it
