@@ -1193,6 +1193,8 @@ class NamedBackup(SingletonMixin):
     if subpath:
       validate_subpath(subpath)
     runstate = backup_run.runstate
+    if runstate.cancelled:
+      break
     backup_record = backup_run.backup_record
     backup_uuid = backup_record.uuid
     dirpath = joinpath(backup_root_dirpath, subpath)
