@@ -47,7 +47,7 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
-from cs.deco import decorator, fmtdoc, logging_wrapper
+from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
@@ -519,7 +519,7 @@ def pfx(func, message=None, message_args=()):
   ''' General purpose @pfx for generators, methods etc.
 
       Parameters:
-      * `func`: the function to decorate
+      * `func`: the function or generator function to decorate
       * `message`: optional prefix to use instead of the function name
       * `message_args`: optional arguments to embed in the preifx using `%`
 
@@ -531,38 +531,30 @@ def pfx(func, message=None, message_args=()):
   '''
   fname = funcname(func)
   if message is None:
+    if message_args:
+      raise ValueError("no message, but message_args=%r"%(message_args,))
     message = fname
 
   if isgeneratorfunction(func):
 
-    def wrapper(*a, **kw):
-      ''' Before running the generator the current stack height is
-          noted.  After yield, the stack above that height is trimmed
-          and saved, and the value yielded.  On recommencement the saved
-          stack is reapplied to the current stack (which may have
-          changed) and the generator continued.
+    # persistent in-generator stack to be reused across calls to
+    # the context manager
+    saved_stack = []
+
+    @contextdecorator
+    def wrapper(func, a, kw):
+      ''' Context manager to note the entry `Pfx` stack height, append saved
+          `Pfx` stack from earlier run, then after the iteration step save the
+          top of the `Pfx` stack for next time.
       '''
-      # commence the generator
-      g = func(*a, **kw)
-      # prepare an initial generator Pfx stack
-      saved = []
-      while True:
-        # note the current Thread's Pfx stack
-        stack = Pfx._state.stack
-        height = len(stack)
-        stack.extend(saved)
-        try:
-          with Pfx(message, *message_args):
-            value = next(g)
-        except StopIteration:
-          # clean up and return
-          stack[height:] = []
-          return
-          # other exceptions raise cleanly out of the generator
-        # save generator Pfx stack, reset caller Pfx stack, yield
-        saved = stack[height:]
-        stack[height:] = []
-        yield value
+      pfx_stack = Pfx._state.stack
+      height = len(pfx_stack)
+      pfx_stack.extend(saved_stack)
+      with Pfx(message, *message_args):
+        yield
+      saved_stack[:] = pfx_stack[height:]
+      pfx_stack[height:] = []
+
   else:
 
     def wrapper(*a, **kw):
