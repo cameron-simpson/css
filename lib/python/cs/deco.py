@@ -171,7 +171,7 @@ def contextdecorator(cmgrfunc):
               try:
                 yield
               except Exception as e:
-                print("exception from %s(*%r,**%r)" % (func, a, kw))
+                print("exception from %s(*%r,**%r): %s" % (func, a, kw, e))
                 raise
               else:
                 print("return from %s(*%r,**%r)" % (func, a, kw))
