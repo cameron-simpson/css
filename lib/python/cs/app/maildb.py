@@ -1,5 +1,8 @@
 #!/usr/bin/python -tt
 
+''' My database of mail information.
+'''
+
 from __future__ import with_statement, print_function
 from collections import deque
 from getopt import getopt, GetoptError
@@ -22,7 +25,8 @@ from cs.threads import locked_property
 
 DISTINFO = {
     'description':
-    "a cs.nodedb NodeDB subclass for storing email address information (groups, addresses, so forth)",
+    "a cs.nodedb NodeDB subclass for storing email address information"
+    " (groups, addresses, so forth)",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -47,7 +51,11 @@ DISTINFO = {
     },
 }
 
+# pylint: disable=too-many-branches,too-many-locals,too-many-statements
+# pylint: disable=too-many-nested-blocks
 def main(argv=None, stdin=None):
+  ''' Command line main programme.
+  '''
   if argv is None:
     argv = sys.argv
   if stdin is None:
@@ -122,7 +130,7 @@ def main(argv=None, stdin=None):
           else:
             MDB.importAddresses(stdin)
             MDB.close()
-        elif op == 'abbreviate' or op == 'abbrev':
+        elif op in ('abbreviate', 'abbrev'):
           if len(argv) != 2:
             error("expected abbreviation and address, got: %r", argv)
             badopts = True
@@ -147,7 +155,7 @@ def main(argv=None, stdin=None):
                 MDB.scrub()
                 with open(exportpath, "w") as exfp:
                   MDB.dump(exfp)
-        elif op == 'list-abbreviations' or op == 'list-abbrevs':
+        elif op in ('list-abbreviations', 'list-abbrevs'):
           try:
             opts, argv = getopt(argv, 'A')
           except GetoptError as e:
@@ -354,6 +362,7 @@ def edit_group(MDB, groupname):
     Gs = [G for G in MDB.GROUPs if groupname in G.GROUPs]
   return edit_groupness(MDB, As, Gs)
 
+# pylint: disable=too-many-branches,too-many-locals,too-many-statements
 def edit_groupness(MDB, addresses, subgroups):
   ''' Modify the group memberships of the supplied addresses and groups.
       Removed addresses or groups are not modified.
@@ -433,6 +442,8 @@ def edit_groupness(MDB, addresses, subgroups):
         A.GROUPs = groups
 
 def update_domain(MDB, old_domain, new_domain, argv):
+  ''' Update the `@domain` of addresses in `MDB`.
+  '''
   if not argv:
     addrs = [A.name for A in MDB.ADDRESSes if A.name.endswith(old_domain)]
   else:
@@ -459,9 +470,13 @@ def update_domain(MDB, old_domain, new_domain, argv):
 PersonNode = Node
 
 class AddressNode(Node):
+  ''' An address `Node`.
+  '''
 
   @property
   def formatted(self):
+    ''' The formatted form of this address, typically `"realname" <name>`.
+    '''
     return ustr(formataddr((self.realname, self.name)))
 
   @property
@@ -476,15 +491,21 @@ class AddressNode(Node):
 
   @realname.setter
   def realname(self, newname):
+    ''' Set the `.REALNAME` attribute.
+    '''
     self.REALNAME = newname
 
   def groups(self):
+    ''' Return the groups of which this address is a member.
+    '''
     return [
         address_group for address_group in self.nodedb.address_groups
         if self.name in address_group
     ]
 
   def in_group(self, group_name):
+    ''' Test whther this address is a member of the group named `group_name`.
+    '''
     address_group = self.nodedb.address_groups.get(group_name)
     if address_group is None:
       return False
@@ -492,14 +513,20 @@ class AddressNode(Node):
 
   @property
   def abbreviation(self):
+    ''' The preferred abbreviation for this address or `None`.
+    '''
     return self.get0('ABBREVIATION')
 
   @abbreviation.setter
   def abbreviation(self, abbrev):
+    ''' Set the preferred abreviation for this address.
+    '''
     return self._setAbbreviation(abbrev)
 
   @abbreviation.deleter
   def abbreviation(self):
+    ''' Delete the preferred abreviation for this address.
+    '''
     return self._setAbbreviation(None)
 
   def _setAbbreviation(self, abbrev):
@@ -532,18 +559,26 @@ class AddressNode(Node):
       self.ABBREVIATION = abbrev
 
 class MessageNode(Node):
+  ''' A node representing a particular message.
+  '''
 
   @property
   def references(self):
+    ''' Return the `.REFERENCEs` of this message.
+    '''
     return self.REFERENCEs
 
   @property
   def followups(self):
+    ''' Locate the immediate followups to a message.
+    '''
     return set(
         N for N, attr, count in self.references(attr='PARENT', type='MESSAGE')
     )
 
   def thread_root(self):
+    ''' Locate the root message of a message thread.
+    '''
     M = self
     while True:
       ps = M.PARENTs
@@ -574,6 +609,8 @@ class MessageNode(Node):
           msgq.append(M2)
 
 def MailDB(mdburl, readonly=True, klass=None):
+  ''' Factory to obtain the `NodeDB` for `mdburl`.
+  '''
   if klass is None:
     klass = _MailDB
   return NodeDBFromURL(mdburl, readonly=readonly, klass=klass)
@@ -623,6 +660,8 @@ class _MailDB(NodeDB):
 
   @staticmethod
   def parsedAddress(addr):
+    ''' Return `(realname,addr)` for the address string `addr`.
+    '''
     if isinstance(addr, StringTypes):
       realname, coreaddr = parseaddr(addr)
     else:
@@ -767,6 +806,8 @@ class _MailDB(NodeDB):
     return self.get(('MESSAGE', message_id), doCreate=True)
 
   def getAddressNodes(self, *addrtexts):
+    ''' Get the `AddressNode`s for supplied `(realname,addr)` pairs.
+    '''
     return [
         self.getAddressNode((realname, addr))
         for realname, addr in getaddresses(addrtexts)
@@ -860,6 +901,8 @@ class _MailDB(NodeDB):
     return addrs
 
   def update_domain(self, addr, old_domain, new_domain):
+    ''' Rewrite the domain part of an address.
+    '''
     with Pfx("update_domain(%s, %s, %s)", addr, old_domain, new_domain):
       if not old_domain.startswith('@'):
         raise ValueError('old_domain does not start with "@"')
