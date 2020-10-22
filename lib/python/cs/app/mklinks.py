@@ -258,16 +258,19 @@ class Linker(object):
   def scan(self, path):
     ''' Scan the file tree.
     '''
-    if isdir(path):
-      for dirpath, dirnames, filenames in os.walk(path):
-        for filename in sorted(filenames):
-          path = joinpath(dirpath, filename)
-          status(path)
-          if isfile(path):
-            self.addpath(path)
-        dirnames[:] = sorted(dirnames)
-    else:
-      self.addpath(path)
+    with Upd().insert(1) as proxy:
+      proxy.prefix="scan %s: "%(path)
+      if isdir(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+          proxy(relpath(dirpath, path))
+          for filename in sorted(filenames):
+            path = joinpath(dirpath, filename)
+            status(path)
+            if isfile(path):
+              self.addpath(path)
+          dirnames[:] = sorted(dirnames)
+      else:
+        self.addpath(path)
 
   def addpath(self, path):
     ''' Add a new path to the data structures.
