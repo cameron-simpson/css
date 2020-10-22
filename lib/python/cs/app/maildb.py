@@ -176,6 +176,8 @@ def main(argv=None, stdin=None):
                   xit = 1
             # generate other aliases automatically to aid mutt's reverse_alias=yes behaviour
             if mutt_aliases:
+              nonames_group=MDB.address_groups.get('noaliasname')
+              noname_addrs = set(nonames_group) if nonames_group else ()
               alias_names = set(abbrevs.keys())
               auto_aliases = {}
               As = sorted(MDB.ADDRESSes, key=lambda a: a.name)
@@ -193,7 +195,7 @@ def main(argv=None, stdin=None):
                   while auto_alias in alias_names:
                     n += 1
                     auto_alias = auto_alias_base + str(n)
-                  auto_aliases[auto_alias] = A.formatted
+                  auto_aliases[auto_alias] = A.name if A.name in noname_addrs else A.formatted
                   alias_names.add(auto_alias)
               for auto_alias in sorted(auto_aliases.keys()):
                 print('alias', auto_alias, auto_aliases[auto_alias])
@@ -220,6 +222,10 @@ def main(argv=None, stdin=None):
           else:
             group_names = sorted(MDB.address_groups.keys())
           if not badopts:
+            # addresses for which we should list the realname part
+            # to stop mutt overruling the comment port in the index display
+            nonames_group=MDB.address_groups.get('noaliasname')
+            noname_addrs = set(nonames_group) if nonames_group else ()
             for group_name in group_names:
               with Pfx(group_name):
                 address_group = MDB.address_groups.get(group_name)
@@ -234,9 +240,11 @@ def main(argv=None, stdin=None):
                 elif mutt_groups:
                   print('group', end=' ')
                 print(group_name, end=' ')
-                formatted_addresses = sorted(MDB['ADDRESS', address].formatted
-                                             for address in address_group
-                                            )
+                formatted_addresses = sorted((
+                    address_entry.name if address_entry.name in noname_addrs
+                    else address_entry.formatted)
+                    for address_entry in map(
+                        lambda address:MDB['ADDRESS', address], address_group))
                 if mutt_aliases or mutt_groups:
                   # write slosh extended lines
                   first = True
