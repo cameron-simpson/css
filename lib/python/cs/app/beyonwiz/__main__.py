@@ -26,10 +26,6 @@ class BWizCmd(BaseCommand):
   ''' Command line handler.
   '''
 
-  GETOPT_SPEC = ''
-
-  USAGE_FORMAT = '''Usage: {cmd} subcmd [subcmd-args...]'''
-
   @staticmethod
   def cmd_cat(args, options):
     ''' Output the tvwiz transport stream data.

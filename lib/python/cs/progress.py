@@ -3,20 +3,31 @@
 # Progress counting.
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
+# pylint: disable=(too-many-lines)
+#
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
     also a compound progress meter composed from other progress meters.
 '''
 
 from collections import namedtuple
+from contextlib import contextmanager
 import functools
+import sys
 import time
-from cs.logutils import warning, exception
+from cs.deco import decorator
+from cs.logutils import debug, exception
+from cs.py.func import funcname
 from cs.seq import seq
 from cs.units import (
-    transcribe_time, transcribe, BINARY_BYTES_SCALE, TIME_SCALE, UNSCALED_SCALE
+    transcribe_time,
+    transcribe,
+    BINARY_BYTES_SCALE,
+    DECIMAL_SCALE,
+    TIME_SCALE,
+    UNSCALED_SCALE,
 )
-from cs.upd import Upd, print as upd_print
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20200718.3-post'
 
@@ -26,7 +37,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires':
+    ['cs.deco', 'cs.logutils', 'cspy.func', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -63,6 +75,7 @@ class BaseProgress(object):
     self.name = name
     self.start_time = start_time
     self.units_scale = units_scale
+    self._warned = set()
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -134,7 +147,7 @@ class BaseProgress(object):
     '''
     consumed = self.position - self.start
     if consumed < 0:
-      warning(
+      debug(
           "%s.throughput: self.position(%s) < self.start(%s)", self,
           self.position, self.start
       )
@@ -144,7 +157,7 @@ class BaseProgress(object):
     if elapsed == 0:
       return 0
     if elapsed <= 0:
-      warning(
+      debug(
           "%s.throughput: negative elapsed time since start_time=%s: %s", self,
           self.start_time, elapsed
       )
@@ -174,10 +187,12 @@ class BaseProgress(object):
       return None
     remaining = total - self.position
     if remaining < 0:
-      warning(
-          "%s.remaining_time: self.position(%s) > self.total(%s)", self,
-          self.position, self.total
-      )
+      if "position>total" not in self._warned:
+        self._warned.add("position>total")
+        debug(
+            "%s.remaining_time: self.position(%s) > self.total(%s)", self,
+            self.position, self.total
+        )
       return None
     throughput = self.throughput
     if throughput is None or throughput == 0:
@@ -216,7 +231,7 @@ class BaseProgress(object):
       arrow += ' ' * (width - len(arrow))
     return arrow
 
-  def format_counter(self, value, scale=None, max_parts=2, sep=' '):
+  def format_counter(self, value, scale=None, max_parts=2, sep=','):
     ''' Format `value` accoridng to `scale` and `max_parts`
         using `cs.units.transcribe`.
     '''
@@ -227,22 +242,27 @@ class BaseProgress(object):
     return transcribe(value, scale, max_parts=max_parts, sep=sep)
 
   def text_pos_of_total(
-      self, fmt="{pos_text}/{total_text}", fmt_pos=None, fmt_total=None
+      self, fmt=None, fmt_pos=None, fmt_total=None, pos_first=False
   ):
-    ''' Return a "position/total" style progress string.
+    ''' Return a "total:position" or "position/total" style progress string.
 
         Parameters:
         * `fmt`: format string interpolating `pos_text` and `total_text`.
-          Default: `"{pos_text}/{total_text}"`
+          Default: `"{pos_text}/{total_text}"` if `pos_first`,
+          otherwise `"{total_text}:{pos_text}"`
         * `fmt_pos`: formatting function for `self.position`,
           default `self.format_counter`
         * `fmt_total`: formatting function for `self.total`,
           default from `fmt_pos`
+        * `pos_first`: put the position first if true (default `False`),
+          only consulted if `fmt` is `None`
     '''
     if fmt_pos is None:
       fmt_pos = self.format_counter
     if fmt_total is None:
       fmt_total = fmt_pos
+    if fmt is None:
+      fmt = "{pos_text}/{total_text}" if pos_first else "{total_text}:{pos_text}"
     pos_text = fmt_pos(self.position)
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
@@ -251,40 +271,151 @@ class BaseProgress(object):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
-    left = label
+    from cs.upd import print
+    left = ''
     remaining = self.remaining_time
     if remaining:
       remaining = int(remaining)
     throughput = self.throughput_recent(5)
-    if throughput is None:
-      return left
-    if throughput == 0:
-      if self.total is not None and self.position >= self.total:
-        left += ': idle'
-        return left
-      left += ': stalled'
-    else:
-      if throughput >= 10:
-        throughput = int(throughput)
-      left += ': ' + self.format_counter(throughput, max_parts=1) + '/s'
+    if throughput is not None:
+      if throughput == 0:
+        if self.total is not None and self.position >= self.total:
+          left = 'idle'
+          return left
+        left = 'stalled'
+      else:
+        if throughput >= 10:
+          throughput = int(throughput)
+        left = self.format_counter(throughput, max_parts=1) + '/s'
     if self.total is not None and self.total > 0:
       left += ' ' + self.text_pos_of_total()
     if remaining is None:
-      right = 'ETA unknown'
+      right = 'ETA ??'
     else:
       right = 'ETA ' + transcribe_time(remaining)
     if self.total is None:
       arrow_field = ' '
     else:
-      arrow_width = width - len(left) - len(right) - 2
+      # how much room for an arrow? we would like:
+      # "label: left arrow right"
+      arrow_width = width - len(left) - len(right) - len(label) - 4
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
       else:
         arrow_field = ' ' + self.arrow(arrow_width) + ' '
-    return left + arrow_field + right
+    status_line = left + arrow_field + right
+    if label:
+      label_width = width - len(status_line)
+      if label_width >= len(label) + 2:
+        prefix = label + ': '
+      elif label_width == len(label) + 1:
+        prefix = label + ':'
+      # label_width<=len(label): need to crop the label
+      elif label_width <= 0:
+        # no room
+        prefix = ''
+      elif label_width == 1:
+        # just indicate the crop
+        prefix = '<'
+      elif label_width == 2:
+        # just indicate the crop
+        prefix = '<:'
+      else:
+        # crop as "<tail-of-label:"
+        prefix = '<' + label[-label_width + 2:] + ':'
+    else:
+      prefix = ''
+    status_line = prefix + status_line
+    return status_line
 
-  def bar(  # pylint: disable=blacklisted-name,too-many-arguments
+  # pylint: disable=blacklisted-name,too-many-arguments
+  @contextmanager
+  def bar(
+      self,
+      label=None,
+      upd=None,
+      proxy=None,
+      statusfunc=None,
+      width=None,
+      report_print=None,
+      insert_pos=1,
+      deferred=False,
+  ):
+    ''' A context manager to create and withdraw a progress bar.
+       It yields the `UpdProxy` which displays the progress bar.
+
+        Parameters:
+        * `label`: a label for the progress bar,
+          default from `self.name`.
+        * `proxy`: an optional `UpdProxy` to display the progress bar
+        * `upd`: an optional `cs.upd.Upd` instance,
+          used to produce the progress bar status line if not supplied.
+          The default `upd` is `cs.upd.Upd()`
+          which uses `sys.stderr` for display.
+        * `statusfunc`: an optional function to compute the progress bar text
+          accepting `(self,label,width)`.
+        * `width`: an optional width expressioning how wide the progress bar
+          text may be.
+          The default comes from the `proxy.width` property.
+        * `report_print`: optional `print` compatible function
+          with which to write a report on completion;
+          this may also be a `bool`, which if true will use `Upd.print`
+          in order to interoperate with `Upd`.
+        * `insert_pos`: where to insert the progress bar, default `1`
+        * `deferred`: optional flag; if true do not create the
+          progress bar until the first update occurs.
+
+        Example use:
+
+            # display progress reporting during upload_filename()
+            # which updates the supplied Progress instance
+            # during its operation
+            P = Progress(name=label)
+            with P.bar(report_print=True):
+                upload_filename(src, progress=P)
+
+    '''
+    if label is None:
+      label = self.name
+    if upd is None:
+      upd = Upd()
+    if statusfunc is None:
+      statusfunc = lambda P, label, width: P.status(label, width)
+    pproxy = [proxy]
+    proxy_delete = proxy is None
+
+    def update(P, _):
+      proxy = pproxy[0]
+      if proxy is None:
+        proxy = pproxy[0] = upd.insert(insert_pos, 'LABEL=' + label)
+      proxy(statusfunc(P, label, width or proxy.width))
+
+    try:
+      if not deferred:
+        if proxy is None:
+          proxy = pproxy[0] = upd.insert(insert_pos)
+        status = statusfunc(self, label, width or proxy.width)
+        proxy(statusfunc(self, label, width or proxy.width))
+      self.notify_update.add(update)
+      start_pos = self.position
+      yield pproxy[0]
+    finally:
+      self.notify_update.remove(update)
+      if proxy and proxy_delete:
+        proxy.delete()
+    if report_print:
+      if isinstance(report_print, bool):
+        report_print = print
+      report_print(
+          label + ':', self.format_counter(self.position - start_pos), 'in',
+          transcribe(
+              self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+          )
+      )
+
+  # pylint: disable=too-many-arguments
+  def iterbar(
       self,
       it,
       label=None,
@@ -297,8 +428,8 @@ class BaseProgress(object):
       update_frequency=None,
       report_print=None,
   ):
-    ''' Generator yielding values from the iterable `it`
-        while updating a progress bar.
+    ''' An iterable progress bar: a generator yielding values
+        from the iterable `it` while updating a progress bar.
 
         Parameters:
         * `it`: the iterable to consume and yield.
@@ -340,7 +471,7 @@ class BaseProgress(object):
             from cs.units import DECIMAL_SCALE
             rows = [some list of data]
             P = Progress(total=len(rows), units_scale=DECIMAL_SCALE)
-            for row in P.bar(rows, incfirst=True):
+            for row in P.iterbar(rows, incfirst=True):
                 ... do something with each row ...
 
             f = open(data_filename, 'rb')
@@ -352,7 +483,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.bar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -386,7 +517,7 @@ class BaseProgress(object):
       proxy(statusfunc(self, label, width or proxy.width))
     if report_print:
       if isinstance(report_print, bool):
-        report_print = upd_print
+        report_print = print
       report_print(
           label + ':', self.format_counter(self.position - start_pos), 'in',
           transcribe(
@@ -436,7 +567,8 @@ class Progress(BaseProgress):
           my_thing.amount = Progress(my_thing.amount)
   '''
 
-  def __init__( # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments
+  def __init__(
       self,
       position=None,
       name=None,
@@ -490,7 +622,7 @@ class Progress(BaseProgress):
 
   def _updated(self):
     datum = self.latest
-    for notify in self.notify_update:
+    for notify in list(self.notify_update):
       try:
         notify(self, datum)
       except Exception as e:  # pylint: disable=broad-except
@@ -537,11 +669,13 @@ class Progress(BaseProgress):
             >>> P.position
             12
     '''
+    if new_position < self.latest.position:
+      debug(
+          "%s.update: new position %s < latest position %s", self,
+          new_position, self.latest.position
+      )
     if update_time is None:
       update_time = time.time()
-    ##if new_position < self.position:
-    ##  warning("%s.update: .position going backwards from %s to %s",
-    ##          self, self.position, new_position)
     datum = CheckPoint(update_time, new_position)
     self._positions.append(datum)
     self._flushed = False
@@ -657,11 +791,11 @@ class Progress(BaseProgress):
       return 0
     if low_time >= now:
       # in the future? warn and return 0
-      warning('low_time=%s >= now=%s', low_time, now)
+      debug('low_time=%s >= now=%s', low_time, now)
       return 0
     rate = float(self.position - low_pos) / (now - low_time)
     if rate < 0:
-      warning('rate < 0 (%s)', rate)
+      debug('rate < 0 (%s)', rate)
     return rate
 
 class OverProgress(BaseProgress):
@@ -785,7 +919,7 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.bar`.
+  ''' Convenience function to construct and run a `Progress.iterbar`.
 
       Parameters:
       * `it`: the iterable to consume
@@ -798,7 +932,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       If `total` is `None` and `it` supports `len()`
       then the `Progress.total` is set from it.
 
-      All arguments are passed through to `Progress.bar`.
+      All arguments are passed through to `Progress.iterbar`.
 
       Example use:
 
@@ -812,20 +946,55 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       total = None
   yield from Progress(
       name=label, total=total, units_scale=units_scale
-  ).bar(
+  ).iterbar(
       it, label=label, **kw
   )
 
-if __name__ == '__main__':
-  from cs.units import DECIMAL_SCALE
+@decorator
+def auto_progressbar(func, label=None, report_print=False):
+  ''' Decorator for function which accept an optional `progress` parameter.
+      If `progress` is `None` and the default `Upd` is not disabled,
+      run the function with a progress bar.
+  '''
+
+  def wrapper(
+      *a,
+      progress=None,
+      progress_name=None,
+      progress_total=None,
+      progress_report_print=None,
+      **kw
+  ):
+    if progress_name is None:
+      progress_name = label or funcname(func)
+    if progress_report_print is None:
+      progress_report_print = report_print
+    if progress is None:
+      upd = Upd()
+      if not upd.disabled:
+        progress = Progress(name=progress_name, total=progress_total)
+        with progress.bar(upd=upd, report_print=progress_report_print):
+          return func(*a, progress=progress, **kw)
+    return func(*a, progress=progress, **kw)
+
+  return wrapper
+
+# pylint: disable=unused-argument
+def selftest(argv):
+  ''' Exercise some of the functionality.
+  '''
   lines = open(__file__).readlines()
   lines += lines
-  for line in progressbar(lines, "lines"):
+  for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for line in progressbar(lines, "lines step 100", update_frequency=100, report_print=True):
+  for _ in progressbar(lines, "lines step 100", update_frequency=100,
+                       report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for line in P.bar(open(__file__)):
+  for _ in P.iterbar(open(__file__)):
     time.sleep(0.005)
-  from cs.debug import selftest
-  selftest('cs.progress_tests')
+  from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
+  runtests('cs.progress_tests')
+
+if __name__ == '__main__':
+  sys.exit(selftest(sys.argv))

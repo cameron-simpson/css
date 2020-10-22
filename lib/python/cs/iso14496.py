@@ -400,7 +400,7 @@ class UTF8or16Field(PacketField):
         bom = None
         text = UTF8NULField.value_from_buffer(bfr)
       else:
-        text = UTF16NULField.value_from_buffer(bfr, encoding)
+        text = UTF16NULField.value_from_buffer(bfr, encoding=encoding)
     return cls(text, bom=bom)
 
   def transcribe(self):
@@ -1468,7 +1468,15 @@ class TrackReferenceTypeBoxBody(BoxBody):
   PACKET_FIELDS = dict(BoxBody.PACKET_FIELDS, track_ids=ListField)
 
   BOX_TYPES = (
-      b'hint', b'cdsc', b'chap', b'font', b'hind', b'vdep', b'vplx', b'subt'
+      b'hint',
+      b'cdsc',
+      b'chap',
+      b'font',
+      b'hind',
+      b'vdep',
+      b'vplx',
+      b'subt',
+      b'forc',
   )
 
   def parse_buffer(self, bfr, **kw):

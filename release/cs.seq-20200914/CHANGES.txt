@@ -1,0 +1,4 @@
+lib/python/cs/seq_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/seq_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/seq.py: cs.seq: new common_prefix_length and common_suffix_length for comparing prefixes and suffixes of sequences
+lib/python/cs/seq.py: cs.seq: clean lint, autoformat

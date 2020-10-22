@@ -11,12 +11,14 @@
 
 set -ue
 
+quiet=
 rsopts=
+rsvopts=
 trace=
 doit=1
 dont=
 isatty=
-[ -t 2 ] && isatty=1 rsopts=-P trace=set-x
+[ -t 2 ] && isatty=1 rsvopts=-P trace=set-x
 
 rcdir=$HOME/.run-backups
 
@@ -24,6 +26,8 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [backup-filelists...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
+  -q    Quiet.
+  -x    Trace execution.
   backup-filelists...
         Backup definition files. Each file's basename has the form:
           mode.target
@@ -58,6 +62,8 @@ do
         exit 0
         ;;
     -n) doit= dont=echo ;;
+    -q) quiet=1 rsvopts= trace=;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -117,7 +123,7 @@ do_rsync(){
     do
       [ -d "$path/" ] && path=$path/
       $dont prefix "$target:$path" $trace \
-        rsync -ia $rsopts ${1+"$@"} $more_rsopts "$path" "$target:BACKUP/$HOST/rsync/$path" \
+        rsync -a $rsvopts $rsopts ${1+"$@"} $more_rsopts "$path" "$target:BACKUP/$HOST/rsync/$path" \
         </dev/null \
       || xit=1
     done
