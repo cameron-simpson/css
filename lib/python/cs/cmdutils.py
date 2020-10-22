@@ -339,8 +339,9 @@ class BaseCommand:
               (', '.join(sorted(subcmds.keys())),)
           )
         subcmd = argv.pop(0)
+        subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
