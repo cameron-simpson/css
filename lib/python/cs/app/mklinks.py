@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, join as joinpath
+from os.path import dirname, isdir, isfile, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
