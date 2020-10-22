@@ -250,9 +250,10 @@ class Linker(object):
   ''' The class which links files with identical content.
   '''
 
-  def __init__(self):
+  def __init__(self, min_size=512):
     self.sizemap = defaultdict(dict)  # file_size => FileInfo.key => FileInfo
     self.keymap = {}  # FileInfo.key => FileInfo
+    self.min_size = min_size
 
   @pfx_method
   def scan(self, path):
@@ -279,6 +280,8 @@ class Linker(object):
       with Pfx("lstat"):
         S = os.lstat(path)
       if not S_ISREG(S.st_mode):
+        return
+      if S.st_size < self.min_size:
         return
       key = FileInfo.stat_key(S)
       FI = self.keymap.get(key)
