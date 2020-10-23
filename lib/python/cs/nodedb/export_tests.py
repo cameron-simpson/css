@@ -12,6 +12,8 @@ from .mappingdb import MappingBackend
 from .node_tests import TestAll as NodeTestAll
 
 class TestAll(NodeTestAll):
+  ''' Tests for `cs.nodedb.export`.
+  '''
 
   def nodedb(self):
     self.backend = MappingBackend(self.mapping)

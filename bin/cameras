@@ -6,27 +6,67 @@
 
 set -ue
 
+exec 9>/dev/null
+iout=1  # info messages
+vout=1  # verbose messages
+vecho(){
+  echo "$*" >&$vout
+}
+
+if [ -t 2 ]
+then  trace=set-x
+      ff_loglevel=warning
+else  trace=
+      ff_loglevel=error
+      vout=9
+fi
+
+once=
 cfg=$HOME/.cameras
-trace=
-[ -t 2 ] && trace=set-x
-all_names=$( awk '$1 ~ /^[^#]/ { print $1 }' "$cfg" | keepfirst | tr '\012' ' ' )
+
+cfgnames(){
+  [ $# = 1 ] || {
+    echo "$cmd: cfgnames: expected config file name" >&2
+    return 2
+  }
+  awk '$1 ~ /^[^#]/ { print $1 }' "$1" | keepfirst | tr '\012' ' '
+}
+
+cfgline(){
+  [ $# = 2 ] || {
+    echo "$cmd: cfgline: expected config file name and clause name" >&2
+    return 2
+  }
+  awk -v "name=$2" '$1 == name { print; exit 0; } END { exit 1; }' "$1"
+}
 
 cmd=$0
-usage="Usage: $cmd [-f cfg] [--] op [args...]
+usage="Usage: $cmd [options...] [--] op [args...]
+  -1        Once. Process or collate only one date.
+  -f cfg    Specify the comfig file.
+            Default: $cfg
+  -q        Quiet.
+  -v        Verbose.
+  -x        Trace execution.
   Operations:
+    collate [names...]
+      Move all snapshot images prior to today into subdirectories by day.
     poll [names...]
       Fetch camera images.
-    process [{name|directory}...]
-      Move all images prior to today into subdirectories by day.
-      Create per-day MP4 files for all such subdirectories.
-  Config names: $all_names"
+    process [--purge] [{name|directory}...]
+      Compile per-day MP4 files for all collated subdirectories.
+      --purge  Remove the source image files for successful MP4s."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -1) once=1 ;;
     -f) cfg=$2; shift ;;
+    -q) ff_loglevel=error iout=9 vout=9 ;;
+    -v) ff_loglevel=info iout=1 vout=1 ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -49,7 +89,12 @@ else
   op=$1
   shift
   case $op in
-    poll | process )
+    process )
+        do_purge=
+        [ $# -gt 0 ] && [ "x$1" = 'x--purge' ] && { do_purge=1; shift; }
+        names=$*
+        ;;
+    collate | poll )
         names=$*
         ;;
     *)  echo "$cmd: unrecognised op: $op" >&2
@@ -60,7 +105,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$names" ] || names=$all_names
+[ -n "$names" ] || names=$( cfgnames "$cfg" )
 
 xit=0
 
@@ -73,16 +118,8 @@ do
       dir=$name
       ;;
     *)
-      # locate name in config
-      # name dir url
-      exec 3<"$cfg"
-      while read -r cfg_name cfg_dir cfg_url <&3
-      do
-        [ "x$cfg_name" = "x$name" ] || continue
-        dir=$cfg_dir url=$cfg_url
-        break
-      done
-      exec 3<&-
+      set -- $( cfgline "$cfg" "$name" )
+      dir=$2 url=$3
       ;;
   esac
   [ -n "$dir" ] || {
@@ -95,66 +132,103 @@ do
     xit=1
     continue
   }
-  snapshots=$dir/snapshots
-  compiled=$dir/compiled
-  case "$op" in
-    poll)
-          [ -n "$url" ] || {
-            echo "$cmd: $name: no URL" >&2
-            xit=1
-            continue
-          }
-          [ -d "$snapshots/" ] || $trace mkdir "$snapshots"
-          timestamp=$( date +%Y-%m-%d-%H:%M:%S )
-          $trace wget -q -O "$snapshots/$timestamp.jpg" "$url" || xit=1
-          ;;
-    process)
-          [ -d "$compiled/" ] || $trace mkdir "$compiled"
-          (
-            set -ue
-            cd "$snapshots"
-            for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
-            do
-              ddir=$compiled/$date
-              [ -d "$ddir" ] || $trace mkdir "$ddir"
-              echo "mv $date-*.jpg $ddir/ ..." >&2
-              mv "$date"-*.jpg "$ddir/"
-            done
-          )
-          (
-            set -ue
-            cd "$compiled"
-            for date in 20??-??-??
-            do
-              [ -d "$date" ] || continue
-              video=$date.mp4
-              ls -ldL "$video" 2>/dev/null || (
-                set -ue
-                cd "$date"
-                # delete empty files
-                find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
-                n=0
-                for img in "$date"-*.jpg
-                do  nimg=$(printf '%04d.jpg' "$n")
-                    $trace ln "$img" "$nimg"
-                    n=$((n+1))
-                done
-                # get video size from first image
-                size=$(
-                  set -- "$date"-*jpg
-                  { gm identify "$1" || identify "$1"; } \
-                  | awk '{print$3}' | sed 's/+.*//'
-                )
-                $trace ffmpeg -r 4 -s "$size" -i '%04d.jpg' "$video"
-                rm [0-9][0-9][0-9][0-9].jpg
-                $trace touch -d "$date" "$video"
-                $trace mv "$video" ..
-              ) || { echo "VIDEO FAILED FOR $video" >&2; break; }
-            done
-          )
-          ;;
-    *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
+
+  # make paths absolute
+  case "$dir" in
+    /*) ;; *) dir=$(pwd)/$dir ;;
   esac
+  collated=$dir/collated
+  compiled=$dir/compiled
+  snapshots=$dir/snapshots
+
+  (
+    set -ue
+    cd "$dir"
+    case "$op" in
+      poll)
+            [ -n "$url" ] || {
+              echo "$cmd: $name: no URL" >&2
+              exit 1
+            }
+            [ -d "$snapshots/" ] || $trace mkdir "$snapshots"
+            timestamp=$( date +%Y-%m-%d-%H:%M:%S )
+            $trace wget -q -O "$snapshots/$timestamp.jpg" "$url"
+            ;;
+      collate)
+            pwd
+            [ -d "$collated/" ] || $trace mkdir "$collated"
+            (
+              set -ue
+              cd "$snapshots"
+              pwd
+              for date in $( ls | sed -n 's/^\(20..-..-..\)-.*/\1/p' | sort -u | sed '$d' )
+              do
+                ddir=$collated/$date
+                [ -d "$ddir" ] || $trace mkdir "$ddir"
+                vecho "mv $date-*.jpg $ddir/ ..."
+                mv "$date"-*.jpg "$ddir/"
+                [ $once ] && break
+              done
+            )
+            ;;
+      process)
+            pwd
+            [ -d "$compiled/" ] || $trace mkdir "$compiled"
+            (
+              set -ue
+              cd "$collated"
+              xit=0
+              for date in $( ls -rd 20??-??-?? )
+              do
+                [ -d "$date" ] || continue
+                video=$date.mp4
+                ls -ldL "$compiled/$video" 2>&$vout && continue
+                if (
+                  set -ue
+                  subxit=0
+                  cd "$date"
+                  pwd
+                  # delete empty files
+                  find . -type f -name "$date-*.jpg" -size 0 -ls -exec $trace rm {} ';'
+                  set -- "$date-"*.jpg
+                  [ -s "$1" ] || {
+                    vecho "$date: no .jpg files"
+                    exit 0
+                  }
+                  # make nnnnn.jpg names for ffmpeg to process
+                  ls \
+                  | awk "/^$date"'-.*\.jpg$/ { printf("ln %s %05d.jpg\n", $1, n++); }' \
+                  | sh -ue
+                  # get video size from first image
+                  size=$(
+                    set -- "$date"-*jpg
+                    ls -ld "$1" >&2
+                    { gm identify "$1" || identify "$1"; } \
+                    | awk '{print$3}' | sed 's/+.*//'
+                  )
+                  $trace ffmpeg -loglevel "$ff_loglevel" \
+                    -r 4 -s "$size" -i '%05d.jpg' \
+                    "$video" || subxit=1
+                  # clean out the nnnnn.jpg files
+                  rm [0-9][0-9][0-9][0-9][0-9].jpg
+                  $trace touch -d "$date" "$video"
+                  $trace mv "$video" "$compiled/"
+                  exit $subxit
+                )
+                then
+                  [ $do_purge ] && $trace rm -r "$date" || xit=1
+                else
+                  echo "VIDEO FAILED FOR $video" >&2
+                  xit=1
+                fi
+                [ $once ] && break
+              done
+              exit $xit
+            )
+            ;;
+      *)    echo "$cmd: $op: UNIMPLEMENTED" >&2; exit 1 ;;
+    esac
+  ) || xit=1
 done
 
 exit $xit

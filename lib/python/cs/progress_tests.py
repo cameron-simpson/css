@@ -7,9 +7,13 @@
 from __future__ import absolute_import
 import time
 import unittest
-from .progress import Progress
+from .progress import Progress, DEFAULT_THROUGHPUT_WINDOW
 
 class TestProgress(unittest.TestCase):
+  ''' Test `cs.progress.Progress`.
+
+      TODO: generalise for `OverProgress`.
+  '''
 
   def test00basic(self):
     P = Progress(
@@ -27,7 +31,7 @@ class TestProgress(unittest.TestCase):
     self.assertEqual(P.start, 0)
     self.assertLessEqual(P.start_time, time.time())
     self.assertIsNone(P.total)
-    self.assertIsNone(P.throughput_window)
+    self.assertEqual(P.throughput_window, DEFAULT_THROUGHPUT_WINDOW)
     P2 = Progress(5)
     self.assertEqual(P2.position, 5)
     self.assertEqual(P2.start, 5)

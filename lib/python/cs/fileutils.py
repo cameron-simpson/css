@@ -3,22 +3,32 @@
 # Assorted convenience functions for files and filenames/pathnames.
 # - Cameron Simpson <cs@cskk.id.au>
 
-''' Assorted convenience functions for files and filenames/pathnames.'''
+''' My grab bag of convenience functions for files and filenames/pathnames.
+'''
+
+# pylint: disable=too-many-lines
 
 from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
-import datetime
 import errno
 from functools import partial
+import json
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
 try:
   from os import pread
 except ImportError:
   pread = None
 from os.path import (
-    abspath, basename, dirname, isdir, isabs as isabspath,
-    join as joinpath, splitext
+    abspath,
+    basename,
+    dirname,
+    exists as existspath,
+    isabs as isabspath,
+    isdir,
+    isfile as isfilepath,
+    join as joinpath,
+    splitext,
 )
 import shutil
 import stat
@@ -30,20 +40,21 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
-from cs.lex import as_lines, cutsuffix
+from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
+from cs.mappings import LoadableMappingMixin, UUIDedDict
 from cs.pfx import Pfx
-from cs.py3 import ustr, bytes, pread
+from cs.progress import Progress, progressbar
+from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
 from cs.timeutils import TimeoutError
+from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20200517-post'
+__version__ = '20200914-post'
 
 DISTINFO = {
-    'description':
-    "convenience functions and classes for files and filenames/pathnames",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -55,7 +66,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
-        'cs.lex',
+        'cs.lex>=20200914',
         'cs.logutils',
         'cs.pfx',
         'cs.py3',
@@ -107,8 +118,8 @@ def trysaferename(oldpath, newpath):
     saferename(oldpath, newpath)
   except OSError:
     return False
-  except Exception:
-    raise
+  ##except Exception:
+  ##  raise
   return True
 
 def compare(f1, f2, mode="rb"):
@@ -125,6 +136,116 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+@contextmanager
+def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
+  ''' A Context manager yielding a temporary copy of `filename`
+      as returned by `NamedTemporaryFile(**kw)`.
+
+      Parameters:
+      * `f`: the name of the file to copy, or an open binary file,
+        or a `CornuCopyBuffer`
+      * `progress`: an optional progress indicator, default `False`;
+        if a `bool`, show a progress bar for the copy phase if true;
+        if an `int`, show a progress bar for the copy phase
+        if the file size equals or exceeds the value;
+        otherwise it should be a `cs.progress.Progress` instance
+      * `progress_label`: option progress bar label,
+        only used if a progress bar is made
+      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+  '''
+  if isinstance(f, str):
+    # copy named file
+    filename = f
+    progress_label = (
+        "copy " + repr(filename) if progress_label is None else progress_label
+    )
+    # should we use shutil.copy() and display no progress?
+    if progress is False:
+      fast_mode = True
+    else:
+      with Pfx("stat(%r)", filename):
+        S = os.stat(filename)
+      fast_mode = stat.S_ISREG(S.st_mode)
+    if fast_mode:
+      with NamedTemporaryFile(**kw) as T:
+        with Pfx("shutil.copy(%r,%r)", filename, T.name):
+          shutil.copy(filename, T.name)
+        yield T
+    else:
+      with Pfx("open(%r)", filename):
+        with open(filename, 'rb') as f2:
+          with NamedTemporaryCopy(f2, progress=progress,
+                                  progress_label=progress_label, **kw) as T:
+            yield T
+    return
+  # prepare the buffer and try to infer the length
+  if isinstance(f, CornuCopyBuffer):
+    length = None
+    bfr = f
+  else:
+    if isinstance(f, int):
+      fd = f
+      bfr = CornuCopyBuffer.from_fd(fd)
+    else:
+      bfr = CornuCopyBuffer.from_file(f)
+      try:
+        fd = f.fileno()
+      except AttributeError:
+        fd = None
+    if fd is None:
+      length = None
+    else:
+      S = os.fstat(fd)
+      length = S.st_size if stat.S_ISREG(S.st_mode) else None
+  # determine whether we need a progress bar
+  if isinstance(progress, bool):
+    need_bar = progress
+    progress = None
+  elif isinstance(progress, int):
+    need_bar = length is None or length >= progress
+    progress = None
+  else:
+    need_bar = False
+    assert isinstance(progress, Progress)
+  with NamedTemporaryFile(**kw) as T:
+    it = (
+        bfr if need_bar else progressbar(
+            bfr,
+            label=progress_label,
+            total=length,
+            itemlenfunc=len,
+            units_scale=BINARY_BYTES_SCALE,
+        )
+    )
+    nbs = 0
+    for bs in it:
+      while bs:
+        nwritten = T.write(bs)
+        if progress is not None:
+          progress += nwritten
+        if nwritten != len(bs):
+          warning(
+              "NamedTemporaryCopy: %r.write(%d bytes) => %d",
+              T.name,
+              len(bs),
+              nwritten,
+          )
+          bs = bs[nwritten:]
+        else:
+          bs = b''
+        nbs += nwritten
+    bfr.close()
+    T.flush()
+    if length is not None and nbs != length:
+      warning(
+          "NamedTemporaryCopy: given length=%s, wrote %d bytes to %r",
+          length,
+          nbs,
+          T.name,
+      )
+    yield T
+
+# pylint: disable=too-many-arguments
 def rewrite(
     filepath,
     data,
@@ -138,116 +259,97 @@ def rewrite(
   ''' Rewrite the file `filepath` with data from the file object `data`.
 
       Parameters:
-      * `empty_ok`: if not true, raise ValueError if the new data are
+      * `filepath`: the name of the file to rewrite
+      * `data`: the source file containing the new content
+      * `empty_ok`: if not true, raise `ValueError` if the new data are
         empty.
         Default: `False`.
       * `overwrite_anyway`: if true (default `False`),
         skip the content check and overwrite unconditionally.
       * `backup_ext`: if a nonempty string,
         take a backup of the original at `filepath + backup_ext`.
-      * `do_diff`: if not None, call `do_diff(filepath, tempfile)`.
-      * `do_rename`: if true (default False),
+      * `do_diff`: if not `None`, call `do_diff(filepath, tempfile)`.
+      * `do_rename`: if true (default `False`),
         rename the temp file to `filepath`
         after copying the permission bits.
-        Otherwise (default), copy the tempfile to `filepath`.
+        Otherwise (default), copy the tempfile to `filepath`;
+        this preserves the file's inode and permissions etc.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
-    T.flush()
-    if not empty_ok:
-      st = os.stat(T.name)
-      if st.st_size == 0:
-        raise ValueError("no data in temp file")
-    if do_diff or not overwrite_anyway:
-      # need to compare data
-      if compare(T.name, filepath):
-        # data the same, do nothing
-        return
-      if do_diff:
-        # call the supplied differ
-        do_diff(filepath, T.name)
-    if do_rename:
-      # rename new file into old path
-      # tries to preserve perms, but does nothing for other metadata
-      shutil.copymode(filepath, T.name)
-      if backup_ext:
-        os.link(filepath, filepath + backup_ext)
-      os.rename(T.name, filepath)
-    else:
-      # overwrite old file - preserves perms, ownership, hard links
-      if backup_ext:
-        shutil.copy2(filepath, filepath + backup_ext)
-      shutil.copyfile(T.name, filepath)
+  with Pfx("rewrite(%r)", filepath):
+    with NamedTemporaryFile(dir=dirname(filepath), mode=mode) as T:
+      T.write(data.read())
+      T.flush()
+      if not empty_ok:
+        st = os.stat(T.name)
+        if st.st_size == 0:
+          raise ValueError("no data in temp file")
+      if do_diff or not overwrite_anyway:
+        # need to compare data
+        if compare(T.name, filepath):
+          # data the same, do nothing
+          return
+        if do_diff:
+          # call the supplied differ
+          do_diff(filepath, T.name)
+      if do_rename:
+        # rename new file into old path
+        # tries to preserve perms, but does nothing for other metadata
+        shutil.copymode(filepath, T.name)
+        if backup_ext:
+          os.link(filepath, filepath + backup_ext)
+        os.rename(T.name, filepath)
+      else:
+        # overwrite old file - preserves perms, ownership, hard links
+        if backup_ext:
+          shutil.copy2(filepath, filepath + backup_ext)
+        shutil.copyfile(T.name, filepath)
 
+# pylint: disable=too-many-branches,too-many-arguments
 @contextmanager
-def rewrite_cmgr(
-    pathname,
-    mode='w',
-    backup_ext=None,
-    keep_backup=False,
-    do_rename=False,
-    do_diff=None,
-    empty_ok=False,
-    overwrite_anyway=False
-):
+def rewrite_cmgr(filepath, mode='w', **kw):
   ''' Rewrite a file, presented as a context manager.
 
       Parameters:
       * `mode`: file write mode, defaulting to "w" for text.
-      * `backup_ext`: backup extension. `None` means no backup.
-        An empty string generates an extension based on the current time.
-      * `keep_backup`: keep the backup file even if everything works.
-      * `do_rename`: rename the temporary file to the original to update.
-      * `do_diff`: call `do_diff(pathname, tempfile)` before commiting.
-      * `empty_ok`: do not consider empty output an error.
-      * `overwrite_anyway`: do not update the original if the new
-        data are identical.
+
+      Other keyword parameters are passed to `rewrite()`.
 
       Example:
 
           with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
              ... write new content to f ...
   '''
-  if backup_ext is None:
-    backuppath = None
-  else:
-    if not backup_ext:
-      backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
-    backuppath = pathname + backup_ext
-  dirpath = dirname(pathname)
-
-  T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
-  # hand control to caller
-  try:
+  with NamedTemporaryFile(mode=mode) as T:
     yield T
-    T.flush()
-    if not empty_ok and os.fstat(T.fileno()).st_size == 0:
-      raise ValueError("empty file")
-  except Exception as e:
-    # failure from caller or flush or sanity check, clean up
-    try:
-      os.unlink(T.name)
-    except OSError as e2:
-      if e2.errno != errno.ENOENT:
-        warning("%s: unlink: %s", T.name, e2)
-    raise e
+    return rewrite(filepath, mode=mode, **kw)
 
-  # success
-  if not overwrite_anyway and compare(pathname, T.name):
-    # file unchanged, remove temporary
-    os.unlink(T.name)
-    return
+@strable
+def scan_ndjson(f, dictclass=dict):
+  ''' Read a newline delimited JSON file, yield instances of `dictclass`
+      (default `dict`, otherwise a class which can be instantiated
+      by `dictclass(a_dict)`).
+  '''
+  for lineno, line in enumerate(f, 1):
+    with Pfx("line %d", lineno):
+      d = json.loads(line)
+      if dictclass is not dict:
+        d = dictclass(**d)
+    yield d
 
-  if do_rename:
-    if backuppath is not None:
-      os.rename(pathname, backuppath)
-    os.rename(T.name, pathname)
-  else:
-    if backuppath is not None:
-      shutil.copy2(pathname, backuppath)
-    shutil.copyfile(T.name, pathname)
-  if backuppath and not keep_backup:
-    os.remove(backuppath)
+@strable(open_func=lambda filename: open(filename, 'w'))
+def write_ndjson(f, objs):
+  ''' Transcribe an iterable of objects to a file as newline delimited JSON.
+  '''
+  for lineno, o in enumerate(objs, 1):
+    with Pfx("line %d", lineno):
+      f.write(json.dumps(o, separators=(',', ':')))
+      f.write('\n')
+
+@strable(open_func=lambda filename: open(filename, 'a'))
+def append_ndjson(f, objs):
+  ''' Append an iterable of objects to a file as newline delimited JSON.
+  '''
+  return write_ndjson(f, objs)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
@@ -310,7 +412,7 @@ def file_based(
       * `attr_name`: the name for the associated attribute, used as
         the basis for the internal cache value attribute
       * `filename`: the filename to monitor.
-        Default from the `._{attr_name}__filename attribute.
+        Default from the `._{attr_name}__filename` attribute.
         This value will be passed to the method as the `filename` keyword
         parameter.
       * `poll_delay`: delay between file polls, default `DEFAULT_POLL_INTERVAL`.
@@ -368,15 +470,16 @@ def files_property(func):
       Note: this is just the default mode for `make_files_property`.
 
       `func` accepts the file path and returns the new value.
-      The underlying attribute name is '_' + func.__name__,
-      the default from make_files_property().
-      The attribute {attr_name}_lock controls access to the property.
-      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      The underlying attribute name is `'_'+func.__name__`,
+      the default from `make_files_property()`.
+      The attribute *{attr_name}*`_lock` is a mutex controlling access to the property.
+      The attributes *{attr_name}*`_filestates` and *{attr_name}*`_paths` track the
       associated file states.
-      The attribute {attr_name}_lastpoll tracks the last poll time.
+      The attribute *{attr_name}*`_lastpoll` tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
+
       One example use would be a configuration file with recurive
       include operations; the inner function would parse the first
       file in the list, and the parse would accumulate this filename
@@ -403,6 +506,7 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
+# pylint: disable=too-many-statements
 @fmtdoc
 def make_files_property(
     attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL
@@ -415,10 +519,10 @@ def make_files_property(
       * `poll_rate`: how often in seconds to poll the file for changes,
         default from `DEFAULT_POLL_INTERVAL`: `{DEFAULT_POLL_INTERVAL}`
 
-      The attribute {{attr_name}}_lock controls access to the property.
-      The attributes {{attr_name}}_filestates and {{attr_name}}_paths track the
+      The attribute *attr_name*`_lock` controls access to the property.
+      The attributes *attr_name*`_filestates` and *attr_name*`_paths` track the
       associated files' state.
-      The attribute {{attr_name}}_lastpoll tracks the last poll time.
+      The attribute *attr_name*`_lastpoll` tracks the last poll time.
 
       The decorated function is passed the current list of files
       and returns the new list of files and the associated value.
@@ -446,10 +550,11 @@ def make_files_property(
 
       An attempt at avoiding races is made by
       ignoring reloads that raise exceptions and ignoring reloads
-      where files that were `os.stat`()ed during the change check have
+      where files that were `os.stat()`ed during the change check have
       changed state after the load.
   '''
 
+  # pylint: disable=too-many-statements
   def made_files_property(func):
     if attr_name is None:
       attr_value = '_' + func.__name__
@@ -460,6 +565,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
+    # pylint: disable=too-many-statements
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -496,7 +602,7 @@ def make_files_property(
               raise
             except AttributeError:
               raise
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
               new_value = getattr(self, attr_value, unset_object)
               if new_value is unset_object:
                 raise
@@ -523,16 +629,17 @@ def make_files_property(
 
   return made_files_property
 
+# pylint: disable=too-many-branches
 def makelockfile(
     path, ext=None, poll_interval=None, timeout=None, runstate=None
 ):
   ''' Create a lockfile and return its path.
 
-      The lockfile can be removed with os.remove.
-      This is the core functionality supporting the lockfile()
+      The lockfile can be removed with `os.remove`.
+      This is the core functionality supporting the `lockfile()`
       context manager.
 
-      Paramaters:
+      Parameters:
       * `path`: the base associated with the lock file,
         often the filesystem object whose access is being managed.
       * `ext`: the extension to the base used to construct the lockfile name.
@@ -542,8 +649,8 @@ def makelockfile(
         Note that zero is an accepted value
         and requires the lock to succeed on the first attempt.
       * `poll_interval`: polling frequency when timeout is not 0.
-      * `runstate`: optional RunState duck instance supporting cancellation.
-        Note that if a cancelled RunState is provided
+      * `runstate`: optional `RunState` duck instance supporting cancellation.
+        Note that if a cancelled `RunState` is provided
         no attempt will be made to make the lockfile.
   '''
   if poll_interval is None:
@@ -604,11 +711,11 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
       Parameters:
       * `path`: the base associated with the lock file.
       * `ext`: the extension to the base used to construct the lock file name.
-        Default: ".lock"
+        Default: `'.lock'`
       * `timeout`: maximum time to wait before failing.
         Default: `None` (wait forever).
-      * `poll_interval`: polling frequency when timeout is not 0.
-      * `runstate`: optional RunState duck instance supporting cancellation.
+      * `poll_interval`: polling frequency when timeout is not `0`.
+      * `runstate`: optional `RunState` duck instance supporting cancellation.
   '''
   lockpath = makelockfile(
       path,
@@ -644,8 +751,8 @@ def crop_name(name, name_max=255, ext=None):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name %r before ext %r to <=%s"
-        % (name, ext, name_max))
+        "cannot crop name %r before ext %r to <=%s" % (name, ext, name_max)
+    )
   if len(base) <= max_base_len:
     return name
   return base[:max_base_len] + ext
@@ -672,6 +779,7 @@ def max_suffix(dirpath, pfx):
         maxn = n
   return maxn
 
+# pylint: disable=too-many-branches
 def mkdirn(path, sep=''):
   ''' Create a new directory named `path+sep+n`,
       where `n` exceeds any name already present.
@@ -679,7 +787,7 @@ def mkdirn(path, sep=''):
       Parameters:
       * `path`: the basic directory path.
       * `sep`: a separator between `path` and n.
-        Default: ""
+        Default: `''`
   '''
   with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
     if os.sep in sep:
@@ -732,7 +840,7 @@ def mkdirn(path, sep=''):
 
 def tmpdir():
   ''' Return the pathname of the default temporary directory for scratch data,
-      $TMPDIR or '/tmp'.
+      the environment variable `$TMPDIR` or `'/tmp'`.
   '''
   return os.environ.get('TMPDIR', '/tmp')
 
@@ -765,8 +873,7 @@ def find(path, select=None, sort_names=True):
       if select(filepath):
         yield filepath
     dirnames[:] = [
-        dirname for dirname in dirnames
-        if select(joinpath(dirpath, dirname))
+        dirname for dirname in dirnames if select(joinpath(dirpath, dirname))
     ]
 
 def findup(path, test, first=False):
@@ -803,7 +910,7 @@ def shortpath(path, environ=None, prefixes=None):
 
       Parameters:
       * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of (prefix, subst) to consider for replacement;
+      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
         each `prefix` is subject to environment variable
         substitution before consideration
         The default considers "$HOME/" for replacement by "~/".
@@ -818,7 +925,7 @@ def shortpath(path, environ=None, prefixes=None):
 
 def longpath(path, environ=None, prefixes=None):
   ''' Return `path` with prefixes and environment variables substituted.
-      The converse of shortpath().
+      The converse of `shortpath()`.
   '''
   if prefixes is None:
     prefixes = DEFAULT_SHORTEN_PREFIXES
@@ -828,6 +935,67 @@ def longpath(path, environ=None, prefixes=None):
       break
   path = envsub(path, environ)
   return path
+
+def common_path_prefix(*paths):
+  ''' Return the common path prefix of the `paths`.
+
+      Note that the common prefix of `'/a/b/c1'` and `'/a/b/c2'`
+      is `'/a/b/'`, _not_ `'/a/b/c'`.
+
+      Callers may find it useful to preadjust the supplied paths
+      with `normpath`, `abspath` or `realpath` from `os.path`;
+      see the `os.path` documentation for the various caveats
+      which go with those functions.
+
+      Examples:
+
+          >>> # the obvious
+          >>> common_path_prefix('', '')
+          ''
+          >>> common_path_prefix('/', '/')
+          '/'
+          >>> common_path_prefix('a', 'a')
+          'a'
+          >>> common_path_prefix('a', 'b')
+          ''
+          >>> # nonempty directory path prefixes end in os.sep
+          >>> common_path_prefix('/', '/a')
+          '/'
+          >>> # identical paths include the final basename
+          >>> common_path_prefix('p/a', 'p/a')
+          'p/a'
+          >>> # the comparison does not normalise paths
+          >>> common_path_prefix('p//a', 'p//a')
+          'p//a'
+          >>> common_path_prefix('p//a', 'p//b')
+          'p//'
+          >>> common_path_prefix('p//a', 'p/a')
+          'p/'
+          >>> common_path_prefix('p/a', 'p/b')
+          'p/'
+          >>> # the comparison strips complete unequal path components
+          >>> common_path_prefix('p/a1', 'p/a2')
+          'p/'
+          >>> common_path_prefix('p/a/b1', 'p/a/b2')
+          'p/a/'
+          >>> # contrast with cs.lex.common_prefix
+          >>> common_prefix('abc/def', 'abc/def1')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1')
+          'abc/'
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
+          >>> common_path_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/'
+  '''
+  prefix = common_prefix(*paths)
+  if not prefix.endswith(os.sep):
+    path0 = paths[0]
+    if not all(map(lambda path: path == path0, paths)):
+      # strip basename from prefix
+      base = basename(prefix)
+      prefix = prefix[:-len(base)]
+  return prefix
 
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
@@ -879,9 +1047,35 @@ class Pathname(str):
     '''
     return shortpath(self, environ=environ, prefixes=prefixes)
 
+def iter_fd(fd, **kw):
+  ''' Iterate over data from the file descriptor `fd`.
+  '''
+  for bs in CornuCopyBuffer.from_fd(fd, **kw):
+    yield bs
+
+def iter_file(f, **kw):
+  ''' Iterate over data from the file `f`.
+  '''
+  for bs in CornuCopyBuffer.from_file(f, **kw):
+    yield bs
+
+def byteses_as_fd(bss, **kw):
+  ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
+      Return the file descriptor.
+      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+
+      Example:
+
+         # present a passphrase for use as in input file descrptor
+         # for a subprocess
+         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+  '''
+  return CornuCopyBuffer(bss).as_fd(**kw)
+
 def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   ''' General purpose reader for file descriptors yielding data from `offset`.
-      This does not move the file descriptor position.
+      **Note**: This does not move the file descriptor position
+      **if** the file is seekable.
 
       Parameters:
       * `fd`: the file descriptor from which to read.
@@ -893,7 +1087,12 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
   if offset is None:
-    offset = os.lseek(fd, 0, SEEK_CUR)
+    try:
+      offset = os.lseek(fd, 0, SEEK_CUR)
+      is_seekable = True
+    except OSError:
+      offset = 0
+      is_seekable = False
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
@@ -902,7 +1101,7 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
     if alignsize > 0:
       if maxlength is not None:
         alignsize = min(maxlength, alignsize)
-      bs = pread(fd, alignsize, offset)
+      bs = pread(fd, alignsize, offset) if is_seekable else read(fd, alignsize)
       if not bs:
         return
       yield bs
@@ -913,7 +1112,7 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
   while maxlength is None or maxlength > 0:
     if maxlength is not None:
       readsize = min(readsize, maxlength)
-    bs = pread(fd, readsize, offset)
+    bs = pread(fd, readsize, offset) if is_seekable else read(fd, readsize)
     if not bs:
       return
     yield bs
@@ -922,16 +1121,17 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
     if maxlength is not None:
       maxlength -= bslen
 
-@strable(open_func=partial(os.open, flags=O_RDONLY))
-def datafrom(f, offset, readsize=None, maxlength=None):
+@strable(open_func=lambda filename: os.open(filename, flags=O_RDONLY))
+def datafrom(f, offset=None, readsize=None, maxlength=None):
   ''' General purpose reader for files yielding data from `offset`.
 
       *WARNING*: this function might move the file pointer.
 
       Parameters:
-      * `f`: the file from which to read data; if a string, the file
-        is opened with mode="rb"; if an int, treated as an OS file
-        descriptor; otherwise presumed to be a file-like object.
+      * `f`: the file from which to read data;
+        if a string, the file is opened with mode="rb";
+        if an int, treated as an OS file descriptor;
+        otherwise presumed to be a file-like object.
         If that object has a `.fileno()` method, treat that as an
         OS file descriptor and use it.
       * `offset`: starting offset for the data
@@ -946,7 +1146,8 @@ def datafrom(f, offset, readsize=None, maxlength=None):
     readsize = DEFAULT_READSIZE
   if isinstance(f, int):
     # operating system file descriptor
-    for data in datafrom_fd(f, offset, readsize=readsize, maxlength=maxlength):
+    for data in datafrom_fd(f, offset=offset, readsize=readsize,
+                            maxlength=maxlength):
       yield data
     return
   # see if the file has a fileno; if so use datafrom_fd
@@ -957,7 +1158,7 @@ def datafrom(f, offset, readsize=None, maxlength=None):
   else:
     fd = get_fileno()
     if stat.S_ISREG(os.fstat(fd).st_mode):
-      for data in datafrom_fd(fd, offset, readsize=readsize,
+      for data in datafrom_fd(fd, offset=offset, readsize=readsize,
                               maxlength=maxlength):
         yield data
       return
@@ -1019,6 +1220,7 @@ class ReadMixin(object):
     '''
     return CornuCopyBuffer(self.datafrom(offset), offset=offset)
 
+  # pylint: disable=too-many-branches
   def read(self, size=-1, offset=None, longread=False):
     ''' Read up to `size` bytes, honouring the "single system call"
         spirit unless `longread` is true.
@@ -1236,11 +1438,13 @@ class BackedFile(ReadMixin):
     self.front_range.add_span(start, start + written)
     return written
 
+# pylint: disable=too-few-public-methods,protected-access
 class BackedFile_TestMethods(object):
   ''' Mixin for testing subclasses of BackedFile.
       Tests self.backed_fp.
   '''
 
+  # pylint: disable=no-member
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.
     '''
@@ -1248,10 +1452,11 @@ class BackedFile_TestMethods(object):
     ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
+  # pylint: disable=no-member
   def test_BackedFile(self):
     ''' Test function for a BackedFile to use in unit test suites.
     '''
-    from random import randint
+    from random import randint  # pylint: disable=import-outside-toplevel
     backing_text = self.backing_text
     bfp = self.backed_fp
     # test reading whole file
@@ -1374,7 +1579,6 @@ class NullFile(object):
   def flush(self):
     ''' Flush buffered data to the subsystem.
     '''
-    pass
 
 def file_data(fp, nbytes=None, rsize=None):
   ''' Read `nbytes` of data from `fp` and yield the chunks as read.
@@ -1542,6 +1746,47 @@ class RWFileBlockCache(object):
     data = os.pread(fd, length, offset)
     assert len(data) == length
     return data
+
+class UUIDNDJSONMapping(LoadableMappingMixin):
+  ''' A subclass of `LoadableMappingMixin` which maintains records
+      from a newline delimited JSON file.
+  '''
+
+  loadable_mapping_key = 'uuid'
+
+  def __init__(self, filename, dictclass=UUIDedDict, create=False):
+    ''' Initialise the mapping.
+
+        Parameters:
+        * `filename`: the file containing the newline delimited JSON data;
+          this need not yet exist
+        * `dictclass`: a optional `dict` subclass to hold each record,
+          default `UUIDedDict`
+        * `create`: if true, ensure the file exists
+          by transiently opening it for append if it is missing;
+          default `False`
+    '''
+    self.__ndjson_filename = filename
+    self.__dictclass = dictclass
+    if create and not isfilepath(filename):
+      # make sure the file exists
+      with open(filename, 'a'):
+        pass
+    self._lock = RLock()
+
+  def scan_mapping(self):
+    ''' Scan the backing file, yield records.
+    '''
+    if existspath(self.__ndjson_filename):
+      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+        yield record
+
+  def append_to_mapping(self, record):
+    ''' Append `record` to the backing file.
+    '''
+    with open(self.__ndjson_filename, 'a') as f:
+      f.write(record.as_json())
+      f.write('\n')
 
 if __name__ == '__main__':
   import cs.fileutils_tests

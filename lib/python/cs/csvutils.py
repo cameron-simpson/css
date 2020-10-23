@@ -115,7 +115,7 @@ def csv_import(
       * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties
 
-      All other keyword paramaters are passed to csv_reader(). This
+      All other keyword parameters are passed to csv_reader(). This
       is a very thin shim around `cs.mappings.named_column_tuples`.
 
       Examples:

@@ -1,11 +1,21 @@
 #!/usr/bin/env python
 #
 
-''' Convenience functions to do with date and time.
+''' A few conveniences to do with dates and times.
 '''
 
 from datetime import datetime, tzinfo, timedelta
 from time import localtime, strftime
+
+DISTINFO = {
+    'keywords': ["date", "time", "datetime", "python", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+}
 
 class tzinfoHHMM(tzinfo):
   ''' tzinfo class based on +HHMM / -HHMM strings.

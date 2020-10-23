@@ -86,6 +86,18 @@ class HashCode(bytes, Transcriber):
   def __repr__(self):
     return ':'.join((self.HASHNAME, hexify(self)))
 
+  @property
+  def bare_etag(self):
+    ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11) without the quote marks.
+    '''
+    return ':'.join((self.HASHNAME, hexify(self)))
+
+  @property
+  def etag(self):
+    ''' An HTTP ETag string (HTTP/1.1, RFC2616 3.11).
+    '''
+    return '"' + self.bare_etag + '"'
+
   def __eq__(self, other):
     return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
 
@@ -113,7 +125,7 @@ class HashCode(bytes, Transcriber):
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
-    ''' Factory function returning a Hash_SHA1 object from the hash bytes.
+    ''' Factory function returning a HashCode object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
       raise ValueError(
@@ -121,6 +133,25 @@ class HashCode(bytes, Transcriber):
           (cls.HASHLEN, len(hashbytes), hashbytes)
       )
     return cls(hashbytes)
+
+  @classmethod
+  def from_hashbytes_hex(cls, hashtext):
+    ''' Factory function returning a `HashCode` object
+        from the hash bytes hex text.
+    '''
+    bs = unhexlify(hashtext)
+    return cls.from_hashbytes(bs)
+
+  @staticmethod
+  def from_named_hashbytes_hex(hashname, hashtext):
+    ''' Factory function to return a `HashCode` object
+        from the hash type name and the hash bytes hex text.
+    '''
+    try:
+      hashclass = HASHCLASS_BY_NAME[hashname.lower()]
+    except KeyError:
+      raise ValueError("unknown hashclass name %r", hashname)
+    return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
   def from_chunk(cls, chunk):
@@ -185,8 +216,7 @@ class HashCode(bytes, Transcriber):
           "expected %d hex digits, found only %d" % (hexlen, len(hashtext))
       )
     offset += hexlen
-    bs = unhexlify(hashtext)
-    H = hashclass.from_hashbytes(bs)
+    H = hashclass.from_hashbytes_hex(hashtext)
     return H, offset
 
 register_transcriber(HashCode)
@@ -328,7 +358,7 @@ class HashCodeUtilsMixin(object):
         expensive and also runtime expensive if only a few hashcodes
         are desired.
 
-        Paramaters:
+        Parameters:
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
           if None start the sequences from the smallest hashcode
@@ -341,7 +371,7 @@ class HashCodeUtilsMixin(object):
         hashclass = self.hashclass
       else:
         hashclass = type(start_hashcode)
-    ks = sorted(hashcode for hashcode in self.keys(hashclass))
+    ks = sorted(self.keys())
     if not ks:
       return
     if start_hashcode is None:

@@ -1,0 +1,2 @@
+lib/python/cs/units.py: Release information for cs.units-20200613.
+lib/python/cs/units.py: cs.units: transcribe: use "%.1f" to format the count if it is not == int(count) ==> a float-with-fraction

@@ -22,7 +22,9 @@ from .logutils import D
 from .timeutils import TimeoutError, sleep
 from .x import X
 
-class TestFileProperty(object):
+class ThingWithFileProperty(object):
+  ''' An object with an `@file_property`.
+  '''
 
   def __init__(self):
     self._test1__filename = 'testfileprop1'
@@ -45,8 +47,8 @@ class TestFileProperty(object):
     ##D("test1 loads \"%s\" => %s", path, data)
     return data
 
-class TestFilesProperty(object):
-  ''' Tests for watching multiple files.
+class ThingWithFilesProperty(object):
+  ''' An object with an `@files_property`.
   '''
 
   def __init__(self):
@@ -74,6 +76,8 @@ class TestFilesProperty(object):
     return (paths[0],), data
 
 class Test_Misc(unittest.TestCase):
+  ''' Tests.
+  '''
 
   def setUp(self):
     self.proppath = 'cs.fileutils_tests_tstprop'
@@ -147,7 +151,7 @@ class Test_Misc(unittest.TestCase):
       self.assertEqual(t1data, newdata, "bad new data in %s" % (T1.name,))
 
   def test_file_property_00(self):
-    PC = self.fileprop = TestFileProperty()
+    PC = self.fileprop = ThingWithFileProperty()
     self.assertTrue(not os.path.exists(PC._test1__filename))
     data1 = PC.test1
     self.assertTrue(data1 is None)
@@ -220,6 +224,8 @@ class Test_Misc(unittest.TestCase):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
 class Test_BackedFile(unittest.TestCase, BackedFile_TestMethods):
+  ''' tests for `BackedFile`.
+  '''
 
   def setUp(self, backing_filename=None):
     if backing_filename is None:

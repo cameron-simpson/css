@@ -39,7 +39,7 @@ from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
-from logging import DEBUG
+import logging
 import os
 import os.path
 import re
@@ -81,6 +81,8 @@ from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
+
+__version__ = '20200719-post'
 
 DISTINFO = {
     'description':
@@ -131,9 +133,7 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
-  if 'DEBUG' not in os.environ:
-    os.environ['DEBUG'] = 'INFO'
-  return MailFilerCommand().run(argv, options=NS(stdin=stdin))
+  return MailFilerCommand().run(argv, options=NS(stdin=stdin, log_level=logging.INFO))
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -147,21 +147,10 @@ class MailFilerCommand(BaseCommand):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from
           Maildir names.
-          Default: {DEFAULT_RULES_PATTERN}
-  Subcommands:
-    {cmd} monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
-      Monitor Maildirs for new messages and file them.
-      -1  File at most 1 message per Maildir.
-      -d delay
-          Delay between runs in seconds.
-          Default is to make only one run over the Maildirs.
-      -n  No remove. Keep filed messages in the origin Maildir.
-    {cmd} save target[,target...] <message
-      Save a message from standard input to the specified targets.
-    {cmd} report <message
-      Report various things about a message from standard input.'''
+          Default: {DEFAULT_RULES_PATTERN}'''
 
-  def apply_defaults(self, options):
+  @staticmethod
+  def apply_defaults(options):
     ''' Set up default options.
     '''
     options.stdin = getattr(options, 'stdin', None) or sys.stdin
@@ -191,7 +180,13 @@ class MailFilerCommand(BaseCommand):
         yield
 
   def cmd_monitor(self, argv, options):
-    ''' Usage: monitor [-1] [-d delay] [-n] [maildirs...]
+    ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
+          Monitor Maildirs for new messages and file them.
+          -1  File at most 1 message per Maildir.
+          -d delay
+              Delay between runs in seconds.
+              Default is to make only one run over the Maildirs.
+          -n  No remove. Keep filed messages in the origin Maildir.
     '''
     warning("test warning")
     justone = False
@@ -232,7 +227,8 @@ class MailFilerCommand(BaseCommand):
     )
 
   def cmd_save(self, argv, options):
-    ''' Usage: save targets < message
+    ''' Usage: {cmd} target[,target...] <message
+          Save a message from standard input to the specified targets.
 
         Save message to the `targets`,
         a single command line argument of the form
@@ -256,9 +252,8 @@ class MailFilerCommand(BaseCommand):
     return self.mailfiler(options).save(targets, message_fp)
 
   def cmd_report(self, argv, options):
-    ''' Usage: report < message
-
-        Report of the processing of `message`.
+    ''' Usage: {cmd} <message
+          Report various things about a message from standard input.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
@@ -528,7 +523,7 @@ class MailFiler(NS):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+          with LogTime("key = %s", key, threshold=1.0, level=logging.DEBUG):
             ok = self.file_wmdir_key(wmdir, key)
             if not ok:
               warning("NOT OK, lurking key %s", key)
@@ -589,7 +584,7 @@ class MailFiler(NS):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
         This does not remove a successfully filed message or update the lurking list.
     '''
-    with LogTime("file key %s", key, threshold=1.0, level=DEBUG):
+    with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
       M = wmdir[key]
       filer = MessageFiler(self)
       ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
@@ -821,7 +816,8 @@ class MessageFiler(NS):
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
-        info("    MATCH %s", R)
+        if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
+          info("    MATCH %s", R)
 
       return self.save_message()
 

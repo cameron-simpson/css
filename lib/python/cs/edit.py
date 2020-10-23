@@ -11,6 +11,7 @@ import os
 import os.path
 from subprocess import Popen
 from tempfile import NamedTemporaryFile
+from cs.deco import fmtdoc
 from cs.pfx import Pfx
 
 DISTINFO = {
@@ -20,14 +21,23 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.pfx'],
+    'install_requires': ['cs.deco', 'cs.pfx'],
 }
 
 # default editor
 EDITOR = 'vi'
 
+@fmtdoc
 def choose_editor(editor=None, environ=None):
-  ''' Choose an editor.
+  ''' Choose an editor,
+      honouring the `$EDITOR` environment variable.
+
+      Parameters:
+      * `editor`: optional editor,
+        default from `environ['EDITOR']`
+        or from `EDITOR` (`{EDITOR!r}`).
+      * `environ`: optional environment mapping,
+        default `os.environ`
   '''
   if editor is None:
     if environ is None:
@@ -36,8 +46,9 @@ def choose_editor(editor=None, environ=None):
   return editor
 
 def edit_strings(strs, editor=None, environ=None):
-  ''' Edit an iterable list of string, return tuples of changed string pairs.
-      Honours $EDITOR envvar, defaults to "vi".
+  ''' Edit an iterable list of `str`, return tuples of changed string pairs.
+
+      The editor is chosen by `choose_editor(editor=editor,environ=environ)`.
   '''
   oldstrs = list(strs)
   newstrs = edit(strs, editor, environ)
@@ -50,6 +61,8 @@ def edit_strings(strs, editor=None, environ=None):
 
 def edit(lines, editor=None, environ=None):
   ''' Write lines to a temporary file, edit the file, return the new lines.
+
+      The editor is chosen by `choose_editor(editor=editor,environ=environ)`.
   '''
   editor = choose_editor(editor, environ)
   with NamedTemporaryFile(mode='w') as T:

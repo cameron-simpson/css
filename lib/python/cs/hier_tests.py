@@ -10,6 +10,8 @@ import unittest
 from cs.hier import loadfp
 
 class TestHier(unittest.TestCase):
+  ''' Test `cs.hier`.
+  '''
 
   def setUp(self):
     pass

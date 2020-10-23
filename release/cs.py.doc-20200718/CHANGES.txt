@@ -1,0 +1,8 @@
+lib/python/cs/py/doc.py: Release information for cs.py.doc-20200521.
+lib/python/cs/py/doc.py: cs.py.doc: new is_dunder(name) function to test whether name is a dunder name
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: new method_names parameter to report only specific attributes from a class - default is all public names and most dunder methods - things without docs are not reported
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: default sort puts upper case names first, now that I'm documenting "CONSTANTS"
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: handle noncallable objects
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: obj_doc now defined earlier; handle noncallable class attributes
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: assorted name selection changes to get a fairly sensible result the default names
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: order names in a case insensitive fashion

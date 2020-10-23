@@ -1,3 +1,40 @@
+cs.logutils,pilfer: drop D_mode and the D function
+cs.upd: what to do when the number of status lines exceeds the terminal height?
+try to strip out use of cs.py3.bytes
+replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
+MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
+cs.logutils: warning et all: once=key (or key on the warning format string if True)
+Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
+cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
+cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
+a facility to do things just once, particularly warnings - then port cs.progress to it
+use common_prefix in cs.upd for line change comparison?
+use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
+@OBSOLETE(PfxThread) and replace uses with cs.threads.bg
+cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
+vbox: cmd to associate the current default interface before starting vm?
+vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
+does dbdigraph really need T_SEQ and friends? try to push that into cs.hier too
+cs.distinfo: update URLs from bitbcuket to sr.ht
+securer findup: sanity check on ownership or perms to stop walk? tunable?
+BaseCommand: can we provide the expected command name instead of the class name in the docstring?
+cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
+cs.upd: ansi_mode to accept coloured message strings - requires an ansi_ln function in cs.tty
+cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
+cs.progress: control over status display - units etc
+cs.upd: rate per proxy, bisect to update counter, autotune?
+incd: remote tmux session to be per target dir
+haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
+cs.upd: UpdProxy: make into context manage with null enter and self-delete on exit
+BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
+new cs.dlog module and bin-cs/dlog command doing what the shell script does now
+dlog: commit logs - tags the commit hash and branch
+dlog: accept tags (leading tag=value words)?
+rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
+can putacc be recoded to use fstags --for-rsync efficiently?
+ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
+treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
+pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
 cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
 cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
 import the examples in the module docstring
@@ -61,10 +98,6 @@ make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
 fvwm: move cs-fvwm-blah python code into cs.app.fvwm
-nodedb:
-  reform map: dunders update and push changes, foreign methods to
-    ingest changes, iter to watch foreign changes or all changes,
-    support multiple iterators by registering notifiers?
 cs.py.func: find out why eval causes syntax error with raise e from e2
 vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
 portfwd ARP_ADDR check for local networks

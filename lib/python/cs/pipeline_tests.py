@@ -17,8 +17,8 @@ from cs.pipeline import (
 )
 from cs.result import report
 
-class TestLater(unittest.TestCase):
-  ''' Unit tests for the Later class.
+class TestPipeline(unittest.TestCase):
+  ''' Unit tests for pipelines.
   '''
 
   @staticmethod
@@ -35,12 +35,13 @@ class TestLater(unittest.TestCase):
 
   @staticmethod
   def _bang():
-    raise TestLater._Bang()
+    raise TestPipeline._Bang()
 
   def setUp(self):
     ''' Set up a Later, log to the terminal.
     '''
     self.L = Later(2)
+    self.L.open()
     self.L.logTo("/dev/tty")
 
   def tearDown(self):
