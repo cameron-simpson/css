@@ -34,7 +34,7 @@ from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
-from cs.units import BINARY_BYTES_SCALE
+from cs.units import BINARY_BYTES_SCALE, UNSCALED_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
@@ -264,9 +264,11 @@ class Linker(object):
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
           proxy(relpath(dirpath, path))
-          for filename in sorted(filenames):
-            path = joinpath(dirpath, filename)
-            status(path)
+          for filename in progressbar(sorted(filenames),
+              label=relpath(dirpath, path),
+              total=len(filenames),
+              units_scale=UNSCALED_SCALE,
+              update_frequency=32,):
             if isfile(path):
               self.addpath(path)
           dirnames[:] = sorted(dirnames)
