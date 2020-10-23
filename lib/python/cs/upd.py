@@ -546,6 +546,7 @@ class Upd(SingletonMixin):
       if len(txt) >= self.columns:
         # the line will overflow, force a complete redraw approach
         redraw = True
+      el = sekf.ti_str('el')
       il1 = self.ti_str('il1')
       cuu1 = self.ti_str('cuu1')
       if not il1 or not cuu1:
@@ -557,6 +558,8 @@ class Upd(SingletonMixin):
         txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
         txts.extend(self._redraw_line_v(''))
         txts.append(txt)
+        if el:
+          txts.append(el)
         txts.extend(self._redraw_trailing_slots_v(top_slot))
         self._current_slot = 0
       else:
@@ -571,6 +574,8 @@ class Upd(SingletonMixin):
         txts.append('\r')
         txts.append(il1)
         txts.append(txt)
+        if el:
+          txts.append(el)
         txts.append('\v\r')
         txts.append(slots[top_slot])
         self._current_slot = top_slot
