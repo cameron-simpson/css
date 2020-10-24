@@ -1259,8 +1259,16 @@ class NamedBackup(SingletonMixin):
         L = backup_run.file_later
         Rs = []
         entries = sorted(dir_entries.items())
-        for name, dir_entry in progressbar(entries, proxy=proxy,
-                                           update_frequency=16):
+        if len(entries) >= 64:
+          entries = progressbar(
+              entries,
+              label="scan",
+              proxy=proxy,
+              update_frequency=16,
+          )
+        else:
+          proxy("scan %d entries", len(entries))
+        for name, dir_entry in entries:
           if runstate.cancelled:
             break
           with Pfx(name):
