@@ -3,7 +3,7 @@
 # Progress counting.
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
-# pylint: disable=(too-many-lines)
+# pylint: disable=too-many-lines
 #
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
