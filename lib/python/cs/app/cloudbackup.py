@@ -124,7 +124,9 @@ class CloudBackupCommand(BaseCommand):
         raise ValueError(
             "no cloud area specified; requires -A option or $CLOUDBACKUP_AREA"
         )
-      return CloudArea.from_cloudpath(self.cloud_area_path)
+      return CloudArea.from_cloudpath(
+          self.cloud_area_path, max_connections=self.job_max
+      )
 
   @staticmethod
   def apply_defaults(options):
