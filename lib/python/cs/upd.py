@@ -404,8 +404,8 @@ class Upd(SingletonMixin):
         movetxts.append('\v' * (from_slot - to_slot))
       else:
         # emit cursor_up
-        cuu1 = self.ti_str('cuu1')
-        movetxts.append(cuu1 * (to_slot - from_slot))
+        cursor_up = self.ti_str('cuu1')
+        movetxts.append(cursor_up * (to_slot - from_slot))
       # adjust horizontal position
       vpos_cur = len(self._slot_text[from_slot])
       vpos_slot = len(oldtxt)
@@ -546,10 +546,10 @@ class Upd(SingletonMixin):
       if len(txt) >= self.columns:
         # the line will overflow, force a complete redraw approach
         redraw = True
-      el = sekf.ti_str('el')
-      il1 = self.ti_str('il1')
-      cuu1 = self.ti_str('cuu1')
-      if not il1 or not cuu1:
+      clr_eol = self.ti_str('el')
+      insert_line = self.ti_str('il1')
+      cursor_up = self.ti_str('cuu1')
+      if not insert_line or not cursor_up:
         redraw = True
       # move to the top slot
       top_slot = len(slots) - 1
@@ -558,8 +558,8 @@ class Upd(SingletonMixin):
         txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
         txts.extend(self._redraw_line_v(''))
         txts.append(txt)
-        if el:
-          txts.append(el)
+        if clr_eol:
+          txts.append(clr_eol)
         txts.extend(self._redraw_trailing_slots_v(top_slot))
         self._current_slot = 0
       else:
@@ -568,14 +568,14 @@ class Upd(SingletonMixin):
         txts.extend(self._move_to_slot_v(self._current_slot, 0))
         self._current_slot = 0
         txts.append('\v')
-        txts.append(cuu1)
+        txts.append(cursor_up)
         # insert the output line above the top slot
         txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
         txts.append('\r')
-        txts.append(il1)
+        txts.append(insert_line)
         txts.append(txt)
-        if el:
-          txts.append(el)
+        if clr_eol:
+          txts.append(clr_eol)
         txts.append('\v\r')
         txts.append(slots[top_slot])
         self._current_slot = top_slot
@@ -672,16 +672,18 @@ class Upd(SingletonMixin):
         Return the `UpdProxy` for the new status line.
     '''
     if proxy and proxy.upd is not None:
-      raise ValueError("proxy %s already associated with an Upd: %s" % (proxy, self))
+      raise ValueError(
+          "proxy %s already associated with an Upd: %s" % (proxy, self)
+      )
     slots = self._slot_text
     proxies = self._proxies
-    cuu1 = self.ti_str('cuu1')
-    if not cuu1:
+    cursor_up = self.ti_str('cuu1')
+    if not cursor_up:
       raise IndexError(
           "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
           % (os.environ.get('TERM'),)
       )
-    il1 = self.ti_str('il1')
+    insert_line = self.ti_str('il1')
     txts = []
     with self._lock:
       if index < 0:
@@ -711,27 +713,27 @@ class Upd(SingletonMixin):
       else:
         # adjust the display, insert the slot
         first_slot = self._current_slot is None
-        if il1:
+        if insert_line:
           # make sure insert line does not push the bottom line off the screen
           # by forcing a scroll
           if first_slot:
-            ll = self.ti_str('ll')  # move to lower left
-            if ll:
-              txts.append(ll)
+            cursor_to_ll = self.ti_str('ll')  # move to lower left
+            if cursor_to_ll:
+              txts.append(cursor_to_ll)
             else:
               txts.append('\r')
           else:
             txts.extend(self._move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
           txts.append('\v')
-          txts.append(cuu1)
+          txts.append(cursor_up)
         if index == 0:
           # move to bottom slot, add line below
           if not first_slot:
             txts.extend(self._move_to_slot_v(self._current_slot, 0))
           txts.append('\v\r')
-          if il1:
-            txts.append(il1)
+          if insert_line:
+            txts.append(insert_line)
             txts.append(txt)
           else:
             txts.extend(self._redraw_line_v(txt))
@@ -746,8 +748,8 @@ class Upd(SingletonMixin):
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
-          if il1:
-            txts.append(il1)
+          if insert_line:
+            txts.append(insert_line)
             txts.append('\r')
             txts.append(txt)
             self._current_slot = index
@@ -784,9 +786,10 @@ class Upd(SingletonMixin):
         proxy.index = None
         del proxies[index]
       else:
-        dl1 = self.ti_str('dl1')
-        cuu1 = self.ti_str('cuu1')
+        delete_line = self.ti_str('dl1')
+        cursor_up = self.ti_str('cuu1')
         txts = self._move_to_slot_v(self._current_slot, index)
+        self._current_slot = index
         del slots[index]
         proxy = proxies[index]
         proxy.index = None
@@ -796,22 +799,22 @@ class Upd(SingletonMixin):
           assert self._current_slot == len(self)
           self._current_slot -= 1
         if index == 0:
-          if dl1:
+          if delete_line:
             # erase bottom line and move up and then to the end of that slot
-            txts.append(dl1)
+            txts.append(delete_line)
           else:
             # clear the bottom lone
             txts.extend(self._redraw_line_v(''))
           # move up and to the end of that slot
-          txts.append(cuu1)
+          txts.append(cursor_up)
           txts.append('\r')
           txts.append(slots[index])
         else:
           # the effectiove index has now moved down
           index -= 1
-          if dl1:
+          if delete_line:
             # delete line and advance to the end of the new current line
-            txts.extend((dl1, '\r', slots[index]))
+            txts.extend((delete_line, '\r', slots[index]))
             self._current_slot = index
           else:
             # no delete line: redraw from here on down then clear the line below
@@ -820,7 +823,7 @@ class Upd(SingletonMixin):
             )
             txts.append('\v')
             txts.extend(self._redraw_line_v(''))
-            txts.append(cuu1)
+            txts.append(cursor_up)
             txts.append(slots[0])
             self._current_slot = 0
         self._backend.write(''.join(txts))

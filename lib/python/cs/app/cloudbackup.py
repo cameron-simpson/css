@@ -20,6 +20,7 @@ from os.path import (
     isabs as isabspath,
     isfile as isfilepath,
     isdir as isdirpath,
+    islink as islinkpath,
     join as joinpath,
     relpath,
 )
@@ -45,7 +46,7 @@ from cs.cloud.crypt import (
 )
 from cs.cmdutils import BaseCommand
 from cs.context import pushattrs, popattrs
-from cs.deco import strable
+from cs.deco import fmtdoc, strable
 from cs.fileutils import UUIDNDJSONMapping, NamedTemporaryCopy
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
@@ -67,6 +68,8 @@ from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
 from typeguard import typechecked
 
+DEFAULT_JOB_MAX = 16
+
 def main(argv=None):
   ''' Create a `CloudBackupCommandCmd` instance and call its main method.
   '''
@@ -76,7 +79,7 @@ class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
-  GETOPT_SPEC = 'A:d:k:n:'
+  GETOPT_SPEC = 'A:d:j:k:n:'
   USAGE_FORMAT = r'''Usage: {cmd} [options] subcommand [...]
     Encrypted cloud backup utility.
     Options:
@@ -84,6 +87,7 @@ class CloudBackupCommand(BaseCommand):
                     Default from the $CLOUDBACKUP_AREA environment variable.
       -d statedir   The directoy containing {cmd} state.
                     Default: $HOME/.cloudbackup
+      -j jobs       Number of uploads or downloads to do in parallel.
       -k key_name   Specify the name of the public/private key to
                     use for operations. The default is from the
                     $CLOUDBACKUP_KEYNAME environment variable or from the
@@ -125,6 +129,7 @@ class CloudBackupCommand(BaseCommand):
   @staticmethod
   def apply_defaults(options):
     options.cloud_area_path = os.environ.get('CLOUDBACKUP_AREA')
+    options.job_max = DEFAULT_JOB_MAX
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
     options.backup_name = os.environ.get('CLOUDBACKUP_NAME')
@@ -139,6 +144,18 @@ class CloudBackupCommand(BaseCommand):
           options.cloud_area_path = val
         elif opt == '-d':
           options.state_dirpath = val
+        elif opt == '-j':
+          try:
+            val = int(val)
+          except ValueError as e:
+            warning("%r: %s", val, e)
+            badopts = True
+          else:
+            if val < 1:
+              warning("value < 1: %d", val)
+              badopts = True
+            else:
+              options.job_max = val
         elif opt == '-k':
           options.key_name = val
         elif opt == '-n':
@@ -198,7 +215,13 @@ class CloudBackupCommand(BaseCommand):
           badopts = True
         else:
           subdirpath = joinpath(backup_root_dirpath, subpath)
-          if not isdirpath(subdirpath):
+          if islinkpath(subdirpath):
+            linkpath = os.readlink(subdirpath)
+            warning(
+                "symbolic link -> %s, please use the real subpath", linkpath
+            )
+            badopts = True
+          elif not isdirpath(subdirpath):
             warning("not a directory: %r", subdirpath)
             badopts = True
     if badopts:
@@ -222,7 +245,8 @@ class CloudBackupCommand(BaseCommand):
           backup_root_dirpath,
           subpaths or ('',),
           backup_name=options.backup_name,
-          public_key_name=options.key_name
+          public_key_name=options.key_name,
+          file_parallel=options.job_max,
       )
     print("backup run completed ==>", backup)
 
@@ -684,6 +708,7 @@ class CloudBackup:
       *,
       backup_name,
       public_key_name=None,
+      file_parallel=None,
   ) -> "BackupRecord":
     ''' Run a new backup of data from `backup_root_dirpath`,
         backing up everything from each `backup_root_dirpath/subpath` downward.
@@ -708,8 +733,8 @@ class CloudBackup:
     named_backup = self[backup_name]
     assert isinstance(named_backup, NamedBackup)
     named_backup.init()
-    with BackupRun(named_backup, cloud_area,
-                   public_key_name=public_key_name) as backup_run:
+    with BackupRun(named_backup, cloud_area, public_key_name=public_key_name,
+                   file_parallel=file_parallel) as backup_run:
       for subpath in subpaths:
         named_backup.backup_tree(
             backup_run,
@@ -785,17 +810,20 @@ class BackupRun(RunStateMixin):
   ''' State management and display for a multithreaded backup run.
   '''
 
+  @fmtdoc
   @typechecked
-  @require(lambda folder_parallel: folder_parallel > 0)
-  @require(lambda file_parallel: file_parallel > 0)
+  @require(
+      lambda folder_parallel: folder_parallel is None or folder_parallel > 0
+  )
+  @require(lambda file_parallel: file_parallel is None or file_parallel > 0)
   def __init__(
       self,
       named_backup: "NamedBackup",
       cloud_area: CloudArea,
       *,
       public_key_name: str,
-      folder_parallel: int = 4,
-      file_parallel: int = 16,
+      folder_parallel=None,
+      file_parallel=None,
   ):
     ''' Initialise a `BackupRun`.
 
@@ -805,11 +833,16 @@ class BackupRun(RunStateMixin):
         * `public_key_name`: the name of the public key
           to use with this backup run
         * `folder_parallel`: the number of filesystem directories to process
-          in parallel, normally a small number
+          in parallel, normally a small number; default `4`
         * `file_parallel`: the number of parallel file uploads to support,
           normally a not so small number, enough to get good throughput
-          allowing for the latency of the cloud upload process
+          allowing for the latency of the cloud upload process;
+          default from `DEFAULT_JOB_MAX`: `{DEFAULT_JOB_MAX}`
     '''
+    if folder_parallel is None:
+      folder_parallel = 4
+    if file_parallel is None:
+      file_parallel = DEFAULT_JOB_MAX
     self.named_backup = named_backup
     self.cloud_area = cloud_area
     self.public_key_name = public_key_name
