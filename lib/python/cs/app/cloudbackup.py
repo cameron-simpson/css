@@ -20,6 +20,7 @@ from os.path import (
     isabs as isabspath,
     isfile as isfilepath,
     isdir as isdirpath,
+    islink as islinkpath,
     join as joinpath,
     relpath,
 )
@@ -214,7 +215,13 @@ class CloudBackupCommand(BaseCommand):
           badopts = True
         else:
           subdirpath = joinpath(backup_root_dirpath, subpath)
-          if not isdirpath(subdirpath):
+          if islinkpath(subdirpath):
+            linkpath = os.readlink(subdirpath)
+            warning(
+                "symbolic link -> %s, please use the real subpath", linkpath
+            )
+            badopts = True
+          elif not isdirpath(subdirpath):
             warning("not a directory: %r", subdirpath)
             badopts = True
     if badopts:
