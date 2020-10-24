@@ -735,14 +735,15 @@ class CloudBackup:
     named_backup = self[backup_name]
     assert isinstance(named_backup, NamedBackup)
     named_backup.init()
-    with BackupRun(named_backup, cloud_area, public_key_name=public_key_name,
-                   file_parallel=file_parallel) as backup_run:
+    with BackupRun(
+        named_backup,
+        backup_root_dirpath,
+        cloud_area,
+        public_key_name=public_key_name,
+        file_parallel=file_parallel,
+    ) as backup_run:
       for subpath in subpaths:
-        named_backup.backup_tree(
-            backup_run,
-            backup_root_dirpath,
-            subpath,
-        )
+        backup_run.backup_subpath(subpath)
       backup_record = backup_run.backup_record
     return backup_record
 
@@ -770,8 +771,10 @@ class BackupRecord(UUIDedDict):
   def __init__(
       self,
       *,
-      public_key_name,
-      content_path,
+      backup_name=None,
+      public_key_name: str,
+      root_path=None,
+      content_path: str,
       count_files_checked=0,
       count_files_changed=0,
       count_uploaded_bytes=0,
@@ -779,7 +782,9 @@ class BackupRecord(UUIDedDict):
       **kw
   ):
     super().__init__(**kw)
+    self['backup_name'] = backup_name
     self['public_key_name'] = public_key_name
+    self['root_path'] = root_path
     self['content_path'] = content_path
     self['count_files_checked'] = count_files_checked
     self['count_files_changed'] = count_files_changed
@@ -821,6 +826,7 @@ class BackupRun(RunStateMixin):
   def __init__(
       self,
       named_backup: "NamedBackup",
+      root_dirpath: str,
       cloud_area: CloudArea,
       *,
       public_key_name: str,
@@ -845,7 +851,10 @@ class BackupRun(RunStateMixin):
       folder_parallel = 4
     if file_parallel is None:
       file_parallel = DEFAULT_JOB_MAX
+    if not isdirpath(root_dirpath):
+      raise ValueError("root_dirpath nto a directory: %r" % (root_dirpath,))
     self.named_backup = named_backup
+    self.root_dirpath = root_dirpath
     self.cloud_area = cloud_area
     self.public_key_name = public_key_name
     self.folder_parallel = folder_parallel
@@ -874,7 +883,9 @@ class BackupRun(RunStateMixin):
     file_proxies = set(UpdProxy() for _ in range(self.file_parallel))
     folder_proxies = set(UpdProxy() for _ in range(self.folder_parallel))
     backup_record = BackupRecord(
+        backup_name=self.named_backup.backup_name,
         public_key_name=self.public_key_name,
+        root_path=self.root_dirpath,
         content_path=self.content_path,
     )
 
@@ -922,6 +933,13 @@ class BackupRun(RunStateMixin):
     self.status_proxy.delete()
     old_attrs = self._stacked.pop()
     popattrs(self, old_attrs.keys(), old_attrs)
+
+  def backup_subpath(self, subpath):
+    ''' Use this `BackupRun` to backup `subpath` from `self.root_dirpath`.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    return self.named_backup.backup_tree(self, self.root_dirpath, subpath)
 
   @contextmanager
   def folder_proxy(self):
