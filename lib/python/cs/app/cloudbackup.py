@@ -63,7 +63,7 @@ from cs.resources import RunState, RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
-from cs.units import BINARY_BYTES_SCALE
+from cs.units import BINARY_BYTES_SCALE, transcribe
 from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
 from typeguard import typechecked
@@ -250,7 +250,44 @@ class CloudBackupCommand(BaseCommand):
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    print("backup run completed ==>", backup)
+    fields = set(backup.keys())
+    # print the important fields
+    for field in (
+        'uuid',
+        'backup_name',
+        'public_key_name',
+        'root_path',
+        'content_path',
+        'timestamp_start',
+        'timestamp_end',
+        'count_files_checked',
+        'count_files_changed',
+        'count_uploaded_files',
+        'count_uploaded_bytes',
+    ):
+      try:
+        value = backup[field]
+      except KeyError:
+        value_s = 'MSSING'
+      else:
+        try:
+          if field in ('count_uploaded_bytes',):
+            value_s = transcribe(
+                value, BINARY_BYTES_SCALE, max_parts=2, sep=' '
+            )
+          elif field.startswith('timestamp_'):
+            dt = datetime.fromtimestamp(value)
+            value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
+          else:
+            value_s = str(value)
+        except ValueError as e:
+          warning("cannot present field %r=%r: %s", field, value, e)
+          value_s = repr(value)
+      print(field, ':', value_s)
+      fields.discard(field)
+    # print remaining fields
+    for field in sorted(fields):
+      print(field, ':', backup[field])
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
