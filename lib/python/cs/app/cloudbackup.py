@@ -805,8 +805,10 @@ class BackupRun(RunStateMixin):
 
   @fmtdoc
   @typechecked
-  @require(lambda folder_parallel: folder_parallel > 0)
-  @require(lambda file_parallel: file_parallel > 0)
+  @require(
+      lambda folder_parallel: folder_parallel is None or folder_parallel > 0
+  )
+  @require(lambda file_parallel: file_parallel is None or file_parallel > 0)
   def __init__(
       self,
       named_backup: "NamedBackup",
