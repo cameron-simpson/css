@@ -260,15 +260,15 @@ class Linker(object):
     ''' Scan the file tree.
     '''
     with Upd().insert(1) as proxy:
-      proxy.prefix="scan %s: "%(path)
+      proxy.prefix = "scan %s: " % (path)
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
           proxy(relpath(dirpath, path))
-          for filename in progressbar(sorted(filenames),
+          for filename in progressbar(
+              sorted(filenames),
               label=relpath(dirpath, path),
-              total=len(filenames),
-              units_scale=UNSCALED_SCALE,
-              update_frequency=32,):
+              update_frequency=32,
+          ):
             if isfile(path):
               self.addpath(path)
           dirnames[:] = sorted(dirnames)
