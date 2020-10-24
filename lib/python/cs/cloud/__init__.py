@@ -104,6 +104,7 @@ class Cloud(ABC):
       raise ValueError("max_connections:%s < 1" % (max_connections,))
     self.credentials = credentials
     self._lock = RLock()
+    self.max_connections = max_connections
     self._conn_sem = Semaphore(max_connections)
 
   @staticmethod

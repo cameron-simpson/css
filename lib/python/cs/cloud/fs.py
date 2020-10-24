@@ -30,15 +30,15 @@ class FSCloud(SingletonMixin, Cloud):
 
   @staticmethod
   @require(lambda credentials: credentials is None)
-  def _singleton_key(credentials):
+  def _singleton_key(credentials, max_connections=None):
     return credentials
 
   @require(lambda credentials: credentials is None)
-  def __init__(self, credentials):
+  def __init__(self, credentials, max_connections=None):
     assert credentials is None
     if hasattr(self, 'credentials'):
       return
-    super().__init__(credentials)
+    super().__init__(credentials, max_connections=max_connections)
 
   def __str__(self):
     return f"{self.PREFIX}:///"
