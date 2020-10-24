@@ -48,22 +48,22 @@ class B2Cloud(SingletonMixin, Cloud):
 
   PREFIX = 'b2'
 
-  DEFAULT_MAX_CONNECTIONS = 32
+  DEFAULT_MAX_CONNECTIONS = 24
 
   credentials_from_str = B2Credentials.from_str
 
   @staticmethod
   @require(lambda credentials: hasattr(credentials, 'keyId'))
   @require(lambda credentials: hasattr(credentials, 'apiKey'))
-  def _singleton_key(credentials):
+  def _singleton_key(credentials, max_connections=None):
     return credentials.keyId, credentials.apiKey
 
   @require(lambda credentials: hasattr(credentials, 'keyId'))
   @require(lambda credentials: hasattr(credentials, 'apiKey'))
-  def __init__(self, credentials):
+  def __init__(self, credentials, max_connections=None):
     if hasattr(self, 'credentials'):
       return
-    super().__init__(credentials)
+    super().__init__(credentials, max_connections=max_connections)
     self._buckets_by_name = {}
 
   def __str__(self):

@@ -85,11 +85,16 @@ class ParsedCloudPath(namedtuple('ParsedCloudPath',
         self.cloud.bucketpath(self.bucket_name), self.subpath or ""
     )
 
+  def new_cloud(self, **kw):
+    ''' Make a new `Cloud` instance using the supplied keyword parameters `kw`.
+    '''
+    return self.cloudcls(self.credentials, **kw)
+
   @property
   def cloud(self):
-    ''' The cloud service supporting this path.
+    ''' The default cloud service supporting this path.
     '''
-    return self.cloudcls(self.credentials)
+    return self.new_cloud(self.credentials)
 
 class Cloud(ABC):
   ''' A cloud storage service.
@@ -104,6 +109,7 @@ class Cloud(ABC):
       raise ValueError("max_connections:%s < 1" % (max_connections,))
     self.credentials = credentials
     self._lock = RLock()
+    self.max_connections = max_connections
     self._conn_sem = Semaphore(max_connections)
 
   @staticmethod
@@ -330,11 +336,13 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   '''
 
   @classmethod
-  def from_cloudpath(cls, path: str):
-    ''' Construct a new `CloudArea` from the cloud path `path`.
+  def from_cloudpath(cls, path: str, **kw):
+    ''' Construct a new `CloudArea` from the cloud path `path`
+        using the supplied keyword parameters `kw`.
     '''
     CP = ParsedCloudPath.from_str(path)
-    return cls(CP.cloud, CP.bucket_name, CP.subpath)
+    cloud = CP.new_cloud(**kw)
+    return cls(cloud, CP.bucket_name, CP.subpath)
 
   def subarea(self, subpath):
     ''' Return a `CloudArea` which is located within this `CloudArea`.

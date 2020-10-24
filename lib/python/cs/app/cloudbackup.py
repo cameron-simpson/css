@@ -124,7 +124,9 @@ class CloudBackupCommand(BaseCommand):
         raise ValueError(
             "no cloud area specified; requires -A option or $CLOUDBACKUP_AREA"
         )
-      return CloudArea.from_cloudpath(self.cloud_area_path)
+      return CloudArea.from_cloudpath(
+          self.cloud_area_path, max_connections=self.job_max
+      )
 
   @staticmethod
   def apply_defaults(options):
@@ -1257,8 +1259,16 @@ class NamedBackup(SingletonMixin):
         L = backup_run.file_later
         Rs = []
         entries = sorted(dir_entries.items())
-        for name, dir_entry in progressbar(entries, proxy=proxy,
-                                           update_frequency=16):
+        if len(entries) >= 64:
+          entries = progressbar(
+              entries,
+              label="scan",
+              proxy=proxy,
+              update_frequency=16,
+          )
+        else:
+          proxy("scan %d entries", len(entries))
+        for name, dir_entry in entries:
           if runstate.cancelled:
             break
           with Pfx(name):
