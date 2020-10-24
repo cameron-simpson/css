@@ -782,6 +782,7 @@ class Upd(SingletonMixin):
         dl1 = self.ti_str('dl1')
         cuu1 = self.ti_str('cuu1')
         txts = self._move_to_slot_v(self._current_slot, index)
+        self._current_slot = index
         del slots[index]
         proxy = proxies[index]
         proxy.index = None
