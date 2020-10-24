@@ -1256,10 +1256,11 @@ class NamedBackup(SingletonMixin):
         names = set()
         L = backup_run.file_later
         Rs = []
-        for name, dir_entry in sorted(dir_entries.items()):
+        entries = sorted(dir_entries.items())
+        for name, dir_entry in progressbar(entries, proxy=proxy,
+                                           update_frequency=16):
           if runstate.cancelled:
             break
-          proxy("check " + name)
           with Pfx(name):
             pathname = joinpath(dirpath, name)
             if name in names:
