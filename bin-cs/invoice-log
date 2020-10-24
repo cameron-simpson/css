@@ -19,6 +19,7 @@ rcfile=$HOME/rc/invoice/$org.sh
 set -x
 (
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
+  [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
   for d in $gitdirs
   do
     ( cd "$d"
