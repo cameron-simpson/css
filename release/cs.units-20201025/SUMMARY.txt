@@ -1,0 +1,1 @@
+transcribe: use str(count_i), not str(count) if count == count_i.
