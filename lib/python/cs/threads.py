@@ -12,7 +12,8 @@ from collections import defaultdict, deque, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
 import sys
-from threading import Semaphore, Thread, current_thread, Lock
+from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
+from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, warning, debug, exception
@@ -34,6 +35,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.excutils',
         'cs.logutils',
@@ -44,6 +46,45 @@ DISTINFO = {
         'cs.seq',
     ],
 }
+
+class State(thread_local):
+  ''' A `Thread` local object with attributes
+      which can be used as a context manager to stack attribute values.
+
+      Example:
+
+          from cs.threads import State
+
+          S = State(verbose=False)
+
+          with S(verbopse=True) as prev_attrs:
+              if S.verbose:
+                  print("verbose! (formerly verbose=%s)" % prev_attrs['verbose'])
+  '''
+
+  def __init__(self, **kw):
+    ''' Initiale the `State`, providing the per-Thread initial values.
+    '''
+    thread_local.__init__(self)
+    for k, v in kw.items():
+      setattr(self, k, v)
+
+  def __str__(self):
+    return "%s(%s)" % (
+        type(self).__name__,
+        ','.join("%s=%r" % kv for kv in self.__dict__.items())
+    )
+
+  __repr__ = __str__
+
+  @contextmanager
+  def __call__(self, **kw):
+    ''' Calling a `State` returns a context manager which stacks some state.
+        The context manager yields the previous values
+        for the attributes which were stacked.
+    '''
+    with stackattrs(self, **kw) as prev_attrs:
+      yield prev_attrs
 
 def bg(
     func,
