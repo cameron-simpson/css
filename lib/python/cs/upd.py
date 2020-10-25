@@ -187,7 +187,6 @@ class Upd(SingletonMixin):
     self._above = None
     self._proxies = []
     self._lock = RLock()
-    self.insert(0)
     global instances  # pylint: disable=global-statement
     instances.append(self)
 
@@ -228,25 +227,26 @@ class Upd(SingletonMixin):
         Otherwise we clean up the status lines.
     '''
     slots = self._slot_text
-    if (exc_type is None or
-        (issubclass(exc_type, SystemExit) and (exc_val.code == 0 if isinstance(
-            exc_val.code, int) else exc_val.code is None))):
-      # no exception or SystemExit(0) or SystemExit(None)
-      # remove the Upd display
-      with self._lock:
-        while len(slots) > 1:
-          del self[len(slots) - 1]
-        self[0] = ''
-    elif not self._disabled and self._backend is not None:
-      # preserve the display for debugging purposes
-      # move to the bottom and emit a newline
-      with self._lock:
-        txts = self._move_to_slot_v(self._current_slot, 0)
-        if slots[0]:
-          # preserve the last status line if not empty
-          txts.append('\n')
-        self._backend.write(''.join(txts))
-        self._backend.flush()
+    if slots:
+      if (exc_type is None or
+          (issubclass(exc_type, SystemExit) and (exc_val.code == 0 if isinstance(
+              exc_val.code, int) else exc_val.code is None))):
+        # no exception or SystemExit(0) or SystemExit(None)
+        # remove the Upd display
+        with self._lock:
+          while len(slots) > 1:
+            del self[len(slots) - 1]
+          self[0] = ''
+      elif not self._disabled and self._backend is not None:
+        # preserve the display for debugging purposes
+        # move to the bottom and emit a newline
+        with self._lock:
+          txts = self._move_to_slot_v(self._current_slot, 0)
+          if slots[0]:
+            # preserve the last status line if not empty
+            txts.append('\n')
+          self._backend.write(''.join(txts))
+          self._backend.flush()
 
   @property
   def disabled(self):
@@ -302,7 +302,7 @@ class Upd(SingletonMixin):
   def close(self):
     ''' Close this Upd.
     '''
-    if self._backend is not None:
+    if self._backend is not None and self._slot_text:
       self.out('')
       self._backend = None
 
@@ -503,6 +503,9 @@ class Upd(SingletonMixin):
       txt = self.normalise(txt)
     backend = self._backend
     with self._lock:
+      slots = self._slot_text
+      if slot == 0 and not slots:
+        self.insert(0)
       if self._disabled or self._backend is None:
         oldtxt = self._slot_text[slot]
         self._slot_text[slot] = txt
@@ -606,7 +609,7 @@ class Upd(SingletonMixin):
             with U.above():
                 print('some message for stdout ...', flush=True)
     '''
-    if self._disabled or self._backend is None:
+    if self._disabled or self._backend is None or not self._slot_text:
       yield
     else:
       # go to the top slot, overwrite it and then rewrite the slots below
