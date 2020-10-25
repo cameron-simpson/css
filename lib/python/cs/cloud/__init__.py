@@ -94,7 +94,7 @@ class ParsedCloudPath(namedtuple('ParsedCloudPath',
   def cloud(self):
     ''' The default cloud service supporting this path.
     '''
-    return self.new_cloud(self.credentials)
+    return self.new_cloud()
 
 class Cloud(ABC):
   ''' A cloud storage service.
