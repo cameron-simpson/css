@@ -7,10 +7,9 @@ from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
 from threading import local as thread_local
-from sqlalchemy import Column, DateTime, Integer
+from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
-import sqlalchemy.sql.functions as func
 from icontract import require
 from cs.context import stackattrs
 from cs.deco import decorator, contextdecorator
@@ -147,7 +146,7 @@ def auto_session(function):
   return wrapper
 
 @contextdecorator
-def log_level(func,a,kw,level=NOne):
+def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
       Yields the logger.
 
@@ -312,6 +311,7 @@ class BasicTableMixin:
       ))
     return row
 
+# pylint: disable=too-few-public-methods
 class HasIdMixin:
   ''' Include an "id" `Column` as the primary key.
   '''
