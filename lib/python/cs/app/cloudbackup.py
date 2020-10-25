@@ -172,7 +172,7 @@ class CloudBackupCommand(BaseCommand):
         os.mkdir(options.state_dirpath, 0o777)
     if options.backup_name is None:
       warning("no backup_name specified")
-      print("The follow backup names exist:", file=sys.stderr)
+      print("The following backup names exist:", file=sys.stderr)
       for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
                                                     'backups'))):
         if is_identifier(backup_name):
