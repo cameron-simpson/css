@@ -81,7 +81,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20201026'
+__version__ = '20201026-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
