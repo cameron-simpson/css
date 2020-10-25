@@ -7,15 +7,17 @@ from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
 from threading import local as thread_local
-from sqlalchemy import Column, DateTime, Integer
+from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
-import sqlalchemy.sql.functions as func
 from icontract import require
 from cs.context import stackattrs
 from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
+from cs.threads import State
+
+__version__ = '20201025-post'
 
 DISTINFO = {
     'description':
@@ -35,25 +37,7 @@ DISTINFO = {
     ],
 }
 
-# TODO: have a cs.threads.ThreadState superclass with __call__ etc
-class _State(thread_local):
-  ''' Shared per-thread state.
-  '''
-
-  def __init__(self):
-    super().__init__()
-    self.orm = None
-    self.session = None
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling the shared state returns a context manager
-        pushing the supplied keyword arguments as state attribute values.
-    '''
-    with stackattrs(self, **kw):
-      yield
-
-_state = _State()
+_state = State()
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
@@ -164,7 +148,7 @@ def auto_session(function):
   return wrapper
 
 @contextdecorator
-def log_level(func,a,kw,level=NOne):
+def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
       Yields the logger.
 
@@ -198,7 +182,6 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
-    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self, *a, **kw):
@@ -330,6 +313,7 @@ class BasicTableMixin:
       ))
     return row
 
+# pylint: disable=too-few-public-methods
 class HasIdMixin:
   ''' Include an "id" `Column` as the primary key.
   '''
