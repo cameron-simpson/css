@@ -16,6 +16,7 @@ from cs.context import stackattrs
 from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
+from cs.threads import State
 
 DISTINFO = {
     'description':
@@ -35,25 +36,7 @@ DISTINFO = {
     ],
 }
 
-# TODO: have a cs.threads.ThreadState superclass with __call__ etc
-class _State(thread_local):
-  ''' Shared per-thread state.
-  '''
-
-  def __init__(self):
-    super().__init__()
-    self.orm = None
-    self.session = None
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling the shared state returns a context manager
-        pushing the supplied keyword arguments as state attribute values.
-    '''
-    with stackattrs(self, **kw):
-      yield
-
-_state = _State()
+_state = State()
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
