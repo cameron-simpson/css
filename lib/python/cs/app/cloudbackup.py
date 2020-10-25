@@ -1342,7 +1342,15 @@ class NamedBackup(SingletonMixin):
             if name_backups is None:
               name_backups = FileBackupState(name=name, backups=[])
               dirstate.add_to_mapping(name_backups)
-            stat = dir_entry.stat(follow_symlinks=False)
+            try:
+              stat = dir_entry.stat(follow_symlinks=False)
+            except FileNotFoundError as e:
+              warning("skipped: %s", e)
+              continue
+            except OSError as e:
+              warning("skipped: %s", e)
+              ok = False
+              continue
             if dir_entry.is_symlink():
               try:
                 link = readlink(pathname)
