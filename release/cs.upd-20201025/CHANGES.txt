@@ -1,0 +1,25 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200914.
+lib/python/cs/upd.py: cs.upd: update module docstring, drop most of the boring discussion of the no-output mode
+lib/python/cs/upd.py: cs.upd: Upd: new .disabled property to allow inspection of disabledness
+lib/python/cs/upd.py: cs.upd: UpdProxy: turn .prefix into a property which causes a redraw when changed
+lib/python/cs/upd.py: cs.upd: Upd.insert: accept negative insert indices to position from the top of the list
+lib/python/cs/upd.py: cs.upd: make the compute-redraw-strings methods private - since not called from outside we don't need to make them MT safe
+lib/python/cs/upd.py: cs.upd: fix various race conditions
+lib/python/cs/upd.py: cs.upd: fix potential race, only possible if someone changes the Upd used by an UpdProxy (not sure if that is even sane)
+lib/python/cs/upd.py: cs.upd: Upd.proxy(index): return None if the index is out of range, accomodates racy or incorrect behaviour by a user
+lib/python/cs/upd.py: cs.upd: Upd.delete: if we delete the top slot, crop _current_slot; add some sanity checks
+lib/python/cs/upd.py: cs.upd: Upd.above: keep the lock over the whole content manager
+lib/python/cs/upd.py: cs.upd: Upd: set up ._proxies after the lock etc are ready
+lib/python/cs/upd.py: cs.upd: UpdProxy: keep the post-prefix test separately, fixes bug with growing prefix
+lib/python/cs/upd.py: cs.upd: UpdProxy: cropped overflowing text gets a leading '<' to make it apparent
+lib/python/cs/upd.py: cs.upd: UpdProxy: new .insert() method to support insterting new proxies with respect to an existing proxy
+lib/python/cs/upd.py: merge cloud ==> default: initial implementation of cloudbackup
+lib/python/cs/upd.py: cs.upd: UpdProxy: new reset() method, clears prefix and text
+lib/python/cs/upd.py: merge cloud ==> default: cloudbackup: BackupRun: clear proxies on return to the pool
+lib/python/cs/upd.py: cs.upd: UpdProxy.__init__: BREAKING: make all arguments optional to aid use; Upd.insert: modify to match; Upd: start with no slots and insert the first one
+lib/python/cs/upd.py: cs.upd: Upd.nl: use clear-to-end-of-line at the end of the message if available
+lib/python/cs/upd.py: cs.upd: Upd.delete: set ._current_slot to preserve internal consistency
+lib/python/cs/upd.py: merge default ==> cloud
+lib/python/cs/upd.py: cs.upd: better variable names for cursor motion strings to aid readability
+lib/python/cs/upd.py: cs.upd: do not make any slots unless required
+lib/python/cs/upd.py: cs.upd: update DISTINFO, clean lint, autoformat
