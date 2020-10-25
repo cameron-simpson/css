@@ -17,7 +17,7 @@ import itertools
 from threading import Lock, Condition
 from cs.gimmicks import warning
 
-__version__ = '20201025'
+__version__ = '20201025-post'
 
 DISTINFO = {
     'description':
