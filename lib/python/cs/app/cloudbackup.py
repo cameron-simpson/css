@@ -1496,30 +1496,36 @@ class NamedBackup(SingletonMixin):
         if runstate.cancelled:
           return None, None
         # checksum the file contents
-        with open(filename, 'rb') as f:
-          fd = f.fileno()
-          ##fd = os.open(filename, O_RDONLY)
-          fstat = os.fstat(fd)
-          if not S_ISREG(fstat.st_mode):
-            raise ValueError("not a regular file")
-          hasher = DEFAULT_HASHCLASS.digester()
-          if fstat.st_size == 0:
-            # TODO: why upload empty files at all? back to the "inline small files" issue
-            # can't mmap empty files, and in any case they're easy
-            hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
+        try:
+          with open(filename, 'rb') as f:
+            fd = f.fileno()
+            ##fd = os.open(filename, O_RDONLY)
+            fstat = os.fstat(fd)
+            if not S_ISREG(fstat.st_mode):
+              raise ValueError("not a regular file")
+            hasher = DEFAULT_HASHCLASS.digester()
+            if fstat.st_size == 0:
+              # TODO: why upload empty files at all? back to the "inline small files" issue
+              # can't mmap empty files, and in any case they're easy
+              hashcode = DEFAULT_HASHCLASS(
+                  DEFAULT_HASHCLASS.digester().digest()
+              )
+              if runstate.cancelled:
+                return None, None
+              self.upload_hashcode_content(
+                  backup_record, fd, hashcode, length=fstat.st_size
+              )
+              return hashcode, fstat
+            # compute hashcode from file contents
+            hashcode = DEFAULT_HASHCLASS.digester()
+            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
             if runstate.cancelled:
               return None, None
-            self.upload_hashcode_content(
-                backup_record, fd, hashcode, length=fstat.st_size
-            )
-            return hashcode, fstat
-          # compute hashcode from file contents
-          hashcode = DEFAULT_HASHCLASS.digester()
-          mm = mmap(fd, fstat.st_size, prot=PROT_READ)
-          if runstate.cancelled:
-            return None, None
-          hasher.update(mm)
-          hashcode = DEFAULT_HASHCLASS(hasher.digest())
+            hasher.update(mm)
+            hashcode = DEFAULT_HASHCLASS(hasher.digest())
+        except OSError as e:
+          warning("checksum: %s", e)
+          return None, None
         # compute some crypt-side upload paths
         basepath = self.hashcode_path(hashcode)
         # TODO: a check_uploaded flag?
