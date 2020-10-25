@@ -1483,16 +1483,16 @@ class NamedBackup(SingletonMixin):
     runstate = backup_run.runstate
     if runstate.cancelled:
       return None, None
-    with backup_run.file_proxy() as proxy:
-      filename = joinpath(backup_root_dirpath, subpath)
-      proxy.prefix = subpath + ': '
-      proxy("check against previous backup")
-      backup_record = backup_run.backup_record
-      cloud_backup = self.cloud_backup
-      cloud = backup_record.content_area.cloud
-      bucket_name = backup_record.content_area.bucket_name
-      public_key_name = backup_record.public_key_name
-      with Pfx("backup_filename(%r)", filename):
+    filename = joinpath(backup_root_dirpath, subpath)
+    with Pfx("backup_filename(%r)", filename):
+      with backup_run.file_proxy() as proxy:
+        proxy.prefix = subpath + ': '
+        proxy("check against previous backup")
+        backup_record = backup_run.backup_record
+        cloud_backup = self.cloud_backup
+        cloud = backup_record.content_area.cloud
+        bucket_name = backup_record.content_area.bucket_name
+        public_key_name = backup_record.public_key_name
         if runstate.cancelled:
           return None, None
         # checksum the file contents
