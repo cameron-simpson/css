@@ -85,7 +85,6 @@ from os.path import (
 from pathlib import PurePath
 import shutil
 import sys
-import threading
 from threading import Lock, RLock
 from icontract import require
 from cs.cmdutils import BaseCommand
@@ -98,13 +97,13 @@ from cs.lex import (
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TaggedEntity,
     TagsCommandMixin, RegexpTagRule
 )
-from cs.threads import locked, locked_property
+from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 __version__ = '20200717.1-post'
@@ -143,16 +142,7 @@ def main(argv=None):
   '''
   return FSTagsCommand().run(argv)
 
-class _State(threading.local):
-  ''' Per-thread default context stack.
-  '''
-
-  def __init__(self, **kw):
-    threading.local.__init__(self)
-    for k, v in kw.items():
-      setattr(self, k, v)
-
-state = _State(verbose=False)
+state = State(verbose=False)
 
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
