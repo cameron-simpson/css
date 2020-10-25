@@ -1480,14 +1480,14 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
+    runstate = backup_run.runstate
     if runstate.cancelled:
       return None, None
-    filename = joinpath(backup_root_dirpath, subpath)
     with backup_run.file_proxy() as proxy:
+      filename = joinpath(backup_root_dirpath, subpath)
       proxy.prefix = subpath + ': '
       proxy("check against previous backup")
       backup_record = backup_run.backup_record
-      runstate = backup_run.runstate
       cloud_backup = self.cloud_backup
       cloud = backup_record.content_area.cloud
       bucket_name = backup_record.content_area.bucket_name
