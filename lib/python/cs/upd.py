@@ -91,7 +91,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.pfx', 'cs.tty'],
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
 }
 
 instances = []
@@ -228,9 +228,10 @@ class Upd(SingletonMixin):
     '''
     slots = self._slot_text
     if slots:
-      if (exc_type is None or
-          (issubclass(exc_type, SystemExit) and (exc_val.code == 0 if isinstance(
-              exc_val.code, int) else exc_val.code is None))):
+      if (exc_type is None
+          or (issubclass(exc_type, SystemExit) and
+              (exc_val.code == 0
+               if isinstance(exc_val.code, int) else exc_val.code is None))):
         # no exception or SystemExit(0) or SystemExit(None)
         # remove the Upd display
         with self._lock:
@@ -669,6 +670,7 @@ class Upd(SingletonMixin):
         assert proxy.index == i
     return True
 
+  # pylint: disable=too-many-branches,too-many-statements
   def insert(self, index, txt='', proxy=None):
     ''' Insert a new status line at `index`.
 
