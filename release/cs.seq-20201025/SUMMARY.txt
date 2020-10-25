@@ -1,0 +1,1 @@
+New splitoff() function to split a sequence into (usually short) prefixes and a tail.
