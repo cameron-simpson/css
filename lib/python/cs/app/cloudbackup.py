@@ -140,6 +140,7 @@ class CloudBackupCommand(BaseCommand):
   def apply_opts(opts, options):
     ''' Apply main command line options.
     '''
+    badopts = False
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-A':
@@ -164,12 +165,11 @@ class CloudBackupCommand(BaseCommand):
           options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
-    options.cloud_backup = CloudBackup(options.state_dirpath)
-    badopts = False
-    if not isdirpath(options.state_dirpath):
-      print(f"{options.cmd}: mkdir {options.state_dirpath}")
-      with Pfx("mkdir(%r)", options.state_dirpath):
-        os.mkdir(options.state_dirpath, 0o777)
+    try:
+      options.cloud_area
+    except ValueError as e:
+      warning("invalid cloud_area: %s: %s", options.cloud_area_path, e)
+      badopts = True
     if options.backup_name is None:
       warning("no backup_name specified")
       print("The following backup names exist:", file=sys.stderr)
@@ -185,6 +185,11 @@ class CloudBackupCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("bad options")
+    options.cloud_backup = CloudBackup(options.state_dirpath)
+    if not isdirpath(options.state_dirpath):
+      print(f"{options.cmd}: mkdir {options.state_dirpath}")
+      with Pfx("mkdir(%r)", options.state_dirpath):
+        os.mkdir(options.state_dirpath, 0o777)
 
   @staticmethod
   def cmd_backup(argv, options):
