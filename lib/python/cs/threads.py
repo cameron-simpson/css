@@ -57,7 +57,7 @@ class State(thread_local):
 
           S = State(verbose=False)
 
-          with S(verbopse=True) as prev_attrs:
+          with S(verbose=True) as prev_attrs:
               if S.verbose:
                   print("verbose! (formerly verbose=%s)" % prev_attrs['verbose'])
   '''
