@@ -181,7 +181,6 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
-    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self, *a, **kw):
