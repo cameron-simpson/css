@@ -1424,7 +1424,6 @@ class NamedBackup(SingletonMixin):
               # because the file might change while we're mucking about
               backedup_hashcode, backedup_stat = R()
             except CancellationError:
-              ##warning("backup cancelled: %s", R.extra.pathname)
               ok = False
             except Exception as e:  # pylint: disable=broad-except
               exception("file backup fails: %s", e)
@@ -1468,6 +1467,8 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
+    if runstate.cancelled:
+      return None, None
     filename = joinpath(backup_root_dirpath, subpath)
     with backup_run.file_proxy() as proxy:
       proxy.prefix = subpath + ': '
@@ -1480,7 +1481,6 @@ class NamedBackup(SingletonMixin):
       public_key_name = backup_record.public_key_name
       with Pfx("backup_filename(%r)", filename):
         if runstate.cancelled:
-          ##warning("cancelled")
           return None, None
         # checksum the file contents
         with open(filename, 'rb') as f:
@@ -1495,7 +1495,6 @@ class NamedBackup(SingletonMixin):
             # can't mmap empty files, and in any case they're easy
             hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
             self.upload_hashcode_content(
                 backup_record, fd, hashcode, length=fstat.st_size
@@ -1505,7 +1504,6 @@ class NamedBackup(SingletonMixin):
           hashcode = DEFAULT_HASHCLASS.digester()
           mm = mmap(fd, fstat.st_size, prot=PROT_READ)
           if runstate.cancelled:
-            ##warning("cancelled")
             return None, None
           hasher.update(mm)
           hashcode = DEFAULT_HASHCLASS(hasher.digest())
@@ -1523,7 +1521,6 @@ class NamedBackup(SingletonMixin):
           # previous upload used a different key
           # check if the upload is keyed against the current key
           if runstate.cancelled:
-            ##warning("cancelled")
             return None, None
           _, key_subpath = upload_paths(
               basepath, public_key_name=public_key_name
@@ -1548,7 +1545,6 @@ class NamedBackup(SingletonMixin):
                   " from {private_key_name} to {public_key_name}..."
               )
               if runstate.cancelled:
-                ##warning("cancelled")
                 return None, None
               recrypt_passtext(
                   cloud,
@@ -1568,27 +1564,23 @@ class NamedBackup(SingletonMixin):
         # copy the file so that what we upload is stable
         # this includes a second hashcode pass, alas
         if runstate.cancelled:
-          ##warning("cancelled")
           return None, None
         proxy("prepare upload")
         with NamedTemporaryCopy(filename, progress=65536,
                                 progress_label="snapshot " + filename) as T:
           if runstate.cancelled:
-            ##warning("cancelled")
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
             mm = mmap(fd2, 0, prot=PROT_READ)
             hasher = DEFAULT_HASHCLASS.digester()
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
             hasher.update(mm)
             hashcode = DEFAULT_HASHCLASS(hasher.digest())
             # upload the content if not already uploaded
             # TODO: shared by hashcode set of locks
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
             P = Progress(name="crypt upload " + subpath, total=len(mm))
             with P.bar(proxy=proxy, label=''):
