@@ -120,7 +120,12 @@ class Cloud(ABC):
     '''
     module_name = __name__ + '.' + prefix
     class_name = prefix.upper() + 'Cloud'
-    return import_module_name(module_name, class_name)
+    try:
+      return import_module_name(module_name, class_name)
+    except (ModuleNotFoundError, ImportError) as e:
+      raise ValueError(
+          "no module %r for cloud service %r" % (module_name, prefix)
+      ) from e
 
   @abstractmethod
   def bucketpath(self, bucket_name, *, credentials=None):
