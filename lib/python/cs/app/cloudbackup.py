@@ -140,6 +140,7 @@ class CloudBackupCommand(BaseCommand):
   def apply_opts(opts, options):
     ''' Apply main command line options.
     '''
+    badopts = False
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-A':
@@ -164,15 +165,14 @@ class CloudBackupCommand(BaseCommand):
           options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
-    options.cloud_backup = CloudBackup(options.state_dirpath)
-    badopts = False
-    if not isdirpath(options.state_dirpath):
-      print(f"{options.cmd}: mkdir {options.state_dirpath}")
-      with Pfx("mkdir(%r)", options.state_dirpath):
-        os.mkdir(options.state_dirpath, 0o777)
+    try:
+      options.cloud_area
+    except ValueError as e:
+      warning("invalid cloud_area: %s: %s", options.cloud_area_path, e)
+      badopts = True
     if options.backup_name is None:
       warning("no backup_name specified")
-      print("The follow backup names exist:", file=sys.stderr)
+      print("The following backup names exist:", file=sys.stderr)
       for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
                                                     'backups'))):
         if is_identifier(backup_name):
@@ -185,6 +185,11 @@ class CloudBackupCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("bad options")
+    options.cloud_backup = CloudBackup(options.state_dirpath)
+    if not isdirpath(options.state_dirpath):
+      print(f"{options.cmd}: mkdir {options.state_dirpath}")
+      with Pfx("mkdir(%r)", options.state_dirpath):
+        os.mkdir(options.state_dirpath, 0o777)
 
   @staticmethod
   def cmd_backup(argv, options):
@@ -1337,7 +1342,15 @@ class NamedBackup(SingletonMixin):
             if name_backups is None:
               name_backups = FileBackupState(name=name, backups=[])
               dirstate.add_to_mapping(name_backups)
-            stat = dir_entry.stat(follow_symlinks=False)
+            try:
+              stat = dir_entry.stat(follow_symlinks=False)
+            except FileNotFoundError as e:
+              warning("skipped: %s", e)
+              continue
+            except OSError as e:
+              warning("skipped: %s", e)
+              ok = False
+              continue
             if dir_entry.is_symlink():
               try:
                 link = readlink(pathname)
@@ -1424,7 +1437,6 @@ class NamedBackup(SingletonMixin):
               # because the file might change while we're mucking about
               backedup_hashcode, backedup_stat = R()
             except CancellationError:
-              ##warning("backup cancelled: %s", R.extra.pathname)
               ok = False
             except Exception as e:  # pylint: disable=broad-except
               exception("file backup fails: %s", e)
@@ -1468,47 +1480,52 @@ class NamedBackup(SingletonMixin):
     '''
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
+    runstate = backup_run.runstate
+    if runstate.cancelled:
+      return None, None
     filename = joinpath(backup_root_dirpath, subpath)
-    with backup_run.file_proxy() as proxy:
-      proxy.prefix = subpath + ': '
-      proxy("check against previous backup")
-      backup_record = backup_run.backup_record
-      runstate = backup_run.runstate
-      cloud_backup = self.cloud_backup
-      cloud = backup_record.content_area.cloud
-      bucket_name = backup_record.content_area.bucket_name
-      public_key_name = backup_record.public_key_name
-      with Pfx("backup_filename(%r)", filename):
+    with Pfx("backup_filename(%r)", filename):
+      with backup_run.file_proxy() as proxy:
+        proxy.prefix = subpath + ': '
+        proxy("check against previous backup")
+        backup_record = backup_run.backup_record
+        cloud_backup = self.cloud_backup
+        cloud = backup_record.content_area.cloud
+        bucket_name = backup_record.content_area.bucket_name
+        public_key_name = backup_record.public_key_name
         if runstate.cancelled:
-          ##warning("cancelled")
           return None, None
         # checksum the file contents
-        with open(filename, 'rb') as f:
-          fd = f.fileno()
-          ##fd = os.open(filename, O_RDONLY)
-          fstat = os.fstat(fd)
-          if not S_ISREG(fstat.st_mode):
-            raise ValueError("not a regular file")
-          hasher = DEFAULT_HASHCLASS.digester()
-          if fstat.st_size == 0:
-            # TODO: why upload empty files at all? back to the "inline small files" issue
-            # can't mmap empty files, and in any case they're easy
-            hashcode = DEFAULT_HASHCLASS(DEFAULT_HASHCLASS.digester().digest())
+        try:
+          with open(filename, 'rb') as f:
+            fd = f.fileno()
+            ##fd = os.open(filename, O_RDONLY)
+            fstat = os.fstat(fd)
+            if not S_ISREG(fstat.st_mode):
+              raise ValueError("not a regular file")
+            hasher = DEFAULT_HASHCLASS.digester()
+            if fstat.st_size == 0:
+              # TODO: why upload empty files at all? back to the "inline small files" issue
+              # can't mmap empty files, and in any case they're easy
+              hashcode = DEFAULT_HASHCLASS(
+                  DEFAULT_HASHCLASS.digester().digest()
+              )
+              if runstate.cancelled:
+                return None, None
+              self.upload_hashcode_content(
+                  backup_record, fd, hashcode, length=fstat.st_size
+              )
+              return hashcode, fstat
+            # compute hashcode from file contents
+            hashcode = DEFAULT_HASHCLASS.digester()
+            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
-            self.upload_hashcode_content(
-                backup_record, fd, hashcode, length=fstat.st_size
-            )
-            return hashcode, fstat
-          # compute hashcode from file contents
-          hashcode = DEFAULT_HASHCLASS.digester()
-          mm = mmap(fd, fstat.st_size, prot=PROT_READ)
-          if runstate.cancelled:
-            ##warning("cancelled")
-            return None, None
-          hasher.update(mm)
-          hashcode = DEFAULT_HASHCLASS(hasher.digest())
+            hasher.update(mm)
+            hashcode = DEFAULT_HASHCLASS(hasher.digest())
+        except OSError as e:
+          warning("checksum: %s", e)
+          return None, None
         # compute some crypt-side upload paths
         basepath = self.hashcode_path(hashcode)
         # TODO: a check_uploaded flag?
@@ -1523,7 +1540,6 @@ class NamedBackup(SingletonMixin):
           # previous upload used a different key
           # check if the upload is keyed against the current key
           if runstate.cancelled:
-            ##warning("cancelled")
             return None, None
           _, key_subpath = upload_paths(
               basepath, public_key_name=public_key_name
@@ -1548,7 +1564,6 @@ class NamedBackup(SingletonMixin):
                   " from {private_key_name} to {public_key_name}..."
               )
               if runstate.cancelled:
-                ##warning("cancelled")
                 return None, None
               recrypt_passtext(
                   cloud,
@@ -1568,27 +1583,23 @@ class NamedBackup(SingletonMixin):
         # copy the file so that what we upload is stable
         # this includes a second hashcode pass, alas
         if runstate.cancelled:
-          ##warning("cancelled")
           return None, None
         proxy("prepare upload")
         with NamedTemporaryCopy(filename, progress=65536,
                                 progress_label="snapshot " + filename) as T:
           if runstate.cancelled:
-            ##warning("cancelled")
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
             mm = mmap(fd2, 0, prot=PROT_READ)
             hasher = DEFAULT_HASHCLASS.digester()
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
             hasher.update(mm)
             hashcode = DEFAULT_HASHCLASS(hasher.digest())
             # upload the content if not already uploaded
             # TODO: shared by hashcode set of locks
             if runstate.cancelled:
-              ##warning("cancelled")
               return None, None
             P = Progress(name="crypt upload " + subpath, total=len(mm))
             with P.bar(proxy=proxy, label=''):
