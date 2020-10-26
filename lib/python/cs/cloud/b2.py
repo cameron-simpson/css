@@ -131,10 +131,10 @@ class B2Cloud(SingletonMixin, Cloud):
     bucket = self.bucket_by_name(bucket_name)
     with self._conn_sem:
       versions = bucket.list_file_versions(path, fetch_count=1)
-    try:
-      version, = versions
-    except ValueError:
-      return None
+      try:
+        version, = versions
+      except ValueError:
+        return None
     return version.as_dict()
 
   def _b2_upload_bytes(
