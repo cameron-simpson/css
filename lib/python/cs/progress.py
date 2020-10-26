@@ -300,7 +300,9 @@ class BaseProgress(object):
     else:
       # how much room for an arrow? we would like:
       # "label: left arrow right"
-      arrow_width = width - len(left) - len(right) - len(label) - 4
+      arrow_width = width - len(left) - len(right) - len(label) - 2
+      if label:
+        arrow_width -= 2  # allow for ': ' separator after label
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
