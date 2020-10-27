@@ -305,8 +305,10 @@ class CloudBackupCommand(BaseCommand):
                 omit_fields=('uuid', 'root_path', 'timestamp_start')):
               print('   ', field, ':', value_s)
       return 0
-    all_backups = False
-    backup_uuid = None
+    backup_name = argv.pop(0)
+    if not is_identifier(backup_name):
+      warning("backup_name %r: not an identifier", backup_name)
+      badopts = True
     subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -318,19 +320,30 @@ class CloudBackupCommand(BaseCommand):
             badopts = True
     if badopts:
       raise GetoptError("bad invocation")
+    backup = cloud_backup[backup_name]
+    backups_by_uuid = backup.backup_records.by_uuid
+    if all_uuids:
+      backup_uuids = list(
+          map(lambda record: record.uuid, backup.sorted_backup_records())
+      )
+    else:
+      latest_backup = backup.latest_backup_record()
+      if not latest_backup:
+        warning("%s: no backups", backup_name)
+        return 1
+      backup_uuids = latest_backup.uuid,
     subpaths = list(
-        map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
+        map(lambda subpath: '' if subpath == '.' else subpath, subpaths)
     )
-    cloud_backup = options.cloud_backup
-    backup = cloud_backup[options.backup_name]
     for subpath in subpaths:
-      if subpath == ".":
-        subpath = ''
-      for subsubpath, details in backup.walk(subpath, backup_uuid=backup_uuid,
-                                             all_backups=all_backups):
+      for subsubpath, details in backup.walk(
+          subpath,
+          backup_uuid=(backup_uuids[0] if len(backup_uuids) == 1 else None),
+          all_backups=all_uuids,
+      ):
         for name, name_details in sorted(details.items()):
           pathname = joinpath(subsubpath, name) if subsubpath else name
-          if all_backups:
+          if all_uuids:
             print(pathname + ":")
             for backup in name_details.backups:
               print(" ", repr(backup))
@@ -1213,6 +1226,7 @@ class NamedBackup(SingletonMixin):
 
         If `all_backups` is false, the details are the name->backup_state
         associated with `backup_uuid`.
+
         The default `backup_uuid` is that of the latest recorded backup.
     '''
     if subpath:
