@@ -92,12 +92,6 @@ class CloudBackupCommand(BaseCommand):
                     use for operations. The default is from the
                     $CLOUDBACKUP_KEYNAME environment variable or from the
                     most recent existing key pair.
-      -n backup_name A named backup area, corresponding to a directory tree
-                    to be backed up.  The default is from the
-                    $CLOUDBACKUP_NAME environment variable.
-                    All the named areas usually share the cloud_area,
-                    providing file-level deduplication.  Backup and restore
-                    subpaths are relative to a named backup area.
   '''
 
   # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
@@ -134,7 +128,6 @@ class CloudBackupCommand(BaseCommand):
     options.job_max = DEFAULT_JOB_MAX
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
-    options.backup_name = os.environ.get('CLOUDBACKUP_NAME')
 
   @staticmethod
   def apply_opts(opts, options):
@@ -148,6 +141,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-d':
           options.state_dirpath = val
         elif opt == '-j':
+          # TODO: just save -j as job_max_s, validate below
           try:
             val = int(val)
           except ValueError as e:
@@ -161,27 +155,12 @@ class CloudBackupCommand(BaseCommand):
               options.job_max = val
         elif opt == '-k':
           options.key_name = val
-        elif opt == '-n':
-          options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
     try:
       options.cloud_area
     except ValueError as e:
-      warning("invalid cloud_area: %s: %s", options.cloud_area_path, e)
-      badopts = True
-    if options.backup_name is None:
-      warning("no backup_name specified")
-      print("The following backup names exist:", file=sys.stderr)
-      for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
-                                                    'backups'))):
-        if is_identifier(backup_name):
-          print(" ", backup_name, file=sys.stderr)
-      badopts = True
-    elif not is_identifier(options.backup_name):
-      warning(
-          "invalid backup name, not an identifier: %r", options.backup_name
-      )
+      warning("-A: invalid cloud_area: %s: %s", options.cloud_area_path, e)
       badopts = True
     if badopts:
       raise GetoptError("bad options")
@@ -193,7 +172,7 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} /path/to/backup_root [subpaths...]
+    ''' Usage: {cmd} backup_name:/path/to/backup_root [subpaths...]
           For each subpath, back up /path/to/backup_root/subpath into the
           named backup area. If no subpaths are specified, back up all of
           /path/to/backup_root.
@@ -203,15 +182,28 @@ class CloudBackupCommand(BaseCommand):
       warning("missing backup_root")
       badopts = True
     else:
-      backup_root_dirpath = argv.pop(0)
-      with Pfx("backup_root %r", backup_root_dirpath):
-        if not isabspath(backup_root_dirpath):
-          warning("backup_root not an absolute path")
-          badopts = True
+      backup_root_spec = argv.pop(0)
+      with Pfx("backup_name:backup_root %r", backup_root_spec):
+        try:
+          backup_name, backup_root_dirpath = backup_root_spec.split(':', 1)
+        except ValueError:
+          warning("missing backup_name")
+          print("The following backup names exist:", file=sys.stderr)
+          for backup_name in options.cloud_backup.keys():
+            print(" ", backup_name, file=sys.stderr)
         else:
-          if not isdirpath(backup_root_dirpath):
-            warning("not a directory")
-            badopts = True
+          with Pfx("backup_name %r", backup_name):
+            if not is_identifier(backup_name):
+              warning("not an identifier")
+              badopts = True
+          with Pfx("backup_root %r", backup_root_dirpath):
+            if not isabspath(backup_root_dirpath):
+              warning("backup_root not an absolute path")
+              badopts = True
+            else:
+              if not isdirpath(backup_root_dirpath):
+                warning("not a directory")
+                badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -245,66 +237,65 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {options.backup_name} "
+      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
           backup_root_dirpath,
           subpaths or ('',),
-          backup_name=options.backup_name,
+          backup_name=backup_name,
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    fields = set(backup.keys())
-    # print the important fields
-    for field in (
-        'uuid',
-        'backup_name',
-        'public_key_name',
-        'root_path',
-        'content_path',
-        'timestamp_start',
-        'timestamp_end',
-        'count_files_checked',
-        'count_files_changed',
-        'count_uploaded_files',
-        'count_uploaded_bytes',
-    ):
-      try:
-        value = backup[field]
-      except KeyError:
-        value_s = 'MSSING'
-      else:
-        try:
-          if field in ('count_uploaded_bytes',):
-            value_s = transcribe(
-                value, BINARY_BYTES_SCALE, max_parts=2, sep=' '
-            )
-          elif field.startswith('timestamp_'):
-            dt = datetime.fromtimestamp(value)
-            value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
-          else:
-            value_s = str(value)
-        except ValueError as e:
-          warning("cannot present field %r=%r: %s", field, value, e)
-          value_s = repr(value)
+    for field, value, value_s in backup.report():
       print(field, ':', value_s)
-      fields.discard(field)
-    # print remaining fields
-    for field in sorted(fields):
-      print(field, ':', backup[field])
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd} [subpaths...]
-          List the files in the backup.
+    ''' Usage: {cmd} [-l] [-u] [backup_name [subpaths...]]
+          Without a backup_name, list the named backups.
+          With a backup_name, list the files in the backup.
+          Options:
+            -l  Long mode - detailed listing.
+            -u  List backup UUIDs.
     '''
-    # TODO: list backup names if no backup_name
     # TODO: list backup_uuids?
     # TODO: -A: allbackups=True
     # TODO: -U backup_uuid
     badopts = False
+    cloud_backup = options.cloud_backup
+    opts, argv = getopt(argv, 'lu')
+    long_mode = False
+    show_backup_uuids = False
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-l':
+          long_mode = True
+        elif opt == '-u':
+          show_backup_uuids = True
+        else:
+          raise RuntimeError("unhandled option")
+    if not argv:
+      for backup_name in cloud_backup.keys():
+        print(backup_name)
+        backup = cloud_backup[backup_name]
+        if show_backup_uuids:
+          for backup_uuid, backup_record in backup.backup_records.by_uuid.items(
+          ):
+            # short form
+            print(
+                ' ',
+                datetime.fromtimestamp(backup_record.timestamp_start
+                                       ).isoformat(timespec='seconds'),
+                backup_uuid,
+                backup_record.root_path,
+            )
+            if long_mode:
+              for field, value, value_s in backup_record.report(
+                  omit_fields=('uuid', 'root_path', 'timestamp_start')):
+                print('   ', field, ':', value_s)
+      return 0
     all_backups = False
     backup_uuid = None
     subpaths = argv or ('',)
@@ -650,6 +641,14 @@ class CloudBackup:
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath, 0o700)
 
+  def keys(self):
+    ''' The existing backup names.
+    '''
+    return filter(
+        is_identifier,
+        sorted(os.listdir(joinpath(self.state_dirpath, 'backups')))
+    )
+
   def __getitem__(self, index):
     ''' Indexing by an identifier returns the associated `NamedBackup`.
     '''
@@ -854,6 +853,57 @@ class BackupRecord(UUIDedDict):
 
   def __exit__(self, exc_type, exc_value, exc_traceback):
     self.end()
+
+  def report(self, first_fields=None, omit_fields=None):
+    ''' Yield `(field,value,value_s)` for the fields of the backup record,
+        being the field name, its value
+        and its default human friendly representation as a `str`.
+    '''
+    if first_fields is None:
+      first_fields = (
+          'uuid',
+          'backup_name',
+          'public_key_name',
+          'root_path',
+          'content_path',
+          'timestamp_start',
+          'timestamp_end',
+          'count_files_checked',
+          'count_files_changed',
+          'count_uploaded_files',
+          'count_uploaded_bytes',
+      )
+    fields = set(self.keys())
+    report_fields = []
+    # start with the important fields in preferred order
+    for field in first_fields:
+      if field not in fields:
+        continue
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+      fields.remove(field)
+    for field in sorted(fields):
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+    for field in report_fields:
+      try:
+        value = self[field]
+      except KeyError:
+        continue
+      try:
+        if field.endswith('_bytes'):
+          value_s = transcribe(value, BINARY_BYTES_SCALE, max_parts=2, sep=' ')
+        elif field.startswith('timestamp_'):
+          dt = datetime.fromtimestamp(value)
+          value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
+        else:
+          value_s = str(value)
+      except ValueError as e:
+        warning("cannot present field %r=%r: %s", field, value, e)
+        value_s = repr(value)
+      yield field, value, value_s
 
 class BackupRun(RunStateMixin):
   ''' State management and display for a multithreaded backup run.
