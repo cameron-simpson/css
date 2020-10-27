@@ -79,7 +79,7 @@ class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
-  GETOPT_SPEC = 'A:d:j:k:n:'
+  GETOPT_SPEC = 'A:d:j:k:'
   USAGE_FORMAT = r'''Usage: {cmd} [options] subcommand [...]
     Encrypted cloud backup utility.
     Options:
