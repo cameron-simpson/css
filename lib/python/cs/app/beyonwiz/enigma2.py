@@ -143,7 +143,8 @@ class Enigma2(_Recording):
       except OSError as e:
         if e.errno == errno.ENOENT:
           warning("cannot open: %s", e)
-        raise
+        else:
+          raise
       except EOFError as e:
         warning("short file: %s", e)
 
