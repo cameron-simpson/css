@@ -1003,14 +1003,17 @@ class BackupRun(RunStateMixin):
         content_path=self.content_path,
     )
 
-    def interrupt(signum, frame):
-      ''' Receive interrupt, cancel the `RunState`.
+    def cancel_runstate(signum, frame):
+      ''' Receive signal, cancel the `RunState`.
       '''
       self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
-    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+    # TODO: keep all the rpevious handlers and restore them in __exit__
+    previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
+    signal.signal(signal.SIGTERM, cancel_runstate)
+    signal.signal(signal.SIGALRM, cancel_runstate)
     self._stacked.append(
         pushattrs(
             self,
