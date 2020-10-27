@@ -253,14 +253,49 @@ class CloudBackupCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd} [subpaths...]
-          List the files in the backup.
+    ''' Usage: {cmd} [-l] [-u] [backup_name [subpaths...]]
+          Without a backup_name, list the named backups.
+          With a backup_name, list the files in the backup.
+          Options:
+            -l  Long mode - detailed listing.
+            -u  List backup UUIDs.
     '''
-    # TODO: list backup names if no backup_name
     # TODO: list backup_uuids?
     # TODO: -A: allbackups=True
     # TODO: -U backup_uuid
     badopts = False
+    cloud_backup = options.cloud_backup
+    opts, argv = getopt(argv, 'lu')
+    long_mode = False
+    show_backup_uuids = False
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-l':
+          long_mode = True
+        elif opt == '-u':
+          show_backup_uuids = True
+        else:
+          raise RuntimeError("unhandled option")
+    if not argv:
+      for backup_name in cloud_backup.keys():
+        print(backup_name)
+        backup = cloud_backup[backup_name]
+        if show_backup_uuids:
+          for backup_uuid, backup_record in backup.backup_records.by_uuid.items(
+          ):
+            # short form
+            print(
+                ' ',
+                datetime.fromtimestamp(backup_record.timestamp_start
+                                       ).isoformat(timespec='seconds'),
+                backup_uuid,
+                backup_record.root_path,
+            )
+            if long_mode:
+              for field, value, value_s in backup_record.report(
+                  omit_fields=('uuid', 'root_path', 'timestamp_start')):
+                print('   ', field, ':', value_s)
+      return 0
     all_backups = False
     backup_uuid = None
     subpaths = argv or ('',)
