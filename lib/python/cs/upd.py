@@ -547,6 +547,10 @@ class Upd(SingletonMixin):
     txts = []
     with self._lock:
       slots = self._slot_text
+      if not slots:
+        self._backend.write(txt)
+        self._backend.write('\n')
+        return
       if len(txt) >= self.columns:
         # the line will overflow, force a complete redraw approach
         redraw = True
