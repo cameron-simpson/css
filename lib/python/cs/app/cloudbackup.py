@@ -247,44 +247,8 @@ class CloudBackupCommand(BaseCommand):
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    fields = set(backup.keys())
-    # print the important fields
-    for field in (
-        'uuid',
-        'backup_name',
-        'public_key_name',
-        'root_path',
-        'content_path',
-        'timestamp_start',
-        'timestamp_end',
-        'count_files_checked',
-        'count_files_changed',
-        'count_uploaded_files',
-        'count_uploaded_bytes',
-    ):
-      try:
-        value = backup[field]
-      except KeyError:
-        value_s = 'MSSING'
-      else:
-        try:
-          if field in ('count_uploaded_bytes',):
-            value_s = transcribe(
-                value, BINARY_BYTES_SCALE, max_parts=2, sep=' '
-            )
-          elif field.startswith('timestamp_'):
-            dt = datetime.fromtimestamp(value)
-            value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
-          else:
-            value_s = str(value)
-        except ValueError as e:
-          warning("cannot present field %r=%r: %s", field, value, e)
-          value_s = repr(value)
+    for field, value, value_s in backup.report():
       print(field, ':', value_s)
-      fields.discard(field)
-    # print remaining fields
-    for field in sorted(fields):
-      print(field, ':', backup[field])
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
@@ -854,6 +818,57 @@ class BackupRecord(UUIDedDict):
 
   def __exit__(self, exc_type, exc_value, exc_traceback):
     self.end()
+
+  def report(self, first_fields=None, omit_fields=None):
+    ''' Yield `(field,value,value_s)` for the fields of the backup record,
+        being the field name, its value
+        and its default human friendly representation as a `str`.
+    '''
+    if first_fields is None:
+      first_fields = (
+          'uuid',
+          'backup_name',
+          'public_key_name',
+          'root_path',
+          'content_path',
+          'timestamp_start',
+          'timestamp_end',
+          'count_files_checked',
+          'count_files_changed',
+          'count_uploaded_files',
+          'count_uploaded_bytes',
+      )
+    fields = set(self.keys())
+    report_fields = []
+    # start with the important fields in preferred order
+    for field in first_fields:
+      if field not in fields:
+        continue
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+      fields.remove(field)
+    for field in sorted(fields):
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+    for field in report_fields:
+      try:
+        value = self[field]
+      except KeyError:
+        continue
+      try:
+        if field.endswith('_bytes'):
+          value_s = transcribe(value, BINARY_BYTES_SCALE, max_parts=2, sep=' ')
+        elif field.startswith('timestamp_'):
+          dt = datetime.fromtimestamp(value)
+          value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
+        else:
+          value_s = str(value)
+      except ValueError as e:
+        warning("cannot present field %r=%r: %s", field, value, e)
+        value_s = repr(value)
+      yield field, value, value_s
 
 class BackupRun(RunStateMixin):
   ''' State management and display for a multithreaded backup run.
