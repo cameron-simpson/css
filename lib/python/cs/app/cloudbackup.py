@@ -650,6 +650,14 @@ class CloudBackup:
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath, 0o700)
 
+  def keys(self):
+    ''' The existing backup names.
+    '''
+    return filter(
+        is_identifier,
+        sorted(os.listdir(joinpath(self.state_dirpath, 'backups')))
+    )
+
   def __getitem__(self, index):
     ''' Indexing by an identifier returns the associated `NamedBackup`.
     '''
