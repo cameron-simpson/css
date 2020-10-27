@@ -141,6 +141,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-d':
           options.state_dirpath = val
         elif opt == '-j':
+          # TODO: just save -j as job_max_s, validate below
           try:
             val = int(val)
           except ValueError as e:
