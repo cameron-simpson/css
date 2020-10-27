@@ -79,7 +79,7 @@ class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
-  GETOPT_SPEC = 'A:d:j:k:n:'
+  GETOPT_SPEC = 'A:d:j:k:'
   USAGE_FORMAT = r'''Usage: {cmd} [options] subcommand [...]
     Encrypted cloud backup utility.
     Options:
@@ -1003,14 +1003,17 @@ class BackupRun(RunStateMixin):
         content_path=self.content_path,
     )
 
-    def interrupt(signum, frame):
-      ''' Receive interrupt, cancel the `RunState`.
+    def cancel_runstate(signum, frame):
+      ''' Receive signal, cancel the `RunState`.
       '''
       self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
-    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+    # TODO: keep all the rpevious handlers and restore them in __exit__
+    previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
+    signal.signal(signal.SIGTERM, cancel_runstate)
+    signal.signal(signal.SIGALRM, cancel_runstate)
     self._stacked.append(
         pushattrs(
             self,
@@ -1191,14 +1194,18 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # DirStates
 
-  @locked
   def dirstate(self, subpath: str):
     ''' Return the `DirState` for `subpath`.
     '''
     if subpath:
       validate_subpath(subpath)
     state = self._dirstates.get(subpath)
-    if state is None:
+    if state is not None:
+      return state
+    with self._lock:
+      state = self._dirstates.get(subpath)
+      if state is not None:
+        return state
       uu_sp = self.diruuids.by_subpath.get(subpath)
       if uu_sp:
         uu = uu_sp.uuid
@@ -1214,6 +1221,7 @@ class NamedBackup(SingletonMixin):
       )
       state.uuid = uu
       state.subpath = subpath
+      self._dirstates[subpath] = state
     return state
 
   # pylint: disable=too-many-branches
