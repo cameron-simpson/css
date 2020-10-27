@@ -92,12 +92,6 @@ class CloudBackupCommand(BaseCommand):
                     use for operations. The default is from the
                     $CLOUDBACKUP_KEYNAME environment variable or from the
                     most recent existing key pair.
-      -n backup_name A named backup area, corresponding to a directory tree
-                    to be backed up.  The default is from the
-                    $CLOUDBACKUP_NAME environment variable.
-                    All the named areas usually share the cloud_area,
-                    providing file-level deduplication.  Backup and restore
-                    subpaths are relative to a named backup area.
   '''
 
   # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
@@ -134,7 +128,6 @@ class CloudBackupCommand(BaseCommand):
     options.job_max = DEFAULT_JOB_MAX
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
-    options.backup_name = os.environ.get('CLOUDBACKUP_NAME')
 
   @staticmethod
   def apply_opts(opts, options):
@@ -161,27 +154,12 @@ class CloudBackupCommand(BaseCommand):
               options.job_max = val
         elif opt == '-k':
           options.key_name = val
-        elif opt == '-n':
-          options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
     try:
       options.cloud_area
     except ValueError as e:
-      warning("invalid cloud_area: %s: %s", options.cloud_area_path, e)
-      badopts = True
-    if options.backup_name is None:
-      warning("no backup_name specified")
-      print("The following backup names exist:", file=sys.stderr)
-      for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
-                                                    'backups'))):
-        if is_identifier(backup_name):
-          print(" ", backup_name, file=sys.stderr)
-      badopts = True
-    elif not is_identifier(options.backup_name):
-      warning(
-          "invalid backup name, not an identifier: %r", options.backup_name
-      )
+      warning("-A: invalid cloud_area: %s: %s", options.cloud_area_path, e)
       badopts = True
     if badopts:
       raise GetoptError("bad options")
@@ -193,7 +171,7 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} /path/to/backup_root [subpaths...]
+    ''' Usage: {cmd} backup_name:/path/to/backup_root [subpaths...]
           For each subpath, back up /path/to/backup_root/subpath into the
           named backup area. If no subpaths are specified, back up all of
           /path/to/backup_root.
@@ -203,15 +181,28 @@ class CloudBackupCommand(BaseCommand):
       warning("missing backup_root")
       badopts = True
     else:
-      backup_root_dirpath = argv.pop(0)
-      with Pfx("backup_root %r", backup_root_dirpath):
-        if not isabspath(backup_root_dirpath):
-          warning("backup_root not an absolute path")
-          badopts = True
+      backup_root_spec = argv.pop(0)
+      with Pfx("backup_name:backup_root %r", backup_root_spec):
+        try:
+          backup_name, backup_root_dirpath = backup_root_spec.split(':', 1)
+        except ValueError:
+          warning("missing backup_name")
+          print("The following backup names exist:", file=sys.stderr)
+          for backup_name in options.cloud_backup.keys():
+            print(" ", backup_name, file=sys.stderr)
         else:
-          if not isdirpath(backup_root_dirpath):
-            warning("not a directory")
-            badopts = True
+          with Pfx("backup_name %r", backup_name):
+            if not is_identifier(backup_name):
+              warning("not an identifier")
+              badopts = True
+          with Pfx("backup_root %r", backup_root_dirpath):
+            if not isabspath(backup_root_dirpath):
+              warning("backup_root not an absolute path")
+              badopts = True
+            else:
+              if not isdirpath(backup_root_dirpath):
+                warning("not a directory")
+                badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -245,13 +236,13 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {options.backup_name} "
+      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
           backup_root_dirpath,
           subpaths or ('',),
-          backup_name=options.backup_name,
+          backup_name=backup_name,
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
