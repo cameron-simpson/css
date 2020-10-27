@@ -253,51 +253,62 @@ class CloudBackupCommand(BaseCommand):
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd} [-l] [-u] [backup_name [subpaths...]]
+    ''' Usage: {cmd} [-A] [-l] [backup_name [subpaths...]]
           Without a backup_name, list the named backups.
           With a backup_name, list the files in the backup.
           Options:
+            -A  List all backup UUIDs.
             -l  Long mode - detailed listing.
-            -u  List backup UUIDs.
     '''
     # TODO: list backup_uuids?
-    # TODO: -A: allbackups=True
     # TODO: -U backup_uuid
     badopts = False
-    cloud_backup = options.cloud_backup
-    opts, argv = getopt(argv, 'lu')
+    all_uuids = False
     long_mode = False
-    show_backup_uuids = False
+    opts, argv = getopt(argv, 'Al')
     for opt, val in opts:
       with Pfx(opt):
-        if opt == '-l':
+        if opt == '-A':
+          all_uuids = True
+        elif opt == '-l':
           long_mode = True
-        elif opt == '-u':
-          show_backup_uuids = True
         else:
           raise RuntimeError("unhandled option")
+    cloud_backup = options.cloud_backup
     if not argv:
       for backup_name in cloud_backup.keys():
         print(backup_name)
         backup = cloud_backup[backup_name]
-        if show_backup_uuids:
-          for backup_uuid, backup_record in backup.backup_records.by_uuid.items(
-          ):
-            # short form
-            print(
-                ' ',
-                datetime.fromtimestamp(backup_record.timestamp_start
-                                       ).isoformat(timespec='seconds'),
-                backup_uuid,
-                backup_record.root_path,
-            )
-            if long_mode:
-              for field, value, value_s in backup_record.report(
-                  omit_fields=('uuid', 'root_path', 'timestamp_start')):
-                print('   ', field, ':', value_s)
+        backups_by_uuid = backup.backup_records.by_uuid
+        if all_uuids:
+          backup_uuids = map(
+              lambda record: record.uuid, backup.sorted_backup_records()
+          )
+        else:
+          latest_backup = backup.latest_backup_record()
+          if not latest_backup:
+            warning("%s: no backups", backup.name)
+            return 1
+          backup_uuids = latest_backup.uuid,
+        for backup_uuid in backup_uuids:
+          backup_record = backups_by_uuid[backup_uuid]
+          # short form
+          print(
+              ' ',
+              datetime.fromtimestamp(backup_record.timestamp_start
+                                     ).isoformat(timespec='seconds'),
+              backup_uuid,
+              backup_record.root_path,
+          )
+          if long_mode:
+            for field, value, value_s in backup_record.report(
+                omit_fields=('uuid', 'root_path', 'timestamp_start')):
+              print('   ', field, ':', value_s)
       return 0
-    all_backups = False
-    backup_uuid = None
+    backup_name = argv.pop(0)
+    if not is_identifier(backup_name):
+      warning("backup_name %r: not an identifier", backup_name)
+      badopts = True
     subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -309,19 +320,30 @@ class CloudBackupCommand(BaseCommand):
             badopts = True
     if badopts:
       raise GetoptError("bad invocation")
+    backup = cloud_backup[backup_name]
+    backups_by_uuid = backup.backup_records.by_uuid
+    if all_uuids:
+      backup_uuids = list(
+          map(lambda record: record.uuid, backup.sorted_backup_records())
+      )
+    else:
+      latest_backup = backup.latest_backup_record()
+      if not latest_backup:
+        warning("%s: no backups", backup_name)
+        return 1
+      backup_uuids = latest_backup.uuid,
     subpaths = list(
-        map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
+        map(lambda subpath: '' if subpath == '.' else subpath, subpaths)
     )
-    cloud_backup = options.cloud_backup
-    backup = cloud_backup[options.backup_name]
     for subpath in subpaths:
-      if subpath == ".":
-        subpath = ''
-      for subsubpath, details in backup.walk(subpath, backup_uuid=backup_uuid,
-                                             all_backups=all_backups):
+      for subsubpath, details in backup.walk(
+          subpath,
+          backup_uuid=(backup_uuids[0] if len(backup_uuids) == 1 else None),
+          all_backups=all_uuids,
+      ):
         for name, name_details in sorted(details.items()):
           pathname = joinpath(subsubpath, name) if subsubpath else name
-          if all_backups:
+          if all_uuids:
             print(pathname + ":")
             for backup in name_details.backups:
               print(" ", repr(backup))
@@ -1135,16 +1157,30 @@ class NamedBackup(SingletonMixin):
     )
     return path
 
-  def latest_backup_record(self):
-    ''' Return the latest completed backup record.
+  def sorted_backup_records(self, key=None, reverse=False):
+    ''' Return the `BackupRecord`s for this `NamedBackup`
+        sorted by `key` and `reverse` as for the `sorted` builtin function.
+        If `key` is a `str` the key function
+        will access that field of the record.
+        The default sort key is `'timestamp_start'`.
     '''
-    backup_records = list(self.backup_records.by_uuid.values())
-    if not backup_records:
-      return None
-    return max(
-        self.backup_records.by_uuid.values(),
-        key=lambda backup_record: backup_record.get('timestamp_end') or 0
+    if key is None:
+      key = 'timestamp_start'
+    if isinstance(key, str):
+      field = key
+      key = lambda backup_record: backup_record[field]
+    return sorted(
+        self.backup_records.by_uuid.values(), key=key, reverse=reverse
     )
+
+  def latest_backup_record(self):
+    ''' Return the latest `BackupRecord` by `.timestamp_start`
+        or `None` if there are no records.
+    '''
+    records = self.sorted_backup_records()
+    if not records:
+      return None
+    return records[-1]
 
   @typechecked
   def add_backup_record(self, backup_record: BackupRecord):
@@ -1190,6 +1226,7 @@ class NamedBackup(SingletonMixin):
 
         If `all_backups` is false, the details are the name->backup_state
         associated with `backup_uuid`.
+
         The default `backup_uuid` is that of the latest recorded backup.
     '''
     if subpath:
