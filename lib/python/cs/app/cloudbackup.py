@@ -1191,14 +1191,18 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # DirStates
 
-  @locked
   def dirstate(self, subpath: str):
     ''' Return the `DirState` for `subpath`.
     '''
     if subpath:
       validate_subpath(subpath)
     state = self._dirstates.get(subpath)
-    if state is None:
+    if state is not None:
+      return state
+    with self._lock:
+      state = self._dirstates.get(subpath)
+      if state is not None:
+        return state
       uu_sp = self.diruuids.by_subpath.get(subpath)
       if uu_sp:
         uu = uu_sp.uuid
@@ -1214,6 +1218,7 @@ class NamedBackup(SingletonMixin):
       )
       state.uuid = uu
       state.subpath = subpath
+      self._dirstates[subpath] = state
     return state
 
   # pylint: disable=too-many-branches
