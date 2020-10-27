@@ -4,17 +4,20 @@
 '''
 
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 import logging
 from threading import local as thread_local
-from sqlalchemy import Column, DateTime, Integer
+from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
-import sqlalchemy.sql.functions as func
 from icontract import require
 from cs.context import stackattrs
-from cs.deco import decorator
+from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
+from cs.threads import State
+
+__version__ = '20201025-post'
 
 DISTINFO = {
     'description':
@@ -34,24 +37,7 @@ DISTINFO = {
     ],
 }
 
-# TODO: have a cs.threads.ThreadState superclass with __call__ etc
-class _State(thread_local):
-  ''' Shared per-thread state.
-  '''
-
-  def __init__(self):
-    self.orm = None
-    self.session = None
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling the shared state returns a context manager
-        pushing the supplied keyword arguments as state attribute values.
-    '''
-    with stackattrs(self, **kw):
-      yield
-
-_state = _State()
+_state = State()
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
@@ -62,6 +48,48 @@ def with_orm(function, *a, orm=None, **kw):
       raise RuntimeError("no ORM supplied and no _state.orm")
   with _state(orm=orm):
     return function(*a, orm=orm, **kw)
+
+@contextmanager
+def using_session(orm=None, session=None):
+  ''' A context manager to prepare an SQLAlchemy session
+      for use by a suite.
+
+      Parameters:
+      * `orm`: optional reference ORM,
+        an object with a `.session()` method for creating a new session.
+        Default: if needed, obtained from the global `_state.orm`.
+      * `session`: optional existing session.
+        Default: the global `_state.session` if not `None`,
+        otherwise created by `orm.session()`.
+
+      If a new session is created, the new session and reference ORM
+      are pushed onto the globals `_state.session` and `_state.orm`
+      respectively.
+
+      If an existing session is reused,
+      the suite runs within a savepoint from `session.begin_nested()`.
+  '''
+  # use the shared state session if no session is supplied
+  if session is None:
+    session = _state.session
+  # we have a session, push to the global context
+  if session is not None:
+    with _state(session=session):
+      yield session
+  else:
+    # no session, we need to create one
+    if orm is None:
+      # use the shared state ORM if no orm is supplied
+      orm = _state.orm
+      if orm is None:
+        raise ValueError(
+            "no orm supplied from which to make a session,"
+            " and no shared state orm"
+        )
+    # create a new session and run the function within it
+    with orm.session() as new_session:
+      with _state(orm=orm, session=new_session):
+        yield new_session
 
 def with_session(function, *a, orm=None, session=None, **kw):
   ''' Call `function(*a,session=session,**kw)`, creating a session if required.
@@ -88,28 +116,8 @@ def with_session(function, *a, orm=None, session=None, **kw):
       The `session` is also passed to `function` as
       the keyword parameter `session` to support nested calls.
   '''
-  # use the shared state session if no session is supplied
-  if session is None:
-    session = _state.session
-  # we have a session, run the function inside a nested transaction
-  if session is not None:
-    with _state(session=session):
-      # run the function inside a savepoint in the supplied session
-      with session.begin_nested():
-        return function(*a, session=session, **kw)
-  # no session, we need to create one
-  if orm is None:
-    # use the shared state ORM if no orm is supplied
-    orm = _state.orm
-    if orm is None:
-      raise ValueError(
-          "no orm supplied from which to make a session,"
-          " and no shared state orm"
-      )
-  # create a new session and run the function within it
-  with orm.session() as new_session:
-    with _state(orm=orm, session=new_session):
-      return function(*a, session=new_session, **kw)
+  with using_session(orm=orm, session=session):
+    return function(*a, **kw)
 
 def auto_session(function):
   ''' Decorator to run a function in a session if one is not presupplied.
@@ -119,28 +127,35 @@ def auto_session(function):
       See `with_session` for details.
   '''
 
-  def wrapper(*a, orm=None, session=None, **kw):
-    ''' Call the function with a session.
+  if isgeneratorfunction(function):
 
-        If no session is supplied
-        and the shared per-thread state does not have an active session,
-        prepare a new session for the function
-        using `with_session()`.
-    '''
-    return with_session(function, *a, orm=orm, session=session, **kw)
+    def wrapper(*a, orm=None, session=None, **kw):
+      ''' Yield from the function with a session.
+      '''
+      with using_session(orm=orm, session=session) as active_session:
+        yield from function(*a, session=active_session, **kw)
+  else:
+
+    def wrapper(*a, orm=None, session=None, **kw):
+      ''' Call the function with a session.
+      '''
+      with using_session(orm=orm, session=session) as active_session:
+        return function(*a, session=active_session, **kw)
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
   wrapper.__doc__ = function.__doc__
   wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
-@contextmanager
-def push_log_level(level):
+@contextdecorator
+def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
       Yields the logger.
 
       *NOTE*: this is not MT safe - competing Threads can mix log levels up.
   '''
+  if level is None:
+    level = logging.DEBUG
   logger = logging.getLogger('sqlalchemy.engine')
   old_level = logger.level
   logger.setLevel(level)
@@ -148,22 +163,6 @@ def push_log_level(level):
     yield logger
   finally:
     logger.setLevel(old_level)
-
-@decorator
-def log_level(function, level=None):
-  ''' Decorator to run `function` at the specified logging `level`, default `logging.DEBUG`.
-  '''
-  if level is None:
-    level = logging.DEBUG
-
-  def wrapper(*a, **kw):
-    ''' Push the desired log level and run the function.
-    '''
-    with push_log_level(level):
-      return function(*a, **kw)
-
-  wrapper.__name__ = "@log_level(%s,%s)" % (function, level)
-  return wrapper
 
 class ORM(MultiOpenMixin):
   ''' A convenience base class for an ORM class.
@@ -183,7 +182,6 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
-    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self, *a, **kw):
@@ -193,14 +191,15 @@ class ORM(MultiOpenMixin):
     '''
     with self:
       new_session = self.Session(*a, **kw)
-      try:
-        yield new_session
-        new_session.commit()
-      except:
-        new_session.rollback()
-        raise
-      finally:
-        new_session.close()
+      with using_session(orm=self, session=new_session):
+        try:
+          yield new_session
+          new_session.commit()
+        except:
+          new_session.rollback()
+          raise
+        finally:
+          new_session.close()
 
   @staticmethod
   def auto_session(method):
@@ -210,10 +209,20 @@ class ORM(MultiOpenMixin):
         See `with_session` for details.
     '''
 
-    def wrapper(self, *a, session=None, **kw):
-      ''' Prepare a session if one is not supplied.
-      '''
-      return with_session(method, self, *a, session=session, orm=self, **kw)
+    if isgeneratorfunction(method):
+
+      def wrapper(self, *a, session=None, **kw):
+        ''' Prepare a session if one is not supplied.
+        '''
+        with using_session(session=session, orm=self):
+          yield from method(self, *a, session=session, **kw)
+    else:
+
+      def wrapper(self, *a, session=None, **kw):
+        ''' Prepare a session if one is not supplied.
+        '''
+        with using_session(session=session, orm=self):
+          return method(self, *a, session=session, **kw)
 
     wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
     wrapper.__doc__ = method.__doc__
@@ -226,11 +235,20 @@ class ORM(MultiOpenMixin):
         to set the shared state `orm` to `self`.
     '''
 
-    def wrapper(self, *a, **kw):
-      ''' Call `method` with its ORM as the shared state `orm`.
-      '''
-      with _state(orm=self):
-        return method(self, *a, **kw)
+    if isgeneratorfunction(method):
+
+      def wrapper(self, *a, **kw):
+        ''' Call `method` with its ORM as the shared state `orm`.
+        '''
+        with _state(orm=self):
+          yield from method(self, *a, **kw)
+    else:
+
+      def wrapper(self, *a, **kw):
+        ''' Call `method` with its ORM as the shared state `orm`.
+        '''
+        with _state(orm=self):
+          return method(self, *a, **kw)
 
     wrapper.__name__ = method.__name__
     wrapper.__doc__ = method.__doc__
@@ -246,10 +264,20 @@ def orm_auto_session(method):
       See `with_session` for details.
   '''
 
-  def wrapper(self, *a, session=None, **kw):
-    ''' Prepare a session if one is not supplied.
-    '''
-    return with_session(method, self, *a, session=session, orm=self.orm, **kw)
+  if isgeneratorfunction(method):
+
+    def wrapper(self, *a, session=None, **kw):
+      ''' Yield from the method with a session.
+      '''
+      with using_session(orm=self.orm, session=session) as active_session:
+        yield from method(self, *a, session=active_session, **kw)
+  else:
+
+    def wrapper(self, *a, session=None, **kw):
+      ''' Call the method with a session.
+      '''
+      with using_session(orm=self.orm, session=session) as active_session:
+        return method(self, *a, session=active_session, **kw)
 
   wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
   wrapper.__doc__ = method.__doc__
@@ -285,6 +313,7 @@ class BasicTableMixin:
       ))
     return row
 
+# pylint: disable=too-few-public-methods
 class HasIdMixin:
   ''' Include an "id" `Column` as the primary key.
   '''

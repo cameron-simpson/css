@@ -9,11 +9,12 @@
 set -ue
 
 : ${MAILHOMEHOST:=}
-: ${MAILDIR:=$HOME/mail}
+: ${MAILDIR:="$HOME/mail"}
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
 : ${MAIL_IMAPSYNC:=}
-: ${MAILBOX:=INBOX}
-: ${SENDMESG_FCC:=spool-out}
+: ${MAILBOX:='INBOX'}
+: ${MUTTEDIT_EDITOR:='vim-flowed'}
+: ${SENDMESG_FCC:='spool-out'}
 export SENDMESG_FCC
 
 cmd=`basename "$0"`

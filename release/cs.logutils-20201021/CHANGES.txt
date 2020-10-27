@@ -1,0 +1,9 @@
+lib/python/cs/logutils.py: Release information for cs.logutils-20200729.
+lib/python/cs/logutils.py: cs.logutils: docstring updates
+lib/python/cs/logutils.py: cs.logutils,cs.pfx: exception(): plumb keyword arguments
+lib/python/cs/logutils.py: merge testing ==> default: assorted fixes
+lib/python/cs/logutils.py: cs.loginfo: setup_logging: always provide loginfo.upd, being either main_handler.upd if upd_mode otherwise Upd()
+lib/python/cs/logutils.py: cs.logutils: simplistic hack to only add a log handler the first time setup_logging is called
+lib/python/cs/logutils.py: cs.logutils: docstring tweak
+lib/python/cs/logutils.py: cs.logutils: clean some lint
+lib/python/cs/logutils.py: cs.logutils: restore dropped import

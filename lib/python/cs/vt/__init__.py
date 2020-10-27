@@ -22,7 +22,7 @@
 
     These are logically disconnected.
     Dirents are not associated with particular Stores;
-    it is it sufficient to have access to any Store
+    it is sufficient to have access to any Store
     containing the required blocks.
 
     The other common entity is the Archive,
@@ -42,8 +42,9 @@
 import os
 import tempfile
 import threading
+from types import SimpleNamespace as NS
 from cs.logutils import error, warning
-from cs.progress import Progress
+from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
@@ -107,10 +108,9 @@ DEFAULT_BASEDIR = '~/.local/share/vt'
 
 DEFAULT_CONFIG_PATH = '~/.vtrc'
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
         'basedir': DEFAULT_BASEDIR,
-        'blockmapdir': '[default]/blockmaps',
     },
     'default': {
         'type': 'datadir',
@@ -158,9 +158,19 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-# some shared default state
-_common_progress = Progress(name="cs.vt._common_progress")
-_common_runstate = RunState("cs.vt._common_runstate")
+_progress = Progress(name="cs.vt.common.progress"),
+_over_progress = OverProgress(name="cs.vt.common.over_progress")
+
+# some shared default state, Thread independent
+common = NS(
+    progress=_progress,
+    over_progress=_over_progress,
+    runstate=RunState("cs.vt.common.runstate"),
+    config=None
+)
+
+del _progress
+del _over_progress
 
 class _Defaults(threading.local):
   ''' Per-thread default context stack.
@@ -176,11 +186,19 @@ class _Defaults(threading.local):
 
   def __init__(self):
     threading.local.__init__(self)
-    self.progress = _common_progress
-    self.runstate = _common_runstate
+    self.progress = common.progress
+    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
     self.Ss = []
+
+  @property
+  def config(self):
+    cfg = common.config
+    if not cfg:
+      from .config import Config
+      cfg = Config()
+    return cfg
 
   def _fallback(self, key):
     ''' Fallback function for empty stack.
