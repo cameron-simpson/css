@@ -272,7 +272,8 @@ class BaseProgress(object):
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
     from cs.upd import print
-    left = ''
+    leftv = []
+    rightv = []
     remaining = self.remaining_time
     if remaining:
       remaining = int(remaining)
@@ -280,25 +281,28 @@ class BaseProgress(object):
     if throughput is not None:
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
-          left = 'idle'
-          return left
-        left = 'stalled'
+          return 'idle'
+        rightv.append('stalled')
       else:
         if throughput >= 10:
           throughput = int(throughput)
-        left = self.format_counter(throughput, max_parts=1) + '/s'
+        rightv.append(self.format_counter(throughput, max_parts=1) + '/s')
     if self.total is not None and self.total > 0:
-      left += ' ' + self.text_pos_of_total()
+      leftv.append(self.text_pos_of_total())
     if remaining is None:
-      right = 'ETA ??'
+      rightv.append('ETA ??')
     else:
-      right = 'ETA ' + transcribe_time(remaining)
+      rightv.append('ETA ' + transcribe_time(remaining))
+    left = ' '.join(leftv)
+    right = ' '.join(rightv)
     if self.total is None:
       arrow_field = ' '
     else:
       # how much room for an arrow? we would like:
       # "label: left arrow right"
-      arrow_width = width - len(left) - len(right) - len(label) - 4
+      arrow_width = width - len(left) - len(right) - len(label) - 2
+      if label:
+        arrow_width -= 2  # allow for ': ' separator after label
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'

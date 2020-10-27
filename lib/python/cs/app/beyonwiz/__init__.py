@@ -233,9 +233,9 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Find an available unused pathname based on `path`.
         Raises ValueError in none is available.
     '''
-    pfx, ext = os.path.splitext(path)
+    basis, ext = os.path.splitext(path)
     for i in range(max_n):
-      path2 = "%s--%d%s" % (pfx, i + 1, ext)
+      path2 = "%s--%d%s" % (basis, i + 1, ext)
       if not os.path.exists(path2):
         return path2
     raise ValueError(

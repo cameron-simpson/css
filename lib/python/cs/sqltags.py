@@ -23,7 +23,6 @@ import os
 from os.path import abspath, expanduser, exists as existspath
 import re
 import sys
-import threading
 from threading import RLock
 import time
 from icontract import require
@@ -51,7 +50,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TaggedEntity
 )
-from cs.threads import locked
+from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
@@ -66,7 +65,7 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
         'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
-        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads', 'icontract',
+        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025', 'icontract',
         'sqlalchemy', 'typeguard'
     ],
 }
@@ -87,16 +86,7 @@ def main(argv=None):
   '''
   return SQLTagsCommand().run(argv)
 
-class _State(threading.local):
-  ''' Per-thread default context stack.
-  '''
-
-  def __init__(self, **kw):
-    threading.local.__init__(self)
-    for k, v in kw.items():
-      setattr(self, k, v)
-
-state = _State(verbose=sys.stderr.isatty())
+state = State(verbose=sys.stderr.isatty())
 
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
