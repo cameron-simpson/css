@@ -1381,7 +1381,7 @@ class NamedBackup(SingletonMixin):
           base_backups = FileBackupState(name=base, backups=[])
         record = None
         for backup in base_backups.backups:
-          if backup['uuid'] == backup_uuid_s:
+          if backup.uuid == backup_uuid:
             record = backup
             break
         if record is None:
@@ -1844,9 +1844,7 @@ class FileBackupState(UUIDedDict):
   def _new_backup(self, backup_uuid: UUID, stat):
     ''' Prepare a shiny new file state.
     '''
-    backup_uuid_s = str(backup_uuid)
-    assert backup_uuid_s not in self.backups
-    backup_state = UUIDedDict(uuid=backup_uuid_s, st_mode=stat.st_mode)
+    backup_state = UUIDedDict(uuid=backup_uuid, st_mode=stat.st_mode)
     if S_ISREG(stat.st_mode):
       backup_state.update(st_mtime=stat.st_mtime, st_size=stat.st_size)
     self.backups.insert(0, backup_state)
