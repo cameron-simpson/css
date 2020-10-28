@@ -1,4 +1,6 @@
 #!/usr/bin/python -tt
+#
+# pylint: disable=too-many-lines
 
 ''' Facilities for mappings and objects associated with mappings.
 
@@ -16,9 +18,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import json
-from os.path import exists as existspath, isfile as isfilepath
 import re
-from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
@@ -115,6 +115,7 @@ def named_row_tuple(*column_names, **kw):
 
   _NamedRow = namedtuple(class_name, attributes)
 
+  # pylint: disable=too-few-public-methods
   class NamedRow(_NamedRow, mixin):
     ''' A namedtuple to store row data.
 
@@ -205,6 +206,7 @@ def named_row_tuple(*column_names, **kw):
 #
 _nct_Context = namedtuple('Context', 'cls index previous')
 
+# pylint: disable=too-many-arguments
 def named_column_tuples(
     rows,
     class_name=None,
@@ -332,6 +334,7 @@ def named_column_tuples(
   cls = next(gen)
   return cls, gen
 
+# pylint: disable=too-many-arguments
 def _named_column_tuples(
     rows,
     class_name=None,
