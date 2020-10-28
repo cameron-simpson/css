@@ -1752,6 +1752,20 @@ class FileBackupState(UUIDedDict):
         of the content hashcode
   '''
 
+  def __init__(self, **kw):
+    super().__init__(**kw)
+    try:
+      backups = self['backups']
+    except KeyError:
+      pass
+    else:
+      backups[:] = map(
+          lambda record:
+          (record if isinstance(record, UUIDedDict) else UUIDedDict(**record)),
+          backups
+      )
+      print("backups => %r", backups)
+
   @typechecked
   def _new_backup(self, backup_uuid: UUID, stat):
     ''' Prepare a shiny new file state.
