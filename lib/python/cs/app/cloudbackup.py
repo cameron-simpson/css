@@ -1418,6 +1418,10 @@ class NamedBackup(SingletonMixin):
     Rs = []
     L = backup_run.folder_later
     runstate = backup_run.runstate
+    if topsubpath:
+      self.attach_subpath(
+          backup_root_dirpath, topsubpath, backup_uuid=backup_run.backup_uuid
+      )
     for dirpath, dirnames, _ in os.walk(topdirpath):
       if runstate.cancelled:
         break
@@ -1466,11 +1470,6 @@ class NamedBackup(SingletonMixin):
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = subpath + ': '
-        if subpath:
-          proxy("attach")
-          self.attach_subpath(
-              backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
-          )
         with Pfx("scandir"):
           proxy("scandir")
           try:
