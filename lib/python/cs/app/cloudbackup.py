@@ -1637,6 +1637,16 @@ class NamedBackup(SingletonMixin):
                 )
                 dirstate.add_to_mapping(name_backups, exists_ok=True)
 
+        if dirstate.scan_mapping_length >= 3 * len(dirstate):
+          with Pfx(
+              "rewrite %s: len=%d and scan_mapping_length=%d",
+              dirstate,
+              len(dirstate),
+              dirstate.scan_mapping_length,
+          ):
+            print("rewrite", dirstate)
+            dirstate.rewrite_mapping()
+
         proxy('')
       return ok
 
