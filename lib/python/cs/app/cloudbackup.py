@@ -1369,7 +1369,6 @@ class NamedBackup(SingletonMixin):
         subpaths of a larger area.
     '''
     validate_subpath(subpath)
-    backup_uuid_s = str(backup_uuid)
     while subpath:
       with Pfx(subpath):
         base = basename(subpath)
