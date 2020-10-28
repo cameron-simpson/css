@@ -1838,6 +1838,24 @@ class FileBackupState(UUIDedDict):
           backups
       )
 
+  @pfx_method
+  def _clean_backups(self):
+    ''' Remove repeated backup entries (cruft from old bugs I hope).
+    '''
+    cleaned = []
+    seen_uuids = set()
+    for backup in self.backups:
+      backup_uuid = backup.uuid
+      if not isinstance(backup_uuid, UUID):
+        warning("not a UUID: backup_uuid %r", backup_uuid)
+      if backup_uuid in seen_uuids:
+        warning("discard repeated entry for backup_uuid %r", backup.uuid)
+        continue
+      cleaned.append(backup)
+      seen_uuids.add(backup_uuid)
+    self.backups[:] = cleaned
+
+  @pfx_method
   @typechecked
   def _new_backup(self, backup_uuid: UUID, stat):
     ''' Prepare a shiny new file state.
