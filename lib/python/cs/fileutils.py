@@ -321,7 +321,8 @@ def rewrite_cmgr(filepath, mode='w', **kw):
   '''
   with NamedTemporaryFile(mode=mode) as T:
     yield T
-    return rewrite(filepath, mode=mode, **kw)
+    with open(T.name, 'rb') as f:
+      return rewrite(filepath, mode='wb', data=f, **kw)
 
 @strable
 def scan_ndjson(f, dictclass=dict):
