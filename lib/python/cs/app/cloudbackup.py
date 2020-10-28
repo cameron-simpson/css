@@ -250,6 +250,39 @@ class CloudBackupCommand(BaseCommand):
     for field, value, value_s in backup.report():
       print(field, ':', value_s)
 
+  @staticmethod
+  def cmd_dirstate(argv, options):
+    ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }}
+          Do stuff with dirstate NDJSON files.
+    '''
+    if not argv:
+      raise GetoptError("missing pathname or backup_name")
+    if isabspath(argv[0]):
+      uu = None
+      subpath = None
+      dirstate_path = argv.pop(0)
+    else:
+      backup_name = argv.pop(0)
+      if not argv:
+        raise GetoptError("missing subpath")
+      subpath = argv.pop(0)
+      if subpath == '.':
+        subpath = ''
+      elif subpath:
+        validate_subpath(subpath)
+      if argv:
+        raise GetoptError("extra arguments after subpath: %r" % (argv,))
+      backup = options.cloud_backup[backup_name]
+      uu, dirstate_path = backup.dirstate_uuid_pathname(subpath)
+      print('subpath', subpath, '=>', uu)
+    print(dirstate_path)
+    state = NamedBackup.dirstate_from_pathname(
+        dirstate_path, uuid=uu, subpath=subpath
+    )
+    print(state)
+    for record in state.scan_mapping():
+      print(record)
+
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
