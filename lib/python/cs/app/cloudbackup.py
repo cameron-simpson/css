@@ -1469,9 +1469,9 @@ class NamedBackup(SingletonMixin):
                 ##print("CHANGED (previous not a file)", pathname)
                 changed = True
               else:
-                prev_mode = prevstate['st_mode']
-                prev_mtime = prevstate['st_mtime']
-                prev_size = prevstate['st_size']
+                prev_mode = prevstate.st_mode
+                prev_mtime = prevstate.st_mtime
+                prev_size = prevstate.st_size
                 if not S_ISREG(prev_mode):
                   ##print("CHANGED (not regular file)", pathname)
                   changed = True
@@ -1481,7 +1481,7 @@ class NamedBackup(SingletonMixin):
                     ##print("CHANGED (changed size/mtime)", pathname)
                     changed = True
                   else:
-                    prev_backup_uuid = UUID(prevstate['uuid'])
+                    prev_backup_uuid = prevstate.uuid
                     prev_backup_record = backup_records_by_uuid.get(
                         prev_backup_uuid
                     )
@@ -1513,7 +1513,7 @@ class NamedBackup(SingletonMixin):
                 name_backups.add_regular_file(
                     backup_uuid=backup_uuid,
                     stat=stat,
-                    hashcode=prevstate['hashcode']
+                    hashcode=prevstate.hashcode
                 )
             else:
               warning("unsupported type st_mode=%o", stat.st_mode)
@@ -1764,7 +1764,6 @@ class FileBackupState(UUIDedDict):
           (record if isinstance(record, UUIDedDict) else UUIDedDict(**record)),
           backups
       )
-      print("backups => %r", backups)
 
   @typechecked
   def _new_backup(self, backup_uuid: UUID, stat):
