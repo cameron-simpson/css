@@ -247,7 +247,7 @@ class CloudBackupCommand(BaseCommand):
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    for field, value, value_s in backup.report():
+    for field, _, value_s in backup.report():
       print(field, ':', value_s)
 
   @staticmethod
