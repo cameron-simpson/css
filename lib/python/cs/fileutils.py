@@ -332,7 +332,11 @@ def scan_ndjson(f, dictclass=dict):
   '''
   for lineno, line in enumerate(f, 1):
     with Pfx("line %d", lineno):
-      d = json.loads(line)
+      try:
+        d = json.loads(line)
+      except json.JSONDecodeError as e:
+        warning("%s", e)
+        continue
       if dictclass is not dict:
         d = dictclass(**d)
     yield d
