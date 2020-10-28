@@ -247,8 +247,55 @@ class CloudBackupCommand(BaseCommand):
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    for field, value, value_s in backup.report():
+    for field, _, value_s in backup.report():
       print(field, ':', value_s)
+
+  @staticmethod
+  def cmd_dirstate(argv, options):
+    ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }} [subcommand ...]
+          Do stuff with dirstate NDJSON files.
+          Subcommands:
+            rewrite Rewrite the state file with the latest lines
+                    only, and with the backup listing cleaned up.
+    '''
+    if not argv:
+      raise GetoptError("missing pathname or backup_name")
+    if isabspath(argv[0]):
+      uu = None
+      subpath = None
+      dirstate_path = argv.pop(0)
+    else:
+      backup_name = argv.pop(0)
+      if not argv:
+        raise GetoptError("missing subpath")
+      subpath = argv.pop(0)
+      if subpath == '.':
+        subpath = ''
+      elif subpath:
+        validate_subpath(subpath)
+      backup = options.cloud_backup[backup_name]
+      uu, dirstate_path = backup.dirstate_uuid_pathname(subpath)
+      print('subpath', subpath, '=>', uu)
+    print(dirstate_path)
+    state = NamedBackup.dirstate_from_pathname(
+        dirstate_path, uuid=uu, subpath=subpath
+    )
+    for record in state.by_uuid.values():
+      record._clean_backups()
+    ##print(state)
+    by_name = {record.name: record for record in state.scan_mapping()}
+    for name, record in sorted(by_name.items()):
+      with Pfx(name):
+        record._clean_backups()
+    if argv:
+      subcmd = argv.pop(0)
+      with Pfx(subcmd):
+        if subcmd == 'rewrite':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          state.rewrite_mapping()
+        else:
+          raise GetoptError("unrecognised subsubcommand")
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
@@ -1194,6 +1241,59 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # DirStates
 
+  def _dirstate__uu_sp(self, subpath):
+    ''' Return `UUIDedDict(uuid,subpath)` for `subpath`,
+        creating it if necessary.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    with self._lock:
+      uu_sp = self.diruuids.by_subpath.get(subpath)
+      if uu_sp:
+        uu = uu_sp.uuid
+      else:
+        uu = uuid4()
+        uu_sp = UUIDedDict(uuid=uu, subpath=subpath)
+        self.diruuids.add_to_mapping(uu_sp)
+    return uu_sp
+
+  def dirstate_uuid_pathname(self, subpath):
+    ''' Return `(UUID,pathname)` for the `DirState` file for `subpath`.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    uu_sp = self._dirstate__uu_sp(subpath)
+    uu = uu_sp.uuid
+    uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
+    dirstate_path = joinpath(
+        self.dirstates_dirpath, dirname(uupath), uu.hex
+    ) + '.ndjson'
+    return uu, dirstate_path
+
+  @classmethod
+  @typechecked
+  def dirstate_from_pathname(
+      cls,
+      ndjson_path: str,
+      *,
+      uuid: UUID,
+      subpath: str,
+      create: bool = False,
+  ):
+    ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
+    '''
+    if not ndjson_path.endswith('.ndjson'):
+      warning(
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          cls.__name__, ndjson_path
+      )
+    state = UUIDNDJSONMapping(
+        ndjson_path, dictclass=FileBackupState, create=create
+    )
+    state.uuid = uuid
+    state.subpath = subpath
+    return state
+
   def dirstate(self, subpath: str):
     ''' Return the `DirState` for `subpath`.
     '''
@@ -1206,21 +1306,10 @@ class NamedBackup(SingletonMixin):
       state = self._dirstates.get(subpath)
       if state is not None:
         return state
-      uu_sp = self.diruuids.by_subpath.get(subpath)
-      if uu_sp:
-        uu = uu_sp.uuid
-      else:
-        uu = uuid4()
-        self.diruuids.add_to_mapping(UUIDedDict(uuid=uu, subpath=subpath))
-      uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
-      dirstate_path = joinpath(
-          self.dirstates_dirpath, dirname(uupath), uu.hex
-      ) + '.ndjson'
-      state = UUIDNDJSONMapping(
-          dirstate_path, dictclass=FileBackupState, create=True
+      uu, dirstate_path = self.dirstate_uuid_pathname(subpath)
+      state = self.dirstate_from_pathname(
+          dirstate_path, uuid=uu, subpath=subpath, create=True
       )
-      state.uuid = uu
-      state.subpath = subpath
       self._dirstates[subpath] = state
     return state
 
@@ -1294,7 +1383,6 @@ class NamedBackup(SingletonMixin):
         subpaths of a larger area.
     '''
     validate_subpath(subpath)
-    backup_uuid_s = str(backup_uuid)
     while subpath:
       with Pfx(subpath):
         base = basename(subpath)
@@ -1306,7 +1394,7 @@ class NamedBackup(SingletonMixin):
           base_backups = FileBackupState(name=base, backups=[])
         record = None
         for backup in base_backups.backups:
-          if backup['uuid'] == backup_uuid_s:
+          if backup.uuid == backup_uuid:
             record = backup
             break
         if record is None:
@@ -1344,6 +1432,10 @@ class NamedBackup(SingletonMixin):
     Rs = []
     L = backup_run.folder_later
     runstate = backup_run.runstate
+    if topsubpath:
+      self.attach_subpath(
+          backup_root_dirpath, topsubpath, backup_uuid=backup_run.backup_uuid
+      )
     for dirpath, dirnames, _ in os.walk(topdirpath):
       if runstate.cancelled:
         break
@@ -1392,11 +1484,6 @@ class NamedBackup(SingletonMixin):
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = subpath + ': '
-        if subpath:
-          proxy("attach")
-          self.attach_subpath(
-              backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
-          )
         with Pfx("scandir"):
           proxy("scandir")
           try:
@@ -1469,9 +1556,9 @@ class NamedBackup(SingletonMixin):
                 ##print("CHANGED (previous not a file)", pathname)
                 changed = True
               else:
-                prev_mode = prevstate['st_mode']
-                prev_mtime = prevstate['st_mtime']
-                prev_size = prevstate['st_size']
+                prev_mode = prevstate.st_mode
+                prev_mtime = prevstate.st_mtime
+                prev_size = prevstate.st_size
                 if not S_ISREG(prev_mode):
                   ##print("CHANGED (not regular file)", pathname)
                   changed = True
@@ -1481,7 +1568,7 @@ class NamedBackup(SingletonMixin):
                     ##print("CHANGED (changed size/mtime)", pathname)
                     changed = True
                   else:
-                    prev_backup_uuid = UUID(prevstate['uuid'])
+                    prev_backup_uuid = prevstate.uuid
                     prev_backup_record = backup_records_by_uuid.get(
                         prev_backup_uuid
                     )
@@ -1513,7 +1600,7 @@ class NamedBackup(SingletonMixin):
                 name_backups.add_regular_file(
                     backup_uuid=backup_uuid,
                     stat=stat,
-                    hashcode=prevstate['hashcode']
+                    hashcode=prevstate.hashcode
                 )
             else:
               warning("unsupported type st_mode=%o", stat.st_mode)
@@ -1752,15 +1839,50 @@ class FileBackupState(UUIDedDict):
         of the content hashcode
   '''
 
+  def __init__(self, **kw):
+    super().__init__(**kw)
+    try:
+      backups = self['backups']
+    except KeyError:
+      pass
+    else:
+      backups[:] = map(
+          lambda record:
+          (record if isinstance(record, UUIDedDict) else UUIDedDict(**record)),
+          backups
+      )
+
+  @pfx_method
+  def _clean_backups(self):
+    ''' Remove repeated backup entries (cruft from old bugs I hope).
+    '''
+    cleaned = []
+    seen_uuids = set()
+    for backup in self.backups:
+      backup_uuid = backup.uuid
+      if not isinstance(backup_uuid, UUID):
+        warning("not a UUID: backup_uuid %r", backup_uuid)
+      if backup_uuid in seen_uuids:
+        warning("discard repeated entry for backup_uuid %r", backup.uuid)
+        continue
+      cleaned.append(backup)
+      seen_uuids.add(backup_uuid)
+    self.backups[:] = cleaned
+
+  @pfx_method
   @typechecked
   def _new_backup(self, backup_uuid: UUID, stat):
     ''' Prepare a shiny new file state.
     '''
-    backup_uuid_s = str(backup_uuid)
-    assert backup_uuid_s not in self.backups
-    backup_state = UUIDedDict(uuid=backup_uuid_s, st_mode=stat.st_mode)
+    backup_state = UUIDedDict(uuid=backup_uuid, st_mode=stat.st_mode)
     if S_ISREG(stat.st_mode):
       backup_state.update(st_mtime=stat.st_mtime, st_size=stat.st_size)
+    uuids = set(map(lambda record: record.uuid, self.backups))
+    assert all(map(lambda uuid: isinstance(uuid, UUID), uuids))
+    if backup_uuid in uuids:
+      raise ValueError(
+          "backup_uuid %r already present: %r" % (backup_uuid, uuids)
+      )
     self.backups.insert(0, backup_state)
     return backup_state
 

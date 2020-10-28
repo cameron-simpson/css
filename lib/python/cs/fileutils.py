@@ -321,7 +321,8 @@ def rewrite_cmgr(filepath, mode='w', **kw):
   '''
   with NamedTemporaryFile(mode=mode) as T:
     yield T
-    return rewrite(filepath, mode=mode, **kw)
+    with open(T.name, 'rb') as f:
+      return rewrite(filepath, mode='wb', data=f, **kw)
 
 @strable
 def scan_ndjson(f, dictclass=dict):
@@ -1787,6 +1788,19 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
+
+  def rewrite_mapping(self):
+    ''' Rewrite the backing file.
+
+        Because the record updates are normally written in append mode,
+        a rewrite will be required every so often.
+    '''
+    with self._lock:
+      with rewrite_cmgr(self.__ndjson_filename) as T:
+        for record in self.by_uuid.values():
+          T.write(record.as_json())
+          T.write('\n')
+        T.flush()
 
 if __name__ == '__main__':
   import cs.fileutils_tests
