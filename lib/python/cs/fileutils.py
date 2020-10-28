@@ -43,6 +43,7 @@ from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.mappings import LoadableMappingMixin, UUIDedDict
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
@@ -68,6 +69,7 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.range',
@@ -1752,12 +1754,18 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(LoadableMappingMixin):
+class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
   ''' A subclass of `LoadableMappingMixin` which maintains records
       from a newline delimited JSON file.
   '''
 
   loadable_mapping_key = 'uuid'
+
+  @staticmethod
+  def _singleton_key(filename, dictclass=UUIDedDict, create=False):
+    ''' Key off the absolute path of `filename`.
+    '''
+    return abspath(filename)
 
   def __init__(self, filename, dictclass=UUIDedDict, create=False):
     ''' Initialise the mapping.
@@ -1771,6 +1779,8 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
           by transiently opening it for append if it is missing;
           default `False`
     '''
+    if hasattr(self, '_lock'):
+      return
     self.__ndjson_filename = filename
     self.__dictclass = dictclass
     if create and not isfilepath(filename):
@@ -1778,6 +1788,11 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
       with open(filename, 'a'):
         pass
     self._lock = RLock()
+
+  def __str__(self):
+    return "%s(%r,%s)" % (
+        type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
+    )
 
   def scan_mapping(self):
     ''' Scan the backing file, yield records.
@@ -1801,10 +1816,12 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
     '''
     with self._lock:
       with rewrite_cmgr(self.__ndjson_filename) as T:
-        for record in self.by_uuid.values():
+        i = 0
+        for i, record in enumerate(self.by_uuid.values(), 1):
           T.write(record.as_json())
           T.write('\n')
         T.flush()
+      self.scan_mapping_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests
