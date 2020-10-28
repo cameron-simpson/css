@@ -1877,6 +1877,12 @@ class FileBackupState(UUIDedDict):
     backup_state = UUIDedDict(uuid=backup_uuid, st_mode=stat.st_mode)
     if S_ISREG(stat.st_mode):
       backup_state.update(st_mtime=stat.st_mtime, st_size=stat.st_size)
+    uuids = set(map(lambda record: record.uuid, self.backups))
+    assert all(map(lambda uuid: isinstance(uuid, UUID), uuids))
+    if backup_uuid in uuids:
+      raise ValueError(
+          "backup_uuid %r already present: %r" % (backup_uuid, uuids)
+      )
     self.backups.insert(0, backup_state)
     return backup_state
 
