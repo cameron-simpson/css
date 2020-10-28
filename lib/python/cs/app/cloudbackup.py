@@ -1194,6 +1194,59 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # DirStates
 
+  def _dirstate__uu_sp(self, subpath):
+    ''' Return `UUIDedDict(uuid,subpath)` for `subpath`,
+        creating it if necessary.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    with self._lock:
+      uu_sp = self.diruuids.by_subpath.get(subpath)
+      if uu_sp:
+        uu = uu_sp.uuid
+      else:
+        uu = uuid4()
+        uu_sp = UUIDedDict(uuid=uu, subpath=subpath)
+        self.diruuids.add_to_mapping(uu_sp)
+    return uu_sp
+
+  def dirstate_uuid_pathname(self, subpath):
+    ''' Return `(UUID,pathname)` for the `DirState` file for `subpath`.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    uu_sp = self._dirstate__uu_sp(subpath)
+    uu = uu_sp.uuid
+    uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
+    dirstate_path = joinpath(
+        self.dirstates_dirpath, dirname(uupath), uu.hex
+    ) + '.ndjson'
+    return uu, dirstate_path
+
+  @classmethod
+  @typechecked
+  def dirstate_from_pathname(
+      cls,
+      ndjson_path: str,
+      *,
+      uuid: UUID,
+      subpath: str,
+      create: bool = False,
+  ):
+    ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
+    '''
+    if not ndjson_path.endswith('.ndjson'):
+      warning(
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          cls.__name__, ndjson_path
+      )
+    state = UUIDNDJSONMapping(
+        ndjson_path, dictclass=FileBackupState, create=create
+    )
+    state.uuid = uuid
+    state.subpath = subpath
+    return state
+
   def dirstate(self, subpath: str):
     ''' Return the `DirState` for `subpath`.
     '''
@@ -1206,21 +1259,10 @@ class NamedBackup(SingletonMixin):
       state = self._dirstates.get(subpath)
       if state is not None:
         return state
-      uu_sp = self.diruuids.by_subpath.get(subpath)
-      if uu_sp:
-        uu = uu_sp.uuid
-      else:
-        uu = uuid4()
-        self.diruuids.add_to_mapping(UUIDedDict(uuid=uu, subpath=subpath))
-      uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
-      dirstate_path = joinpath(
-          self.dirstates_dirpath, dirname(uupath), uu.hex
-      ) + '.ndjson'
-      state = UUIDNDJSONMapping(
-          dirstate_path, dictclass=FileBackupState, create=True
+      uu, dirstate_path = self.dirstate_uuid_pathname(subpath)
+      state = self.dirstate_from_pathname(
+          dirstate_path, uuid=uu, subpath=subpath, create=True
       )
-      state.uuid = uu
-      state.subpath = subpath
       self._dirstates[subpath] = state
     return state
 
