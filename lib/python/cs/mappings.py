@@ -1045,7 +1045,7 @@ class LoadableMappingMixin:
     pk_name = self.loadable_mapping_key
     assert pk_name, "empty .loadable_mapping_key"
     # ensure the primary mapping is loaded
-    pk_mapping = getattr(self, 'by_' + self.loadable_mapping_key)
+    pk_mapping = getattr(self, 'by_' + pk_name)
     with self._lock:
       if not exists_ok and record[pk_name] in pk_mapping:
         raise KeyError(
@@ -1078,6 +1078,7 @@ class LoadableMappingMixin:
           else:
             records = getattr(self, by_pk).values()
           # load the
+          ##warned = set()
           i = 0
           for i, record in enumerate(records, 1):
             try:
@@ -1086,10 +1087,10 @@ class LoadableMappingMixin:
               if field_name == pk_name:
                 warning("no primary key %r: %r", field_name, record)
               continue
-            if field_value in by_map:
-              if field_value not in warned:
-                ##warning("multiple records for %r", field_value)
-                warned.add(field_value)
+            ##if field_value in by_map:
+            ##  if field_value not in warned:
+            ##    warning("multiple records for %r", field_value)
+            ##    warned.add(field_value)
             by_map[field_value] = record
           setattr(self, attr, by_map)
           indexed.add(field_name)
