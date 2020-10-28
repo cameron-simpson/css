@@ -1276,8 +1276,8 @@ class NamedBackup(SingletonMixin):
       cls,
       ndjson_path: str,
       *,
-      uuid: UUID,
-      subpath: str,
+      uuid: [UUID, None],
+      subpath: [str, None],
       create: bool = False,
   ):
     ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
