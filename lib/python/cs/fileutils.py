@@ -1816,10 +1816,12 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
     '''
     with self._lock:
       with rewrite_cmgr(self.__ndjson_filename) as T:
-        for record in self.by_uuid.values():
+        i = 0
+        for i, record in enumerate(self.by_uuid.values(), 1):
           T.write(record.as_json())
           T.write('\n')
         T.flush()
+      self.scan_mapping_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests
