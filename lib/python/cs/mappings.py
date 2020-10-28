@@ -1029,9 +1029,9 @@ class LoadableMappingMixin:
   loadable_mapping_key = ''
 
   def scan_mapping(self):
-    ''' Load the mapping from its backing store,
-        which might be a file or might be another related data structure.
-        Return the loaded mapping.
+    ''' Scan the mapping records (themselves mappings) from the backing store,
+        which might be a file or another related data structure.
+        Yield each record as scanned.
     '''
     raise NotImplementedError("scan_mapping")
 
@@ -1064,23 +1064,22 @@ class LoadableMappingMixin:
   def __getattr__(self, attr):
     field_name = cutprefix(attr, 'by_')
     if field_name is not attr:
-      by_map = {}
       with Pfx("%s.%s", type(self).__name__, attr):
         pk_name = self.loadable_mapping_key
         assert pk_name, "empty .loadable_mapping_key"
         by_pk = 'by_' + pk_name
         indexed = self.__indexed
-        assert field_name not in indexed, "repeated __getattr__ of .%s" % (
-            attr,
-        )
-        warned = set()
         with self._lock:
+          if field_name in indexed:
+            return self.__dict__[attr]
+          by_map = {}
           if field_name == pk_name:
             records = self.scan_mapping()
           else:
             records = getattr(self, by_pk).values()
           # load the
-          for record in records:
+          i = 0
+          for i, record in enumerate(records, 1):
             try:
               field_value = record[field_name]
             except KeyError:
@@ -1094,6 +1093,8 @@ class LoadableMappingMixin:
             by_map[field_value] = record
           setattr(self, attr, by_map)
           indexed.add(field_name)
+          if field_name == pk_name:
+            self.__scan_length = i
       return by_map
     if attr == '_LoadableMappingMixin__indexed':
       # .__indexed
@@ -1105,6 +1106,26 @@ class LoadableMappingMixin:
       return getattr(type(self), attr)
     else:
       return supergetattr(attr)
+
+  def __len__(self):
+    ''' The length of the primary key mapping.
+    '''
+    return len(getattr(self, 'by_' + self.loadable_mapping_key))
+
+  @property
+  def scan_mapping_length(self):
+    ''' The number of records encountered during the backend scan.
+    '''
+    # ensure the mapping has been scanned
+    getattr(self, 'by_' + self.loadable_mapping_key)
+    # return the length of the scan
+    return self.__scan_length
+
+  @scan_mapping_length.setter
+  def scan_mapping_length(self, length):
+    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_mapping`.
+    '''
+    self.__scan_length = length
 
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
