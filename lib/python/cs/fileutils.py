@@ -1789,6 +1789,19 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
       f.write(record.as_json())
       f.write('\n')
 
+  def rewrite_mapping(self):
+    ''' Rewrite the backing file.
+
+        Because the record updates are normally written in append mode,
+        a rewrite will be required every so often.
+    '''
+    with self._lock:
+      with rewrite_cmgr(self.__ndjson_filename) as T:
+        for record in self.by_uuid.values():
+          T.write(record.as_json())
+          T.write('\n')
+        T.flush()
+
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)
