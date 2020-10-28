@@ -252,8 +252,11 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_dirstate(argv, options):
-    ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }}
+    ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }} [subcommand ...]
           Do stuff with dirstate NDJSON files.
+          Subcommands:
+            rewrite Rewrite the state file with the latest lines
+                    only, and with the backup listing cleaned up.
     '''
     if not argv:
       raise GetoptError("missing pathname or backup_name")
@@ -270,8 +273,6 @@ class CloudBackupCommand(BaseCommand):
         subpath = ''
       elif subpath:
         validate_subpath(subpath)
-      if argv:
-        raise GetoptError("extra arguments after subpath: %r" % (argv,))
       backup = options.cloud_backup[backup_name]
       uu, dirstate_path = backup.dirstate_uuid_pathname(subpath)
       print('subpath', subpath, '=>', uu)
@@ -279,9 +280,22 @@ class CloudBackupCommand(BaseCommand):
     state = NamedBackup.dirstate_from_pathname(
         dirstate_path, uuid=uu, subpath=subpath
     )
-    print(state)
-    for record in state.scan_mapping():
-      print(record)
+    for record in state.by_uuid.values():
+      record._clean_backups()
+    ##print(state)
+    by_name = {record.name: record for record in state.scan_mapping()}
+    for name, record in sorted(by_name.items()):
+      with Pfx(name):
+        record._clean_backups()
+    if argv:
+      subcmd = argv.pop(0)
+      with Pfx(subcmd):
+        if subcmd == 'rewrite':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          state.rewrite_mapping()
+        else:
+          raise GetoptError("unrecognised subsubcommand")
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
