@@ -22,6 +22,7 @@ from os.path import (
     isdir as isdirpath,
     islink as islinkpath,
     join as joinpath,
+    realpath,
     relpath,
 )
 import signal
@@ -172,12 +173,22 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} backup_name:/path/to/backup_root [subpaths...]
+    ''' Usage: {cmd} [-R] backup_name:/path/to/backup_root [subpaths...]
           For each subpath, back up /path/to/backup_root/subpath into the
           named backup area. If no subpaths are specified, back up all of
           /path/to/backup_root.
+          -R  Resolve the real path of /path/to/backup_root and
+              record that as the source path for the backup.
     '''
     badopts = False
+    use_realpath = False
+    opts, argv = getopt(argv, 'R')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-R':
+          use_realpath = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       warning("missing backup_root")
       badopts = True
@@ -204,6 +215,8 @@ class CloudBackupCommand(BaseCommand):
               if not isdirpath(backup_root_dirpath):
                 warning("not a directory")
                 badopts = True
+              if use_realpath:
+                backup_root_dirpath = realpath(backup_root_dirpath)
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
