@@ -67,7 +67,7 @@ def setupterm(*args):
   ''' Run curses.setupterm, needed to be able to use the status line.
       Uses a global flag to avoid doing this twice.
   '''
-  global _ti_setup
+  global _ti_setup  # pylint: disable=global-statement
   if _ti_setup:
     return True
   termstr = None
@@ -83,7 +83,7 @@ def setupterm(*args):
     termstr = os.environ['TERM']
   if fd is None:
     fd = sys.stdout.fileno()
-  import curses
+  import curses  # pylint: disable=import-outside-toplevel
   curses.setupterm(termstr, fd)
   _ti_setup = True
   return True
@@ -91,7 +91,7 @@ def setupterm(*args):
 def statusline_bs(text, reverse=False, xpos=None, ypos=None):
   ''' Return a byte string to update the status line.
   '''
-  from curses import tigetstr, tparm, tigetflag
+  from curses import tigetstr, tparm, tigetflag  # pylint: disable=import-outside-toplevel
   setupterm()
   if tigetflag('hs'):
     seq = (
@@ -99,7 +99,7 @@ def statusline_bs(text, reverse=False, xpos=None, ypos=None):
         tigetstr('dsl'),
         tigetstr('rev') if reverse else b'',
         text.encode(),
-        tigetstr('fsl')
+        tigetstr('fsl'),
     )
   else:
     # save cursor position, position, reverse, restore position
@@ -108,7 +108,7 @@ def statusline_bs(text, reverse=False, xpos=None, ypos=None):
     if ypos is None:
       ypos = 0
     seq = (
-        tigetstr('sc'),   # save cursor position
+        tigetstr('sc'),  # save cursor position
         tparm(tigetstr("cup"), xpos, ypos),
         tigetstr('rev') if reverse else b'',
         text.encode(),
@@ -146,7 +146,7 @@ def status(msg, *args, **kwargs):
     has_ansi_status = f.has_ansi_status
   except AttributeError:
     try:
-      import curses
+      import curses  # pylint: disable=import-outside-toplevel
     except ImportError:
       has_ansi_status = None
     else:
