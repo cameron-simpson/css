@@ -76,6 +76,16 @@ class B2Cloud(SingletonMixin, Cloud):
     ''' The B2API, authorized from `self.credentials`.
     '''
     api = B2Api(InMemoryAccountInfo())
+    # monkey patch the API instance to serialise reauthorization attempts
+    b2authorize_account = api.authorize_account
+
+    def locked_authorize_account(*a):
+      ''' Serialised version of the API authorize_account method.
+      '''
+      with self._lock:
+        return b2authorize_account(*a)
+
+    api.authorize_account = locked_authorize_account
     with self._conn_sem:
       api.authorize_account(
           "production", self.credentials.keyId, self.credentials.apiKey
