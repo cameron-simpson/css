@@ -1066,7 +1066,7 @@ class BackupRun(RunStateMixin):
         root_path=self.root_dirpath,
         content_path=self.content_path,
     )
-    status_proxy.prefix = "backup %s" % (backup_record.uuid)
+    status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
