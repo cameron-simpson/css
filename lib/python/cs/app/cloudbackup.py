@@ -35,6 +35,7 @@ import hashlib
 import os
 import shutil
 import sys
+import termios
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
@@ -64,6 +65,7 @@ from cs.resources import RunState, RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
+from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
 from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
@@ -349,6 +351,7 @@ class CloudBackupCommand(BaseCommand):
           if not latest_backup:
             warning("%s: no backups", backup.name)
             return 1
+          # pylint: disable=trailing-comma-tuple
           backup_uuids = latest_backup.uuid,
         for backup_uuid in backup_uuids:
           backup_record = backups_by_uuid[backup_uuid]
@@ -391,6 +394,7 @@ class CloudBackupCommand(BaseCommand):
       if not latest_backup:
         warning("%s: no backups", backup_name)
         return 1
+      # pylint: disable=trailing-comma-tuple
       backup_uuids = latest_backup.uuid,
     subpaths = list(
         map(lambda subpath: '' if subpath == '.' else subpath, subpaths)
@@ -1062,18 +1066,21 @@ class BackupRun(RunStateMixin):
         root_path=self.root_dirpath,
         content_path=self.content_path,
     )
+    status_proxy.prefix = "backup %s" % (backup_record.uuid)
 
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
+      warning("received signal %s", signum)
       self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
-    # TODO: keep all the rpevious handlers and restore them in __exit__
+    # TODO: keep all the previous handlers and restore them in __exit__
     previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
     signal.signal(signal.SIGTERM, cancel_runstate)
     signal.signal(signal.SIGALRM, cancel_runstate)
+    previous_termios = modify_termios(0, clear_modes={'lflag': termios.ECHO})
     self._stacked.append(
         pushattrs(
             self,
@@ -1089,6 +1096,7 @@ class BackupRun(RunStateMixin):
             file_later=Later(self.file_parallel, inboundCapacity=256),
             file_proxies=file_proxies,
             previous_interrupt=previous_interrupt,
+            previous_termios=previous_termios,
         )
     )
     backup_record.start()
@@ -1100,6 +1108,8 @@ class BackupRun(RunStateMixin):
     '''
     self.named_backup.add_backup_record(self.backup_record)
     signal.signal(signal.SIGINT, self.previous_interrupt)
+    if self.previous_termios:
+      termios.tcsetattr(0, termios.TCSANOW, self.previous_termios)
     self.runstate.stop()
     self.backup_record.end()
     self.named_backup.add_backup_record(self.backup_record)
@@ -1441,10 +1451,10 @@ class NamedBackup(SingletonMixin):
       validate_subpath(topsubpath)
       topdirpath = joinpath(backup_root_dirpath, topsubpath)
     status_proxy = backup_run.status_proxy
-    status_proxy("os.walk %r ...", topdirpath)
     Rs = []
     L = backup_run.folder_later
     runstate = backup_run.runstate
+    status_proxy("attach %r", topsubpath)
     if topsubpath:
       self.attach_subpath(
           backup_root_dirpath, topsubpath, backup_uuid=backup_run.backup_uuid
