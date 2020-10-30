@@ -1064,6 +1064,7 @@ class BackupRun(RunStateMixin):
         root_path=self.root_dirpath,
         content_path=self.content_path,
     )
+    status_proxy.prefix = "backup %s" % (backup_record.uuid)
 
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
@@ -1447,10 +1448,10 @@ class NamedBackup(SingletonMixin):
       validate_subpath(topsubpath)
       topdirpath = joinpath(backup_root_dirpath, topsubpath)
     status_proxy = backup_run.status_proxy
-    status_proxy("os.walk %r ...", topdirpath)
     Rs = []
     L = backup_run.folder_later
     runstate = backup_run.runstate
+    status_proxy("attach %r", topsubpath)
     if topsubpath:
       self.attach_subpath(
           backup_root_dirpath, topsubpath, backup_uuid=backup_run.backup_uuid
