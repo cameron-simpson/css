@@ -351,6 +351,7 @@ class CloudBackupCommand(BaseCommand):
           if not latest_backup:
             warning("%s: no backups", backup.name)
             return 1
+          # pylint: disable=trailing-comma-tuple
           backup_uuids = latest_backup.uuid,
         for backup_uuid in backup_uuids:
           backup_record = backups_by_uuid[backup_uuid]
@@ -393,6 +394,7 @@ class CloudBackupCommand(BaseCommand):
       if not latest_backup:
         warning("%s: no backups", backup_name)
         return 1
+      # pylint: disable=trailing-comma-tuple
       backup_uuids = latest_backup.uuid,
     subpaths = list(
         map(lambda subpath: '' if subpath == '.' else subpath, subpaths)
@@ -1069,11 +1071,12 @@ class BackupRun(RunStateMixin):
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
+      warning("received signal %s", signum)
       self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
-    # TODO: keep all the rpevious handlers and restore them in __exit__
+    # TODO: keep all the previous handlers and restore them in __exit__
     previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
     signal.signal(signal.SIGTERM, cancel_runstate)
     signal.signal(signal.SIGALRM, cancel_runstate)
