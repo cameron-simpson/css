@@ -35,6 +35,7 @@ import hashlib
 import os
 import shutil
 import sys
+import termios
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
@@ -64,6 +65,7 @@ from cs.resources import RunState, RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
+from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
 from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
@@ -1074,6 +1076,7 @@ class BackupRun(RunStateMixin):
     previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
     signal.signal(signal.SIGTERM, cancel_runstate)
     signal.signal(signal.SIGALRM, cancel_runstate)
+    previous_termios = modify_termios(0, clear_modes={'lflag': termios.ECHO})
     self._stacked.append(
         pushattrs(
             self,
@@ -1089,6 +1092,7 @@ class BackupRun(RunStateMixin):
             file_later=Later(self.file_parallel, inboundCapacity=256),
             file_proxies=file_proxies,
             previous_interrupt=previous_interrupt,
+            previous_termios=previous_termios,
         )
     )
     backup_record.start()
@@ -1100,6 +1104,8 @@ class BackupRun(RunStateMixin):
     '''
     self.named_backup.add_backup_record(self.backup_record)
     signal.signal(signal.SIGINT, self.previous_interrupt)
+    if self.previous_termios:
+      termios.tcsetattr(0, termios.TCSANOW, self.previous_termios)
     self.runstate.stop()
     self.backup_record.end()
     self.named_backup.add_backup_record(self.backup_record)
