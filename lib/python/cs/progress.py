@@ -879,7 +879,9 @@ class OverProgress(BaseProgress):
             self.total)
 
   def _updated(self):
-    for notify in list(self.notify_update):
+    with self.lock:
+      notifiers = list(self.notify_update)
+    for notify in notifiers:
       try:
         notify(self, None)
       except Exception as e:  # pylint: disable=broad-except
@@ -920,8 +922,10 @@ class OverProgress(BaseProgress):
         computed from the subsidiary `Progress`es.
         Return the maximum, or `None` if there are no non-`None` values.
     '''
+    with self._lock:
+      children = list(self.subprogresses)
     maximum = None
-    for value in filter(fnP, self.subprogresses):
+    for value in filter(fnP, children):
       if value is not None:
         maximum = value if maximum is None else max(maximum, value)
     return maximum
@@ -930,8 +934,10 @@ class OverProgress(BaseProgress):
     ''' Sum non-`None` values computed from the subsidiary `Progress`es.
         Return the sum, or `None` if there are no non-`None` values.
     '''
+    with self._lock:
+      children = list(self.subprogresses)
     summed = None
-    for value in map(fnP, self.subprogresses):
+    for value in map(fnP, children):
       if value is not None:
         summed = value if summed is None else summed + value
     return summed
