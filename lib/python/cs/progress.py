@@ -270,7 +270,7 @@ class BaseProgress(object):
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
-  def status(self, label, width):
+  def status(self, label, width, window=5):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
 
@@ -279,6 +279,8 @@ class BaseProgress(object):
           if `None` use `self.name`
         * `width`: the available width for the status line;
           if not an `int` use `width.width`
+        * `window`: optional timeframe to define "recent" in seconds,
+          default : `5`
     '''
     if label is None:
       label = self.name
@@ -286,7 +288,7 @@ class BaseProgress(object):
       width = width.width
     leftv = []
     rightv = []
-    throughput = self.throughput_recent(5)
+    throughput = self.throughput_recent(window)
     if throughput is not None:
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
