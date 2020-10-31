@@ -538,14 +538,18 @@ class CloudBackupCommand(BaseCommand):
                 cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
                 length = name_details.st_size
-                P = crypt_download(
-                    content_area.cloud,
-                    content_area.bucket_name,
-                    cloudpath,
-                    private_path=private_path,
-                    passphrase=passphrase,
-                    public_key_name=public_key_name
-                )
+                download_progress = Progress(name=cloudpath, total=length)
+                with UpdProxy() as dl_proxy:
+                  with download_progress.bar(proxy=dl_proxy):
+                    P = crypt_download(
+                        content_area.cloud,
+                        content_area.bucket_name,
+                        cloudpath,
+                        private_path=private_path,
+                        passphrase=passphrase,
+                        public_key_name=public_key_name,
+                        download_progress=download_progress,
+                    )
                 fsdirpath = dirname(fspath)
                 if fsdirpath not in made_dirs:
                   print("mkdir", fsdirpath)
