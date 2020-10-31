@@ -14,6 +14,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import sys
+from threading import RLock
 import time
 from cs.deco import decorator
 from cs.logutils import debug, exception
@@ -77,6 +78,7 @@ class BaseProgress(object):
     self.units_scale = units_scale
     self.notify_update = set()
     self._warned = set()
+    self._lock = RLock()
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -888,16 +890,18 @@ class OverProgress(BaseProgress):
   def add(self, subprogress):
     ''' Add a subsidairy `Progress` to the contributing set.
     '''
-    subprogress.notify_update.add(self._child_updated)
-    self.subprogresses.add(subprogress)
-    self._updated()
+    with self._lock:
+      subprogress.notify_update.add(self._child_updated)
+      self.subprogresses.add(subprogress)
+      self._updated()
 
   def remove(self, subprogress):
     ''' Remove a subsidairy `Progress` from the contributing set.
     '''
-    subprogress.notify_update.remove(self._child_updated)
-    self.subprogresses.remove(subprogress)
-    self._updated()
+    with self._lock:
+      subprogress.notify_update.remove(self._child_updated)
+      self.subprogresses.remove(subprogress)
+      self._updated()
 
   @property
   def start(self):
