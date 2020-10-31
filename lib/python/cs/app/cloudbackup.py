@@ -1081,11 +1081,16 @@ class BackupRun(RunStateMixin):
     )
     status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
+    runstate = RunState(
+        "%s.runstate(%s,%s)" %
+        (type(self).__name__, self.cloud_area, self.public_key_name)
+    )
+
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
       warning("received signal %s", signum)
-      self.runstate.cancel()
+      runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
@@ -1097,10 +1102,7 @@ class BackupRun(RunStateMixin):
     self._stacked.append(
         pushattrs(
             self,
-            runstate=RunState(
-                "%s.runstate(%s,%s)" %
-                (type(self).__name__, self.cloud_area, self.public_key_name)
-            ),
+            runstate=runstate,
             backup_record=backup_record,
             backup_uuid=backup_record.uuid,
             status_proxy=status_proxy,
@@ -1114,7 +1116,7 @@ class BackupRun(RunStateMixin):
         )
     )
     backup_record.start()
-    self.runstate.start()
+    runstate.start()
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
