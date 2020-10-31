@@ -270,7 +270,17 @@ class BaseProgress(object):
   def status(self, label, width):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
+
+        Parameters:
+        * `label`: the label for the status line;
+          if `None` use `self.name`
+        * `width`: the available width for the status line;
+          if not an `int` use `width.width`
     '''
+    if label is None:
+      label = self.name
+    if not isinstance(width, int):
+      width = width.width
     leftv = []
     rightv = []
     throughput = self.throughput_recent(5)
