@@ -923,7 +923,9 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.iterbar`.
+  ''' Convenience function to construct and run a `Progress.iterbar`
+      wrapping the iterable `it`,
+      issuing and withdrawning a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume
