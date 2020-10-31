@@ -192,7 +192,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
 
@@ -202,7 +202,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     raise NotImplementedError("upload_buffer")
 
@@ -215,7 +216,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bs` to `path` within `bucket_name`.
 
@@ -227,7 +228,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     return self.upload_buffer(
         CornuCopyBuffer([bs]),
@@ -235,7 +237,7 @@ class Cloud(ABC):
         path=path,
         file_info=file_info,
         content_type=content_type,
-        progress=progress
+        upload_progress=upload_progress
     )
 
   @pfx_method
@@ -247,7 +249,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
       as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
@@ -262,7 +264,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -280,7 +283,7 @@ class Cloud(ABC):
             path=path,
             file_info=file_info,
             content_type=content_type,
-            progress=progress,
+            upload_progress=upload_progress,
         )
 
   def upload_file(
@@ -291,7 +294,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
@@ -304,7 +307,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     return self.upload_buffer(
         CornuCopyBuffer.from_file(f),
@@ -312,7 +316,7 @@ class Cloud(ABC):
         path=path,
         file_info=file_info,
         content_type=content_type,
-        progress=progress,
+        upload_progress=upload_progress,
     )
 
   # pylint: disable=too-many-arguments
@@ -322,7 +326,7 @@ class Cloud(ABC):
       *,
       bucket_name: str,
       path: str,
-      progress=None,
+      download_progress=None,
   ):
     ''' Download from `path` within `bucket_name`,
         returning `(buffer,file_info)`
@@ -332,7 +336,8 @@ class Cloud(ABC):
         Parameters:
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `download_progress`: an optional `cs.progress.Progress` instance
+          to which to report download data
     '''
     raise NotImplementedError("download_buffer")
 
@@ -411,29 +416,31 @@ class CloudAreaFile(SingletonMixin):
     '''
     return joinpath(self.cloud_area.cloudpath, self.filepath)
 
-  def upload_buffer(self, bfr, *, progress=None):
+  def upload_buffer(self, bfr, *, upload_progress=None):
     ''' Upload a buffer into the cloud.
     '''
     return self.cloud.upload_buffer(
         bfr,
         bucket_name=self.bucket_name,
         path=self.bucket_path,
-        progress=progress
+        upload_progress=upload_progress
     )
 
-  def upload_filename(self, filename, *, progress=None):
+  def upload_filename(self, filename, *, upload_progress=None):
     ''' Upload a local file into the cloud.
     '''
     return self.cloud.upload_filename(
         filename,
         bucket_name=self.bucket_name,
         path=self.bucket_path,
-        progress=progress
+        upload_progress=upload_progress
     )
 
-  def download_buffer(self, *, progress=None):
+  def download_buffer(self, *, download_progress=None):
     ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.
     '''
     return self.cloud.download_buffer(
-        bucket_name=self.bucket_name, path=self.bucket_path, progress=progress
+        bucket_name=self.bucket_name,
+        path=self.bucket_path,
+        download_progress=download_progress
     )
