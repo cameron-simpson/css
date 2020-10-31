@@ -1827,7 +1827,11 @@ class NamedBackup(SingletonMixin):
             P = Progress(name="crypt upload " + subpath, total=len(mm))
             with P.bar(proxy=proxy, label=''):
               self.upload_hashcode_content(
-                  backup_record, mm, hashcode, progress=P, length=len(mm)
+                  backup_record,
+                  mm,
+                  hashcode,
+                  upload_progress=P,
+                  length=len(mm)
               )
         return hashcode, fstat
 
@@ -1837,7 +1841,7 @@ class NamedBackup(SingletonMixin):
       f,
       hashcode,
       *,
-      progress=None,
+      upload_progress=None,
       length,
   ):
     ''' Upload the contents of `f` under the supplied `hashcode`
@@ -1854,7 +1858,7 @@ class NamedBackup(SingletonMixin):
             backup_record.public_key_name
         ),
         public_key_name=backup_record.public_key_name,
-        progress=progress,
+        upload_progress=upload_progress,
     )
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
