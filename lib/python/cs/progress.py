@@ -75,6 +75,7 @@ class BaseProgress(object):
     self.name = name
     self.start_time = start_time
     self.units_scale = units_scale
+    self.notify_update = set()
     self._warned = set()
 
   def __str__(self):
@@ -623,7 +624,6 @@ class Progress(BaseProgress):
       positions.append(CheckPoint(time.time(), position))
     self._positions = positions
     self._flushed = True
-    self.notify_update = set()
 
   def __repr__(self):
     return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
@@ -818,6 +818,11 @@ class Progress(BaseProgress):
 class OverProgress(BaseProgress):
   ''' A `Progress`-like class computed from a set of subsidiary `Progress`es.
 
+      AN OverProgress instance has an attribute ``notify_update`` which
+      is a set of callables.
+      Whenever the position of a subsidiary `Progress` is updated,
+      each of these will be called with the `Progress` instance and `None`.
+
       Example:
 
           >>> P = OverProgress(name="over")
@@ -868,15 +873,31 @@ class OverProgress(BaseProgress):
             self.start, self.position, self.start_time,
             self.total)
 
+  def _updated(self):
+    for notify in list(self.notify_update):
+      try:
+        notify(self, None)
+      except Exception as e:  # pylint: disable=broad-except
+        exception("%s: notify_update %s: %s", self, notify, e)
+
+  def _child_updated(self, child, _):
+    ''' Notify watchers if a child updates.
+    '''
+    self._updated()
+
   def add(self, subprogress):
     ''' Add a subsidairy `Progress` to the contributing set.
     '''
+    subprogress.notify_update.add(self._child_updated)
     self.subprogresses.add(subprogress)
+    self._updated()
 
   def remove(self, subprogress):
     ''' Remove a subsidairy `Progress` from the contributing set.
     '''
+    subprogress.notify_update.remove(self._child_updated)
     self.subprogresses.remove(subprogress)
+    self._updated()
 
   @property
   def start(self):
