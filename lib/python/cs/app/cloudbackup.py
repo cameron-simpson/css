@@ -1682,7 +1682,10 @@ class NamedBackup(SingletonMixin):
               len(dirstate),
               dirstate.scan_mapping_length,
           ):
-            dirstate.rewrite_mapping()
+            # serialise these because we can run out of file descriptors
+            # in a multithread environment
+            with self._lock:
+              dirstate.rewrite_mapping()
 
         proxy('')
       return ok

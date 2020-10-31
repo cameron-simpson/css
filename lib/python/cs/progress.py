@@ -270,7 +270,8 @@ class BaseProgress(object):
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
-  def status(self, label, width):
+  # pylint: disable=too-many-branches,too-many-statements
+  def status(self, label, width, window=5):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
 
@@ -279,6 +280,8 @@ class BaseProgress(object):
           if `None` use `self.name`
         * `width`: the available width for the status line;
           if not an `int` use `width.width`
+        * `window`: optional timeframe to define "recent" in seconds,
+          default : `5`
     '''
     if label is None:
       label = self.name
@@ -286,7 +289,7 @@ class BaseProgress(object):
       width = width.width
     leftv = []
     rightv = []
-    throughput = self.throughput_recent(5)
+    throughput = self.throughput_recent(window)
     if throughput is not None:
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
@@ -354,6 +357,7 @@ class BaseProgress(object):
       proxy=None,
       statusfunc=None,
       width=None,
+      window=None,
       report_print=None,
       insert_pos=1,
       deferred=False,
@@ -374,6 +378,9 @@ class BaseProgress(object):
         * `width`: an optional width expressioning how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
+        * `window`: optional timeframe to define "recent" in seconds;
+          if the default `statusfunc` (`Progress.status`) is used
+          this is passed to it
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -397,7 +404,9 @@ class BaseProgress(object):
     if upd is None:
       upd = Upd()
     if statusfunc is None:
-      statusfunc = lambda P, label, width: P.status(label, width)
+      statusfunc = lambda P, label, width: P.status(
+          label, width, window=window
+      )
     pproxy = [proxy]
     proxy_delete = proxy is None
 
@@ -430,7 +439,7 @@ class BaseProgress(object):
           )
       )
 
-  # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
   def iterbar(
       self,
       it,
@@ -441,6 +450,7 @@ class BaseProgress(object):
       statusfunc=None,
       incfirst=False,
       width=None,
+      window=None,
       update_frequency=None,
       report_print=None,
   ):
@@ -464,6 +474,9 @@ class BaseProgress(object):
         * `width`: an optional width expressioning how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
+        * `window`: optional timeframe to define "recent" in seconds;
+          if the default `statusfunc` (`Progress.status`) is used
+          this is passed to it
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
         * `proxy`: an optional proxy for displaying the progress bar,
@@ -511,7 +524,9 @@ class BaseProgress(object):
       proxy = upd.insert(1)
       delete_proxy = True
     if statusfunc is None:
-      statusfunc = lambda P, label, width: P.status(label, width)
+      statusfunc = lambda P, label, width: P.status(
+          label, width, window=window
+      )
     proxy(statusfunc(self, label, width or proxy.width))
     last_pos = start_pos = self.position
     for i in it:
@@ -887,6 +902,7 @@ class OverProgress(BaseProgress):
       except Exception as e:  # pylint: disable=broad-except
         exception("%s: notify_update %s: %s", self, notify, e)
 
+  # pylint: disable=unused-argument
   def _child_updated(self, child, _):
     ''' Notify watchers if a child updates.
     '''
