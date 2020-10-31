@@ -1682,10 +1682,6 @@ class NamedBackup(SingletonMixin):
               len(dirstate),
               dirstate.scan_mapping_length,
           ):
-            print(
-                "rewrite", dirstate, "len =", len(dirstate),
-                "scan_mapping_length =", dirstate.scan_mapping_length
-            )
             dirstate.rewrite_mapping()
 
         proxy('')
