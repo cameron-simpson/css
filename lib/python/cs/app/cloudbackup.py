@@ -1682,10 +1682,6 @@ class NamedBackup(SingletonMixin):
               len(dirstate),
               dirstate.scan_mapping_length,
           ):
-            print(
-                "rewrite", dirstate, "len =", len(dirstate),
-                "scan_mapping_length =", dirstate.scan_mapping_length
-            )
             dirstate.rewrite_mapping()
 
         proxy('')
@@ -1844,7 +1840,7 @@ class NamedBackup(SingletonMixin):
                   upload_progress=P,
                   length=len(mm)
               )
-            backup_run.upload_progress.remove(P)
+            backup_run.upload_progress.remove(P, accrue=True)
         return hashcode, fstat
 
   def upload_hashcode_content(

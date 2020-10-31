@@ -14,6 +14,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import sys
+from threading import RLock
 import time
 from cs.deco import decorator
 from cs.logutils import debug, exception
@@ -77,6 +78,7 @@ class BaseProgress(object):
     self.units_scale = units_scale
     self.notify_update = set()
     self._warned = set()
+    self._lock = RLock()
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -861,6 +863,9 @@ class OverProgress(BaseProgress):
     BaseProgress.__init__(
         self, name=name, start_time=start_time, units_scale=units_scale
     )
+    # we use these to to accrue removed subprogresses (optional)
+    self._base_total = 0
+    self._base_position = 0
     self.subprogresses = set()
     if subprogresses:
       for subP in subprogresses:
@@ -888,16 +893,21 @@ class OverProgress(BaseProgress):
   def add(self, subprogress):
     ''' Add a subsidairy `Progress` to the contributing set.
     '''
-    subprogress.notify_update.add(self._child_updated)
-    self.subprogresses.add(subprogress)
-    self._updated()
+    with self._lock:
+      subprogress.notify_update.add(self._child_updated)
+      self.subprogresses.add(subprogress)
+      self._updated()
 
-  def remove(self, subprogress):
+  def remove(self, subprogress, accrue=False):
     ''' Remove a subsidairy `Progress` from the contributing set.
     '''
-    subprogress.notify_update.remove(self._child_updated)
-    self.subprogresses.remove(subprogress)
-    self._updated()
+    with self._lock:
+      subprogress.notify_update.remove(self._child_updated)
+      self.subprogresses.remove(subprogress)
+      if accrue:
+        self._base_position += subprogress.position - subprogress.start
+        self._base_total += subprogress.total
+      self._updated()
 
   @property
   def start(self):
@@ -931,13 +941,19 @@ class OverProgress(BaseProgress):
     ''' The `position` is the sum off the subsidiary position offsets
         from their respective starts.
     '''
-    return self._oversum(lambda P: P.position - P.start)
+    pos = self._oversum(lambda P: P.position - P.start)
+    if pos is None:
+      pos = 0
+    return self._base_position + pos
 
   @property
   def total(self):
     ''' The `total` is the sum of the subsidiary totals.
     '''
-    return self._oversum(lambda P: P.total)
+    total = self._oversum(lambda P: P.total)
+    if total is None:
+      total = 0
+    return self._base_total + total
 
   @property
   def throughput(self):
