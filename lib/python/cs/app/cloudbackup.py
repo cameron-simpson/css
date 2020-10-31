@@ -60,7 +60,7 @@ from cs.mappings import (
 )
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
-from cs.progress import Progress, progressbar
+from cs.progress import Progress, OverProgress, progressbar
 from cs.resources import RunState, RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
@@ -538,14 +538,18 @@ class CloudBackupCommand(BaseCommand):
                 cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
                 length = name_details.st_size
-                P = crypt_download(
-                    content_area.cloud,
-                    content_area.bucket_name,
-                    cloudpath,
-                    private_path=private_path,
-                    passphrase=passphrase,
-                    public_key_name=public_key_name
-                )
+                download_progress = Progress(name=cloudpath, total=length)
+                with UpdProxy() as dl_proxy:
+                  with download_progress.bar(proxy=dl_proxy):
+                    P = crypt_download(
+                        content_area.cloud,
+                        content_area.bucket_name,
+                        cloudpath,
+                        private_path=private_path,
+                        passphrase=passphrase,
+                        public_key_name=public_key_name,
+                        download_progress=download_progress,
+                    )
                 fsdirpath = dirname(fspath)
                 if fsdirpath not in made_dirs:
                   print("mkdir", fsdirpath)
@@ -1058,8 +1062,17 @@ class BackupRun(RunStateMixin):
         and commences a backup run.
     '''
     status_proxy = UpdProxy()
+
+    upload_progress = OverProgress(name="uploads")
+    upload_proxy = UpdProxy()
+    update_uploads = lambda P, _: upload_proxy(
+        P.status(None, upload_proxy.width)
+    )
+    upload_progress.notify_update.add(update_uploads)
+
     file_proxies = set(UpdProxy() for _ in range(self.file_parallel))
     folder_proxies = set(UpdProxy() for _ in range(self.folder_parallel))
+
     backup_record = BackupRecord(
         backup_name=self.named_backup.backup_name,
         public_key_name=self.public_key_name,
@@ -1097,6 +1110,7 @@ class BackupRun(RunStateMixin):
             file_proxies=file_proxies,
             previous_interrupt=previous_interrupt,
             previous_termios=previous_termios,
+            upload_progress=upload_progress,
         )
     )
     backup_record.start()
@@ -1821,10 +1835,16 @@ class NamedBackup(SingletonMixin):
             if runstate.cancelled:
               return None, None
             P = Progress(name="crypt upload " + subpath, total=len(mm))
+            backup_run.upload_progress.add(P)
             with P.bar(proxy=proxy, label=''):
               self.upload_hashcode_content(
-                  backup_record, mm, hashcode, progress=P, length=len(mm)
+                  backup_record,
+                  mm,
+                  hashcode,
+                  upload_progress=P,
+                  length=len(mm)
               )
+            backup_run.upload_progress.remove(P)
         return hashcode, fstat
 
   def upload_hashcode_content(
@@ -1833,7 +1853,7 @@ class NamedBackup(SingletonMixin):
       f,
       hashcode,
       *,
-      progress=None,
+      upload_progress=None,
       length,
   ):
     ''' Upload the contents of `f` under the supplied `hashcode`
@@ -1850,7 +1870,7 @@ class NamedBackup(SingletonMixin):
             backup_record.public_key_name
         ),
         public_key_name=backup_record.public_key_name,
-        progress=progress,
+        upload_progress=upload_progress,
     )
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length

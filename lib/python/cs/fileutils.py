@@ -250,7 +250,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
 # pylint: disable=too-many-arguments
 def rewrite(
     filepath,
-    data,
+    srcf,
     mode='w',
     backup_ext=None,
     do_rename=False,
@@ -258,11 +258,11 @@ def rewrite(
     empty_ok=False,
     overwrite_anyway=False
 ):
-  ''' Rewrite the file `filepath` with data from the file object `data`.
+  ''' Rewrite the file `filepath` with data from the file object `srcf`.
 
       Parameters:
       * `filepath`: the name of the file to rewrite
-      * `data`: the source file containing the new content
+      * `srcf`: the source file containing the new content
       * `empty_ok`: if not true, raise `ValueError` if the new data are
         empty.
         Default: `False`.
@@ -279,7 +279,7 @@ def rewrite(
   '''
   with Pfx("rewrite(%r)", filepath):
     with NamedTemporaryFile(dir=dirname(filepath), mode=mode) as T:
-      T.write(data.read())
+      T.write(srcf.read())
       T.flush()
       if not empty_ok:
         st = os.stat(T.name)
@@ -324,7 +324,7 @@ def rewrite_cmgr(filepath, mode='w', **kw):
   with NamedTemporaryFile(mode=mode) as T:
     yield T
     with open(T.name, 'rb') as f:
-      return rewrite(filepath, mode='wb', data=f, **kw)
+      return rewrite(filepath, mode='wb', srcf=f, **kw)
 
 @strable
 def scan_ndjson(f, dictclass=dict):

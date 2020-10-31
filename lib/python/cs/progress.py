@@ -75,6 +75,7 @@ class BaseProgress(object):
     self.name = name
     self.start_time = start_time
     self.units_scale = units_scale
+    self.notify_update = set()
     self._warned = set()
 
   def __str__(self):
@@ -270,7 +271,17 @@ class BaseProgress(object):
   def status(self, label, width):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
+
+        Parameters:
+        * `label`: the label for the status line;
+          if `None` use `self.name`
+        * `width`: the available width for the status line;
+          if not an `int` use `width.width`
     '''
+    if label is None:
+      label = self.name
+    if not isinstance(width, int):
+      width = width.width
     leftv = []
     rightv = []
     throughput = self.throughput_recent(5)
@@ -613,7 +624,6 @@ class Progress(BaseProgress):
       positions.append(CheckPoint(time.time(), position))
     self._positions = positions
     self._flushed = True
-    self.notify_update = set()
 
   def __repr__(self):
     return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
@@ -808,6 +818,11 @@ class Progress(BaseProgress):
 class OverProgress(BaseProgress):
   ''' A `Progress`-like class computed from a set of subsidiary `Progress`es.
 
+      AN OverProgress instance has an attribute ``notify_update`` which
+      is a set of callables.
+      Whenever the position of a subsidiary `Progress` is updated,
+      each of these will be called with the `Progress` instance and `None`.
+
       Example:
 
           >>> P = OverProgress(name="over")
@@ -858,15 +873,31 @@ class OverProgress(BaseProgress):
             self.start, self.position, self.start_time,
             self.total)
 
+  def _updated(self):
+    for notify in list(self.notify_update):
+      try:
+        notify(self, None)
+      except Exception as e:  # pylint: disable=broad-except
+        exception("%s: notify_update %s: %s", self, notify, e)
+
+  def _child_updated(self, child, _):
+    ''' Notify watchers if a child updates.
+    '''
+    self._updated()
+
   def add(self, subprogress):
     ''' Add a subsidairy `Progress` to the contributing set.
     '''
+    subprogress.notify_update.add(self._child_updated)
     self.subprogresses.add(subprogress)
+    self._updated()
 
   def remove(self, subprogress):
     ''' Remove a subsidairy `Progress` from the contributing set.
     '''
+    subprogress.notify_update.remove(self._child_updated)
     self.subprogresses.remove(subprogress)
+    self._updated()
 
   @property
   def start(self):
@@ -926,7 +957,9 @@ class OverProgress(BaseProgress):
     return self._overmax(lambda P: P.eta)
 
 def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.iterbar`.
+  ''' Convenience function to construct and run a `Progress.iterbar`
+      wrapping the iterable `it`,
+      issuing and withdrawning a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume

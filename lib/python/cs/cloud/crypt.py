@@ -418,7 +418,7 @@ def upload(
     *,
     public_path: str,
     public_key_name=None,
-    progress=None,
+    upload_progress=None,
     overwrite: bool = False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
@@ -434,6 +434,8 @@ def upload(
       * `public_path`: the name of a file containing a public key
       * `public_key_name`: an optional name for the public key
         used to encrypt the per file key
+      * `upload_progress`: optional `cs.progress.Progress` instance
+        to which to report upload data
       * `overwrite`: optional flag, default `False`;
         if true, do the upload even if the content file and key file exist
 
@@ -479,7 +481,7 @@ def upload(
         T.name,
         bucket_name=bucket_name,
         path=data_subpath,
-        progress=progress,
+        upload_progress=upload_progress,
         as_is=True,
     )
     retcode = P.wait()
@@ -492,7 +494,7 @@ def upload(
       per_file_passtext_enc,
       bucket_name=bucket_name,
       path=key_subpath,
-      progress=progress,
+      upload_progress=upload_progress,
   )
   return upload_result, data_subpath, key_subpath
 
@@ -503,7 +505,7 @@ def download_passtext(
     *,
     private_path,
     passphrase,
-    progress=None
+    download_progress=None
 ):
   ''' Download the encrypted passtext for use with another encrypted file,
       usually the per-file passtext for an encrypted upload.
@@ -512,7 +514,9 @@ def download_passtext(
       Return the decrypted passtext.
   '''
   bfr, _ = cloud.download_buffer(
-      bucket_name=bucket_name, path=passtext_path, progress=progress
+      bucket_name=bucket_name,
+      path=passtext_path,
+      download_progress=download_progress
   )
   per_file_passtext_enc = b''.join(bfr)
   bfr.close()
@@ -530,7 +534,7 @@ def download(
     private_path,
     passphrase: str,
     public_key_name=None,
-    progress=None,
+    download_progress=None,
     stdout=PIPE,
 ):
   ''' Download from `cloud` in bucket `bucket_name` at path `basepath`
@@ -566,10 +570,12 @@ def download(
       key_subpath,
       private_path=private_path,
       passphrase=passphrase,
-      progress=progress
+      download_progress=download_progress
   )
   bfr, _ = cloud.download_buffer(
-      bucket_name=bucket_name, path=data_subpath, progress=progress
+      bucket_name=bucket_name,
+      path=data_subpath,
+      download_progress=download_progress
   )
   return symdecrypt(bfr, per_file_passtext, stdout=stdout)
 

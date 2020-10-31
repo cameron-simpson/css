@@ -98,6 +98,7 @@ class CornuCopyBuffer(object):
       copy_offsets=None,
       copy_chunks=None,
       close=None,
+      progress=None,
   ):
     ''' Prepare the buffer.
 
@@ -132,6 +133,9 @@ class CornuCopyBuffer(object):
         * `close`: an optional callable
           that may be provided for resource cleanup
           when the user of the buffer calls its `.close()` method.
+        * `progress`: an optional `cs.Progress.progress` instance
+          to which to report data consumed from `input_data`;
+          any object supporting `+=` is acceptable
     '''
     self.bufs = []
     if buf is None or not buf:
@@ -153,6 +157,7 @@ class CornuCopyBuffer(object):
     input_offset = getattr(input_data, 'offset', 0)
     self.input_offset_displacement = input_offset - offset
     self._close = close
+    self.progress = progress
 
   def selfcheck(self, msg=''):
     ''' Integrity check for the buffer, useful during debugging.
@@ -418,6 +423,8 @@ class CornuCopyBuffer(object):
       self.buflen -= len(chunk)
     else:
       chunk = next(self.input_data)
+      if self.progress is not None:
+        self.progress += len(chunk)
     self.offset += len(chunk)
     return chunk
 
@@ -525,6 +532,9 @@ class CornuCopyBuffer(object):
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
         )
+      else:
+        if self.progress is not None:
+          self.progress += len(next_chunk)
       if next_chunk:
         self.bufs.append(next_chunk)
         self.buflen += len(next_chunk)

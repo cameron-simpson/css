@@ -153,7 +153,7 @@ class B2Cloud(SingletonMixin, Cloud):
       *,
       bucket_name: str,
       path: str,
-      progress=None,
+      upload_progress=None,
       file_info=None,
       **b2_kw,
   ):
@@ -161,7 +161,9 @@ class B2Cloud(SingletonMixin, Cloud):
         Return the resulting B2 `FileVersion`.
     '''
     bucket = self.bucket_by_name(bucket_name)
-    progress_listener = None if progress is None else B2ProgressShim(progress)
+    progress_listener = None if upload_progress is None else B2ProgressShim(
+        upload_progress
+    )
     with self._conn_sem:
       return bucket.upload_bytes(
           bs,
@@ -177,7 +179,7 @@ class B2Cloud(SingletonMixin, Cloud):
       *,
       bucket_name: str,
       path: str,
-      progress=None,
+      upload_progress=None,
       file_info=None,
       **b2_kw,
   ):
@@ -189,7 +191,9 @@ class B2Cloud(SingletonMixin, Cloud):
         So we use it unconditionally if we're given a filename.
     '''
     bucket = self.bucket_by_name(bucket_name)
-    progress_listener = None if progress is None else B2ProgressShim(progress)
+    progress_listener = None if upload_progress is None else B2ProgressShim(
+        upload_progress
+    )
     with self._conn_sem:
       return bucket.upload_local_file(
           local_file=filename,
@@ -210,7 +214,7 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileVersion` attribute values.
@@ -221,7 +225,8 @@ class B2Cloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
 
         Annoyingly, the B2 stuff expects to seek on the buffer.
         Therefore we write a scratch file for the upload.
@@ -237,7 +242,7 @@ class B2Cloud(SingletonMixin, Cloud):
           path=path,
           file_info=file_info,
           content_type=content_type,
-          progress=progress,
+          upload_progress=upload_progress,
       )
 
   @pfx_method
@@ -249,7 +254,7 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload the data from the bytes `bs` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileVersion` attribute values.
@@ -260,13 +265,14 @@ class B2Cloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     file_version = self._b2_upload_bytes(
         bs,
         bucket_name=bucket_name,
         path=path,
-        progress=progress,
+        upload_progress=upload_progress,
         file_info=file_info,
         content_type=content_type,
     )
@@ -281,7 +287,7 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the B2 `FileVersion` attribute values.
@@ -296,7 +302,8 @@ class B2Cloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     try:
       fd = f.fileno()
@@ -312,14 +319,14 @@ class B2Cloud(SingletonMixin, Cloud):
           path=path,
           file_info=file_info,
           content_type=content_type,
-          progress=progress,
+          upload_progress=upload_progress,
       )
     else:
       file_version = self._b2_upload_bytes(
           mm,
           bucket_name=bucket_name,
           path=path,
-          progress=progress,
+          upload_progress=upload_progress,
       )
       return file_version.as_dict()
 
@@ -332,7 +339,7 @@ class B2Cloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
       as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
@@ -347,7 +354,8 @@ class B2Cloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -361,7 +369,7 @@ class B2Cloud(SingletonMixin, Cloud):
         filename,
         bucket_name=bucket_name,
         path=path,
-        progress=progress,
+        upload_progress=upload_progress,
         file_info=file_info,
         content_type=content_type,
     )
@@ -374,7 +382,7 @@ class B2Cloud(SingletonMixin, Cloud):
       *,
       bucket_name: str,
       path: str,
-      progress=None,
+      download_progress=None,
   ) -> (CornuCopyBuffer, dict):
     ''' Download from `path` within `bucket_name`,
         returning `(buffer,file_info)`
@@ -384,10 +392,14 @@ class B2Cloud(SingletonMixin, Cloud):
         Parameters:
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `download_progress`: an optional `cs.progress.Progress` instance
+          to which to report download data
     '''
     bucket = self.bucket_by_name(bucket_name)
-    progress_listener = None if progress is None else B2ProgressShim(progress)
+    progress_listener = (
+        None
+        if download_progress is None else B2ProgressShim(download_progress)
+    )
     download_dest = B2DownloadBufferShim()
     try:
       file_info = bucket.download_file_by_name(
@@ -396,32 +408,6 @@ class B2Cloud(SingletonMixin, Cloud):
     except B2FileNotPresent as e:
       raise FileNotFoundError(self.pathfor(bucket_name, path)) from e
     return download_dest.bfr, file_info
-
-class B2UploadFileWrapper:
-  ''' A Wrapper for a file-like object which updates a `Progress`.
-  '''
-
-  def __init__(self, f, *, progress):
-    self.f = f
-    self.progress = progress
-
-  def read(self, size):
-    ''' Read from the file and advance the progress meter.
-    '''
-    bs = self.f.read(size)
-    if self.progress:
-      self.progress += len(bs)
-    return bs
-
-  def seek(self, position, whence):
-    ''' Adjust the position of the file.
-    '''
-    return self.f.seek(position, whence)
-
-  def tell(self):
-    ''' Report position from the file.
-    '''
-    return self.f.tell()
 
 class B2DownloadBufferShimFileShim:
   ''' Shim to present a write-to-file interface for an `IterableQueue`.
