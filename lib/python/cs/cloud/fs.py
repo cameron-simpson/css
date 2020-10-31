@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' BackBlaze B2 support.
+''' Filesystem support.
 '''
 
 import errno
