@@ -270,6 +270,7 @@ class BaseProgress(object):
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
+  # pylint: disable=too-many-branches,too-many-statements
   def status(self, label, width, window=5):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
@@ -438,7 +439,7 @@ class BaseProgress(object):
           )
       )
 
-  # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
   def iterbar(
       self,
       it,
@@ -899,6 +900,7 @@ class OverProgress(BaseProgress):
       except Exception as e:  # pylint: disable=broad-except
         exception("%s: notify_update %s: %s", self, notify, e)
 
+  # pylint: disable=unused-argument
   def _child_updated(self, child, _):
     ''' Notify watchers if a child updates.
     '''
