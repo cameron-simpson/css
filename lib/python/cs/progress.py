@@ -1029,6 +1029,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
   ).iterbar(
       it, label=label, **kw
   )
+  pass
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
