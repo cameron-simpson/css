@@ -271,12 +271,8 @@ class BaseProgress(object):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
     '''
-    from cs.upd import print
     leftv = []
     rightv = []
-    remaining = self.remaining_time
-    if remaining:
-      remaining = int(remaining)
     throughput = self.throughput_recent(5)
     if throughput is not None:
       if throughput == 0:
@@ -287,12 +283,15 @@ class BaseProgress(object):
         if throughput >= 10:
           throughput = int(throughput)
         rightv.append(self.format_counter(throughput, max_parts=1) + '/s')
+      remaining = self.remaining_time
+      if remaining:
+        remaining = int(remaining)
+      if remaining is None:
+        rightv.append('ETA ??')
+      else:
+        rightv.append('ETA ' + transcribe_time(remaining))
     if self.total is not None and self.total > 0:
       leftv.append(self.text_pos_of_total())
-    if remaining is None:
-      rightv.append('ETA ??')
-    else:
-      rightv.append('ETA ' + transcribe_time(remaining))
     left = ' '.join(leftv)
     right = ' '.join(rightv)
     if self.total is None:
@@ -400,7 +399,7 @@ class BaseProgress(object):
         if proxy is None:
           proxy = pproxy[0] = upd.insert(insert_pos)
         status = statusfunc(self, label, width or proxy.width)
-        proxy(statusfunc(self, label, width or proxy.width))
+        proxy(status)
       self.notify_update.add(update)
       start_pos = self.position
       yield pproxy[0]
@@ -775,6 +774,10 @@ class Progress(BaseProgress):
       )
     if not self._flushed:
       self._flush()
+    positions = self._positions
+    if len(positions) == 1 and positions[0].time == self.start_time:
+      # no throughput if we only have the starting position
+      return None
     now = time.time()
     time0 = now - time_window
     if time0 < self.start_time:
