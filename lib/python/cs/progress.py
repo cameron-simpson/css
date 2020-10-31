@@ -356,6 +356,7 @@ class BaseProgress(object):
       proxy=None,
       statusfunc=None,
       width=None,
+      window=None,
       report_print=None,
       insert_pos=1,
       deferred=False,
@@ -376,6 +377,9 @@ class BaseProgress(object):
         * `width`: an optional width expressioning how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
+        * `window`: optional timeframe to define "recent" in seconds;
+          if the default `statusfunc` (`Progress.status`) is used
+          this is passed to it
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -399,7 +403,9 @@ class BaseProgress(object):
     if upd is None:
       upd = Upd()
     if statusfunc is None:
-      statusfunc = lambda P, label, width: P.status(label, width)
+      statusfunc = lambda P, label, width: P.status(
+          label, width, window=window
+      )
     pproxy = [proxy]
     proxy_delete = proxy is None
 
