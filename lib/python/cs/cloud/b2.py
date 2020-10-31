@@ -397,32 +397,6 @@ class B2Cloud(SingletonMixin, Cloud):
       raise FileNotFoundError(self.pathfor(bucket_name, path)) from e
     return download_dest.bfr, file_info
 
-class B2UploadFileWrapper:
-  ''' A Wrapper for a file-like object which updates a `Progress`.
-  '''
-
-  def __init__(self, f, *, progress):
-    self.f = f
-    self.progress = progress
-
-  def read(self, size):
-    ''' Read from the file and advance the progress meter.
-    '''
-    bs = self.f.read(size)
-    if self.progress:
-      self.progress += len(bs)
-    return bs
-
-  def seek(self, position, whence):
-    ''' Adjust the position of the file.
-    '''
-    return self.f.seek(position, whence)
-
-  def tell(self):
-    ''' Report position from the file.
-    '''
-    return self.f.tell()
-
 class B2DownloadBufferShimFileShim:
   ''' Shim to present a write-to-file interface for an `IterableQueue`.
   '''
