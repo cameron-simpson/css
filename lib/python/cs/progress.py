@@ -271,7 +271,7 @@ class BaseProgress(object):
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
   # pylint: disable=too-many-branches,too-many-statements
-  def status(self, label, width, window=5):
+  def status(self, label, width, window=None):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
 
@@ -287,6 +287,8 @@ class BaseProgress(object):
       label = self.name
     if not isinstance(width, int):
       width = width.width
+    if window is None:
+      window = 5
     leftv = []
     rightv = []
     throughput = self.throughput_recent(window)
