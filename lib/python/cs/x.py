@@ -38,6 +38,8 @@ import os
 import sys
 from cs.ansi_colour import colourise
 
+__version__ = '20201102'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
