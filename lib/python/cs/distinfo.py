@@ -1180,7 +1180,10 @@ class Module(object):
       if distinfo_requires is None:
         problems.append("missing DISTINFO[install_requires]")
       else:
-        if sorted(distinfo_requires) != import_names:
+        distinfo_requires_names = [
+            get_dotted_identifier(dirq)[0] for dirq in distinfo_requires
+        ]
+        if sorted(distinfo_requires_names) != import_names:
           problems.append(
               "DISTINFO[install_requires=%r] != direct_imports=%r" %
               (distinfo_requires, sorted(import_names))
