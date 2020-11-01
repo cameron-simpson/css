@@ -71,4 +71,4 @@ cs.upd pypi.release="20201102"
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
-cs.x pypi.release=20181231
+cs.x pypi.release="20201102"
