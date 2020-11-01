@@ -182,6 +182,7 @@ class Upd(SingletonMixin):
     self.columns = columns
     self._ti_ready = False
     self._ti_strs = {}
+    self._cursor_visible = True
     self._slot_text = []
     self._current_slot = None
     self._above = None
@@ -246,8 +247,38 @@ class Upd(SingletonMixin):
           if slots[0]:
             # preserve the last status line if not empty
             txts.append('\n')
+          txts.append(self._set_cursor_visible(True))
           self._backend.write(''.join(txts))
+          self.cursor_visible()
           self._backend.flush()
+
+  def _set_cursor_visible(self, mode):
+    ''' Set the cursor visibility mode, return terminal sequence.
+    '''
+    txt = ''
+    if self._cursor_visible:
+      if not mode:
+        txt = self.ti_str('vi') or ''
+        self._cursor_visible = False
+    else:
+      if mode:
+        txt = self.ti_str('vs') or ''
+        self._cursor_visible = True
+    return txt
+
+  def cursor_visible(self):
+    ''' Make the cursor visible.
+    '''
+    with self._lock:
+      if not self._disabled and self._backend is not None:
+        self._set_cursor_visible(True)
+
+  def cursor_invisible(self):
+    ''' Make the cursor vinisible.
+    '''
+    with self._lock:
+      if not self._disabled and self._backend is not None:
+        self._set_cursor_visible(False)
 
   @property
   def disabled(self):
