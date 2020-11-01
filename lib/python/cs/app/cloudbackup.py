@@ -1480,8 +1480,8 @@ class NamedBackup(SingletonMixin):
     for dirpath, dirnames, _ in os.walk(topdirpath):
       if runstate.cancelled:
         break
-      status_proxy("os.walk %s/", dirpath)
       subpath = relpath(dirpath, backup_root_dirpath)
+      status_proxy("os.walk %s/", subpath)
       if subpath == '.':
         subpath = ''
       Rs.append(
@@ -1494,8 +1494,8 @@ class NamedBackup(SingletonMixin):
       dirnames[:] = sorted(dirnames)
     if Rs:
       for R in progressbar(report(Rs), total=len(Rs),
-                           label="%s: wait for subdirectories" %
-                           (backup_root_dirpath,), proxy=status_proxy):
+                           label="%s: wait for subdirectories" % (topsubpath,),
+                           proxy=status_proxy):
         try:
           R()
         except Exception as e:  # pylint: disable=broad-except
