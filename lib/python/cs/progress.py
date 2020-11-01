@@ -39,7 +39,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.deco', 'cs.logutils', 'cspy.func', 'cs.seq', 'cs.units', 'cs.upd'],
+    ['cs.deco', 'cs.logutils', 'cs.py.func', 'cs.seq', 'cs.units', 'cs.upd'],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
