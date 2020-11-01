@@ -896,7 +896,7 @@ class OverProgress(BaseProgress):
             self.total)
 
   def _updated(self):
-    with self.lock:
+    with self._lock:
       notifiers = list(self.notify_update)
     for notify in notifiers:
       try:
