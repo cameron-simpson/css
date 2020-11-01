@@ -67,7 +67,7 @@ from cs.seq import splitoff
 from cs.threads import locked
 from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
-from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
 from typeguard import typechecked
 
@@ -1061,6 +1061,7 @@ class BackupRun(RunStateMixin):
         prepares a new `BackupRecord`, catches `SIGINT`,
         and commences a backup run.
     '''
+    Upd().cursor_invisible()
     status_proxy = UpdProxy()
 
     upload_progress = OverProgress(name="uploads")
@@ -1134,6 +1135,7 @@ class BackupRun(RunStateMixin):
     for proxy in self.folder_proxies:
       proxy.delete()
     self.status_proxy.delete()
+    Upd().cursor_visible()
     old_attrs = self._stacked.pop()
     popattrs(self, old_attrs.keys(), old_attrs)
 
