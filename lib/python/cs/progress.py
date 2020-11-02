@@ -120,7 +120,7 @@ class BaseProgress(object):
         Example:
 
             >>> P = Progress()
-            >>> P.ratio
+             P.ratio
             >>> P.total = 16
             >>> P.ratio
             0.0
@@ -769,11 +769,14 @@ class Progress(BaseProgress):
         )
       oldest = time.time() - window
     positions = self._positions
-    # scan for first item still in time window
-    for ndx, posn in enumerate(positions):
+    # scan for first item still in time window,
+    # never discard the last 2 positions
+    for ndx in range(0, len(positions) - 1):
+      posn = positions[ndx]
       if posn.time >= oldest:
-        if ndx > 0:
-          del positions[0:ndx]
+        # this is the first element to keep, discard preceeding (if any)
+        # note we can't just start at ndx=1 because ndx=0 might be in range
+        del positions[0:ndx]
         break
     self._flushed = True
 
