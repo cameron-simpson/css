@@ -17,7 +17,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20200716-post'
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,6 +50,7 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
+# pylint: disable=too-few-public-methods
 class O(SimpleNamespace):
   ''' The `O` class is now obsolete, please subclass `types.SimpleNamespace`.
   '''
@@ -140,7 +141,7 @@ def O_str(o, no_recurse=False, seen=None):
   if obj_type in (tuple, int, float, bool, list):
     return str(o)
   if obj_type is dict:
-    o2 = dict([(k, str(v)) for k, v in o.items()])
+    o2 = {k: str(v) for k, v in o.items()}
     return str(o2)
   if obj_type is set:
     return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
@@ -183,34 +184,34 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
-def as_dict(o, attr_prefix=None, attr_match=None):
+def as_dict(o, selector=None):
   ''' Return a dictionary with keys mapping to the values of the attributes of `o`.
 
       Parameters:
       * `o`: the object to map
-      * `attr_prefix`: optional prefix for interesting attribute names
-      * `attr_match`: optional test for interesting attribute names
+      * `selector`: the optional selection criterion
 
-      It is an error to specify both `attr_prefix` and `attr_match`.
+      If `selector` is omitted or `None`, select "public" attributes,
+      those not commencing with an underscore.
+
+      If `selector` is a `str`, select attributes starting with `selector`.
+
+      Otherwise presume `selector` is callable
+      and select attributes `attr` where `selector(attr)` is true.
   '''
-  if attr_match is None:
-    if attr_prefix is None:
-      match = lambda attr: attr and not attr.startswith('_')
-    else:
-      match = lambda attr: attr.startswith(attr_prefix)
-  elif attr_prefix is None:
-    match = attr_match
+  if selector is None:
+    match = lambda attr: attr and not attr.startswith('_')
+  elif isinstance(selector, str):
+    match = lambda attr: attr.startswith(selector)
   else:
-    raise ValueError("cannot specify both attr_prefix and attr_match")
-  d = {}
-  for attr in dir(o):
-    if match(attr):
-      d[attr] = getattr(o, attr)
-  return d
+    match = selector
+  return {attr: getattr(o, attr) for attr in dir(o) if match(attr)}
 
 @OBSOLETE("use cs.obj.as_dict")
 def obj_as_dict(o, **kw):
-  return as_dict(o, **kw)
+  ''' OBSOLETE convesion of an object to a `dict`. Please us `cs.obj.as_dict`.
+  '''
+  raise RuntimeError("please use cs.obj.as_dict")
 
 class Proxy(object):
   ''' An extremely simple proxy object
@@ -321,6 +322,7 @@ def singleton(registry, key, factory, fargs, fkwargs):
     is_new = True
   return is_new, instance
 
+# pylint: disable=too-few-public-methods
 class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
@@ -405,6 +407,8 @@ class SingletonMixin:
           registry = cls._singleton_registry = WeakValueDictionary()
           registry._singleton_lock = Lock()
 
+    # TODO: what happens with fargs and fkwargs? unused yet supplied?
+    # TODO: docstring wrong - there is no _singleton_init any more
     def factory(*fargs, **fkwargs):
       ''' Prepare a new object.
 
@@ -415,7 +419,7 @@ class SingletonMixin:
 
     okey = cls._singleton_key(*a, **kw)
     with registry._singleton_lock:
-      isnew, instance = singleton(registry, okey, factory, a, kw)
+      _, instance = singleton(registry, okey, factory, a, kw)
     return instance
 
 if __name__ == '__main__':

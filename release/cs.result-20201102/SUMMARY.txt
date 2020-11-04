@@ -1,0 +1,1 @@
+Result: now .extra attribute for associated data and a new optional "extra" parameter in the initialiser.

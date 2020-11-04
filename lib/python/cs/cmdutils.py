@@ -12,20 +12,22 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
-from types import SimpleNamespace as NS
+from types import SimpleNamespace
 from cs.context import nullcontext, stackattrs
 from cs.deco import cachedmethod
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx, XP
+from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200615-post'
+__version__ = '20201102-post'
 
 DISTINFO = {
     'description':
-    "convenience functions for working with the Cmd module, a BaseCommand class for constructing command lines and other command line related stuff",
+    "convenience functions for working with the Cmd module,"
+    " a BaseCommand class for constructing command lines"
+    " and other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -76,7 +78,7 @@ def docmd(dofunc):
         warning("%s", e)
         self.do_help(argv0)
         return None
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception("%s", e)
         return None
 
@@ -147,6 +149,7 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  OPTIONS_CLASS = SimpleNamespace
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
@@ -193,7 +196,7 @@ class BaseCommand:
     usage_message = usage_format.format_map(usage_format_mapping)
     if has_subcmds:
       subusages = []
-      for attr, method in sorted(subcmds.items()):
+      for attr in sorted(subcmds):
         with Pfx(attr):
           subusage = cls.subcommand_usage_text(attr)
           if subusage:
@@ -259,6 +262,7 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `options`.
     '''
 
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self, argv=None, options=None, cmd=None):
     ''' Run a command from `argv`.
         Returns the exit status of the command.
@@ -276,7 +280,7 @@ class BaseCommand:
           If not specified a new `SimpleNamespace`
           is allocated for use as `options`,
           and prefilled with `.cmd` set to `cmd`
-          and other values as set by `.apply_default(options)`
+          and other values as set by `.apply_defaults(options)`
           if such a method is provided.
         * `cmd`:
           optional command name for context;
@@ -304,7 +308,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     if options is None:
-      options = NS()
+      options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -328,7 +332,7 @@ class BaseCommand:
       # we do this regardless in order to honour '--'
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
-        self.apply_opts(opts, options)
+        self.apply_opts(opts, options)  # pylint: disable=no-member
 
       subcmds = self.subcommands()
       if subcmds and list(subcmds) != ['help']:
@@ -339,8 +343,9 @@ class BaseCommand:
               (', '.join(sorted(subcmds.keys())),)
           )
         subcmd = argv.pop(0)
+        subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
@@ -381,6 +386,7 @@ class BaseCommand:
         return 2
       raise
 
+  # pylint: disable=unused-argument
   @staticmethod
   def getopt_error_handler(cmd, options, e, usage):
     ''' The `getopt_error_handler` method
@@ -417,6 +423,7 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
+  # pylint: disable=unused-argument
   @staticmethod
   @contextmanager
   def run_context(argv, options):
@@ -428,6 +435,7 @@ class BaseCommand:
     finally:
       pass
 
+  # pylint: disable=unused-argument
   @classmethod
   def cmd_help(cls, argv, options):
     ''' Usage: {cmd} [subcommand-names...]

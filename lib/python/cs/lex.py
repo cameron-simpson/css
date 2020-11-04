@@ -12,6 +12,8 @@ Generally the get_* functions accept a source string and an offset
 raising `ValueError` on failed tokenisation.
 '''
 
+# pylint: disable=too-many-lines
+
 import binascii
 from functools import partial
 import os
@@ -19,9 +21,10 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
 from cs.deco import fmtdoc
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
+from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
+from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20200718-post'
+__version__ = '20200914-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,7 +33,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3', 'cs.seq>=20200914'],
 }
 
 unhexify = binascii.unhexlify
@@ -45,16 +48,22 @@ else:
 
 ord_space = ord(' ')
 
+# pylint: disable=too-many-branches
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
   '''
+  if tabsize < 1:
+    raise ValueError("tabsize(%r) < 1" % (tabsize,))
   s2 = ''
   sofar = 0
   for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
-      pass
+      if sofar < i:
+        s2 += s[sofar:i]
+        sofar = i
+      ch2 = ' ' * (tabsize - (len(s2) % tabsize))
     elif ch == '\f':
       ch2 = '\\f'
     elif ch == '\n':
@@ -508,6 +517,8 @@ def slosh_mapper(c, charmap=None):
     charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
+# pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+# pylint: disable=too-many-statements,too-many-arguments
 def get_sloshed_text(
     s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None
 ):
@@ -695,6 +706,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
+# pylint: disable=too-many-arguments
 def get_qstr(
     s, offset=0, q='"', environ=None, default=None, env_specials=None
 ):
@@ -770,6 +782,7 @@ def get_tokens(s, offset, getters):
         a `.end()` method returning the offset of the end of the match
   '''
   tokens = []
+  # pylint: disable=cell-var-from-loop
   for getter in getters:
     args = ()
     kwargs = {}
@@ -909,6 +922,34 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
+def common_prefix(*strs):
+  ''' Return the common prefix of the strings `strs`.
+
+      Examples:
+
+          >>> common_prefix('abc', 'def')
+          ''
+          >>> common_prefix('abc', 'abd')
+          'ab'
+          >>> common_prefix('abc', 'abcdef')
+          'abc'
+          >>> common_prefix('abc', 'abcdef', 'abz')
+          'ab'
+          >>> # contrast with cs.fileutils.common_path_prefix
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
+  '''
+  return strs[0][:common_prefix_length(*strs)]
+
+def common_suffix(*strs):
+  ''' Return the common suffix of the strings `strs`.
+  '''
+  length = common_suffix_length(*strs)
+  if not length:
+    # catch 0 length suffix specially, because -0 == 0
+    return ''
+  return strs[0][-length:]
+
 def cropped_repr(s, max_length=32, offset=0):
   ''' If the length of the sequence `s` after `offset` (default `0`)
       exceeds `max_length` (default `32`)
@@ -1002,7 +1043,7 @@ def format_as(format_s, format_mapping, error_sep=None):
 
 _format_as = format_as
 
-class FormatableMixin(object):
+class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes with an
       existing `format_kwargs` method.
 

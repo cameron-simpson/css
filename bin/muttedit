@@ -4,8 +4,13 @@
 # This lets you detach from an unfinished reply and finish it later.
 # My muttrc has this:
 #
-#  macro index g ":set editor=muttedit<enter><group-reply>:set editor=$EDITOR<enter>" "group reply"
-#   
+#     macro index m "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><mail>:set editor=\$my_old_editor<enter>" "compose new message"
+#     macro index g "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><group-reply>:set editor=\$my_old_editor<enter>" "group reply"
+#     macro index L "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><list-reply>:set editor=\$my_old_editor<enter>" "list reply"
+#
+# and I have the environment variable $MUTTEDIT_EDITOR set to
+# "vim-flowed", which invokes vim with settings which aid with composing
+# format=flowed email (see RFC3676).
 # - Cameron Simpson <cs@cskk.id.au> 31mar2006
 # 
 
@@ -17,7 +22,7 @@ default_composedir=$HOME/var/mutt/compose
 : ${TMPDIR:=/tmp}
 : ${TMUX:=''}
 wprog=${MUTTEDIT_WINDOWPROG:-}
-editor=${MUTTEDIT_EDITOR:-${EDITOR:-$default_editor}}
+editor=${MUTTEDIT_EDITOR:-$default_editor}
 composedir=${MUTTEDIT_COMPOSEDIR:-"$default_composedir"}
 
 cmd=$0
@@ -117,7 +122,7 @@ filename=$tmpf
 
 set -- \
   rmafter "$filename" \
-    mutt -e "set editor=$editor" -e 'unset signature' -H "$filename"
+    mutt -e "set editor=$editor" -e 'unset signature' -e 'set sidebar_visible=no' -H "$filename"
 
 if tmux start-server
 then  use_tmux=1

@@ -1,0 +1,1 @@
+Bugfix Upd.insert: accept insert(1) when len(self)==0.
