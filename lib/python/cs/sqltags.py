@@ -217,6 +217,24 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           yield
 
   @classmethod
+  def parse_tagset_criteria(cls, argv):
+    ''' Parse tag criteria from `argv`.
+
+        The criteria may be either:
+        * an integer specifying a `Tag` id
+        * a sequence of tag criteria
+    '''
+    # try a single int argument
+    if len(argv) == 1:
+      try:
+        index = int(argv[0])
+      except ValueError:
+        pass
+      else:
+        return [index], []
+    return super().parse_tagset_criteria(argv)
+
+  @classmethod
   def cmd_edit(cls, argv, options):
     ''' Usage: edit name
     '''
