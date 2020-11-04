@@ -1761,28 +1761,49 @@ class TagsCommandMixin:
   '''
 
   @classmethod
-  def parse_tagset_criteria(cls, argv, tag_based_test_class=None):
-    ''' Parse a list of tag specifications `argv` of the form:
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+    ''' Parse `arg` as a tag specification
+        and return a `tag_based_test_class` instance
+        via its `.from_str` factory method.
+        Raises `ValueError` in a misparse.
+        The default `tag_based_test_class`
+        comes from `cls.TAGSET_CRITERION_CLASS`,
+        which itself defaults to class `TagSetCriterion`.
+
+        The default `TagSetCriterion.from_str` recognises:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
-        Return a list of `TagSetCriterion` instances for each `arg` in `argv`.
-
-        The optional parameter `tag_based_test_class` is a class
-        with a `.from_str(str)` factory method
-        returning a `TagSetCriterion` duck instance.
-        The default `tag_based_test_class` is `cls.TAGSET_CRITERION_CLASS`
-        or `TagSetCriterion`.
     '''
     if tag_based_test_class is None:
       tag_based_test_class = getattr(
           cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
       )
-    choices = []
-    for arg in argv:
-      with Pfx(arg):
-        choices.append(tag_based_test_class.from_str(arg))
-    return choices
+    return tag_based_test_class.from_str(arg)
+
+  @classmethod
+  def parse_tagset_criteria(cls, argv, tag_based_test_class=None):
+    ''' Parse tag specifications from `argv` until an unparseable item is found.
+        Return `(criteria,argv)`
+        where `criteria` is a list of the parsed criteria
+        and `argv` is the remaining unparsed items.
+
+        Each item is parsed via
+        `cls.parse_tagset_criterion(item,tag_based_test_class)`.
+    '''
+    argv = list(argv)
+    criteria = []
+    while argv:
+      try:
+        criterion = cls.parse_tagset_criterion(
+            argv[0], tag_based_test_class=tag_based_test_class
+        )
+      except ValueError as e:
+        warning("parse_tagset_criteria(%r): %s", argv[0], e)
+        break
+      criteria.append(criterion)
+      argv.pop(0)
+    return criteria, argv
 
   @staticmethod
   def parse_tag_choices(argv):

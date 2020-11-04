@@ -207,33 +207,39 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           yield
 
   @classmethod
+  def parse_tagset_criteria(cls, argv):
+    ''' Parse tag criteria from `argv`.
+
+        The criteria may be either:
+        * an integer specifying a `Tag` id
+        * a sequence of tag criteria
+    '''
+    # try a single int argument
+    if len(argv) == 1:
+      try:
+        index = int(argv[0])
+      except ValueError:
+        pass
+      else:
+        return [index], []
+    return super().parse_tagset_criteria(argv)
+
+  @classmethod
   def cmd_edit(cls, argv, options):
     ''' Usage: edit name
     '''
     sqltags = options.sqltags
     badopts = False
-    if not argv:
-      raise GetoptError("missing name or tag criteria")
-    tes = None
-    if len(argv) == 1:
-      try:
-        index = int(argv[0])
-      except ValueError:
-        index, offset = Tag.parse_name(argv[0])
-        if not index or offset < len(argv[0]):
-          index = None
-      if index is not None:
-        tes = [sqltags[index]]
-    if tes is None:
-      try:
-        tag_criteria = cls.parse_tagset_criteria(argv)
-      except ValueError as e:
-        warning("bad tag specifications: %s", e)
-        badopts = True
+    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("remaining unparsed arguments: %r", argv)
+      badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    if tes is None:
-      tes = list(sqltags.find(tag_criteria))
+    tes = list(sqltags.find(tag_criteria))
     changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
@@ -250,10 +256,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     sqltags = options.sqltags
     badopts = False
-    try:
-      tag_criteria = cls.parse_tagset_criteria(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
+    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
@@ -284,10 +289,12 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           output_format = value
         else:
           raise RuntimeError("unsupported option")
-    try:
-      tag_criteria = cls.parse_tagset_criteria(argv)
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
+    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("unparsed arguments: %r", argv)
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
@@ -1118,16 +1125,18 @@ class SQLTags(MultiOpenMixin):
         for the `Entity` rows matching `tag_criteria`.
     '''
     entities = self.orm.entities
-    query = entities.by_tags(tag_criteria, session=session)
-    XP("QUERY = %s", query)
-    for te in self._run_query(query, session=session):
-      ok = True
-      for criterion in tag_criteria:
-        if not criterion.match(te.tags):
-          ok = False
-          break
-      if ok:
-        yield te
+    if len(tag_criteria) == 1 and isinstance(tag_criteria[0], int):
+      yield self[tag_criteria[0]]
+    else:
+      query = entities.by_tags(tag_criteria, session=session)
+      for te in self._run_query(query, session=session):
+        ok = True
+        for criterion in tag_criteria:
+          if not criterion.match(te.tags):
+            ok = False
+            break
+        if ok:
+          yield te
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
