@@ -485,7 +485,7 @@ def pfx(func, message=None, message_args=()):
   fname = funcname(func)
   if message is None:
     if message_args:
-      raise ValueError("no message, but message_args=%r"%(message_args,))
+      raise ValueError("no message, but message_args=%r" % (message_args,))
     message = fname
 
   if isgeneratorfunction(func):
