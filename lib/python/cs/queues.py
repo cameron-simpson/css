@@ -19,7 +19,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20200718-post'
+__version__ = '20201025-post'
 
 DISTINFO = {
     'description':
@@ -55,13 +55,12 @@ class _QueueIterator(MultiOpenMixin):
       name = "QueueIterator-%d" % (seq(),)
     self.q = q
     self.name = name
-    MultiOpenMixin.__init__(self)
     self.finalise_later = True
     # count of non-sentinel items
     self._item_count = 0
 
   def __str__(self):
-    return "<%s:opens=%d>" % (self.name, self._opens)
+    return "%s(%r)" % (type(self).__name__,self.name)
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -86,7 +85,6 @@ class _QueueIterator(MultiOpenMixin):
   def startup(self):
     ''' Required MultiOpenMixin method.
     '''
-    pass
 
   def shutdown(self):
     ''' Support method for MultiOpenMixin.shutdown.

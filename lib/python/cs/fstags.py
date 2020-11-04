@@ -85,7 +85,6 @@ from os.path import (
 from pathlib import PurePath
 import shutil
 import sys
-import threading
 from threading import Lock, RLock
 from icontract import require
 from cs.cmdutils import BaseCommand
@@ -93,18 +92,19 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    get_nonwhite, get_ini_clause_entryname, FormatableMixin, FormatAsError
+    cutsuffix, get_nonwhite, get_ini_clause_entryname, FormatableMixin,
+    FormatAsError
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TaggedEntity,
     TagsCommandMixin, RegexpTagRule
 )
-from cs.threads import locked, locked_property
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.threads import locked, locked_property, State
+from cs.upd import print  # pylint: disable=redefined-builtin
 
 __version__ = '20200717.1-post'
 
@@ -142,16 +142,7 @@ def main(argv=None):
   '''
   return FSTagsCommand().run(argv)
 
-class _State(threading.local):
-  ''' Per-thread default context stack.
-  '''
-
-  def __init__(self, **kw):
-    threading.local.__init__(self)
-    for k, v in kw.items():
-      setattr(self, k, v)
-
-state = _State(verbose=False)
+state = State(verbose=False)
 
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
@@ -1477,7 +1468,9 @@ class TagFile(SingletonMixin):
 
         This is loaded on demand.
     '''
-    return self.load_tagsets(self.filepath, self.ontology)
+    ts, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    self.unparsed = unparsed
+    return ts
 
   @property
   def names(self):
@@ -1486,6 +1479,7 @@ class TagFile(SingletonMixin):
     return list(self.tagsets.keys())
 
   @classmethod
+  @pfx_method
   def parse_tags_line(cls, line, ontology=None):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
@@ -1508,25 +1502,38 @@ class TagFile(SingletonMixin):
 
   @classmethod
   def load_tagsets(cls, filepath, ontology):
-    ''' Load `filepath` and return
-        a mapping of `name`=>`tag_name`=>`value`.
+    ''' Load `filepath` and return `(tagsets,unparsed)`.
+
+        The returned `tagsets` are a mapping of `name`=>`tag_name`=>`value`.
+        The returned `unparsed` is a list of `(lineno,line)`
+        for lines which failed the parse (excluding the trailing newline).
     '''
     with Pfx("%r", filepath):
       tagsets = defaultdict(lambda: TagSet(ontology=ontology))
+      unparsed = []
       try:
         with open(filepath) as f:
           with stackattrs(state, verbose=False):
             for lineno, line in enumerate(f, 1):
               with Pfx(lineno):
-                line = line.strip()
-                if not line or line.startswith('#'):
+                line0 = cutsuffix(line, '\n')
+                line = line0.strip()
+                if not line:
                   continue
-                name, tags = cls.parse_tags_line(line, ontology=ontology)
-                tagsets[name] = tags
+                if line.startswith('#'):
+                  unparsed.append((lineno, line0))
+                  continue
+                try:
+                  name, tags = cls.parse_tags_line(line, ontology=ontology)
+                except ValueError as e:
+                  warning("parse error: %s", e)
+                  unparsed.append((lineno, line0))
+                else:
+                  tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
           raise
-      return tagsets
+      return tagsets, unparsed
 
   @classmethod
   def tags_line(cls, name, tags):
@@ -1538,21 +1545,27 @@ class TagFile(SingletonMixin):
     return ' '.join(fields)
 
   @classmethod
-  def save_tagsets(cls, filepath, tagsets):
-    ''' Save `tagsets` to `filepath`.
+  @pfx_method
+  def save_tagsets(cls, filepath, tagsets, unparsed):
+    ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
         if missing.
     '''
-    with Pfx("savetags(%r)", filepath):
+    with Pfx(filepath):
       dirpath = dirname(filepath)
       if not isdirpath(dirpath):
         verbose("makedirs(%r)", dirpath)
-        with Pfx("makedirs(%r)", dirpath):
+        with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
       try:
         with open(filepath, 'w') as f:
+          for _, line in unparsed:
+            if not line.startswith('#'):
+              f.write('##  ')
+            f.write(line)
+            f.write('\n')
           for name, tags in name_tags:
             if not tags:
               continue
@@ -1574,7 +1587,7 @@ class TagFile(SingletonMixin):
     with self._lock:
       if any(map(lambda tagset: tagset.modified, tagsets.values())):
         # modified TagSets
-        self.save_tagsets(self.filepath, self.tagsets)
+        self.save_tagsets(self.filepath, self.tagsets, self.unparsed)
         for tagset in tagsets.values():
           tagset.modified = False
     if self.find_parent:

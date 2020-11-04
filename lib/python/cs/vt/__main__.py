@@ -180,6 +180,7 @@ class VTCmd(BaseCommand):
       cmd = options.cmd
     else:
       cmd = options.cmd + ': ' + cmd
+    config = options.config
     runstate = options.runstate
     progress = options.progress
     if progress is None:
@@ -213,62 +214,66 @@ class VTCmd(BaseCommand):
 
       ticker = bg_thread(ticker, name='status-line', daemon=True)
     with stackattrs(options, progress=progress, ticker=ticker):
-      with stackattrs(defaults, runstate=runstate, progress=progress):
-        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
-          yield
-        else:
-          # open the default Store
-          if options.store_spec is None:
-            if cmd == "serve":
-              store_spec = '[server]'
-            else:
-              store_spec = os.environ.get('VT_STORE', '[default]')
-            options.store_spec = store_spec
-          try:
-            # set up the primary Store using the main programme RunState for control
-            S = Store(options.store_spec, options.config)
-          except (KeyError, ValueError) as e:
-            raise GetoptError(
-                "unusable Store specification: %s: %s" %
-                (options.store_spec, e)
-            )
-          except Exception as e:
-            exception(
-                "UNEXPECTED EXCEPTION: can't open store %r: %s",
-                options.store_spec, e
-            )
-            raise GetoptError(
-                "unusable Store specification: %s" % (options.store_spec,)
-            )
-          defaults.push_Ss(S)
-          if options.cache_store_spec is None:
-            cacheS = None
+      with stackattrs(common, runstate=runstate, progress=progress,
+                      config=config):
+        # redo these because defaults is already initialised
+        with stackattrs(defaults, runstate=runstate, progress=progress):
+          if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+            yield
           else:
+            # open the default Store
+            if options.store_spec is None:
+              if cmd == "serve":
+                store_spec = '[server]'
+              else:
+                store_spec = os.environ.get('VT_STORE', '[default]')
+              options.store_spec = store_spec
             try:
-              cacheS = Store(options.cache_store_spec, options.config)
+              # set up the primary Store using the main programme RunState for control
+              S = Store(options.store_spec, options.config)
+            except (KeyError, ValueError) as e:
+              raise GetoptError(
+                  "unusable Store specification: %s: %s" %
+                  (options.store_spec, e)
+              )
             except Exception as e:
               exception(
-                  "can't open cache store %r: %s", options.cache_store_spec, e
+                  "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                  options.store_spec, e
               )
               raise GetoptError(
-                  "unusable Store specification: %s" %
-                  (options.cache_store_spec,)
+                  "unusable Store specification: %s" % (options.store_spec,)
               )
+            defaults.push_Ss(S)
+            if options.cache_store_spec is None:
+              cacheS = None
             else:
-              S = ProxyStore(
-                  "%s:%s" % (cacheS.name, S.name),
-                  read=(cacheS,),
-                  read2=(S,),
-                  copy2=(cacheS,),
-                  save=(cacheS, S),
-                  archives=((S, '*'),),
-              )
-              S.config = options.config
-          defaults.push_Ss(S)
-          with S:
-            yield
-          if cacheS:
-            cacheS.backend = None
+              try:
+                cacheS = Store(options.cache_store_spec, options.config)
+              except Exception as e:
+                exception(
+                    "can't open cache store %r: %s", options.cache_store_spec,
+                    e
+                )
+                raise GetoptError(
+                    "unusable Store specification: %s" %
+                    (options.cache_store_spec,)
+                )
+              else:
+                S = ProxyStore(
+                    "%s:%s" % (cacheS.name, S.name),
+                    read=(cacheS,),
+                    read2=(S,),
+                    copy2=(cacheS,),
+                    save=(cacheS, S),
+                    archives=((S, '*'),),
+                )
+                S.config = options.config
+            defaults.push_Ss(S)
+            with S:
+              yield
+            if cacheS:
+              cacheS.backend = None
     runstate.cancel()
     if ticker:
       ticker.join()

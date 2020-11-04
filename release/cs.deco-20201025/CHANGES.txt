@@ -1,0 +1,4 @@
+lib/python/cs/deco.py: Release information for cs.deco-20201020.
+lib/python/cs/deco.py: cs.deco: new @contextdecorator decorator for context managers to turn them into setup/teardown decorators
+lib/python/cs/deco.py: cs.deco: @contextdecorator: tweak example code
+lib/python/cs/deco.py: cs.deco: @contextdecorator: grammar fix for docstring

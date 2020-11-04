@@ -110,7 +110,7 @@ def csv_import(
         via __getitem__
       * `preprocess`: optional keyword parameter providing a callable
         to modify CSV rows before they are converted into the namedtuple.
-        It receives a context object an the data row. It may return
+        It receives a context object and the data row. It may return
         the row (possibly modified), or None to drop the row.
       * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties

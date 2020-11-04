@@ -19,13 +19,16 @@ rcfile=$HOME/rc/invoice/$org.sh
 set -x
 (
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
+  [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
   for d in $gitdirs
   do
     ( cd "$d"
       git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
-    ) | awk -v "email=$EMAIL" '$4 == email {print}'
-  done
+    )
+  done \
+  | awk -v "email=$EMAIL" '$4 == email { $3=""; $4=""; print}'
 ) \
+| sed 's/   */ /g' \
 | awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$1 >= start && $1 <= end {print}' \
 | sort -u \
 | awk '$1 != last_date {print("")}

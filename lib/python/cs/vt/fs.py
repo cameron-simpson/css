@@ -437,6 +437,7 @@ class FileSystem(object):
     self._fs_gid = os.getegid()
     self._lock = RLock()
     self._later = Later(DEFAULT_FS_THREAD_MAX)
+    self._later.open()
     self._path_files = {}
     self._file_handles = []
     inodes = self._inodes = Inodes(self)

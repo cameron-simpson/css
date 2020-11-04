@@ -35,7 +35,7 @@ from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
 from cs.fstags import TagFile
-from cs.lex import cutsuffix
+from cs.lex import cutsuffix, get_dotted_identifier
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
@@ -214,7 +214,9 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True, bare=True)
+    ModulePackageDir.fill(
+        checkout_dir, pkg, vcs, vcstag, do_mkdir=True, bare=True
+    )
     print(checkout_dir)
 
   @staticmethod
@@ -910,7 +912,7 @@ class Module(object):
           continue
         for filename in sorted(filenames):
           if not (filename.endswith('.pyc') or filename.endswith('.o')):
-            filepath=joinpath(subpath, filename)
+            filepath = joinpath(subpath, filename)
             pathlist.append(filepath)
     else:
       base = self.basename
@@ -956,7 +958,7 @@ class Module(object):
                 info("create %s", mddst)
                 with Pfx(mddst):
                   with open(mddst, 'w') as mddstf:
-                    runcmd(['md2man-roff', mdsrc], stdout=mddstf)
+                    runcmd(['md2man-roff', subpath], stdout=mddstf)
               mf.write('include ' + subpath + '\n')
               mf.write('include ' + prefix + '\n')
           elif ext == '.c':
@@ -1178,7 +1180,10 @@ class Module(object):
       if distinfo_requires is None:
         problems.append("missing DISTINFO[install_requires]")
       else:
-        if sorted(distinfo_requires) != import_names:
+        distinfo_requires_names = [
+            get_dotted_identifier(dirq)[0] for dirq in distinfo_requires
+        ]
+        if sorted(distinfo_requires_names) != import_names:
           problems.append(
               "DISTINFO[install_requires=%r] != direct_imports=%r" %
               (distinfo_requires, sorted(import_names))
@@ -1190,8 +1195,15 @@ class Module(object):
           if import_problems:
             subproblems[import_name] = import_problems
     for required_name in sorted(self.requires):
-      if required_name not in self.imported_names:
-        problems.append("requirement %r not imported" % (required_name,))
+      with Pfx(required_name):
+        dotted_name, _ = get_dotted_identifier(required_name)
+        if not dotted_name:
+          problems.append(
+              "requirement %r does not start with a module name" %
+              (required_name,)
+          )
+        elif dotted_name not in self.imported_names:
+          problems.append("requirement %r not imported" % (required_name,))
     # check that this package has files
     if not self.paths():
       problems.append("no files")

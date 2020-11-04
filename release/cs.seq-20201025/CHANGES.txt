@@ -1,0 +1,2 @@
+lib/python/cs/seq.py: Release information for cs.seq-20200914.
+lib/python/cs/seq.py: cs.seq: new splitoff() function to split a sequence into (usually short) prefixes and a tail

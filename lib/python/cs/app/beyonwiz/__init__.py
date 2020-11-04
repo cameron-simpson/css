@@ -25,7 +25,7 @@ from cs.deco import strable
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
 
@@ -65,6 +65,26 @@ def trailing_nul(bs):
   else:
     start += 1
   return start, bs[start:]
+
+@pfx
+def jsonable(value):
+  if isinstance(value, (int, str, float)):
+    return value
+  # mapping?
+  if hasattr(value, 'items') and callable(value.items):
+    # mapping
+    return {field: jsonable(subvalue) for field, subvalue in value.items()}
+  if isinstance(value, (set, tuple, list)):
+    return [jsonable(subvalue) for subvalue in value]
+  if isinstance(value, datetime.datetime):
+    return value.isoformat(' ')
+  try:
+    d = value._asdict()
+  except AttributeError:
+    pass
+  else:
+    return jsonable(d)
+  raise TypeError('not JSONable value for %s:%r' % (type(value), value))
 
 class MetaJSONEncoder(json.JSONEncoder):
   ''' `json.JSONEncoder` sublass with handlers for `set` and `datetime`.
@@ -112,13 +132,7 @@ class RecordingMetaData(NS):
     yield from (Tag.with_prefix(tag, None, prefix=prefix) for tag in self.tags)
     yield from self.episodeinfo.as_tags(prefix=prefix)
     for rawkey, rawvalue in self.raw.items():
-      try:
-        value_items = rawvalue.items
-      except AttributeError:
-        yield Tag.with_prefix(rawkey, rawvalue, prefix=prefix)
-      else:
-        for field, value in value_items():
-          yield Tag.with_prefix(rawkey + '.' + field, value, prefix=prefix)
+      yield Tag.with_prefix(rawkey, jsonable(rawvalue), prefix=prefix)
 
   @property
   def start_dt(self):
@@ -219,9 +233,9 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Find an available unused pathname based on `path`.
         Raises ValueError in none is available.
     '''
-    pfx, ext = os.path.splitext(path)
+    basis, ext = os.path.splitext(path)
     for i in range(max_n):
-      path2 = "%s--%d%s" % (pfx, i + 1, ext)
+      path2 = "%s--%d%s" % (basis, i + 1, ext)
       if not os.path.exists(path2):
         return path2
     raise ValueError(

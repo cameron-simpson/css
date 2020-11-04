@@ -1,0 +1,2 @@
+setup_logging: always provide loginfo.upd, being either main_handler.upd if upd_mode otherwise Upd().
+exception(): plumb keyword arguments.

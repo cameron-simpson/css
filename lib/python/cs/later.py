@@ -1,5 +1,7 @@
 #!/usr/bin/python
 #
+# pylint: disable=too-many-lines
+#
 
 r'''
 Queue functions for execution later in priority and time order.
@@ -44,9 +46,12 @@ from cs.logutils import error, warning, info, debug, exception, D
 from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.queues import IterableQueue, TimerQueue
+from cs.resources import MultiOpenMixin
 from cs.result import Result, report, after
 from cs.seq import seq
 from cs.threads import bg as bg_thread
+
+__version__ = '20201021-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -62,6 +67,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.func',
         'cs.queues',
+        'cs.resources',
         'cs.result',
         'cs.seq',
         'cs.threads',
@@ -106,7 +112,6 @@ def defer(func, *a, **kw):
 class RetryError(Exception):
   ''' Exception raised by functions which should be resubmitted to the queue.
   '''
-  pass
 
 def retry(retry_interval, func, *a, **kw):
   ''' Call the callable `func` with the supplied arguments.
@@ -133,6 +138,7 @@ class _Late_context_manager(object):
       This permits easy inline scheduled code.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self, L, priority=None, delay=None, when=None, name=None, pfx=None
   ):
@@ -156,12 +162,12 @@ class _Late_context_manager(object):
     '''
 
     def run():
-      ''' This is the placeholder function dispatched by the Later instance.
-          It releases the "commence" lock for __enter__ to acquire,
-          permitting to with-suite to commence.
+      ''' This is the placeholder function dispatched by the `Later` instance.
+          It releases the "commence" lock for `__enter__` to acquire,
+          permitting the with-suite to commence.
           It then blocks waiting to acquire the "completed" lock;
-          __exit__ releases that lock permitting the placeholder to return
-          and release the Later resource.
+          `__exit__` releases that lock permitting the placeholder to return
+          and release the `Later` resource.
       '''
       self.commence.release()
       self.completed.acquire()
@@ -285,7 +291,8 @@ class LateFunction(Result):
         error("%s", e, exc_info=exc_info)
     Result._complete(self, result, exc_info)
 
-class Later(object):
+# pylint: disable=too-many-public-methods,too-many-instance-attributes
+class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
 
       Methods are provided for submitting functions to run ASAP or
@@ -322,7 +329,7 @@ class Later(object):
     if name is None:
       name = "Later-%d" % (seq(),)
     if ifdebug():
-      import inspect
+      import inspect  # pylint: disable=import-outside-toplevel
       filename, lineno = inspect.stack()[1][1:3]
       name = "%s[%s:%d]" % (name, filename, lineno)
     debug(
@@ -346,7 +353,11 @@ class Later(object):
     self._priority = (0,)
     self._timerQ = None  # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self.closed = False
+    self._finished = None
+
+  def startup(self):
+    ''' Initial startup.
+    '''
     self._finished = Event()
 
   @pfx_method
@@ -358,18 +369,11 @@ class Later(object):
         - dispatch a Thread to wait for completion and fire the
           _finished Event
     '''
-    if not self.closed:
-      self.close()
     if self._timerQ:
       self._timerQ.close()
       self._timerQ.join()
     # queue actions to detect activity completion
     bg_thread(self._finished.set)
-
-  def close(self):
-    ''' Close the Later, preventing further task submission.
-    '''
-    self.closed = True
 
   def _try_dispatch(self):
     ''' Try to dispatch the next LateFunction.
@@ -385,10 +389,10 @@ class Later(object):
         else:
           LF = pri_entry[-1]
           self.running.add(LF)
-          # NB: set up notify before dispatch so that it cannot
+          # NB: we set up notify before dispatch so that it cannot
           # fire before we release the lock (which would happen if
           # the LF completes really fast - notify fires immediately
-          # in the current thread if the function is already complete.
+          # in the current thread if the function is already complete).
           LF.notify(self._complete_LF)
           debug("LATER: dispatch %s", LF)
           LF._dispatch()
@@ -469,7 +473,7 @@ class Later(object):
       self.debug("STATUS: running: %s", LF)
 
   def __enter__(self):
-    global default
+    global default  # pylint: disable=global-statement
     debug("%s: __enter__", self)
     default.push(self)
     return self
@@ -478,7 +482,7 @@ class Later(object):
     ''' Exit handler: release the "complete" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    global default
+    global default  # pylint: disable=global-statement
     debug("%s: __exit__: exc_type=%s", self, exc_type)
     default.pop()
     return False
@@ -579,6 +583,7 @@ class Later(object):
     '''
     return _Late_context_manager(self, **kwargs)
 
+  # pylint: disable=too-many-arguments
   def submit(
       self, func, priority=None, delay=None, when=None, name=None, pfx=None
   ):
@@ -609,6 +614,7 @@ class Later(object):
         func, priority=priority, delay=delay, when=when, name=name, pfx=pfx
     )
 
+  # pylint: disable=too-many-arguments
   def _submit(
       self,
       func,
@@ -716,9 +722,14 @@ class Later(object):
     return self._defer(func, *a, **kw)
 
   def _defer(self, func, *a, **kw):
+    # snapshot the arguments as supplied
+    # note; a shallow snapshot
     if a:
       a = list(a)
+    if kw:
+      kw = dict(kw)
     params = {}
+    # pop off leading parameters before the function
     while not callable(func):
       if isinstance(func, str):
         params['name'] = func
@@ -800,13 +811,13 @@ class Later(object):
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
     return after(LFs, None, lambda: self._defer(put_func))
 
-  def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
+  def defer_iterable(self, it, outQ, test_ready=None):
+    ''' Submit an iterable `it` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         Return a `Result` for final synchronisation.
 
         Parameters:
-        * `I`: the iterable for for asynchronous stepwise iteration
+        * `it`: the iterable for for asynchronous stepwise iteration
         * `outQ`: an `IterableQueue`like object
           with a `.put` method to accept items
           and a `.close` method to indicate the end of items.
@@ -824,10 +835,10 @@ class Later(object):
       raise RuntimeError(
           "%s.defer_iterable(...) but not self.submittable" % (self,)
       )
-    return self._defer_iterable(I, outQ=outQ, test_ready=test_ready)
+    return self._defer_iterable(it, outQ=outQ, test_ready=test_ready)
 
-  def _defer_iterable(self, I, outQ, test_ready=None):
-    iterate = partial(next, iter(I))
+  def _defer_iterable(self, it, outQ, test_ready=None):
+    iterate = partial(next, iter(it))
     R = Result()
     iterationss = [0]
 
@@ -845,7 +856,7 @@ class Later(object):
       except StopIteration:
         outQ.close()
         R.result = iterationss[0]
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception(
             "defer_iterable: iterate_once: exception during iteration: %s", e
         )
@@ -861,7 +872,7 @@ class Later(object):
         self._defer(iterate_once)
 
     iterate_once.__name__ = "%s:next(iter(%s))" % (
-        funcname(iterate_once), getattr(I, '__name__', repr(I))
+        funcname(iterate_once), getattr(it, '__name__', repr(it))
     )
     self._defer(iterate_once)
     return R
@@ -906,6 +917,7 @@ class SubLater(object):
         associated checks.
     '''
     self._later = L
+    self._later.open()
     self._lock = Lock()
     self._deferred = 0
     self._queued = 0
@@ -938,8 +950,8 @@ class SubLater(object):
         self._later.warning("repeated close of %s", self)
       else:
         self.closed = True
-        if self._queued >= self._deferred:
-          self._queue.close()
+        self._queue.close()
+        self._later.close()
 
   def defer(self, func, *a, **kw):
     ''' Defer a function, return its `LateFunction`.
@@ -975,7 +987,7 @@ class SubLater(object):
         if handler:
           try:
             handler(LF)
-          except Exception as e:
+          except Exception as e:  # pylint: disable=broad-except
             exception("%s: reap %s: %s", self, LF, e)
 
     T = Thread(name="reaper(%s)" % (self,), target=reap, args=(self._queue,))
@@ -1001,6 +1013,7 @@ class LatePool(object):
             print(result)
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self,
       L=None,

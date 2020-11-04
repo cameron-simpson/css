@@ -146,6 +146,7 @@ from datetime import date, datetime
 import fnmatch
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
+from json.decoder import JSONDecodeError
 import re
 import time
 from types import SimpleNamespace
@@ -277,10 +278,12 @@ class TagSet(dict, FormatableMixin):
     if tag_name not in self or old_value is not value:
       self.modified = True
       if tag_name not in self or old_value != value:
-        ifverbose(
-            verbose, "+ %s (was %s)",
-            Tag(tag_name, value, ontology=self.ontology), old_value
+        tag = Tag(tag_name, value, ontology=self.ontology)
+        msg = (
+            "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
+            (tag, old_value)
         )
+        ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
 
   def __delitem__(self, tag_name):
@@ -634,7 +637,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         else:
           # decode as plain JSON data
           value_part = s[offset:]
-          value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+          try:
+            value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+          except JSONDecodeError as e:
+            raise ValueError(
+                "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+            )
           offset += suboffset
     return value, offset
 
@@ -898,7 +906,7 @@ class TagSetCriterion(ABC):
       for crit_cls in cls.CRITERION_PARSE_CLASSES:
         with Pfx(crit_cls.__name__):
           parse = crit_cls.parse
-          with Pfx("parse(%r,offset=%d)", s, offset):
+          with Pfx("%s.parse(%r,offset=%d)", crit_cls.__name__, s, offset):
             try:
               params, offset = parse(s, offset, delim)
             except ValueError:
@@ -993,11 +1001,11 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
   COMPARISON_OPS = sorted(COMPARISON_FUNCS.keys(), key=len, reverse=True)
 
   def __str__(self):
-    if self.comparison is None:
-      return self.tag.name
-    return (
-        self.tag.name + self.comparison +
-        self.tag.transcribe_value(self.tag.value)
+    return ('' if self.choice else '!') + (
+        self.tag.name if self.comparison is None else (
+            self.tag.name + self.comparison +
+            self.tag.transcribe_value(self.tag.value)
+        )
     )
 
   @classmethod
@@ -1015,7 +1023,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     if offset == len(s) or s[offset].isspace() or (delim
                                                    and s[offset] in delim):
       # just tag_name present
-      return dict(tag=Tag(tag_name), comparison=None), offset
+      return dict(tag=Tag(tag_name), comparison='='), offset
 
     comparison = None
     for cmp_op in cls.COMPARISON_OPS:
@@ -1239,7 +1247,7 @@ class TagSetNamespace(ExtendedNamespace):
         if member_metadata is None:
           # No metadata? Return the element.
           return element
-        # Return teh metadata for the element.
+        # Return the metadata for the element as a namespace.
         return member_metadata.ns()
     return super().__getitem__(key)
 
@@ -1806,13 +1814,12 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagBasedTest.from_str(arg)
+          tag_choice = TagSetCriterion.from_str(arg)
         except ValueError as e:
-          raise ValueError("bad tag specifications: %s" % (e,))
-        else:
-          if tag_choice.comparison != '=':
-            raise ValueError("only tag_name or tag_name=value accepted")
-          tag_choices.append(tag_choice)
+          raise ValueError("bad tag specifications: %s" % (e,)) from e
+        if tag_choice.comparison != '=':
+          raise ValueError("only tag_name or tag_name=value accepted")
+        tag_choices.append(tag_choice)
     return tag_choices
 
 class TaggedEntityMixin(FormatableMixin):

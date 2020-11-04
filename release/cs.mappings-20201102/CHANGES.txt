@@ -1,0 +1,17 @@
+lib/python/cs/mappings.py: cs.mappings: StackableValues: add recommendation for cs.context.stackattrs to the docstring
+lib/python/cs/mappings.py: cs.mappings: new AttrableMappingMixin with a __getattr__ which looks up unknown attributes as keys
+lib/python/cs/mappings.py: cs.mappings: new JSONableMappingMixin with methods for JSON actions: from_json, as_json, append_ndjson and a __str__ and __repr__
+lib/python/cs/mappings.py: cs.mappings: add import, update DISTINFO, tweak lint
+lib/python/cs/mappings.py: cs.mappings: UC_Sequence: there is no list.__getattr__
+lib/python/cs/mappings.py: cs.mappings: new LoadableMappingMixin to load .by_* attributes on demand
+lib/python/cs/mappings.py: cs.mappings: new AttrableMapping(dict, AttrableMappingMixin)
+lib/python/cs/mappings.py: cs.mappings: new UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin) providing a .uuid attribute
+lib/python/cs/mappings.py: cs.mappings: new UUIDNDJSONMapping(LoadableMappingMixin): a LoadableMappingMixin for newline delimited JSON files
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: improve the AttributeError message
+lib/python/cs/mappings.py: cs.mappings: LoadableMappingMixin: rename the load_mapping method to scan_mapping - there's no "store" semantic associated with this method
+lib/python/cs/mappings.py: cs.mappings: UUIDNDJSONMapping.scan_mapping: a missing file scans as empty
+lib/python/cs/mappings.py: cs.mappings: docstring updates, import fixes, autoformat
+lib/python/cs/mappings.py: cs.fileutils,mappings: move UUIDNDJSONMapping from cs.mappings to cs.fileutils - it is file related and preserves the import hierarchy
+lib/python/cs/mappings.py: cs.mappings: LoadableMappingMixin: fix race in by_*field_name* resolution, record the scan length of the mapping and make it available, implement __len__, tweak a docstring
+lib/python/cs/mappings.py: cs.mappings: LoadableMappingMixin: small optimisation, comment out a warning which isn't fired under present policy
+lib/python/cs/mappings.py: cs.mappings: clean some lint
