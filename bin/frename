@@ -68,14 +68,14 @@ for my $path (@ARGV)
     my $ndir = dirname($npath);
     -d "$ndir/." || mkpath($ndir);
     if (-e $npath)
-    {
-      if (compare($path,$npath) == 0)
-      { print "$path -> $npath: identical, unlinking $path\n" if $verbose;
-        unlink($path) || warn "$::cmd: unlink($path): $!";
-      }
-      else
-      { warn "$path -> $npath: existing file differs\n";
-      }
+    { warn "$path -> $npath: already exists\n";
+    ##if (compare($path,$npath) == 0)
+    ##{ print "$path -> $npath: identical, unlinking $path\n" if $verbose;
+    ##unlink($path) || warn "$::cmd: unlink($path): $!";
+    ##}
+    ##else
+    ##{ warn "$path -> $npath: existing file differs\n";
+    ##}
     }
     else
     { print "$path -> $npath\n" if $verbose;
