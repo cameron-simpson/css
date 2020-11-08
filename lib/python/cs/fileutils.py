@@ -323,6 +323,7 @@ def rewrite_cmgr(filepath, mode='w', **kw):
   '''
   with NamedTemporaryFile(mode=mode) as T:
     yield T
+    T.flush()
     with open(T.name, 'rb') as f:
       return rewrite(filepath, mode='wb', srcf=f, **kw)
 
