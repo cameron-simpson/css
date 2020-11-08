@@ -1,0 +1,17 @@
+lib/python/cs/cmdutils.py: Release information for cs.cmdutils-20200615.
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: supply usage only for "all commands", full docstring for specified commands
+lib/python/cs/cmdutils.py: cs.logutils: BaseCommand: honour presupplied options.log_level; docstring updates
+lib/python/cs/cmdutils.py: merge mailfiler ==> default: internal logging level changes
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.cmd_help: import "fulldoc" help text layout
+lib/python/cs/cmdutils.py: cs.cmdutils: improve error message
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text: handle missing USAGE_FORMAT better
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: provide options.upd
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand subclasses may now override BaseCommand.OPTIONS_CLASS (default SimpleNamespace) in order to provide convenience methods on the options
+lib/python/cs/cmdutils.py: cs.cmdutils: fix docstring spelling error
+lib/python/cs/cmdutils.py: cs.cmdutils: new BaseCommand.OPTIONS_CLASS, default types.SimpleNamespace
+lib/python/cs/cmdutils.py: cs.cmdutils: docstring updates
+lib/python/cs/cmdutils.py: cs.cmdutils: clean lint
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix subcommand usage construction
+lib/python/cs/cmdutils.py: cs.cmdutils: clean lint
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: separate variable for subcmd with dash translated to underscore to match method names
+lib/python/cs/cmdutils.py: merge default ==> maildb

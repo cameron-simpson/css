@@ -1,0 +1,4 @@
+lib/python/cs/upd.py: Release information for cs.upd-20201026.1.
+lib/python/cs/upd.py: cs.upd: Upd.nl: simple approach when there are no status lines
+lib/python/cs/upd.py: merge cloud ==> default: cs.app.cloudbackup: ls: update for no global -n option
+lib/python/cs/upd.py: cs.upd: Upd: new cursor_visible and cursor_invisible methods to show and hide the cursor

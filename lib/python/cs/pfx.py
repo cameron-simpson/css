@@ -52,7 +52,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201025-post'
+__version__ = '20201105-post'
 
 DISTINFO = {
     'description':
@@ -485,7 +485,7 @@ def pfx(func, message=None, message_args=()):
   fname = funcname(func)
   if message is None:
     if message_args:
-      raise ValueError("no message, but message_args=%r"%(message_args,))
+      raise ValueError("no message, but message_args=%r" % (message_args,))
     message = fname
 
   if isgeneratorfunction(func):
@@ -495,7 +495,7 @@ def pfx(func, message=None, message_args=()):
     saved_stack = []
 
     @contextdecorator
-    def wrapper(func, a, kw):
+    def cmgrdeco(func, a, kw):
       ''' Context manager to note the entry `Pfx` stack height, append saved
           `Pfx` stack from earlier run, then after the iteration step save the
           top of the `Pfx` stack for next time.
@@ -507,6 +507,8 @@ def pfx(func, message=None, message_args=()):
         yield
       saved_stack[:] = pfx_stack[height:]
       pfx_stack[height:] = []
+
+    wrapper = cmgrdeco(func)
 
   else:
 

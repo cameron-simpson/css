@@ -267,11 +267,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       badopts = True
     else:
       path = argv.pop(0)
-      try:
-        tag_choices = cls.parse_tagset_criteria(argv)
-      except ValueError as e:
-        warning("bad tag specifications: %s", e)
-        badopts = True
+    tag_choices, argv = cls.parse_tagset_criteria(argv)
+    if argv:
+      warning("extra arguments (invalid tag choices?): %r", argv)
+      badopts = True
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
@@ -322,11 +321,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         warning("missing tag criteria")
         badopts = True
       else:
-        try:
-          tag_choices = cls.parse_tagset_criteria(argv)
-        except ValueError as e:
-          warning("bad tag specifications: %s", e)
-          badopts = True
+        tag_choices, argv = cls.parse_tagset_criteria(argv)
+      if argv:
+        warning("extra arguments (invalid tag choices?): %r", argv)
+        badopts = True
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
@@ -784,10 +782,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             if not argv:
               raise GetoptError("missing tags")
             badopts = False
-            try:
-              tag_choices = cls.parse_tagset_criteria(argv)
-            except ValueError as e:
-              warning("bad tag specifications: %s", e)
+            tag_choices, argv = cls.parse_tagset_criteria(argv)
+            if argv:
+              warning("extra arguments (invalid tag choices?): %r", argv)
               badopts = True
             if badopts:
               raise GetoptError("bad arguments")
@@ -816,13 +813,16 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     badopts = False
     fstags = options.fstags
     if not argv:
-      raise GetoptError("missing tag choice")
-    tag_choice = argv.pop(0)
-    try:
-      tag_choices = cls.parse_tagset_criteria([tag_choice])
-    except ValueError as e:
-      warning("bad tag specifications: %s", e)
+      warning("missing tag choice")
       badopts = True
+    else:
+      tag_choice_s = argv.pop(0)
+      with Pfx(repr(tag_choice_s)):
+        try:
+          tag_choice = cls.parse_tagset_criterion(tag_choice_s)
+        except ValueError as e:
+          warning(e)
+          badopts = True
     if not argv:
       warning("missing paths")
       badopts = True
@@ -833,7 +833,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     with stackattrs(state, verbose=True):
-      fstags.apply_tag_choices(tag_choices, paths)
+      fstags.apply_tag_choices([tag_choice], paths)
 
   @classmethod
   def cmd_test(cls, argv, options):
@@ -860,10 +860,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         warning("missing tag criteria")
         badopts = True
       else:
-        try:
-          tag_choices = cls.parse_tagset_criteria(argv)
-        except ValueError as e:
-          warning("bad tag specifications: %s", e)
+        tag_choices, argv = cls.parse_tagset_criteria(argv)
+        if argv:
+          warning("extra arguments (invalid tag choices?): %r", argv)
           badopts = True
     if badopts:
       raise GetoptError("bad arguments")

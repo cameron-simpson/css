@@ -20,7 +20,7 @@ hbopts=
 cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] src_path[:backup_subpath]...
 
-  Backup a series of directories to multiple backup area, usually
+  Backup a series of directories to multiple backup areas, usually
   mountable external drives. The files to back up are identified
   by tags to support backing up directory trees which exceed the
   size of the backup drives.
