@@ -915,81 +915,84 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       @classmethod
       @pfx_method
       @auto_session
-      def by_name(cls, name, *, session, query=None):
-        ''' Return a query to select `Entity` rows by `name`.
-
-            If `name` is `None`, log entities are returned (`name IS NULL`),
-            otherwise the entity with the specific name will be matched.
-        '''
-        entities = orm.entities
-        if query is None:
-          query = session.query(entities)
-        query = query.filter_by(name=name)
-        return query
-
-      @classmethod
-      @pfx_method
-      @auto_session
-      def by_tags(cls, tag_criteria, *, session, name=None, query=None, **kw):
+      def search(cls, criteria, *, session, mode='tagged'):
         ''' Construct a query to match `Entity` rows
-            matching `name` and the supplied `tag_criteria`.
+            matching the supplied `criteria` iterable.
             Return an SQLAlchemy `Query`.
 
-            An existing query may be supplied,
-            in which case it will be extended.
+            The `mode` parameter has the following values:
+            * `'id'`: the query only yields entity ids
+            * `'entity'`: (default) the query yields entities without tags
+            * `'tagged'`: (default) the query yields entities left
+            outer joined with their matching tags
+
+            Note that the `'tagged'` result produces multiple rows for any entity with 
+              this requires the caller to fold entities with multiple tags
+              together 
 
             *Note*:
-            the SQL query may not apply all the criteria,
+            due to implementation limitations
+            the SQL query itself may not apply all the criteria,
             so every criterion must still be applied
-            to the resulting `TaggedEntities`.
+            to the results
+            using its `.match_entity` method.
 
             If `name` is omitted or `None` the query will match log entities
             otherwise the entity with the specified `name`.
 
-            The `tag_criteria` should be an iterable
-            of objects acceptable to `TagSetCriterion.from_any`;
-            all the objects will be converted to `TagSetCriterion`s
-            and used to construct the query.
+            The `criteria` should be an iterable of `SQTCriterion` instances
+            used to construct the query.
         '''
         entities = orm.entities
-        if query is None:
-          query = session.query(entities)
-        try:
-          name = kw.pop('name')
-        except KeyError:
-          # no name, get all Entities
-          pass
-        else:
-          query = cls.by_name(name=name, session=session, query=query)
-        if kw:
-          raise ValueError("unexpected keyword arguments: %r" % (kw,))
-        for taggy in tag_criteria:
-          with Pfx(taggy):
-            tag_choice = SQLTagSetCriterion.from_any(taggy)
-            try:
-              query_extender = tag_choice.extend_query
-            except AttributeError:
-              pass
+        query = session.query(entities)
+        # first condition:
+        #   select tags as alias where constraint
+        # following:
+        #   inner join tags as alias using entity_id where constraint
+        # inner join entities on
+        query = None
+        sqlps = []
+        for criterion in criteria:
+          with Pfx(criterion):
+            sqlp = criterion.sql_parameters(orm)
+            if not query:
+              query = session.query(sqlp.entity_id_column)
             else:
-              query = query_extender(query, orm=orm)
-        return query
-
-      @classmethod
-      @pfx_method
-      def with_tags(cls, query):
-        ''' Extend `query` to `RIGHT JOIN` against the `Tags`,
-            adding `(tag_name,float_value,string_value,structured_value)`
-            to the columns returned.
-        '''
-        entities = orm.entities
-        tags = orm.tags
-        tags_alias = aliased(tags)
-        query = query.join(
-            tags_alias, isouter=True
-        ).filter(entities.id is not None).add_columns(
-            tags_alias.name, tags_alias.float_value, tags_alias.string_value,
-            tags_alias.structured_value
-        )
+              previous = sqlps[-1]
+              # join on the entity_id column
+              query = query.join(
+                  sqlp.alias,
+                  sqlp.entity_id_column == previous.entity_id_column,
+              )
+            # apply conditions
+            query = query.filter(sqlp.constraint)
+            sqlps.append(sqlp)
+        if query is None:
+          query = session.query(entities.id)
+        with Pfx("mode=%r", mode):
+          if mode == 'id':
+            pass
+          elif mode == 'entity':
+            query = session.query(
+                entities.id, entities.unixtime, entities.name
+            ).filter(entities.id.in_(query.distinct()))
+          elif mode == 'tagged':
+            tags = orm.tags
+            query = session.query(
+                entities.id, entities.unixtime, entities.name
+            ).filter(entities.id.in_(query.distinct())).join(
+                tags, isouter=True
+            ).filter(entities.id is not None).add_columns(
+                tags.name.label('tag_name'),
+                tags.float_value.label('tag_float_value'),
+                tags.string_value.label('tag_string_value'),
+                tags.structured_value.label('tag_structured_value'),
+            )
+          else:
+            raise ValueError("unrecognised mode")
+        XP("******\nSQL =\n%s", query)
+        ##for row in query:
+        ##  print("=>", row)
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
