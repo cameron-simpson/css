@@ -375,7 +375,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           yield
 
   @classmethod
-  def parse_tagset_criteria(cls, argv):
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
     ''' Parse tag criteria from `argv`.
 
         The criteria may be either:
@@ -383,14 +383,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         * a sequence of tag criteria
     '''
     # try a single int argument
-    if len(argv) == 1:
-      try:
-        index = int(argv[0])
-      except ValueError:
-        pass
-      else:
-        return [index], []
-    return super().parse_tagset_criteria(argv)
+    try:
+      index = int(arg)
+    except ValueError:
+      return super().parse_tagset_criterion(
+          arg, tag_based_test_class=tag_based_test_class
+      )
+    else:
+      return SQTEntityIdTest([index])
 
   @classmethod
   def cmd_edit(cls, argv, options):
