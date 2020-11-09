@@ -80,7 +80,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -477,6 +477,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             xit = 1
             continue
           print(output.replace('\n', ' '))
+          if True:
+            for tag in sorted(te.tags):
+              if tag.name != 'headline':
+                print(" ", tag)
     return xit
 
   @staticmethod
