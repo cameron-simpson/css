@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Tags and sets of tags
     with __format__ support and optional ontology information.
@@ -603,6 +605,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           value = None
       return cls(name, value, ontology=ontology), offset
 
+  # pylint: disable=too-many-branches
   @classmethod
   def parse_value(cls, s, offset=0):
     ''' Parse a value from `s` at `offset` (default `0`).
