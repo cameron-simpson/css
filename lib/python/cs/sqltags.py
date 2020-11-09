@@ -94,7 +94,11 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-  ''' Subclass of `TagSetCriterion` requiring the `.extend_query` method.
+class SQLParameters(namedtuple(
+    'SQLParameters', 'criterion table alias entity_id_column constraint')):
+  ''' The parameters required for constructing queries or extending queries with JOINs.
+  '''
+
 class SQTCriterion(TaggedEntityCriterion):
       It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
       the SQL capable criterion classes below.
