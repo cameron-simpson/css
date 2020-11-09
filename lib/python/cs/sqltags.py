@@ -100,6 +100,9 @@ class SQLParameters(namedtuple(
   '''
 
 class SQTCriterion(TaggedEntityCriterion):
+  ''' Subclass of `TaggedEntityCriterion` requiring an `.sql_parameters` method
+      which returns an `SQLParameters` providing the information required
+      to construct an sqlalchemy query.
       It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
       the SQL capable criterion classes below.
   '''
@@ -109,55 +112,215 @@ class SQTCriterion(TaggedEntityCriterion):
   CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
-  def extend_query(self, sqla_query, *, orm):
-    ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
-        returning the extended Query.
-    '''
-    raise NotImplementedError("extend_query")
+  def sql_parameters(self, orm) -> SQLParameters:
+    raise NotImplementedError("sql_parameters")
 
-class SQLTagBasedTest(TagBasedTest, SQLTagSetCriterion):
+##  @abstractmethod
+##  def extend_query(self, sqla_query, *, orm):
+##    ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
+##        returning the extended Query.
+##    '''
+##    raise NotImplementedError("extend_query")
+
+class SQTEntityIdTest(SQTCriterion):
+
+  @typechecked
+  def __init__(self, ids: List[int]):
+    self.entity_ids = ids
+
+  @classmethod
+  def parse(cls, s, offset=0, delim=None):
+    ''' Parse a decimal entity id from `s`.
+    '''
+    value, offset = get_decimal_value(s, offset=offset)
+    return cls([value]), offset
+
+  @pfx_method
+  def sql_parameters(self, orm) -> SQLParameters:
+    entities = orm.entities
+    alias = aliased(entities)
+    sqlp = SQLParameters(
+        criterion=self,
+        table=entities,
+        alias=alias,
+        entity_id_column=alias.id,
+        constraint=alias.id.in_(self.entity_ids),
+    )
+    return sqlp
+
+  def match_tagged_entity(self, te: TaggedEntity) -> bool:
+    ''' Test the `TaggedEntity` `te` against `self.entity_ids`.
+    '''
+    return te.id in self.entity_ids
+
+SQTCriterion.CRITERION_PARSE_CLASSES.append(SQTEntityIdTest)
+SQTCriterion.TAG_BASED_TEST_CLASS = SQTEntityIdTest
+
+class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.extend_query` method.
   '''
 
+  # functions returning SQL tag.value tests based on self.comparison
+  SQL_TAG_VALUE_COMPARISON_FUNCS = {
+      None:
+      lambda alias, tag_value: and_(
+          alias.float_value == None, alias.string_value == None, alias.
+          structured_value == None
+      ),
+      '=':
+      lambda alias, tag_value: (
+          alias.float_value == tag_value
+          if isinstance(tag_value, (int, float)) else (
+              alias.string_value == tag_value
+              if isinstance(tag_value, str) else
+              (alias.structured_value == tag_value)
+          )
+      ),
+      '<=':
+      lambda alias, tag_value: (
+          alias.float_value <= tag_value
+          if isinstance(tag_value, (int, float)) else (
+              alias.string_value <= tag_value
+              if isinstance(tag_value, str) else
+              (alias.structured_value <= tag_value)
+          )
+      ),
+      '<':
+      lambda alias, tag_value: (
+          alias.float_value < tag_value
+          if isinstance(tag_value, (int, float)) else (
+              alias.string_value < tag_value if isinstance(tag_value, str) else
+              (alias.structured_value < tag_value)
+          )
+      ),
+      '>=':
+      lambda alias, tag_value: (
+          alias.float_value >= tag_value
+          if isinstance(tag_value, (int, float)) else (
+              alias.string_value >= tag_value
+              if isinstance(tag_value, str) else
+              (alias.structured_value >= tag_value)
+          )
+      ),
+      '>':
+      lambda alias, tag_value: (
+          alias.float_value > tag_value
+          if isinstance(tag_value, (int, float)) else (
+              alias.string_value > tag_value if isinstance(tag_value, str) else
+              (alias.structured_value > tag_value)
+          )
+      ),
+      '~':
+      lambda alias, tag_value: None,
+  }
+
+  SQL_NAME_VALUE_COMPARISON_FUNCS = {
+      None: lambda entity, name_value: entity.name != None,
+      '=': lambda entity, name_value: entity.name == name_value,
+      '<=': lambda entity, name_value: entity.name <= name_value,
+      '<': lambda entity, name_value: entity.name < name_value,
+      '>=': lambda entity, name_value: entity.name >= name_value,
+      '>': lambda entity, name_value: entity.name > name_value,
+      '~': lambda entity, name_value: entity.name.like(f'%{name_value}%'),
+  }
+
+  SQL_UNIXTIME_VALUE_COMPARISON_FUNCS = {
+      None: lambda entity, unixtime_value: entity.unixtime != None,
+      '=': lambda entity, unixtime_value: entity.unixtime == unixtime_value,
+      '<=': lambda entity, unixtime_value: entity.unixtime <= unixtime_value,
+      '<': lambda entity, unixtime_value: entity.unixtime < unixtime_value,
+      '>=': lambda entity, unixtime_value: entity.unixtime >= unixtime_value,
+      '>': lambda entity, unixtime_value: entity.unixtime > unixtime_value,
+  }
+
+  TE_VALUE_COMPARISON_FUNCS = {
+      '=': lambda te_value, value: te_value == value,
+      '<=': lambda te_value, value: te_value <= value,
+      '<': lambda te_value, value: te_value < value,
+      '>=': lambda te_value, value: te_value >= value,
+      '>': lambda te_value, value: te_value > value,
+      '~': lambda te_value, value: value in te_value
+  }
+
   @pfx_method
-  def extend_query(self, sqla_query, *, orm):
-    ''' Extend the SQLAlchemy `Query` `sqla_query`.
-        Return the new `Query`.
+  def sql_parameters(self, orm) -> SQLParameters:
+    tag = self.tag
+    if tag.name in ('name', 'unixtime'):
+      table = entities = orm.entities
+      alias = aliased(entities)
+      entity_id_column = alias.id
+      if tag.name == 'name':
+        if not isinstance(tag.value, str):
+          raise ValueError(
+              "name comparison requires a str, got %s:%r" %
+              (type(tag.value), tag.value)
+          )
+        constraint = self.SQL_NAME_VALUE_COMPARISON_FUNCS[self.comparison
+                                                          ](alias, tag.value)
+      elif tag.name == 'unixtime':
+        if not isinstance(tag.value, (int, float)):
+          raise ValueError(
+              "unixtime comparison requires a float, got %s:%r" %
+              (type(tag.value), tag.value)
+          )
+        constraint = self.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
+            self.comparison](alias, tag.value)
+      else:
+        raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
+    else:
+      table = tag = self.tag
+      tags = orm.tags
+      alias = aliased(tags)
+      entity_id_column = alias.entity_id
+      constraint = alias.name == tag.name
+      constraint2 = self.SQL_TAG_VALUE_COMPARISON_FUNCS[self.comparison
+                                                        ](alias, tag.value)
+      if constraint2 is not None:
+        constraint = and_(constraint, constraint2)
+      else:
+        warning("no SQL side value test for comparison=%r", self.comparison)
+    sqlp = SQLParameters(
+        criterion=self,
+        table=table,
+        alias=alias,
+        entity_id_column=entity_id_column,
+        constraint=constraint if self.choice else -alias.has(constraint),
+    )
+    return sqlp
+
+  def match_tagged_entity(self, te: TaggedEntity) -> bool:
+    ''' Match this criterion against `te`.
     '''
     tag = self.tag
-    tags_alias = aliased(orm.tags)
-    tag_column, tag_test_value = tags_alias.value_test(tag.value)
-    if tag_column is None or self.comparison == '~':
-      test_expr = None
+    tag_name = tag.name
+    tag_value = tag.value
+    if tag_name == 'name':
+      if tag_value is None:
+        # does this entity have a name?
+        result = te.name is not None
+      else:
+        result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                                ](te.name, tag_value)
+    elif tag_name == 'unixtime':
+      result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                              ](te.unixtime, tag_value)
     else:
-      test_func = self.COMPARISON_FUNCS[self.comparison]
-      test_expr = test_func(tag_column, tag_test_value)
-    # require the tag_name to be our target
-    match = [tags_alias.name == tag.name]
-    isouter = not self.choice
-    if self.choice:
-      # positive test
-      if test_expr:
-        # test for presence and value
-        match.append(test_expr)
-    else:
-      # negative test
-      if tag_column is None:
-        # just test for absence
-        match.append(tags_alias.id is None)
-      elif test_expr:
-        # test for absence or incorrect value
-        match.append(or_(tags_alias.id is None, not (test_expr)))
-    return sqla_query.join(tags_alias, isouter=isouter).filter(*match)
+      te_tag_value = te.tags.get(tag_name)
+      if te_tag_value is None:
+        result = False
+      else:
+        result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                                ](te_tag_value, tag_value)
+    return result if self.choice else not result
 
-SQLTagSetCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
-SQLTagSetCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
+SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
+SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
 class SQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `sqltags` main command line utility.
   '''
 
-  TAGSET_CRITERION_CLASS = SQLTagSetCriterion
+  TAGSET_CRITERION_CLASS = SQTCriterion
 
   TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
