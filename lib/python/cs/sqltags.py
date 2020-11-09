@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Simple SQL based tagging
     and the associated `sqltags` command line script,
@@ -15,6 +17,7 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
+from collections import namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
@@ -25,23 +28,24 @@ import re
 import sys
 from threading import RLock
 import time
+from typing import List
 from icontract import require
 from sqlalchemy import (
     create_engine, Column, Integer, Float, String, JSON, ForeignKey,
     UniqueConstraint
 )
-from sqlalchemy.sql.expression import or_
 from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.sql.expression import and_, or_
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
-from cs.lex import FormatAsError, cutprefix
+from cs.lex import FormatAsError, cutprefix, get_decimal_value
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
@@ -66,8 +70,8 @@ DISTINFO = {
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
         'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
-        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025', 'icontract',
-        'sqlalchemy', 'typeguard'
+        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025',
+        'icontract', 'sqlalchemy', 'typeguard'
     ],
 }
 
@@ -113,16 +117,14 @@ class SQTCriterion(TaggedEntityCriterion):
 
   @abstractmethod
   def sql_parameters(self, orm) -> SQLParameters:
+    ''' Subclasses must return am `SQLParameters` instance
+        parameterising the SQL queries that follow.
+    '''
     raise NotImplementedError("sql_parameters")
 
-##  @abstractmethod
-##  def extend_query(self, sqla_query, *, orm):
-##    ''' Extend the SQLAlchemy Query `sqla_query` to require this criterion,
-##        returning the extended Query.
-##    '''
-##    raise NotImplementedError("extend_query")
-
 class SQTEntityIdTest(SQTCriterion):
+  ''' A test on `entity.id`.
+  '''
 
   @typechecked
   def __init__(self, ids: List[int]):
@@ -157,15 +159,15 @@ SQTCriterion.CRITERION_PARSE_CLASSES.append(SQTEntityIdTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQTEntityIdTest
 
 class SQLTagBasedTest(TagBasedTest, SQTCriterion):
-  ''' A `cs.tagset.TagBasedTest` extended with a `.extend_query` method.
+  ''' A `cs.tagset.TagBasedTest` extended with a `.sql_parameters` method.
   '''
 
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
       lambda alias, tag_value: and_(
-          alias.float_value == None, alias.string_value == None, alias.
-          structured_value == None
+          alias.float_value is None, alias.string_value is None, alias.
+          structured_value is None
       ),
       '=':
       lambda alias, tag_value: (
@@ -215,7 +217,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   }
 
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
-      None: lambda entity, name_value: entity.name != None,
+      None: lambda entity, name_value: entity.name is not None,
       '=': lambda entity, name_value: entity.name == name_value,
       '<=': lambda entity, name_value: entity.name <= name_value,
       '<': lambda entity, name_value: entity.name < name_value,
@@ -225,7 +227,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   }
 
   SQL_UNIXTIME_VALUE_COMPARISON_FUNCS = {
-      None: lambda entity, unixtime_value: entity.unixtime != None,
+      None: lambda entity, unixtime_value: entity.unixtime is not None,
       '=': lambda entity, unixtime_value: entity.unixtime == unixtime_value,
       '<=': lambda entity, unixtime_value: entity.unixtime <= unixtime_value,
       '<': lambda entity, unixtime_value: entity.unixtime < unixtime_value,
@@ -477,10 +479,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             xit = 1
             continue
           print(output.replace('\n', ' '))
-          if True:
-            for tag in sorted(te.tags):
-              if tag.name != 'headline':
-                print(" ", tag)
+          for tag in sorted(te.tags):
+            if tag.name != 'headline':
+              print(" ", tag)
     return xit
 
   @staticmethod
@@ -529,6 +530,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("extra arguments: %r" % (argv,))
     options.sqltags.orm.define_schema()
 
+  # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @classmethod
   def cmd_log(cls, argv, options):
     ''' Record a log entry.
@@ -682,6 +684,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             print(" ", tag)
     return xit
 
+  # pylint: disable=too-many-branches
   @classmethod
   def cmd_tag(cls, argv, options):
     ''' Usage: {cmd} {{-|entity-name}} {{tag[=value]|-tag}}...
@@ -734,6 +737,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
 SQLTagsCommand.add_usage_to_docstring()
 
+# pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
   '''
@@ -820,6 +824,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     '''
     return self.entities.lookup1(id=0, session=session)
 
+  # pylint: disable=too-many-statements
   def declare_schema(self):
     ''' Define the database schema / ORM mapping.
     '''
@@ -926,9 +931,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             * `'tagged'`: (default) the query yields entities left
             outer joined with their matching tags
 
-            Note that the `'tagged'` result produces multiple rows for any entity with 
-              this requires the caller to fold entities with multiple tags
-              together 
+            Note that the `'tagged'` result produces multiple rows for any
+            entity with multiple tags, and that this requires the caller to
+            fold entities with multiple tags together.
 
             *Note*:
             due to implementation limitations
@@ -1212,7 +1217,7 @@ class SQLTags(MultiOpenMixin):
     ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
-      tes = self.tagged_entities(SQLEntityIdTest([index]))
+      tes = self.tagged_entities(SQTEntityIdTest([index]))
     elif isinstance(index, str):
       tes = self.tagged_entities(
           SQLTagBasedTest(index, True, Tag('name', index), '=')
@@ -1258,7 +1263,6 @@ class SQLTags(MultiOpenMixin):
     )
     if without_tags:
       # just assmble the TEs directly
-      results = session.execute(query)
       for row in query:
         te = SQLTaggedEntity(
             id=row.entity_id,
@@ -1271,7 +1275,6 @@ class SQLTags(MultiOpenMixin):
           yield te
       return
     # obtain entities and tag information which must be merged
-    entities = self.orm.entities
     tags = self.orm.tags
     entity_map = {}
     for row in query:
