@@ -1040,7 +1040,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
   @typechecked
-  def match_entity(self, te: "TaggedEntity") -> bool:
+  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
     ''' Test against the `Tag`s in `tags`.
 
         *Note*: comparisons when `self.tag.name` is not in `tags`
