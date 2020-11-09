@@ -879,14 +879,14 @@ class TaggedEntityCriterion(ABC):
   def from_str(cls, s):
     ''' Prepare a `TaggedEntityCriterion` from the string `s`.
     '''
-    criterion, offset = cls.parse(s)
+    criterion, offset = cls.from_str2(s)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
     return criterion
 
   @classmethod
   @pfx_method
-  def parse(cls, s, offset=0, delim=None):
+  def from_str2(cls, s, offset=0, delim=None):
     ''' Parse a criterion from `s` at `offset` and return `(TaggedEntityCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
@@ -905,10 +905,10 @@ class TaggedEntityCriterion(ABC):
       criterion = None
       for crit_cls in cls.CRITERION_PARSE_CLASSES:
         with Pfx(crit_cls.__name__):
-          parse = crit_cls.parse
           with Pfx("%s.parse(%r,offset=%d)", crit_cls.__name__, s, offset):
+          parse_method = crit_cls.parse
             try:
-              params, offset = parse(s, offset, delim)
+              params, offset = parse_method(s, offset, delim)
             except ValueError:
               pass
             else:
