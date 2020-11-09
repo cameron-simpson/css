@@ -1195,22 +1195,6 @@ class SQLTags(MultiOpenMixin):
     self.orm = None
 
   @orm_auto_session
-  @typechecked
-  def db_query1(self, index: [int, str], session):
-    ''' Construct a query to look up a `str` or `int` index value.
-    '''
-    entities = self.orm.entities
-    if isinstance(index, int):
-      XP(
-          "entities=%s, entities.__mro__=%r", entities,
-          getattr(entities, '__mro__', None)
-      )
-      query = session.query(entities).filter_by(id=index)
-    else:
-      query = entities.by_name(index)
-    return query
-
-  @orm_auto_session
   def db_entity(self, index, *, session):
     ''' Return the `Entities` instance for `index` or `None`.
     '''
@@ -1235,7 +1219,6 @@ class SQLTags(MultiOpenMixin):
       )
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
-    query = self.db_query1(index)
     tes = list(tes)
     if not tes:
       return default
