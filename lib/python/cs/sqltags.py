@@ -48,7 +48,8 @@ from cs.sqlalchemy_utils import (
     HasIdMixin
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TaggedEntity
+    TagSet, Tag, TaggedEntityCriterion, TagBasedTest, TagsCommandMixin,
+    TaggedEntity
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -93,13 +94,13 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-class SQLTagSetCriterion(TagSetCriterion):
   ''' Subclass of `TagSetCriterion` requiring the `.extend_query` method.
+class SQTCriterion(TaggedEntityCriterion):
       It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
       the SQL capable criterion classes below.
   '''
 
-  # list of TagSetCriterion classes
+  # list of TaggedEntityCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 

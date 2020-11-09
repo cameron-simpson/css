@@ -860,24 +860,24 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     except KeyError:
       raise AttributeError('member_type')
 
-class TagSetCriterion(ABC):
+class TaggedEntityCriterion(ABC):
   ''' A testable criterion for a `TagSet`.
   '''
 
-  # list of TagSetCriterion classes
+  # list of TaggedEntityCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
   def match(self, tagset):
-    ''' Apply this `TagSetCriterion` to a `TagSet`.
+    ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
 
   @classmethod
   @pfx_method
   def from_str(cls, s):
-    ''' Prepare a `TagSetCriterion` from the string `s`.
+    ''' Prepare a `TaggedEntityCriterion` from the string `s`.
     '''
     criterion, offset = cls.parse(s)
     if offset != len(s):
@@ -887,7 +887,7 @@ class TagSetCriterion(ABC):
   @classmethod
   @pfx_method
   def parse(cls, s, offset=0, delim=None):
-    ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
+    ''' Parse a criterion from `s` at `offset` and return `(TaggedEntityCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
         indicating negation of the test,
@@ -921,14 +921,14 @@ class TagSetCriterion(ABC):
   @classmethod
   @pfx_method
   def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TagSetCriterion`.
+    ''' Convert some suitable object `o` into a `TaggedEntityCriterion`.
 
         Various possibilities for `o` are:
-        * `TagSetCriterion`: returned unchanged
+        * `TaggedEntityCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
         * an object with a `.choice` attribute;
-          this is taken to be a `TagSetCriterion` ducktype and returned unchanged
+          this is taken to be a `TaggedEntityCriterion` ducktype and returned unchanged
         * an object with `.name` and `.value` attributes;
           this is taken to be `Tag`-like and a positive test is constructed
         * `Tag`: an object with a `.name` and `.value`
@@ -937,7 +937,7 @@ class TagSetCriterion(ABC):
           is equivalent to a positive equality `TagBasedTest`
     '''
     tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
-    if isinstance(o, (cls, TagSetCriterion)):
+    if isinstance(o, (cls, TaggedEntityCriterion)):
       # already suitable
       return o
     if isinstance(o, str):
@@ -966,7 +966,7 @@ class TagSetCriterion(ABC):
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
 class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
-                   TagSetCriterion):
+                   TaggedEntityCriterion):
   ''' A test based on a `Tag`.
 
       Attributes:
@@ -1753,8 +1753,8 @@ class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
 
       Optional subclass attributes:
-      * `TAGSET_CRITERION_CLASS`: a `TagSetCriterion` duck class,
-        default `TagSetCriterion`.
+      * `TAGSET_CRITERION_CLASS`: a `TaggedEntityCriterion` duck class,
+        default `TaggedEntityCriterion`.
         For example, `cs.sqltags` has a subclass
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
@@ -1768,16 +1768,16 @@ class TagsCommandMixin:
         Raises `ValueError` in a misparse.
         The default `tag_based_test_class`
         comes from `cls.TAGSET_CRITERION_CLASS`,
-        which itself defaults to class `TagSetCriterion`.
+        which itself defaults to class `TaggedEntityCriterion`.
 
-        The default `TagSetCriterion.from_str` recognises:
+        The default `TaggedEntityCriterion.from_str` recognises:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
     '''
     if tag_based_test_class is None:
       tag_based_test_class = getattr(
-          cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
+          cls, 'TAGSET_CRITERION_CLASS', TaggedEntityCriterion
       )
     return tag_based_test_class.from_str(arg)
 
@@ -1814,7 +1814,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagSetCriterion.from_str(arg)
+          tag_choice = TaggedEntityCriterion.from_str(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':
