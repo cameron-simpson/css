@@ -151,6 +151,7 @@ import re
 import time
 from types import SimpleNamespace
 from icontract import ensure, require
+from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
@@ -181,6 +182,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'icontract',
+        'typeguard',
     ],
 }
 
@@ -869,7 +871,8 @@ class TaggedEntityCriterion(ABC):
   CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
-  def match(self, tagset):
+  @typechecked
+  def match_entity(self, te: "TaggedEntity") -> bool:
     ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
@@ -1037,12 +1040,14 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     value, offset = Tag.parse_value(s, offset)
     return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
-  def match(self, tags):
+  @typechecked
+  def match_entity(self, te: "TaggedEntity") -> bool:
     ''' Test against the `Tag`s in `tags`.
 
         *Note*: comparisons when `self.tag.name` is not in `tags`
         always return `False` (possibly inverted by `self.choice`).
     '''
+    tags = te.tags
     tag_name = self.tag.name
     comparison = self.comparison
     if comparison is None:
