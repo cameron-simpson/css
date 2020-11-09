@@ -1140,13 +1140,11 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     tagged_path = self[path]
+    te = tagged_path.as_TaggedEntity()
     tags = (
         tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
     )
-    for tag_test in tag_tests:
-      if not tag_test.match(tags):
-        return False
-    return True
+    return all(criterion.match_tagged_entity(te) for criterion in tag_tests)
 
   @pfx_method
   def edit_dirpath(self, dirpath):
