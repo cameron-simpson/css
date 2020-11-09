@@ -1223,6 +1223,25 @@ class SQLTags(MultiOpenMixin):
         "expected index to be int or str, got %s:%s" % (type(index), index)
     )
 
+  @orm_auto_session
+  def get(self, index, default=None, *, session):
+    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
+    '''
+    if isinstance(index, int):
+      tes = self.tagged_entities(SQLEntityIdTest([index]))
+    elif isinstance(index, str):
+      tes = self.tagged_entities(
+          SQLTagBasedTest(index, True, Tag('name', index), '=')
+      )
+    else:
+      raise TypeError("unsupported index: %s:%r" % (type(index), index))
+    query = self.db_query1(index)
+    tes = list(tes)
+    if not tes:
+      return default
+    te, = tes
+    return te
+
   @locked
   @orm_auto_session
   def __getitem__(self, index, *, session):
@@ -1235,23 +1254,12 @@ class SQLTags(MultiOpenMixin):
       raise KeyError("%s[%r]" % (self, index))
     return te
 
-  @orm_auto_session
-  def get(self, index, *, session):
-    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
-    '''
-    query = self.db_query1(index)
-    tes = list(self._run_query(query, session=session))
-    if not tes:
-      return None
-    te, = tes
-    return te
-
   def __contains__(self, index):
-    return self.db_entity(index) is not None
+    return self.get(index) is not None
 
   @orm_auto_session
-  def _run_query(self, query, *, session, without_tags=False):
-    ''' Run a query derived from `self.orm.entities.query(session)`
+  def find(self, criteria, *, session, without_tags=False):
+    ''' Generate and run a query derived from `criteria`
         yielding `SQLTaggedEntity` instances.
 
         If the optional `without_tags` parameter (default `False`)
@@ -1259,62 +1267,53 @@ class SQLTags(MultiOpenMixin):
         resulting in empty `.tags` `SQLTagSet`s
         in the resulting `SQLTaggedEntity` instances.
     '''
+    orm = self.orm
+    query = orm.entities.search(
+        criteria,
+        session=session,
+        mode=('entity' if without_tags else 'tagged')
+    )
     if without_tags:
-      # do not bother fetching tags
+      # just assmble the TEs directly
       results = session.execute(query)
-      for entity_id, entity_name, unixtime in results:
-        yield SQLTaggedEntity(
-            id=entity_id,
-            name=entity_name,
-            unixtime=unixtime,
-            tags=SQLTagSet(sqltags=self, entity_id=entity_id),
-            sqltags=self
+      for row in query:
+        te = SQLTaggedEntity(
+            id=row.entity_id,
+            name=row.name,
+            unixtime=row.unixtime,
+            tags=SQLTagSet(sqltags=self, entity_id=row.entity_id),
+            sqltags=self,
         )
+        if all(criterion.match_tagged_entity(te) for criterion in criteria):
+          yield te
       return
     # obtain entities and tag information which must be merged
     entities = self.orm.entities
-    query = entities.with_tags(query)
-    results = session.execute(query)
+    tags = self.orm.tags
     entity_map = {}
-    for (entity_id, entity_name, unixtime, tag_name, tag_float_value,
-         tag_string_value, tag_structured_value) in results:
+    for row in query:
+      entity_id = row.id
       e = entity_map.get(entity_id)
       if not e:
         # not seen before
         e = entity_map[entity_id] = SQLTaggedEntity(
             id=entity_id,
-            name=entity_name,
-            unixtime=unixtime,
+            name=row.name,
+            unixtime=row.unixtime,
             tags=SQLTagSet(sqltags=self, entity_id=entity_id),
             sqltags=self
         )
-      if tag_name is not None:
+      # a None tag_name means no tags
+      if row.tag_name is not None:
         # set the dict entry directly - we are loading db values,
         # not applying them to the db
-        value = self.orm.tags.pick_value(
-            tag_float_value, tag_string_value, tag_structured_value
+        tag_value = tags.pick_value(
+            row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
-        e.tags.set(tag_name, value, skip_db=True)
-    yield from entity_map.values()
-
-  @orm_auto_session
-  def find(self, tag_criteria, *, session):
-    ''' Generator yielding `TaggedEntity` instances
-        for the `Entity` rows matching `tag_criteria`.
-    '''
-    entities = self.orm.entities
-    if len(tag_criteria) == 1 and isinstance(tag_criteria[0], int):
-      yield self[tag_criteria[0]]
-    else:
-      query = entities.by_tags(tag_criteria, session=session)
-      for te in self._run_query(query, session=session):
-        ok = True
-        for criterion in tag_criteria:
-          if not criterion.match(te.tags):
-            ok = False
-            break
-        if ok:
-          yield te
+        e.tags.set(row.tag_name, tag_value, skip_db=True)
+    for te in entity_map.values():
+      if all(criterion.match_tagged_entity(te) for criterion in criteria):
+        yield te
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
