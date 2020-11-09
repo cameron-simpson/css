@@ -1140,10 +1140,7 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     tagged_path = self[path]
-    te = tagged_path.as_TaggedEntity()
-    tags = (
-        tagged_path.direct_tags if use_direct_tags else tagged_path.all_tags
-    )
+    te = tagged_path.as_TaggedEntity(indirect=not use_direct_tags)
     return all(criterion.match_tagged_entity(te) for criterion in tag_tests)
 
   @pfx_method
