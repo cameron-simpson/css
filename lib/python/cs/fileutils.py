@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20201102-post'
+__version__ = '20201108-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -323,6 +323,7 @@ def rewrite_cmgr(filepath, mode='w', **kw):
   '''
   with NamedTemporaryFile(mode=mode) as T:
     yield T
+    T.flush()
     with open(T.name, 'rb') as f:
       return rewrite(filepath, mode='wb', srcf=f, **kw)
 
