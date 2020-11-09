@@ -1072,8 +1072,8 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
           result = False
     return result if self.choice else not result
 
-TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
-TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
+TaggedEntityCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
+TaggedEntityCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
