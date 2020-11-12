@@ -159,7 +159,8 @@ from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
-    is_dotted_identifier, skipwhite, lc_, titleify_lc, FormatableMixin
+    is_dotted_identifier, is_identifier, skipwhite, lc_, titleify_lc,
+    FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
 from cs.obj import SingletonMixin
@@ -205,11 +206,27 @@ class TagSet(dict, FormatableMixin):
   '''
 
   @pfx_method
-  def __init__(self, *, ontology=None):
+  def __init__(self, *a, _ontology=None, **kw):
     ''' Initialise the `TagSet`.
+
+        Parameters:
+        * positional parameters initialise the `dict`
+          and are passed to `dict.__init__`
+        * `_ontology`: optional `TagsOntology to use for this `TagSet`
+        * other alphabetic keyword parameters are also used to initialise the
+          `dict` and are passed to `dict.__init__`
     '''
-    super().__init__()
-    self.ontology = ontology
+    dict_kw = {}
+    okw = {}
+    for k, v in kw.items():
+      if k and k[0].isalpha() and is_identifier(k):
+        dict_kw[k] = v
+      else:
+        okw[k] = v
+    if okw:
+      raise ValueError("unrecognised keywords: %r" % (okw,))
+    super().__init__(*a, **dict_kw)
+    self.ontology = _ontology
     self.modified = False
 
   def __str__(self):
