@@ -1503,7 +1503,7 @@ class TagFile(SingletonMixin):
         for lines which failed the parse (excluding the trailing newline).
     '''
     with Pfx("%r", filepath):
-      tagsets = defaultdict(lambda: TagSet(ontology=ontology))
+      tagsets = defaultdict(lambda: TagSet(_ontology=ontology))
       unparsed = []
       try:
         with open(filepath) as f:
@@ -1720,7 +1720,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         * `filepath.encoded`: the JSON encoded filepath
     '''
     ont = self.ontology
-    kwtags = TagSet(ontology=ont)
+    kwtags = TagSet(_ontology=ont)
     kwtags.update(self.direct_tags if direct else self.all_tags)
     # add in cascaded values
     for tag in list(self.fstags.cascade_tags(kwtags)):
@@ -1797,7 +1797,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     ''' Return the cumulative tags for this path as a `TagSet`
         by merging the tags from the root to the path.
     '''
-    tags = TagSet(ontology=self.ontology)
+    tags = TagSet(_ontology=self.ontology)
     with stackattrs(state, verbose=False):
       for tagfile, name in self._tagfile_stack:
         for tag in tagfile[name]:
@@ -1853,7 +1853,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     if rules is None:
       rules = self.fstags.config.filename_rules
     name = self.basename
-    tagset = TagSet(ontology=self.ontology)
+    tagset = TagSet(_ontology=self.ontology)
     with stackattrs(state, verbose=False):
       for rule in rules:
         for tag in rule.infer_tags(name):
@@ -1871,7 +1871,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       xattr_name = XATTR_B
     xattr_s = get_xattr_value(self.filepath, xattr_name)
     if xattr_s is None:
-      return TagSet(ontology=self.ontology)
+      return TagSet(_ontology=self.ontology)
     return TagSet.from_line(xattr_s)
 
   def import_xattrs(self):

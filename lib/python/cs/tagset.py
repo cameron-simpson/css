@@ -241,7 +241,7 @@ class TagSet(dict, FormatableMixin):
   def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
     ''' Create a new `TagSet` from a line of text.
     '''
-    tags = cls(ontology=ontology)
+    tags = cls(_ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
       tag, offset = Tag.parse(line, offset, ontology=ontology)
@@ -1500,7 +1500,7 @@ class TagsOntology(SingletonMixin):
     try:
       tags = self.tagsets[name]
     except KeyError:
-      tags = self.tagsets[name] = TagSet(ontology=self)
+      tags = self.tagsets[name] = TagSet(_ontology=self)
     return tags
 
   def entity(self, index, name=None):
