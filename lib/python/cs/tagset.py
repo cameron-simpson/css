@@ -249,14 +249,6 @@ class TagSet(dict, FormatableMixin):
       offset = skipwhite(line, offset)
     return tags
 
-##@classmethod
-##def from_bytes(cls, bs, ontology=None):
-##  ''' Create a new `TagSet` from the bytes `bs`,
-##      a UTF-8 encoding of a `TagSet` line.
-##  '''
-##  line = bs.decode(errors='replace')
-##  return cls.from_line(line, ontology=ontology)
-
   def __contains__(self, tag):
     if isinstance(tag, str):
       return super().__contains__(tag)
