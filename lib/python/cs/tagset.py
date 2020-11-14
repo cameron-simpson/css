@@ -46,18 +46,26 @@
         >>> tags.add('topic','tagging')
         >>> # make a "subtopic" Tag and add it
         >>> subtopic = Tag('subtopic', 'ontologies')
+        >>> tags.add(subtopic)
         >>> # Tags have nice repr() and str()
         >>> subtopic
         Tag(name='subtopic',value='ontologies',ontology=None)
         >>> print(subtopic)
         subtopic=ontologies
-        >>> # you can add a Tag directly
-        >>> tags.add(subtopic)
         >>> # TagSets also have nice repr() and str()
         >>> tags
         TagSet:{'blue': None, 'topic': 'tagging', 'subtopic': 'ontologies'}
         >>> print(tags)
         blue subtopic=ontologies topic=tagging
+        >>> tags2 = TagSet({'a': 1}, b=3, c=[1,2,3], d='dee')
+        >>> tags2
+        TagSet:{'a': 1, 'b': 3, 'c': [1, 2, 3], 'd': 'dee'}
+        >>> print(tags2)
+        a=1 b=3 c=[1,2,3] d=dee
+        >>> # since you can print a TagSet to a file as a line of text
+        >>> # you can get it back from a line of text
+        >>> TagSet.from_line('a=1 b=3 c=[1,2,3] d=dee')
+        TagSet:{'a': 1, 'b': 3, 'c': [1, 2, 3], 'd': 'dee'}
         >>> # because TagSets are dicts you can format strings with them
         >>> print('topic:{topic} subtopic:{subtopic}'.format_map(tags))
         topic:tagging subtopic:ontologies
@@ -74,8 +82,8 @@
         >>> # test for subtopic=ontologies
         >>> subtopic in tags
         True
-        >>> subtopic2 = Tag('subtopic', 'libraries')
         >>> # test for subtopic=libraries
+        >>> subtopic2 = Tag('subtopic', 'libraries')
         >>> subtopic2 in tags
         False
 
