@@ -265,15 +265,24 @@ class TagSet(dict, FormatableMixin):
         return True
     return False
 
+  def tag(self, tag_name, prefix=None):
+    ''' Return a `Tag` for `tag_name`, or `None` if missing.
+    '''
+    try:
+      value = self[tag_name]
+    except KeyError:
+      return None
+    return Tag(
+        prefix + '.' + tag_name if prefix else tag_name,
+        value,
+        ontology=self.ontology
+    )
+
   def as_tags(self, prefix=None):
     ''' Yield the tag data as `Tag`s.
     '''
-    for tag_name, value in self.items():
-      yield Tag(
-          prefix + '.' + tag_name if prefix else tag_name,
-          value,
-          ontology=self.ontology
-      )
+    for tag_name in self.keys():
+      yield self.tag(tag_name, prefix=prefix)
 
   __iter__ = as_tags
 
