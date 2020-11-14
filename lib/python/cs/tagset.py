@@ -84,6 +84,9 @@
 `Tag`s and `TagSet`s suffice to apply simple annotations to things.
 However, an ontology brings meaning to those annotations.
 
+See the `TagsOntology` class for implementation details,
+access methods and more examples.
+
 Consider a record about a movie, with this `TagSet`:
 
     title="Avengers Assemble"
@@ -101,8 +104,8 @@ Here's an example ontology supporting the above `TagSet`:
     type.cast type=dict key_type=person member_type=character description="members of a production"
     type.character description="an identified member of a story"
     type.series type=str
-    metadata.character.marvel.black_widow type=character names=["Natasha Romanov"]
-    metadata.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+    meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
+    meta.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
 The type information for a `cast`
 is defined by the ontology entry named `type.cast`,
@@ -677,6 +680,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         This is how its type is defined,
         and is obtained from:
         `self.ontology['type.'+self.name]`
+
+        For example, a `Tag` `colour=blue`
+        gets its type information from the `type.colour` entry in an ontology.
     '''
     ont = self.ontology
     if ont is None:
@@ -687,10 +693,14 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @pfx_method(use_str=True)
   def key_typedata(self):
-    ''' Return the typedata definition for this `Tag`'s keys,
-        obtained from `self.ontology[self.typedata['key_type']]`
-        i.e. the ontology `TagSet` named by the `self.typedata`'s
-        `key_type` `Tag`.
+    ''' The typedata definition for this `Tag`'s keys.
+
+        This is for `Tag`s which store mappings,
+        for example a movie cast, mapping actors to roles.
+
+        The name of the member type comes from
+        the `key_type` entry from `self.typedata`.
+        That name is then looked up in the ontology's types.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -724,7 +734,15 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @pfx_method(use_str=True)
   def member_typedata(self):
-    ''' Return the typedata definition for this `Tag`'s members.
+    ''' The typedata definition for this `Tag`'s members.
+
+        This is for `Tag`s which store mappings or sequences,
+        for example a movie cast, mapping actors to roles,
+        or a list of scenes.
+
+        The name of the member type comes from
+        the `member_type` entry from `self.typedata`.
+        That name is then looked up in the ontology's types.
     '''
     typedata = self.typedata
     if typedata is None:
@@ -1174,11 +1192,27 @@ class ExtendedNamespace(SimpleNamespace):
 
 class TagSetNamespace(ExtendedNamespace):
   ''' A formattable nested namespace for a `TagSet`,
-      subclassing `ExtendedNamespace`.
+      subclassing `ExtendedNamespace`,
+      providing attribute based access to tag data.
 
-      These are useful within format strings
-      and `str.format` or `str.format_map`
-      (as it implements the `keys` and `__getitem__` methods).
+      `TagSet`s have a `.ns()` method which returns a `TagSetNamespace`
+      derived from that `TagSet`.
+
+      This class exists particularly to help with format strings
+      because tools like fstags and sqltags use these for their output formats.
+      As such, I wanted to be able to put some expressive stuff
+      in the format strings.
+
+      However, this also gets you attribute style access to various
+      related values without mucking with format strings.
+      For example for some `TagSet` `tags` with a `colour=blue` `Tag`,
+      if I set `ns=tags.ns()`:
+      * `ns.colour` is itself a namespace based on the `colour `Tag`
+      * `ns.colour_s` is the string `'blue'`
+      * `ns.colour._tag` is the `colour` `Tag` itself
+      If the `TagSet` had an ontology:
+      * `ns.colour._meta` is a namespace based on the metadata
+        for the `colour` `Tag`
 
       This provides an assortment of special names derived from the `TagSet`.
       See the docstring for `__getattr__` for the special attributes provided
@@ -1474,6 +1508,53 @@ class TagsOntology(SingletonMixin):
 
       A `cs.fstags.FSTags` uses ontologies initialised from `TagFile`s
       containing ontology mappings.
+
+      There are two main categories of entries in an ontology:
+      * types: an entry named `type.{typename}` contains a `TagSet`
+        defining the type named `typename`
+      * metadata: an entry named `meta.{typename}.{value_key}`
+        contains a `TagSet` holding metadata for a value of type {typename}
+
+      Types:
+
+      The type of a `Tag` is nothing more than its `name`.
+
+      The basic types have their Python names: `int`, `float`, `str`, `list`,
+      dict`, `date`, `datetime`.
+      You can define subtypes of these for your own purposes,
+      for example:
+
+          type.colour type=str description="A hue."
+
+      which subclasses `str`.
+
+      Subtypes of `list` include a `member_type`
+      specifying the type for members of a `Tag` value:
+
+          type.scene type=list member_type=str description="A movie scene."
+
+      Subtypes of `dict` include a `key_type` and a `member_type`
+      specifying the type for keys and members of a `Tag` value:
+
+          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
+          type.actor type=person description="An actor's stage name."
+          type.person type=str description="A person."
+          type.role type=character description="A character role in a performance."
+          type.character type=str description="A person in a story."
+
+      Metadata:
+
+      Metadata are `Tag`s describing particular values of a type.
+      For example, the metadata for the `Tag` `colour=blue`:
+
+          meta.colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
+          meta.actor.scarlett_johansson
+          meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
+
+      Accessing type data and metadata:
+
+      A `TagSet` may have a reference to a `TagsOntology` as `.ontology`
+      and so also do any of its `Tag`s.
   '''
 
   # A mapping of base type named to Python types.
