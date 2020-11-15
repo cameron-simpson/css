@@ -1664,12 +1664,12 @@ class TagsOntology(SingletonMixin):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    if isinstance(value, str):
-      value_tag_name = self.value_to_tag_name(value)
+    if isinstance(value, (int, str)):
+      value_tag_name = self.value_to_tag_name(str(value))
       ontkey = 'meta.' + type_name + '.' + '_'.join(
           value_tag_name.lower().split()
       )
-      return ValueMetadata(self, ontkey, value)
+      return self[ontkey]
     return None
 
   def basetype(self, typename):
