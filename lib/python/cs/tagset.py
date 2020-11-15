@@ -409,35 +409,6 @@ class TagSet(dict, FormatableMixin):
         new_values[tag.name] = tag.value
     self.set_from(new_values, verbose=verbose)
 
-class ValueMetadata(namedtuple('ValueMetadata', 'ontology ontkey value')):
-  ''' Metadata information about a value.
-        * `ontology`: the reference ontology
-        * `ontkey`: the key within the ontology providing the metadata
-        * `value`: the value
-    '''
-
-  @property
-  def metadata(self):
-    ''' The metadata, the `TagSet` from `ontology[ontkey]`.
-      '''
-    return self.ontology[self.ontkey]
-
-  def ns(self):
-    ''' Return a `ValueMetadataNamespace` for this `ValueMetadata`.
-    '''
-    return ValueMetadataNamespace.from_metadata(self)
-
-class KeyValueMetadata(namedtuple('KeyValueMetadata',
-                                  'key_metadata value_metadata')):
-  ''' Metadata information about a `(key,value)` pair.
-      * `ontology`: the reference ontology
-      * `key_metadata`: the metadata for the `key`,
-        the `TagSet` from `ontology[key_metadata.ontkey]`
-      * `value`: the value
-      * `value_metadata`: the metadata for the `value`,
-        the `TagSet` from `ontology[value_metadata.ontkey]`
-  '''
-
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
@@ -847,28 +818,13 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     ''' The metadataed information about this specific tag value,
         derived through the ontology from the tag name and value.
 
-        For a scalar type this is a `ValueMetadata`
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `ontkey`: the ontology key providing the metadata for the `value`
-        * `value`: the value `self.value`
-        * `metadata`: the metadata, a `TagSet`
+        For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
+        for `self.value`.
 
-        However, note that the types `'list'` and `'dict'` are special,
-        indicating that the value is a sequence or mapping respectively.
+        For a sequence (`list`) this is a list of the metadata
+        for each member.
 
-        For `'list'` types
-        this property is a list of `ValueMetadata` instances
-        for each element of the sequence.
-
-        For `'dict'` types
-        this property is a list of `KeyValueMetadata` instances
-        with the following attributes:
-        * `ontology`: the reference ontology
-        * `key`: the key
-        * `key_metadata`: a `ValueMetadata` for the key
-        * `value`: the value
-        * `value_metadata`: a `ValueMetadata` for the value
+        For a mapping (`dict`) this is mapping of `key->value_metadata`.
     '''
     ont = self.ontology
     basetype = self.basetype
@@ -876,14 +832,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       member_type = self.member_type
       return [ont.value_metadata(member_type, value) for value in self.value]
     if basetype == 'dict':
-      key_type = self.key_type
       member_type = self.member_type
-      return [
-          KeyValueMetadata(
-              ont.value_metadata(key_type, key),
-              ont.value_metadata(member_type, value)
-          ) for key, value in self.value.items()
-      ]
+      return {
+          key: ont.value_metadata(member_type, value)
+          for key, value in self.value.items()
+      }
     return ont.value_metadata(self.name, self.value)
 
   @property
