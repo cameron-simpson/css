@@ -815,7 +815,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @require(lambda self: isinstance(self.type, str))
   def metadata(self):
-    ''' The metadataed information about this specific tag value,
+    ''' The metadata information about this specific tag value,
         derived through the ontology from the tag name and value.
 
         For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
@@ -1481,7 +1481,7 @@ class TagsOntology(SingletonMixin):
       The type of a `Tag` is nothing more than its `name`.
 
       The basic types have their Python names: `int`, `float`, `str`, `list`,
-      dict`, `date`, `datetime`.
+      `dict`, `date`, `datetime`.
       You can define subtypes of these for your own purposes,
       for example:
 
