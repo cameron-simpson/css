@@ -174,6 +174,7 @@ from cs.lex import (
     FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
+from cs.mappings import AttrableMappingMixin
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
@@ -192,6 +193,7 @@ DISTINFO = {
         'cs.edit',
         'cs.lex',
         'cs.logutils',
+        'cs.mappings',
         'cs.obj>=20200716',
         'cs.pfx',
         'cs.py3',
@@ -200,11 +202,14 @@ DISTINFO = {
     ],
 }
 
-class TagSet(dict, FormatableMixin):
+class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
       mapping of tag names to values.
+      It accepts attribute access to simple tag values when they
+      do not conflict with the class methods;
+      the reliable method is normal item access.
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
 
