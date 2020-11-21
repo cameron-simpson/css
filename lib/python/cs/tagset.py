@@ -987,6 +987,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       * `'<='`: test that the tag value is less than or equal to `tag.value`
       * `'>'`: test that the tag value is greater than `tag.value`
       * `'>='`: test that the tag value is greater than or equal to `tag.value`
+      * `'~/'`: test if the tag value as a regexp is present in `tag.value`
       * '~': test if the tag value is present in `tag.value`
   '''
 
@@ -996,6 +997,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       '<': lambda tag_value, cmp_value: tag_value < cmp_value,
       '>=': lambda tag_value, cmp_value: tag_value >= cmp_value,
       '>': lambda tag_value, cmp_value: tag_value > cmp_value,
+      '~/': lambda tag_value, cmp_value: re.match(cmp_value, tag_value),
       '~': lambda tag_value, cmp_value: cmp_value in tag_value,
   }
 
