@@ -1087,7 +1087,7 @@ class ExtendedNamespace(SimpleNamespace):
   '''
 
   def _public_keys(self):
-    return (k for k in self.__dict__.keys() if k and k[0].isalpha())
+    return (k for k in self.__dict__ if k and k[0].isalpha())
 
   def _public_keys_str(self):
     return ','.join(sorted(self._public_keys()))
