@@ -163,6 +163,7 @@ from json.decoder import JSONDecodeError
 import re
 import time
 from types import SimpleNamespace
+from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
@@ -485,6 +486,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   JSON_DECODER = JSONDecoder()
 
   EXTRA_TYPES = [
+      (UUID, UUID, str),
       (date, date_fromisoformat, date.isoformat),
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
