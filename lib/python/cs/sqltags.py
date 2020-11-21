@@ -214,6 +214,9 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       ),
       '~':
       lambda alias, tag_value: None,
+      # requires sqlalchemy 1.4
+      ##'~/':
+      ##lambda alias, tag_value: alias.string_value.regexp_match(tag_value),
   }
 
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
@@ -224,6 +227,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       '>=': lambda entity, name_value: entity.name >= name_value,
       '>': lambda entity, name_value: entity.name > name_value,
       '~': lambda entity, name_value: entity.name.like(f'%{name_value}%'),
+      ##'~/': lambda entity, name_value: re.search(name_value, entity.name),
   }
 
   SQL_UNIXTIME_VALUE_COMPARISON_FUNCS = {
@@ -236,12 +240,21 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   }
 
   TE_VALUE_COMPARISON_FUNCS = {
-      '=': lambda te_value, value: te_value == value,
-      '<=': lambda te_value, value: te_value <= value,
-      '<': lambda te_value, value: te_value < value,
-      '>=': lambda te_value, value: te_value >= value,
-      '>': lambda te_value, value: te_value > value,
-      '~': lambda te_value, value: value in te_value
+      '=':
+      lambda te_value, value: te_value == value,
+      '<=':
+      lambda te_value, value: te_value <= value,
+      '<':
+      lambda te_value, value: te_value < value,
+      '>=':
+      lambda te_value, value: te_value >= value,
+      '>':
+      lambda te_value, value: te_value > value,
+      '~':
+      lambda te_value, value: value in te_value,
+      '~/':
+      lambda te_value, value:
+      (isinstance(te_value, str) and re.search(value, te_value)),
   }
 
   @pfx_method
@@ -257,16 +270,20 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
               "name comparison requires a str, got %s:%r" %
               (type(tag.value), tag.value)
           )
-        constraint = self.SQL_NAME_VALUE_COMPARISON_FUNCS[self.comparison
-                                                          ](alias, tag.value)
+        constraint_fn = self.SQL_NAME_VALUE_COMPARISON_FUNCS.get(
+            self.comparison
+        )
+        constraint = constraint_fn and constraint_fn(alias, tag.value)
       elif tag.name == 'unixtime':
         if not isinstance(tag.value, (int, float)):
           raise ValueError(
               "unixtime comparison requires a float, got %s:%r" %
               (type(tag.value), tag.value)
           )
-        constraint = self.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
-            self.comparison](alias, tag.value)
+        constraint_fn = self.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS.get(
+            self.comparison
+        )
+        constraint = constraint_fn and constraint_fn(alias, tag.value)
       else:
         raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
     else:
@@ -275,8 +292,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       alias = aliased(tags)
       entity_id_column = alias.entity_id
       constraint = alias.name == tag.name
-      constraint2 = self.SQL_TAG_VALUE_COMPARISON_FUNCS[self.comparison
-                                                        ](alias, tag.value)
+      constraint2_fn = self.SQL_TAG_VALUE_COMPARISON_FUNCS.get(self.comparison)
+      constraint2 = constraint2_fn and constraint2_fn(alias, tag.value)
       if constraint2 is not None:
         constraint = and_(constraint, constraint2)
       else:
