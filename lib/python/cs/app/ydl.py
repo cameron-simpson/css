@@ -152,7 +152,7 @@ class OverYDL:
     if all_progress is None:
       all_progress = OverProgress()
     self.upd = upd
-    self.proxy0 = upd.proxy(0)
+    self.proxy0 = upd.insert(0)
     self.fstags = fstags
     self.all_progress = all_progress
     self.ydl_opts = ydl_opts

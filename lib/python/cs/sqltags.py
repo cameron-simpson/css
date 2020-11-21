@@ -414,12 +414,15 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       if sys.stdin.isatty():
         warning("reading log lines from stdin...")
     cmdline_headline = argv.pop(0)
-    log_tags = cls.parse_tagset_criteria(argv)
+    log_tags, argv = cls.parse_tagset_criteria(argv)
     for log_tag in log_tags:
       with Pfx(log_tag):
         if not log_tag.choice:
           warning("negative tag choice")
           badopts = True
+    if argv:
+      warning("extra arguments (invalid tag choices?): %r", argv)
+      badopts = True
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
