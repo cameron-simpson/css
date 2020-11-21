@@ -176,7 +176,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       argv = ['.']
     filename_rules = fstags.config.filename_rules
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       for top_path in argv:
         for isdir, path in rpaths(top_path, yield_dirs=True):
           spath = shortpath(path)
@@ -227,7 +227,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       path = argv.pop(0)
       if argv:
         raise GetoptError("extra arguments after path: %r" % (argv,))
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
           tags = fstags[path].direct_tags
@@ -450,7 +450,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not isinstance(data, dict):
       error("JSON data do not specify a dict: %s", type(dict))
       return 1
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       for path in paths:
         with Pfx(path):
           ont = fstags.ontology(path)
@@ -562,7 +562,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       raise GetoptError("missing paths or targetdir")
     endpath = argv[-1]
     if isdirpath(endpath):
-      with stackattrs(state, verbose=True):
+      with state(verbose=True):
         dirpath = argv.pop()
         for srcpath in argv:
           dstpath = joinpath(dirpath, basename(srcpath))
@@ -580,7 +580,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             "expected exactly 2 arguments if the last is not a directory, got: %r"
             % (argv,)
         )
-      with stackattrs(state, verbose=True):
+      with state(verbose=True):
         srcpath, dstpath = argv
         try:
           attach(srcpath, dstpath, force=cmd_force, crop_ok=True)
@@ -682,7 +682,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     xit = 0
     U = options.upd
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       for filepath in paths:
         U.out(filepath)
         with Pfx(filepath):
@@ -724,7 +724,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     if not argv:
       raise GetoptError("missing paths")
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       for path in argv:
         fstags.scrub(path)
 
@@ -753,7 +753,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = [path]
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       fstags.apply_tag_choices(tag_choices, paths)
 
   @classmethod
@@ -788,7 +788,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               badopts = True
             if badopts:
               raise GetoptError("bad arguments")
-            with stackattrs(state, verbose=True):
+            with state(verbose=True):
               with TagFile(tagfilepath) as tagfile:
                 tags = tagfile[tagset_name]
                 for choice in tag_choices:
@@ -832,7 +832,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       fstags.apply_tag_choices([tag_choice], paths)
 
   @classmethod
@@ -897,7 +897,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
-    with stackattrs(state, verbose=True):
+    with state(verbose=True):
       fstags.import_xattrs(paths)
 
 FSTagsCommand.add_usage_to_docstring()
@@ -1507,7 +1507,7 @@ class TagFile(SingletonMixin):
       unparsed = []
       try:
         with open(filepath) as f:
-          with stackattrs(state, verbose=False):
+          with state(verbose=False):
             for lineno, line in enumerate(f, 1):
               with Pfx(lineno):
                 line0 = cutsuffix(line, '\n')
@@ -1798,7 +1798,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
         by merging the tags from the root to the path.
     '''
     tags = TagSet(_ontology=self.ontology)
-    with stackattrs(state, verbose=False):
+    with state(verbose=False):
       for tagfile, name in self._tagfile_stack:
         for tag in tagfile[name]:
           tags.add(tag)
@@ -1854,7 +1854,7 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       rules = self.fstags.config.filename_rules
     name = self.basename
     tagset = TagSet(_ontology=self.ontology)
-    with stackattrs(state, verbose=False):
+    with state(verbose=False):
       for rule in rules:
         for tag in rule.infer_tags(name):
           if tag.name not in tagset:
