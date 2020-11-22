@@ -206,7 +206,21 @@ class TVWiz(_Recording):
   def metadata(self):
     ''' The decoded metadata.
     '''
-    return TVWizMetaData(self.read_header()._asdict())
+    hdrs = self.read_header()
+    tags = TagSet(
+        series_name=hdrs.evtName,
+        description=hdrs.synopsis,
+        start_unixtime=(raw['mjd'] - 40587) * DAY + raw['start'],
+        course_name=hdrs.svcName,
+    )
+    episode = hdrs.episode
+    try:
+      episode_num = int(episode)
+    except ValueError:
+      tags.update(episode_title=episode)
+    else:
+      tags.update(episode=episode_num)
+    return tags
 
   @staticmethod
   def tvwiz_parse_trunc(fp):
