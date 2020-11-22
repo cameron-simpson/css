@@ -1,0 +1,6 @@
+lib/python/cs/threads.py: Release information for cs.threads-20200718.
+lib/python/cs/threads_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/threads.py: cs.threads: @locked_property: adjust use of @transmute decorator for recent change
+lib/python/cs/threads.py: cs.threads: @locked: bump the default warning timeout to 10s, was firing too often; @locked_property: include the class name for AttributeErrors; tweak some docstrings
+lib/python/cs/threads.py: cs.threads: improve the timeout warning
+lib/python/cs/threads.py: cs.threads: new State class for thread local state objects with default attribute values and a stacking __call__ context manager

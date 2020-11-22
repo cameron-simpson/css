@@ -1,0 +1,5 @@
+Format/layout changes for the default status line.
+Progress.throughtput_recent: return None if no new positions beyond the starting position.
+BaseProgress.status: accept label=None (default to self.name) and width=UpdProxy (uses width.width).
+BaseProgress.status: new optional window parameter, default 5, defining the recent throughput window size in seconds.
+A few bugfixes.

@@ -1,0 +1,19 @@
+lib/python/cs/progress.py: Release information for cs.progress-20201025.
+lib/python/cs/progress.py: cs.progress: put the throughtput next to the ETA on the right hand end
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: fix off-by-2 error when the label is empty
+lib/python/cs/progress.py: cs.progress: Progress.throughtput_recent: return None if no new positions beyond the starting position; BaseProgress.status: drop throughput and ETA of no throughput; drop a redundant call to status()
+lib/python/cs/progress.py: cs.progress: docstring update
+lib/python/cs/progress.py: merge default ==> cloud
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: accept label=None (default to self.name) and width=UpdProxy (uses width.width)
+lib/python/cs/progress.py: cs.progress: self.notify_update now a common feature of BaseProgress, add update support to OverProgress
+lib/python/cs/progress.py: cs.progress: BaseProgress: new ._lock
+lib/python/cs/progress.py: cs.progress: OverProgress: new ._base_position, ._base_total underlying the computed position and total; also arrange that position and total are 0 if there are no children
+lib/python/cs/progress.py: cs.progress: hold the lock around certain operations
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: new optional window parameter, default 5, defining the recent throughput window size in seconds
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: plumb the new window parameter through to the default status function
+lib/python/cs/progress.py: cs.progress: BaseProgress.iterbar: plumb the new window parameter through to the default status function
+lib/python/cs/progress.py: cs.progress: clean a little lint
+lib/python/cs/progress.py: merge cloud ==> default: serialise dirstate rewrites, seem to be running out of files - may point to a leak; cs.progress: plumg a window parameter to tune "recent" throught put in status lines
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: bugfix handling of window default value
+lib/python/cs/progress.py: cs.progress: progressbar: put dummy "pass" statment at the bottom of the function, seems to resolve a CPython bug with (maybe) yield from tail recursion, or something
+lib/python/cs/progress.py: cs.progress: OverProgress._updated: fix spelling of self._lock
