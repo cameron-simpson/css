@@ -186,6 +186,15 @@ class _Recording(ABC, HasFSTagsMixin):
       return getattr(self.metadata, attr)
     raise AttributeError(attr)
 
+  def filename(self, format=None, *, ext):
+    ''' Compute a filename from `format` with extension `ext`.
+
+        If `format` is omitted it defaults to `self.DEFAULT_FILENAME_BASIS`.
+    '''
+    if format is None:
+      format = self.DEFAULT_FILENAME_BASIS
+    return format.format_map(self.metadata.ns()) + ext
+
   @abstractmethod
   def data(self):
     ''' Stub method for the raw video data method.
