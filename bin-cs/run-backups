@@ -97,36 +97,39 @@ do
   case "$src" in
     /*) ;; *) src=$HOME/$src ;;
   esac
-  case "$dsthost" in
-    *:*)    dst=$(     expr "x$dsthost" : 'x[^:]*:\(.*\)' )
-            dsthost=$( expr "x$dsthost" : 'x\([^:]*\):.*' )
-            ;;
-    *)      dst=$( basename "$src" )
-            ;;
-  esac
-  case "$mode" in
-    hg)         $dont pfx "$src:$dsthost:$dst" $trace \
-                  incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
-                ;;
-    image)      $dont pfx "$src:$dsthost:$dst" $trace \
-                  rsync -a $rsvopts --delete-after $etc \
-                    "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
-                ;;
-    mv)         $dont pfx "$src:$dsthost:$dst" $trace \
-                  rsync -a $rsvopts --remove-source-files $etc \
-                    "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
-                ;;
-    push)       $dont pfx "$src:$dsthost:$dst" $trace \
-                  rsync -a $rsvopts $etc \
-                    "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
-                ;;
-    histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
-                  rhistbackup "$src:$dsthost:BACKUP/$HOST/histbackup/$dst"
-                ;;
-    *)          echo "$0: unsupported mode: $mode" >&2
-                exit 1
-                ;;
-  esac || xit=1
+  for dsthost in ${dsthost/,/ }
+  do
+    case "$dsthost" in
+      *:*)    dst=$(     expr "x$dsthost" : 'x[^:]*:\(.*\)' )
+              dsthost=$( expr "x$dsthost" : 'x\([^:]*\):.*' )
+              ;;
+      *)      dst=$( basename "$src" )
+              ;;
+    esac
+    case "$mode" in
+      hg)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
+                  ;;
+      image)      $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --delete-after $etc \
+                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                  ;;
+      mv)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --remove-source-files $etc \
+                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                  ;;
+      push)       $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts $etc \
+                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                  ;;
+      histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
+                    rhistbackup "$src:$dsthost:BACKUP/$HOST/histbackup/$dst"
+                  ;;
+      *)          echo "$0: unsupported mode: $mode" >&2
+                  exit 1
+                  ;;
+    esac || xit=1
+  done
 done
 
 exit $xit
