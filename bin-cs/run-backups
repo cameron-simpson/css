@@ -106,24 +106,36 @@ do
       *)      dst=$( basename "$src" )
               ;;
     esac
+    case "$dst" in
+      /*)     ;;
+      *)      case "$mode" in
+                hg) ;;
+                image|mv|push)  dst=BACKUP/$HOST/rsync/$dst ;;
+                histbackup)     dst=BACKUP/$HOST/histbackup/$dst ;;
+                *)              echo "$cmd: $backups:$lineno: unknown mode: $mode" >&2
+                                exit 1
+                                ;;
+              esac
+              ;;
+    esac
     case "$mode" in
       hg)         $dont pfx "$src:$dsthost:$dst" $trace \
                     incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
                   ;;
       image)      $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts --delete-after $etc \
-                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                      "$src/" "$dsthost:$dst/"
                   ;;
       mv)         $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts --remove-source-files $etc \
-                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                      "$src/" "$dsthost:$dst/"
                   ;;
       push)       $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts $etc \
-                      "$src/" "$dsthost:BACKUP/$HOST/rsync/$dst/"
+                      "$src/" "$dsthost:$dst/"
                   ;;
       histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
-                    rhistbackup "$src:$dsthost:BACKUP/$HOST/histbackup/$dst"
+                    rhistbackup "$src:$dsthost:$dst"
                   ;;
       *)          echo "$0: unsupported mode: $mode" >&2
                   exit 1
