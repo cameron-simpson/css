@@ -90,7 +90,7 @@ do
   [ $# = 0 ] || \
   case " $* " in
     *" $src "*) ;;
-    *)  echo "SKIP $src" >&2
+    *)  [ $quiet ] || echo "$cmd: skip $src" >&2
         continue
         ;;
   esac
