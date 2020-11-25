@@ -137,7 +137,7 @@ do
       histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
                     rhistbackup "$src:$dsthost:$dst"
                   ;;
-      *)          echo "$0: unsupported mode: $mode" >&2
+      *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
                   exit 1
                   ;;
     esac || xit=1
