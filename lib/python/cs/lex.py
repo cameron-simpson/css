@@ -1050,7 +1050,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       The `format_as` method is like an inside out `str.format` or
       `object._format__` method.
       `str.format` is designed for formatting a string from a variety
-      of other obejcts supplied in the keyword arguments,
+      of other objects supplied in the keyword arguments,
       and `object.__format__` is for filling out a single `str.format`
       replacement field from a single object.
       By contrast, `format_as` is designed to fill out an entire format

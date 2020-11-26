@@ -13,6 +13,7 @@ import datetime
 import errno
 import json
 import os.path
+from os.path import join as joinpath, isdir as isdirpath
 import re
 from threading import Lock
 from types import SimpleNamespace as NS
@@ -186,6 +187,15 @@ class _Recording(ABC, HasFSTagsMixin):
       return getattr(self.metadata, attr)
     raise AttributeError(attr)
 
+  def filename(self, format=None, *, ext):
+    ''' Compute a filename from `format` with extension `ext`.
+
+        If `format` is omitted it defaults to `self.DEFAULT_FILENAME_BASIS`.
+    '''
+    if format is None:
+      format = self.DEFAULT_FILENAME_BASIS
+    return format.format_map(self.metadata.ns()) + ext
+
   @abstractmethod
   def data(self):
     ''' Stub method for the raw video data method.
@@ -263,7 +273,11 @@ class _Recording(ABC, HasFSTagsMixin):
       if not os.path.isabs(srcpath):
         srcpath = os.path.join('.', srcpath)
     if dstpath is None:
-      dstpath = self.converted_path(outext=dstfmt)
+      dstpath = self.filename(ext=dstfmt)
+    elif dstpath.endswith('/'):
+      dstpath += self.filename(ext=dstfmt)
+    elif isdirpath(dstpath):
+      dstpath = joinpath(dstpath, self.filename(ext=dstfmt))
     # stop path looking like a URL
     if not os.path.isabs(dstpath):
       dstpath = os.path.join('.', dstpath)
