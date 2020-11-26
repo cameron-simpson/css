@@ -1,2 +1,3 @@
+state files with syntax errors get a full rewrite
 some kind of include/exclude after the fashion of rsync - utilising the .hbinclude would be handy
 
