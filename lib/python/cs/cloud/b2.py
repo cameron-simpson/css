@@ -232,10 +232,13 @@ class B2Cloud(SingletonMixin, Cloud):
         Therefore we write a scratch file for the upload.
     '''
     with NamedTemporaryCopy(
-        bfr, progress=65536,
+        bfr,
+        progress=65536,
         progress_label=(joinpath(self.bucketpath(bucket_name), path) +
                         " scratch file"),
-        dir=self.tmpdir_for(bucket_name=bucket_name, path=path)) as T:
+        dir=self.tmpdir_for(bucket_name=bucket_name, path=path),
+        prefix='upload_buffer__' + path.replace(os.sep, '_') + '__',
+    ) as T:
       return self.upload_filename(
           T.name,
           bucket_name=bucket_name,
