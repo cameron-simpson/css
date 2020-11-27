@@ -1823,8 +1823,12 @@ class NamedBackup(SingletonMixin):
         if runstate.cancelled:
           return None, None
         proxy("prepare upload")
-        with NamedTemporaryCopy(filename, progress=65536,
-                                progress_label="snapshot " + filename) as T:
+        with NamedTemporaryCopy(
+            filename,
+            progress=65536,
+            progress_label="snapshot " + filename,
+            prefix='backup_filename__' + subpath.replace(os.sep, '_') + '__',
+        ) as T:
           if runstate.cancelled:
             return None, None
           with open(T.name, 'rb') as f2:
