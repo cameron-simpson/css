@@ -154,7 +154,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         otherwise it should be a `cs.progress.Progress` instance
       * `progress_label`: option progress bar label,
         only used if a progress bar is made
-      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+      Other keyword parameters are passed to `tempfile.NamedTemporaryFile`.
   '''
   if isinstance(f, str):
     # copy named file
@@ -181,6 +181,9 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
                                   progress_label=progress_label, **kw) as T:
             yield T
     return
+  prefix = kw.pop('prefix', None)
+  if prefix is None:
+    prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
   if isinstance(f, CornuCopyBuffer):
     length = None
@@ -210,7 +213,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(**kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
