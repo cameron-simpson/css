@@ -263,7 +263,7 @@ class B2Cloud(SingletonMixin, Cloud):
         Return a `dict` containing the B2 `FileVersion` attribute values.
 
         Parameters:
-        * `bs`: the file, preferably seekable
+        * `bs`: the bytes-like object
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
