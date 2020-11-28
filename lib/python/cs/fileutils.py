@@ -1803,6 +1803,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
       # make sure the file exists
       with open(filename, 'a'):
         pass
+    self.scan_errors = []
     self._lock = RLock()
 
   def __str__(self):
