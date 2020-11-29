@@ -664,14 +664,12 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               tag_categories = ()
           else:
             tag_categories = categories
-          entity = orm.entities(unixtime=unixtime)
-          for log_tag in log_tags:
-            entity.add_tag(log_tag.tag, session=session)
-          entity.add_tag('headline', headline, session=session)
+          te = sqltags.add(
+              None, session=session, unixtime=unixtime, tags=log_tags
+          )
+          te.add_tag('headline', headline, session=session)
           if tag_categories:
-            entity.add_tag('categories', list(tag_categories), session=session)
-          session.add(entity)
-          session.flush()
+            te.add_tag('categories', list(tag_categories), session=session)
     return xit
 
   @staticmethod
