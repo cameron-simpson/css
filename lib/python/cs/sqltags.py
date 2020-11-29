@@ -1269,11 +1269,9 @@ class SQLTags(MultiOpenMixin):
     ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
-      tes = self.tagged_entities(SQTEntityIdTest([index]))
+      tes = self.find([SQTEntityIdTest([index])],session=session)
     elif isinstance(index, str):
-      tes = self.tagged_entities(
-          SQLTagBasedTest(index, True, Tag('name', index), '=')
-      )
+      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
     tes = list(tes)
