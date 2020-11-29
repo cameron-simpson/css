@@ -37,7 +37,7 @@ DISTINFO = {
     ],
 }
 
-_state = State()
+_state = State(session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
