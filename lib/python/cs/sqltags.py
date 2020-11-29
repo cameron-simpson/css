@@ -718,7 +718,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     try:
       tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
-      raise GetoptError(str(e))
+      raise GetoptError(str(e)) from e
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
