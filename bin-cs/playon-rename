@@ -13,8 +13,10 @@ from cs.pfx import Pfx
 
 PLAYON_RE = re.compile(
     r'^(?P<recording_number>\d+)_(?P<series>\S.*\S)'
-    r' - s*(?P<season>\d+)e*(?P<episode>\d+) - (?P<title>.*)\.mp4$'
+    r' - s*(?P<season>\d+)e*(?P<episode>\d+) (- )?(?P<title>.*)\.mp4$'
 )
+
+PLAYON_FORMAT = '{series}--s{season}e{episode}--{title}--playon.mp4'
 
 def main(argv=None):
   ''' Main programme command line.
@@ -40,9 +42,7 @@ def main(argv=None):
           warning("not recognised as a PlayOn recording")
           continue
         fields = m.groupdict()
-        newbase = "{series}--s{season}e{episode}--{title}.mp4".format_map(
-            fields
-        )
+        newbase = PLAYON_FORMAT.format_map(fields)
         if base == newbase:
           continue
         newpath = joinpath(dirname(pathname), newbase)
