@@ -884,7 +884,7 @@ class TaggedEntityCriterion(ABC):
 
   @abstractmethod
   @typechecked
-  def match_entity(self, te: "TaggedEntity") -> bool:
+  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
     ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
