@@ -545,7 +545,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options.sqltags.orm.define_schema()
+    options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @classmethod
@@ -1215,6 +1215,11 @@ class SQLTags(MultiOpenMixin):
     ''' Stub for shutdown.
     '''
     self.orm = None
+
+  def init(self):
+    ''' Initialise the database.
+    '''
+    self.orm.define_schema()
 
   @orm_auto_session
   def db_entity(self, index, *, session):
