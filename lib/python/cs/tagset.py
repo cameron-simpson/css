@@ -1376,6 +1376,10 @@ class TagSetNamespace(ExtendedNamespace):
             pass
           else:
             return list(keys())
+      if attr == '_value':
+        tag = getns('_tag')
+        if tag is not None:
+          return tag.value
       if attr == '_values':
         tag = getns('_tag')
         if tag is not None:
