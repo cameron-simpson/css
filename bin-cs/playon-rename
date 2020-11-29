@@ -42,7 +42,7 @@ def main(argv=None):
           warning("not recognised as a PlayOn recording")
           continue
         fields = m.groupdict()
-        newbase = PLAYON_FORMAT.format_map(fields)
+        newbase = PLAYON_FORMAT.format_map(fields).replace('_', ':').replace(' ','-').lower()
         if base == newbase:
           continue
         newpath = joinpath(dirname(pathname), newbase)
@@ -53,10 +53,10 @@ def main(argv=None):
             fstags.move(pathname, newpath)
             info("moved")
             P = fstags[newpath]
-            P.add('series', fields['series'])
+            P.add('series', fields['series'].replace('_',':'))
             P.add('season', int(fields['season']))
             P.add('episode', int(fields['episode']))
-            P.add('episode_title', fields['title'])
+            P.add('episode_title', fields['title'].replace('_',':'))
             P.add('playon.recording_number', int(fields['recording_number']))
 
 if __name__ == '__main__':
