@@ -1235,6 +1235,37 @@ class SQLTags(MultiOpenMixin):
     )
 
   @orm_auto_session
+  def add(self, name, *, session, unixtime=None, tags=None):
+    ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
+        with `unixtime` (default `time.time()`
+        and the supplied `tags` (optional iterable of `Tag`s).
+        Return the new `SQLTaggedEntity`.
+    '''
+    if unixtime is None:
+      unixtime = time.time()
+    if tags is None:
+      tags = ()
+    entity = self.orm.entities(name=name, unixtime=unixtime)
+    for tag in tags:
+      entity.add_tag(tag, session=session)
+    session.add(entity)
+    session.flush()
+    te = self.get(entity.id, session=session)
+    for tag in tags:
+      te.set(tag.name, tag.value)
+    return te
+
+  @orm_auto_session
+  @typechecked
+  def make(self, name: str, *, session, unixtime=None):
+    ''' Fetch or create an `SQLTagged
+    '''
+    te = None if name is None else self.get(name)
+    if te is None:
+      te = self.add(name, session=session, unixtime=unixtime)
+    return te
+
+  @orm_auto_session
   def get(self, index, default=None, *, session):
     ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
