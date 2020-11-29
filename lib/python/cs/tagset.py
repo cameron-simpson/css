@@ -1239,6 +1239,22 @@ class TagSetNamespace(ExtendedNamespace):
           ns._tag = tag
     return ns0
 
+  def __str__(self):
+    ''' Return `str(self._tag.value)` if defined, otherwise use the superclass `__str__`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return str(tag.value)
+    return super().__str__()
+
+  def __repr__(self):
+    ''' Return `repr(self._tag.value)` if defined, otherwise use the superclass `__repr__`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return repr(tag.value)
+    return super().__repr__()
+
   def __bool__(self):
     ''' Truthiness: `True` unless the `._bool` attribute overrides that.
     '''
