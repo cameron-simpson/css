@@ -1186,3 +1186,34 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     '''
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
+
+class PrefixedMappingProxy:
+  ''' A proxy for another mapping
+      operating on keys commencing with a prefix.
+  '''
+
+  def __init__(self, mapping, prefix):
+    self.mapping = mapping
+    self.prefix = prefix
+
+  def keys(self):
+    prefix = self.prefix
+    return filter(lambda k: k.startswith(prefix), self.mapping.keys())
+
+  def __contains__(self, k):
+    return self.prefix + k in self.mapping
+
+  def __getitem__(self, k):
+    return self.mapping[self.prefix + k]
+
+  def get(self, k, default=None):
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
+  def __setitem__(self, k, v):
+    self.mapping[self.prefix + k] = v
+
+  def __delitem__(self, k):
+    del self.mapping[self.prefix + k]
