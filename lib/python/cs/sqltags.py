@@ -298,7 +298,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       if constraint2 is not None:
         constraint = and_(constraint, constraint2)
       else:
-        warning("no SQL side value test for comparison=%r", self.comparison)
+        warning("no SQLside value test for comparison=%r", self.comparison)
     sqlp = SQLParameters(
         criterion=self,
         table=table,
@@ -628,12 +628,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
+    use_stdin = cmdline_headline == '-'
     sqltags = options.sqltags
     orm = sqltags.orm
     with orm.session() as session:
-      for lineno, headline in enumerate(sys.stdin if cmdline_headline ==
-                                        '-' else (cmdline_headline,)):
-        with Pfx(lineno):
+      for lineno, headline in enumerate(sys.stdin if use_stdin else (
+          cmdline_headline,)):
+        with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))
+                 ):
           headline = headline.rstrip('\n')
           unixtime = None
           if strptime_format:
