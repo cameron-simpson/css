@@ -680,9 +680,9 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           te = sqltags.add(
               None, session=session, unixtime=unixtime, tags=log_tags
           )
-          te.add_tag('headline', headline, session=session)
+          te.set('headline', headline)
           if tag_categories:
-            te.add_tag('categories', list(tag_categories), session=session)
+            te.set('categories', list(tag_categories))
     return xit
 
   @staticmethod
