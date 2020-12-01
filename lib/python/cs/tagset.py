@@ -416,7 +416,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_string(line)
+        tag = Tag.from_str(line)
         new_values[tag.name] = tag.value
     self.set_from(new_values, verbose=verbose)
 
@@ -563,10 +563,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_string(cls, s, offset=0, ontology=None):
+  def from_str(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    with Pfx("%s.from_string(%r[%d:],...)", cls.__name__, s, offset):
+    with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
       tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
       if post_offset < len(s):
         raise ValueError(
@@ -1937,7 +1937,7 @@ class TaggedEntityMixin(FormatableMixin):
       tags = TagSet()
       for i, csv_value in enumerate(csvrow[3:], 3):
         with Pfx("field %d %r", i, csv_value):
-          tag = Tag.from_string(csv_value)
+          tag = Tag.from_str(csv_value)
           tags.add(tag)
       return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
 
