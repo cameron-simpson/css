@@ -160,6 +160,7 @@ import fnmatch
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
+import os
 import re
 import time
 from types import SimpleNamespace
@@ -202,6 +203,8 @@ DISTINFO = {
         'typeguard',
     ],
 }
+
+EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
 
 class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
@@ -397,21 +400,23 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
 
   format_kwargs = ns
 
-  def edit(self, verbose=None):
+  def edit(self, editor=None, verbose=None):
     ''' Edit this `TagSet`.
     '''
+    if editor is None:
+      editor = EDITOR
     lines = (
         ["# Edit TagSet.", "# One tag per line."] +
         list(map(str, sorted(self)))
     )
-    new_lines = edit_lines(lines)
+    new_lines = edit_lines(lines, editor=editor)
     new_values = {}
     for lineno, line in enumerate(new_lines):
       with Pfx("%d: %r", lineno, line):
         line = line.strip()
         if not line or line.startswith('#'):
           continue
-        tag = Tag.from_string(line)
+        tag = Tag.from_str(line)
         new_values[tag.name] = tag.value
     self.set_from(new_values, verbose=verbose)
 
@@ -558,10 +563,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_string(cls, s, offset=0, ontology=None):
+  def from_str(cls, s, offset=0, ontology=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
-    with Pfx("%s.from_string(%r[%d:],...)", cls.__name__, s, offset):
+    with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
       tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
       if post_offset < len(s):
         raise ValueError(
@@ -879,7 +884,7 @@ class TaggedEntityCriterion(ABC):
 
   @abstractmethod
   @typechecked
-  def match_entity(self, te: "TaggedEntity") -> bool:
+  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
     ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
@@ -1932,7 +1937,7 @@ class TaggedEntityMixin(FormatableMixin):
       tags = TagSet()
       for i, csv_value in enumerate(csvrow[3:], 3):
         with Pfx("field %d %r", i, csv_value):
-          tag = Tag.from_string(csv_value)
+          tag = Tag.from_str(csv_value)
           tags.add(tag)
       return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
 
@@ -2066,18 +2071,20 @@ class TaggedEntity(TaggedEntityMixin):
 
   @classmethod
   @pfx_method
-  def edit_entities(cls, tes, verbose=True):
+  def edit_entities(cls, tes, editor=None, verbose=True):
     ''' Edit an iterable of `TaggedEntities`.
         Return a list of the entities which were modified.
 
         This function supports modifying `Tag`s
         and changing the entity name.
     '''
+    if editor is None:
+      editor = EDITOR
     te_map = {te.name or te.id: te for te in tes}
     assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
         "not all entities have str or int keys: %r" % list(te_map.keys())
     lines = list(map(cls.as_editable_line, te_map.values()))
-    changes = edit_strings(lines)
+    changes = edit_strings(lines, editor=editor)
     changed_tes = []
     for old_line, new_line in changes:
       old_name, _ = cls.from_editable_line(old_line)

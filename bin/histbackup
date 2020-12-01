@@ -119,6 +119,7 @@ usage="Usage:
   $cmd [options...] [-- [rsyncopts...]]
 
   -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
+  -f            Force: presently just implies --no-symlink-if-unchanged.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
@@ -214,6 +215,14 @@ do
     #
     -e)
       sshcmd=$2; shift
+      ;;
+
+    # =item -f
+    #
+    # Force. Presently shorthand for B<--no-symlink-if-unchanged>.
+    #
+    -f)
+      symlink_unchanged=
       ;;
 
     # =item -i, --itemize-changes

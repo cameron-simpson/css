@@ -6,12 +6,10 @@
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
-from threading import local as thread_local
 from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
 from icontract import require
-from cs.context import stackattrs
 from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
@@ -34,10 +32,11 @@ DISTINFO = {
         'cs.deco',
         'cs.py.func',
         'cs.resources',
+        'cs.threads',
     ],
 }
 
-_state = State()
+_state = State(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
