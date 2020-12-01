@@ -35,7 +35,7 @@ from sqlalchemy import (
     UniqueConstraint
 )
 from sqlalchemy.orm import sessionmaker, aliased
-from sqlalchemy.sql.expression import and_, or_
+from sqlalchemy.sql.expression import and_
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -46,7 +46,7 @@ from cs.lex import FormatAsError, cutprefix, get_decimal_value
 from cs.logutils import error, warning, ifverbose
 from cs.mappings import PrefixedMappingProxy
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
@@ -913,7 +913,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         return entity_tags
 
       @auto_session
-      def add_tag(self, name, value=None, *, session):
+      def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
         '''
@@ -1023,9 +1023,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
           else:
             raise ValueError("unrecognised mode")
-        XP("******\nSQL =\n%s", query)
-        ##for row in query:
-        ##  print("=>", row)
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -1246,7 +1243,7 @@ class SQLTags(MultiOpenMixin):
     )
 
   @orm_auto_session
-  def add(self, name, *, session, unixtime=None, tags=None):
+  def add(self, name: [str, None], *, session, unixtime=None, tags=None):
     ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
         with `unixtime` (default `time.time()`
         and the supplied `tags` (optional iterable of `Tag`s).
@@ -1281,7 +1278,7 @@ class SQLTags(MultiOpenMixin):
     ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
-      tes = self.find([SQTEntityIdTest([index])],session=session)
+      tes = self.find([SQTEntityIdTest([index])], session=session)
     elif isinstance(index, str):
       tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
     else:
