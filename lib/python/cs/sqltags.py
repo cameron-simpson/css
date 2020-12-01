@@ -1258,7 +1258,7 @@ class SQLTags(MultiOpenMixin):
       tags = ()
     entity = self.orm.entities(name=name, unixtime=unixtime)
     for tag in tags:
-      entity.add_tag(tag, session=session)
+      entity.add_tag(tag.name, tag.value, session=session)
     session.add(entity)
     session.flush()
     te = self.get(entity.id, session=session)
