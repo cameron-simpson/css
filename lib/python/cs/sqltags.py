@@ -35,7 +35,7 @@ from sqlalchemy import (
     UniqueConstraint
 )
 from sqlalchemy.orm import sessionmaker, aliased
-from sqlalchemy.sql.expression import and_, or_
+from sqlalchemy.sql.expression import and_
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -44,8 +44,9 @@ from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix, get_decimal_value
 from cs.logutils import error, warning, ifverbose
+from cs.mappings import PrefixedMappingProxy
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
@@ -69,9 +70,9 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
-        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
-        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025',
-        'icontract', 'sqlalchemy', 'typeguard'
+        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mappings', 'cs.pfx',
+        'cs.resources', 'cs.sqlalchemy_utils', 'cs.tagset',
+        'cs.threads>=20201025', 'icontract', 'sqlalchemy', 'typeguard'
     ],
 }
 
@@ -297,7 +298,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       if constraint2 is not None:
         constraint = and_(constraint, constraint2)
       else:
-        warning("no SQL side value test for comparison=%r", self.comparison)
+        warning("no SQLside value test for comparison=%r", self.comparison)
     sqlp = SQLParameters(
         criterion=self,
         table=table,
@@ -545,7 +546,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options.sqltags.orm.define_schema()
+    options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @classmethod
@@ -605,24 +606,36 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       if sys.stdin.isatty():
         warning("reading log lines from stdin...")
     cmdline_headline = argv.pop(0)
-    log_tags, argv = cls.parse_tagset_criteria(argv)
-    for log_tag in log_tags:
-      with Pfx(log_tag):
-        if not log_tag.choice:
-          warning("negative tag choice")
-          badopts = True
+    log_tags = []
+    while argv:
+      tag_s = argv.pop(0)
+      with Pfx("tag %r", tag_s):
+        try:
+          tag = Tag.from_str(tag_s)
+        except ValueError:
+          argv.insert(0, tag_s)
+          break
+        else:
+          if tag.value is None:
+            argv.insert(0, tag_s)
+            break
+        log_tags.append(tag)
     if argv:
-      warning("extra arguments (invalid tag choices?): %r", argv)
+      warning(
+          "extra arguments after %d tags: %s", len(log_tags), ' '.join(argv)
+      )
       badopts = True
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
+    use_stdin = cmdline_headline == '-'
     sqltags = options.sqltags
     orm = sqltags.orm
     with orm.session() as session:
-      for lineno, headline in enumerate(sys.stdin if cmdline_headline ==
-                                        '-' else (cmdline_headline,)):
-        with Pfx(lineno):
+      for lineno, headline in enumerate(sys.stdin if use_stdin else (
+          cmdline_headline,)):
+        with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))
+                 ):
           headline = headline.rstrip('\n')
           unixtime = None
           if strptime_format:
@@ -664,14 +677,12 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               tag_categories = ()
           else:
             tag_categories = categories
-          entity = orm.entities(unixtime=unixtime)
-          for log_tag in log_tags:
-            entity.add_tag(log_tag.tag, session=session)
-          entity.add_tag('headline', headline, session=session)
+          te = sqltags.add(
+              None, session=session, unixtime=unixtime, tags=log_tags
+          )
+          te.set('headline', headline)
           if tag_categories:
-            entity.add_tag('categories', list(tag_categories), session=session)
-          session.add(entity)
-          session.flush()
+            te.set('categories', list(tag_categories))
     return xit
 
   @staticmethod
@@ -719,7 +730,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     try:
       tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
-      raise GetoptError(str(e))
+      raise GetoptError(str(e)) from e
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
@@ -902,7 +913,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         return entity_tags
 
       @auto_session
-      def add_tag(self, name, value=None, *, session):
+      def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
         '''
@@ -1012,9 +1023,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
           else:
             raise ValueError("unrecognised mode")
-        XP("******\nSQL =\n%s", query)
-        ##for row in query:
-        ##  print("=>", row)
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -1216,6 +1224,11 @@ class SQLTags(MultiOpenMixin):
     '''
     self.orm = None
 
+  def init(self):
+    ''' Initialise the database.
+    '''
+    self.orm.define_schema()
+
   @orm_auto_session
   def db_entity(self, index, *, session):
     ''' Return the `Entities` instance for `index` or `None`.
@@ -1230,15 +1243,44 @@ class SQLTags(MultiOpenMixin):
     )
 
   @orm_auto_session
+  def add(self, name: [str, None], *, session, unixtime=None, tags=None):
+    ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
+        with `unixtime` (default `time.time()`
+        and the supplied `tags` (optional iterable of `Tag`s).
+        Return the new `SQLTaggedEntity`.
+    '''
+    if unixtime is None:
+      unixtime = time.time()
+    if tags is None:
+      tags = ()
+    entity = self.orm.entities(name=name, unixtime=unixtime)
+    for tag in tags:
+      entity.add_tag(tag.name, tag.value, session=session)
+    session.add(entity)
+    session.flush()
+    te = self.get(entity.id, session=session)
+    for tag in tags:
+      te.set(tag.name, tag.value)
+    return te
+
+  @orm_auto_session
+  @typechecked
+  def make(self, name: str, *, session, unixtime=None):
+    ''' Fetch or create an `SQLTagged
+    '''
+    te = None if name is None else self.get(name)
+    if te is None:
+      te = self.add(name, session=session, unixtime=unixtime)
+    return te
+
+  @orm_auto_session
   def get(self, index, default=None, *, session):
     ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
-      tes = self.tagged_entities(SQTEntityIdTest([index]))
+      tes = self.find([SQTEntityIdTest([index])], session=session)
     elif isinstance(index, str):
-      tes = self.tagged_entities(
-          SQLTagBasedTest(index, True, Tag('name', index), '=')
-      )
+      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
     tes = list(tes)
@@ -1350,6 +1392,49 @@ class SQLTags(MultiOpenMixin):
     for tag in te.tags:
       with Pfx(tag):
         e.add_tag(tag, session=session)
+
+  def subdomain(self, subname):
+    ''' Return a proxy for this `SQLTags` for the `name`s
+        starting with `subname+'.'`.
+    '''
+    return SQLTagsSubdomain(self, subname)
+
+class SQLTagsSubdomain(PrefixedMappingProxy):
+  ''' A view into an `SQLTags` for keys commences with a prefix.
+  '''
+
+  def __init__(self, sqltags, subdomain):
+    PrefixedMappingProxy.__init__(self, sqltags, subdomain + '.')
+    self.sqltags = sqltags
+
+  def add(self, name, **kw):
+    ''' Add a new `SQLTaggedEntity` named `name`.
+        Return the entity.
+
+        This is a proxy for `SQLTags.add(self.prefix+name)`.
+    '''
+    return self.sqltags(self.prefix + name, **kw)
+
+  def find(self, criteria, **kw):
+    ''' Search for `criteria`, yield instances of `SQLTaggedEntity`.
+
+        This is a proxy for `SQLTags.find(criteria)`.
+        Note that the `criteria` are passed through to the primary `SQLTags`
+        and therefore name based tests test against the full `name`.
+    '''
+    prefix = self.prefix
+    return filter(
+        lambda te: te.name.startswith(prefix),
+        self.sqltags.find(criteria, **kw)
+    )
+
+  def make(self, name, **kw):
+    ''' Return the `SQLTaggedEntity` named `name`,
+        creating it if necessary.
+
+        This is a proxy for `SQLTags.make(self.prefix+name)`.
+    '''
+    return self.sqltags.make(self.prefix + name, **kw)
 
 class SQLTagSet(TagSet, SingletonMixin):
   ''' A singleton `TagSet` associated with a tagged entity.

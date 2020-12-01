@@ -1,4 +1,3 @@
-
 #!/bin/sh
 #
 # Run vim with no line wrapping, for editing files with very long lines.
