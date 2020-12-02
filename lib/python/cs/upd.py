@@ -820,7 +820,9 @@ class Upd(SingletonMixin):
     slots = self._slot_text
     proxies = self._proxies
     with self._lock:
-      if index < 0 or index >= len(self):
+      if len(slots) == 0 and index == 0:
+        return None
+      if index < 0 or index >= len(slots):
         raise ValueError(
             "index should be in the range 0..%d inclusive: got %s" %
             (len(self), index)
