@@ -723,13 +723,6 @@ class Upd(SingletonMixin):
       )
     slots = self._slot_text
     proxies = self._proxies
-    cursor_up = self.ti_str('cuu1')
-    if not cursor_up:
-      raise IndexError(
-          "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
-          % (os.environ.get('TERM'),)
-      )
-    insert_line = self.ti_str('il1')
     txts = []
     with self._lock:
       if index < 0:
@@ -761,6 +754,13 @@ class Upd(SingletonMixin):
         slots.insert(index, txt)
         proxies.insert(index, proxy)
       else:
+        cursor_up = self.ti_str('cuu1')
+        if not cursor_up:
+          raise IndexError(
+              "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+              % (os.environ.get('TERM'),)
+          )
+        insert_line = self.ti_str('il1')
         # adjust the display, insert the slot
         first_slot = self._current_slot is None
         if insert_line:
