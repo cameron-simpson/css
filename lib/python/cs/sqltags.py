@@ -1522,7 +1522,6 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
     ''' Add a tag to the database.
     '''
     e = self.sqltags.db_entity(self.id)
-    XP("tag_name=%r, value=%r: entity=%s:%s", tag_name, value, type(e), e)
     return e.add_tag(tag_name, value, session=session)
 
   @auto_session
