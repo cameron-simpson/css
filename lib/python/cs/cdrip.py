@@ -60,7 +60,6 @@ class CDRipCommand(BaseCommand):
   def apply_defaults(options):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
     options.tocdir = None
     options.force = False
     options.device = os.environ.get('CDRIP_DEV', "default")
