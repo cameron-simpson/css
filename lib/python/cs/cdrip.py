@@ -40,6 +40,8 @@ musicbrainzngs.set_useragent(__name__, __version__, os.environ['EMAIL'])
 
 DEFAULT_CDRIP_DIR = '~/var/cdrip'
 
+DEFAULT_MBDB_PATH = '~/var/cache/mbdb.sqlite'
+
 def main(argv=None):
   return CDRipCommand().run(argv)
 
@@ -75,6 +77,18 @@ class CDRipCommand(BaseCommand):
           options.force = True
         else:
           raise GetoptError("unimplemented option")
+
+  @staticmethod
+  @contextmanager
+  def run_context(argv, options):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    fstags = FSTags()
+    mbdb = MBDB()
+    with stackattrs(options, fstags=fstags, mbdb=mbdb, verbose=True):
+      with fstags:
+        with mbdb:
+          yield
 
   @staticmethod
   def cmd_toc(argv, options):
