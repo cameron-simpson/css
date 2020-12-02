@@ -19,10 +19,10 @@ Usage is like this:
     setup_logging()
     ...
     def parser(filename):
-      with Pfx("parse(%r)", filename):
+      with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx("%d", lineno) as P:
+            with Pfx(lineno) as P:
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -311,7 +311,8 @@ class Pfx(object):
           print(
               "warning: %s: %s.%s: " % (current_prefix, e, attr),
               cls.prefixify(
-                  "do not know how to prefixify: %s:%r" % (type(value), value)
+                  "do not know how to prefixify .%s=<%s>:%r" %
+                  (attr, type(value).__name__, value)
               ),
               file=sys.stderr
           )
