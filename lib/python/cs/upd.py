@@ -2,6 +2,8 @@
 #
 # Single line status updates.
 #   - Cameron Simpson <cs@cskk.id.au>
+#
+# pylint: disable=too-many-lines
 
 r'''
 Single and multiple line status updates with minimal update sequences.
