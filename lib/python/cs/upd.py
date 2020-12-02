@@ -347,6 +347,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
+    global curses   # pylint: disable=global-statement
     try:
       return self._ti_strs[ti_name]
     except KeyError:
@@ -355,7 +356,12 @@ class Upd(SingletonMixin):
           s = None
         else:
           if not self._ti_ready:
-            curses.setupterm()
+            try:
+              curses.setupterm()
+            except TypeError:
+              curses = None
+              self._ti_ready = True
+              return None
             self._ti_ready = True
           s = curses.tigetstr(ti_name)
           if s is not None:
