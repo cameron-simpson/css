@@ -38,7 +38,7 @@ from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.sql.expression import and_
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import stackattrs, pushattrs, popattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
@@ -50,7 +50,8 @@ from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
-    HasIdMixin
+    HasIdMixin,
+    _state as sqla_state,
 )
 from cs.tagset import (
     TagSet, Tag, TaggedEntityCriterion, TagBasedTest, TagsCommandMixin,
@@ -1218,10 +1219,13 @@ class SQLTags(MultiOpenMixin):
     ''' Stub for startup: prepare the ORM.
     '''
     self.orm = SQLTagsORM(db_url=self.db_url)
+    self._pre_startup_attrs = pushattrs(sqla_state, orm=self.orm)
 
   def shutdown(self):
     ''' Stub for shutdown.
     '''
+    popattrs(sqla_state, 'orm', self._pre_startup_attrs)
+    self._pre_startup_attrs = None
     self.orm = None
 
   def init(self):
