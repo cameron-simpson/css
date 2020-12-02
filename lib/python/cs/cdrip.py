@@ -12,27 +12,22 @@
 #	- Cameron Simpson <cs@cskk.id.au> 31mar2016
 #
 
-from collections import namedtuple
-import errno
-from getopt import getopt, GetoptError
+from contextlib import contextmanager
+from getopt import GetoptError
 import os
-from os.path import (
-    basename, exists as existspath, expanduser, expandvars, join as joinpath,
-    splitext
-)
-from pprint import pformat, pprint
+from os.path import expanduser, expandvars
+from pprint import pformat
 import sys
-from types import SimpleNamespace as NS
-from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags
-from cs.logutils import warning, error, status
-from cs.mappings import AttrableMapping
-from cs.pfx import Pfx
-from cs.upd import Upd, print
 import discid
 import musicbrainzngs
-
-from cs.x import X
+from typeguard import typechecked
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.fstags import FSTags
+from cs.logutils import warning
+from cs.pfx import Pfx
+from cs.resources import MultiOpenMixin
+from cs.sqltags import SQLTags, SQLTaggedEntity
 
 __version__ = '20201004-dev'
 
@@ -43,9 +38,13 @@ DEFAULT_CDRIP_DIR = '~/var/cdrip'
 DEFAULT_MBDB_PATH = '~/var/cache/mbdb.sqlite'
 
 def main(argv=None):
+  ''' Call the command line main programme.
+  '''
   return CDRipCommand().run(argv)
 
 class CDRipCommand(BaseCommand):
+  ''' 'cdrip' command line.
+  '''
 
   GETOPT_SPEC = 'd:dev_info:f'
   USAGE_FORMAT = r'''Usage: {cmd} [-d tocdir] [-dev_info device] subcommand...
@@ -66,6 +65,8 @@ class CDRipCommand(BaseCommand):
 
   @staticmethod
   def apply_opts(opts, options):
+    ''' Apply the command line options.
+    '''
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-d':
@@ -121,9 +122,13 @@ class MBDB(MultiOpenMixin):
     self.recordings = sqltags.subdomain('recording')
 
   def startup(self):
+    ''' Start up the `MBDB`: open the `SQLTags`.
+    '''
     self.sqltags.open()
 
   def shutdown(self):
+    ''' Shut down the `MBDB`: close the `SQLTags`.
+    '''
     self.sqltags.close()
 
   def artists_of(self, te):
@@ -140,6 +145,8 @@ class MBDB(MultiOpenMixin):
     ]
 
   def toc(self, disc_id):
+    ''' Print a table of contents for `disc_id`.
+    '''
     disc = self.disc(disc_id)
     artists = self.artists_of(disc)
     print(
@@ -154,7 +161,8 @@ class MBDB(MultiOpenMixin):
           ', '.join([artist.tags['artist_name'] for artist in artists])
       )
 
-  def _get(self, typename, id, includes, id_name='id', record_key=None):
+  @staticmethod
+  def _get(typename, db_id, includes, id_name='id', record_key=None):
     if record_key is None:
       record_key = typename
     getter_name = f'get_{typename}_by_{id_name}'
@@ -166,14 +174,14 @@ class MBDB(MultiOpenMixin):
           pformat(dir(musicbrainzngs))
       )
       raise
-    with Pfx("%s(%r,includes=%r)", getter_name, id, includes):
+    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes):
       try:
-        I = getter(id, includes=includes)
+        mb_info = getter(db_id, includes=includes)
       except musicbrainzngs.InvalidIncludeError:
         warning("help(%s):\n%s", getter_name, getter.__doc__)
         raise
-      I = I[record_key]
-    return I
+      mb_info = mb_info[record_key]
+    return mb_info
 
   def _tagif(self, tags, name, value):
     with self.sqltags:
@@ -192,18 +200,20 @@ class MBDB(MultiOpenMixin):
   def tag_artists_from_credits(tags, mb_dict):
     ''' Set `tags.artist_ids` from `mb_dict['artist-credit']`.
     '''
-    credits = mb_dict.get('artist-credit')
-    if credits is not None:
+    artist_credits = mb_dict.get('artist-credit')
+    if artist_credits is not None:
       tags.set(
           'artists', [
               credit['artist']['id']
-              for credit in credits
+              for credit in artist_credits
               if not isinstance(credit, str)
           ]
       )
 
   @typechecked
   def artist(self, artist_id: str, force=False) -> SQLTaggedEntity:
+    ''' Return the artist for `artist_id`.
+    '''
     ##force = True
     te = self.artists.make(artist_id)
     tags = te.tags
@@ -214,9 +224,8 @@ class MBDB(MultiOpenMixin):
       }
     else:
       includes = []
-      for cached in 'tags',:
+      for cached in 'tags', :
         if force or cached not in tags:
-          X("artist: no tags.%s", cached)
           includes.append(cached)
       if includes:
         A = self._get('artist', artist_id, includes)
@@ -226,6 +235,7 @@ class MBDB(MultiOpenMixin):
       self.tag_from_tag_list(tags, A)
     return te
 
+  # pylint: disable=too-many-branches
   @typechecked
   def disc(self, disc_id: str, force=False) -> SQLTaggedEntity:
     ''' Return the `disc.`*disc_id* entry.
@@ -237,7 +247,6 @@ class MBDB(MultiOpenMixin):
     includes = []
     for cached in 'artists', 'recordings':
       if force or cached not in tags:
-        X("disc: no tags.%s", cached)
         includes.append(cached)
     if includes:
       D = self._get('releases', disc_id, includes, 'discid', 'disc')
@@ -261,7 +270,7 @@ class MBDB(MultiOpenMixin):
       self._tagif(tags, 'title', found_release.get('title'))
       self.tag_artists_from_credits(tags, found_release)
       if 'recordings' in includes:
-        track_list = medium.get('track-list')
+        track_list = found_medium.get('track-list')
         if not track_list:
           warning('no medium[track-list]')
         else:
@@ -273,13 +282,14 @@ class MBDB(MultiOpenMixin):
 
   @typechecked
   def recording(self, recording_id: str, force=False) -> SQLTaggedEntity:
+    ''' Return the recording for `recording_id`.
+    '''
     ##force = True
     te = self.recordings.make(recording_id)
     tags = te.tags
     includes = []
     for cached in 'artists', 'tags':
       if force or cached not in tags:
-        X("recording: no tags.%s", cached)
         includes.append(cached)
     if includes:
       R = self._get('recording', recording_id, includes)
