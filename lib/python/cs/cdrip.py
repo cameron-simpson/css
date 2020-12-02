@@ -91,13 +91,18 @@ class CDRipCommand(BaseCommand):
 
   @staticmethod
   def cmd_toc(argv, options):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
     '''
+    disc_id = None
+    if argv:
+      disc_id = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    dev_info = discid.read(device=None)
-    disc_id = dev_info.id
+    MB = options.mbdb
+    if disc_id is None:
+      dev_info = discid.read(device=None)
+      disc_id = dev_info.id
     with Pfx("discid %s", disc_id):
       toc = TOC.from_disc_id(disc_id)
       if not toc:
