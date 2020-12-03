@@ -49,7 +49,11 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, XP
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
+    ORM,
+    orm_method,
+    auto_session,
+    orm_auto_session,
+    BasicTableMixin,
     HasIdMixin,
     _state as sqla_state,
 )
