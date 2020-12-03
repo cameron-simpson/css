@@ -107,6 +107,46 @@ class CDRipCommand(BaseCommand):
     with Pfx("discid %s", disc_id):
       MB.toc(disc_id)
 
+class MBTaggedEntity(SQLTaggedEntity):
+  ''' An `SQLTaggedEntity` subclass for MB entities.
+  '''
+
+  @property
+  def mbdb(self):
+    ''' The associated `MBDB`.
+    '''
+    return self.sqltags.mbdb
+
+  def __getattr__(self, attr):
+    if attr in ('sqltags', 'tags'):
+      raise AttributeError("MBTaggedEntity.__getattr__: no .%s" % (attr,))
+    try:
+      value = self.tags[attr]
+    except KeyError:
+      raise AttributeError(
+          'tags[%r] (have %r)' % (attr, sorted(self.tags.keys()))
+      )
+    return value
+
+  def artists(self):
+    ''' Return a list of the artists.
+    '''
+    return list(map(self.mbdb.artist, self.tags['artists']))
+
+  def recordings(self):
+    ''' Return a list of the recordings.
+    '''
+    return list(map(self.mbdb.recording, self.tags['recordings']))
+
+  def artist_names(self):
+    ''' Return a list of artist names.
+    '''
+    return [artist.artist_name for artist in self.artists()]
+
+class MBSQLTags(SQLTags):
+
+  TaggedEntityClass = MBTaggedEntity
+
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
@@ -114,7 +154,10 @@ class MBDB(MultiOpenMixin):
   VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
 
   def __init__(self):
-    sqltags = self.sqltags = SQLTags(expanduser(expandvars(DEFAULT_MBDB_PATH)))
+    sqltags = self.sqltags = MBSQLTags(
+        expanduser(expandvars(DEFAULT_MBDB_PATH))
+    )
+    sqltags.mbdb = self
     with sqltags:
       sqltags.init()
     self.artists = sqltags.subdomain('artist')
@@ -130,36 +173,6 @@ class MBDB(MultiOpenMixin):
     ''' Shut down the `MBDB`: close the `SQLTags`.
     '''
     self.sqltags.close()
-
-  def artists_of(self, te):
-    ''' Return the artists for `te`.
-    '''
-    return [self.artist(artist_id) for artist_id in te.tags['artists']]
-
-  def recordings_of(self, te):
-    ''' Return the recordings for `te`.
-    '''
-    return [
-        self.recording(recording_id)
-        for recording_id in te.tags.get('recordings', ())
-    ]
-
-  def toc(self, disc_id):
-    ''' Print a table of contents for `disc_id`.
-    '''
-    disc = self.disc(disc_id)
-    artists = self.artists_of(disc)
-    print(
-        "Artist: ",
-        ', '.join([artist.tags['artist_name'] for artist in artists])
-    )
-    print("Title: ", disc.tags.title)
-    for tracknum, recording in enumerate(self.recordings_of(disc), 1):
-      artists = self.artists_of(recording)
-      print(
-          tracknum, recording.tags.title, '--',
-          ', '.join([artist.tags['artist_name'] for artist in artists])
-      )
 
   @staticmethod
   def _get(typename, db_id, includes, id_name='id', record_key=None):
