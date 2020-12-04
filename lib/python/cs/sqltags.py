@@ -178,51 +178,51 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
-      lambda alias, tag_value: and_(
+      lambda alias, cmp_value: and_(
           alias.float_value is None, alias.string_value is None, alias.
           structured_value is None
       ),
       '=':
-      lambda alias, tag_value: (
-          alias.float_value == tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value == tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value == tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value == cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value == cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value == cmp_value)
           )
       ),
       '<=':
-      lambda alias, tag_value: (
-          alias.float_value <= tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value <= tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value <= tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value <= cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value <= cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value <= cmp_value)
           )
       ),
       '<':
-      lambda alias, tag_value: (
-          alias.float_value < tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value < tag_value if isinstance(tag_value, str) else
-              (alias.structured_value < tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value < cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value < cmp_value if isinstance(cmp_value, str) else
+              (alias.structured_value < cmp_value)
           )
       ),
       '>=':
-      lambda alias, tag_value: (
-          alias.float_value >= tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value >= tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value >= tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value >= cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value >= cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value >= cmp_value)
           )
       ),
       '>':
-      lambda alias, tag_value: (
-          alias.float_value > tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value > tag_value if isinstance(tag_value, str) else
-              (alias.structured_value > tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value > cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value > cmp_value if isinstance(cmp_value, str) else
+              (alias.structured_value > cmp_value)
           )
       ),
       '~':
@@ -261,23 +261,23 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 
   TE_VALUE_COMPARISON_FUNCS = {
       '=':
-      lambda te_value, value: te_value == value,
+      lambda te_value, cmp_value: te_value == cmp_value,
       '<=':
-      lambda te_value, value: te_value <= value,
+      lambda te_value, cmp_value: te_value <= cmp_value,
       '<':
-      lambda te_value, value: te_value < value,
+      lambda te_value, cmp_value: te_value < cmp_value,
       '>=':
-      lambda te_value, value: te_value >= value,
+      lambda te_value, cmp_value: te_value >= cmp_value,
       '>':
-      lambda te_value, value: te_value > value,
+      lambda te_value, cmp_value: te_value > cmp_value,
       '~':
       lambda te_value, cmp_value: (
           fnmatchcase(te_value, cmp_value) if isinstance(te_value, str) else
           any(map(lambda value: fnmatchcase(value, cmp_value), te_value))
       ),
       '~/':
-      lambda te_value, value:
-      (isinstance(te_value, str) and re.search(value, te_value)),
+      lambda te_value, cmp_value:
+      (isinstance(te_value, str) and re.search(cmp_value, te_value)),
   }
 
   @pfx_method
@@ -436,7 +436,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   @classmethod
   def cmd_edit(cls, argv, options):
-    ''' Usage: edit name
+    ''' Usage: edit criteria...
+          Edit the entities specified by criteria.
     '''
     sqltags = options.sqltags
     badopts = False
