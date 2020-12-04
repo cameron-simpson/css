@@ -182,6 +182,11 @@ class MBDB(MultiOpenMixin):
     '''
     self.sqltags.close()
 
+  def find(self, criteria):
+    ''' Find entities in the cache database.
+    '''
+    return self.sqltags.find(criteria)
+
   @staticmethod
   def _get(typename, db_id, includes, id_name='id', record_key=None):
     if record_key is None:
