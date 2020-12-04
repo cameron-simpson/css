@@ -46,13 +46,14 @@ class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
   '''
 
-  GETOPT_SPEC = 'd:dev_info:f'
+  GETOPT_SPEC = 'd:D:f'
   USAGE_FORMAT = r'''Usage: {cmd} [-d tocdir] [-dev_info device] subcommand...
     -d tocdir Use tocdir as a directory of contents cached by discid
               In this mode the cache TOC file pathname is recited to standard
               output instead of the contents.
-    -dev_info device Device to access. This may be omitted or "default" or
+    -D device Device to access. This may be omitted or "default" or
               "" for the default device as determined by the discid module.
+              The environment variable $CDRIP_DEV may override the default.
     -f        Force. Read disc and consult Musicbrainz even if a toc file exists.'''
 
   @staticmethod
@@ -71,7 +72,7 @@ class CDRipCommand(BaseCommand):
       with Pfx(opt):
         if opt == '-d':
           options.tocdir = val
-        elif opt == '-dev_info':
+        elif opt == '-D':
           options.device = val
         elif opt == '-f':
           options.force = True
@@ -123,11 +124,10 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     MB = options.mbdb
     if disc_id is None:
-      dev_info = discid.read(device=None)
+      dev_info = discid.read(device=options.device)
       disc_id = dev_info.id
     with Pfx("discid %s", disc_id):
       disc = MB.disc(disc_id)
-      print("disc =", disc)
       print(disc.title)
       print(", ".join(disc.artist_names()))
       for tracknum, recording in enumerate(disc.recordings(), 1):
