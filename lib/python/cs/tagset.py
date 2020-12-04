@@ -995,17 +995,27 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       * `'>'`: test that the tag value is greater than `tag.value`
       * `'>='`: test that the tag value is greater than or equal to `tag.value`
       * `'~/'`: test if the tag value as a regexp is present in `tag.value`
-      * '~': test if the tag value is present in `tag.value`
+      * '~': test if a matching tag value is present in `tag.value`
   '''
 
   COMPARISON_FUNCS = {
-      '=': lambda tag_value, cmp_value: tag_value == cmp_value,
-      '<=': lambda tag_value, cmp_value: tag_value <= cmp_value,
-      '<': lambda tag_value, cmp_value: tag_value < cmp_value,
-      '>=': lambda tag_value, cmp_value: tag_value >= cmp_value,
-      '>': lambda tag_value, cmp_value: tag_value > cmp_value,
-      '~/': lambda tag_value, cmp_value: re.match(cmp_value, tag_value),
-      '~': lambda tag_value, cmp_value: cmp_value in tag_value,
+      '=':
+      lambda tag_value, cmp_value: tag_value == cmp_value,
+      '<=':
+      lambda tag_value, cmp_value: tag_value <= cmp_value,
+      '<':
+      lambda tag_value, cmp_value: tag_value < cmp_value,
+      '>=':
+      lambda tag_value, cmp_value: tag_value >= cmp_value,
+      '>':
+      lambda tag_value, cmp_value: tag_value > cmp_value,
+      '~/':
+      lambda tag_value, cmp_value: re.match(cmp_value, tag_value),
+      '~':
+      lambda tag_value, cmp_value: (
+          fnmatchcase(tag_value, cmp_value) if isinstance(tag_value, str) else
+          any(map(lambda value: fnmatchcase(value, cmp_value), tag_value))
+      ),
   }
 
   # These are ordered so that longer operators
@@ -1047,7 +1057,11 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       raise ValueError("expected one of %r" % (cls.COMPARISON_OPS,))
     # tag_name present with specific value
     offset += len(comparison)
-    value, offset = Tag.parse_value(s, offset)
+    if comparison == '~':
+      value = s[offset:]
+      offset = len(s)
+    else:
+      value, offset = Tag.parse_value(s, offset)
     return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
   @typechecked
