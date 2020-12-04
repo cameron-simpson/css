@@ -21,6 +21,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
+from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import os
 from os.path import abspath, expanduser, exists as existspath
@@ -103,6 +104,12 @@ def verbose(msg, *a):
   ''' Emit message if in verbose mode.
   '''
   ifverbose(state.verbose, msg, *a)
+
+def glob2like(glob:str)->str:
+  ''' Convert a filename glob to an SQL LIKE pattern.
+  '''
+  assert '[' not in glob
+  return glob.replace('*','%').replace('?','_')
 
 class SQLParameters(namedtuple(
     'SQLParameters', 'criterion table alias entity_id_column constraint')):
@@ -219,10 +226,17 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
           )
       ),
       '~':
-      lambda alias, tag_value: None,
-      # requires sqlalchemy 1.4
-      ##'~/':
-      ##lambda alias, tag_value: alias.string_value.regexp_match(tag_value),
+      lambda alias, cmp_value: case(
+          [
+              (
+                  isnot(alias.string_value, None),
+                  alias.string_value.like(glob2like(cmp_value))
+              ),
+          ],
+          else_=True,
+      )
+      ##'~/': # requires sqlalchemy 1.4
+      ##lambda alias, cmp_value: alias.string_value.regexp_match(cmp_value),
   }
 
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
@@ -232,7 +246,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       '<': lambda entity, name_value: entity.name < name_value,
       '>=': lambda entity, name_value: entity.name >= name_value,
       '>': lambda entity, name_value: entity.name > name_value,
-      '~': lambda entity, name_value: entity.name.like(f'%{name_value}%'),
+      '~': lambda entity, name_value: entity.name.like(glob2like(name_value)),
       ##'~/': lambda entity, name_value: re.search(name_value, entity.name),
   }
 
@@ -257,7 +271,10 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       '>':
       lambda te_value, value: te_value > value,
       '~':
-      lambda te_value, value: value in te_value,
+      lambda te_value, cmp_value: (
+          fnmatchcase(te_value, cmp_value) if isinstance(te_value, str) else
+          any(map(lambda value: fnmatchcase(value, cmp_value), te_value))
+      ),
       '~/':
       lambda te_value, value:
       (isinstance(te_value, str) and re.search(value, te_value)),
