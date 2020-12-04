@@ -27,7 +27,7 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
-from cs.sqltags import SQLTags, SQLTaggedEntity
+from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
 
 __version__ = '20201004-dev'
 
@@ -89,6 +89,27 @@ class CDRipCommand(BaseCommand):
       with fstags:
         with mbdb:
           yield
+
+  @staticmethod
+  def cmd_edit(argv, options):
+    ''' Usage: edit criteria...
+          Edit the entities specified by criteria.
+    '''
+    mbdb = options.mbdb
+    badopts = False
+    tag_criteria, argv = SQLTagsCommand.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("remaining unparsed arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    tes = list(mbdb.find(tag_criteria))
+    changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
+    for te in changed_tes:
+      print("changed", repr(te.name or te.id))
 
   @staticmethod
   def cmd_toc(argv, options):
