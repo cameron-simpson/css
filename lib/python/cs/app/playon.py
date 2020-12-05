@@ -34,7 +34,7 @@ def main(argv=None):
   api.download(5438176)
 
 @decorator
-def api_call(func, suburl, method='GET'):
+def _api_call(func, suburl, method='GET'):
   ''' Decorator for API call methods requiring the `suburl`
       and optional `method` (default `'GET'`).
 
@@ -97,7 +97,7 @@ class PlayOnAPI:
     return state
 
   @pfx_method
-  @api_call('login', 'POST')
+  @_api_call('login', 'POST')
   def _dologin(self, rqm, url):
     ''' Perform a login, return the resulting `dict`.
         Does not update the state of `self`.
@@ -124,7 +124,7 @@ class PlayOnAPI:
     self.login_state  # ensure logged in with current tokens
     return self._jwt
 
-  @api_call('login/at', 'POST')
+  @_api_call('login/at', 'POST')
   def _renew_jwt(self, rqm, url):
     at = self.auth_token
     result = rqm(url, params=dict(auth_token=at)).json()
@@ -133,7 +133,7 @@ class PlayOnAPI:
       raise ValueError("failed: %r" % (result,))
     self._jwt = result['data']['token']
 
-  @api_call('library/all')
+  @_api_call('library/all')
   def downloads(self, rqm, url):
     ''' Return a list of dicts describing the available downloads.
     '''
