@@ -12,6 +12,7 @@ from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
+import requests
 from cs.deco import decorator
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx, pfx_method
@@ -19,7 +20,6 @@ from cs.progress import progressbar
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefine-builtin
 from cs.x import Y as X
-import requests
 
 def main(argv=None):
   ''' Playon command line programme.
@@ -46,7 +46,6 @@ def _api_call(func, suburl, method='GET'):
     '''
     url = self.API_BASE + suburl
     with Pfx("%s %r", method, url):
-      X("call %s(self:%r,rqm,url:%r,*%r,**%r)...", self, func, url, a, kw)
       return func(
           self,
           {
@@ -62,6 +61,8 @@ def _api_call(func, suburl, method='GET'):
   return prep_call
 
 class PlayOnAPI:
+  ''' Access to the PlayOn API.
+  '''
 
   API_BASE = 'https://api.playonrecorder.com/v3/'
   API_AUTH_GRACETIME = 30
@@ -92,7 +93,6 @@ class PlayOnAPI:
       self._jwt = None
       # not logged in or login about to expire
       state = self._login_state = self._dologin()
-      X("NEW login_state=%r", state)
       self._jwt = state['token']
     return state
 
@@ -138,7 +138,6 @@ class PlayOnAPI:
     ''' Return a list of dicts describing the available downloads.
     '''
     result = rqm(url, headers=dict(Authorization=self.jwt)).json()
-    X("result=\n%s", pformat(result))
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
@@ -154,16 +153,13 @@ class PlayOnAPI:
         headers=dict(Authorization=self.jwt),
     )
     result = rq.json()
-    X("DL ==> %r", result)
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
     dl_url = result['data']['url']
-    X("dl_url=%r", dl_url)
     if filename is None:
       filename = unpercent(basename(dl_url))
     dl_cookies = result['data']['data']
-    X("dl_cookies=%r", dl_cookies)
     jar = requests.cookies.RequestsCookieJar()
     for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
       jar.set(
@@ -172,9 +168,7 @@ class PlayOnAPI:
           domain='playonrecorder.com',
           secure=True,
       )
-    X("jar = %r", jar)
     dlrq = requests.get(dl_url, cookies=jar, stream=True)
-    X("headers=\n%s", str(dlrq.headers))
     dl_length = int(dlrq.headers['Content-Length'])
     with open(filename, 'wb') as f:
       for chunk in progressbar(
