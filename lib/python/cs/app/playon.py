@@ -7,12 +7,17 @@
 '''
 
 from collections import defaultdict
+from contextlib import contextmanager
+from getopt import getopt, GetoptError
+from os import environ
 from os.path import basename
 from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
 import requests
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.deco import decorator
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx, pfx_method
@@ -22,16 +27,62 @@ from cs.upd import Upd, print  # pylint: disable=redefine-builtin
 from cs.x import Y as X
 
 def main(argv=None):
-  ''' Playon command line programme.
+  ''' Playon command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
-  cmd, user, password = argv
-  setup_logging(cmd)
-  api = PlayOnAPI(user, password)
-  for entry in api.downloads():
-    print(entry['ID'], entry['Series'], entry['Name'])
-  api.download(5438176)
+  return PlayOnCommand().run(argv)
+
+class PlayOnCommand(BaseCommand):
+
+  @staticmethod
+  def apply_defaults(options):
+    options.user = environ.get('PLAYON_USER') or environ['EMAIL']
+    options.password = environ.get('PLAYON_PASSWORD')
+
+  @staticmethod
+  @contextmanager
+  def run_context(argv, options):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    with stackattrs(
+        options,
+        api=PlayOnAPI(options.user, options.password),
+    ):
+      yield
+
+  @staticmethod
+  def cmd_dl(argv, options):
+    ''' Usage: {cmd} download_ids...
+    '''
+    if not argv:
+      raise GetoptError("missing downloads")
+    badopts = False
+    download_ids = []
+    for arg in argv:
+      with Pfx(arg):
+        try:
+          dl_id = int(arg)
+        except ValueError:
+          warning("not an int")
+          badopts = True
+        else:
+          download_ids.append(dl_id)
+    if badopts:
+      raise GetoptError("bad invocation")
+    api = options.api
+    for dl_id in download_ids:
+      with Pfx(dl_id):
+        api.download(dl_id)
+
+  @staticmethod
+  def cmd_ls(argv, options):
+    ''' Usage: {cmd}
+          List available downloads.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = options.api
+    for entry in api.downloads():
+      print(entry['ID'], entry['Series'], entry['Name'])
 
 @decorator
 def _api_call(func, suburl, method='GET'):
