@@ -10,6 +10,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 from getopt import getopt, GetoptError
+from netrc import netrc
 from os import environ
 from os.path import basename
 from pprint import pformat
@@ -36,7 +37,7 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def apply_defaults(options):
-    options.user = environ.get('PLAYON_USER') or environ['EMAIL']
+    options.user = environ.get('PLAYON_USER')
     options.password = environ.get('PLAYON_PASSWORD')
 
   @staticmethod
@@ -44,14 +45,6 @@ class PlayOnCommand(BaseCommand):
   def run_context(argv, options):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    if not options.user:
-      raise GetoptError(
-          "no playon user specified (default from $PLAYON_USER or $EMAIL)"
-      )
-    if not options.password:
-      raise GetoptError(
-          "no playon password specified (default from $PLAYON_PASSWORD)"
-      )
     with stackattrs(
         options,
         api=PlayOnAPI(options.user, options.password),
@@ -134,7 +127,8 @@ class PlayOnAPI:
   ''' Access to the PlayOn API.
   '''
 
-  API_BASE = 'https://api.playonrecorder.com/v3/'
+  API_HOSTNAME = 'api.playonrecorder.com'
+  API_BASE = f'https://{API_HOSTNAME}/v3/'
   API_AUTH_GRACETIME = 30
 
   def __init__(self, login, password):
@@ -172,14 +166,31 @@ class PlayOnAPI:
     ''' Perform a login, return the resulting `dict`.
         Does not update the state of `self`.
     '''
+    login = self._login
+    password = self._password
+    if not login or not password:
+      N = netrc()
+      if login:
+        entry = N.hosts.get(f"{login}:{self.API_HOSTNAME}")
+      else:
+        entry = None
+      if not entry:
+        entry = N.hosts.get(self.API_HOSTNAME)
+      if not entry:
+        raise ValueError("no netrc entry for %r" % (Nkey,))
+      n_login, n_account, n_password = entry
+      if login is None:
+        login = n_login
+      elif n_login and login != n_login:
+        raise ValueError(
+            "netrc: supplied login:%r != netrc login:%r" % (login, n_login)
+        )
+      password = n_password
     result = rqm(
         headers={
             'x-mmt-app': 'web'
         },
-        params=dict(
-            email=self._login,
-            password=self._password,
-        ),
+        params=dict(email=login, password=password),
     ).json()
     ok = result.get('success')
     if not ok:
