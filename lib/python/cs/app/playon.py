@@ -8,6 +8,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+from functools import partial
 from getopt import getopt, GetoptError
 from os import environ
 from os.path import basename
@@ -44,9 +45,13 @@ class PlayOnCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     if not options.user:
-      raise GetoptError("no playon user specified (default from $PLAYON_USER or $EMAIL)")
+      raise GetoptError(
+          "no playon user specified (default from $PLAYON_USER or $EMAIL)"
+      )
     if not options.password:
-      raise GetoptError("no playon password specified (default from $PLAYON_PASSWORD)")
+      raise GetoptError(
+          "no playon password specified (default from $PLAYON_PASSWORD)"
+      )
     with stackattrs(
         options,
         api=PlayOnAPI(options.user, options.password),
@@ -88,6 +93,13 @@ class PlayOnCommand(BaseCommand):
     for entry in api.downloads():
       print(entry['ID'], entry['Series'], entry['Name'])
 
+class _RequestsNoAuth(requests.auth.AuthBase):
+  ''' The API has a distinct login call, avoid basic auth from netrc etc.
+  '''
+
+  def __call__(self, r):
+    return r
+
 @decorator
 def _api_call(func, suburl, method='GET'):
   ''' Decorator for API call methods requiring the `suburl`
@@ -103,12 +115,15 @@ def _api_call(func, suburl, method='GET'):
     with Pfx("%s %r", method, url):
       return func(
           self,
-          {
-              'GET': requests.get,
-              'POST': requests.post,
-              'HEAD': requests.head,
-          }[method],
-          url,
+          partial(
+              {
+                  'GET': requests.get,
+                  'POST': requests.post,
+                  'HEAD': requests.head,
+              }[method],
+              url,
+              auth=_RequestsNoAuth(),
+          ),
           *a,
           **kw,
       )
@@ -153,12 +168,11 @@ class PlayOnAPI:
 
   @pfx_method
   @_api_call('login', 'POST')
-  def _dologin(self, rqm, url):
+  def _dologin(self, rqm):
     ''' Perform a login, return the resulting `dict`.
         Does not update the state of `self`.
     '''
     result = rqm(
-        url,
         headers={
             'x-mmt-app': 'web'
         },
@@ -180,19 +194,19 @@ class PlayOnAPI:
     return self._jwt
 
   @_api_call('login/at', 'POST')
-  def _renew_jwt(self, rqm, url):
+  def _renew_jwt(self, rqm):
     at = self.auth_token
-    result = rqm(url, params=dict(auth_token=at)).json()
+    result = rqm(params=dict(auth_token=at)).json()
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
     self._jwt = result['data']['token']
 
   @_api_call('library/all')
-  def downloads(self, rqm, url):
+  def downloads(self, rqm):
     ''' Return a list of dicts describing the available downloads.
     '''
-    result = rqm(url, headers=dict(Authorization=self.jwt)).json()
+    result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
@@ -205,6 +219,7 @@ class PlayOnAPI:
     '''
     rq = requests.get(
         self.API_BASE + 'library/' + str(download_id) + '/download',
+        auth=_RequestsNoAuth(),
         headers=dict(Authorization=self.jwt),
     )
     result = rq.json()
@@ -223,7 +238,9 @@ class PlayOnAPI:
           domain='playonrecorder.com',
           secure=True,
       )
-    dlrq = requests.get(dl_url, cookies=jar, stream=True)
+    dlrq = requests.get(
+        dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
+    )
     dl_length = int(dlrq.headers['Content-Length'])
     with open(filename, 'wb') as f:
       for chunk in progressbar(
