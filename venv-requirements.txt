@@ -8,6 +8,7 @@ mypy
 pycodestyle
 pyflakes
 pylint
+requests
 sqlalchemy
 twine
 typeguard
