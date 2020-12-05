@@ -43,6 +43,10 @@ class PlayOnCommand(BaseCommand):
   def run_context(argv, options):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
+    if not options.user:
+      raise GetoptError("no playon user specified (default from $PLAYON_USER or $EMAIL)")
+    if not options.password:
+      raise GetoptError("no playon password specified (default from $PLAYON_PASSWORD)")
     with stackattrs(
         options,
         api=PlayOnAPI(options.user, options.password),
