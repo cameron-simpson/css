@@ -144,7 +144,11 @@ class PlayOnAPI:
       raise ValueError("failed: %r" % (result,))
     return result['data']['entries']
 
-  def download(self, download_id):
+  def download(self, download_id, filename=None):
+    ''' Download th file with `download_id` to `filename`.
+        The default `filename` is the basename of the filename
+        from the download.
+    '''
     rq = requests.get(
         self.API_BASE + 'library/' + str(download_id) + '/download',
         headers=dict(Authorization=self.jwt),
@@ -156,7 +160,8 @@ class PlayOnAPI:
       raise ValueError("failed: %r" % (result,))
     dl_url = result['data']['url']
     X("dl_url=%r", dl_url)
-    dl_filename = unpercent(basename(dl_url))
+    if filename is None:
+      filename = unpercent(basename(dl_url))
     dl_cookies = result['data']['data']
     X("dl_cookies=%r", dl_cookies)
     jar = requests.cookies.RequestsCookieJar()
@@ -171,16 +176,15 @@ class PlayOnAPI:
     dlrq = requests.get(dl_url, cookies=jar, stream=True)
     X("headers=\n%s", str(dlrq.headers))
     dl_length = int(dlrq.headers['Content-Length'])
-    nchunks = 0
-    nbytes = 0
-    for chunk in progressbar(
-        dlrq.iter_content(chunk_size=65536),
-        label=dl_filename,
-        total=dl_length,
-        units_scale=BINARY_BYTES_SCALE,
-        itemlenfunc=len,
-    ):
-      pass
+    with open(filename, 'wb') as f:
+      for chunk in progressbar(
+          dlrq.iter_content(chunk_size=131072),
+          label=filename,
+          total=dl_length,
+          units_scale=BINARY_BYTES_SCALE,
+          itemlenfunc=len,
+      ):
+        f.write(chunk)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
