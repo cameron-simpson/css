@@ -47,11 +47,10 @@ class PlayOnCommand(BaseCommand):
   def run_context(argv, options):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
-    with stackattrs(
-        options,
-        api=PlayOnAPI(options.user, options.password),
-    ):
-      yield
+    api = PlayOnAPI(options.user, options.password)
+    with stackattrs(options, api=api):
+      with api:
+        yield
 
   @staticmethod
   def cmd_dl(argv, options):
