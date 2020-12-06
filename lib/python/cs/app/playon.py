@@ -235,7 +235,12 @@ class PlayOnAPI(MultiOpenMixin):
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
-    return result['data']['entries']
+    entries= result['data']['entries']
+    for entry in entries:
+      dbe = self._sqltags.make('recording.'+str(entry['ID']))
+      for k, v in entry.items():
+        dbe.set('playon.'+k,v)
+    return entries
 
   def download(self, download_id, filename=None):
     ''' Download th file with `download_id` to `filename`.
