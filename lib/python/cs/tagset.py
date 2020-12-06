@@ -390,6 +390,25 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
 
+  def subtags(self, prefix):
+    ''' Return a new `TagSet` containing tags commencing with `prefix+'.'`
+        with the key prefixes stripped off.
+
+        Example:
+
+            >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
+            >>> tags.subtags('a')
+            TagSet:{'b': 1, 'd': 2}
+    '''
+    prefix_ = prefix + '.'
+    return type(self)(
+        {
+            cutprefix(k, prefix_): v
+            for k, v in self.items()
+            if k.startswith(prefix_)
+        }
+    )
+
   @pfx_method
   def ns(self):
     ''' Return a `TagSetNamespace` for this `TagSet`.
