@@ -27,7 +27,7 @@ from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefine-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 from cs.x import Y as X
 
 def main(argv=None):
@@ -36,6 +36,8 @@ def main(argv=None):
   return PlayOnCommand().run(argv)
 
 class PlayOnCommand(BaseCommand):
+  ''' Playon command line implementation.
+  '''
 
   @staticmethod
   def apply_defaults(options):
@@ -54,10 +56,11 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def cmd_dl(argv, options):
-    ''' Usage: {cmd} download_ids...
+    ''' Usage: {cmd} recording_ids...
+          Download the specified recording_ids.
     '''
     if not argv:
-      raise GetoptError("missing downloads")
+      raise GetoptError("missing recording_ids")
     badopts = False
     download_ids = []
     for arg in argv:
@@ -87,6 +90,7 @@ class PlayOnCommand(BaseCommand):
     for entry in api.downloads():
       print(entry['ID'], entry['Series'], entry['Name'])
 
+# pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
   ''' The API has a distinct login call, avoid basic auth from netrc etc.
   '''
@@ -187,7 +191,7 @@ class PlayOnAPI(MultiOpenMixin):
       if not entry:
         entry = N.hosts.get(self.API_HOSTNAME)
       if not entry:
-        raise ValueError("no netrc entry for %r" % (Nkey,))
+        raise ValueError("no netrc entry")
       n_login, n_account, n_password = entry
       if login is None:
         login = n_login
