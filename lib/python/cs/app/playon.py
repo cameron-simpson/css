@@ -87,7 +87,7 @@ class PlayOnCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     api = options.api
-    for entry in api.downloads():
+    for entry in api.recordings():
       print(entry['ID'], entry['Series'], entry['Name'])
 
 # pylint: disable=too-few-public-methods
@@ -228,8 +228,8 @@ class PlayOnAPI(MultiOpenMixin):
     self._jwt = result['data']['token']
 
   @_api_call('library/all')
-  def downloads(self, rqm):
     ''' Return a list of dicts describing the available downloads.
+  def recordings(self, rqm):
     '''
     result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
