@@ -12,7 +12,7 @@ from functools import partial
 from getopt import getopt, GetoptError
 from netrc import netrc
 from os import environ
-from os.path import basename
+from os.path import basename, expanduser
 from pprint import pformat
 import sys
 import time
@@ -24,6 +24,8 @@ from cs.deco import decorator
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
+from cs.resources import MultiOpenMixin
+from cs.sqltags import SQLTags
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefine-builtin
 from cs.x import Y as X
@@ -123,7 +125,7 @@ def _api_call(func, suburl, method='GET'):
 
   return prep_call
 
-class PlayOnAPI:
+class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
   '''
 
@@ -139,6 +141,15 @@ class PlayOnAPI:
     self._jwt = None
     self._cookies = {}
     self._storage = defaultdict(str)
+    self._sqltags = SQLTags(expanduser('~/var/playon.sqlite'))
+
+  def startup(self):
+    sqltags = self._sqltags
+    sqltags.open()
+    sqltags.init()
+
+  def shutdown(self):
+    self._sqltags.close()
 
   @property
   @pfx_method
