@@ -227,6 +227,11 @@ class PlayOnAPI(MultiOpenMixin):
       raise ValueError("failed: %r" % (result,))
     self._jwt = result['data']['token']
 
+  def __getitem__(self, download_id: int):
+    ''' Return the `TaggedEntity` associated with `download_id`.
+    '''
+    return self._sqltags.make('recording.' + str(download_id))
+
   @_api_call('library/all')
     ''' Return a list of dicts describing the available downloads.
   def recordings(self, rqm):
