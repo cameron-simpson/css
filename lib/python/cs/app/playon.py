@@ -233,16 +233,16 @@ class PlayOnAPI(MultiOpenMixin):
     return self._sqltags.make('recording.' + str(download_id))
 
   @_api_call('library/all')
-    ''' Return a list of dicts describing the available downloads.
   def recordings(self, rqm):
+    ''' Return a list of dicts describing the available recordings.
     '''
     result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
-    entries= result['data']['entries']
+    entries = result['data']['entries']
     for entry in entries:
-      te=self[entry['ID']]
+      te = self[entry['ID']]
       te.tags.update(entry, prefix='playon')
     return entries
 
