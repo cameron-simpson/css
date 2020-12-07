@@ -194,8 +194,11 @@ class ACL(list):
 def xattrs_from_bytes(bs, offset=0):
   ''' Decode an XAttrs from some bytes, return the xattrs dictionary.
   '''
+  bfr = CornuCopyBuffer.from_bytes(bs)
+  if offset > 0:
+    bfr.skip(offset)
   xattrs = {}
-  while offset < len(bs):
+  while not bfr.at_eof():
     name = BSString.parse_value(bfr)
     data = BSData.parse_value(bfr)
     if name in xattrs:
