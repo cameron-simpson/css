@@ -194,6 +194,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.keys1 = None
 
   def tearDown(self):
+    if self.S is not None:
+      self.S.close()
     Ts = threading.enumerate()
     if len(Ts) > 1:
       thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
