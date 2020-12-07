@@ -269,7 +269,7 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
     ''' Mapping method for .keys.
     '''
     seen = set()
-    for h in self.cached:
+    for h in list(self.cached.keys()):
       yield h
       seen.add(h)
     saved = self.saved
