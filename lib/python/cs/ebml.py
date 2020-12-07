@@ -6,8 +6,8 @@
     Cameron Simpson <cs@cskk.id.au>
 '''
 
-from cs.binary import PacketField
 from cs.x import X
+from cs.binary import BinarySingleValue
 
 def get_length_encoded_bytes(bfr) -> bytes:
   ''' Read a run length encoded byte sequence
@@ -71,12 +71,12 @@ def transcribe_length_encoded_value(value):
   bvalues[-1] |= bitmask
   return bytes(reversed(bvalues))
 
-class ElementID(PacketField):
+class ElementID(BinarySingleValue):
   ''' An ElementID.
   '''
 
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_buffer(bfr):
     bitmask, bs = get_length_encoded_bytes(bfr)
     assert bs and len(bs) <= 4
     return bs
@@ -85,12 +85,12 @@ class ElementID(PacketField):
   def transcribe_value(bs):
     return bs
 
-class DataSize(PacketField):
+class DataSize(BinarySingleValue):
   ''' A run length encoded data size.
   '''
 
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_buffer(bfr):
     return get_length_encoded_value(bfr)
 
   @staticmethod
