@@ -307,7 +307,7 @@ class BinaryMixin:
   def parse_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Factory to parse an instance from the
         bytes `bs` starting at `offset`.
-        Returns the new instance and the post offset.
+        Returns `(instance,offset)` being the new instance and the post offset.
 
         Raises `EOFError` if `bs` has insufficient data.
 
@@ -483,9 +483,10 @@ class BinaryListValues(AbstractBinary):
       end_offset=None,
       min_count=None,
       max_count=None,
-      pt
+      pt,
   ):
-    ''' Read values from `bfr`. Return ` BinaryListValue` containing the values.
+    ''' Read values from `bfr`.
+        Return a `BinaryListValue` containing the values.
 
         Parameters:
         * `count`: optional count of values to read;
@@ -926,7 +927,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   FIELD_PARSERS = {}
   FIELD_TRANSCRIBERS = {}
 
-  def s(self, *, crop_length=32, choose_name=None):
+  def s(self, *, crop_length=64, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
         Transcribe type and attributes, cropping long values
         and omitting private values.
@@ -1066,7 +1067,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
 
         A `ValueError` is raised if no transcription can be chosen.
     '''
-    with Pfx("%s=%r", field_name, field_value):
+    with Pfx("%s.%s=%r", type(self).__name__, field_name, field_value):
       if hasattr(field_value, 'transcribe'):
         transcribe = lambda field_value: field_value.transcribe()
       else:
@@ -1080,8 +1081,9 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
             transcribe = lambda s: s.encode(encoding='ascii')
           else:
             raise ValueError(
-                "no .transcribe method, no FIELD_TRANSCRIBERS entry,"
-                " and neither None nor bytes nor str"
+                "%s:%s has no .transcribe method, no FIELD_TRANSCRIBERS entry,"
+                " and neither None nor bytes nor str" %
+                (type(field_value), field_value)
             )
     return transcribe(field_value)
 
