@@ -2074,6 +2074,11 @@ class TaggedEntity(TaggedEntityMixin):
     '''
     return self.tags.edit(verbose=verbose)
 
+  def subtags(self, prefix: str):
+    ''' Return a `TagSet` containing the `Tag`s commencing with `prefix+'.'`.
+    '''
+    return self.tags.subtags(prefix)
+
   def as_editable_line(self):
     ''' Transcribe the entity as *name*` `*tags...*
         for use in a text file
