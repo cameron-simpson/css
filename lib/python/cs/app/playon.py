@@ -302,7 +302,8 @@ class PlayOnAPI(MultiOpenMixin):
       ):
         f.write(chunk)
     te = self[download_id]
-    te.set('downloaded_path', fullpath)
+    if dlrq is not None:
+      te.set('downloaded_path', fullpath)
     return te
 
 if __name__ == '__main__':
