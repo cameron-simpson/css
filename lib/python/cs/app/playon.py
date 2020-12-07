@@ -290,7 +290,6 @@ class PlayOnAPI(MultiOpenMixin):
     entries = result['data']['entries']
     tes = set()
     for entry in entries:
-      X("entry=\n%s", pformat(entry))
       te = self[entry['ID']]
       te.tags.update(entry, prefix='playon')
       tes.add(te)
