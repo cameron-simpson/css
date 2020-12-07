@@ -105,11 +105,11 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-def glob2like(glob:str)->str:
+def glob2like(glob: str) -> str:
   ''' Convert a filename glob to an SQL LIKE pattern.
   '''
   assert '[' not in glob
-  return glob.replace('*','%').replace('?','_')
+  return glob.replace('*', '%').replace('?', '_')
 
 class SQLParameters(namedtuple(
     'SQLParameters', 'criterion table alias entity_id_column constraint')):
