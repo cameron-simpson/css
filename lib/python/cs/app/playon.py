@@ -301,6 +301,9 @@ class PlayOnAPI(MultiOpenMixin):
           itemlenfunc=len,
       ):
         f.write(chunk)
+    te = self[download_id]
+    te.set('downloaded_path', fullpath)
+    return te
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
