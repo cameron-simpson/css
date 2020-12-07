@@ -9,26 +9,29 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
-from getopt import getopt, GetoptError
+from getopt import GetoptError
 from netrc import netrc
 from os import environ
-from os.path import basename, expanduser
+from os.path import (
+    basename, exists as pathexists, expanduser, realpath, splitext
+)
 from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
 import requests
+from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import decorator
 from cs.fstags import FSTags
-from cs.logutils import setup_logging, warning, error
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import Y as X
 
 def main(argv=None):
@@ -161,6 +164,7 @@ def _api_call(func, suburl, method='GET'):
 
   return prep_call
 
+# pylint: disable=too-many-instance-attributes
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
   '''
@@ -182,12 +186,16 @@ class PlayOnAPI(MultiOpenMixin):
     self._fstags = FSTags()
 
   def startup(self):
+    ''' Start up: open and init the `SQLTags`, open the `FSTags`.
+    '''
     sqltags = self._sqltags
     sqltags.open()
     sqltags.init()
     self._fstags.open()
 
   def shutdown(self):
+    ''' Shutdown: close the `SQLTags`, close the `FSTags`.
+    '''
     self._fstags.close()
     self._sqltags.close()
 
@@ -229,7 +237,7 @@ class PlayOnAPI(MultiOpenMixin):
         entry = N.hosts.get(self.API_HOSTNAME)
       if not entry:
         raise ValueError("no netrc entry")
-      n_login, n_account, n_password = entry
+      n_login, _, n_password = entry
       if login is None:
         login = n_login
       elif n_login and login != n_login:
@@ -252,7 +260,8 @@ class PlayOnAPI(MultiOpenMixin):
   def jwt(self):
     ''' The JWT token.
     '''
-    self.login_state  # ensure logged in with current tokens
+    # ensure logged in with current tokens
+    self.login_state  # pylint: disable=pointless-statement
     return self._jwt
 
   @_api_call('login/at', 'POST')
@@ -264,6 +273,7 @@ class PlayOnAPI(MultiOpenMixin):
       raise ValueError("failed: %r" % (result,))
     self._jwt = result['data']['token']
 
+  @typechecked
   def __getitem__(self, download_id: int):
     ''' Return the `TaggedEntity` associated with `download_id`.
     '''
@@ -271,7 +281,7 @@ class PlayOnAPI(MultiOpenMixin):
 
   @_api_call('library/all')
   def recordings(self, rqm):
-    ''' Return a list of dicts describing the available recordings.
+    ''' Return the `TaggedEntity` instances for the available recordings.
     '''
     result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
@@ -280,12 +290,16 @@ class PlayOnAPI(MultiOpenMixin):
     entries = result['data']['entries']
     tes = set()
     for entry in entries:
+      X("entry=\n%s", pformat(entry))
       te = self[entry['ID']]
       te.tags.update(entry, prefix='playon')
       tes.add(te)
     return tes
 
-  def download(self, download_id, filename=None):
+  # pylint: disable=too-many-locals
+  @pfx_method
+  @typechecked
+  def download(self, download_id: int, filename=None):
     ''' Download th file with `download_id` to `filename`.
         The default `filename` is the basename of the filename
         from the download.
