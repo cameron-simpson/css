@@ -280,31 +280,36 @@ class PlayOnAPI(MultiOpenMixin):
     dl_url = result['data']['url']
     if filename is None:
       filename = unpercent(basename(dl_url))
-    dl_cookies = result['data']['data']
-    jar = requests.cookies.RequestsCookieJar()
-    for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
-      jar.set(
-          ck_name,
-          str(dl_cookies[ck_name]),
-          domain='playonrecorder.com',
-          secure=True,
     elif filename.endswith('.'):
       _, dl_ext = splitext(basename(dl_url))
       filename = filename[:-1] + dl_ext
+    if pathexists(filename):
+      warning("SKIPPING download of %r: already exists, just tagging", filename)
+      dlrq = None
+    else:
+      dl_cookies = result['data']['data']
+      jar = requests.cookies.RequestsCookieJar()
+      for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
+        jar.set(
+            ck_name,
+            str(dl_cookies[ck_name]),
+            domain='playonrecorder.com',
+            secure=True,
+        )
+      dlrq = requests.get(
+          dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
-    dlrq = requests.get(
-        dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
-    )
-    dl_length = int(dlrq.headers['Content-Length'])
-    with open(filename, 'wb') as f:
-      for chunk in progressbar(
-          dlrq.iter_content(chunk_size=131072),
-          label=filename,
-          total=dl_length,
-          units_scale=BINARY_BYTES_SCALE,
-          itemlenfunc=len,
-      ):
-        f.write(chunk)
+      dl_length = int(dlrq.headers['Content-Length'])
+      with open(filename, 'wb') as f:
+        for chunk in progressbar(
+            dlrq.iter_content(chunk_size=131072),
+            label=filename,
+            total=dl_length,
+            units_scale=BINARY_BYTES_SCALE,
+            itemlenfunc=len,
+        ):
+          f.write(chunk)
+    fullpath = realpath(filename)
     te = self[download_id]
     if dlrq is not None:
       te.set('downloaded_path', fullpath)
