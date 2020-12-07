@@ -123,7 +123,7 @@ class FileCacheStore(BasicStoreSync):
     '''
 
   def __len__(self):
-    return len(self.backend)
+    return len(self.cache) + len(self.backend)
 
   def keys(self):
     hashclass = self.hashclass
