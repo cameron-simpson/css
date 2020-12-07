@@ -260,6 +260,9 @@ class PlayOnAPI(MultiOpenMixin):
     ''' Download th file with `download_id` to `filename`.
         The default `filename` is the basename of the filename
         from the download.
+        If the filename is supplied with a trailing dot (`'.'`)
+        then the file extension will be taken from the filename
+        of the download.
     '''
     rq = requests.get(
         self.API_BASE + 'library/' + str(download_id) + '/download',
