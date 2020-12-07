@@ -44,10 +44,10 @@ class HashCodeField(PacketField):
   '''
 
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_value(bfr):
     ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
     '''
-    hashenum = BSUInt.value_from_buffer(bfr)
+    hashenum = BSUInt.parse_value(bfr)
     hashcls = HASHCLASS_BY_ENUM[hashenum]
     return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
 
@@ -58,7 +58,7 @@ class HashCodeField(PacketField):
     yield BSUInt.transcribe_value(hashcode.HASHENUM)
     yield hashcode
 
-decode_buffer = HashCodeField.value_from_buffer
+decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.value_from_bytes
 
 class HashCode(bytes, Transcriber):
@@ -103,7 +103,7 @@ class HashCode(bytes, Transcriber):
   def from_buffer(bfr):
     ''' Decode a hash from a buffer.
     '''
-    return HashCodeField.value_from_buffer(bfr)
+    return HashCodeField.parse_value(bfr)
 
   def transcribe_b(self):
     ''' Binary transcription of this hash via `cs.binary.PacketField.transcribe_value`.

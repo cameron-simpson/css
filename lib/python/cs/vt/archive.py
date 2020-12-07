@@ -52,8 +52,8 @@ class ArchiveEntry(PacketField):
   def from_buffer(cls, bfr, **kw):
     ''' Parse the `when` and `dirent` values from `bfr`.
     '''
-    when = BSSFloat.value_from_buffer(bfr)
-    dirent = DirentRecord.value_from_buffer(bfr)
+    when = BSSFloat.parse_value(bfr)
+    dirent = DirentRecord.parse_value(bfr)
     return cls(when, dirent, **kw)
 
   def transcribe(self):

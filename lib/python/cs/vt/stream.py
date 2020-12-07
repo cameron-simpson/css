@@ -511,9 +511,9 @@ class StreamStoreArchive(BaseArchive):
     _, payload = self.S.do(ArchiveListRequest(self.archive_name))
     bfr = CornuCopyBuffer([payload])
     while not bfr.at_eof():
-      when = BSString.value_from_buffer(bfr)
+      when = BSString.parse_value(bfr)
       when = float(when)
-      E = BSString.value_from_buffer(bfr)
+      E = BSString.parse_value(bfr)
       E = parse(E)
       if not isinstance(E, _Dirent):
         raise ValueError("not a _Dirent: %r" % (E,))
@@ -573,9 +573,9 @@ class AddRequest(VTPacket):
   def from_buffer(cls, bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    hashenum = BSUInt.value_from_buffer(bfr)
+    hashenum = BSUInt.parse_value(bfr)
     hashclass = HASHCLASS_BY_ENUM[hashenum]
-    data = BSData.value_from_buffer(bfr)
+    data = BSData.parse_value(bfr)
     return cls(data, hashclass)
 
   def transcribe(self):
@@ -605,7 +605,7 @@ class GetRequest(VTPacket):
   RQTYPE = RqType.GET
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return hash_from_buffer(bfr)
@@ -634,7 +634,7 @@ class ContainsRequest(VTPacket):
   RQTYPE = RqType.CONTAINS
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return hash_from_buffer(bfr)
@@ -664,7 +664,7 @@ class FlushRequest(VTPacket):
     super().__init__(None)
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return None
@@ -692,7 +692,7 @@ class LengthRequest(VTPacket):
     super().__init__(None)
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
     return None
@@ -763,10 +763,10 @@ class HashCodesRequest(Packet):
     extra_flags = flags & ~0x07
     if extra_flags:
       raise ValueError("extra flags: 0x%02x" % (extra_flags,))
-    hashname = BSString.value_from_buffer(bfr)
+    hashname = BSString.parse_value(bfr)
     hashclass = HASHCLASS_BY_NAME[hashname]
     if has_start_hashcode:
-      start_hashcode = HashCodeField.value_from_buffer(bfr)
+      start_hashcode = HashCodeField.parse_value(bfr)
       if type(start_hashcode) is not hashclass:
         raise ValueError(
             "request hashclass %s does not match start_hashcode class %s" %
@@ -774,7 +774,7 @@ class HashCodesRequest(Packet):
         )
     else:
       start_hashcode = None
-    length = BSUInt.value_from_buffer(bfr)
+    length = BSUInt.parse_value(bfr)
     return cls(
         reverse=reverse,
         after=after,
@@ -832,10 +832,10 @@ class ArchiveLastRequest(VTPacket):
   RQTYPE = RqType.ARCHIVE_LAST
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return BSString.value_from_buffer(bfr)
+    return BSString.parse_value(bfr)
 
   def transcribe(self):
     ''' Return the serialised hashcode.
@@ -861,10 +861,10 @@ class ArchiveListRequest(VTPacket):
   RQTYPE = RqType.ARCHIVE_LIST
 
   @staticmethod
-  def value_from_buffer(bfr, flags=0):
+  def parse_value(bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return BSString.value_from_buffer(bfr)
+    return BSString.parse_value(bfr)
 
   def transcribe(self):
     ''' Return the archive name serialised.
@@ -898,7 +898,7 @@ class ArchiveUpdateRequest(VTPacket):
   def from_buffer(cls, bfr, flags=0):
     if flags:
       raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    archive_name = BSString.value_from_buffer(bfr)
+    archive_name = BSString.parse_value(bfr)
     entry = ArchiveEntry.from_buffer(bfr)
     return cls(archive_name=archive_name, entry=entry, flags=flags)
 

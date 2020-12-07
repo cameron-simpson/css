@@ -196,8 +196,8 @@ def xattrs_from_bytes(bs, offset=0):
   '''
   xattrs = {}
   while offset < len(bs):
-    name, offset = get_bss(bs, offset)
-    data, offset = get_bsdata(bs, offset)
+    name = BSString.parse_value(bfr)
+    data = BSData.parse_value(bfr)
     if name in xattrs:
       warning("repeated name, ignored: %r", name)
     else:

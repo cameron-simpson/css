@@ -78,10 +78,10 @@ class DataRecord(PacketField):
 
   @classmethod
   def from_buffer(cls, bfr):
-    ''' Parse a DataRecord from a buffer.
+    ''' Parse a `DataRecord` from a buffer.
     '''
-    flags = BSUInt.value_from_buffer(bfr)
-    data = BSData.value_from_buffer(bfr)
+    flags = BSUInt.parse_value(bfr)
+    data = BSData.parse_value(bfr)
     is_compressed = (flags & DataFlag.COMPRESSED) != 0
     if is_compressed:
       flags &= ~DataFlag.COMPRESSED

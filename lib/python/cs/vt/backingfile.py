@@ -46,8 +46,8 @@ class BackingFileIndexEntry(PacketField):
   def from_buffer(cls, bfr):
     ''' Construct a `BackingFileIndexEntry` from a `CornuCopyBuffer`.
     '''
-    offset = BSUInt.value_from_buffer(bfr)
-    length = BSUInt.value_from_buffer(bfr)
+    offset = BSUInt.parse_value(bfr)
+    length = BSUInt.parse_value(bfr)
     return cls(offset, length)
 
   def transcribe(self):
@@ -299,8 +299,8 @@ class CompressibleDataRecord(PacketField):
   def from_buffer(cls, bfr):
     ''' Parse a `CompressibleDataRecord` from a buffer.
     '''
-    flags = BSUInt.value_from_buffer(bfr)
-    data = BSData.value_from_buffer(bfr)
+    flags = BSUInt.parse_value(bfr)
+    data = BSData.parse_value(bfr)
     is_compressed = (flags & cls.FLAG_COMPRESSED) != 0
     if is_compressed:
       flags &= ~cls.FLAG_COMPRESSED

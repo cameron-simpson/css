@@ -79,19 +79,19 @@ class DirentRecord(PacketField):
   '''
 
   @classmethod
-  def value_from_buffer(cls, bfr):
+  def parse_value(cls, bfr):
     ''' Unserialise a serialised Dirent.
     '''
-    type_ = BSUInt.value_from_buffer(bfr)
-    flags = DirentFlags(BSUInt.value_from_buffer(bfr))
+    type_ = BSUInt.parse_value(bfr)
+    flags = DirentFlags(BSUInt.parse_value(bfr))
     if flags & DirentFlags.HASNAME:
       flags ^= DirentFlags.HASNAME
-      name = BSString.value_from_buffer(bfr)
+      name = BSString.parse_value(bfr)
     else:
       name = ""
     if flags & DirentFlags.HASMETA:
       flags ^= DirentFlags.HASMETA
-      metatext = BSString.value_from_buffer(bfr)
+      metatext = BSString.parse_value(bfr)
     else:
       metatext = None
     uu = None
@@ -102,20 +102,20 @@ class DirentRecord(PacketField):
       flags ^= DirentFlags.NOBLOCK
       block = None
     else:
-      block = BlockRecord.value_from_buffer(bfr)
+      block = BlockRecord.parse_value(bfr)
     if flags & DirentFlags.HASPREVDIRENT:
       flags ^= DirentFlags.HASPREVDIRENT
-      prev_dirent_blockref = BlockRecord.value_from_buffer(bfr)
+      prev_dirent_blockref = BlockRecord.parse_value(bfr)
     else:
       prev_dirent_blockref = None
     if flags & DirentFlags.EXTENDED:
       flags ^= DirentFlags.EXTENDED
-      extended_data = BSData.value_from_buffer(bfr)
+      extended_data = BSData.parse_value(bfr)
     else:
       extended_data = None
     if flags:
       warning(
-          "%s.value_from_buffer: unexpected extra flags: 0x%02x", cls.__name__,
+          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__,
           flags
       )
     E = _Dirent.from_components(
@@ -277,7 +277,7 @@ class _Dirent(Transcriber):
     ''' Factory to extract a Dirent from the CornuCopyBuffer `bfr`.
         Returns the Dirent.
     '''
-    return DirentRecord.value_from_buffer(bfr)
+    return DirentRecord.parse_value(bfr)
 
   def exists(self):
     ''' Does this exist? For a Dir this is always true: cogito ergo sum.

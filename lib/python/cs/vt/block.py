@@ -80,7 +80,7 @@ class BlockRecord(PacketField):
 
   @staticmethod
   # pylint: disable=arguments-differ
-  def value_from_buffer(bfr):
+  def parse_value(bfr):
     ''' Decode a Block reference from a buffer.
 
         Format is:
@@ -104,9 +104,9 @@ class BlockRecord(PacketField):
         we use a leading length so that future encodings do not
         prevent parsing any following data.
     '''
-    raw_encoding = BSData.value_from_buffer(bfr)
+    raw_encoding = BSData.parse_value(bfr)
     blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
-    flags = BSUInt.value_from_buffer(blockref_bfr)
+    flags = BSUInt.parse_value(blockref_bfr)
     is_indirect = bool(flags & F_BLOCK_INDIRECT)
     is_typed = bool(flags & F_BLOCK_TYPED)
     has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
@@ -118,7 +118,7 @@ class BlockRecord(PacketField):
           "unexpected flags value (0x%02x) with unsupported flags=0x%02x" %
           (flags, unknown_flags)
       )
-    span = BSUInt.value_from_buffer(blockref_bfr)
+    span = BSUInt.parse_value(blockref_bfr)
     if is_indirect:
       # With indirect blocks, the span is of the implied data, not
       # the referenced block's data. Therefore we build the referenced
@@ -128,11 +128,11 @@ class BlockRecord(PacketField):
       span = None
     # block type, default BT_HASHCODE
     if is_typed:
-      block_type = BlockType(BSUInt.value_from_buffer(blockref_bfr))
+      block_type = BlockType(BSUInt.parse_value(blockref_bfr))
     else:
       block_type = BlockType.BT_HASHCODE
     if has_type_flags:
-      type_flags = BSUInt.value_from_buffer(blockref_bfr)
+      type_flags = BSUInt.parse_value(blockref_bfr)
       if type_flags:
         warning("nonzero type_flags: 0x%02x", type_flags)
     else:
@@ -148,8 +148,8 @@ class BlockRecord(PacketField):
       data = blockref_bfr.take(span)
       B = LiteralBlock(data)
     elif block_type == BlockType.BT_SUBBLOCK:
-      suboffset = BSUInt.value_from_buffer(blockref_bfr)
-      superB = BlockRecord.value_from_buffer(blockref_bfr)
+      suboffset = BSUInt.parse_value(blockref_bfr)
+      superB = BlockRecord.parse_value(blockref_bfr)
       # wrap inner Block in subspan
       B = SubBlock(superB, suboffset, span)
     else:
@@ -166,7 +166,7 @@ class BlockRecord(PacketField):
   @staticmethod
   # pylint: disable=arguments-differ
   def transcribe_value(B):
-    ''' Transcribe this Block, the inverse of value_from_buffer.
+    ''' Transcribe this Block, the inverse of parse_value.
     '''
     transcription = []
     is_indirect = B.indirect
