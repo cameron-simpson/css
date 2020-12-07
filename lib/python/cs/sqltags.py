@@ -1213,11 +1213,11 @@ class SQLTagSet(TagSet, SingletonMixin):
   def _singleton_key(*, sqltags, entity_id, **_):
     return builtin_id(sqltags), entity_id
 
-  def __init__(self, *, sqltags, entity_id, **kw):
+  def __init__(self, *a, sqltags, entity_id, **kw):
     try:
       pre_sqltags = self.sqltags
     except AttributeError:
-      super().__init__(**kw)
+      super().__init__(*a, **kw)
       self.sqltags = sqltags
       self.entity_id = entity_id
     else:
