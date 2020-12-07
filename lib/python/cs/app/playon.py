@@ -62,23 +62,46 @@ class PlayOnCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing recording_ids")
-    badopts = False
-    download_ids = []
-    for arg in argv:
-      with Pfx(arg):
-        try:
-          dl_id = int(arg)
-        except ValueError:
-          warning("not an int")
-          badopts = True
-        else:
-          download_ids.append(dl_id)
-    if badopts:
-      raise GetoptError("bad invocation")
     api = options.api
-    for dl_id in download_ids:
-      with Pfx(dl_id):
-        api.download(dl_id)
+
+    @typechecked
+    def _dl(dl_id: int):
+      filename = api[dl_id].format_as(
+          '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}.'
+      ).lower().replace(' - ', '--').replace('_', ':').replace(' ', '-')
+      try:
+        api.download(dl_id, filename=filename)
+      except ValueError as e:
+        warning("download fails: %s", e)
+        return False
+      return True
+
+    available = None
+    xit = 0
+    for dlrq in argv:
+      with Pfx(dlrq):
+        if dlrq == 'pending':
+          if available is None:
+            available = api.recordings()
+          tes = [te for te in available if 'download_path' not in te.tags]
+          if not tes:
+            warning("no undownloaded recordings")
+          else:
+            for te in tes:
+              dl_id = te.tags.playon.ID
+              with Pfx(dl_id):
+                if not _dl(te.tags.playon.ID):
+                  xit = 1
+        else:
+          try:
+            dl_id = int(dlrq)
+          except ValueError:
+            warning("not an int")
+            xit = 2
+          else:
+            if not _dl(dl_id):
+              xit = 1
+    return xit
 
   @staticmethod
   def cmd_ls(argv, options):
