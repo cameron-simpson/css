@@ -1606,10 +1606,6 @@ class TagFile(SingletonMixin):
     ''' Update the tags for `name` from the supplied `tags`
         as for `Tagset.update`.
     '''
-    if prefix:
-      tags = [
-          Tag.with_prefix(tag.name, tag.value, prefix=prefix) for tag in tags
-      ]
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
 class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
