@@ -278,10 +278,12 @@ class PlayOnAPI(MultiOpenMixin):
     if not ok:
       raise ValueError("failed: %r" % (result,))
     entries = result['data']['entries']
+    tes = set()
     for entry in entries:
       te = self[entry['ID']]
       te.tags.update(entry, prefix='playon')
-    return entries
+      tes.add(te)
+    return tes
 
   def download(self, download_id, filename=None):
     ''' Download th file with `download_id` to `filename`.
