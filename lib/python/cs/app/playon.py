@@ -81,14 +81,23 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [-l]
           List available downloads.
+          -l  Long format.
     '''
+    long_format = False
+    if argv and argv[0] == '-l':
+      argv.pop(0)
+      long_format = True
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     api = options.api
-    for entry in api.recordings():
-      print(entry['ID'], entry['Series'], entry['Name'])
+    for te in api.recordings():
+      entry = te.subtags('playon')
+      print(int(entry.ID), entry.HumanSize, entry.Series, entry.Name)
+      if long_format:
+        for tag in sorted(te.tags):
+          print(" ", tag)
 
 # pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
