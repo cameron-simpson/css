@@ -21,6 +21,7 @@ import requests
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import decorator
+from cs.fstags import FSTags
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
@@ -155,13 +156,16 @@ class PlayOnAPI(MultiOpenMixin):
     self._cookies = {}
     self._storage = defaultdict(str)
     self._sqltags = SQLTags(expanduser(self.STATEDBPATH))
+    self._fstags = FSTags()
 
   def startup(self):
     sqltags = self._sqltags
     sqltags.open()
     sqltags.init()
+    self._fstags.open()
 
   def shutdown(self):
+    self._fstags.close()
     self._sqltags.close()
 
   @property
@@ -304,6 +308,9 @@ class PlayOnAPI(MultiOpenMixin):
     te = self[download_id]
     if dlrq is not None:
       te.set('downloaded_path', fullpath)
+    pl_tags = te.subtags('playon')
+    fse = self._fstags[fullpath]
+    fse.update(pl_tags, prefix='playon')
     return te
 
 if __name__ == '__main__':
