@@ -281,6 +281,9 @@ class PlayOnAPI(MultiOpenMixin):
           str(dl_cookies[ck_name]),
           domain='playonrecorder.com',
           secure=True,
+    elif filename.endswith('.'):
+      _, dl_ext = splitext(basename(dl_url))
+      filename = filename[:-1] + dl_ext
       )
     dlrq = requests.get(
         dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
