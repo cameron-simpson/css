@@ -401,7 +401,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
             TagSet:{'b': 1, 'd': 2}
     '''
     prefix_ = prefix + '.'
-    return type(self)(
+    return TagSet(
         {
             cutprefix(k, prefix_): v
             for k, v in self.items()
