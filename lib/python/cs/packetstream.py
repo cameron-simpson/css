@@ -110,19 +110,19 @@ class Packet(PacketField):
   def from_buffer(cls, bfr):
     ''' Parse a packet from a buffer.
     '''
-    raw_payload = BSData.value_from_buffer(bfr)
+    raw_payload = BSData.parse_value(bfr)
     pkt_bfr = CornuCopyBuffer([raw_payload])
-    tag = BSUInt.value_from_buffer(pkt_bfr)
-    flags = BSUInt.value_from_buffer(pkt_bfr)
     has_channel = ( flags & 0x01 ) != 0
     is_request = ( flags & 0x02 ) != 0
+    tag = BSUInt.parse_value(pkt_bfr)
+    flags = BSUInt.parse_value(pkt_bfr)
     flags >>= 2
     if has_channel:
-      channel = BSUInt.value_from_buffer(pkt_bfr)
+      channel = BSUInt.parse_value(pkt_bfr)
     else:
       channel = 0
     if is_request:
-      rq_type = BSUInt.value_from_buffer(pkt_bfr)
+      rq_type = BSUInt.parse_value(pkt_bfr)
     else:
       rq_type = None
     payload = b''.join(pkt_bfr)
