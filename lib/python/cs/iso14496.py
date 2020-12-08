@@ -1004,12 +1004,22 @@ def add_body_subclass(superclass, box_type, section, desc):
     box_type = box_type.decode('ascii')
   classname = box_type.upper() + 'BoxBody'
   box_type = box_type.encode('ascii')
-  K = type(classname, (superclass,), {})
-  K.__doc__ = (
+
+  class SubClass(superclass):
+    ''' A distinct subclass simply subclassing the parent.
+    '''
+
+    def transcribe(self):
+      ''' A stub transcribe method distinct from the parent.
+      '''
+      yield from super().transcribe()
+
+  SubClass.__name__ = classname
+  SubClass.__doc__ = (
       "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
   )
-  add_body_class(K)
-  return K
+  add_body_class(SubClass)
+  return SubClass
 
 class HasBoxesMixin:
 
