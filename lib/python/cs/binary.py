@@ -531,9 +531,9 @@ class BinaryListValues(AbstractBinary):
         break
       values.append(value)
     if min_count is not None and len(values) < min_count:
-      raise ValueError(
-          "unsuffient instances of %r found: required at least %s, found %d" %
-          (pt, min_count, len(values))
+      warning(
+          "%s.parse: insufficient instances of %r found: required at least %s, found %d",
+          type(self).__name__, pt, min_count, len(values)
       )
     return self
 
