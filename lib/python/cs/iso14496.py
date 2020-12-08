@@ -2068,28 +2068,40 @@ class STCOBoxBody(FullBoxBody):
   ''' A 'stco' Chunk Offset box - section 8.7.5.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
-      entry_count=UInt32BE,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
+      entry_count=int,
+      chunk_offsets_bs=bytes,
       ##chunk_offsets=ListField,
   )
 
   def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `chunk_offsets` fields.
     '''
-    entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    self.add_deferred_field(
-        'chunk_offsets', bfr, entry_count * UInt32BE.length
-    )
     super().parse_fields(bfr)
+    self.entry_count = UInt32BE.parse_value(bfr)
+    self.chunk_offsets_bs = bfr.take(self.entry_count * UInt32BE.length)
 
-  @deferred_field
+  def transcribe(self):
+    yield super().transcribe()
+    yield UInt32BE.transcribe_value(self.entry_count)
+    try:
+      chunk_offsets = self._chunk_offsets
+    except AttributeError:
+      yield self.chunk_offsets_bs
+    else:
+      yield from map(UInt32BE.transcribe_value, chunk_offsets)
+
+  @locked_property
+  @pfx_method
   def chunk_offsets(self, bfr):
     ''' Parse the `UInt32BE` chunk offsets from stashed buffer.
     '''
+    XP("decode .chunk_offsets_bs")
+    bfr = CornuCopyBuffer.from_bytes(self.chunk_offsets_bs)
     chunk_offsets = []
     for _ in range(self.entry_count):
-      chunk_offsets.append(UInt32BE.from_buffer(bfr))
+      chunk_offsets.append(UInt32BE.parse_value(bfr))
     return chunk_offsets
 
 add_body_class(STCOBoxBody)
