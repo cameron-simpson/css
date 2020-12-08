@@ -2110,20 +2110,28 @@ class CO64BoxBody(FullBoxBody):
   ''' A 'c064' Chunk Offset box - section 8.7.5.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
-      entry_count=UInt32BE,
-      ##chunk_offsets=ListField,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
+      entry_count=int,
+      chunk_offsets_bs=bytes,
   )
 
   def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `chunk_offsets` fields.
     '''
-    entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    self.add_deferred_field(
-        'chunk_offsets', bfr, entry_count * UInt64BE.length
-    )
     super().parse_fields(bfr)
+    self.entry_count = UInt32BE.parse_value(bfr)
+    self.chunk_offsets_bs = bfr.take(self.entry_count * UInt64BE.length)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield UInt32BE.transcribe_value(self.entry_count)
+    try:
+      chunk_offsets = self._chunk_offsets
+    except AttributeError:
+      yield self.chunk_offsets_bs
+    else:
+      yield from map(UInt64BE.transcribe_value, chunk_offsets)
 
   @deferred_field
   def chunk_offsets(self, bfr):
