@@ -1906,11 +1906,11 @@ class STSZBoxBody(FullBoxBody):
   ''' A 'stsz' Sample Size box - section 8.7.3.2.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       sample_size=UInt32BE,
       sample_count=UInt32BE,
-      ##entry_sizes=(False, ListField),
+      entry_sizes_bs=(False, (bytes,)),
   )
 
   def parse_fields(self, bfr):
