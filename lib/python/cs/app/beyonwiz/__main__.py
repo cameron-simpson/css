@@ -26,10 +26,6 @@ class BWizCmd(BaseCommand):
   ''' Command line handler.
   '''
 
-  GETOPT_SPEC = ''
-
-  USAGE_FORMAT = '''Usage: {cmd} subcmd [subcmd-args...]'''
-
   @staticmethod
   def cmd_cat(args, options):
     ''' Output the tvwiz transport stream data.
@@ -125,7 +121,10 @@ class BWizCmd(BaseCommand):
     for filename in args:
       with Pfx(filename):
         R = Recording(filename)
-        print(filename, pformat(R.metadata.as_dict()), sep='\t')
+        print(filename)
+        print(pformat(R.metadata))
+        print(R.DEFAULT_FILENAME_BASIS)
+        print(R.filename(ext='.mp4'))
     return 0
 
   @staticmethod

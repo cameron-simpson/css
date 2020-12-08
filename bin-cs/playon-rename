@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+
+''' Rename PlayOn recordings.
+'''
+
+import os
+from os.path import basename, dirname, exists as existspath, join as joinpath
+import re
+import sys
+from cs.fstags import FSTags
+from cs.logutils import setup_logging, warning, info
+from cs.pfx import Pfx
+
+PLAYON_RE = re.compile(
+    r'^(?P<recording_number>\d+)_(?P<series>\S.*\S)'
+    r' - s*(?P<season>\d+)e*(?P<episode>\d+) (- )?(?P<title>.*)\.mp4$'
+)
+
+PLAYON_FORMAT = '{series}--s{season}e{episode}--{title}--playon.mp4'
+
+def main(argv=None):
+  ''' Main programme command line.
+  '''
+  if argv is None:
+    argv = list(sys.argv)
+  cmd = basename(argv.pop(0))
+  setup_logging(cmd)
+  if not argv:
+    argv = list(
+        filter(
+            lambda name: name.endswith('.mp4') and name[0].isdigit(),
+            os.listdir('.')
+        )
+    )
+  pathnames = argv
+  with FSTags() as fstags:
+    for pathname in pathnames:
+      with Pfx(pathname):
+        base = basename(pathname)
+        m = PLAYON_RE.match(base)
+        if not m:
+          warning("not recognised as a PlayOn recording")
+          continue
+        fields = m.groupdict()
+        newbase = PLAYON_FORMAT.format_map(fields).replace('_', ':').replace(' ','-').lower()
+        if base == newbase:
+          continue
+        newpath = joinpath(dirname(pathname), newbase)
+        with Pfx("-> %s", newpath):
+          if existspath(newpath):
+            warning("already exists")
+          else:
+            fstags.move(pathname, newpath)
+            info("moved")
+            P = fstags[newpath]
+            P.add('series', fields['series'].replace('_',':'))
+            P.add('season', int(fields['season']))
+            P.add('episode', int(fields['episode']))
+            P.add('episode_title', fields['title'].replace('_',':'))
+            P.add('playon.recording_number', int(fields['recording_number']))
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

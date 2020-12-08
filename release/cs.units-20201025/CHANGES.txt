@@ -1,0 +1,2 @@
+lib/python/cs/units.py: Release information for cs.units-20200718.
+lib/python/cs/units.py: cs.units: transcribe: use str(count_i), not str(count) if count == count_i

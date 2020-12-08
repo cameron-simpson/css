@@ -1,0 +1,1 @@
+CornuCopyBuffer: new optional `progress` parameter for reporting data consumed from `input_data`.

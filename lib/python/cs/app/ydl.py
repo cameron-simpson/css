@@ -134,6 +134,7 @@ class YDLCommand(BaseCommand):
 
 YDLCommand.add_usage_to_docstring()
 
+# pylint: disable=too-many-instance-attributes
 class OverYDL:
   ''' A manager for multiple `YDL` instances.
   '''
@@ -151,9 +152,9 @@ class OverYDL:
     if all_progress is None:
       all_progress = OverProgress()
     self.upd = upd
-    self.proxy0 = upd.proxy(0)
+    self.proxy0 = upd.insert(0)
     self.fstags = fstags
-    self.all_progress = OverProgress()
+    self.all_progress = all_progress
     self.ydl_opts = ydl_opts
     self.Rs = []
     self.nfetches = 0
@@ -177,7 +178,7 @@ class OverYDL:
 
   def report(self, Rs=None):
     ''' Wrapper returning `cs.result.report(.Rs)`.
-        `Rs` defaults to `list(self.Rs`, the accumulated `Result`s..
+        `Rs` defaults to `list(self.Rs`, the accumulated `Result`s.
     '''
     if Rs is None:
       Rs = list(self.Rs)
@@ -218,6 +219,7 @@ class OverYDL:
       R.notify(on_completion)
       return R
 
+# pylint: disable=too-many-instance-attributes
 class YDL:
   ''' Manager for a download process.
   '''

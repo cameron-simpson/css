@@ -1,11 +1,8 @@
 #!/usr/bin/python
 #
-# Convenience functions to work with processes.
-#       - Cameron Simpson <cs@cskk.id.au> 02sep2011
-#
 
 r'''
-Assorted process management functions.
+Assorted process and subprocess management functions.
 '''
 
 from __future__ import print_function
@@ -26,8 +23,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [
-    ],
+    'install_requires': [],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
@@ -191,8 +187,8 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   if binary:
     if kw:
       raise ValueError(
-          "binary mode: extra keyword arguments not supported: %r"
-          % (kw,))
+          "binary mode: extra keyword arguments not supported: %r" % (kw,)
+      )
   else:
     P.stdout = io.TextIOWrapper(P.stdout, **kw)
   if not keep_stdin and sp_devnull is None:
@@ -250,17 +246,17 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     max_argv = MAX_ARGV
   if encode:
     if isinstance(encode, bool):
-      pre_argv = [ arg.encode() for arg in pre_argv ]
-      argv = [ arg.encode() for arg in argv ]
-      post_argv = [ arg.encode() for arg in post_argv ]
+      pre_argv = [arg.encode() for arg in pre_argv]
+      argv = [arg.encode() for arg in argv]
+      post_argv = [arg.encode() for arg in post_argv]
     elif isinstance(encode, str):
-      pre_argv = [ arg.encode(encode) for arg in pre_argv ]
-      argv = [ arg.encode(encode) for arg in argv ]
-      post_argv = [ arg.encode(encode) for arg in post_argv ]
+      pre_argv = [arg.encode(encode) for arg in pre_argv]
+      argv = [arg.encode(encode) for arg in argv]
+      post_argv = [arg.encode(encode) for arg in post_argv]
     else:
-      pre_argv = [ encode(arg) for arg in pre_argv ]
-      argv = [ encode(arg) for arg in argv ]
-      post_argv = [ encode(arg) for arg in post_argv ]
+      pre_argv = [encode(arg) for arg in pre_argv]
+      argv = [encode(arg) for arg in argv]
+      post_argv = [encode(arg) for arg in post_argv]
   else:
     pre_argv = list(pre_argv)
     post_argv = list(post_argv)
@@ -274,8 +270,9 @@ def groupargv(pre_argv, argv, post_argv=(), max_argv=None, encode=False):
     if available - nbytes < 0:
       if not per:
         raise ValueError(
-            "cannot fit argument into argv: available=%d, len(arg)=%d: %r"
-            % (available, len(arg), arg))
+            "cannot fit argument into argv: available=%d, len(arg)=%d: %r" %
+            (available, len(arg), arg)
+        )
       argvs.append(pre_argv + per + post_argv)
       available = max_argv - pre_nbytes - post_nbytes
       per = []
@@ -289,9 +286,11 @@ if __name__ == '__main__':
   for test_max_argv in 64, 20, 16, 8:
     print(
         test_max_argv,
-        repr(groupargv(
-            ['cp', '-a'],
-            ['a', 'bbbb', 'ddddddddddddd'],
-            ['end'],
-            max_argv=test_max_argv,
-            encode=True)))
+        repr(
+            groupargv(
+                ['cp', '-a'], ['a', 'bbbb', 'ddddddddddddd'], ['end'],
+                max_argv=test_max_argv,
+                encode=True
+            )
+        )
+    )

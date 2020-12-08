@@ -6,16 +6,16 @@
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
-from threading import local as thread_local
-from sqlalchemy import Column, DateTime, Integer
+from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
-import sqlalchemy.sql.functions as func
 from icontract import require
-from cs.context import stackattrs
-from cs.deco import decorator
+from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
+from cs.threads import State
+
+__version__ = '20201025-post'
 
 DISTINFO = {
     'description':
@@ -32,28 +32,11 @@ DISTINFO = {
         'cs.deco',
         'cs.py.func',
         'cs.resources',
+        'cs.threads',
     ],
 }
 
-# TODO: have a cs.threads.ThreadState superclass with __call__ etc
-class _State(thread_local):
-  ''' Shared per-thread state.
-  '''
-
-  def __init__(self):
-    super().__init__()
-    self.orm = None
-    self.session = None
-
-  @contextmanager
-  def __call__(self, **kw):
-    ''' Calling the shared state returns a context manager
-        pushing the supplied keyword arguments as state attribute values.
-    '''
-    with stackattrs(self, **kw):
-      yield
-
-_state = _State()
+_state = State(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
@@ -163,13 +146,15 @@ def auto_session(function):
   wrapper.__module__ = getattr(function, '__module__', None)
   return wrapper
 
-@contextmanager
-def push_log_level(level):
+@contextdecorator
+def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   ''' Temporarily set the level of the default SQLAlchemy logger to `level`.
       Yields the logger.
 
       *NOTE*: this is not MT safe - competing Threads can mix log levels up.
   '''
+  if level is None:
+    level = logging.DEBUG
   logger = logging.getLogger('sqlalchemy.engine')
   old_level = logger.level
   logger.setLevel(level)
@@ -177,22 +162,6 @@ def push_log_level(level):
     yield logger
   finally:
     logger.setLevel(old_level)
-
-@decorator
-def log_level(function, level=None):
-  ''' Decorator to run `function` at the specified logging `level`, default `logging.DEBUG`.
-  '''
-  if level is None:
-    level = logging.DEBUG
-
-  def wrapper(*a, **kw):
-    ''' Push the desired log level and run the function.
-    '''
-    with push_log_level(level):
-      return function(*a, **kw)
-
-  wrapper.__name__ = "@log_level(%s,%s)" % (function, level)
-  return wrapper
 
 class ORM(MultiOpenMixin):
   ''' A convenience base class for an ORM class.
@@ -212,7 +181,6 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
-    MultiOpenMixin.__init__(self)
 
   @contextmanager
   def session(self, *a, **kw):
@@ -344,6 +312,7 @@ class BasicTableMixin:
       ))
     return row
 
+# pylint: disable=too-few-public-methods
 class HasIdMixin:
   ''' Include an "id" `Column` as the primary key.
   '''

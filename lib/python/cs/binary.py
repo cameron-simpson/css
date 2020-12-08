@@ -2034,10 +2034,17 @@ def multi_struct_field(struct_format, subvalue_names=None, class_name=None):
       ''' A struct field for a complex struct format.
       '''
 
+      def __str__(self):
+        return str(self.value)
+
       if subvalue_names:
 
-        def __str__(self):
-          return str(self.value)
+        def _asdict(self):
+          return self.value._asdict()
+      else:
+
+        def _asdict(self):
+          return dict(value=self.value)
 
       length = struct.size
 

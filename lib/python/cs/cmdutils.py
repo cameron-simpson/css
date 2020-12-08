@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
-from cs.context import stackattrs
+from types import SimpleNamespace
+from cs.context import nullcontext, stackattrs
 from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext, SimpleNamespace as NS
 from cs.lex import cutprefix, stripped_dedent
@@ -21,7 +22,7 @@ from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20200615-post'
+__version__ = '20201102-post'
 
 DISTINFO = {
     'description':
@@ -149,6 +150,7 @@ class BaseCommand:
       and aborts the whole programme with `SystemExit`.
   '''
 
+  OPTIONS_CLASS = SimpleNamespace
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
 
   @classmethod
@@ -287,7 +289,7 @@ class BaseCommand:
           If not specified a new `SimpleNamespace`
           is allocated for use as `options`,
           and prefilled with `.cmd` set to `cmd`
-          and other values as set by `.apply_default(options)`
+          and other values as set by `.apply_defaults(options)`
           if such a method is provided.
         * `cmd`:
           optional command name for context;
@@ -315,7 +317,7 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     if options is None:
-      options = NS()
+      options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -339,7 +341,7 @@ class BaseCommand:
       # we do this regardless in order to honour '--'
       opts, argv = getopt(argv, getopt_spec, '')
       if getopt_spec:
-        self.apply_opts(opts, options)
+        self.apply_opts(opts, options)  # pylint: disable=no-member
 
       subcmds = self.subcommands()
       if subcmds and list(subcmds) != ['help']:
@@ -350,8 +352,9 @@ class BaseCommand:
               (', '.join(sorted(subcmds.keys())),)
           )
         subcmd = argv.pop(0)
+        subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
@@ -392,6 +395,7 @@ class BaseCommand:
         return 2
       raise
 
+  # pylint: disable=unused-argument
   @staticmethod
   def getopt_error_handler(cmd, options, e, usage):  # pylint: disable=unused-argument
     ''' The `getopt_error_handler` method
@@ -428,6 +432,7 @@ class BaseCommand:
       print(usage.rstrip(), file=sys.stderr)
     return True
 
+  # pylint: disable=unused-argument
   @staticmethod
   @contextmanager
   def run_context(argv, options):  # pylint: disable=unused-argument
@@ -439,6 +444,7 @@ class BaseCommand:
     finally:
       pass
 
+  # pylint: disable=unused-argument
   @classmethod
   def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
     ''' Usage: {cmd} [subcommand-names...]
