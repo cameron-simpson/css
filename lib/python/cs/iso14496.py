@@ -1891,9 +1891,14 @@ class URN_BoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `name` and `location` fields.
     '''
-    self.add_from_buffer('name', bfr, UTF8NULField)
-    self.add_from_buffer('location', bfr, UTF8NULField)
     super().parse_fields(bfr)
+    self.parse_field('name', bfr, BinaryUTF8NUL)
+    self.parse_field('location', bfr, BinaryUTF8NUL)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.name
+    yield self.location
 
 add_body_class(URN_BoxBody)
 
