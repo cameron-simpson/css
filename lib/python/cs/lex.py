@@ -965,12 +965,8 @@ def cropped(
       s = s[:max_length - len(ellipsis)] + ellipsis
   return s
 
-def cropped_repr(s, max_length=32, offset=0):
-  ''' If the length of the sequence `s` after `offset` (default `0`)
-      exceeds `max_length` (default `32`)
-      return the `repr` of the leading `max_length-3` characters from `offset`
-      plus `'...'`.
-      Otherwise return the `repr(s[offset:])`.
+def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
+  ''' Compute a cropped `repr()` of `o`.
 
       Parameters:
       * `o`: the object to represent
@@ -1077,6 +1073,7 @@ def format_as(format_s, format_mapping, error_sep=None):
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
+    # pylint: disable=raise-missing-from
     raise FormatAsError(
         e.args[0], format_s, format_mapping, error_sep=error_sep
     )
