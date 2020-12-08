@@ -2445,65 +2445,66 @@ class ILSTBoxBody(ContainerBoxBody):
       subbox_type = bytes(subbox.box_type)
       with Pfx("subbox %r", subbox_type):
         with subbox.reparse_buffer() as subbfr:
-          subbox.add_from_buffer(
-              'boxes', subbfr, SubBoxesField, end_offset=...
-          )
-          inner_boxes = subbox.boxes
-          if subbox_type == b'----':
-            # 3 boxes: mean, name, value
-            mean_box, name_box, data_box = inner_boxes
-            assert mean_box.box_type == b'mean'
-            assert name_box.box_type == b'name'
-            with mean_box.reparse_buffer() as meanbfr:
-              mean_box.add_from_buffer('n1', meanbfr, UInt32BE)
-              mean_box.add_from_value(
-                  'text',
-                  meanbfr.take(...).decode(), str.encode
+          subbox.parse_boxes(subbfr)
+        inner_boxes = list(subbox.boxes)
+        if subbox_type == b'----':
+          # 3 boxes: mean, name, value
+          mean_box, name_box, data_box = inner_boxes
+          assert mean_box.box_type == b'mean'
+          assert name_box.box_type == b'name'
+          with mean_box.reparse_buffer() as meanbfr:
+            mean_box.parse_field('n1', meanbfr, UInt32BE)
+            mean_box.parse_field(
+                'text', meanbfr,
+                (lambda bfr: bfr.take(...).decode(), str.encode)
+            )
+          with Pfx("mean %r", mean_box.text):
+            with name_box.reparse_buffer() as namebfr:
+              name_box.parse_field('n1', namebfr, UInt32BE)
+              name_box.parse_field(
+                  'text', namebfr,
+                  (lambda bfr: bfr.take(...).decode(), str.encode)
               )
-            with Pfx("mean %r", mean_box.text):
-              with name_box.reparse_buffer() as namebfr:
-                name_box.add_from_buffer('n1', namebfr, UInt32BE)
-                name_box.add_from_value(
-                    'text',
-                    namebfr.take(...).decode(), str.encode
+            with Pfx("name %r", name_box.text):
+              with data_box.reparse_buffer() as databfr:
+                data_box.parse_field('n1', databfr, UInt32BE)
+                data_box.parse_field('n2', databfr, UInt32BE)
+                data_box.parse_field(
+                    'text', databfr,
+                    (lambda bfr: bfr.take(...).decode(), str.encode)
                 )
-              with Pfx("name %r", name_box.text):
-                with data_box.reparse_buffer() as databfr:
-                  data_box.add_from_buffer('n1', databfr, UInt32BE)
-                  data_box.add_from_buffer('n2', databfr, UInt32BE)
-                  data_box.add_from_value(
-                      'text',
-                      databfr.take(...).decode(), str.encode
-                  )
-                value = data_box.text
-                decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
-                                                    {}).get(name_box.text)
-                if decoder is not None:
-                  value = decoder(value)
-                # annotate the subbox and the ilst
-                attribute_name = '.'.join((mean_box.text, name_box.text))
-                setattr(subbox, attribute_name, value)
-                self.tags.add(attribute_name, value)
+              value = data_box.text
+              decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
+                                                  {}).get(name_box.text)
+              if decoder is not None:
+                value = decoder(value)
+              # annotate the subbox and the ilst
+              attribute_name = '.'.join((mean_box.text, name_box.text))
+              setattr(subbox, attribute_name, value)
+              self.tags.add(attribute_name, value)
+        else:
+          # single data box
+          if not inner_boxes:
+            warning("no inner boxes, expected 1 data box")
           else:
-            # single data box
             data_box, = inner_boxes
             with data_box.reparse_buffer() as databfr:
+              data_box.parse_field('n1', databfr, UInt32BE)
+              data_box.parse_field('n2', databfr, UInt32BE)
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                debug("%r: no schema", subbox_type)
+                warning("%r: no schema", subbox_type)
               else:
-                data_box.add_from_buffer('n1', databfr, UInt32BE)
-                data_box.add_from_buffer('n2', databfr, UInt32BE)
-                with Pfx("%s", subbox_schema.from_buffer):
+                with Pfx("%s", subbox_schema.parse):
                   try:
-                    value = subbox_schema.from_buffer(databfr)
+                    data_box.parse_field(
+                        subbox_schema.attribute_name, databfr,
+                        (subbox_schema.parse, subbox_schema.transcribe)
+                    )
+                    value = subbox_schema.parse(databfr)
                   except (ValueError, TypeError) as e:
                     warning("decode fails: %s", e)
                   else:
-                    data_box.add_from_value(
-                        subbox_schema.attribute_name, value,
-                        subbox_schema.transcribe_value
-                    )
                     # annotate the subbox and the ilst
                     setattr(subbox, subbox_schema.attribute_name, value)
                     if isinstance(value, bytes):
