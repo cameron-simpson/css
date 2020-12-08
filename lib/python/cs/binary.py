@@ -1074,7 +1074,8 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         such as a `.tags` attribute collating metadata tag values
         parsed during the parse phase.
     '''
-    with Pfx("%s.%s=%r", type(self).__name__, field_name, field_value):
+    with Pfx("%s.transcribe_field: %s=%r", type(self).__name__, field_name,
+             field_value):
       if hasattr(field_value, 'transcribe'):
         transcribe = lambda field_value: field_value.transcribe()
       else:
@@ -1088,9 +1089,9 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
             transcribe = lambda s: s.encode(encoding='ascii')
           else:
             raise ValueError(
-                "%s:%s has no .transcribe method, no FIELD_TRANSCRIBERS entry,"
-                " and neither None nor bytes nor str" %
-                (type(field_value), field_value)
+                ".%s=<%s>%s has no .transcribe method, no FIELD_TRANSCRIBERS entry,"
+                " and is neither None nor bytes nor str" %
+                (field_name, type(field_value).__name__, field_value)
             )
         else:
           if transcribe is None:
