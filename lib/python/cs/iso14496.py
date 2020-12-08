@@ -793,9 +793,9 @@ class Box(BaseBinaryMultiValue):
           raise RuntimeError(
               "header size unstable, maybe we need a header mode to force the representation"
           )
-    yield self.header.transcribe()
-    yield self.body.transcribe()
-    yield self.unparsed.transcribe()
+    yield self.header
+    yield self.body
+    yield self.unparsed
 
   def self_check(self):
     ''' Sanity check this Box.
@@ -1289,16 +1289,16 @@ class MVHDBoxBody(FullBoxBody):
 
   def transcribe(self):
     yield super().transcribe()
-    yield self.creation_time.transcribe()
-    yield self.modification_time.transcribe()
-    yield self.timescale.transcribe()
-    yield self.duration.transcribe()
-    yield self.rate_long.transcribe()
-    yield self.volume_short.transcribe()
+    yield self.creation_time
+    yield self.modification_time
+    yield self.timescale
+    yield self.duration
+    yield self.rate_long
+    yield self.volume_short
     yield self.reserved1
-    yield self.matrix.transcribe()
+    yield self.matrix
     yield self.predefined1
-    yield self.next_track_id.transcribe()
+    yield self.next_track_id
 
   @prop
   def rate(self):
@@ -1373,20 +1373,20 @@ class TKHDBoxBody(FullBoxBody):
 
   def transcribe(self):
     yield super().transcribe()
-    yield self.creation_time.transcribe()
-    yield self.modification_time.transcribe()
-    yield self.track_id.transcribe()
-    yield self.reserved1.transcribe()
-    yield self.duration.transcribe()
-    yield self.reserved2.transcribe()
-    yield self.reserved3.transcribe()
-    yield self.layer.transcribe()
-    yield self.alternate_group.transcribe()
-    yield self.volume.transcribe()
-    yield self.reserved4.transcribe()
-    yield self.matrix.transcribe()
-    yield self.width.transcribe()
-    yield self.height.transcribe()
+    yield self.creation_time
+    yield self.modification_time
+    yield self.track_id
+    yield self.reserved1
+    yield self.duration
+    yield self.reserved2
+    yield self.reserved3
+    yield self.layer
+    yield self.alternate_group
+    yield self.volume
+    yield self.reserved4
+    yield self.matrix
+    yield self.width
+    yield self.height
 
   @prop
   def track_enabled(self):
