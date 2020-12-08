@@ -1100,6 +1100,13 @@ class FullBoxBody(BoxBody):
     self.flags2 = UInt8.parse_value(bfr)
 
   def transcribe(self):
+    ''' Transcribe the basic fields so that subclasses can safely
+        call `super().transcribe()` as the basis for their tranxription.
+    '''
+    assert (
+        type(self) is not FullBoxBody
+        and type(self).transcribe is not FullBoxBody.transcribe
+    ), "subclass %s did not implement .transcribe" % (type(self),)
     yield UInt8.transcribe_value(self.version)
     yield UInt8.transcribe_value(self.flags0)
     yield UInt8.transcribe_value(self.flags0)
