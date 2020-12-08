@@ -1640,9 +1640,9 @@ class _SampleEntry(BoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `data_reference_inde` field.
     '''
-    self.add_from_buffer('reserved', bfr, BytesField, length=6)
-    self.add_from_buffer('data_reference_index', bfr, UInt16BE)
     super().parse_fields(bfr)
+    self.parse_field('reserved', bfr, BytesField, length=6)
+    self.parse_field('data_reference_index', bfr, UInt16BE)
 
 class BTRTBoxBody(BoxBody):
   ''' BitRateBoxBody - section 8.5.2.2.
