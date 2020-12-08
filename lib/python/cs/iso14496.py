@@ -13,19 +13,16 @@ ISO make the standard available here:
 '''
 
 from __future__ import print_function
+from abc import ABC, abstractmethod
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
-from functools import partial
 from getopt import getopt, GetoptError
 import os
-import stat
 import sys
 from cs.binary import (
-    Packet,
-    PacketField,
-    BytesesField,
+    BytesField,
     ListField,
     UInt8,
     Int16BE,
@@ -34,25 +31,29 @@ from cs.binary import (
     UInt16BE,
     UInt32BE,
     UInt64BE,
-    UTF8NULField,
-    BytesField,
-    BytesRunField,
-    EmptyField,
-    EmptyPacketField,
+    BinaryUTF8NUL,
+    BinaryUTF16NUL,
+    BaseBinaryMultiValue,
+    BinaryListValues,
+    BinaryByteses,
     BinaryMultiStruct,
+    BinaryMultiValue,
     deferred_field,
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import StackableState
-from cs.fstags import FSTags, TaggedPath, rpaths
+from cs.fstags import FSTags, rpaths
 from cs.lex import get_identifier, get_decimal_value
-from cs.logutils import debug, warning, error
-from cs.pfx import Pfx
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
 from cs.tagset import TagSet, Tag
+from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out
+
+from cs.x import X
 
 __version__ = '20200229'
 
@@ -1212,7 +1213,7 @@ class PDINBoxBody(FullBoxBody):
 
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
-      pdinfo=ListField,
+      pdinfo=BinaryListValues,
   )
 
   # field names for the tuples in a PDINBoxBody
@@ -1242,7 +1243,6 @@ class MOOVBoxBody(ContainerBoxBody):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
   '''
-  pass
 
 add_body_class(MOOVBoxBody)
 
@@ -2438,6 +2438,7 @@ class ILSTBoxBody(ContainerBoxBody):
       }
   }
 
+  # pylint: disable=attribute-defined-outside-init,too-many-locals,too-many-statements
   def parse_fields(self, bfr):
     super().parse_fields(bfr)
     self.tags = TagSet()
@@ -2636,6 +2637,7 @@ def parse_fields(bfr, copy_offsets=None, **kw):
     bfr.copy_offsets = copy_offsets
   yield from OverBox.scan(bfr, **kw)
 
+# pylint: disable=too-many-branches
 def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   ''' Recursively dump a Box.
   '''
@@ -2674,6 +2676,7 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
     for subbox in boxes:
       subbox.dump(indent=indent + indent_incr, fp=fp, crop_length=crop_length)
 
+# pylint: disable=too-many-locals,too-many-branches
 def report(box, indent='', fp=None, indent_incr=None):
   ''' Report some human friendly information about a box.
   '''
