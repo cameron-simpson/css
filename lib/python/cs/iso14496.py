@@ -1735,14 +1735,17 @@ def add_generic_sample_boxbody(
       else:
         yield from map(self.sample_type.transcribe_value, samples)
 
-    @deferred_field
+    @locked_property
+    @pfx_method
     def samples(self, bfr):
       ''' The `sample_data` decoded.
       '''
+      bfr = CornuCopyBuffer.from_bytes(self.sample_bs)
       sample_type = self.sample_type
       decoded = []
       for _ in range(self.samples_count):
-        decoded.append(sample_type.from_buffer(bfr))
+        decoded.append(sample_type.parse_value(bfr))
+      assert bfr.at_eof()
       return decoded
 
   SpecificSampleBoxBody.__name__ = class_name
