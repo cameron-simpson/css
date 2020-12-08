@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 #
+# pylint: disable=too-many-lines
+#
 
 ''' Facilities associated with binary data parsing and transcription.
     The classes in this module support easy parsing of binary data
@@ -1090,6 +1092,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         try:
           transcribe = self.FIELD_TRANSCRIBERS[field_name]
         except KeyError:
+          # pylint: disable=raise-missing-from
           if (field_value is None or isinstance(field_value,
                                                 (bytes, memoryview))):
             transcribe = lambda value: value
@@ -2165,6 +2168,7 @@ class Packet(PacketField):
     try:
       return self.field_map[field_name]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise ValueError("unknown field %r" % (field_name,))
 
   def set_field(self, field_name, new_field):
@@ -2286,6 +2290,7 @@ class Packet(PacketField):
     try:
       field = self.field_map[attr]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise AttributeError(
           "%s.%s (field_map has %r)" %
           (type(self), attr, sorted(self.field_map.keys()))
