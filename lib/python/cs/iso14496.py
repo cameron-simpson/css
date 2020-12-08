@@ -1552,7 +1552,7 @@ class HDLRBoxBody(FullBoxBody):
     '''
     super().parse_fields(bfr)
     # NB: handler_type is supposed to be an unsigned long, but in
-    # practice seems to be 4 ASCII bytes, so we load it as a string
+    # practice seems to be 4 ASCII bytes, so we present it as a string
     # for readability
     self.parse_field('pre_defined', bfr, UInt32BE)
     self.parse_field('handler_type_long', bfr, UInt32BE)
@@ -1560,6 +1560,15 @@ class HDLRBoxBody(FullBoxBody):
     self.parse_field('reserved2', bfr, UInt32BE)
     self.parse_field('reserved3', bfr, UInt32BE)
     self.parse_field('name', bfr, BinaryUTF8NUL)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.pre_defined
+    yield self.handler_type_long
+    yield self.reserved1
+    yield self.reserved2
+    yield self.reserved3
+    yield self.name
 
   @property
   def handler_type(self):
