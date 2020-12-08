@@ -617,10 +617,19 @@ class BoxBody(BaseBinaryMultiValue, ABC):
       box.parent = self.parent
 
   @abstractmethod
-  def transcribe(self):
-    raise NotImplementedError(
-        "class %s requires a .transcribe method" % (type(self),)
-    )
+  def transcribe(self, exclude_names=None):
+    ''' The default transcription of a `BoxBody`
+        uses `BaseBinaryMultiValue.transcribe`
+        excluding the names `parent`, `offset`, and `post_offset`.
+
+        The `exclude_names` parameter may be used by subclasses
+        to override that list.
+        More complex subclasses should outright replace the transcribe function,
+        as a bare `BoxBody` has no transcribable fields.
+    '''
+    if exclude_names is None:
+      exclude_names = 'parent', 'offset', 'post_offset'
+    return BaseBinaryMultiValue.transcribe(self, exclude_names=exclude_names)
 
   @classmethod
   def boxbody_type_from_klass(cls):
