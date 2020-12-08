@@ -2023,10 +2023,10 @@ class STSCBoxBody(FullBoxBody):
   ''' 'stsc' (Sample Table box - section 8.7.4.1.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
-      entry_count=UInt32BE,
-      ##entries=ListField,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
+      entry_count=int,
+      entries_bs=bytes,
   )
 
   STSCEntry = BinaryMultiStruct(
@@ -2037,19 +2037,29 @@ class STSCBoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `entries` fields.
     '''
-    entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    self.add_deferred_field(
-        'entries', bfr, entry_count * STSCBoxBody.STSCEntry.length
-    )
     super().parse_fields(bfr)
+    self.entry_count = UInt32BE.parse_value(bfr)
+    self.entries_bs = bfr.take(self.entry_count * STSCBoxBody.STSCEntry.length)
 
-  @deferred_field
+  def transcribe(self):
+    yield super().transcribe()
+    yield UInt32BE.transcribe_value(self.entry_count)
+    try:
+      entries = self._entries
+    except AttributeError:
+      yield self.entries_bs
+    else:
+      yield from map(STSCBoxBody.STSCEntry.transcribe_value, entries)
+
+  @locked_property
+  @pfx_method
   def entries(self, bfr):
-    ''' Parse the `STSCEntry` list from stashed buffer.
+    ''' Parse the `STSCEntry` list into a list of `int`s.
     '''
+    bfr = CornuCopyBuffer.from_bytes(self.entries_bs)
     entries = []
     for _ in range(self.entry_count):
-      entries.append(STSCBoxBody.STSCEntry.from_buffer(bfr))
+      entries.append(STSCBoxBody.STSCEntry.parse_value(bfr))
     return entries
 
 add_body_class(STSCBoxBody)
