@@ -1916,23 +1916,41 @@ class STSZBoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `sample_size`, `sample_count`, and `entry_sizes` fields.
     '''
-    sample_size = self.add_from_buffer('sample_size', bfr, UInt32BE)
-    sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
     super().parse_fields(bfr)
+    self.sample_size = UInt32BE.parse(bfr)
+    sample_size = self.sample_size.value
+    self.sample_count = UInt32BE.parse(bfr)
+    sample_count = self.sample_count.value
     if sample_size == 0:
       # a zero sample size means that each sample's individual size
       # is specified in `entry_sizes`
-      self.add_deferred_field(
-          'entry_sizes', bfr, sample_count * UInt32BE.length
-      )
+      self.entry_sizes_bs = bfr.take(sample_count * UInt32BE.length)
 
-  @deferred_field
-  def entry_sizes(self, bfr):
-    ''' Parse the `UInt32BE` entry sizes from stashed buffer.
-      '''
+  def transcribe(self):
+    ''' Transcribe the `STSZBoxBody`.
+    '''
+    yield super().transcribe()
+    yield self.sample_size
+    yield self.sample_count
+    if self.sample_size == 0:
+      try:
+        entry_sizes = self._entry_sizes
+      except AttributeError:
+        yield self.entry_sizes_bs
+      else:
+        yield from map(UInt32BE.transcribe_value, entry_sizes)
+
+  @locked_property
+  @pfx_method
+  def entry_sizes(self):
+    ''' Parse the `UInt32BE` entry sizes from stashed buffer
+        into a list of `int`s.
+    '''
+    XP("parse %d bytes from .entry_sizes_bs", len(self.entry_sizes_bs))
+    bfr = CornuCopyBuffer.from_bytes(self.entry_sizes_bs)
     entry_sizes = []
-    for _ in range(self.sample_count):
-      entry_sizes.append(UInt32BE.from_buffer(bfr))
+    for _ in range(self.sample_count.value):
+      entry_sizes.append(UInt32BE.parse_value(bfr))
     return entry_sizes
 
 add_body_class(STSZBoxBody)
