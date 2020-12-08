@@ -1136,9 +1136,6 @@ class MDATBoxBody(BoxBody):
     else:
       self.data = BinaryByteses.parse(bfr)
 
-  def transcribe(self):
-    return self.data.transcribe()
-
 add_body_class(MDATBoxBody)
 
 class FREEBoxBody(BoxBody):
