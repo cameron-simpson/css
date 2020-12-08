@@ -2653,11 +2653,12 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   boxes = getattr(B, 'boxes', None)
   body = getattr(B, 'body', None)
   if body:
-    for field_name in body.field_names:
+    for field_name in sorted(filter(lambda name: not name.startswith('_'),
+                                    body.__dict__.keys())):
       if field_name == 'boxes':
         boxes = None
-      field = body[field_name]
-      if isinstance(field, SubBoxesField):
+      field = getattr(body, field_name)
+      if isinstance(field, BinaryListValues):
         if field_name != 'boxes':
           fp.write(indent + indent_incr)
           fp.write(field_name)
@@ -2665,7 +2666,7 @@ def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
             fp.write(':\n')
           else:
             fp.write(': []\n')
-        for subbox in field.value:
+        for subbox in field.values:
           subbox.dump(
               indent=indent + indent_incr, fp=fp, crop_length=crop_length
           )
