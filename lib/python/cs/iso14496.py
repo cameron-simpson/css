@@ -2531,8 +2531,8 @@ class VMHDBoxBody(FullBoxBody):
 
   OpColor = BinaryMultiStruct('OpColor', '>HHH', 'red green blue')
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       graphicsmode=UInt16BE,
       opcolor=OpColor,
   )
@@ -2540,9 +2540,14 @@ class VMHDBoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `graphicsmode` and `opcolor` fields.
     '''
-    self.add_from_buffer('graphicsmode', bfr, UInt16BE)
-    self.add_from_buffer('opcolor', bfr, VMHDBoxBody.OpColor)
     super().parse_fields(bfr)
+    self.parse_field('graphicsmode', bfr, UInt16BE)
+    self.parse_field('opcolor', bfr, VMHDBoxBody.OpColor)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.graphicsmode
+    yield self.opcolor
 
 add_body_class(VMHDBoxBody)
 
