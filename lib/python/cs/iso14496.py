@@ -2622,7 +2622,7 @@ def parse(o):
     over_box = OverBox.parse(CornuCopyBuffer.from_file(o))
   return over_box
 
-def parse_buffer(bfr, copy_offsets=None, **kw):
+def parse_fields(bfr, copy_offsets=None, **kw):
   ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`,
       yield top level OverBoxes.
 
@@ -2634,8 +2634,7 @@ def parse_buffer(bfr, copy_offsets=None, **kw):
   '''
   if copy_offsets is not None:
     bfr.copy_offsets = copy_offsets
-  while not bfr.at_eof():
-    yield OverBox.from_buffer(bfr, **kw)
+  yield from OverBox.scan(bfr, **kw)
 
 def dump_box(B, indent='', fp=None, crop_length=170, indent_incr=None):
   ''' Recursively dump a Box.
