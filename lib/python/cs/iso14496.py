@@ -720,27 +720,28 @@ class Box(BaseBinaryMultiValue):
     self = cls()
     self.offset = bfr.offset
     header = self.header = BoxHeader.parse(bfr)
-    length = header.box_size
-    if length is Ellipsis:
-      end_offset = Ellipsis
-      bfr_tail = bfr
-      warning("Box.parse_buffer: Box %s has no length", header)
-    else:
-      end_offset = self.offset + length
-      bfr_tail = bfr.bounded(end_offset)
-    body_class = pick_boxbody_class(header.type)
-    self.body = body_class.parse(bfr_tail, box=self)
-    self.unparsed_offset = bfr_tail.offset
-    self.unparsed = BinaryByteses.parse(bfr_tail)
-    if bfr_tail is not bfr:
-      assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
-    self.end_offset = bfr.offset
-    self.self_check()
-    bfr.report_offset(self.offset)
-    copy_boxes = PARSE_MODE.copy_boxes
-    if copy_boxes:
-      copy_boxes(self)
-    return self
+    with Pfx("%s.parse", header.box_type):
+      length = header.box_size
+      if length is Ellipsis:
+        end_offset = Ellipsis
+        bfr_tail = bfr
+        warning("Box.parse_buffer: Box %s has no length", header)
+      else:
+        end_offset = self.offset + length
+        bfr_tail = bfr.bounded(end_offset)
+      body_class = pick_boxbody_class(header.type)
+      self.body = body_class.parse(bfr_tail, box=self)
+      self.unparsed_offset = bfr_tail.offset
+      self.unparsed = BinaryByteses.parse(bfr_tail)
+      if bfr_tail is not bfr:
+        assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
+      self.end_offset = bfr.offset
+      self.self_check()
+      bfr.report_offset(self.offset)
+      copy_boxes = PARSE_MODE.copy_boxes
+      if copy_boxes:
+        copy_boxes(self)
+      return self
 
   @property
   def parse_length(self):
