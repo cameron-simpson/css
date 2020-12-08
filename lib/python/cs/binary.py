@@ -43,7 +43,7 @@
     * `BinarySingleValue`: a base class for subclasses
       parsing and transcribing a single value
     * `BinaryMultiValue`: a base class for subclasses
-      parsing and transcribing a multiple values
+      parsing and transcribing multiple values
 
     The `BinaryMultiValue` base class is what should be used
     for complex structures with varying or recursive subfields.
@@ -56,6 +56,7 @@
     for when greater flexibility is desired.
     It also means that all classes have `parse`* methods
     for parsing binary data streams.
+
     You can also instantiate objects directly;
     there's no requirement for the source information to be binary.
 
@@ -135,9 +136,9 @@ def pt_spec(pt, field_name=None):
 
       Each specification `pt` may be one of:
       * an object with `.parse` and `.transcribe` callable attributes,
-        usually a subclass of `AbstractBinary`
-      * a 2-tuple of `(struct_format,field_names)`
-      * a tuple of `(parse,transcribe)`
+        usually an instance of some subclass of `AbstractBinary`
+      * a 2-tuple of `(struct_format:str,field_names:str)`
+      * a 2-tuple of `(parse,transcribe)`
   '''
   try:
     func_parse = pt.parse
@@ -169,8 +170,8 @@ class BinaryMixin:
         `FIELD_TYPES` attribute is a mapping of `field_name` to
         a specification of `required` and `types`. The specification
         may take one of 2 forms:
-        * a tuple of `(required, types)`
-        * a single `type`; this is equivalent to `(True, (type,))`
+        * a tuple of `(required,types)`
+        * a single `type`; this is equivalent to `(True,(type,))`
         Their meanings are as follows:
         * `required`: a Boolean. If true, the field must be present
           in the packet `field_map`, otherwise it need not be present.
@@ -178,34 +179,34 @@ class BinaryMixin:
 
         There are some special semantics involved here.
 
-        An implementation of a `Packet` may choose to make some
-        fields plain instance attributes instead of `Field`s in the
-        `field_map` mapping, particularly variable packets such as
-        a `cs.iso14496.BoxHeader`, whose `.length` may be parsed
+        An implementation of a structure may choose to make some
+        fields plain instance attributes instead of binary objects
+        in the `field_map` mapping, particularly variable structures
+        such as a `cs.iso14496.BoxHeader`, whose `.length` may be parsed
         directly from its binary form or computed from other fields
         depending on the `box_size` value. Therefore, checking for
         a field is first done via the `field_map` mapping, then by
         `getattr`, and as such the acceptable `types` may include
-        non-`PacketField` types such as `int`.
+        nonstructure types such as `int`.
 
         Here is the `BoxHeader.FIELD_TYPES` definition as an example:
 
-          FIELD_TYPES = {
-            'box_size': UInt32BE,
-            'box_type': BytesField,
-            'length': (
-                True,
-                (
-                    type(Ellipsis),
-                    UInt64BE,
-                    UInt32BE,
-                    int
-                ),
-            ),
-          }
+            FIELD_TYPES = {
+              'box_size': UInt32BE,
+              'box_type': BytesField,
+              'length': (
+                  True,
+                  (
+                      type(Ellipsis),
+                      UInt64BE,
+                      UInt32BE,
+                      int
+                  ),
+              ),
+            }
 
-        Note that `length` includes some non-`PacketField` types,
-        and that it is written as a tuple of `(True, types)` because
+        Note that `length` includes some nonstructure types,
+        and that it is written as a tuple of `(True,types)` because
         it has more than one acceptable type.
     '''
     ok = True
@@ -1297,9 +1298,6 @@ class BinaryUTF16NUL(BinarySingleValue):
 
   # pylint: disable=super-init-not-called
   def __init__(self, value, *, encoding):
-    ''' Initialise the `PacketField`.
-        If omitted the inial field `value` will be `None`.
-    '''
     if encoding not in self.VALID_ENCODINGS:
       raise ValueError(
           'unexpected encoding %r, expected one of %r' %
