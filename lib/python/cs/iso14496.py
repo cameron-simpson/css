@@ -1838,9 +1838,33 @@ add_generic_sample_boxbody(
 
 add_body_subclass(ContainerBoxBody, b'edts', '8.6.5.1', 'Edit')
 
-add_generic_sample_boxbody(
-    b'elst', '8.6.6', 'Edit List', '>Ll', 'segment_duration media_time', '>Qq'
-)
+class ELSTBoxBody(FullBoxBody):
+  ''' An 'elst' Edit List FullBoxBody - section 8.6.6.
+  '''
+
+  V0EditEntry = BinaryMultiStruct(
+      'ELSTBoxBody_V0EditEntry', '>Llhh',
+      'segment_duration media_time media_rate_integer media_rate_fration'
+  )
+  V1EditEntry = BinaryMultiStruct(
+      'ELSTBoxBody_V1EditEntry', '>Qqhh',
+      'segment_duration media_time media_rate_integer media_rate_fration'
+  )
+
+  def parse_fields(self, bfr):
+    super().parse_fields(bfr)
+    assert self.version in (0, 1)
+    self.entry_count = UInt32BE.parse_value(bfr)
+    self.entries = BinaryListValues.parse(
+        bfr,
+        count=self.entry_count,
+        pt=(V1EditEntry if self.version == 1 else V0EditEntry)
+    )
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield UInt32BE.transcribe_value(self.entry_count)
+    yield self.entries
 
 add_body_subclass(ContainerBoxBody, b'dinf', '8.7.1', 'Data Information')
 
