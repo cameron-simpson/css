@@ -1233,10 +1233,7 @@ class ContainerBoxBody(BoxBody):
   @pfx_method
   def parse_fields(self, bfr):
     super().parse_fields(bfr)
-    self.boxes = BinaryListValues.parse(bfr, pt=Box)
-
-  def transcribe(self):
-    return self.boxes.transcribe()
+    self.parse_boxes(bfr)
 
   def __iter__(self):
     return iter(self.boxes)
