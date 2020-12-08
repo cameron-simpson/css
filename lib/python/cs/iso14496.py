@@ -609,6 +609,13 @@ class BoxBody(BaseBinaryMultiValue, ABC):
         specific fields.
     '''
 
+  def parse_boxes(self, bfr, **kw):
+    ''' Parse the remainder of the buffer as a sequence of Boxes.
+    '''
+    self.boxes = BinaryListValues.parse(bfr, pt=Box, **kw)
+    for box in self.boxes.values:
+      box.parent = self.parent
+
   @abstractmethod
   def transcribe(self):
     raise NotImplementedError(
