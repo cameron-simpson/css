@@ -1688,10 +1688,13 @@ def add_generic_sample_boxbody(
   class SpecificSampleBoxBody(FullBoxBody):
     ''' Time to Sample box - section 8.6.1.
     '''
-    PACKET_FIELDS = dict(
-        FullBoxBody.PACKET_FIELDS,
+    FIELD_TYPES = dict(
+        FullBoxBody.FIELD_TYPES,
         entry_count=(False, UInt32BE),
-        ##samples=ListField,
+        has_inferred_entry_count=bool,
+        sample_type=(True, type),
+        samples_count=int,
+        samples_bs=bytes,
     )
 
     def parse_fields(self, bfr):
@@ -1709,22 +1712,28 @@ def add_generic_sample_boxbody(
       self.has_inferred_entry_count = has_inferred_entry_count
       if has_inferred_entry_count:
         entry_count = Ellipsis
-      else:
-        entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-      # gather the sample data but do not bother to parse it yet
-      # because that can be very expensive
-      if entry_count is Ellipsis:
         end_offset = bfr.end_offset
         entry_count = (end_offset - bfr.offset) // sample_size
+      else:
+        entry_count = UInt32BE.parse_value(bfr)
+      # gather the sample data but do not bother to parse it yet
+      # because that can be very expensive
       self.samples_count = entry_count
-      self.add_deferred_field('samples', bfr, entry_count * sample_size)
+      self.samples_bs = bfr.take(entry_count * sample_size)
 
     def transcribe(self):
       ''' Transcribe the regular fields
           then transcribe the source data of the samples.
       '''
       yield super().transcribe()
-      yield self._samples__raw_data
+      if not self.has_inferred_entry_count:
+        yield UInt32BE.transcribe_value(self.samples_count)
+      try:
+        samples = self._samples
+      except AttributeError:
+        yield self.samples_bs
+      else:
+        yield from map(self.sample_type.transcribe_value, samples)
 
     @deferred_field
     def samples(self, bfr):
