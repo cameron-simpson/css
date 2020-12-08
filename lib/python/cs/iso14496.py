@@ -246,7 +246,8 @@ class MP4Command(BaseCommand):
           parsee = sys.stdin.fileno()
         else:
           parsee = spec
-        over_box = parse(parsee)
+        with PARSE_MODE(discard_data=True):
+          over_box = parse(parsee)
         over_box.dump(crop_length=None)
 
   def cmd_tags(self, argv, options):
