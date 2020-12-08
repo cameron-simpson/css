@@ -1122,7 +1122,9 @@ class MDATBoxBody(BoxBody):
   ''' A Media Data Box - ISO14496 section 8.1.1.
   '''
 
-  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, data=BinaryByteses)
+  FIELD_TYPES = dict(
+      BoxBody.FIELD_TYPES, data=(True, (type(None), BinaryByteses))
+  )
 
   def parse_fields(self, bfr):
     ''' Gather all data to the end of the field.
