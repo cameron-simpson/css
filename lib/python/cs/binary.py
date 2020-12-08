@@ -1066,6 +1066,13 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         * `field_value.encode('ascii')` if `field_value` is a `str`
 
         A `ValueError` is raised if no transcription can be chosen.
+
+        An entry in `self.FIELD_TRANSCRIBERS` may be `None`,
+        in which case that field is not transcribed.
+        This accomodates informational attributes
+        already covered elsewhere in the transcription
+        such as a `.tags` attribute collating metadata tag values
+        parsed during the parse phase.
     '''
     with Pfx("%s.%s=%r", type(self).__name__, field_name, field_value):
       if hasattr(field_value, 'transcribe'):
@@ -1085,6 +1092,9 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
                 " and neither None nor bytes nor str" %
                 (type(field_value), field_value)
             )
+        else:
+          if transcribe is None:
+            return None
     return transcribe(field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
