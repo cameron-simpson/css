@@ -2204,10 +2204,10 @@ class METABoxBody(FullBoxBody):
   ''' A 'meta' Meta BoxBody - section 8.11.1.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       theHandler=Box,
-      boxes=SubBoxesField,
+      boxes=BinaryListValues,
   )
 
   def __iter__(self):
@@ -2216,24 +2216,25 @@ class METABoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
     '''
-    theHandler = self.add_field('theHandler', Box.from_buffer(bfr))
-    theHandler.parent = self.box
-    self.add_from_buffer(
-        'boxes',
-        bfr,
-        SubBoxesField,
-        end_offset=Ellipsis,
-        parent=self.box,
-        copy_boxes=copy_boxes
-    )
     super().parse_fields(bfr)
+    self.theHandler = Box.parse(bfr)
+    self.theHandler.parent = self.parent
+    self.parse_boxes(bfr)
 
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.theHandler
+    yield self.boxes
+
+  @pfx_method
   def __getattr__(self, attr):
     ''' Present the ilst attributes if present.
     '''
+    if attr == 'boxes':
+      raise AttributeError("NO BOXES")
     try:
       return super().__getattr__(attr)
-    except AttributeError:
+    except AttributeError as e:
       ilst = super().__getattr__('ISLT0')
       if ilst is not None:
         value = getattr(ilst, attr, None)
