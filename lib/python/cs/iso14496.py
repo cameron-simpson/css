@@ -1962,30 +1962,62 @@ class STZ2BoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `field_size`, `sample_count` and `entry_sizes` fields.
     '''
-    self.add_from_buffer('reserved', bfr, BytesField, length=3)
-    field_size = self.add_from_buffer('field_size', bfr, UInt8)
-    sample_count = self.add_from_buffer('sample_count', bfr, UInt32BE)
-    entry_sizes = []
-    if field_size == 4:
     super().parse_fields(bfr)
+    self.reserved = bfr.take(3)
+    self.field_size = UInt8.parse_value(bfr)
+    self.sample_count = UInt32BE.parse_value(bfr)
+    # TODO: defer the parse of entry_sizes
+    if self.field_size == 4:
       # nybbles packed into bytes
+      entry_sizes = []
       for i in range(sample_count):
         if i % 2 == 0:
           bs = bfr.take(1)
           entry_sizes.append(bs[0] >> 4)
         else:
           entry_sizes.append(bs[0] & 0x0f)
-      self.add_field('entry_sizes', ListField(entry_sizes))
     elif field_size == 8:
-      for _ in range(sample_count):
-        entry_sizes.append(UInt8.from_buffer(bfr))
-      self.add_field('entry_sizes', ListField(entry_sizes))
+      # unsigned byte values - store directly!
+      entry_sizes = bfr.take(sample_count)
     elif field_size == 16:
-      for _ in range(sample_count):
-        entry_sizes.append(UInt16BE.from_buffer(bfr))
-      self.add_field('entry_sizes', ListField(entry_sizes))
+      entry_sizes = BinaryListValues.parse(bfr, count=sample_count).values
     else:
-      warning("unhandled field_size=%s, not parsing entry_sizes", field_size)
+      warning("unhandled field_size=%d, not parsing entry_sizes", field_size)
+      entry_sizes = None
+    self.entry_sizes = entry_sizes
+
+  def transcribe(self):
+    ''' transcribe the STZ2BoxBody.
+    '''
+    yield super().transcribe()
+    yield self.reserved
+    field_size = self.field_size
+    yield bytes([field_size])
+    yield UInt32BE.transcribe_value(self.sample_count)
+    entry_sizes = self.entry_sizes
+    if entry_sizes:
+      if field_size == 4:
+        b = None
+        bs = []
+        for i, n in entry_sizes:
+          assert n > 0 and n < 16
+          if i % 2 == 0:
+            b = n << 4
+          else:
+            b |= n
+            bs.append(b)
+        if entry_sizes % 2 != 0:
+          bs.append(b)
+        yield bytes(bs)
+      elif field_size == 8:
+        assert isinstance(entry_sizes, bytes)
+        yield entry_sizes
+      elif field_size == 16:
+        yield from map(UInt16BE.transcribe_value, entry_sizes)
+      else:
+        raise ValueError(
+            "unhandled field_size=%d, not transcribing entry_sizes"
+        )
 
 class STSCBoxBody(FullBoxBody):
   ''' 'stsc' (Sample Table box - section 8.7.4.1.
