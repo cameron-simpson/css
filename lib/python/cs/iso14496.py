@@ -2146,26 +2146,23 @@ class DREFBoxBody(FullBoxBody):
   ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       entry_count=UInt32BE,
-      boxes=SubBoxesField,
+      boxes=BinaryListValues,
   )
 
   def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `boxes` fields.
     '''
-    entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    self.add_from_buffer(
-        'boxes',
-        bfr,
-        SubBoxesField,
-        end_offset=Ellipsis,
-        max_boxes=entry_count,
-        parent=self.box,
-        copy_boxes=copy_boxes
     super().parse_fields(bfr)
-    )
+    self.entry_count = UInt32BE.parse(bfr)
+    self.parse_boxes(bfr, count=int(self.entry_count.value))
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.entry_count
+    yield self.boxes
 
 add_body_class(DREFBoxBody)
 
