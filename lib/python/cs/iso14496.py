@@ -1621,21 +1621,13 @@ class _SampleTableContainerBoxBody(FullBoxBody):
     '''
     super().parse_fields(bfr)
     # obtain box data after version and flags decode
-    entry_count = self.add_from_buffer('entry_count', bfr, UInt32BE)
-    boxes = self.add_from_buffer(
-        'boxes',
-        bfr,
-        SubBoxesField,
-        end_offset=Ellipsis,
-        max_boxes=entry_count,
-        parent=self.box,
-        copy_boxes=copy_boxes
-    )
-    if len(boxes) != entry_count:
-      raise ValueError(
-          "expected %d contained Boxes but parsed %d" %
-          (entry_count, len(boxes))
-      )
+    self.entry_count = UInt32BE.parse(bfr)
+    self.parse_boxes(bfr, count=int(self.entry_count.value))
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.entry_count
+    yield self.boxes
 
 add_body_subclass(
     _SampleTableContainerBoxBody, b'stsd', '8.5.2', 'Sample Description'
