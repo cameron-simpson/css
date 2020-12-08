@@ -1109,8 +1109,8 @@ class FullBoxBody(BoxBody):
     ), "subclass %s did not implement .transcribe" % (type(self),)
     yield UInt8.transcribe_value(self.version)
     yield UInt8.transcribe_value(self.flags0)
-    yield UInt8.transcribe_value(self.flags0)
-    yield UInt8.transcribe_value(self.flags0)
+    yield UInt8.transcribe_value(self.flags1)
+    yield UInt8.transcribe_value(self.flags2)
 
   @property
   def flags(self):
