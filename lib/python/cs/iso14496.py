@@ -1596,6 +1596,10 @@ class ELNGBoxBody(FullBoxBody):
     # extended language based on RFC4646
     self.parse_field('extended_language', bfr, BinaryUTF8NUL)
 
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.extended_language
+
 add_body_class(ELNGBoxBody)
 add_body_subclass(ContainerBoxBody, b'stbl', '8.5.1', 'Sample Table')
 
