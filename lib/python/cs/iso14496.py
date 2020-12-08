@@ -2555,8 +2555,8 @@ class SMHDBoxBody(FullBoxBody):
   ''' A 'smhd' Sound Media Headerbox - section 12.2.2.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       balance=Int16BE,
       reserved=UInt16BE,
   )
@@ -2564,9 +2564,14 @@ class SMHDBoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `balance` field.
     '''
-    self.add_from_buffer('balance', bfr, Int16BE)
-    self.add_from_buffer('reserved', bfr, UInt16BE)
     super().parse_fields(bfr)
+    self.parse_field('balance', bfr, Int16BE)
+    self.parse_field('reserved', bfr, UInt16BE)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.balance
+    yield self.reserved
 
 add_body_class(SMHDBoxBody)
 
