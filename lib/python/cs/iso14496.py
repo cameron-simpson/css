@@ -2325,6 +2325,7 @@ class ILSTBoxBody(ContainerBoxBody):
       ContainerBoxBody.FIELD_TYPES,
       tags=TagSet,
   )
+  FIELD_TRANSCRIBERS = dict(tags=lambda _: None,)
 
   SUBBOX_SCHEMA = {
       b'\xa9alb': ILSTTextSchema('album_title'),
