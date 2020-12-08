@@ -1844,11 +1844,11 @@ class ELSTBoxBody(FullBoxBody):
 
   V0EditEntry = BinaryMultiStruct(
       'ELSTBoxBody_V0EditEntry', '>Llhh',
-      'segment_duration media_time media_rate_integer media_rate_fration'
+      'segment_duration media_time media_rate_integer media_rate_fraction'
   )
   V1EditEntry = BinaryMultiStruct(
       'ELSTBoxBody_V1EditEntry', '>Qqhh',
-      'segment_duration media_time media_rate_integer media_rate_fration'
+      'segment_duration media_time media_rate_integer media_rate_fraction'
   )
 
   def parse_fields(self, bfr):
