@@ -1651,10 +1651,10 @@ class BTRTBoxBody(BoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `bufferSizeDB`, `maxBitrate` and `avgBitrate` fields.
     '''
-    self.add_from_buffer('bufferSizeDB', bfr, UInt32BE)
-    self.add_from_buffer('maxBitrate', bfr, UInt32BE)
-    self.add_from_buffer('avgBitRate', bfr, UInt32BE)
     super().parse_fields(bfr)
+    self.parse_field('bufferSizeDB', bfr, UInt32BE)
+    self.parse_field('maxBitrate', bfr, UInt32BE)
+    self.parse_field('avgBitRate', bfr, UInt32BE)
 
 add_body_class(BTRTBoxBody)
 add_body_subclass(
