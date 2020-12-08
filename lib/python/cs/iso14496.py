@@ -1836,7 +1836,7 @@ add_generic_sample_boxbody(
     has_inferred_entry_count=True
 )
 
-add_body_subclass(BoxBody, b'edts', '8.6.5.1', 'Edit')
+add_body_subclass(ContainerBoxBody, b'edts', '8.6.5.1', 'Edit')
 
 add_generic_sample_boxbody(
     b'elst', '8.6.6', 'Edit List', '>Ll', 'segment_duration media_time', '>Qq'
