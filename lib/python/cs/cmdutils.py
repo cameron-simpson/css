@@ -13,9 +13,9 @@ from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace
-from cs.context import nullcontext, stackattrs
+from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.gimmicks import nullcontext, SimpleNamespace as NS
+from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
@@ -356,6 +356,7 @@ class BaseCommand:
         try:
           main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
+          # pylint: disable=raise-missing-from
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
                   subcmd,
@@ -377,6 +378,7 @@ class BaseCommand:
         try:
           main = self.main
         except AttributeError:
+          # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
         subcmd_context = nullcontext()
       upd_context = options.loginfo.upd
