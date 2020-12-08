@@ -1050,11 +1050,18 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         from `self.transcribe_field(field_name,field_value)`.
     '''
     for field_name, field_value in self.__dict__.items():
-      if field_name.startswith('_'):
-        continue
-      if field_name in exclude_names:
-        continue
-      yield self.transcribe_field(field_name, field_value)
+      with Pfx(
+          "%s.transcribe: %s=%s",
+          type(self).__name__,
+          field_name,
+          field_value,
+      ):
+        if field_name.startswith('_'):
+          continue
+        if field_name in exclude_names:
+          continue
+        transcription = self.transcribe_field(field_name, field_value)
+      yield transcription
 
   def transcribe_field(self, field_name, field_value):
     ''' Transcribe a field named `field_name` with value `field_value`.
