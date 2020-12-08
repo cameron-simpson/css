@@ -1875,8 +1875,12 @@ class URL_BoxBody(FullBoxBody):
   def parse_fields(self, bfr):
     ''' Gather the `location` field.
     '''
-    self.add_from_buffer('location', bfr, UTF8NULField)
     super().parse_fields(bfr)
+    self.parse_field('location', bfr, BinaryUTF8NUL)
+
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.location
 
 add_body_class(URL_BoxBody)
 
