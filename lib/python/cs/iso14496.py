@@ -1508,6 +1508,15 @@ class MDHDBoxBody(FullBoxBody):
     self.parse_field('language_short', bfr, UInt16BE)
     self.parse_field('pre_defined', bfr, UInt16BE)
 
+  def transcribe(self):
+    yield super().transcribe()
+    yield self.creation_time
+    yield self.modification_time
+    yield self.timescale
+    yield self.duration
+    yield self.language_short
+    yield self.pre_defined
+
   @prop
   def language(self):
     ''' The ISO 639‐2/T language code as decoded from the packed form.
