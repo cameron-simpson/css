@@ -1607,10 +1607,10 @@ class _SampleTableContainerBoxBody(FullBoxBody):
   ''' An intermediate FullBoxBody subclass which contains more boxes.
   '''
 
-  PACKET_FIELDS = dict(
-      FullBoxBody.PACKET_FIELDS,
+  FIELD_TYPES = dict(
+      FullBoxBody.FIELD_TYPES,
       entry_count=UInt32BE,
-      boxes=SubBoxesField,
+      boxes=BinaryListValues,
   )
 
   def __iter__(self):
