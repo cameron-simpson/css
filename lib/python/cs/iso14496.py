@@ -2575,7 +2575,7 @@ class SMHDBoxBody(FullBoxBody):
 
 add_body_class(SMHDBoxBody)
 
-def parse_tags(path, tag_prefix=None, **kw):
+def parse_tags(path, tag_prefix=None):
   ''' Parse the tags from `path`.
       Yield `(box,tags)` for each subbox with tags.
 
@@ -2584,18 +2584,19 @@ def parse_tags(path, tag_prefix=None, **kw):
       Other keyword arguments are passed to `parse()`
       (typical example: `discard_data=True`).
   '''
-  over_box, = parse(path, discard_data=True)
-  for top_box in over_box:
-    for box, tags in top_box.gather_metadata():
-      if tags:
-        if tag_prefix:
-          new_tags = TagSet()
-          new_tags.update(
-              Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
-              for tag in tags
-          )
-          tags = new_tags
-        yield box, tags
+  with PARSE_MODE(discard_data=True):
+    over_box = parse(path)
+    for top_box in over_box:
+      for box, tags in top_box.gather_metadata():
+        if tags:
+          if tag_prefix:
+            new_tags = TagSet()
+            new_tags.update(
+                Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
+                for tag in tags
+            )
+            tags = new_tags
+          yield box, tags
 
 def parse(o, **kw):
   ''' Return the OverBoxes from a source (str, int, file).
