@@ -2598,66 +2598,29 @@ def parse_tags(path, tag_prefix=None):
             tags = new_tags
           yield box, tags
 
-def parse(o, **kw):
-  ''' Return the OverBoxes from a source (str, int, file).
+def parse(o):
+  ''' Return the `OverBox` from a source (str, int, bytes, file).
 
       The leading `o` parameter may be one of:
       * `str`: a filesystem file pathname
       * `int`: a OS file descriptor
+      * `bytes`: a `bytes` object
       * `file`: if not `int` or `str` the presumption
         is that this is a file-like object
 
       Keyword arguments are as for `OverBox.from_buffer`.
   '''
-  close = None
   if isinstance(o, str):
     fd = os.open(o, os.O_RDONLY)
-    over_boxes = parse_fd(fd, **kw)
-    close = partial(os.close, fd)
+    over_box = OverBox.parse(CornuCopyBuffer.from_fd(fd))
+    os.close(fd)
   elif isinstance(o, int):
-    over_boxes = parse_fd(o, **kw)
+    over_box = OverBox.parse(CornuCopyBuffer.from_fd(o))
+  elif isinstance(o, bytes):
+    over_box = OverBox.parse(CornuCopyBuffer.from_bytes([o]))
   else:
-    over_boxes = parse_file(o, **kw)
-  if close:
-    close()
-  return over_boxes
-
-def parse_fd(fd, discard_data=False, **kw):
-  ''' Parse an ISO14496 stream from the file descriptor `fd`, yield top level Boxes.
-
-      Parameters:
-      * `fd`: a file descriptor open for read
-      * `discard_data`: whether to discard unparsed data, default `False`
-      * `copy_offsets`: callable to receive `BoxBody` offsets
-  '''
-  if not discard_data and stat.S_ISREG(os.fstat(fd).st_mode):
-    return parse_buffer(
-        CornuCopyBuffer.from_mmap(fd), discard_data=False, **kw
-    )
-  return parse_buffer(
-      CornuCopyBuffer.from_fd(fd), discard_data=discard_data, **kw
-  )
-
-def parse_file(fp, **kw):
-  ''' Parse an ISO14496 stream from the file `fp`, yield top level Boxes.
-
-      Parameters:
-      * `fp`: a file open for read
-      * `discard_data`: whether to discard unparsed data, default `False`
-      * `copy_offsets`: callable to receive `BoxBody` offsets
-  '''
-  return parse_buffer(CornuCopyBuffer.from_file(fp), **kw)
-
-def parse_chunks(chunks, **kw):
-  ''' Parse an ISO14496 stream from the iterator of data `chunks`,
-      yield top level Boxes.
-
-      Parameters:
-      * `chunks`: an iterator yielding bytes objects
-      * `discard_data`: whether to discard unparsed data, default `False`
-      * `copy_offsets`: callable to receive BoxBody offsets
-  '''
-  return parse_buffer(CornuCopyBuffer(chunks), **kw)
+    over_box = OverBox.parse(CornuCopyBuffer.from_file(o))
+  return over_box
 
 def parse_buffer(bfr, copy_offsets=None, **kw):
   ''' Parse an ISO14496 stream from the CornuCopyBuffer `bfr`,
