@@ -1,10 +1,12 @@
 b2sdk
 bs4
+discid
 enum34
 icontract
 lmdb
 lxml
 mypy
+musicbrainzngs
 pycodestyle
 pyflakes
 pylint
