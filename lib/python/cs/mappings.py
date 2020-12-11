@@ -1,4 +1,6 @@
 #!/usr/bin/python -tt
+#
+# pylint: disable=too-many-lines
 
 ''' Facilities for mappings and objects associated with mappings.
 
@@ -16,9 +18,7 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import json
-from os.path import exists as existspath, isfile as isfilepath
 import re
-from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20200130'
+__version__ = '20201102-post'
 
 DISTINFO = {
     'description':
@@ -115,6 +115,7 @@ def named_row_tuple(*column_names, **kw):
 
   _NamedRow = namedtuple(class_name, attributes)
 
+  # pylint: disable=too-few-public-methods
   class NamedRow(_NamedRow, mixin):
     ''' A namedtuple to store row data.
 
@@ -205,6 +206,7 @@ def named_row_tuple(*column_names, **kw):
 #
 _nct_Context = namedtuple('Context', 'cls index previous')
 
+# pylint: disable=too-many-arguments
 def named_column_tuples(
     rows,
     class_name=None,
@@ -332,6 +334,7 @@ def named_column_tuples(
   cls = next(gen)
   return cls, gen
 
+# pylint: disable=too-many-arguments
 def _named_column_tuples(
     rows,
     class_name=None,
@@ -1029,9 +1032,9 @@ class LoadableMappingMixin:
   loadable_mapping_key = ''
 
   def scan_mapping(self):
-    ''' Load the mapping from its backing store,
-        which might be a file or might be another related data structure.
-        Return the loaded mapping.
+    ''' Scan the mapping records (themselves mappings) from the backing store,
+        which might be a file or another related data structure.
+        Yield each record as scanned.
     '''
     raise NotImplementedError("scan_mapping")
 
@@ -1045,7 +1048,7 @@ class LoadableMappingMixin:
     pk_name = self.loadable_mapping_key
     assert pk_name, "empty .loadable_mapping_key"
     # ensure the primary mapping is loaded
-    pk_mapping = getattr(self, 'by_' + self.loadable_mapping_key)
+    pk_mapping = getattr(self, 'by_' + pk_name)
     with self._lock:
       if not exists_ok and record[pk_name] in pk_mapping:
         raise KeyError(
@@ -1064,36 +1067,38 @@ class LoadableMappingMixin:
   def __getattr__(self, attr):
     field_name = cutprefix(attr, 'by_')
     if field_name is not attr:
-      by_map = {}
       with Pfx("%s.%s", type(self).__name__, attr):
         pk_name = self.loadable_mapping_key
         assert pk_name, "empty .loadable_mapping_key"
         by_pk = 'by_' + pk_name
         indexed = self.__indexed
-        assert field_name not in indexed, "repeated __getattr__ of .%s" % (
-            attr,
-        )
-        warned = set()
         with self._lock:
+          if field_name in indexed:
+            return self.__dict__[attr]
+          by_map = {}
           if field_name == pk_name:
             records = self.scan_mapping()
           else:
             records = getattr(self, by_pk).values()
           # load the
-          for record in records:
+          ##warned = set()
+          i = 0
+          for i, record in enumerate(records, 1):
             try:
               field_value = record[field_name]
             except KeyError:
               if field_name == pk_name:
                 warning("no primary key %r: %r", field_name, record)
               continue
-            if field_value in by_map:
-              if field_value not in warned:
-                ##warning("multiple records for %r", field_value)
-                warned.add(field_value)
+            ##if field_value in by_map:
+            ##  if field_value not in warned:
+            ##    warning("multiple records for %r", field_value)
+            ##    warned.add(field_value)
             by_map[field_value] = record
           setattr(self, attr, by_map)
           indexed.add(field_name)
+          if field_name == pk_name:
+            self.__scan_length = i
       return by_map
     if attr == '_LoadableMappingMixin__indexed':
       # .__indexed
@@ -1105,6 +1110,26 @@ class LoadableMappingMixin:
       return getattr(type(self), attr)
     else:
       return supergetattr(attr)
+
+  def __len__(self):
+    ''' The length of the primary key mapping.
+    '''
+    return len(getattr(self, 'by_' + self.loadable_mapping_key))
+
+  @property
+  def scan_mapping_length(self):
+    ''' The number of records encountered during the backend scan.
+    '''
+    # ensure the mapping has been scanned
+    getattr(self, 'by_' + self.loadable_mapping_key)
+    # return the length of the scan
+    return self.__scan_length
+
+  @scan_mapping_length.setter
+  def scan_mapping_length(self, length):
+    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_mapping`.
+    '''
+    self.__scan_length = length
 
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
@@ -1161,3 +1186,34 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     '''
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
+
+class PrefixedMappingProxy:
+  ''' A proxy for another mapping
+      operating on keys commencing with a prefix.
+  '''
+
+  def __init__(self, mapping, prefix):
+    self.mapping = mapping
+    self.prefix = prefix
+
+  def keys(self):
+    prefix = self.prefix
+    return filter(lambda k: k.startswith(prefix), self.mapping.keys())
+
+  def __contains__(self, k):
+    return self.prefix + k in self.mapping
+
+  def __getitem__(self, k):
+    return self.mapping[self.prefix + k]
+
+  def get(self, k, default=None):
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
+  def __setitem__(self, k, v):
+    self.mapping[self.prefix + k] = v
+
+  def __delitem__(self, k):
+    del self.mapping[self.prefix + k]

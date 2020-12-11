@@ -22,6 +22,7 @@ from os.path import (
     isdir as isdirpath,
     islink as islinkpath,
     join as joinpath,
+    realpath,
     relpath,
 )
 import signal
@@ -34,6 +35,7 @@ import hashlib
 import os
 import shutil
 import sys
+import termios
 import time
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
@@ -58,13 +60,14 @@ from cs.mappings import (
 )
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
-from cs.progress import Progress, progressbar
+from cs.progress import Progress, OverProgress, progressbar
 from cs.resources import RunState, RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
+from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
-from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 from icontract import require
 from typeguard import typechecked
 
@@ -79,7 +82,7 @@ class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
 
-  GETOPT_SPEC = 'A:d:j:k:n:'
+  GETOPT_SPEC = 'A:d:j:k:'
   USAGE_FORMAT = r'''Usage: {cmd} [options] subcommand [...]
     Encrypted cloud backup utility.
     Options:
@@ -92,12 +95,6 @@ class CloudBackupCommand(BaseCommand):
                     use for operations. The default is from the
                     $CLOUDBACKUP_KEYNAME environment variable or from the
                     most recent existing key pair.
-      -n backup_name A named backup area, corresponding to a directory tree
-                    to be backed up.  The default is from the
-                    $CLOUDBACKUP_NAME environment variable.
-                    All the named areas usually share the cloud_area,
-                    providing file-level deduplication.  Backup and restore
-                    subpaths are relative to a named backup area.
   '''
 
   # TODO: -K keysdir, or -K private_keysdir:public_keysdir, default from {state_dirpath}/keys
@@ -134,7 +131,6 @@ class CloudBackupCommand(BaseCommand):
     options.job_max = DEFAULT_JOB_MAX
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
-    options.backup_name = os.environ.get('CLOUDBACKUP_NAME')
 
   @staticmethod
   def apply_opts(opts, options):
@@ -148,6 +144,7 @@ class CloudBackupCommand(BaseCommand):
         elif opt == '-d':
           options.state_dirpath = val
         elif opt == '-j':
+          # TODO: just save -j as job_max_s, validate below
           try:
             val = int(val)
           except ValueError as e:
@@ -161,27 +158,12 @@ class CloudBackupCommand(BaseCommand):
               options.job_max = val
         elif opt == '-k':
           options.key_name = val
-        elif opt == '-n':
-          options.backup_name = val
         else:
           raise RuntimeError("unimplemented option")
     try:
       options.cloud_area
     except ValueError as e:
-      warning("invalid cloud_area: %s: %s", options.cloud_area_path, e)
-      badopts = True
-    if options.backup_name is None:
-      warning("no backup_name specified")
-      print("The following backup names exist:", file=sys.stderr)
-      for backup_name in sorted(os.listdir(joinpath(options.state_dirpath,
-                                                    'backups'))):
-        if is_identifier(backup_name):
-          print(" ", backup_name, file=sys.stderr)
-      badopts = True
-    elif not is_identifier(options.backup_name):
-      warning(
-          "invalid backup name, not an identifier: %r", options.backup_name
-      )
+      warning("-A: invalid cloud_area: %s: %s", options.cloud_area_path, e)
       badopts = True
     if badopts:
       raise GetoptError("bad options")
@@ -193,25 +175,50 @@ class CloudBackupCommand(BaseCommand):
 
   @staticmethod
   def cmd_backup(argv, options):
-    ''' Usage: {cmd} /path/to/backup_root [subpaths...]
+    ''' Usage: {cmd} [-R] backup_name:/path/to/backup_root [subpaths...]
           For each subpath, back up /path/to/backup_root/subpath into the
           named backup area. If no subpaths are specified, back up all of
           /path/to/backup_root.
+          -R  Resolve the real path of /path/to/backup_root and
+              record that as the source path for the backup.
     '''
     badopts = False
+    use_realpath = False
+    opts, argv = getopt(argv, 'R')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-R':
+          use_realpath = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       warning("missing backup_root")
       badopts = True
     else:
-      backup_root_dirpath = argv.pop(0)
-      with Pfx("backup_root %r", backup_root_dirpath):
-        if not isabspath(backup_root_dirpath):
-          warning("backup_root not an absolute path")
-          badopts = True
+      backup_root_spec = argv.pop(0)
+      with Pfx("backup_name:backup_root %r", backup_root_spec):
+        try:
+          backup_name, backup_root_dirpath = backup_root_spec.split(':', 1)
+        except ValueError:
+          warning("missing backup_name")
+          print("The following backup names exist:", file=sys.stderr)
+          for backup_name in options.cloud_backup.keys():
+            print(" ", backup_name, file=sys.stderr)
         else:
-          if not isdirpath(backup_root_dirpath):
-            warning("not a directory")
-            badopts = True
+          with Pfx("backup_name %r", backup_name):
+            if not is_identifier(backup_name):
+              warning("not an identifier")
+              badopts = True
+          with Pfx("backup_root %r", backup_root_dirpath):
+            if not isabspath(backup_root_dirpath):
+              warning("backup_root not an absolute path")
+              badopts = True
+            else:
+              if not isdirpath(backup_root_dirpath):
+                warning("not a directory")
+                badopts = True
+              if use_realpath:
+                backup_root_dirpath = realpath(backup_root_dirpath)
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -245,68 +252,126 @@ class CloudBackupCommand(BaseCommand):
     # a per-file key under a new public key when the per-file key is
     # present under a different public key
     with UpdProxy() as proxy:
-      proxy.prefix = f"{options.cmd} {options.backup_name} "
+      proxy.prefix = f"{options.cmd} {backup_root_dirpath} => {backup_name}"
       options.cloud_backup.init()
       backup = options.cloud_backup.run_backup(
           options.cloud_area,
           backup_root_dirpath,
           subpaths or ('',),
-          backup_name=options.backup_name,
+          backup_name=backup_name,
           public_key_name=options.key_name,
           file_parallel=options.job_max,
       )
-    fields = set(backup.keys())
-    # print the important fields
-    for field in (
-        'uuid',
-        'backup_name',
-        'public_key_name',
-        'root_path',
-        'content_path',
-        'timestamp_start',
-        'timestamp_end',
-        'count_files_checked',
-        'count_files_changed',
-        'count_uploaded_files',
-        'count_uploaded_bytes',
-    ):
-      try:
-        value = backup[field]
-      except KeyError:
-        value_s = 'MSSING'
-      else:
-        try:
-          if field in ('count_uploaded_bytes',):
-            value_s = transcribe(
-                value, BINARY_BYTES_SCALE, max_parts=2, sep=' '
-            )
-          elif field.startswith('timestamp_'):
-            dt = datetime.fromtimestamp(value)
-            value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
-          else:
-            value_s = str(value)
-        except ValueError as e:
-          warning("cannot present field %r=%r: %s", field, value, e)
-          value_s = repr(value)
+    for field, _, value_s in backup.report():
       print(field, ':', value_s)
-      fields.discard(field)
-    # print remaining fields
-    for field in sorted(fields):
-      print(field, ':', backup[field])
+
+  @staticmethod
+  def cmd_dirstate(argv, options):
+    ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }} [subcommand ...]
+          Do stuff with dirstate NDJSON files.
+          Subcommands:
+            rewrite Rewrite the state file with the latest lines
+                    only, and with the backup listing cleaned up.
+    '''
+    if not argv:
+      raise GetoptError("missing pathname or backup_name")
+    if isabspath(argv[0]):
+      uu = None
+      subpath = None
+      dirstate_path = argv.pop(0)
+    else:
+      backup_name = argv.pop(0)
+      if not argv:
+        raise GetoptError("missing subpath")
+      subpath = argv.pop(0)
+      if subpath == '.':
+        subpath = ''
+      elif subpath:
+        validate_subpath(subpath)
+      backup = options.cloud_backup[backup_name]
+      uu, dirstate_path = backup.dirstate_uuid_pathname(subpath)
+      print('subpath', subpath, '=>', uu)
+    print(dirstate_path)
+    state = NamedBackup.dirstate_from_pathname(
+        dirstate_path, uuid=uu, subpath=subpath
+    )
+    for record in state.by_uuid.values():
+      record._clean_backups()
+    ##print(state)
+    by_name = {record.name: record for record in state.scan_mapping()}
+    for name, record in sorted(by_name.items()):
+      with Pfx(name):
+        record._clean_backups()
+    if argv:
+      subcmd = argv.pop(0)
+      with Pfx(subcmd):
+        if subcmd == 'rewrite':
+          if argv:
+            raise GetoptError("extra arguments: %r" % (argv,))
+          state.rewrite_mapping()
+        else:
+          raise GetoptError("unrecognised subsubcommand")
 
   # pylint: disable=too-many-locals,too-many-branches
   @staticmethod
   def cmd_ls(argv, options):
-    ''' Usage: {cmd} [subpaths...]
-          List the files in the backup.
+    ''' Usage: {cmd} [-A] [-l] [backup_name [subpaths...]]
+          Without a backup_name, list the named backups.
+          With a backup_name, list the files in the backup.
+          Options:
+            -A  List all backup UUIDs.
+            -l  Long mode - detailed listing.
     '''
-    # TODO: list backup names if no backup_name
     # TODO: list backup_uuids?
-    # TODO: -A: allbackups=True
     # TODO: -U backup_uuid
     badopts = False
-    all_backups = False
-    backup_uuid = None
+    all_uuids = False
+    long_mode = False
+    opts, argv = getopt(argv, 'Al')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-A':
+          all_uuids = True
+        elif opt == '-l':
+          long_mode = True
+        else:
+          raise RuntimeError("unhandled option")
+    cloud_backup = options.cloud_backup
+    if not argv:
+      for backup_name in cloud_backup.keys():
+        print(backup_name)
+        backup = cloud_backup[backup_name]
+        backups_by_uuid = backup.backup_records.by_uuid
+        if all_uuids:
+          backup_uuids = map(
+              lambda record: record.uuid, backup.sorted_backup_records()
+          )
+        else:
+          latest_backup = backup.latest_backup_record()
+          if not latest_backup:
+            warning("%s: no backups", backup.name)
+            return 1
+          # pylint: disable=trailing-comma-tuple
+          backup_uuids = latest_backup.uuid,
+        for backup_uuid in backup_uuids:
+          backup_record = backups_by_uuid[backup_uuid]
+          # short form
+          print(
+              ' ',
+              datetime.fromtimestamp(backup_record.timestamp_start
+                                     ).isoformat(timespec='seconds'),
+              backup_uuid,
+              backup_record.root_path,
+          )
+          if long_mode:
+            for field, value, value_s in backup_record.report(
+                omit_fields=('uuid', 'root_path', 'timestamp_start')):
+              print('   ', field, ':', value_s)
+      return 0
+    backup_name = argv.pop(0)
+    if not is_identifier(backup_name):
+      warning("backup_name %r: not an identifier", backup_name)
+      badopts = True
     subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -318,19 +383,31 @@ class CloudBackupCommand(BaseCommand):
             badopts = True
     if badopts:
       raise GetoptError("bad invocation")
+    backup = cloud_backup[backup_name]
+    backups_by_uuid = backup.backup_records.by_uuid
+    if all_uuids:
+      backup_uuids = list(
+          map(lambda record: record.uuid, backup.sorted_backup_records())
+      )
+    else:
+      latest_backup = backup.latest_backup_record()
+      if not latest_backup:
+        warning("%s: no backups", backup_name)
+        return 1
+      # pylint: disable=trailing-comma-tuple
+      backup_uuids = latest_backup.uuid,
     subpaths = list(
-        map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
+        map(lambda subpath: '' if subpath == '.' else subpath, subpaths)
     )
-    cloud_backup = options.cloud_backup
-    backup = cloud_backup[options.backup_name]
     for subpath in subpaths:
-      if subpath == ".":
-        subpath = ''
-      for subsubpath, details in backup.walk(subpath, backup_uuid=backup_uuid,
-                                             all_backups=all_backups):
+      for subsubpath, details in backup.walk(
+          subpath,
+          backup_uuid=(backup_uuids[0] if len(backup_uuids) == 1 else None),
+          all_backups=all_uuids,
+      ):
         for name, name_details in sorted(details.items()):
           pathname = joinpath(subsubpath, name) if subsubpath else name
-          if all_backups:
+          if all_uuids:
             print(pathname + ":")
             for backup in name_details.backups:
               print(" ", repr(backup))
@@ -461,14 +538,18 @@ class CloudBackupCommand(BaseCommand):
                 cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
                 length = name_details.st_size
-                P = crypt_download(
-                    content_area.cloud,
-                    content_area.bucket_name,
-                    cloudpath,
-                    private_path=private_path,
-                    passphrase=passphrase,
-                    public_key_name=public_key_name
-                )
+                download_progress = Progress(name=cloudpath, total=length)
+                with UpdProxy() as dl_proxy:
+                  with download_progress.bar(proxy=dl_proxy):
+                    P = crypt_download(
+                        content_area.cloud,
+                        content_area.bucket_name,
+                        cloudpath,
+                        private_path=private_path,
+                        passphrase=passphrase,
+                        public_key_name=public_key_name,
+                        download_progress=download_progress,
+                    )
                 fsdirpath = dirname(fspath)
                 if fsdirpath not in made_dirs:
                   print("mkdir", fsdirpath)
@@ -649,6 +730,14 @@ class CloudBackup:
         ##print("create directory", repr(dirpath))
         with Pfx("makedirs(%r)", dirpath):
           os.makedirs(dirpath, 0o700)
+
+  def keys(self):
+    ''' The existing backup names.
+    '''
+    return filter(
+        is_identifier,
+        sorted(os.listdir(joinpath(self.state_dirpath, 'backups')))
+    )
 
   def __getitem__(self, index):
     ''' Indexing by an identifier returns the associated `NamedBackup`.
@@ -855,6 +944,57 @@ class BackupRecord(UUIDedDict):
   def __exit__(self, exc_type, exc_value, exc_traceback):
     self.end()
 
+  def report(self, first_fields=None, omit_fields=None):
+    ''' Yield `(field,value,value_s)` for the fields of the backup record,
+        being the field name, its value
+        and its default human friendly representation as a `str`.
+    '''
+    if first_fields is None:
+      first_fields = (
+          'uuid',
+          'backup_name',
+          'public_key_name',
+          'root_path',
+          'content_path',
+          'timestamp_start',
+          'timestamp_end',
+          'count_files_checked',
+          'count_files_changed',
+          'count_uploaded_files',
+          'count_uploaded_bytes',
+      )
+    fields = set(self.keys())
+    report_fields = []
+    # start with the important fields in preferred order
+    for field in first_fields:
+      if field not in fields:
+        continue
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+      fields.remove(field)
+    for field in sorted(fields):
+      if omit_fields and field in omit_fields:
+        continue
+      report_fields.append(field)
+    for field in report_fields:
+      try:
+        value = self[field]
+      except KeyError:
+        continue
+      try:
+        if field.endswith('_bytes'):
+          value_s = transcribe(value, BINARY_BYTES_SCALE, max_parts=2, sep=' ')
+        elif field.startswith('timestamp_'):
+          dt = datetime.fromtimestamp(value)
+          value_s = "%s : %f" % (dt.isoformat(timespec='seconds'), value)
+        else:
+          value_s = str(value)
+      except ValueError as e:
+        warning("cannot present field %r=%r: %s", field, value, e)
+        value_s = repr(value)
+      yield field, value, value_s
+
 class BackupRun(RunStateMixin):
   ''' State management and display for a multithreaded backup run.
   '''
@@ -921,31 +1061,49 @@ class BackupRun(RunStateMixin):
         prepares a new `BackupRecord`, catches `SIGINT`,
         and commences a backup run.
     '''
+    Upd().cursor_invisible()
     status_proxy = UpdProxy()
+
+    upload_progress = OverProgress(name="uploads")
+    upload_proxy = UpdProxy()
+    update_uploads = lambda P, _: upload_proxy(
+        P.status(None, upload_proxy.width)
+    )
+    upload_progress.notify_update.add(update_uploads)
+
     file_proxies = set(UpdProxy() for _ in range(self.file_parallel))
     folder_proxies = set(UpdProxy() for _ in range(self.folder_parallel))
+
     backup_record = BackupRecord(
         backup_name=self.named_backup.backup_name,
         public_key_name=self.public_key_name,
         root_path=self.root_dirpath,
         content_path=self.content_path,
     )
+    status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
-    def interrupt(signum, frame):
-      ''' Receive interrupt, cancel the `RunState`.
+    runstate = RunState(
+        "%s.runstate(%s,%s)" %
+        (type(self).__name__, self.cloud_area, self.public_key_name)
+    )
+
+    def cancel_runstate(signum, frame):
+      ''' Receive signal, cancel the `RunState`.
       '''
-      self.runstate.cancel()
+      warning("received signal %s", signum)
+      runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
-    previous_interrupt = signal.signal(signal.SIGINT, interrupt)
+    # TODO: keep all the previous handlers and restore them in __exit__
+    previous_interrupt = signal.signal(signal.SIGINT, cancel_runstate)
+    signal.signal(signal.SIGTERM, cancel_runstate)
+    signal.signal(signal.SIGALRM, cancel_runstate)
+    previous_termios = modify_termios(0, clear_modes={'lflag': termios.ECHO})
     self._stacked.append(
         pushattrs(
             self,
-            runstate=RunState(
-                "%s.runstate(%s,%s)" %
-                (type(self).__name__, self.cloud_area, self.public_key_name)
-            ),
+            runstate=runstate,
             backup_record=backup_record,
             backup_uuid=backup_record.uuid,
             status_proxy=status_proxy,
@@ -954,10 +1112,12 @@ class BackupRun(RunStateMixin):
             file_later=Later(self.file_parallel, inboundCapacity=256),
             file_proxies=file_proxies,
             previous_interrupt=previous_interrupt,
+            previous_termios=previous_termios,
+            upload_progress=upload_progress,
         )
     )
     backup_record.start()
-    self.runstate.start()
+    runstate.start()
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -965,6 +1125,8 @@ class BackupRun(RunStateMixin):
     '''
     self.named_backup.add_backup_record(self.backup_record)
     signal.signal(signal.SIGINT, self.previous_interrupt)
+    if self.previous_termios:
+      termios.tcsetattr(0, termios.TCSANOW, self.previous_termios)
     self.runstate.stop()
     self.backup_record.end()
     self.named_backup.add_backup_record(self.backup_record)
@@ -973,6 +1135,7 @@ class BackupRun(RunStateMixin):
     for proxy in self.folder_proxies:
       proxy.delete()
     self.status_proxy.delete()
+    Upd().cursor_visible()
     old_attrs = self._stacked.pop()
     popattrs(self, old_attrs.keys(), old_attrs)
 
@@ -1085,16 +1248,30 @@ class NamedBackup(SingletonMixin):
     )
     return path
 
-  def latest_backup_record(self):
-    ''' Return the latest completed backup record.
+  def sorted_backup_records(self, key=None, reverse=False):
+    ''' Return the `BackupRecord`s for this `NamedBackup`
+        sorted by `key` and `reverse` as for the `sorted` builtin function.
+        If `key` is a `str` the key function
+        will access that field of the record.
+        The default sort key is `'timestamp_start'`.
     '''
-    backup_records = list(self.backup_records.by_uuid.values())
-    if not backup_records:
-      return None
-    return max(
-        self.backup_records.by_uuid.values(),
-        key=lambda backup_record: backup_record.get('timestamp_end') or 0
+    if key is None:
+      key = 'timestamp_start'
+    if isinstance(key, str):
+      field = key
+      key = lambda backup_record: backup_record[field]
+    return sorted(
+        self.backup_records.by_uuid.values(), key=key, reverse=reverse
     )
+
+  def latest_backup_record(self):
+    ''' Return the latest `BackupRecord` by `.timestamp_start`
+        or `None` if there are no records.
+    '''
+    records = self.sorted_backup_records()
+    if not records:
+      return None
+    return records[-1]
 
   @typechecked
   def add_backup_record(self, backup_record: BackupRecord):
@@ -1105,29 +1282,76 @@ class NamedBackup(SingletonMixin):
   ##############################################################
   # DirStates
 
-  @locked
+  def _dirstate__uu_sp(self, subpath):
+    ''' Return `UUIDedDict(uuid,subpath)` for `subpath`,
+        creating it if necessary.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    with self._lock:
+      uu_sp = self.diruuids.by_subpath.get(subpath)
+      if uu_sp:
+        uu = uu_sp.uuid
+      else:
+        uu = uuid4()
+        uu_sp = UUIDedDict(uuid=uu, subpath=subpath)
+        self.diruuids.add_to_mapping(uu_sp)
+    return uu_sp
+
+  def dirstate_uuid_pathname(self, subpath):
+    ''' Return `(UUID,pathname)` for the `DirState` file for `subpath`.
+    '''
+    if subpath:
+      validate_subpath(subpath)
+    uu_sp = self._dirstate__uu_sp(subpath)
+    uu = uu_sp.uuid
+    uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
+    dirstate_path = joinpath(
+        self.dirstates_dirpath, dirname(uupath), uu.hex
+    ) + '.ndjson'
+    return uu, dirstate_path
+
+  @classmethod
+  @typechecked
+  def dirstate_from_pathname(
+      cls,
+      ndjson_path: str,
+      *,
+      uuid: [UUID, None],
+      subpath: [str, None],
+      create: bool = False,
+  ):
+    ''' Return a `UUIDNDJSONMapping` associated with the filename `ndjson_path`.
+    '''
+    if not ndjson_path.endswith('.ndjson'):
+      warning(
+          "%s.dirstate_from_pathname(%r): does not end in .ndjson",
+          cls.__name__, ndjson_path
+      )
+    state = UUIDNDJSONMapping(
+        ndjson_path, dictclass=FileBackupState, create=create
+    )
+    state.uuid = uuid
+    state.subpath = subpath
+    return state
+
   def dirstate(self, subpath: str):
     ''' Return the `DirState` for `subpath`.
     '''
     if subpath:
       validate_subpath(subpath)
     state = self._dirstates.get(subpath)
-    if state is None:
-      uu_sp = self.diruuids.by_subpath.get(subpath)
-      if uu_sp:
-        uu = uu_sp.uuid
-      else:
-        uu = uuid4()
-        self.diruuids.add_to_mapping(UUIDedDict(uuid=uu, subpath=subpath))
-      uupath = uuidpath(uu, 2, 2, make_subdir_of=self.dirstates_dirpath)
-      dirstate_path = joinpath(
-          self.dirstates_dirpath, dirname(uupath), uu.hex
-      ) + '.ndjson'
-      state = UUIDNDJSONMapping(
-          dirstate_path, dictclass=FileBackupState, create=True
+    if state is not None:
+      return state
+    with self._lock:
+      state = self._dirstates.get(subpath)
+      if state is not None:
+        return state
+      uu, dirstate_path = self.dirstate_uuid_pathname(subpath)
+      state = self.dirstate_from_pathname(
+          dirstate_path, uuid=uu, subpath=subpath, create=True
       )
-      state.uuid = uu
-      state.subpath = subpath
+      self._dirstates[subpath] = state
     return state
 
   # pylint: disable=too-many-branches
@@ -1140,6 +1364,7 @@ class NamedBackup(SingletonMixin):
 
         If `all_backups` is false, the details are the name->backup_state
         associated with `backup_uuid`.
+
         The default `backup_uuid` is that of the latest recorded backup.
     '''
     if subpath:
@@ -1199,7 +1424,6 @@ class NamedBackup(SingletonMixin):
         subpaths of a larger area.
     '''
     validate_subpath(subpath)
-    backup_uuid_s = str(backup_uuid)
     while subpath:
       with Pfx(subpath):
         base = basename(subpath)
@@ -1211,7 +1435,7 @@ class NamedBackup(SingletonMixin):
           base_backups = FileBackupState(name=base, backups=[])
         record = None
         for backup in base_backups.backups:
-          if backup['uuid'] == backup_uuid_s:
+          if backup.uuid == backup_uuid:
             record = backup
             break
         if record is None:
@@ -1245,15 +1469,19 @@ class NamedBackup(SingletonMixin):
       validate_subpath(topsubpath)
       topdirpath = joinpath(backup_root_dirpath, topsubpath)
     status_proxy = backup_run.status_proxy
-    status_proxy("os.walk %r ...", topdirpath)
     Rs = []
     L = backup_run.folder_later
     runstate = backup_run.runstate
+    status_proxy("attach %r", topsubpath)
+    if topsubpath:
+      self.attach_subpath(
+          backup_root_dirpath, topsubpath, backup_uuid=backup_run.backup_uuid
+      )
     for dirpath, dirnames, _ in os.walk(topdirpath):
       if runstate.cancelled:
         break
-      status_proxy("os.walk %s/", dirpath)
       subpath = relpath(dirpath, backup_root_dirpath)
+      status_proxy("os.walk %s/", subpath)
       if subpath == '.':
         subpath = ''
       Rs.append(
@@ -1266,8 +1494,8 @@ class NamedBackup(SingletonMixin):
       dirnames[:] = sorted(dirnames)
     if Rs:
       for R in progressbar(report(Rs), total=len(Rs),
-                           label="%s: wait for subdirectories" %
-                           (backup_root_dirpath,), proxy=status_proxy):
+                           label="%s: wait for subdirectories" % (topsubpath,),
+                           proxy=status_proxy):
         try:
           R()
         except Exception as e:  # pylint: disable=broad-except
@@ -1297,11 +1525,6 @@ class NamedBackup(SingletonMixin):
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
         proxy.prefix = subpath + ': '
-        if subpath:
-          proxy("attach")
-          self.attach_subpath(
-              backup_root_dirpath, subpath, backup_uuid=backup_run.backup_uuid
-          )
         with Pfx("scandir"):
           proxy("scandir")
           try:
@@ -1374,9 +1597,9 @@ class NamedBackup(SingletonMixin):
                 ##print("CHANGED (previous not a file)", pathname)
                 changed = True
               else:
-                prev_mode = prevstate['st_mode']
-                prev_mtime = prevstate['st_mtime']
-                prev_size = prevstate['st_size']
+                prev_mode = prevstate.st_mode
+                prev_mtime = prevstate.st_mtime
+                prev_size = prevstate.st_size
                 if not S_ISREG(prev_mode):
                   ##print("CHANGED (not regular file)", pathname)
                   changed = True
@@ -1386,7 +1609,7 @@ class NamedBackup(SingletonMixin):
                     ##print("CHANGED (changed size/mtime)", pathname)
                     changed = True
                   else:
-                    prev_backup_uuid = UUID(prevstate['uuid'])
+                    prev_backup_uuid = prevstate.uuid
                     prev_backup_record = backup_records_by_uuid.get(
                         prev_backup_uuid
                     )
@@ -1418,7 +1641,7 @@ class NamedBackup(SingletonMixin):
                 name_backups.add_regular_file(
                     backup_uuid=backup_uuid,
                     stat=stat,
-                    hashcode=prevstate['hashcode']
+                    hashcode=prevstate.hashcode
                 )
             else:
               warning("unsupported type st_mode=%o", stat.st_mode)
@@ -1454,6 +1677,21 @@ class NamedBackup(SingletonMixin):
                     hashcode=backedup_hashcode
                 )
                 dirstate.add_to_mapping(name_backups, exists_ok=True)
+
+        if dirstate.scan_errors or (
+            dirstate.scan_mapping_length >= 64
+            and dirstate.scan_mapping_length >= 3 * len(dirstate)):
+          with Pfx(
+              "rewrite %s: %d scan_errors, len=%d and scan_mapping_length=%d",
+              dirstate,
+              len(dirstate.scan_errors),
+              len(dirstate),
+              dirstate.scan_mapping_length,
+          ):
+            # serialise these because we can run out of file descriptors
+            # in a multithread environment
+            with self._lock:
+              dirstate.rewrite_mapping()
 
         proxy('')
       return ok
@@ -1602,10 +1840,16 @@ class NamedBackup(SingletonMixin):
             if runstate.cancelled:
               return None, None
             P = Progress(name="crypt upload " + subpath, total=len(mm))
+            backup_run.upload_progress.add(P)
             with P.bar(proxy=proxy, label=''):
               self.upload_hashcode_content(
-                  backup_record, mm, hashcode, progress=P, length=len(mm)
+                  backup_record,
+                  mm,
+                  hashcode,
+                  upload_progress=P,
+                  length=len(mm)
               )
+            backup_run.upload_progress.remove(P, accrue=True)
         return hashcode, fstat
 
   def upload_hashcode_content(
@@ -1614,7 +1858,7 @@ class NamedBackup(SingletonMixin):
       f,
       hashcode,
       *,
-      progress=None,
+      upload_progress=None,
       length,
   ):
     ''' Upload the contents of `f` under the supplied `hashcode`
@@ -1631,7 +1875,7 @@ class NamedBackup(SingletonMixin):
             backup_record.public_key_name
         ),
         public_key_name=backup_record.public_key_name,
-        progress=progress,
+        upload_progress=upload_progress,
     )
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
@@ -1657,15 +1901,50 @@ class FileBackupState(UUIDedDict):
         of the content hashcode
   '''
 
+  def __init__(self, **kw):
+    super().__init__(**kw)
+    try:
+      backups = self['backups']
+    except KeyError:
+      pass
+    else:
+      backups[:] = map(
+          lambda record:
+          (record if isinstance(record, UUIDedDict) else UUIDedDict(**record)),
+          backups
+      )
+
+  @pfx_method
+  def _clean_backups(self):
+    ''' Remove repeated backup entries (cruft from old bugs I hope).
+    '''
+    cleaned = []
+    seen_uuids = set()
+    for backup in self.backups:
+      backup_uuid = backup.uuid
+      if not isinstance(backup_uuid, UUID):
+        warning("not a UUID: backup_uuid %r", backup_uuid)
+      if backup_uuid in seen_uuids:
+        warning("discard repeated entry for backup_uuid %r", backup.uuid)
+        continue
+      cleaned.append(backup)
+      seen_uuids.add(backup_uuid)
+    self.backups[:] = cleaned
+
+  @pfx_method
   @typechecked
   def _new_backup(self, backup_uuid: UUID, stat):
     ''' Prepare a shiny new file state.
     '''
-    backup_uuid_s = str(backup_uuid)
-    assert backup_uuid_s not in self.backups
-    backup_state = UUIDedDict(uuid=backup_uuid_s, st_mode=stat.st_mode)
+    backup_state = UUIDedDict(uuid=backup_uuid, st_mode=stat.st_mode)
     if S_ISREG(stat.st_mode):
       backup_state.update(st_mtime=stat.st_mtime, st_size=stat.st_size)
+    uuids = set(map(lambda record: record.uuid, self.backups))
+    assert all(map(lambda uuid: isinstance(uuid, UUID), uuids))
+    if backup_uuid in uuids:
+      raise ValueError(
+          "backup_uuid %r already present: %r" % (backup_uuid, uuids)
+      )
     self.backups.insert(0, backup_state)
     return backup_state
 

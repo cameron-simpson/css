@@ -16,6 +16,7 @@ from cs.binary import structtuple
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py3 import datetime_fromisoformat
+from cs.tagset import TagSet
 from cs.threads import locked_property
 from cs.x import X
 from . import _Recording, RecordingMetaData
@@ -26,27 +27,13 @@ Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
 # a "cut" record from the .cuts file
 Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
 
-class Enigma2MetaData(RecordingMetaData):
-  ''' Metadata for an Enigma2 recording.
-  '''
-
-  def __init__(self, raw):
-    RecordingMetaData.__init__(self, raw)
-    raw_meta = raw['meta']
-    raw_file = raw['file']
-    self.series_name = raw_meta['title']
-    self.description = raw_meta['description']
-    self.start_unixtime = raw_meta['start_unixtime']
-    channel = raw_file['channel']
-    if channel:
-      self.source_name = channel
-    self.tags.update(raw_meta['tags'])
-
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
       File format information from:
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
+
+  DEFAULT_FILENAME_BASIS = '{meta.title_lc}--{file.channel_lc}--beyonwiz--{file.datetime}'
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
@@ -84,14 +71,12 @@ class Enigma2(_Recording):
   def metadata(self):
     ''' The metadata associated with this recording.
     '''
-    return Enigma2MetaData(
-        {
-            'meta': self.read_meta(),
-            'file': self.filename_metadata(),
-            'cuts': self.read_cuts(),
-            'ap': self.read_ap(),
-        }
-    )
+    tags = TagSet()
+    tags.update(self.read_meta(), prefix='meta')
+    tags.update(self.filename_metadata(), prefix='file')
+    ##tags.update( self.read_cuts(),prefix='cuts')
+    ##tags.update({'ap': self.read_ap()})
+    return tags
 
   def filename_metadata(self):
     ''' Information about the recording inferred from the filename.

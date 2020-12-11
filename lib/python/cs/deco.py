@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20201025-post'
+__version__ = '20201202-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -87,7 +87,7 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) == 1 and callable(da[0]):
+    if len(da) >= 1 and callable(da[0]):
       # `func` is already supplied, decorate it now.
       func = da[0]
       da = tuple(da[1:])
@@ -268,7 +268,7 @@ def contextdecorator(cmgrfunc):
       def wrapped(*a, **kw):
         ''' Wrapper function:
             * obtain an iterator by calling `func(*a,**kw)`
-            * for iterate over the iterator, yielding its results,
+            * iterate over the iterator, yielding its results,
               by calling the context manager with `(func,a,kw,**da,**dkw)`,
               around each `next()`
         '''
@@ -280,6 +280,7 @@ def contextdecorator(cmgrfunc):
             except StopIteration:
               break
           yield value
+
     else:
 
       def wrapped(*a, **kw):
@@ -287,7 +288,8 @@ def contextdecorator(cmgrfunc):
             * call the context manager with `(func,a,kw,**da,**dkw)`,
               returning `ctxt`
             * within the context
-              return the value of `func(ctxt,*a,**kw)` if `provide_context` is true
+              return the value of `func(ctxt,*a,**kw)`
+              if `provide_context` is true
               or the value of `func(*a,**kw)` if not (the default)
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:

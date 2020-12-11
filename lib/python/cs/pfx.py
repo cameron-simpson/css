@@ -19,10 +19,10 @@ Usage is like this:
     setup_logging()
     ...
     def parser(filename):
-      with Pfx("parse(%r)", filename):
+      with Pfx(filename):
         with open(filename) as f:
           for lineno, line in enumerate(f, 1):
-            with Pfx("%d", lineno) as P:
+            with Pfx(lineno) as P:
               if line_is_invalid(line):
                 raise ValueError("problem!")
               info("line = %r", line)
@@ -52,7 +52,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201025-post'
+__version__ = '20201105-post'
 
 DISTINFO = {
     'description':
@@ -311,7 +311,8 @@ class Pfx(object):
           print(
               "warning: %s: %s.%s: " % (current_prefix, e, attr),
               cls.prefixify(
-                  "do not know how to prefixify: %s:%r" % (type(value), value)
+                  "do not know how to prefixify .%s=<%s>:%r" %
+                  (attr, type(value).__name__, value)
               ),
               file=sys.stderr
           )
@@ -485,7 +486,7 @@ def pfx(func, message=None, message_args=()):
   fname = funcname(func)
   if message is None:
     if message_args:
-      raise ValueError("no message, but message_args=%r"%(message_args,))
+      raise ValueError("no message, but message_args=%r" % (message_args,))
     message = fname
 
   if isgeneratorfunction(func):
@@ -495,7 +496,7 @@ def pfx(func, message=None, message_args=()):
     saved_stack = []
 
     @contextdecorator
-    def wrapper(func, a, kw):
+    def cmgrdeco(func, a, kw):
       ''' Context manager to note the entry `Pfx` stack height, append saved
           `Pfx` stack from earlier run, then after the iteration step save the
           top of the `Pfx` stack for next time.
@@ -507,6 +508,8 @@ def pfx(func, message=None, message_args=()):
         yield
       saved_stack[:] = pfx_stack[height:]
       pfx_stack[height:] = []
+
+    wrapper = cmgrdeco(func)
 
   else:
 

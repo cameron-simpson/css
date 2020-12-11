@@ -43,6 +43,7 @@ from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.mappings import LoadableMappingMixin, UUIDedDict
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
@@ -52,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20200914-post'
+__version__ = '20201108-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -68,6 +69,7 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py3',
         'cs.range',
@@ -82,10 +84,10 @@ DEFAULT_READSIZE = 131072
 DEFAULT_TAIL_PAUSE = 0.25
 
 def seekable(fp):
-  ''' Try to test if a filelike object is seekable.
+  ''' Try to test whether a filelike object is seekable.
 
-      First try the `.seekable` method from `IOBase`, otherwise try
-      getting a file descriptor from `fp.fileno` and `os.stat`()ing that,
+      First try the `IOBase.seekable` method, otherwise try getting a file 
+      descriptor from `fp.fileno` and `os.stat()`ing that,
       otherwise return `False`.
   '''
   try:
@@ -99,7 +101,7 @@ def seekable(fp):
   return test()
 
 def saferename(oldpath, newpath):
-  ''' Rename a path using os.rename(),
+  ''' Rename a path using `os.rename()`,
       but raise an exception if the target path already exists.
       Note: slightly racey.
   '''
@@ -112,7 +114,8 @@ def saferename(oldpath, newpath):
     os.rename(oldpath, newpath)
 
 def trysaferename(oldpath, newpath):
-  ''' A saferename() that returns True on success, False on failure.
+  ''' A `saferename()` that returns `True` on success,
+      `False` on failure.
   '''
   try:
     saferename(oldpath, newpath)
@@ -138,7 +141,7 @@ def compare(f1, f2, mode="rb"):
 
 @contextmanager
 def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
-  ''' A Context manager yielding a temporary copy of `filename`
+  ''' A context manager yielding a temporary copy of `filename`
       as returned by `NamedTemporaryFile(**kw)`.
 
       Parameters:
@@ -248,7 +251,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
 # pylint: disable=too-many-arguments
 def rewrite(
     filepath,
-    data,
+    srcf,
     mode='w',
     backup_ext=None,
     do_rename=False,
@@ -256,19 +259,20 @@ def rewrite(
     empty_ok=False,
     overwrite_anyway=False
 ):
-  ''' Rewrite the file `filepath` with data from the file object `data`.
+  ''' Rewrite the file `filepath` with data from the file object `srcf`.
 
       Parameters:
-      * `filepath`: the name of the file to rewrite
-      * `data`: the source file containing the new content
-      * `empty_ok`: if not true, raise `ValueError` if the new data are
-        empty.
-        Default: `False`.
+      * `filepath`: the name of the file to rewrite.
+      * `srcf`: the source file containing the new content.
+      * `mode`: the write-mode for the file, default `'w'` (for text);
+        use `'wb'` for binary data.
+      * `empty_ok`: if true (default `False`),
+        do not raise `ValueError` if the new data are empty.
       * `overwrite_anyway`: if true (default `False`),
         skip the content check and overwrite unconditionally.
       * `backup_ext`: if a nonempty string,
         take a backup of the original at `filepath + backup_ext`.
-      * `do_diff`: if not `None`, call `do_diff(filepath, tempfile)`.
+      * `do_diff`: if not `None`, call `do_diff(filepath,tempfile)`.
       * `do_rename`: if true (default `False`),
         rename the temp file to `filepath`
         after copying the permission bits.
@@ -277,7 +281,7 @@ def rewrite(
   '''
   with Pfx("rewrite(%r)", filepath):
     with NamedTemporaryFile(dir=dirname(filepath), mode=mode) as T:
-      T.write(data.read())
+      T.write(srcf.read())
       T.flush()
       if not empty_ok:
         st = os.stat(T.name)
@@ -304,7 +308,6 @@ def rewrite(
           shutil.copy2(filepath, filepath + backup_ext)
         shutil.copyfile(T.name, filepath)
 
-# pylint: disable=too-many-branches,too-many-arguments
 @contextmanager
 def rewrite_cmgr(filepath, mode='w', **kw):
   ''' Rewrite a file, presented as a context manager.
@@ -316,22 +319,33 @@ def rewrite_cmgr(filepath, mode='w', **kw):
 
       Example:
 
-          with rewrite_cmgr(pathname, backup_ext='', keep_backup=True) as f:
-             ... write new content to f ...
+          with rewrite_cmgr(pathname, do_rename=True) as f:
+              ... write new content to f ...
   '''
   with NamedTemporaryFile(mode=mode) as T:
     yield T
-    return rewrite(filepath, mode=mode, **kw)
+    T.flush()
+    with open(T.name, 'rb') as f:
+      rewrite(filepath, mode='wb', srcf=f, **kw)
 
 @strable
-def scan_ndjson(f, dictclass=dict):
+def scan_ndjson(f, dictclass=dict, error_list=None):
   ''' Read a newline delimited JSON file, yield instances of `dictclass`
       (default `dict`, otherwise a class which can be instantiated
       by `dictclass(a_dict)`).
+
+      `error_list` is an optional list to accrue `(lineno,exception)` tuples
+      for errors encountered during the scan.
   '''
   for lineno, line in enumerate(f, 1):
     with Pfx("line %d", lineno):
-      d = json.loads(line)
+      try:
+        d = json.loads(line)
+      except json.JSONDecodeError as e:
+        warning("%s", e)
+        if error_list:
+          error_list.append((lineno, e))
+        continue
       if dictclass is not dict:
         d = dictclass(**d)
     yield d
@@ -362,17 +376,18 @@ def abspath_from_file(path, from_file):
   return path
 
 def poll_file(path, old_state, reload_file, missing_ok=False):
-  ''' Watch a file for modification by polling its state as obtained by FileState().
-      Call reload_file(path) if the state changes.
-      Return (new_state, reload_file(path)) if the file was modified and was
-      unchanged (stable state) beofre and after the reload_file().
-      Otherwise return (None, None).
+  ''' Watch a file for modification by polling its state as obtained
+      by `FileState()`.
+      Call `reload_file(path)` if the state changes.
+      Return `(new_state,reload_file(path))` if the file was modified
+      and was unchanged (stable state) before and after the reload_file().
+      Otherwise return `(None,None)`.
 
-      This may raise an OSError if the `path` cannot be os.stat()ed
+      This may raise an `OSError` if the `path` cannot be `os.stat()`ed
       and of course for any exceptions that occur calling `reload_file`.
 
-      If `missing_ok` is true then a failure to os.stat() which
-      raises OSError with ENOENT will just return (None, None).
+      If `missing_ok` is true then a failure to `os.stat()` which
+      raises `OSError` with `ENOENT` will just return `(None,None)`.
   '''
   try:
     new_state = FileState(path)
@@ -433,12 +448,16 @@ def file_based(
   if sig_func is None:
 
     def sig_func(self):
+      ''' The default signature function: `FileState(filename,missing_ok=True)`.
+      '''
       filename = filename0
       if filename is None:
         filename = getattr(self, filename_attr)
       return FileState(filename, missing_ok=True)
 
   def wrap0(self, *a, **kw):
+    ''' Inner wrapper for `func`.
+    '''
     filename = kw.pop('filename', None)
     if filename is None:
       if filename0 is None:
@@ -761,7 +780,8 @@ def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix
       for names starting with the prefix `pfx`.
 
-      This is generally used as a starting point for picking a new numeric suffix.
+      This is generally used as a starting point for picking
+      a new numeric suffix.
   '''
   pfx = ustr(pfx)
   maxn = None
@@ -786,7 +806,7 @@ def mkdirn(path, sep=''):
 
       Parameters:
       * `path`: the basic directory path.
-      * `sep`: a separator between `path` and n.
+      * `sep`: a separator between `path` and `n`.
         Default: `''`
   '''
   with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
@@ -799,8 +819,8 @@ def mkdirn(path, sep=''):
     if path.endswith(os.sep):
       if sep:
         raise ValueError(
-            "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
-            % (path, sep, os.sep)
+            "mkdirn(path=%r, sep=%r): using non-empty sep"
+            " with a trailing %r seems nonsensical" % (path, sep, os.sep)
         )
       dirpath = path[:-len(os.sep)]
       pfx = ''
@@ -1747,12 +1767,18 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(LoadableMappingMixin):
+class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
   ''' A subclass of `LoadableMappingMixin` which maintains records
       from a newline delimited JSON file.
   '''
 
   loadable_mapping_key = 'uuid'
+
+  @staticmethod
+  def _singleton_key(filename, dictclass=UUIDedDict, create=False):
+    ''' Key off the absolute path of `filename`.
+    '''
+    return abspath(filename)
 
   def __init__(self, filename, dictclass=UUIDedDict, create=False):
     ''' Initialise the mapping.
@@ -1766,6 +1792,8 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
           by transiently opening it for append if it is missing;
           default `False`
     '''
+    if hasattr(self, '_lock'):
+      return
     self.__ndjson_filename = filename
     self.__dictclass = dictclass
     if create and not isfilepath(filename):
@@ -1774,11 +1802,18 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
         pass
     self._lock = RLock()
 
+  def __str__(self):
+    return "%s(%r,%s)" % (
+        type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
+    )
+
   def scan_mapping(self):
     ''' Scan the backing file, yield records.
     '''
     if existspath(self.__ndjson_filename):
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+      self.scan_errors = []
+      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
+                                error_list=self.scan_errors):
         yield record
 
   def append_to_mapping(self, record):
@@ -1787,6 +1822,21 @@ class UUIDNDJSONMapping(LoadableMappingMixin):
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
+
+  def rewrite_mapping(self):
+    ''' Rewrite the backing file.
+
+        Because the record updates are normally written in append mode,
+        a rewrite will be required every so often.
+    '''
+    with self._lock:
+      with rewrite_cmgr(self.__ndjson_filename) as T:
+        i = 0
+        for i, record in enumerate(self.by_uuid.values(), 1):
+          T.write(record.as_json())
+          T.write('\n')
+        T.flush()
+      self.scan_mapping_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests
