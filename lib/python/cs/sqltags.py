@@ -1110,7 +1110,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           if string_value is None:
             return structured_value
           return string_value
-        return float_value
+        i = int(float_value)
+        return i if i == float_value else float_value
 
       @property
       def value(self):
