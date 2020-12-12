@@ -15,9 +15,16 @@
 from contextlib import contextmanager
 from getopt import GetoptError
 import os
-from os.path import expanduser, expandvars
+from os.path import (
+    expanduser,
+    expandvars,
+    isdir as isdirpath,
+    join as joinpath,
+)
 from pprint import pformat
+import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import discid
 import musicbrainzngs
 from typeguard import typechecked
@@ -28,6 +35,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
+from cs.tagset import TagSet
 
 __version__ = '20201004-dev'
 
@@ -245,6 +253,7 @@ class MBTaggedEntity(SQLTaggedEntity):
     try:
       value = self.tags[attr]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise AttributeError(
           '%s:%r.tags[%r] (have %r)' %
           (type(self).__name__, self.name, attr, sorted(self.tags.keys()))
@@ -267,6 +276,8 @@ class MBTaggedEntity(SQLTaggedEntity):
     return [artist.artist_name for artist in self.artists()]
 
 class MBSQLTags(SQLTags):
+  ''' Musicbrainz `SQLTags` with special `TaggedEntityClass`.
+  '''
 
   TaggedEntityClass = MBTaggedEntity
 
@@ -377,7 +388,7 @@ class MBDB(MultiOpenMixin):
       self.tag_from_tag_list(tags, A)
     return te
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-locals
   @typechecked
   def disc(self, disc_id: str, force=False) -> SQLTaggedEntity:
     ''' Return the `disc.`*disc_id* entry.
