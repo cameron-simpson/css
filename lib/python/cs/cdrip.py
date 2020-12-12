@@ -316,7 +316,11 @@ class MBDB(MultiOpenMixin):
               found_medium = medium
               found_release = release
       assert found_medium
+      medium_count = found_release['medium-count']
+      medium_position = found_medium['position']
       self._tagif(tags, 'title', found_release.get('title'))
+      self._tagif(tags, 'medium_count', medium_count)
+      self._tagif(tags, 'medium_position', medium_position)
       self.tag_artists_from_credits(tags, found_release)
       if 'recordings' in includes:
         track_list = found_medium.get('track-list')
