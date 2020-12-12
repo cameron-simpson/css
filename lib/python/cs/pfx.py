@@ -182,6 +182,9 @@ class Pfx(object):
           true, this message forms the base of the message prefixes;
           earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
+        * `print`: if true, print the `mark` on entry to the `with` suite.
+          This may be a `bool`, implying `print()` if `True`
+          or a callable which works like `print()`.
 
         *Note*:
         the `mark` and `args` are only combined if the `Pfx` instance gets used,
@@ -202,12 +205,17 @@ class Pfx(object):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
+    print_func = kwargs.pop('print', False)
+    if print_func:
+      if isinstance(print_func, bool):
+        print_func = print
     if kwargs:
       raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
 
     self.mark = mark
     self.mark_args = args
     self.absolute = absolute
+    self.print_func = print_func
     self._umark = None
     self._loggers = None
     if loggers is not None:
@@ -217,6 +225,13 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
+    print_func = self.print_func
+    if print_func:
+      mark = self.mark
+      mark_args = self.mark_args
+      if mark_args:
+        mark = mark % mark_args
+      print_func(mark)
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
