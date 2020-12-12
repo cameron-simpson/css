@@ -264,6 +264,7 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.artists.make(artist_id)
     tags = te.tags
+    tags['musicbrainz.artist_id'] = artist_id
     A = None
     if artist_id == self.VARIOUS_ARTISTS_ID:
       A = {
@@ -291,6 +292,7 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.discs.make(disc_id)
     tags = te.tags
+    tags['musicbrainz.disc_id'] = disc_id
     includes = []
     for cached in 'artists', 'recordings':
       if force or cached not in tags:
@@ -334,6 +336,7 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.recordings.make(recording_id)
     tags = te.tags
+    tags['musicbrainz.recording_id'] = recording_id
     includes = []
     for cached in 'artists', 'tags':
       if force or cached not in tags:
