@@ -105,11 +105,11 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
-def glob2like(glob:str)->str:
+def glob2like(glob: str) -> str:
   ''' Convert a filename glob to an SQL LIKE pattern.
   '''
   assert '[' not in glob
-  return glob.replace('*','%').replace('?','_')
+  return glob.replace('*', '%').replace('?', '_')
 
 class SQLParameters(namedtuple(
     'SQLParameters', 'criterion table alias entity_id_column constraint')):
@@ -1110,7 +1110,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           if string_value is None:
             return structured_value
           return string_value
-        return float_value
+        i = int(float_value)
+        return i if i == float_value else float_value
 
       @property
       def value(self):
@@ -1213,11 +1214,11 @@ class SQLTagSet(TagSet, SingletonMixin):
   def _singleton_key(*, sqltags, entity_id, **_):
     return builtin_id(sqltags), entity_id
 
-  def __init__(self, *, sqltags, entity_id, **kw):
+  def __init__(self, *a, sqltags, entity_id, **kw):
     try:
       pre_sqltags = self.sqltags
     except AttributeError:
-      super().__init__(**kw)
+      super().__init__(*a, **kw)
       self.sqltags = sqltags
       self.entity_id = entity_id
     else:

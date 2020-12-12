@@ -15,9 +15,16 @@
 from contextlib import contextmanager
 from getopt import GetoptError
 import os
-from os.path import expanduser, expandvars
+from os.path import (
+    expanduser,
+    expandvars,
+    isdir as isdirpath,
+    join as joinpath,
+)
 from pprint import pformat
+import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import discid
 import musicbrainzngs
 from typeguard import typechecked
@@ -28,6 +35,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
+from cs.tagset import TagSet
 
 __version__ = '20201004-dev'
 
@@ -54,7 +62,11 @@ class CDRipCommand(BaseCommand):
     -D device Device to access. This may be omitted or "default" or
               "" for the default device as determined by the discid module.
               The environment variable $CDRIP_DEV may override the default.
-    -f        Force. Read disc and consult Musicbrainz even if a toc file exists.'''
+    -f        Force. Read disc and consult Musicbrainz even if a toc file exists.
+
+  Environment:
+    CDRIP_DEV   Default CDROM device.
+    CDRIP_DIR   Default output directory.'''
 
   @staticmethod
   def apply_defaults(options):
@@ -63,6 +75,7 @@ class CDRipCommand(BaseCommand):
     options.tocdir = None
     options.force = False
     options.device = os.environ.get('CDRIP_DEV', "default")
+    options.dirpath = os.environ.get('CDRIP_DIR', ".")
 
   @staticmethod
   def apply_opts(opts, options):
@@ -112,6 +125,27 @@ class CDRipCommand(BaseCommand):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  # pylint: disable=too-many-locals
+  @staticmethod
+  def cmd_rip(argv, options):
+    ''' Usage: {cmd} [disc_id]
+          Pull the audio into a subdirectory of the current directory.
+    '''
+    fstags = options.fstags
+    dirpath = options.dirpath
+    disc_id = None
+    if argv:
+      disc_id = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    rip(
+        options.device,
+        options.mbdb,
+        output_dirpath=dirpath,
+        disc_id=disc_id,
+        fstags=fstags
+    )
+
   @staticmethod
   def cmd_toc(argv, options):
     ''' Usage: {cmd} [disc_id]
@@ -136,6 +170,73 @@ class CDRipCommand(BaseCommand):
             ", ".join(recording.artist_names())
         )
 
+# pylint: disable=too-many-locals
+def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
+  ''' Pull audio from `device` and save in `output_dirpath`.
+  '''
+  if disc_id is None:
+    dev_info = discid.read(device=device)
+    disc_id = dev_info.id
+  if fstags is None:
+    fstags = FSTags()
+  with Pfx("MB: discid %s", disc_id, print=True):
+    disc = mbdb.disc(disc_id)
+  level1 = ", ".join(disc.artist_names()).replace(os.sep, '_')
+  level2 = disc.title
+  if disc.medium_count > 1:
+    level2 += f" ({disc.medium_position} of {disc.medium_count})"
+  subdir = joinpath(output_dirpath, level1, level2)
+  if not isdirpath(subdir):
+    with Pfx("makedirs(%r)", subdir, print=True):
+      os.makedirs(subdir)
+  fstags[subdir].update(
+      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names())
+  )
+  for tracknum, recording in enumerate(disc.recordings(), 1):
+    track_tags = TagSet(
+        discid=disc.id,
+        artists=recording.artist_names(),
+        title=recording.title,
+        track=tracknum
+    )
+    track_artists = ", ".join(recording.artist_names())
+    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
+    wav_filename = joinpath(subdir, track_base + '.wav')
+    mp3_filename = joinpath(subdir, track_base + '.mp3')
+    with NamedTemporaryFile(dir=subdir,
+                            prefix=f"cdparanoia--track{tracknum}--",
+                            suffix='.wav') as T:
+      argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
+      with Pfx("+ %r", argv, print=True):
+        subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+      with Pfx("%r => %r", T.name, wav_filename, print=True):
+        os.link(T.name, wav_filename)
+    fstags[wav_filename].update(track_tags)
+    argv = [
+        'lame',
+        '-q',
+        '7',
+        '-V',
+        '0',
+        '--tt',
+        recording.title,
+        '--ta',
+        track_artists,
+        '--tl',
+        level2,
+        ## '--ty',recording year
+        '--tn',
+        str(tracknum),
+        ## '--tg', recording genre
+        ## '--ti', album cover filename
+        wav_filename,
+        mp3_filename
+    ]
+    with Pfx("+ %r", argv, print=True):
+      subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+    fstags[mp3_filename].update(track_tags)
+  os.system("eject")
+
 class MBTaggedEntity(SQLTaggedEntity):
   ''' An `SQLTaggedEntity` subclass for MB entities.
   '''
@@ -152,20 +253,22 @@ class MBTaggedEntity(SQLTaggedEntity):
     try:
       value = self.tags[attr]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise AttributeError(
-          'tags[%r] (have %r)' % (attr, sorted(self.tags.keys()))
+          '%s:%r.tags[%r] (have %r)' %
+          (type(self).__name__, self.name, attr, sorted(self.tags.keys()))
       )
     return value
 
   def artists(self):
     ''' Return a list of the artists.
     '''
-    return list(map(self.mbdb.artist, self.tags['artists']))
+    return list(map(self.mbdb.artist, self.tags['artist_ids']))
 
   def recordings(self):
     ''' Return a list of the recordings.
     '''
-    return list(map(self.mbdb.recording, self.tags['recordings']))
+    return list(map(self.mbdb.recording, self.tags['recording_ids']))
 
   def artist_names(self):
     ''' Return a list of artist names.
@@ -173,6 +276,8 @@ class MBTaggedEntity(SQLTaggedEntity):
     return [artist.artist_name for artist in self.artists()]
 
 class MBSQLTags(SQLTags):
+  ''' Musicbrainz `SQLTags` with special `TaggedEntityClass`.
+  '''
 
   TaggedEntityClass = MBTaggedEntity
 
@@ -250,7 +355,7 @@ class MBDB(MultiOpenMixin):
     artist_credits = mb_dict.get('artist-credit')
     if artist_credits is not None:
       tags.set(
-          'artists', [
+          'artist_ids', [
               credit['artist']['id']
               for credit in artist_credits
               if not isinstance(credit, str)
@@ -264,10 +369,11 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.artists.make(artist_id)
     tags = te.tags
+    tags['musicbrainz.artist_id'] = artist_id
     A = None
     if artist_id == self.VARIOUS_ARTISTS_ID:
       A = {
-          'artist_name': 'Various Artists',
+          'name': 'Various Artists',
       }
     else:
       includes = []
@@ -282,7 +388,7 @@ class MBDB(MultiOpenMixin):
       self.tag_from_tag_list(tags, A)
     return te
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-locals
   @typechecked
   def disc(self, disc_id: str, force=False) -> SQLTaggedEntity:
     ''' Return the `disc.`*disc_id* entry.
@@ -291,6 +397,7 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.discs.make(disc_id)
     tags = te.tags
+    tags['musicbrainz.disc_id'] = disc_id
     includes = []
     for cached in 'artists', 'recordings':
       if force or cached not in tags:
@@ -314,7 +421,11 @@ class MBDB(MultiOpenMixin):
               found_medium = medium
               found_release = release
       assert found_medium
+      medium_count = found_release['medium-count']
+      medium_position = found_medium['position']
       self._tagif(tags, 'title', found_release.get('title'))
+      self._tagif(tags, 'medium_count', medium_count)
+      self._tagif(tags, 'medium_position', medium_position)
       self.tag_artists_from_credits(tags, found_release)
       if 'recordings' in includes:
         track_list = found_medium.get('track-list')
@@ -334,6 +445,7 @@ class MBDB(MultiOpenMixin):
     ##force = True
     te = self.recordings.make(recording_id)
     tags = te.tags
+    tags['musicbrainz.recording_id'] = recording_id
     includes = []
     for cached in 'artists', 'tags':
       if force or cached not in tags:
