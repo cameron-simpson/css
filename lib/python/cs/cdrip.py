@@ -250,7 +250,7 @@ class MBDB(MultiOpenMixin):
     artist_credits = mb_dict.get('artist-credit')
     if artist_credits is not None:
       tags.set(
-          'artists', [
+          'artist_ids', [
               credit['artist']['id']
               for credit in artist_credits
               if not isinstance(credit, str)
