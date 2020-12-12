@@ -54,7 +54,11 @@ class CDRipCommand(BaseCommand):
     -D device Device to access. This may be omitted or "default" or
               "" for the default device as determined by the discid module.
               The environment variable $CDRIP_DEV may override the default.
-    -f        Force. Read disc and consult Musicbrainz even if a toc file exists.'''
+    -f        Force. Read disc and consult Musicbrainz even if a toc file exists.
+
+  Environment:
+    CDRIP_DEV   Default CDROM device.
+    CDRIP_DIR   Default output directory.'''
 
   @staticmethod
   def apply_defaults(options):
