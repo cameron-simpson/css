@@ -194,7 +194,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
   )
   for tracknum, recording in enumerate(disc.recordings(), 1):
     track_tags = TagSet(
-        discid=disc.id,
+        discid=disc.tags['musicbrainz.disc_id'],
         artists=recording.artist_names(),
         title=recording.title,
         track=tracknum
