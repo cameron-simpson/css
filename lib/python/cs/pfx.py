@@ -43,6 +43,7 @@ but used with a little discretion produces far more debuggable results.
 
 from __future__ import print_function
 from contextlib import contextmanager
+from functools import partial
 from inspect import isgeneratorfunction
 import logging
 import sys
@@ -183,8 +184,9 @@ class Pfx(object):
           earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
         * `print`: if true, print the `mark` on entry to the `with` suite.
-          This may be a `bool`, implying `print()` if `True`
-          or a callable which works like `print()`.
+          This may be a `bool`, implying `print()` if `True`,
+          a callable which works like `print()`,
+          or a file-like object which implies using `print(...,file=print)`.
 
         *Note*:
         the `mark` and `args` are only combined if the `Pfx` instance gets used,
@@ -208,7 +210,11 @@ class Pfx(object):
     print_func = kwargs.pop('print', False)
     if print_func:
       if isinstance(print_func, bool):
+        # bool:True => print()
         print_func = print
+      elif not callable(print_func) and hasattr(print_func, 'write'):
+        # presume a file
+        print_func = partial(print, file=print_func)
     if kwargs:
       raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
 
