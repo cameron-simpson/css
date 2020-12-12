@@ -112,6 +112,27 @@ class CDRipCommand(BaseCommand):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  # pylint: disable=too-many-locals
+  @staticmethod
+  def cmd_rip(argv, options):
+    ''' Usage: {cmd} [disc_id]
+          Pull the audio into a subdirectory of the current directory.
+    '''
+    fstags = options.fstags
+    dirpath = options.dirpath
+    disc_id = None
+    if argv:
+      disc_id = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    rip(
+        options.device,
+        options.mbdb,
+        output_dirpath=dirpath,
+        disc_id=disc_id,
+        fstags=fstags
+    )
+
   @staticmethod
   def cmd_toc(argv, options):
     ''' Usage: {cmd} [disc_id]
