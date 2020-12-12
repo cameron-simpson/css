@@ -63,6 +63,7 @@ class CDRipCommand(BaseCommand):
     options.tocdir = None
     options.force = False
     options.device = os.environ.get('CDRIP_DEV', "default")
+    options.dirpath = os.environ.get('CDRIP_DIR', ".")
 
   @staticmethod
   def apply_opts(opts, options):
