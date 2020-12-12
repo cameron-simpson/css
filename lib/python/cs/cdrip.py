@@ -268,7 +268,7 @@ class MBDB(MultiOpenMixin):
     A = None
     if artist_id == self.VARIOUS_ARTISTS_ID:
       A = {
-          'artist_name': 'Various Artists',
+          'name': 'Various Artists',
       }
     else:
       includes = []
