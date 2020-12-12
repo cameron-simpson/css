@@ -153,7 +153,8 @@ class MBTaggedEntity(SQLTaggedEntity):
       value = self.tags[attr]
     except KeyError:
       raise AttributeError(
-          'tags[%r] (have %r)' % (attr, sorted(self.tags.keys()))
+          '%s:%r.tags[%r] (have %r)' %
+          (type(self).__name__, self.name, attr, sorted(self.tags.keys()))
       )
     return value
 
