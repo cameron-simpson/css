@@ -160,12 +160,12 @@ class MBTaggedEntity(SQLTaggedEntity):
   def artists(self):
     ''' Return a list of the artists.
     '''
-    return list(map(self.mbdb.artist, self.tags['artists']))
+    return list(map(self.mbdb.artist, self.tags['artist_ids']))
 
   def recordings(self):
     ''' Return a list of the recordings.
     '''
-    return list(map(self.mbdb.recording, self.tags['recordings']))
+    return list(map(self.mbdb.recording, self.tags['recording_ids']))
 
   def artist_names(self):
     ''' Return a list of artist names.
