@@ -136,6 +136,73 @@ class CDRipCommand(BaseCommand):
             ", ".join(recording.artist_names())
         )
 
+# pylint: disable=too-many-locals
+def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
+  ''' Pull audio from `device` and save in `output_dirpath`.
+  '''
+  if disc_id is None:
+    dev_info = discid.read(device=device)
+    disc_id = dev_info.id
+  if fstags is None:
+    fstags = FSTags()
+  with Pfx("MB: discid %s", disc_id, print=True):
+    disc = mbdb.disc(disc_id)
+  level1 = ", ".join(disc.artist_names()).replace(os.sep, '_')
+  level2 = disc.title
+  if disc.medium_count > 1:
+    level2 += f" ({disc.medium_position} of {disc.medium_count})"
+  subdir = joinpath(output_dirpath, level1, level2)
+  if not isdirpath(subdir):
+    with Pfx("makedirs(%r)", subdir, print=True):
+      os.makedirs(subdir)
+  fstags[subdir].update(
+      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names())
+  )
+  for tracknum, recording in enumerate(disc.recordings(), 1):
+    track_tags = TagSet(
+        discid=disc.id,
+        artists=recording.artist_names(),
+        title=recording.title,
+        track=tracknum
+    )
+    track_artists = ", ".join(recording.artist_names())
+    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
+    wav_filename = joinpath(subdir, track_base + '.wav')
+    mp3_filename = joinpath(subdir, track_base + '.mp3')
+    with NamedTemporaryFile(dir=subdir,
+                            prefix=f"cdparanoia--track{tracknum}--",
+                            suffix='.wav') as T:
+      argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
+      with Pfx("+ %r", argv, print=True):
+        subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+      with Pfx("%r => %r", T.name, wav_filename, print=True):
+        os.link(T.name, wav_filename)
+    fstags[wav_filename].update(track_tags)
+    argv = [
+        'lame',
+        '-q',
+        '7',
+        '-V',
+        '0',
+        '--tt',
+        recording.title,
+        '--ta',
+        track_artists,
+        '--tl',
+        level2,
+        ## '--ty',recording year
+        '--tn',
+        str(tracknum),
+        ## '--tg', recording genre
+        ## '--ti', album cover filename
+        wav_filename,
+        mp3_filename
+    ]
+    with Pfx("+ %r", argv, print=True):
+      subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+    fstags[mp3_filename].update(track_tags)
+  os.system("eject")
+
 class MBTaggedEntity(SQLTaggedEntity):
   ''' An `SQLTaggedEntity` subclass for MB entities.
   '''
