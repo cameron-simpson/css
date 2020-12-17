@@ -247,6 +247,12 @@ class MBTaggedEntity(SQLTaggedEntity):
     '''
     return self.sqltags.mbdb
 
+  @property
+  def ontology(self):
+    ''' The `TagsOntology` for this entity.
+    '''
+    return self.mbdb.ontology
+
   def __getattr__(self, attr):
     if attr in ('sqltags', 'tags'):
       raise AttributeError("MBTaggedEntity.__getattr__: no .%s" % (attr,))
