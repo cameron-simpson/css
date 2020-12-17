@@ -32,10 +32,11 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
+from cs.sqlalchemy_utils import orm_auto_session
 from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
-from cs.tagset import TagSet
+from cs.tagset import TagSet, TagsOntology
 
 __version__ = '20201004-dev'
 
@@ -287,9 +288,10 @@ class MBSQLTags(SQLTags):
 
   TaggedEntityClass = MBTaggedEntity
 
+  @orm_auto_session
   @pfx_method
-  def default_factory(self, name: str):
-    te = super().default_factory(name)
+  def default_factory(self, name: str, *, session, unixtime=None):
+    te = super().default_factory(name, session=session, unixtime=unixtime)
     assert te.name == name
     mbdb = te.sqltags.mbdb
     if name.startswith('meta.'):
@@ -343,6 +345,8 @@ class MBDB(MultiOpenMixin):
 
   @staticmethod
   def _get(typename, db_id, includes, id_name='id', record_key=None):
+    ''' Fetch data from the Musicbrainz API.
+    '''
     if record_key is None:
       record_key = typename
     getter_name = f'get_{typename}_by_{id_name}'
@@ -364,6 +368,8 @@ class MBDB(MultiOpenMixin):
     return mb_info
 
   def _tagif(self, tags, name, value):
+    ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
+    '''
     with self.sqltags:
       if value is not None:
         tags.set(name, value)
