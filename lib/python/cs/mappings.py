@@ -1198,7 +1198,10 @@ class PrefixedMappingProxy:
 
   def keys(self):
     prefix = self.prefix
-    return filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    return map(
+        lambda k: cutprefix(k, prefix),
+        filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    )
 
   def __contains__(self, k):
     return self.prefix + k in self.mapping

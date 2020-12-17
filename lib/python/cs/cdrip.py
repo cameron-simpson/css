@@ -32,10 +32,11 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
+from cs.sqlalchemy_utils import orm_auto_session
 from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
-from cs.tagset import TagSet
+from cs.tagset import TagSet, TagsOntology
 
 __version__ = '20201004-dev'
 
@@ -161,7 +162,7 @@ class CDRipCommand(BaseCommand):
       dev_info = discid.read(device=options.device)
       disc_id = dev_info.id
     with Pfx("discid %s", disc_id):
-      disc = MB.disc(disc_id)
+      disc = MB.discs[disc_id]
       print(disc.title)
       print(", ".join(disc.artist_names()))
       for tracknum, recording in enumerate(disc.recordings(), 1):
@@ -194,7 +195,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
   )
   for tracknum, recording in enumerate(disc.recordings(), 1):
     track_tags = TagSet(
-        discid=disc.id,
+        discid=disc.tags['musicbrainz.disc_id'],
         artists=recording.artist_names(),
         title=recording.title,
         track=tracknum
@@ -247,6 +248,12 @@ class MBTaggedEntity(SQLTaggedEntity):
     '''
     return self.sqltags.mbdb
 
+  @property
+  def ontology(self):
+    ''' The `TagsOntology` for this entity.
+    '''
+    return self.mbdb.ontology
+
   def __getattr__(self, attr):
     if attr in ('sqltags', 'tags'):
       raise AttributeError("MBTaggedEntity.__getattr__: no .%s" % (attr,))
@@ -261,14 +268,14 @@ class MBTaggedEntity(SQLTaggedEntity):
     return value
 
   def artists(self):
-    ''' Return a list of the artists.
+    ''' Return a list of the artists' metadata.
     '''
-    return list(map(self.mbdb.artist, self.tags['artist_ids']))
+    return self.tag('artists').metadata(convert=str)
 
   def recordings(self):
     ''' Return a list of the recordings.
     '''
-    return list(map(self.mbdb.recording, self.tags['recording_ids']))
+    return self.tag('recordings').metadata(convert=str)
 
   def artist_names(self):
     ''' Return a list of artist names.
@@ -280,6 +287,25 @@ class MBSQLTags(SQLTags):
   '''
 
   TaggedEntityClass = MBTaggedEntity
+
+  @orm_auto_session
+  @pfx_method
+  def default_factory(self, name: str, *, session, unixtime=None):
+    te = super().default_factory(name, session=session, unixtime=unixtime)
+    assert te.name == name
+    mbdb = te.sqltags.mbdb
+    if name.startswith('meta.'):
+      try:
+        _, typename, _ = name.split('.', 2)
+      except ValueError:
+        pass
+      else:
+        fill_in = getattr(mbdb, '_fill_in_' + typename, None)
+        if fill_in:
+          fill_in(te)
+        else:
+          warning("no fill_in for typename=%r", typename)
+    return te
 
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
@@ -294,9 +320,13 @@ class MBDB(MultiOpenMixin):
     sqltags.mbdb = self
     with sqltags:
       sqltags.init()
-    self.artists = sqltags.subdomain('artist')
-    self.discs = sqltags.subdomain('disc')
-    self.recordings = sqltags.subdomain('recording')
+      ont = self.ontology = TagsOntology(sqltags)
+      self.artists = sqltags.subdomain('meta.artist')
+      ont['type.artists'].update(type='list', member_type='artist')
+      self.discs = sqltags.subdomain('meta.disc')
+      ont['type.discs'].update(type='list', member_type='disc')
+      self.recordings = sqltags.subdomain('meta.recording')
+      ont['type.recordings'].update(type='list', member_type='recording')
 
   def startup(self):
     ''' Start up the `MBDB`: open the `SQLTags`.
@@ -315,6 +345,8 @@ class MBDB(MultiOpenMixin):
 
   @staticmethod
   def _get(typename, db_id, includes, id_name='id', record_key=None):
+    ''' Fetch data from the Musicbrainz API.
+    '''
     if record_key is None:
       record_key = typename
     getter_name = f'get_{typename}_by_{id_name}'
@@ -336,6 +368,8 @@ class MBDB(MultiOpenMixin):
     return mb_info
 
   def _tagif(self, tags, name, value):
+    ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
+    '''
     with self.sqltags:
       if value is not None:
         tags.set(name, value)
@@ -350,12 +384,12 @@ class MBDB(MultiOpenMixin):
 
   @staticmethod
   def tag_artists_from_credits(tags, mb_dict):
-    ''' Set `tags.artist_ids` from `mb_dict['artist-credit']`.
+    ''' Set `tags.artists` from `mb_dict['artist-credit']`.
     '''
     artist_credits = mb_dict.get('artist-credit')
     if artist_credits is not None:
       tags.set(
-          'artist_ids', [
+          'artists', [
               credit['artist']['id']
               for credit in artist_credits
               if not isinstance(credit, str)
@@ -363,11 +397,9 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def artist(self, artist_id: str, force=False) -> SQLTaggedEntity:
-    ''' Return the artist for `artist_id`.
-    '''
-    ##force = True
-    te = self.artists.make(artist_id)
+  def _fill_in_artist(self, te: MBTaggedEntity, force=False):
+    assert te.name.startswith('meta.artist.')
+    artist_id = te.name.split('.', 2)[-1]
     tags = te.tags
     tags['musicbrainz.artist_id'] = artist_id
     A = None
@@ -390,12 +422,14 @@ class MBDB(MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @typechecked
-  def disc(self, disc_id: str, force=False) -> SQLTaggedEntity:
+  def _fill_in_disc(self, te: MBTaggedEntity, force=False):
     ''' Return the `disc.`*disc_id* entry.
         Update from MB as required before return.
     '''
     ##force = True
-    te = self.discs.make(disc_id)
+    assert te.name.startswith('meta.disc.')
+    disc_id = te.name.split('.', 2)[-1]
+    te = self.discs[disc_id]
     tags = te.tags
     tags['musicbrainz.disc_id'] = disc_id
     includes = []
@@ -433,17 +467,17 @@ class MBDB(MultiOpenMixin):
           warning('no medium[track-list]')
         else:
           tags.set(
-              'recording_ids',
-              [track['recording']['id'] for track in track_list]
+              'recordings', [track['recording']['id'] for track in track_list]
           )
     return te
 
   @typechecked
-  def recording(self, recording_id: str, force=False) -> SQLTaggedEntity:
+  def _fill_in_recording(self, te: MBTaggedEntity, force=False):
     ''' Return the recording for `recording_id`.
     '''
     ##force = True
-    te = self.recordings.make(recording_id)
+    assert te.name.startswith('meta.recording.')
+    recording_id = te.name.split('.', 2)[-1]
     tags = te.tags
     tags['musicbrainz.recording_id'] = recording_id
     includes = []
