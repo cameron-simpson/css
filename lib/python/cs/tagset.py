@@ -2067,6 +2067,11 @@ class TaggedEntity(TaggedEntityMixin):
         type(self).__name__, self.name, self.id, self.unixtime, self.tags
     )
 
+  def tag(self, tag_name, ontology=None):
+    ''' Return a `Tag` for `tag_name`, or `None` if missing.
+    '''
+    return self.tags.tag(tag_name, ontology=ontology)
+
   def set(self, tag_name, value, *, verbose=None):
     ''' Set a tag on `self.tags`.
     '''
