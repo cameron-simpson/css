@@ -277,7 +277,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         return True
     return False
 
-  def tag(self, tag_name, prefix=None):
+  def tag(self, tag_name, prefix=None, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
     '''
     try:
@@ -287,7 +287,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     return Tag(
         prefix + '.' + tag_name if prefix else tag_name,
         value,
-        ontology=self.ontology
+        ontology=ontology or self.ontology
     )
 
   def as_tags(self, prefix=None):
