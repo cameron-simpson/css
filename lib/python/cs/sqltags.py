@@ -1467,10 +1467,10 @@ class SQLTags(MultiOpenMixin):
     entity_map = {}
     for row in query:
       entity_id = row.id
-      e = entity_map.get(entity_id)
-      if not e:
+      te = entity_map.get(entity_id)
+      if not te:
         # not seen before
-        e = entity_map[entity_id] = cls(
+        te = entity_map[entity_id] = cls(
             id=entity_id,
             name=row.name,
             unixtime=row.unixtime,
@@ -1484,7 +1484,7 @@ class SQLTags(MultiOpenMixin):
         tag_value = tags.pick_value(
             row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
-        e.tags.set(row.tag_name, tag_value, skip_db=True)
+        te.tags.set(row.tag_name, tag_value, skip_db=True)
     for te in entity_map.values():
       if all(criterion.match_tagged_entity(te) for criterion in criteria):
         yield te
