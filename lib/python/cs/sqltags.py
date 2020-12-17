@@ -1421,12 +1421,12 @@ class SQLTags(MultiOpenMixin):
   def __getitem__(self, index, *, session, cls=None):
     ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
     '''
-    te = self.get(index, session=session, cls=cls)
-    if te is None:
-      if isinstance(index, int):
-        raise IndexError("%s[%r]" % (self, index))
-      raise KeyError("%s[%r]" % (self, index))
-    return te
+    if isinstance(index, int):
+      te = self.get(index, session=session, cls=cls)
+      if te is None:
+        raise IndexError(index)
+      return te
+    return super().__getitem__(index)
 
   @orm_auto_session
   def keys(self, *, session):
