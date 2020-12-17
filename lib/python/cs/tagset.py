@@ -2067,6 +2067,14 @@ class TaggedEntity(TaggedEntityMixin):
         type(self).__name__, self.name, self.id, self.unixtime, self.tags
     )
 
+  __repr__ = __str__
+
+  def __getitem__(self, tag_name: str):
+    return self.tags[tag_name]
+
+  def __contains__(self, tag_name: str):
+    return tag_name in self.tags
+
   def tag(self, tag_name, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
     '''
