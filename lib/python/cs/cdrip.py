@@ -372,12 +372,12 @@ class MBDB(MultiOpenMixin):
 
   @staticmethod
   def tag_artists_from_credits(tags, mb_dict):
-    ''' Set `tags.artist_ids` from `mb_dict['artist-credit']`.
+    ''' Set `tags.artists` from `mb_dict['artist-credit']`.
     '''
     artist_credits = mb_dict.get('artist-credit')
     if artist_credits is not None:
       tags.set(
-          'artist_ids', [
+          'artists', [
               credit['artist']['id']
               for credit in artist_credits
               if not isinstance(credit, str)
@@ -455,8 +455,7 @@ class MBDB(MultiOpenMixin):
           warning('no medium[track-list]')
         else:
           tags.set(
-              'recording_ids',
-              [track['recording']['id'] for track in track_list]
+              'recordings', [track['recording']['id'] for track in track_list]
           )
     return te
 
