@@ -1610,7 +1610,7 @@ class TagsOntology(SingletonMixin):
     return TaggedEntity(name=name or index, tags=self[index])
 
   def type(self, type_name):
-    ''' Return the `TagSet` defining the type named `type_name`.
+    ''' Return the `TaggedEntity` defining the type named `type_name`.
     '''
     return self[self.type_index(type_name)]
 
