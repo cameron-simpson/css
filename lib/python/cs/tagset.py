@@ -157,6 +157,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
 import fnmatch
+from fnmatch import fnmatchcase
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -176,10 +177,11 @@ from cs.lex import (
     FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
-from cs.mappings import AttrableMappingMixin
+from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
+from cs.resources import MultiOpenMixin
 
 __version__ = '20200716-post'
 
@@ -226,6 +228,10 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   '''
 
   @pfx_method
+  @require(
+      lambda _ontology: _ontology is None or
+      isinstance(_ontology, TagsOntology)
+  )
   def __init__(self, *a, _ontology=None, **kw):
     ''' Initialise the `TagSet`.
 
@@ -471,6 +477,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         if the `ontology` parameter is not `None`
   '''
 
+  @require(
+      lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
+  )
   def __new__(cls, name, value=None, *, ontology=None):
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
@@ -678,7 +687,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           except JSONDecodeError as e:
             raise ValueError(
                 "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
-            )
+            ) from e
           offset += suboffset
     return value, offset
 
@@ -887,7 +896,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     try:
       return self.typedata['key_type']
     except KeyError:
-      raise AttributeError('key_type')
+      raise AttributeError('key_type')  # pylint: disable=raise-missing-from
 
   @property
   @pfx_method
@@ -899,7 +908,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     try:
       return self.typedata['member_type']
     except KeyError:
-      raise AttributeError('member_type')
+      raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
 class TaggedEntityCriterion(ABC):
   ''' A testable criterion for a `TagSet`.
@@ -1203,7 +1212,7 @@ class ExtendedNamespace(SimpleNamespace):
       try:
         value = getattr(self, attr)
       except AttributeError:
-        raise KeyError(attr)
+        raise KeyError(attr)  # pylint: disable=raise-missing-from
       return value
 
 class TagSetNamespace(ExtendedNamespace):
@@ -1622,7 +1631,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
     ''' Return the length of `self.te_mapping`.
     '''
     raise NotImplementedError(
-        "%s: no .__len__() method" % (type(self).__name,)
+        "%s: no .__len__() method" % (type(self).__name__,)
     )
 
   def subdomain(self, subname):
