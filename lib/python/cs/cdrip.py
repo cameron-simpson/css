@@ -294,9 +294,13 @@ class MBDB(MultiOpenMixin):
     sqltags.mbdb = self
     with sqltags:
       sqltags.init()
-    self.artists = sqltags.subdomain('artist')
-    self.discs = sqltags.subdomain('disc')
-    self.recordings = sqltags.subdomain('recording')
+      ont = self.ontology = TagsOntology(sqltags)
+      self.artists = sqltags.subdomain('meta.artist')
+      ont['type.artists'].update(type='list', member_type='artist')
+      self.discs = sqltags.subdomain('meta.disc')
+      ont['type.discs'].update(type='list', member_type='disc')
+      self.recordings = sqltags.subdomain('meta.recording')
+      ont['type.recordings'].update(type='list', member_type='recording')
 
   def startup(self):
     ''' Start up the `MBDB`: open the `SQLTags`.
@@ -363,11 +367,9 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def artist(self, artist_id: str, force=False) -> SQLTaggedEntity:
-    ''' Return the artist for `artist_id`.
-    '''
-    ##force = True
-    te = self.artists.make(artist_id)
+  def _fill_in_artist(self, te: MBTaggedEntity, force=False):
+    assert te.name.startswith('meta.artist.')
+    artist_id = te.name.split('.', 2)[-1]
     tags = te.tags
     tags['musicbrainz.artist_id'] = artist_id
     A = None
@@ -390,12 +392,14 @@ class MBDB(MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @typechecked
-  def disc(self, disc_id: str, force=False) -> SQLTaggedEntity:
+  def _fill_in_disc(self, te: MBTaggedEntity, force=False):
     ''' Return the `disc.`*disc_id* entry.
         Update from MB as required before return.
     '''
     ##force = True
-    te = self.discs.make(disc_id)
+    assert te.name.startswith('meta.disc.')
+    disc_id = te.name.split('.', 2)[-1]
+    te = self.discs[disc_id]
     tags = te.tags
     tags['musicbrainz.disc_id'] = disc_id
     includes = []
@@ -439,11 +443,12 @@ class MBDB(MultiOpenMixin):
     return te
 
   @typechecked
-  def recording(self, recording_id: str, force=False) -> SQLTaggedEntity:
+  def _fill_in_recording(self, te: MBTaggedEntity, force=False):
     ''' Return the recording for `recording_id`.
     '''
     ##force = True
-    te = self.recordings.make(recording_id)
+    assert te.name.startswith('meta.recording.')
+    recording_id = te.name.split('.', 2)[-1]
     tags = te.tags
     tags['musicbrainz.recording_id'] = recording_id
     includes = []
