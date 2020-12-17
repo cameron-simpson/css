@@ -1390,8 +1390,8 @@ class SQLTags(MultiOpenMixin):
 
   @orm_auto_session
   @typechecked
-  def make(self, name: str, *, session, unixtime=None):
-    ''' Fetch or create an `SQLTagged
+  def default_factory(self, name: str, *, session, unixtime=None):
+    ''' Fetch or create an `SQLTaggedEntity` for `name`.
     '''
     te = None if name is None else self.get(name)
     if te is None:
