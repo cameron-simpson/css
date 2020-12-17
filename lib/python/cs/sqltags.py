@@ -1324,6 +1324,16 @@ class SQLTags(MultiOpenMixin):
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
 
+  @orm_auto_session
+  @typechecked
+  def default_factory(self, name: str, *, session, unixtime=None):
+    ''' Fetch or create an `SQLTaggedEntity` for `name`.
+    '''
+    te = None if name is None else self.get(name)
+    if te is None:
+      te = self.add(name, session=session, unixtime=unixtime)
+    return te
+
   @staticmethod
   @fmtdoc
   def infer_db_url(envvar=None, default_path=None):
@@ -1392,16 +1402,6 @@ class SQLTags(MultiOpenMixin):
     te = self.get(entity.id, session=session)
     for tag in tags:
       te.set(tag.name, tag.value)
-    return te
-
-  @orm_auto_session
-  @typechecked
-  def default_factory(self, name: str, *, session, unixtime=None):
-    ''' Fetch or create an `SQLTaggedEntity` for `name`.
-    '''
-    te = None if name is None else self.get(name)
-    if te is None:
-      te = self.add(name, session=session, unixtime=unixtime)
     return te
 
   @orm_auto_session
