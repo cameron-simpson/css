@@ -824,7 +824,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     typedata = self.typedata
     if typedata is None:
       return None
-    type_name = typedata.get('type')
+    type_name = typedata.type
     if type_name is None:
       type_name = self.ontology.value_to_tag_name(self.name)
     return type_name
