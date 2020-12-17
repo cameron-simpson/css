@@ -1357,7 +1357,7 @@ class TagSetNamespace(ExtendedNamespace):
           meaningful if `self._tag.value` has a `keys` method
         * `_meta`: a namespace containing the meta information
           for the `Tag` associated with this node:
-          `self._tag.metadata.ns()`
+          `self._tag.meta.ns()`
         * `_type`: a namespace containing the type definition
           for the `Tag` associated with this node:
           `self._tag.typedata.ns()`
@@ -1390,7 +1390,7 @@ class TagSetNamespace(ExtendedNamespace):
       if attr == '_type':
         return self._tag.typedata.ns()
       if attr == '_meta':
-        return self._tag.metadata.ns()
+        return self._tag.meta.ns()
       if attr == '_keys':
         tag = getns('_tag')
         if tag is not None:
