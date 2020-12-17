@@ -1302,7 +1302,7 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
         tag_name, value, session=session
     )
 
-class SQLTags(MultiOpenMixin):
+class SQLTags(TaggedEntities):
   ''' A class to embodying an database and its entities and tags.
   '''
 
