@@ -1516,7 +1516,137 @@ class ValueMetadataNamespace(TagSetNamespace):
         "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
     ).__format__(spec)
 
-class TagsOntology(SingletonMixin):
+class TaggedEntities(MultiOpenMixin, ABC):
+  ''' Base class for collections of `TaggedEntity` instances
+      such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
+
+      Examples of this include:
+      * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSets`
+      * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
+
+      Subclasses must implement:
+      * `add(name)`: create a new `TaggedEntity` associated with `name`,
+        which should not already be in use.
+      * `get(name,default=None)`: return the `TaggedEntity` associated
+        with `name`, or `default`.
+
+      Subclasses may reasonably want to define the following:
+      * `default_factory(self,name)`: like `defaultdict`, if this not `None`
+        it is called as `default_factory(name)`
+        from `__getitem__` for missing names.
+      * `startup(self)`: allocate any needed resources
+        such as database connections
+      * `shutdown(self)`: write pending changes to a backing store,
+        release resources acquired during `startup`
+      * `keys(self)`: return an iterable of names
+      * `__len__(self)`: return the number of names
+  '''
+
+  default_factory = None
+
+  def __init__(self):
+    ''' Initialise the collection.
+    '''
+
+  def __str__(self):
+    return "%s<%s>" % (type(self).__name__, id(self))
+
+  __repr__ = __str__
+
+  def startup(self):
+    ''' Allocate any needed resources such as database connections.
+    '''
+
+  def shutdown(self):
+    ''' Write any pending changes to a backing store,
+        release resources allocated during `startup`.
+    '''
+
+  _missing = object()
+
+  @pfx_method(use_str=True)
+  def __missing__(self, name: str):
+    ''' Like `dict`, the `__missing__` method autocreates new `TaggedEntity` 
+
+        This is called from `__getitem__` is `name` is missing
+        and uses the factory `self.default_factory`.
+        If that is `None` raise `KeyError`,
+        otherwise call `self.default_factory(name)`.
+        If that returns `None` raise `KeyError`,
+        otherwise return the entity.
+    '''
+    te_factory = self.default_factory
+    if te_factory is None:
+      raise KeyError(name)
+    return te_factory(name)
+
+  @abstractmethod
+  def add(self, name: str):
+    ''' Return a new `TaggedEntity` associated with `name`,
+        which should not already be in use.
+    '''
+    raise NotImplementedError(
+        "%s: no .create(name) method" % (type(self).__name__,)
+    )
+
+  @abstractmethod
+  def get(self, name: str, default=None):
+    ''' Return the `TaggedEntity` associated with `name`,
+        or `default` if there is no such entity.
+    '''
+    raise NotImplementedError(
+        "%s: no .get(name,default=None) method" % (type(self).__name__,)
+    )
+
+  def __getitem__(self, name: str):
+    ''' Obtain the `TaggedEntity` associated with `name`.
+
+        If `name` is not presently mapped,
+        return `self.__missing__(name)`.
+    '''
+    te = self.get(name, default=self._missing)
+    if te is self._missing:
+      te = self.__missing__(name)
+    return te
+
+  def __contains__(self, name: str):
+    ''' Test whether `name` is present in `self.te_mapping`.
+    '''
+    missing = object()
+    return self.get(name) is not missing
+
+  def __len__(self):
+    ''' Return the length of `self.te_mapping`.
+    '''
+    raise NotImplementedError(
+        "%s: no .__len__() method" % (type(self).__name,)
+    )
+
+  def subdomain(self, subname):
+    ''' Return a proxy for this `TaggedEntities` for the `name`s
+        starting with `subname+'.'`.
+    '''
+    return TaggedEntitiesSubdomain(self, subname)
+
+class TaggedEntitiesSubdomain(SingletonMixin, PrefixedMappingProxy):
+  ''' A view into a `TaggedEntities` for keys commencing with a prefix.
+  '''
+
+  @classmethod
+  def _singleton_key(cls, tes, subdomain: str):
+    return id(tes), subdomain
+
+  def __init__(self, tes, subdomain: str):
+    PrefixedMappingProxy.__init__(self, tes, subdomain + '.')
+    self.tes = tes
+
+  @property
+  def TAGGED_ENTITY_FACTORY(self):
+    ''' The entity factory comes from the parent collection.
+    '''
+    return self.tes.TAGGED_ENTITY_FACTORY
+
+class TagsOntology(SingletonMixin, TaggedEntities):
   ''' An ontology for tag names.
 
       This is based around a mapping of names
