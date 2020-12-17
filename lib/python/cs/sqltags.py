@@ -1522,48 +1522,5 @@ class SQLTags(MultiOpenMixin):
       with Pfx(tag):
         e.add_tag(tag, session=session)
 
-  def subdomain(self, subname):
-    ''' Return a proxy for this `SQLTags` for the `name`s
-        starting with `subname+'.'`.
-    '''
-    return SQLTagsSubdomain(self, subname)
-
-class SQLTagsSubdomain(PrefixedMappingProxy):
-  ''' A view into an `SQLTags` for keys commences with a prefix.
-  '''
-
-  def __init__(self, sqltags, subdomain):
-    PrefixedMappingProxy.__init__(self, sqltags, subdomain + '.')
-    self.sqltags = sqltags
-
-  def add(self, name, **kw):
-    ''' Add a new `SQLTaggedEntity` named `name`.
-        Return the entity.
-
-        This is a proxy for `SQLTags.add(self.prefix+name)`.
-    '''
-    return self.sqltags(self.prefix + name, **kw)
-
-  def find(self, criteria, **kw):
-    ''' Search for `criteria`, yield instances of `SQLTaggedEntity`.
-
-        This is a proxy for `SQLTags.find(criteria)`.
-        Note that the `criteria` are passed through to the primary `SQLTags`
-        and therefore name based tests test against the full `name`.
-    '''
-    prefix = self.prefix
-    return filter(
-        lambda te: te.name.startswith(prefix),
-        self.sqltags.find(criteria, **kw)
-    )
-
-  def make(self, name, **kw):
-    ''' Return the `SQLTaggedEntity` named `name`,
-        creating it if necessary.
-
-        This is a proxy for `SQLTags.make(self.prefix+name)`.
-    '''
-    return self.sqltags.make(self.prefix + name, **kw)
-
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
