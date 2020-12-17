@@ -2077,6 +2077,11 @@ class TaggedEntity(TaggedEntityMixin):
     '''
     self.discard(tag_name, value, verbose=verbose)
 
+  def update(self, **kw):
+    ''' Update the tags using keyword parameters.
+    '''
+    return self.tags.update(kw)
+
   def edit(self, verbose=None):
     ''' Edit the `Tag`s of this `TaggedEntity`.
     '''
