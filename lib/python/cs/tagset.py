@@ -685,7 +685,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @pfx_method(use_str=True)
   def typedata(self):
-    ''' The defining `TagSet` for this tag's name.
+    ''' The defining `TaggedEntity` for this tag's name.
 
         This is how its type is defined,
         and is obtained from:
