@@ -1428,8 +1428,6 @@ class SQLTags(MultiOpenMixin):
       raise KeyError("%s[%r]" % (self, index))
     return te
 
-  def __contains__(self, index):
-    return self.get(index) is not None
 
   @orm_auto_session
   def find(self, criteria, *, session, cls=None):
