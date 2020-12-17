@@ -32,11 +32,18 @@ import time
 from typing import List
 from icontract import require
 from sqlalchemy import (
-    create_engine, Column, Integer, Float, String, JSON, ForeignKey,
-    UniqueConstraint
+    create_engine,
+    select,
+    Column,
+    Integer,
+    Float,
+    String,
+    JSON,
+    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
-from sqlalchemy.sql.expression import and_
+from sqlalchemy.sql.expression import and_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, pushattrs, popattrs
@@ -45,10 +52,8 @@ from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix, get_decimal_value
 from cs.logutils import error, warning, ifverbose
-from cs.mappings import PrefixedMappingProxy
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
-from cs.resources import MultiOpenMixin
+from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
     ORM,
     orm_method,
@@ -60,7 +65,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TaggedEntityCriterion, TagBasedTest, TagsCommandMixin,
-    TaggedEntity
+    TagsOntology, TaggedEntity, TaggedEntities
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -76,9 +81,9 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
-        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mappings', 'cs.pfx',
-        'cs.resources', 'cs.sqlalchemy_utils', 'cs.tagset',
-        'cs.threads>=20201025', 'icontract', 'sqlalchemy', 'typeguard'
+        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx',
+        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025',
+        'icontract', 'sqlalchemy', 'typeguard'
     ],
 }
 
@@ -113,7 +118,8 @@ def glob2like(glob: str) -> str:
 
 class SQLParameters(namedtuple(
     'SQLParameters', 'criterion table alias entity_id_column constraint')):
-  ''' The parameters required for constructing queries or extending queries with JOINs.
+  ''' The parameters required for constructing queries
+      or extending queries with JOINs.
   '''
 
 class SQTCriterion(TaggedEntityCriterion):
@@ -479,6 +485,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         with Pfx(te):
           csvw.writerow(te.csvrow)
 
+  # pylint: disable=too-many-locals
   @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
@@ -1126,7 +1133,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         new_values = None, None, new_value
         if isinstance(new_value, datetime):
           # store datetime as unixtime
-          new_value = self.datetime2unixtime(new_value)
+          new_value = datetime2unixtime(new_value)
         elif isinstance(new_value, float):
           new_values = new_value, None, None
         elif isinstance(new_value, int):
@@ -1149,12 +1156,12 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             will just be `other_value`,
             but for certain types the `test_value` will be:
             * `NoneType`: `None`, and the column will also be `None`
-            * `datetime`: `cls.datetime2unixtime(other_value)`
+            * `datetime`: `datetime2unixtime(other_value)`
         '''
         if other_value is None:
           return None, None
         if isinstance(other_value, datetime):
-          return cls.float_value, cls.datetime2unixtime(other_value)
+          return cls.float_value, datetime2unixtime(other_value)
         if isinstance(other_value, float):
           return cls.float_value, other_value
         if isinstance(other_value, int):
