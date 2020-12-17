@@ -161,7 +161,7 @@ class CDRipCommand(BaseCommand):
       dev_info = discid.read(device=options.device)
       disc_id = dev_info.id
     with Pfx("discid %s", disc_id):
-      disc = MB.disc(disc_id)
+      disc = MB.discs[disc_id]
       print(disc.title)
       print(", ".join(disc.artist_names()))
       for tracknum, recording in enumerate(disc.recordings(), 1):
