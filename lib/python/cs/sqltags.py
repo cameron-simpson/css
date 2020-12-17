@@ -229,7 +229,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       lambda alias, cmp_value: case(
           [
               (
-                  isnot(alias.string_value, None),
+                  alias.string_value.isnot(None),
                   alias.string_value.like(glob2like(cmp_value))
               ),
           ],
