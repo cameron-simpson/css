@@ -1704,7 +1704,7 @@ class TagsOntology(SingletonMixin):
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_metadata(self, type_name, value):
+  def value_metadata(self, type_name, value, convert=None):
     ''' Return a `ValueMetadata` for `type_name` and `value`.
         This provides the mapping between a type's value and its semantics.
 
@@ -1714,18 +1714,20 @@ class TagsOntology(SingletonMixin):
             characters=["Captain America (Marvel)","Black Widow (Marvel)"]
 
         then these values could be converted to the dotted identifiers
-        `character.marvel.captain_america`
-        and `character.marvel.black_widow` respectively,
+        `characters.marvel.captain_america`
+        and `characters.marvel.black_widow` respectively,
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    if isinstance(value, (int, str)):
+    if convert:
+      value_tag_name = convert(value)
+      assert isinstance(value_tag_name, str) and value_tag_name
+    else:
       value_tag_name = self.value_to_tag_name(str(value))
-      ontkey = 'meta.' + type_name + '.' + '_'.join(
-          value_tag_name.lower().split()
-      )
-      return self[ontkey]
-    return None
+    ontkey = 'meta.' + type_name + '.' + '_'.join(
+        value_tag_name.lower().split()
+    )
+    return self[ontkey]
 
   def basetype(self, typename):
     ''' Infer the base type name from a type name.
