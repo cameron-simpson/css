@@ -1542,7 +1542,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
       * `__len__(self)`: return the number of names
   '''
 
-  default_factory = None
+  default_factory = lambda name: None
 
   def __init__(self):
     ''' Initialise the collection.
@@ -1566,7 +1566,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
 
   @pfx_method(use_str=True)
   def __missing__(self, name: str):
-    ''' Like `dict`, the `__missing__` method autocreates new `TaggedEntity` 
+    ''' Like `dict`, the `__missing__` method autocreates new `TaggedEntity`.
 
         This is called from `__getitem__` is `name` is missing
         and uses the factory `self.default_factory`.
@@ -1578,7 +1578,10 @@ class TaggedEntities(MultiOpenMixin, ABC):
     te_factory = self.default_factory
     if te_factory is None:
       raise KeyError(name)
-    return te_factory(name)
+    te = te_factory(name)
+    if te is None:
+      raise KeyError(name)
+    return te
 
   @abstractmethod
   def add(self, name: str):
