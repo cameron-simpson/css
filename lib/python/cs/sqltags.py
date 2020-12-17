@@ -1432,14 +1432,9 @@ class SQLTags(MultiOpenMixin):
     return self.get(index) is not None
 
   @orm_auto_session
-  def find(self, criteria, *, session, without_tags=False, cls=None):
+  def find(self, criteria, *, session, cls=None):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTaggedEntity` instances.
-
-        If the optional `without_tags` parameter (default `False`)
-        is true, this function does not JOIN against the `tags` table,
-        resulting in empty `.tags` `SQLTagSet`s
-        in the resulting `SQLTaggedEntity` instances.
     '''
     if cls is None:
       cls = self.TaggedEntityClass
@@ -1447,22 +1442,9 @@ class SQLTags(MultiOpenMixin):
     query = orm.entities.search(
         criteria,
         session=session,
-        mode=('entity' if without_tags else 'tagged')
+        mode='tagged',
     )
-    if without_tags:
-      # just assmble the TEs directly
-      for row in query:
-        te = cls(
-            id=row.entity_id,
-            name=row.name,
-            unixtime=row.unixtime,
-            tags=SQLTagSet(sqltags=self, entity_id=row.entity_id),
-            sqltags=self,
-        )
-        if all(criterion.match_tagged_entity(te) for criterion in criteria):
-          yield te
-      return
-    # obtain entities and tag information which must be merged
+    # merge entities and tag information
     tags = self.orm.tags
     entity_map = {}
     for row in query:
