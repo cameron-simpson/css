@@ -1580,34 +1580,24 @@ class TagsOntology(SingletonMixin):
   }
 
   @classmethod
-  def _singleton_key(cls, tagset_mapping):
-    return id(tagset_mapping)
+  def _singleton_key(cls, te_mapping):
+    return id(te_mapping)
 
-  def __init__(self, tagset_mapping):
-    if hasattr(self, 'tagsets'):
+  def __init__(self, te_mapping):
+    if hasattr(self, 'te_mapping'):
       return
-    self.tagsets = tagset_mapping
+    self.te_mapping = te_mapping
+    self.default_factory = te_mapping.default_factory
 
-  def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.tagsets)
-
-  __repr__ = __str__
-
-  def __getitem__(self, name: str):
-    assert isinstance(name, str)
-    try:
-      tags = self.tagsets[name]
-    except KeyError:
-      tags = self.tagsets[name] = TagSet(_ontology=self)
-    return tags
-
-  def entity(self, index, name=None):
-    ''' Return a `TaggedEntity` for the entry `index`.
-        If specified, `name` is used for the entity name instead of `index`.
-
-        The entity returned is not a singleton, but its `tags` attribute is.
+  def add(self, name):
+    ''' Proxy `.add` through to `self.te_mapping`.
     '''
-    return TaggedEntity(name=name or index, tags=self[index])
+    return self.te_mapping.name
+
+  def get(self, name, default=None):
+    ''' Proxy `.get` through to `self.te_mapping`.
+    '''
+    return self.te_mapping.get(name, default=default)
 
   def type(self, type_name):
     ''' Return the `TaggedEntity` defining the type named `type_name`.
