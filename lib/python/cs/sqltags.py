@@ -1214,11 +1214,17 @@ class SQLTagSet(TagSet, SingletonMixin):
   def _singleton_key(*, sqltags, entity_id, **_):
     return builtin_id(sqltags), entity_id
 
-  def __init__(self, *a, sqltags, entity_id, **kw):
+  @require(
+      lambda _ontology: _ontology is None or
+      isinstance(_ontology, TagsOntology)
+  )
+  def __init__(self, *a, sqltags, entity_id, _ontology=None, **kw):
     try:
       pre_sqltags = self.sqltags
     except AttributeError:
-      super().__init__(*a, **kw)
+      if _ontology is None:
+        _ontology = TagsOntology(sqltags)
+      super().__init__(*a, _ontology=_ontology, **kw)
       self.sqltags = sqltags
       self.entity_id = entity_id
     else:
