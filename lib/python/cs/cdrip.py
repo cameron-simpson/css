@@ -281,6 +281,24 @@ class MBSQLTags(SQLTags):
 
   TaggedEntityClass = MBTaggedEntity
 
+  @pfx_method
+  def default_factory(self, name: str):
+    te = super().default_factory(name)
+    assert te.name == name
+    mbdb = te.sqltags.mbdb
+    if name.startswith('meta.'):
+      try:
+        _, typename, _ = name.split('.', 2)
+      except ValueError:
+        pass
+      else:
+        fill_in = getattr(mbdb, '_fill_in_' + typename, None)
+        if fill_in:
+          fill_in(te)
+        else:
+          warning("no fill_in for typename=%r", typename)
+    return te
+
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `SQLTags` cache.
   '''
