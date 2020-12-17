@@ -1428,6 +1428,14 @@ class SQLTags(MultiOpenMixin):
       raise KeyError("%s[%r]" % (self, index))
     return te
 
+  @orm_auto_session
+  def keys(self, *, session):
+    ''' Return all the nonNULL names.
+    '''
+    return session.execute(
+        select(self.orm.entities.name
+               ).filter_by(self.orm.entities.name.isnot(None))
+    ).all()
 
   @orm_auto_session
   def find(self, criteria, *, session, cls=None):
