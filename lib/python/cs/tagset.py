@@ -843,11 +843,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     return ont.basetype(self.type)
 
-  @property
-  @require(lambda self: isinstance(self.type, str))
-  def metadata(self):
-    ''' The metadata information about this specific tag value,
-        derived through the ontology from the tag name and value.
+  def metadata(self, ontology=None, convert=None):
+    ''' Fetch the metadata information about this specific tag value,
+        derived through the `ontology` from the tag name and value.
+        The default `ontology` is `self.onotology`.
 
         For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
         for `self.value`.
@@ -857,11 +856,14 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
         For a mapping (`dict`) this is mapping of `key->value_metadata`.
     '''
-    ont = self.ontology
+    ont = ontology or self.ontology
     basetype = self.basetype
     if basetype == 'list':
       member_type = self.member_type
-      return [ont.value_metadata(member_type, value) for value in self.value]
+      return [
+          ont.value_metadata(member_type, value, convert=convert)
+          for value in self.value
+      ]
     if basetype == 'dict':
       member_type = self.member_type
       return {
@@ -869,6 +871,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           for key, value in self.value.items()
       }
     return ont.value_metadata(self.name, self.value)
+
+  @property
+  def meta(self):
+    ''' The `Tag` metadata derived from the `Tag`'s ontology.
+    '''
+    return self.metadata()
 
   @property
   def key_type(self):
