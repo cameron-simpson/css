@@ -1308,10 +1308,16 @@ class SQLTags(MultiOpenMixin):
 
   TaggedEntityClass = SQLTaggedEntity
 
-  def __init__(self, db_url=None):
+  @require(
+      lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
+  )
+  def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
+    if ontology is None:
+      ontology = self
     self.db_url = db_url
+    self.ontology = ontology
     self.orm = None
     self._lock = RLock()
 
