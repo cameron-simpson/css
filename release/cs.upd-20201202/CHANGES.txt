@@ -1,0 +1,6 @@
+lib/python/cs/upd.py: Release information for cs.upd-20201102.
+lib/python/cs/upd.py: cs.upd: handle failure of curses.setupterm(), throws TypeError in batch environments
+lib/python/cs/upd.py: cs.upd: Upd.insert: do not access curses if disabled
+lib/python/cs/upd.py: cs.upd: Upd.delete: silently accept delete(0) with no slots
+lib/python/cs/upd.py: cs.upd: Upd.insert: defer check for cuu1 capability until there's at least one line already
+lib/python/cs/upd.py: cs.upd: clean a tiny lint
