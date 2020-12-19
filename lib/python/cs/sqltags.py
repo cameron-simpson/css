@@ -1340,12 +1340,30 @@ class SQLTags(TaggedEntities):
 
   @orm_auto_session
   @typechecked
-  def default_factory(self, name: str, *, session, unixtime=None):
+  def default_factory(
+      self, name: [str, None], *, session, unixtime=None, tags=None
+  ):
     ''' Fetch or create an `SQLTaggedEntity` for `name`.
+
+        Note that `name` may be `None` to create a new "log" entry.
     '''
+    if tags is None:
+      tags = ()
     te = None if name is None else self.get(name)
     if te is None:
-      te = self.add(name, session=session, unixtime=unixtime)
+      if unixtime is None:
+        unixtime = time.time()
+      entity = self.orm.entities(name=name, unixtime=unixtime)
+      for tag in tags:
+        entity.add_tag(tag.name, tag.value, session=session)
+      session.add(entity)
+      session.flush()
+      te = self.get(entity.id, session=session)
+    else:
+      if unixtime is not None:
+        te.unixtime = unixtime
+      for tag in tags:
+        te.set(tag.name, tag.value, session=session)
     return te
 
   @staticmethod
