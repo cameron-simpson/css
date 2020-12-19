@@ -1515,11 +1515,14 @@ class SQLTags(TaggedEntities):
     for csvrow in csvr:
       with Pfx(csvr.line_num):
         te = TaggedEntity.from_csvrow(csvrow)
-        self.add_tagged_entity(te, session=session, update_mode=update_mode)
+        self.import_tagged_entity(te, session=session, update_mode=update_mode)
 
   @orm_auto_session
-  def add_tagged_entity(self, te, *, session, update_mode=False):
-    ''' Add the `TaggedEntity` `te`.
+  def import_tagged_entity(self, te, *, session, update_mode=False) -> None:
+    ''' Import the `TaggedEntity` `te`.
+
+        This updates the database with the contents of the supplied `TaggedEntity`,
+        which has no inherent relationship to the database.
 
         If `update_mode` is true
         named records which already exist will update from `te`,
