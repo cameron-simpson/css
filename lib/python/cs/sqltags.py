@@ -1259,7 +1259,8 @@ class SQLTagSet(TagSet, SingletonMixin):
       self.entity.discard_db_tag(tag_name, value, session=session)
     super().discard(tag_name, value, **kw)
 
-class SQLTaggedEntity(TaggedEntity, SingletonMixin):
+# TODO: unixtime property accessing the db_entity
+class SQLTaggedEntity(SingletonMixin, TaggedEntity):
   ''' A singleton `TaggedEntity` attached to an `SQLTags` instance.
   '''
 
@@ -1268,7 +1269,7 @@ class SQLTaggedEntity(TaggedEntity, SingletonMixin):
   def _singleton_key(*, sqltags, id, **_):
     return builtin_id(sqltags), id
 
-  def __init__(self, *, name=None, sqltags, **kw):
+  def __init__(self, *, sqltags, name=None, **kw):
     try:
       pre_sqltags = self.sqltags
     except AttributeError:
