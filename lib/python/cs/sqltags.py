@@ -1528,13 +1528,21 @@ class SQLTags(TaggedEntities):
         named records which already exist will update from `te`,
         otherwise the conflict will raise a `ValueError`.
     '''
-    e = self[te.name
-             ] if te.name else self[te.id] if te.id is not None else None
-    if e and not update_mode:
-      raise ValueError("entity named %r already exists" % (te.name,))
-    if e is None:
-      e = self.orm.entities(name=te.name or None, unixtime=te.unixtime)
+    entities = self.orm.entities
+    if te.name is None:
+      # new log entry
+      e = entities(name=None, unixtime=te.unixtime)
       session.add(e)
+    else:
+      e = self.orm.entities.lookup1(name=te.name, session=session)
+      if e:
+        if not update_mode:
+          raise ValueError("entity named %r already exists" % (te.name,))
+      else:
+        # new named entry
+        e = entities(name=te.name, unixtime=te.unixtime)
+        session.add(e)
+    # update the db entry
     for tag in te.tags:
       with Pfx(tag):
         e.add_tag(tag, session=session)
