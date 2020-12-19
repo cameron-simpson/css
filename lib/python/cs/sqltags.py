@@ -1290,7 +1290,7 @@ class SQLTaggedEntity(SingletonMixin, TaggedEntity):
     ''' Set the `.name`.
     '''
     if new_name != self._name:
-      e = self.sqltags.db_entity(self.id)
+      e = self.db_entity()
       e.name = new_name
       self._name = new_name
 
