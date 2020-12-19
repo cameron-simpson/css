@@ -1366,6 +1366,56 @@ class SQLTags(TaggedEntities):
         te.set(tag.name, tag.value, session=session)
     return te
 
+  @orm_auto_session
+  def add(self, name: [str, None], *, session, unixtime=None, tags=None):
+    ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
+        with `unixtime` (default `time.time()`
+        and the supplied `tags` (optional iterable of `Tag`s).
+        Return the new `SQLTaggedEntity`.
+    '''
+    if name is not None and name in self:
+      raise KeyError("%r: name already exists" % (name,))
+    return self.default_factory(
+        name, session=session, unixtime=unixtime, tags=tags
+    )
+
+  @orm_auto_session
+  def get(self, index, default=None, *, session):
+    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
+    '''
+    if isinstance(index, int):
+      tes = self.find([SQTEntityIdTest([index])], session=session)
+    elif isinstance(index, str):
+      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
+    else:
+      raise TypeError("unsupported index: %s:%r" % (type(index), index))
+    tes = list(tes)
+    if not tes:
+      return default
+    te, = tes
+    return te
+
+  @locked
+  @orm_auto_session
+  def __getitem__(self, index, *, session):
+    ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
+    '''
+    te = self.get(index, session=session)
+    if te is None:
+      if isinstance(index, int):
+        raise IndexError(index)
+      raise KeyError(index)
+    return te
+
+  @orm_auto_session
+  def keys(self, *, session):
+    ''' Return all the nonNULL names.
+    '''
+    return session.execute(
+        select(self.orm.entities.name
+               ).filter_by(self.orm.entities.name.isnot(None))
+    ).all()
+
   @staticmethod
   @fmtdoc
   def infer_db_url(envvar=None, default_path=None):
@@ -1414,66 +1464,6 @@ class SQLTags(TaggedEntities):
     raise TypeError(
         "expected index to be int or str, got %s:%s" % (type(index), index)
     )
-
-  @orm_auto_session
-  def add(self, name: [str, None], *, session, unixtime=None, tags=None):
-    ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
-        with `unixtime` (default `time.time()`
-        and the supplied `tags` (optional iterable of `Tag`s).
-        Return the new `SQLTaggedEntity`.
-    '''
-    if unixtime is None:
-      unixtime = time.time()
-    if tags is None:
-      tags = ()
-    entity = self.orm.entities(name=name, unixtime=unixtime)
-    for tag in tags:
-      entity.add_tag(tag.name, tag.value, session=session)
-    session.add(entity)
-    session.flush()
-    te = self.get(entity.id, session=session)
-    for tag in tags:
-      te.set(tag.name, tag.value)
-    return te
-
-  @orm_auto_session
-  def get(self, index, default=None, *, session, cls=None):
-    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
-    '''
-    if isinstance(index, int):
-      tes = self.find([SQTEntityIdTest([index])], session=session, cls=cls)
-    elif isinstance(index, str):
-      tes = self.find(
-          [SQLTagBasedTest(index, True, Tag('name', index), '=')], cls=cls
-      )
-    else:
-      raise TypeError("unsupported index: %s:%r" % (type(index), index))
-    tes = list(tes)
-    if not tes:
-      return default
-    te, = tes
-    return te
-
-  @locked
-  @orm_auto_session
-  def __getitem__(self, index, *, session, cls=None):
-    ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
-    '''
-    if isinstance(index, int):
-      te = self.get(index, session=session, cls=cls)
-      if te is None:
-        raise IndexError(index)
-      return te
-    return super().__getitem__(index)
-
-  @orm_auto_session
-  def keys(self, *, session):
-    ''' Return all the nonNULL names.
-    '''
-    return session.execute(
-        select(self.orm.entities.name
-               ).filter_by(self.orm.entities.name.isnot(None))
-    ).all()
 
   @orm_auto_session
   def find(self, criteria, *, session, cls=None):
