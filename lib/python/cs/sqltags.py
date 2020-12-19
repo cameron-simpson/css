@@ -1466,12 +1466,10 @@ class SQLTags(TaggedEntities):
     )
 
   @orm_auto_session
-  def find(self, criteria, *, session, cls=None):
+  def find(self, criteria, *, session):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTaggedEntity` instances.
     '''
-    if cls is None:
-      cls = self.TaggedEntityClass
     orm = self.orm
     query = orm.entities.search(
         criteria,
@@ -1486,7 +1484,7 @@ class SQLTags(TaggedEntities):
       te = entity_map.get(entity_id)
       if not te:
         # not seen before
-        te = entity_map[entity_id] = cls(
+        te = entity_map[entity_id] = self.TaggedEntityClass(
             id=entity_id,
             name=row.name,
             unixtime=row.unixtime,
