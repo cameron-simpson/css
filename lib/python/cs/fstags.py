@@ -1337,7 +1337,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class TagFile(SingletonMixin):
+class TagFile(SingletonMixin, TaggedEntities):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -1367,15 +1367,15 @@ class TagFile(SingletonMixin):
         type(self).__name__, self.filepath, self.find_parent
     )
 
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exc_type, exc_value, exc_traceback):
-    ''' Save the tagsets if modified.
-        Do not save if there's an exception pending.
+  def startup(self):
+    ''' No special startup.
     '''
-    if exc_type is None:
-      self.save()
+
+  def shutdown(self):
+    ''' Save the tagsets if modified.
+    '''
+    self.save()
+    '''
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
