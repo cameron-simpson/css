@@ -940,13 +940,11 @@ class FSTags(MultiOpenMixin):
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
 
-  def _tagfile(self, path, *, find_parent=False, no_ontology=False):
+  def _tagfile(self, path, *, no_ontology=False):
     ''' Obtain and cache the `TagFile` at `path`.
     '''
     ontology = None if no_ontology else self.ontology(path)
-    tagfile = self._tagfiles[path] = TagFile(
-        path, find_parent=find_parent, ontology=ontology
-    )
+    tagfile = self._tagfiles[path] = TagFile(path, ontology=ontology)
     return tagfile
 
   @property
@@ -1015,9 +1013,7 @@ class FSTags(MultiOpenMixin):
       )
       if ontdirpath is not None:
         ontpath = joinpath(ontdirpath, ontbase)
-        ont_tagfile = self._tagfile(
-            ontpath, find_parent=True, no_ontology=True
-        )
+        ont_tagfile = self._tagfile(ontpath, no_ontology=True)
         ont = TagsOntology(ont_tagfile)
         ont_tagfile.ontology = ont
         cache[dirpath] = ont
@@ -1347,27 +1343,22 @@ class TagFile(SingletonMixin, TaggedEntities):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, *, ontology=None, find_parent=False):
-    return filepath, ontology, find_parent
+  def _singleton_key(cls, filepath, *, ontology=None):
+    return filepath, ontology
 
   @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath, *, ontology=None, find_parent=False):
+  def __init__(self, filepath, *, ontology=None):
     if hasattr(self, 'filepath'):
       return
     self.filepath = filepath
     self.ontology = ontology
-    self.find_parent = find_parent
     self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__, shortpath(self.filepath), self.find_parent
-    )
+    return "%s(%r,%s)" % (type(self).__name__, shortpath(self.filepath))
 
   def __repr__(self):
-    return "%s(%r,find_parent=%r)" % (
-        type(self).__name__, self.filepath, self.find_parent
-    )
+    return "%s(%r)" % (type(self).__name__, self.filepath)
 
   def startup(self):
     ''' No special startup.
@@ -1417,44 +1408,10 @@ class TagFile(SingletonMixin, TaggedEntities):
     ''' Return the `TagSet` associated with `name`.
     '''
     with Pfx("%s.__getitem__[%r]", self, name):
-      tagfile = self
-      while tagfile is not None:
-        if name in tagfile.tagsets:
-          break
-        tagfile = tagfile.parent if tagfile.find_parent else None
-      if tagfile is None:
-        # not available in parents, use self
-        # this will autocreate an empty TagSet in self
-        tagfile = self
       return tagfile.tagsets[name]
 
   def __delitem__(self, name):
     del self.tagsets[name]
-
-  def __getattr__(self, attr):
-    if attr == 'parent':
-      # locate parent TagFile
-      dirpath = dirname(self.filepath)
-      updirpath = dirname(dirpath)
-      if updirpath == dirpath:
-        parent = None
-      else:
-        filebase = basename(self.filepath)
-        parent_dirpath = next(
-            findup(
-                updirpath,
-                lambda dirpath: isfilepath(joinpath(dirpath, filebase)),
-                first=True
-            )
-        )
-        if parent_dirpath:
-          parent_filepath = joinpath(parent_dirpath, filebase)
-          parent = type(self)(parent_filepath, find_parent=True)
-        else:
-          parent = None
-      self.parent = parent
-      return parent
-    raise AttributeError(attr)
 
   @locked_property
   @pfx_method
@@ -1586,10 +1543,6 @@ class TagFile(SingletonMixin, TaggedEntities):
         self.save_tagsets(self.filepath, self.tagsets, self.unparsed)
         for tagset in tagsets.values():
           tagset.modified = False
-    if self.find_parent:
-      parent = self.parent
-      if parent:
-        self.parent.save()
 
   @require(lambda name: isinstance(name, str))
   def add(self, name, tag, value=None):
