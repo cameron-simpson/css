@@ -1551,6 +1551,8 @@ class TaggedEntities(MultiOpenMixin, ABC):
       * `__len__(self)`: return the number of names
   '''
 
+  _missing = object()
+
   default_factory = lambda name: None
 
   def __init__(self):
@@ -1570,8 +1572,6 @@ class TaggedEntities(MultiOpenMixin, ABC):
     ''' Write any pending changes to a backing store,
         release resources allocated during `startup`.
     '''
-
-  _missing = object()
 
   @pfx_method(use_str=True)
   def __missing__(self, name: str):
