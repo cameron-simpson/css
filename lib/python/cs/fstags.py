@@ -124,7 +124,7 @@ DISTINFO = {
     ],
 }
 
-TAGSFILE = '.fstags'
+TAGSFILE_BASENAME = '.fstags'
 RCFILE = '~/.fstagsrc'
 
 XATTR_B = (
@@ -909,7 +909,7 @@ class FSTags(MultiOpenMixin):
   def __init__(self, tagsfile=None, ontologyfile=None):
     MultiOpenMixin.__init__(self)
     if tagsfile is None:
-      tagsfile = TAGSFILE
+      tagsfile = TAGSFILE_BASENAME
     if ontologyfile is None:
       ontologyfile = tagsfile + '-ontology'
     self.config = FSTagsConfig()
@@ -2034,7 +2034,7 @@ class FSTagsConfig:
       config.add_section('cascade')
       config.add_section('general')
       config.add_section('xattr')
-      config['general']['tagsfile'] = TAGSFILE
+      config['general']['tagsfile'] = TAGSFILE_BASENAME
       try:
         config.read(rcfilepath)
       except OSError as e:
@@ -2068,9 +2068,9 @@ class FSTagsConfig:
   @property
   @fmtdoc
   def tagsfile(self):
-    ''' The tags filename, default `{TAGSFILE!r}`.
+    ''' The tags filename, default `{TAGSFILE_BASENAME!r}`.
     '''
-    return self.config.get('general', 'tagsfile') or TAGSFILE
+    return self.config.get('general', 'tagsfile') or TAGSFILE_BASENAME
 
   @tagsfile.setter
   def tagsfile(self, tagsfile):
