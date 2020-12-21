@@ -1534,15 +1534,15 @@ class TaggedEntities(MultiOpenMixin, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `add(name)`: create a new `TaggedEntity` associated with `name`,
-        which should not already be in use.
+      * `default_factory(self,name)`: as with `defaultdict` this is called as
+        `default_factory(name)` from `__getitem__` for missing names,
+        and also from `add`.
+        If set to `None` then `__getitem__` will raise `KeyError`
+        for missing names.
       * `get(name,default=None)`: return the `TaggedEntity` associated
         with `name`, or `default`.
 
       Subclasses may reasonably want to define the following:
-      * `default_factory(self,name)`: like `defaultdict`, if this not `None`
-        it is called as `default_factory(name)`
-        from `__getitem__` for missing names.
       * `startup(self)`: allocate any needed resources
         such as database connections
       * `shutdown(self)`: write pending changes to a backing store,
@@ -1592,14 +1592,14 @@ class TaggedEntities(MultiOpenMixin, ABC):
       raise KeyError(name)
     return te
 
-  @abstractmethod
-  def add(self, name: str):
+  def add(self, name: str, **kw):
     ''' Return a new `TaggedEntity` associated with `name`,
         which should not already be in use.
     '''
-    raise NotImplementedError(
-        "%s: no .create(name) method" % (type(self).__name__,)
-    )
+    te = self.get(name, default=self._missing)
+    if te is not self._missing:
+      raise ValueError("%r: name already present" % (name,))
+    return self.default_factory(name, **kw)
 
   @abstractmethod
   def get(self, name: str, default=None):
