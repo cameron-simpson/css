@@ -154,7 +154,7 @@ def replace(f, replacements, base_repl_map):
           if not match:
             # no matches - we're done
             break
-        with Pfx(m.start()):
+        with Pfx(m.start() + 1):
           m, repl = match
           repl_map = dict(settings=base_repl_map)
           repl_map.update(base_repl_map)
