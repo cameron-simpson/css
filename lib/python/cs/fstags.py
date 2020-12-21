@@ -906,14 +906,14 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile=None, ontologyfile=None):
+  def __init__(self, tagsfile_basename=None, ontologyfile=None):
     MultiOpenMixin.__init__(self)
-    if tagsfile is None:
-      tagsfile = TAGSFILE_BASENAME
+    if tagsfile_basename is None:
+      tagsfile_basename = TAGSFILE_BASENAME
     if ontologyfile is None:
-      ontologyfile = tagsfile + '-ontology'
+      ontologyfile = tagsfile_basename + '-ontology'
     self.config = FSTagsConfig()
-    self.config.tagsfile = tagsfile
+    self.config.tagsfile_basename = tagsfile_basename
     self.config.ontologyfile = ontologyfile
     self._tagfiles = {}  # cache of `TagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
@@ -950,10 +950,10 @@ class FSTags(MultiOpenMixin):
     return tagfile
 
   @property
-  def tagsfile(self):
+  def tagsfile_basename(self):
     ''' The tag file basename.
     '''
-    return self.config.tagsfile
+    return self.config.tagsfile_basename
 
   @property
   def ontologyfile(self):
@@ -962,7 +962,9 @@ class FSTags(MultiOpenMixin):
     return self.config.ontologyfile
 
   def __str__(self):
-    return "%s(tagsfile=%r)" % (type(self).__name__, self.tagsfile)
+    return "%s(tagsfile_basename=%r)" % (
+        type(self).__name__, self.tagsfile_basename
+    )
 
   @locked
   def __getitem__(self, path):
@@ -1044,7 +1046,7 @@ class FSTags(MultiOpenMixin):
   def dir_tagfile(self, dirpath):
     ''' Return the `TagFile` associated with `dirpath`.
     '''
-    return self._tagfile(joinpath(abspath(dirpath), self.tagsfile))
+    return self._tagfile(joinpath(abspath(dirpath), self.tagsfile_basename))
 
   def apply_tag_choices(self, tag_choices, paths):
     ''' Apply the `tag_choices` to `paths`.
@@ -2067,16 +2069,16 @@ class FSTagsConfig:
 
   @property
   @fmtdoc
-  def tagsfile(self):
+  def tagsfile_basename(self):
     ''' The tags filename, default `{TAGSFILE_BASENAME!r}`.
     '''
     return self.config.get('general', 'tagsfile') or TAGSFILE_BASENAME
 
-  @tagsfile.setter
-  def tagsfile(self, tagsfile):
+  @tagsfile_basename.setter
+  def tagsfile_basename(self, tagsfile_basename):
     ''' Set the tags filename.
     '''
-    self.config['general']['tagsfile'] = tagsfile
+    self.config['general']['tagsfile'] = tagsfile_basename
 
 def get_xattr_value(filepath, xattr_name):
   ''' Read the extended attribute `xattr_name` of `filepath`.
