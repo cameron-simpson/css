@@ -1312,7 +1312,7 @@ class FSTags(MultiOpenMixin):
       return result
 
 class HasFSTagsMixin:
-  ''' Mixin providing a `.fstags` property.
+  ''' Mixin providing an automatic `.fstags` property.
   '''
 
   _default_fstags = None
@@ -1564,10 +1564,11 @@ class TagFile(SingletonMixin, TaggedEntities):
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
 class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
-  ''' An entry withing a `TagFile`.
+  ''' An reference to an entry within a `TagFile`.
+      This is used entirely by the `FSTags` tagset inheritance system.
 
       Attributes:
-      * `name`: the name of the `TagSet` entry within `tagfile`
+      * `name`: the name of the entry within `tagfile`
       * `tagfile`: the `TagFile` containing `name`
   '''
 
@@ -1981,7 +1982,7 @@ class FSTagsConfig:
 
   @staticmethod
   def load_config(rcfilepath):
-    ''' Read an rc file, return a ConfigParser instance.
+    ''' Read an rc file, return a `ConfigParser` instance.
     '''
     with Pfx(rcfilepath):
       config = ConfigParser()
