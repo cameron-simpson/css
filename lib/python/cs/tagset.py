@@ -1525,7 +1525,7 @@ class ValueMetadataNamespace(TagSetNamespace):
         "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
     ).__format__(spec)
 
-class TaggedEntities(MultiOpenMixin, ABC):
+class TagSets(MultiOpenMixin, ABC):
   ''' Base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
@@ -1635,13 +1635,13 @@ class TaggedEntities(MultiOpenMixin, ABC):
     )
 
   def subdomain(self, subname):
-    ''' Return a proxy for this `TaggedEntities` for the `name`s
+    ''' Return a proxy for this `TagSets` for the `name`s
         starting with `subname+'.'`.
     '''
-    return TaggedEntitiesSubdomain(self, subname)
+    return TagSetsSubdomain(self, subname)
 
-class TaggedEntitiesSubdomain(SingletonMixin, PrefixedMappingProxy):
-  ''' A view into a `TaggedEntities` for keys commencing with a prefix.
+class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
+  ''' A view into a `TagSets` for keys commencing with a prefix.
   '''
 
   @classmethod
@@ -1658,7 +1658,7 @@ class TaggedEntitiesSubdomain(SingletonMixin, PrefixedMappingProxy):
     '''
     return self.tes.TAGGED_ENTITY_FACTORY
 
-class TagsOntology(SingletonMixin, TaggedEntities):
+class TagsOntology(SingletonMixin, TagSets):
   ''' An ontology for tag names.
 
       This is based around a mapping of names
@@ -2270,7 +2270,7 @@ class TagSet(TagSetMixin):
   @classmethod
   @pfx_method
   def edit_entities(cls, tes, editor=None, verbose=True):
-    ''' Edit an iterable of `TaggedEntities`.
+    ''' Edit an iterable of `TagSets`.
         Return a list of the entities which were modified.
 
         This function supports modifying `Tag`s

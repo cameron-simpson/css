@@ -1335,7 +1335,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
-class TagFile(SingletonMixin, TaggedEntities):
+class TagFile(SingletonMixin, TagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,

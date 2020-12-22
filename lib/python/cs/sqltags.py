@@ -65,7 +65,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, TagSet, TaggedEntities
+    TagsOntology, TagSet, TagSets
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -1316,7 +1316,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         tag_name, value, session=session
     )
 
-class SQLTags(TaggedEntities):
+class SQLTags(TagSets):
   ''' A class to embodying an database and its entities and tags.
   '''
 
