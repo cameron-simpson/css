@@ -694,7 +694,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   @property
   @pfx_method(use_str=True)
   def typedata(self):
-    ''' The defining `TaggedEntity` for this tag's name.
+    ''' The defining `TagSet` for this tag's name.
 
         This is how its type is defined,
         and is obtained from:
@@ -910,25 +910,25 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     except KeyError:
       raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TaggedEntityCriterion(ABC):
+class TagSetCriterion(ABC):
   ''' A testable criterion for a `TagSet`.
   '''
 
-  # list of TaggedEntityCriterion classes
+  # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
   @typechecked
-  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
-    ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
+  def match_tagged_entity(self, te: "TagSet") -> bool:
+    ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
 
   @classmethod
   @pfx_method
   def from_str(cls, s):
-    ''' Prepare a `TaggedEntityCriterion` from the string `s`.
+    ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
     criterion, offset = cls.from_str2(s)
     if offset != len(s):
@@ -937,7 +937,7 @@ class TaggedEntityCriterion(ABC):
 
   @classmethod
   def from_str2(cls, s, offset=0, delim=None):
-    ''' Parse a criterion from `s` at `offset` and return `(TaggedEntityCriterion,offset)`.
+    ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
         indicating negation of the test,
@@ -968,14 +968,14 @@ class TaggedEntityCriterion(ABC):
   @classmethod
   @pfx_method
   def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TaggedEntityCriterion`.
+    ''' Convert some suitable object `o` into a `TagSetCriterion`.
 
         Various possibilities for `o` are:
-        * `TaggedEntityCriterion`: returned unchanged
+        * `TagSetCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
         * an object with a `.choice` attribute;
-          this is taken to be a `TaggedEntityCriterion` ducktype and returned unchanged
+          this is taken to be a `TagSetCriterion` ducktype and returned unchanged
         * an object with `.name` and `.value` attributes;
           this is taken to be `Tag`-like and a positive test is constructed
         * `Tag`: an object with a `.name` and `.value`
@@ -984,7 +984,7 @@ class TaggedEntityCriterion(ABC):
           is equivalent to a positive equality `TagBasedTest`
     '''
     tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
-    if isinstance(o, (cls, TaggedEntityCriterion)):
+    if isinstance(o, (cls, TagSetCriterion)):
       # already suitable
       return o
     if isinstance(o, str):
@@ -1013,7 +1013,7 @@ class TaggedEntityCriterion(ABC):
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
 class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
-                   TaggedEntityCriterion):
+                   TagSetCriterion):
   ''' A test based on a `Tag`.
 
       Attributes:
@@ -1101,7 +1101,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
   @typechecked
-  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
+  def match_tagged_entity(self, te: "TagSet") -> bool:
     ''' Test against the `Tag`s in `tags`.
 
         *Note*: comparisons when `self.tag.name` is not in `tags`
@@ -1132,8 +1132,8 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
           result = False
     return result if self.choice else not result
 
-TaggedEntityCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
-TaggedEntityCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
+TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
+TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
@@ -1526,7 +1526,7 @@ class ValueMetadataNamespace(TagSetNamespace):
     ).__format__(spec)
 
 class TaggedEntities(MultiOpenMixin, ABC):
-  ''' Base class for collections of `TaggedEntity` instances
+  ''' Base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
@@ -1539,7 +1539,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
         for missing names.
-      * `get(name,default=None)`: return the `TaggedEntity` associated
+      * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
 
       Subclasses may reasonably want to define the following:
@@ -1575,7 +1575,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
 
   @pfx_method(use_str=True)
   def __missing__(self, name: str):
-    ''' Like `dict`, the `__missing__` method autocreates new `TaggedEntity`.
+    ''' Like `dict`, the `__missing__` method autocreates new `TagSet`.
 
         This is called from `__getitem__` is `name` is missing
         and uses the factory `self.default_factory`.
@@ -1593,7 +1593,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
     return te
 
   def add(self, name: str, **kw):
-    ''' Return a new `TaggedEntity` associated with `name`,
+    ''' Return a new `TagSet` associated with `name`,
         which should not already be in use.
     '''
     te = self.get(name, default=self._missing)
@@ -1603,7 +1603,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
 
   @abstractmethod
   def get(self, name: str, default=None):
-    ''' Return the `TaggedEntity` associated with `name`,
+    ''' Return the `TagSet` associated with `name`,
         or `default` if there is no such entity.
     '''
     raise NotImplementedError(
@@ -1611,7 +1611,7 @@ class TaggedEntities(MultiOpenMixin, ABC):
     )
 
   def __getitem__(self, name: str):
-    ''' Obtain the `TaggedEntity` associated with `name`.
+    ''' Obtain the `TagSet` associated with `name`.
 
         If `name` is not presently mapped,
         return `self.__missing__(name)`.
@@ -1742,7 +1742,7 @@ class TagsOntology(SingletonMixin, TaggedEntities):
     return self.te_mapping.get(name, default=default)
 
   def type(self, type_name):
-    ''' Return the `TaggedEntity` defining the type named `type_name`.
+    ''' Return the `TagSet` defining the type named `type_name`.
     '''
     return self[self.type_index(type_name)]
 
@@ -1911,7 +1911,7 @@ class TagsOntology(SingletonMixin, TaggedEntities):
   @pfx_method
   def edit_indices(self, indices, prefix=None):
     ''' Edit the entries specified by indices.
-        Return `TaggedEntity`s for the entries which were changed.
+        Return `TagSet`s for the entries which were changed.
     '''
     tes = []
     te_old_names = {}
@@ -1925,7 +1925,7 @@ class TagsOntology(SingletonMixin, TaggedEntities):
       tes.append(te)
       te_old_names[id(te)] = name
     # modify tagsets
-    changed_tes = TaggedEntity.edit_entities(tes)
+    changed_tes = TagSet.edit_entities(tes)
     # rename entries
     for te in changed_tes:
       old_name = te_old_names[id(te)]
@@ -2006,8 +2006,8 @@ class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
 
       Optional subclass attributes:
-      * `TAGSET_CRITERION_CLASS`: a `TaggedEntityCriterion` duck class,
-        default `TaggedEntityCriterion`.
+      * `TAGSET_CRITERION_CLASS`: a `TagSetCriterion` duck class,
+        default `TagSetCriterion`.
         For example, `cs.sqltags` has a subclass
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
@@ -2021,16 +2021,16 @@ class TagsCommandMixin:
         Raises `ValueError` in a misparse.
         The default `tag_based_test_class`
         comes from `cls.TAGSET_CRITERION_CLASS`,
-        which itself defaults to class `TaggedEntityCriterion`.
+        which itself defaults to class `TagSetCriterion`.
 
-        The default `TaggedEntityCriterion.from_str` recognises:
+        The default `TagSetCriterion.from_str` recognises:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
     '''
     if tag_based_test_class is None:
       tag_based_test_class = getattr(
-          cls, 'TAGSET_CRITERION_CLASS', TaggedEntityCriterion
+          cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
       )
     return tag_based_test_class.from_str(arg)
 
@@ -2067,7 +2067,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TaggedEntityCriterion.from_str(arg)
+          tag_choice = TagSetCriterion.from_str(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':
@@ -2075,10 +2075,10 @@ class TagsCommandMixin:
         tag_choices.append(tag_choice)
     return tag_choices
 
-class TaggedEntityMixin(FormatableMixin):
-  ''' A mixin for classes like `TaggedEntity`.
+class TagSetMixin(FormatableMixin):
+  ''' A mixin for classes like `TagSet`.
 
-      A `TaggedEntity`like instance has the following attributes:
+      A `TagSet`like instance has the following attributes:
       * `id`: a domain specific identifier;
         this may reasonably be `None` for entities
         not associated with database rows.
@@ -2104,8 +2104,8 @@ class TaggedEntityMixin(FormatableMixin):
 
   @classmethod
   def from_csvrow(cls, csvrow):
-    ''' Construct a `TaggedEntity` from a CSV row like that from
-        `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
+    ''' Construct a `TagSet` from a CSV row like that from
+        `TagSet.csvrow`, being `unixtime,id,name,tags...`.
     '''
     with Pfx("%s.from_csvrow", cls.__name__):
       te_unixtime, te_id, te_name = csvrow[:3]
@@ -2118,7 +2118,7 @@ class TaggedEntityMixin(FormatableMixin):
 
   @property
   def csvrow(self):
-    ''' This `TaggedEntity` as a list useful to a `csv.writer`.
+    ''' This `TagSet` as a list useful to a `csv.writer`.
         The inverse of `from_csvrow`.
     '''
     return [self.unixtime, self.id, self.name
@@ -2171,7 +2171,7 @@ class TaggedEntityMixin(FormatableMixin):
     kwargs = kwtags.format_kwargs()
     return kwargs
 
-class TaggedEntity(TaggedEntityMixin):
+class TagSet(TagSetMixin):
   ''' An entity record with its `Tag`s.
 
       This is a common representation of some tagged entity,
@@ -2230,7 +2230,7 @@ class TaggedEntity(TaggedEntityMixin):
     return self.tags.update(kw)
 
   def edit(self, verbose=None):
-    ''' Edit the `Tag`s of this `TaggedEntity`.
+    ''' Edit the `Tag`s of this `TagSet`.
     '''
     return self.tags.edit(verbose=verbose)
 

@@ -64,8 +64,8 @@ from cs.sqlalchemy_utils import (
     _state as sqla_state,
 )
 from cs.tagset import (
-    TagSet, Tag, TaggedEntityCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, TaggedEntity, TaggedEntities
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin,
+    TagsOntology, TagSet, TaggedEntities
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -122,15 +122,15 @@ class SQLParameters(namedtuple(
       or extending queries with JOINs.
   '''
 
-class SQTCriterion(TaggedEntityCriterion):
-  ''' Subclass of `TaggedEntityCriterion` requiring an `.sql_parameters` method
+class SQTCriterion(TagSetCriterion):
+  ''' Subclass of `TagSetCriterion` requiring an `.sql_parameters` method
       which returns an `SQLParameters` providing the information required
       to construct an sqlalchemy query.
       It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
       the SQL capable criterion classes below.
   '''
 
-  # list of TaggedEntityCriterion classes
+  # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 
@@ -169,8 +169,8 @@ class SQTEntityIdTest(SQTCriterion):
     )
     return sqlp
 
-  def match_tagged_entity(self, te: TaggedEntity) -> bool:
-    ''' Test the `TaggedEntity` `te` against `self.entity_ids`.
+  def match_tagged_entity(self, te: TagSet) -> bool:
+    ''' Test the `TagSet` `te` against `self.entity_ids`.
     '''
     return te.id in self.entity_ids
 
@@ -336,7 +336,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
     )
     return sqlp
 
-  def match_tagged_entity(self, te: TaggedEntity) -> bool:
+  def match_tagged_entity(self, te: TagSet) -> bool:
     ''' Match this criterion against `te`.
     '''
     tag = self.tag
@@ -457,7 +457,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(sqltags.find(tag_criteria))
-    changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
@@ -1239,7 +1239,7 @@ class SQLTagSet(TagSet, SingletonMixin):
 
   @property
   def entity(self):
-    ''' The `SQLTaggedEntity` associated with this `TagSet`.
+    ''' The `SQLTagSet` associated with this `TagSet`.
     '''
     return self.sqltags[self.entity_id]
 
@@ -1260,8 +1260,8 @@ class SQLTagSet(TagSet, SingletonMixin):
     super().discard(tag_name, value, **kw)
 
 # TODO: unixtime property accessing the db_entity
-class SQLTaggedEntity(SingletonMixin, TaggedEntity):
-  ''' A singleton `TaggedEntity` attached to an `SQLTags` instance.
+class SQLTagSet(SingletonMixin, TagSet):
+  ''' A singleton `TagSet` attached to an `SQLTags` instance.
   '''
 
   @staticmethod
@@ -1296,7 +1296,7 @@ class SQLTaggedEntity(SingletonMixin, TaggedEntity):
 
   @property
   def db_entity(self):
-    ''' The database `Entities` instance for this `SQLTaggedEntity`.
+    ''' The database `Entities` instance for this `SQLTagSet`.
     '''
     return self.sqltags.db_entity(self.id)
 
@@ -1320,7 +1320,7 @@ class SQLTags(TaggedEntities):
   ''' A class to embodying an database and its entities and tags.
   '''
 
-  TaggedEntityClass = SQLTaggedEntity
+  TagSetClass = SQLTagSet
 
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
@@ -1343,7 +1343,7 @@ class SQLTags(TaggedEntities):
   def default_factory(
       self, name: [str, None], *, session, unixtime=None, tags=None
   ):
-    ''' Fetch or create an `SQLTaggedEntity` for `name`.
+    ''' Fetch or create an `SQLTagSet` for `name`.
 
         Note that `name` may be `None` to create a new "log" entry.
     '''
@@ -1368,10 +1368,10 @@ class SQLTags(TaggedEntities):
 
   @orm_auto_session
   def add(self, name: [str, None], *, session, unixtime=None, tags=None):
-    ''' Add a new `SQLTaggedEntity` named `name` (`None` for "log" entries)
+    ''' Add a new `SQLTagSet` named `name` (`None` for "log" entries)
         with `unixtime` (default `time.time()`
         and the supplied `tags` (optional iterable of `Tag`s).
-        Return the new `SQLTaggedEntity`.
+        Return the new `SQLTagSet`.
     '''
     if name is not None and name in self:
       raise KeyError("%r: name already exists" % (name,))
@@ -1381,7 +1381,7 @@ class SQLTags(TaggedEntities):
 
   @orm_auto_session
   def get(self, index, default=None, *, session):
-    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
+    ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
       tes = self.find([SQTEntityIdTest([index])], session=session)
@@ -1398,7 +1398,7 @@ class SQLTags(TaggedEntities):
   @locked
   @orm_auto_session
   def __getitem__(self, index, *, session):
-    ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
+    ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
     te = self.get(index, session=session)
     if te is None:
@@ -1468,7 +1468,7 @@ class SQLTags(TaggedEntities):
   @orm_auto_session
   def find(self, criteria, *, session):
     ''' Generate and run a query derived from `criteria`
-        yielding `SQLTaggedEntity` instances.
+        yielding `SQLTagSet` instances.
     '''
     orm = self.orm
     query = orm.entities.search(
@@ -1484,7 +1484,7 @@ class SQLTags(TaggedEntities):
       te = entity_map.get(entity_id)
       if not te:
         # not seen before
-        te = entity_map[entity_id] = self.TaggedEntityClass(
+        te = entity_map[entity_id] = self.TagSetClass(
             id=entity_id,
             name=row.name,
             unixtime=row.unixtime,
@@ -1514,14 +1514,14 @@ class SQLTags(TaggedEntities):
     csvr = csv.reader(f)
     for csvrow in csvr:
       with Pfx(csvr.line_num):
-        te = TaggedEntity.from_csvrow(csvrow)
+        te = TagSet.from_csvrow(csvrow)
         self.import_tagged_entity(te, session=session, update_mode=update_mode)
 
   @orm_auto_session
   def import_tagged_entity(self, te, *, session, update_mode=False) -> None:
-    ''' Import the `TaggedEntity` `te`.
+    ''' Import the `TagSet` `te`.
 
-        This updates the database with the contents of the supplied `TaggedEntity`,
+        This updates the database with the contents of the supplied `TagSet`,
         which has no inherent relationship to the database.
 
         If `update_mode` is true

@@ -35,7 +35,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import orm_auto_session
-from cs.sqltags import SQLTags, SQLTaggedEntity, SQLTagsCommand
+from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
 
 __version__ = '20201004-dev'
@@ -122,7 +122,7 @@ class CDRipCommand(BaseCommand):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(mbdb.find(tag_criteria))
-    changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
@@ -238,8 +238,8 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     fstags[mp3_filename].update(track_tags)
   os.system("eject")
 
-class MBTaggedEntity(SQLTaggedEntity):
-  ''' An `SQLTaggedEntity` subclass for MB entities.
+class MBTagSet(SQLTagSet):
+  ''' An `SQLTagSet` subclass for MB entities.
   '''
 
   @property
@@ -256,7 +256,7 @@ class MBTaggedEntity(SQLTaggedEntity):
 
   def __getattr__(self, attr):
     if attr in ('sqltags', 'tags'):
-      raise AttributeError("MBTaggedEntity.__getattr__: no .%s" % (attr,))
+      raise AttributeError("MBTagSet.__getattr__: no .%s" % (attr,))
     try:
       value = self.tags[attr]
     except KeyError:
@@ -283,10 +283,10 @@ class MBTaggedEntity(SQLTaggedEntity):
     return [artist.artist_name for artist in self.artists()]
 
 class MBSQLTags(SQLTags):
-  ''' Musicbrainz `SQLTags` with special `TaggedEntityClass`.
+  ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
-  TaggedEntityClass = MBTaggedEntity
+  TagSetClass = MBTagSet
 
   @orm_auto_session
   @pfx_method
@@ -397,7 +397,7 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def _fill_in_artist(self, te: MBTaggedEntity, force=False):
+  def _fill_in_artist(self, te: MBTagSet, force=False):
     assert te.name.startswith('meta.artist.')
     artist_id = te.name.split('.', 2)[-1]
     tags = te.tags
@@ -422,7 +422,7 @@ class MBDB(MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @typechecked
-  def _fill_in_disc(self, te: MBTaggedEntity, force=False):
+  def _fill_in_disc(self, te: MBTagSet, force=False):
     ''' Return the `disc.`*disc_id* entry.
         Update from MB as required before return.
     '''
@@ -472,7 +472,7 @@ class MBDB(MultiOpenMixin):
     return te
 
   @typechecked
-  def _fill_in_recording(self, te: MBTaggedEntity, force=False):
+  def _fill_in_recording(self, te: MBTagSet, force=False):
     ''' Return the recording for `recording_id`.
     '''
     ##force = True

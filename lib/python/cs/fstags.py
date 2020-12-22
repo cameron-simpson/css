@@ -100,7 +100,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TaggedEntity,
+    TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TagSet,
     TagsCommandMixin, RegexpTagRule
 )
 from cs.threads import locked, locked_property, State
@@ -277,7 +277,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     csvw = csv.writer(sys.stdout)
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
-      te = fstags[filepath].as_TaggedEntity(indirect=not use_direct_tags)
+      te = fstags[filepath].as_TagSet(indirect=not use_direct_tags)
       if all_paths or te.tags:
         csvw.writerow(te.csvrow)
     return xit
@@ -382,7 +382,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     csvr = csv.reader(f)
     for csvrow in csvr:
       with Pfx(csvr.line_num):
-        te = TaggedEntity.from_csvrow(csvrow)
+        te = TagSet.from_csvrow(csvrow)
         if convert_name:
           with Pfx("convert_name(%r)", te.name):
             path = convert_name(te.name)
@@ -391,9 +391,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         self.add_tagged_entity(te, path=path)
 
   def add_tagged_entity(self, te, path=None):
-    ''' Import a `TaggedEntity` as `path` (default `te.name`).
+    ''' Import a `TagSet` as `path` (default `te.name`).
     '''
-    TaggedPath.from_TaggedEntity(te, fstags=self, path=path)
+    TaggedPath.from_TagSet(te, fstags=self, path=path)
 
   @classmethod
   def cmd_json_import(cls, argv, options):
@@ -1138,7 +1138,7 @@ class FSTags(MultiOpenMixin):
           Default: `False`
     '''
     tagged_path = self[path]
-    te = tagged_path.as_TaggedEntity(indirect=not use_direct_tags)
+    te = tagged_path.as_TagSet(indirect=not use_direct_tags)
     return all(criterion.match_tagged_entity(te) for criterion in tag_tests)
 
   @pfx_method
@@ -1162,11 +1162,11 @@ class FSTags(MultiOpenMixin):
         continue
       path = joinpath(dirpath, name)
       tagged_path = self[path]
-      te = tagged_path.as_TaggedEntity(name=name)
+      te = tagged_path.as_TagSet(name=name)
       tes.append(te)
       te_id_map[id(te)] = name, tagged_path, te
     # edit entities, return modified entities
-    changed_tes = TaggedEntity.edit_entities(tes)  # verbose-state.verbose
+    changed_tes = TagSet.edit_entities(tes)  # verbose-state.verbose
     # now apply any file renames
     for te in changed_tes:
       old_name, tagged_path, old_te = te_id_map[id(te)]
@@ -1601,16 +1601,16 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
     '''
     return tag in self.all_tags
 
-  def as_TaggedEntity(self, te_id=None, name=None, indirect=False):
-    ''' Return a `TaggedEntity` for this `TaggedPath`,
+  def as_TagSet(self, te_id=None, name=None, indirect=False):
+    ''' Return a `TagSet` for this `TaggedPath`,
         useful for export.
 
         Parameters:
-        * `te_id`: a value for the `TaggedEntity.id` attribute, default `None`
-        * `name`: a value for the `TaggedEntity.name` attribute,
+        * `te_id`: a value for the `TagSet.id` attribute, default `None`
+        * `name`: a value for the `TagSet.name` attribute,
           default `self.filepath`
         * `indirect`: if true, use a copy of `self.all_tags`
-          for `TaggedEntity.tags`, otherwise a copy of `self.direct_tags`.
+          for `TagSet.tags`, otherwise a copy of `self.direct_tags`.
           The default is `False`.
     '''
     if name is None:
@@ -1623,14 +1623,14 @@ class TaggedPath(HasFSTagsMixin, FormatableMixin):
       unixtime = S.st_mtime
     tags = TagSet()
     tags.update(self.all_tags if indirect else self.direct_tags)
-    return TaggedEntity(id=te_id, name=name, unixtime=unixtime, tags=tags)
+    return TagSet(id=te_id, name=name, unixtime=unixtime, tags=tags)
 
   @classmethod
-  def from_TaggedEntity(cls, te, *, fstags, path=None):
-    ''' Factory to create a `TaggedPath` from a `TaggedEntity`.
+  def from_TagSet(cls, te, *, fstags, path=None):
+    ''' Factory to create a `TaggedPath` from a `TagSet`.
 
         Parameters:
-        * `te`: the source `TaggedEntity`
+        * `te`: the source `TagSet`
         * `fstags`: the associated `FSTags` instance
         * `path`: the path for the new instance,
           default from `te.name`
