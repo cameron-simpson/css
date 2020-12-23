@@ -481,6 +481,78 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         new_values[tag.name] = tag.value
     self.set_from(new_values, verbose=verbose)
 
+  @classmethod
+  def _from_named_tags_line(cls, line, ontology=None):
+    ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
+        return the `TagSet`.
+    '''
+    name, offset = Tag.parse_value(line)
+    if offset < len(line) and not line[offset].isspace():
+      _, offset2 = get_nonwhite(line, offset)
+      name = line[:offset2]
+      warning(
+          "offset %d: expected whitespace, adjusted name to %r", offset, name
+      )
+      offset = offset2
+    if offset < len(line) and not line[offset].isspace():
+      warning("offset %d: expected whitespace", offset)
+    tags = TagSet.from_line(line, offset, ontology=ontology)
+    return name, tags
+
+  @classmethod
+  @pfx_method
+  def edit_many(cls, tes, editor=None, verbose=True):
+    ''' Edit an iterable of `TagSet`s.
+        Return a list of the `TagSet`s which were modified.
+
+        This function supports modifying `Tag`s
+        including the `'name'` `Tag`.
+    '''
+    if editor is None:
+      editor = EDITOR
+    te_map = {te.name or te.id: te for te in tes}
+    assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
+        "not all entities have str or int keys: %r" % list(te_map.keys())
+    lines = list(
+        map(
+            lambda te: ' '.join(
+                [te.transcribe_value(te.name or te.id)] + [
+                    str(te.tag(tag_name))
+                    for tag_name in te.keys()
+                    if tag_name != 'name'
+                ]
+            ), te_map.values()
+        )
+    )
+    changes = edit_strings(lines, editor=editor)
+    changed_tes = []
+    for old_line, new_line in changes:
+      old_name, _ = cls.from_editable_line(old_line)
+      assert isinstance(old_name, (str, int))
+      with Pfx("%r", old_name):
+        te = te_map[old_name]
+        changed_tes.append(te)
+        new_name, new_tags = cls._from_named_tags_line(new_line)
+        # modify Tags
+        te.set_from(new_tags, verbose=verbose)
+        if old_name != new_name:
+          # update name
+          with Pfx("=> %r", new_name):
+            if not isinstance(new_name, (str, int)):
+              error("illegal value, expected str or int")
+            elif new_name in te_map:
+              error("already in map, not changing")
+            elif isinstance(new_name, int):
+              if isinstance(old_name, int):
+                error("may not change ids")
+              else:
+                te.id = new_name
+                te.discard('name')
+            elif new_name:
+              te.set('name', new_name)
+            else:
+              te.discard('name')
+    return changed_tes
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
