@@ -1335,12 +1335,225 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
+class TaggedPath(TagSet, HasFSTagsMixin):
+  ''' Class to manipulate the tags for a specific path.
+  '''
+
+  def __init__(self, filepath, fstags=None):
+    if fstags is None:
+      fstags = self.fstags
+    else:
+      self.fstags = fstags
+    self.filepath = filepath
+    self._tagfile_stack = fstags.path_tagfiles(filepath)
+    self._lock = Lock()
+
+  def __repr__(self):
+    return "%s(%s)" % (type(self).__name__, self.filepath)
+
+  def __str__(self):
+    return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
+
+  def __contains__(self, tag):
+    ''' Test for the presence of `tag` in the `all_tags`.
+    '''
+    return tag in self.all_tags
+
+  def format_tagset(self, *, direct=False):
+    ''' Compute a `TagSet` from this file's tags
+        with additional derived tags.
+
+        This can be converted into an `ExtendedNamespace`
+        suitable for use with `str.format_map`
+        via the `TagSet`'s `.format_kwargs()` method.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.ext`: the file extension of the basename
+          of the `TaggedPath.filepath`
+        * `filepath.pathname`: the `TaggedPath.filepath`
+        * `filepath.encoded`: the JSON encoded filepath
+    '''
+    ont = self.ontology
+    kwtags = TagSet(_ontology=ont)
+    kwtags.update(self if direct else self.all_tags)
+    # add in cascaded values
+    for tag in list(self.fstags.cascade_tags(kwtags)):
+      if tag.name not in kwtags:
+        kwtags.add(tag)
+    # tags based on the filepath
+    filepath = self.filepath
+    for pathtag in (
+        Tag('filepath.basename', basename(filepath), ontology=ont),
+        Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
+        Tag('filepath.pathname', filepath, ontology=ont),
+        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
+    ):
+      if pathtag.name not in kwtags:
+        kwtags.add(pathtag)
+    return kwtags
+
+  def format_kwargs(self, *, direct=False):
+    ''' Format arguments suitable for `str.format_map`.
+
+        This returns an `ExtendedNamespace` from `TagSet.ns()`
+        for a computed `TagSet`.
+
+        In addition to the normal `TagSet.ns()` names
+        the following additional names are available:
+        * `filepath.basename`: basename of the `TaggedPath.filepath`
+        * `filepath.pathname`: the `TaggedPath.filepath`
+        * `filepath.encoded`: the JSON encoded filepath
+        * `tags`: the `TagSet` as a string
+    '''
+    kwtags = self.format_tagset(direct=direct)
+    kwtags['tags'] = str(kwtags)
+    # convert the TagSet to an ExtendedNamespace
+    kwargs = kwtags.format_kwargs()
+    ##XP("format_kwargs=%s", kwargs)
+    return kwargs
+
+  @property
+  def basename(self):
+    ''' The name of the final path component.
+    '''
+    return basename(self.filepath)
+
+  @property
+  def tagfile(self):
+    ''' Return the `TagFile` storing the state for this `TaggedPath`.
+    '''
+    return self.fstags.tagfile_for(self.filepath)
+
+  def save(self):
+    ''' Update the associated `TagFile`.
+    '''
+    self.tagfile.save()
+
+  def merged_tags(self):
+    ''' Compute the cumulative tags for this path as a `TagSet`
+        by merging the tags from the root to the path.
+    '''
+    tags = TagSet(_ontology=self.ontology)
+    with state(verbose=False):
+      for tagfile, name in self._tagfile_stack:
+        for tag in tagfile[name]:
+          tags.add(tag)
+    return tags
+
+  @locked_property
+  def all_tags(self):
+    ''' Cached cumulative tags for this path as a `TagSet`
+        by merging the tags from the root to the path.
+
+        Note that subsequent changes to some path component's `direct_tags`
+        will not affect this `TagSet`.
+    '''
+    return self.merged_tags()
+
+  def add(self, tag, value=None):
+    ''' Add the `tag`=`value` to the direct tags.
+
+        If `tag` is not a `str` and `value` is omitted or `None`
+        then `tag` should be an object with `.name` and `.value` attributes,
+        such as a `Tag`.
+    '''
+    self.direct_tagfile.add(self.basename, tag, value)
+
+  def discard(self, tag, value=None):
+    ''' Discard the `tag`=`value` from the direct tags.
+
+        If `tag` is not a `str` and `value` is omitted or `None`
+        then `tag` should be an object with `.name` and `.value` attributes,
+        such as a `Tag`.
+    '''
+    self.direct_tagfile.discard(self.basename, tag, value)
+
+  def update(self, tags, *, prefix=None):
+    ''' Update the direct tags from `tags`
+        as for `TagSet.update`.
+    '''
+    self.direct_tagfile.update(self.basename, tags, prefix=prefix)
+
+  def pop(self, tag_name):
+    ''' Remove the tag named `tag_name` from the direct tags.
+        Raises `KeyError` if `tag_name` is not present in the direct tags.
+    '''
+    self.direct_tags.pop(tag_name)
+
+  def infer_from_basename(self, rules=None):
+    ''' Apply `rules` to the basename of this `TaggedPath`,
+        return a `TagSet` of inferred `Tag`s.
+
+        Tag values from earlier rules override values from later rules.
+    '''
+    if rules is None:
+      rules = self.fstags.config.filename_rules
+    name = self.basename
+    tagset = TagSet(_ontology=self.ontology)
+    with state(verbose=False):
+      for rule in rules:
+        for tag in rule.infer_tags(name):
+          if tag.name not in tagset:
+            tagset.add(tag)
+    return tagset
+
+  @fmtdoc
+  def get_xattr_tagset(self, xattr_name=None):
+    ''' Return a new `TagSet`
+        from the extended attribute `xattr_name` of `self.filepath`.
+        The default `xattr_name` is `XATTR_B` (`{XATTR_B!r}`).
+    '''
+    if xattr_name is None:
+      xattr_name = XATTR_B
+    xattr_s = get_xattr_value(self.filepath, xattr_name)
+    if xattr_s is None:
+      return TagSet(_ontology=self.ontology)
+    return TagSet.from_line(xattr_s)
+
+  def import_xattrs(self):
+    ''' Update the direct tags from the file's extended attributes.
+    '''
+    filepath = self.filepath
+    xa_tags = self.get_xattr_tagset()
+    # import tags from other xattrs if not present
+    for xattr_name, tag_name in self.fstags.config['xattr'].items():
+      if tag_name not in xa_tags:
+        tag_value = get_xattr_value(filepath, xattr_name)
+        if tag_value is not None:
+          xa_tags.add(tag_name, tag_value)
+    # merge with the direct tags
+    # if missing from the all_tags
+    # TODO: common merge_tags method
+    all_tags = self.all_tags
+    direct_tags = self.direct_tags
+    for tag in xa_tags:
+      if tag not in all_tags:
+        direct_tags.add(tag)
+
+  def export_xattrs(self):
+    ''' Update the extended attributes of the file.
+    '''
+    filepath = self.filepath
+    all_tags = self.all_tags
+    direct_tags = self.direct_tags
+    update_xattr_value(filepath, XATTR_B, str(direct_tags))
+    # export tags to other xattrs
+    for xattr_name, tag_name in self.fstags.config['xattr'].items():
+      tag_value = all_tags.get(tag_name)
+      update_xattr_value(
+          filepath, xattr_name, None if tag_value is None else str(tag_value)
+      )
+
 class TagFile(SingletonMixin, TagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
+
+  TagSetClass = TaggedPath
 
   @classmethod
   def _singleton_key(cls, filepath, *, ontology=None):
@@ -1577,288 +1790,6 @@ class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
     ''' The `TagSet` from `tagfile`.
     '''
     return self.tagfile[self.name]
-
-class TaggedPath(HasFSTagsMixin, FormatableMixin):
-  ''' Class to manipulate the tags for a specific path.
-  '''
-
-  def __init__(self, filepath, fstags=None):
-    if fstags is None:
-      fstags = self.fstags
-    else:
-      self.fstags = fstags
-    self.filepath = filepath
-    self._tagfile_stack = fstags.path_tagfiles(filepath)
-    self._lock = Lock()
-
-  def __repr__(self):
-    return "%s(%s)" % (type(self).__name__, self.filepath)
-
-  def __str__(self):
-    return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
-
-  def __contains__(self, tag):
-    ''' Test for the presence of `tag` in the `all_tags`.
-    '''
-    return tag in self.all_tags
-
-  def as_TagSet(self, te_id=None, name=None, indirect=False):
-    ''' Return a `TagSet` for this `TaggedPath`,
-        useful for export.
-
-        Parameters:
-        * `te_id`: a value for the `TagSet.id` attribute, default `None`
-        * `name`: a value for the `TagSet.name` attribute,
-          default `self.filepath`
-        * `indirect`: if true, use a copy of `self.all_tags`
-          for `TagSet.tags`, otherwise a copy of `self.direct_tags`.
-          The default is `False`.
-    '''
-    if name is None:
-      name = self.filepath
-    try:
-      S = os.stat(self.filepath)
-    except OSError:
-      unixtime = None
-    else:
-      unixtime = S.st_mtime
-    tags = TagSet()
-    tags.update(self.all_tags if indirect else self.direct_tags)
-    return TagSet(id=te_id, name=name, unixtime=unixtime, tags=tags)
-
-  @classmethod
-  def from_TagSet(cls, te, *, fstags, path=None):
-    ''' Factory to create a `TaggedPath` from a `TagSet`.
-
-        Parameters:
-        * `te`: the source `TagSet`
-        * `fstags`: the associated `FSTags` instance
-        * `path`: the path for the new instance,
-          default from `te.name`
-
-        Note that the `te.tags` are merged into the existing `TagSet`
-        for the `path`.
-    '''
-    if path is None:
-      path = te.name
-    tagged_path = fstags[path]
-    if te.tags:
-      tagged_path.direct_tags.update(te.tags)
-    return tagged_path
-
-  @property
-  def ontology(self):
-    ''' The ontology for use with this file, or `None`.
-    '''
-    try:
-      return self.fstags.ontology(self.filepath)
-    except ValueError:
-      return None
-
-  def format_tagset(self, *, direct=False):
-    ''' Compute a `TagSet` from this file's tags
-        with additional derived tags.
-
-        This can be converted into an `ExtendedNamespace`
-        suitable for use with `str.format_map`
-        via the `TagSet`'s `.format_kwargs()` method.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `filepath.basename`: basename of the `TaggedPath.filepath`
-        * `filepath.ext`: the file extension of the basename
-          of the `TaggedPath.filepath`
-        * `filepath.pathname`: the `TaggedPath.filepath`
-        * `filepath.encoded`: the JSON encoded filepath
-    '''
-    ont = self.ontology
-    kwtags = TagSet(_ontology=ont)
-    kwtags.update(self.direct_tags if direct else self.all_tags)
-    # add in cascaded values
-    for tag in list(self.fstags.cascade_tags(kwtags)):
-      if tag.name not in kwtags:
-        kwtags.add(tag)
-    # tags based on the filepath
-    filepath = self.filepath
-    for pathtag in (
-        Tag('filepath.basename', basename(filepath), ontology=ont),
-        Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
-        Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
-    ):
-      if pathtag.name not in kwtags:
-        kwtags.add(pathtag)
-    return kwtags
-
-  def format_kwargs(self, *, direct=False):
-    ''' Format arguments suitable for `str.format_map`.
-
-        This returns an `ExtendedNamespace` from `TagSet.ns()`
-        for a computed `TagSet`.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `filepath.basename`: basename of the `TaggedPath.filepath`
-        * `filepath.pathname`: the `TaggedPath.filepath`
-        * `filepath.encoded`: the JSON encoded filepath
-        * `tags`: the `TagSet` as a string
-    '''
-    kwtags = self.format_tagset(direct=direct)
-    kwtags['tags'] = str(kwtags)
-    # convert the TagSet to an ExtendedNamespace
-    kwargs = kwtags.format_kwargs()
-    ##XP("format_kwargs=%s", kwargs)
-    return kwargs
-
-  @property
-  def basename(self):
-    ''' The name of the final path component.
-    '''
-    return self._tagfile_stack[-1].name
-
-  @property
-  def direct_tagfile(self):
-    ''' The `TagFile` for the final path component.
-    '''
-    return self._tagfile_stack[-1].tagfile
-
-  @property
-  def direct_tags(self):
-    ''' The direct `TagSet` for the file.
-    '''
-    return self.direct_tagfile.tagsets[self.basename]
-
-  @property
-  def modified(self):
-    ''' The modification state of the `TagSet`.
-    '''
-    return self.direct_tags.modified
-
-  @modified.setter
-  def modified(self, new_modified):
-    ''' The modification state of the `TagSet`.
-    '''
-    self.direct_tags.modified = new_modified
-
-  def save(self):
-    ''' Update the associated `TagFile`.
-    '''
-    self.direct_tagfile.save()
-
-  def merged_tags(self):
-    ''' Return the cumulative tags for this path as a `TagSet`
-        by merging the tags from the root to the path.
-    '''
-    tags = TagSet(_ontology=self.ontology)
-    with state(verbose=False):
-      for tagfile, name in self._tagfile_stack:
-        for tag in tagfile[name]:
-          tags.add(tag)
-    return tags
-
-  @locked_property
-  def all_tags(self):
-    ''' Cached cumulative tags for this path as a `TagSet`
-        by merging the tags from the root to the path.
-
-        Note that subsequent changes to some path component's `direct_tags`
-        will not affect this `TagSet`.
-    '''
-    return self.merged_tags()
-
-  def add(self, tag, value=None):
-    ''' Add the `tag`=`value` to the direct tags.
-
-        If `tag` is not a `str` and `value` is omitted or `None`
-        then `tag` should be an object with `.name` and `.value` attributes,
-        such as a `Tag`.
-    '''
-    self.direct_tagfile.add(self.basename, tag, value)
-
-  def discard(self, tag, value=None):
-    ''' Discard the `tag`=`value` from the direct tags.
-
-        If `tag` is not a `str` and `value` is omitted or `None`
-        then `tag` should be an object with `.name` and `.value` attributes,
-        such as a `Tag`.
-    '''
-    self.direct_tagfile.discard(self.basename, tag, value)
-
-  def update(self, tags, *, prefix=None):
-    ''' Update the direct tags from `tags`
-        as for `TagSet.update`.
-    '''
-    self.direct_tagfile.update(self.basename, tags, prefix=prefix)
-
-  def pop(self, tag_name):
-    ''' Remove the tag named `tag_name` from the direct tags.
-        Raises `KeyError` if `tag_name` is not present in the direct tags.
-    '''
-    self.direct_tags.pop(tag_name)
-
-  def infer_from_basename(self, rules=None):
-    ''' Apply `rules` to the basename of this `TaggedPath`,
-        return a `TagSet` of inferred `Tag`s.
-
-        Tag values from earlier rules override values from later rules.
-    '''
-    if rules is None:
-      rules = self.fstags.config.filename_rules
-    name = self.basename
-    tagset = TagSet(_ontology=self.ontology)
-    with state(verbose=False):
-      for rule in rules:
-        for tag in rule.infer_tags(name):
-          if tag.name not in tagset:
-            tagset.add(tag)
-    return tagset
-
-  @fmtdoc
-  def get_xattr_tagset(self, xattr_name=None):
-    ''' Return a new `TagSet`
-        from the extended attribute `xattr_name` of `self.filepath`.
-        The default `xattr_name` is `XATTR_B` (`{XATTR_B!r}`).
-    '''
-    if xattr_name is None:
-      xattr_name = XATTR_B
-    xattr_s = get_xattr_value(self.filepath, xattr_name)
-    if xattr_s is None:
-      return TagSet(_ontology=self.ontology)
-    return TagSet.from_line(xattr_s)
-
-  def import_xattrs(self):
-    ''' Update the direct tags from the file's extended attributes.
-    '''
-    filepath = self.filepath
-    xa_tags = self.get_xattr_tagset()
-    # import tags from other xattrs if not present
-    for xattr_name, tag_name in self.fstags.config['xattr'].items():
-      if tag_name not in xa_tags:
-        tag_value = get_xattr_value(filepath, xattr_name)
-        if tag_value is not None:
-          xa_tags.add(tag_name, tag_value)
-    # merge with the direct tags
-    # if missing from the all_tags
-    # TODO: common merge_tags method
-    all_tags = self.all_tags
-    direct_tags = self.direct_tags
-    for tag in xa_tags:
-      if tag not in all_tags:
-        direct_tags.add(tag)
-
-  def export_xattrs(self):
-    ''' Update the extended attributes of the file.
-    '''
-    filepath = self.filepath
-    all_tags = self.all_tags
-    direct_tags = self.direct_tags
-    update_xattr_value(filepath, XATTR_B, str(direct_tags))
-    # export tags to other xattrs
-    for xattr_name, tag_name in self.fstags.config['xattr'].items():
-      tag_value = all_tags.get(tag_name)
-      update_xattr_value(
-          filepath, xattr_name, None if tag_value is None else str(tag_value)
-      )
 
 class CascadeRule:
   ''' A cascade rule of possible source tag names to provide a target tag.
