@@ -232,12 +232,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       lambda _ontology: _ontology is None or
       isinstance(_ontology, TagsOntology)
   )
-  def __init__(self, *a, _ontology=None, **kw):
+  def __init__(self, *a, _id=None, _ontology=None, **kw):
     ''' Initialise the `TagSet`.
 
         Parameters:
         * positional parameters initialise the `dict`
           and are passed to `dict.__init__`
+        * `_id`: optional identity value for databaselike implementations
         * `_ontology`: optional `TagsOntology to use for this `TagSet`
         * other alphabetic keyword parameters are also used to initialise the
           `dict` and are passed to `dict.__init__`
@@ -252,6 +253,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if okw:
       raise ValueError("unrecognised keywords: %r" % (okw,))
     super().__init__(*a, **dict_kw)
+    self.id = _id
     self.ontology = _ontology
     self.modified = False
 
