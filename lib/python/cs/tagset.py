@@ -225,6 +225,22 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       Subclasses should override the `set` and `discard` methods;
       the `dict` and mapping methods
       are defined in terms of these two basic operations.
+
+      `TagSet`s have a few special properties:
+      * `id`: a domain specific identifier;
+        this may reasonably be `None` for entities
+        not associated with database rows;
+        the `cs.sqltags.SQLTags` class associates this
+        with the database row id.
+      * `name`: the entity's name;
+        a read only alias for the `'name'` `Tag`.
+        The `cs.sqltags.SQLTags` class defines "log entries"
+        as `TagSet`s with no `name`.
+      * `unixtime`: a UNIX timestamp,
+        a `float` holding seconds since the UNIX epoch
+        (midnight, 1 January 1970 UTC).
+        This is typically the row creation time
+        for entities associated with database rows.
   '''
 
   @pfx_method
@@ -416,6 +432,24 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
             if k.startswith(prefix_)
         }
     )
+
+  @property
+  def name(self):
+    ''' Read only `name` property, `None` if there is no `'name'` tag.
+    '''
+    return self.get('name')
+
+  @property
+  def unixtime(self):
+    ''' `unixtime` property, autosets to `time.time()` if accessed.
+    '''
+    return self.get('unixtime')
+
+  @unixtime.setter
+  def unixtime(self, new_unixtime: float):
+    ''' Set the `unixtime`.
+    '''
+    self['unixtime'] = new_unixtime
 
   @pfx_method
   def ns(self):
