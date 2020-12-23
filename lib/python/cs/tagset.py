@@ -553,6 +553,29 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
             else:
               te.discard('name')
     return changed_tes
+
+  @classmethod
+  def from_csvrow(cls, csvrow):
+    ''' Construct a `TagSet` from a CSV row like that from
+        `TagSet.csvrow`, being `unixtime,id,name,tags...`.
+    '''
+    with Pfx("%s.from_csvrow", cls.__name__):
+      te_unixtime, te_id, te_name = csvrow[:3]
+      tags = TagSet()
+      for i, csv_value in enumerate(csvrow[3:], 3):
+        with Pfx("field %d %r", i, csv_value):
+          tag = Tag.from_str(csv_value)
+          tags.add(tag)
+      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
+
+  @property
+  def csvrow(self):
+    ''' This `TagSet` as a list useful to a `csv.writer`.
+        The inverse of `from_csvrow`.
+    '''
+    return [self.unixtime, self.id, self.name
+            ] + [str(tag) for tag in self.tags]
+
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
