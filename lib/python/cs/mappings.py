@@ -939,7 +939,7 @@ class AttrableMappingMixin(object):
   '''
 
   def __getattr__(self, attr):
-    ''' Unknown attributes are obtained from the `dict` entries.
+    ''' Unknown attributes are obtained from the mapping entries.
     '''
     try:
       value = self[attr]
