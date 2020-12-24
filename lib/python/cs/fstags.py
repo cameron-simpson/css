@@ -1361,7 +1361,8 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   ''' Class to manipulate the tags for a specific path.
   '''
 
-  def __init__(self, filepath, fstags=None):
+  def __init__(self, filepath, fstags=None, _id=None, _ontology=None):
+    super().__init__(_id=_id, _ontology=_ontology)
     if fstags is None:
       fstags = self.fstags
     else:
