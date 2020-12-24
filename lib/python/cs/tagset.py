@@ -168,6 +168,7 @@ from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
+from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -191,6 +192,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
+        'cs.deco',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
@@ -204,6 +206,74 @@ DISTINFO = {
 }
 
 EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
+
+@decorator
+def tag_or_tag_value(func, no_self=False):
+  ''' A decorator for functions or methods which may be called as:
+
+          func(name, [value])
+
+      or as:
+
+          func(Tag, [None])
+
+      The optional decorator argument `no_self` (default `False`)
+      should be supplied for plain functions
+      as they have no leading `self` parameter to accomodate.
+
+      Example:
+
+          @tag_or_tag_value
+          def add(self, tag_name, value, *, verbose=None):
+
+      This defines a `.add()` method
+      which can be called with `name` and `value`
+      or with single `Tag`like object
+      (something with `.name` and `.value` attributes),
+      for example:
+
+          tags = TagSet()
+          ....
+          tags.add('colour', 'blue')
+          ....
+          tag = Tag('size', 9)
+          tags.add(tag)
+  '''
+
+  if no_self:
+
+    def accept_tag_or_tag_value(name, value=None, *a, **kw):
+      ''' Plain function flavour of `tag_or_tag_value`,
+          accepting `(name,value=None,...)`.
+      '''
+      if not isinstance(name, str):
+        if value is not None:
+          raise ValueError(
+              "name is not a str (%s) and value is not None (%s)" %
+              (type(name), type(value))
+          )
+        name, value = name.name, name.value
+      return func(name, value, *a, **kw)
+  else:
+
+    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
+      ''' Method flavour of `tag_or_tag_value`,
+          accepting `(self,name,value=None,...)`.
+      '''
+      if not isinstance(name, str):
+        if value is not None:
+          raise ValueError(
+              "name is not a str (%s) and value is not None (%s)" %
+              (type(name), type(value))
+          )
+        name, value = name.name, name.value
+      return func(self, name, value, *a, **kw)
+
+  accept_tag_or_tag_value.__name__ = "@accept_tag_or_tag_value(%s)" % (
+      func.__name__,
+  )
+  accept_tag_or_tag_value.__doc__ = func.__doc__
+  return accept_tag_or_tag_value
 
 class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
@@ -327,7 +397,8 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
-  def add(self, tag_name, value=None, *, verbose=None):
+  @tag_or_tag_value
+  def add(self, tag_name, value, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag(tag_name, value)
@@ -354,7 +425,8 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       raise KeyError(tag_name)
     self.discard(tag_name)
 
-  def discard(self, tag_name, value=None, *, verbose=None):
+  @tag_or_tag_value
+  def discard(self, tag_name, value, *, verbose=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
@@ -742,7 +814,8 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     '''
     return get_dotted_identifier(s, offset=offset)
 
-  def matches(self, tag_name, value=None):
+  @tag_or_tag_value
+  def matches(self, tag_name, value):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
     other_tag = type(self)(tag_name, value)
