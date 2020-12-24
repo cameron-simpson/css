@@ -1793,6 +1793,33 @@ class BaseTagFile(SingletonMixin, TagSets):
     '''
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
+class TagFile(BaseTagFile, HasFSTagsMixin):
+  ''' A `TagFile` indexing `TagSet`s for file paths
+      which lives in the file path's directory.
+  '''
+
+  @typechecked
+  def __init__(self, filepath: str, *, ontology=None, fstags=None):
+    if fstags is None:
+      fstags = FSTags()
+    super().__init__(filepath, ontology=ontology)
+    self.fstags = fstags
+
+  @typechecked
+  @require(
+      lambda name: is_valid_basename(name),
+      "name should be a clean file basename"
+  )
+  def TagSetClass(self, name: str) -> TaggedPath:
+    if name in self.tagsets:
+      raise ValueError("name already exists: %r" % (name,))
+    filepath = joinpath(dirname(self.filepath), name)
+    te = te.tagsets[name] = TaggedPath(
+        filepath, fstags=self.fstags, _ontology=self.ontology
+    )
+    te.tagfilepath = self.filepath
+    return te
+
 class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
   ''' An reference to an entry within a `TagFile`.
       This is used entirely by the `FSTags` tagset inheritance system.
