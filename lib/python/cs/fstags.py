@@ -1572,10 +1572,10 @@ class TagFile(SingletonMixin, TagSets):
   '''
 
   TagSetClass = TaggedPath
-
   @classmethod
-  def _singleton_key(cls, filepath, *, ontology=None):
-    return filepath, ontology
+  def _singleton_key(cls, filepath, **kw):
+    return filepath
+
 
   @require(lambda filepath: isinstance(filepath, str))
   def __init__(self, filepath, *, ontology=None):
