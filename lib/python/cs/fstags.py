@@ -773,6 +773,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             tag tagset_name {{tag[=value]|-tag}}...
               Directly modify tag_name within the tag file tagfile_path.
     '''
+    fstags = options.fstags
     try:
       tagfilepath = argv.pop(0)
     except IndexError:
@@ -799,7 +800,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             if badopts:
               raise GetoptError("bad arguments")
             with state(verbose=True):
-              with TagFile(tagfilepath) as tagfile:
+              with TagFile(tagfilepath, fstags=fstags) as tagfile:
                 tags = tagfile[tagset_name]
                 for choice in tag_choices:
                   with Pfx(choice.spec):
