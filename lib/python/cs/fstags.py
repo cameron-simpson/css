@@ -1377,11 +1377,6 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   def __str__(self):
     return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
 
-  def __contains__(self, tag):
-    ''' Test for the presence of `tag` in the `all_tags`.
-    '''
-    return tag in self.all_tags
-
   def format_tagset(self, *, direct=False):
     ''' Compute a `TagSet` from this file's tags
         with additional derived tags.
