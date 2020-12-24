@@ -2342,3 +2342,40 @@ class RegexpTagRule:
           tag = Tag(tag_name, value)
           tags.append(tag)
     return tags
+
+def main(_):
+  ''' Test code.
+  '''
+  from cs.logutils import setup_logging
+  from cs.x import X  # pylint: disable=import-outside-toplevel
+  setup_logging()
+  ont = TagsOntology(
+      {
+          'type.colour':
+          TagSet(description="a colour, a hue", type="str"),
+          'meta.colour.blue':
+          TagSet(
+              url='https://en.wikipedia.org/wiki/Blue',
+              wavelengths='450nm-495nm'
+          ),
+      }
+  )
+  tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+  X("tags.colour = %s", tags.colour)
+  colour = tags.tag('colour')
+  X("colour = %s", colour)
+  X("type = %s", colour.typedata)
+  X("meta = %s", colour.metadata)
+  X("meta.url = %s", colour.meta.url)
+  X("meta.ns = %s", colour.meta.ns())
+  X("meta.url = %s", colour.meta.ns().url_s)
+  ns = tags.ns()
+  X("colour = %s", ns.colour._tag)
+  X("colour.metadata = %s", ns.colour._meta)
+  X("colour.metadata.url = %s", ns.colour._meta.url)
+  ##X("colour.metadata.ns() = %s", ns.colour._tag.metadata.ns())
+  ##X(repr(list(ns.colour._tag.metadata.ns().__dict__.items())))
+
+if __name__ == '__main__':
+  import sys  # pylint: disable=import-outside-toplevel
+  sys.exit(main(sys.argv))
