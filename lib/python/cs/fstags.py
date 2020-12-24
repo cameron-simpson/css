@@ -71,7 +71,7 @@
 
 '''
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from configparser import ConfigParser
 from contextlib import contextmanager
 import csv
@@ -1035,23 +1035,20 @@ class FSTags(MultiOpenMixin):
     return ont
 
   def path_tagfiles(self, filepath):
-    ''' Return a list of `TagFileEntry`s
+    ''' Generator yielding a sequence of `(TagFile,name)` pairs
+        where `name` is the key within the `TagFile`
         for the `TagFile`s affecting `filepath`
-        in order from the root to `dirname(filepath)`
-        where `name` is the key within `TagFile`.
+        in order from the root to `dirname(filepath)`.
     '''
-    with Pfx("path_tagfiles(%r)", filepath):
-      absfilepath = abspath(filepath)
-      root, *subparts = PurePath(absfilepath).parts
-      if not subparts:
-        raise ValueError("root=%r and no subparts" % (root,))
-      tagfiles = []
-      current = root
-      while subparts:
-        next_part = subparts.pop(0)
-        tagfiles.append(TagFileEntry(self.dir_tagfile(current), next_part))
-        current = joinpath(current, next_part)
-      return tagfiles
+    absfilepath = abspath(filepath)
+    root, *subparts = PurePath(absfilepath).parts
+    if not subparts:
+      raise ValueError("root=%r and no subparts" % (root,))
+    current = root
+    while subparts:
+      next_part = subparts.pop(0)
+      yield self.dir_tagfile(current), next_part
+      current = joinpath(current, next_part)
 
   @locked
   @typechecked
@@ -1368,7 +1365,6 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     else:
       self.fstags = fstags
     self.filepath = filepath
-    self._tagfile_stack = fstags.path_tagfiles(filepath)
     self._lock = Lock()
 
   def __repr__(self):
@@ -1455,7 +1451,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     tags = TagSet(_ontology=self.ontology)
     with state(verbose=False):
-      for tagfile, name in self._tagfile_stack:
+      for tagfile, name in self.fstags.path_tagfiles(self.filepath):
         for tag in tagfile[name]:
           tags.add(tag)
     return tags
@@ -1819,20 +1815,11 @@ class TagFile(BaseTagFile, HasFSTagsMixin):
     te.tagfilepath = self.filepath
     return te
 
-class TagFileEntry(namedtuple('TagFileEntry', 'tagfile name')):
-  ''' An reference to an entry within a `TagFile`.
-      This is used entirely by the `FSTags` tagset inheritance system.
-
-      Attributes:
-      * `name`: the name of the entry within `tagfile`
-      * `tagfile`: the `TagFile` containing `name`
-  '''
-
   @property
-  def tagset(self):
-    ''' The `TagSet` from `tagfile`.
+  def dirpath(self):
+    ''' Return the path of the directory associated with this `TagFile`.
     '''
-    return self.tagfile[self.name]
+    return dirname(self.filepath)
 
 class CascadeRule:
   ''' A cascade rule of possible source tag names to provide a target tag.
