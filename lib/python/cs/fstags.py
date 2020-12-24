@@ -1470,19 +1470,19 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   def add(self, tag_name, value):
     ''' Add the `tag_name`=`value` to the direct tags.
     '''
-    self.direct_tagfile.add(self.basename, tag, value)
+    self.tagfile[self.basename].set(tag_name, value)
 
   @tag_or_tag_value
   def discard(self, tag_name, value):
     ''' Discard the `tag_name`=`value` from the direct tags.
     '''
-    self.direct_tagfile.discard(self.basename, tag, value)
+    self.tagfile[self.basename].discard(tag_name, value)
 
   def update(self, tags, *, prefix=None):
     ''' Update the direct tags from `tags`
         as for `TagSet.update`.
     '''
-    self.direct_tagfile.update(self.basename, tags, prefix=prefix)
+    self.tagfile[self.basename].update(tags, prefix=prefix)
 
   def pop(self, tag_name):
     ''' Remove the tag named `tag_name` from the direct tags.
