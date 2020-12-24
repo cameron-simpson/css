@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Simple filesystem based file tagging
     and the associated `fstags` command line script.
@@ -87,20 +89,20 @@ import shutil
 import sys
 from threading import Lock, RLock
 from icontract import require
+from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (
-    cutsuffix, get_nonwhite, get_ini_clause_entryname, FormatableMixin,
-    FormatAsError
+    cutsuffix, get_nonwhite, get_ini_clause_entryname, FormatAsError
 )
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    TagSet, Tag, TagBasedTest, TagsOntology, TagsOntologyCommand, TagSet,
+    Tag, TagSet, TagSets, TagBasedTest, TagsOntology, TagsOntologyCommand,
     TagsCommandMixin, RegexpTagRule
 )
 from cs.threads import locked, locked_property, State
@@ -287,6 +289,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         csvw.writerow(te.csvrow)
     return xit
 
+  # pylint: disable=too-many-branches
   @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [--direct] [--for-rsync] [-o output_format] path {{tag[=value]|-tag}}...
@@ -400,6 +403,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     TaggedPath.from_TagSet(te, fstags=self, path=path)
 
+  # pylint: disable=too-many-branches
   @classmethod
   def cmd_json_import(cls, argv, options):
     ''' Usage: json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
@@ -544,6 +548,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     return self._cmd_mvcpln(options.fstags.move, argv, options)
 
+  # pylint: disable=too-many-branches
   @staticmethod
   def _cmd_mvcpln(attach, argv, _):
     ''' Move/copy/link paths and their tags into a destination.
@@ -751,7 +756,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     try:
       tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
-      raise GetoptError(str(e))
+      raise GetoptError(str(e))  # pylint: disable=raise-missing-from
     if badopts:
       raise GetoptError("bad arguments")
     if path == '-':
@@ -771,12 +776,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     try:
       tagfilepath = argv.pop(0)
     except IndexError:
-      raise GetoptError("missing tagfile_path")
+      raise GetoptError("missing tagfile_path")  # pylint: disable=raise-missing-from
     with Pfx(tagfilepath):
       try:
         subcmd = argv.pop(0)
       except IndexError:
-        raise GetoptError("missing subcommand")
+        raise GetoptError("missing subcommand")  # pylint: disable=raise-missing-from
       with Pfx(subcmd):
         if subcmd == 'tag':
           try:
@@ -907,6 +912,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
 FSTagsCommand.add_usage_to_docstring()
 
+# pylint: disable=too-many-public-methods
 class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
@@ -1324,6 +1330,7 @@ class FSTags(MultiOpenMixin):
           raise
       return result
 
+# pylint: disable=too-few-public-methods
 class HasFSTagsMixin:
   ''' Mixin providing an automatic `.fstags` property.
   '''
