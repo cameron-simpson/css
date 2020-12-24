@@ -1937,7 +1937,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.te_mapping`.
     '''
-    return self.te_mapping.get(name, default=default)
+    return self.te_mapping.get(name, default)
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
