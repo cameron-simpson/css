@@ -103,7 +103,7 @@ from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     Tag, TagSet, TagSets, TagBasedTest, TagsOntology, TagsOntologyCommand,
-    TagsCommandMixin, RegexpTagRule
+    TagsCommandMixin, RegexpTagRule, tag_or_tag_value
 )
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -1466,21 +1466,15 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     return self.merged_tags()
 
-  def add(self, tag, value=None):
-    ''' Add the `tag`=`value` to the direct tags.
-
-        If `tag` is not a `str` and `value` is omitted or `None`
-        then `tag` should be an object with `.name` and `.value` attributes,
-        such as a `Tag`.
+  @tag_or_tag_value
+  def add(self, tag_name, value):
+    ''' Add the `tag_name`=`value` to the direct tags.
     '''
     self.direct_tagfile.add(self.basename, tag, value)
 
-  def discard(self, tag, value=None):
-    ''' Discard the `tag`=`value` from the direct tags.
-
-        If `tag` is not a `str` and `value` is omitted or `None`
-        then `tag` should be an object with `.name` and `.value` attributes,
-        such as a `Tag`.
+  @tag_or_tag_value
+  def discard(self, tag_name, value):
+    ''' Discard the `tag_name`=`value` from the direct tags.
     '''
     self.direct_tagfile.discard(self.basename, tag, value)
 
