@@ -1054,7 +1054,8 @@ class FSTags(MultiOpenMixin):
       return tagfiles
 
   @locked
-  def dir_tagfile(self, dirpath):
+  @typechecked
+  def dir_tagfile(self, dirpath: str) -> "TagFile":
     ''' Return the `TagFile` associated with `dirpath`.
     '''
     return self._tagfile(joinpath(abspath(dirpath), self.tagsfile_basename))
