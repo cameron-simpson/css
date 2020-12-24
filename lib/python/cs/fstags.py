@@ -1575,9 +1575,8 @@ class BaseTagFile(SingletonMixin, TagSets):
   def _singleton_key(cls, filepath, **kw):
     return filepath
 
-
-  @require(lambda filepath: isinstance(filepath, str))
-  def __init__(self, filepath, *, ontology=None):
+  @typechecked
+  def __init__(self, filepath: str, *, ontology=None):
     if hasattr(self, 'filepath'):
       return
     self.filepath = filepath
@@ -1585,7 +1584,7 @@ class BaseTagFile(SingletonMixin, TagSets):
     self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r,%s)" % (type(self).__name__, shortpath(self.filepath))
+    return "%s(%r)" % (type(self).__name__, shortpath(self.filepath))
 
   def __repr__(self):
     return "%s(%r)" % (type(self).__name__, self.filepath)
