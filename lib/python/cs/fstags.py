@@ -1564,14 +1564,13 @@ class TaggedPath(TagSet, HasFSTagsMixin):
           filepath, xattr_name, None if tag_value is None else str(tag_value)
       )
 
-class TagFile(SingletonMixin, TagSets):
+class BaseTagFile(SingletonMixin, TagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
       itself a mapping of tag name => tag value.
   '''
 
-  TagSetClass = TaggedPath
   @classmethod
   def _singleton_key(cls, filepath, **kw):
     return filepath
@@ -1599,7 +1598,20 @@ class TagFile(SingletonMixin, TagSets):
     ''' Save the tagsets if modified.
     '''
     self.save()
+
+  @typechecked
+  def default_factory(self, name: str):
+    ''' Create a new `TagSet` named `name`.
     '''
+    if name in self.tagsets:
+      raise ValueError("name already exists: %r" % (name,))
+    te = te.tagsets[name] = self.TagSetClass(name=name)
+    return te
+
+  def get(self, name, default=None):
+    ''' Get from the tagsets.
+    '''
+    return self.tagsets.get(name, default=default)
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
@@ -1639,7 +1651,7 @@ class TagFile(SingletonMixin, TagSets):
     ''' Return the `TagSet` associated with `name`.
     '''
     with Pfx("%s.__getitem__[%r]", self, name):
-      return tagfile.tagsets[name]
+      return self.tagsets[name]
 
   def __delitem__(self, name):
     del self.tagsets[name]
@@ -1774,19 +1786,6 @@ class TagFile(SingletonMixin, TagSets):
         self.save_tagsets(self.filepath, self.tagsets, self.unparsed)
         for tagset in tagsets.values():
           tagset.modified = False
-
-  @require(lambda name: isinstance(name, str))
-  def add(self, name, tag, value=None):
-    ''' Add a tag to the tags for `name`.
-    '''
-    return self[name].add(tag, value, verbose=state.verbose)
-
-  def discard(self, name, tag_name, value=None):
-    ''' Discard the tag matching `(tag_name,value)`.
-        Return a `Tag` with the old value,
-        or `None` if there was no matching tag.
-    '''
-    return self[name].discard(tag_name, value, verbose=state.verbose)
 
   def update(self, name, tags, *, prefix=None):
     ''' Update the tags for `name` from the supplied `tags`
