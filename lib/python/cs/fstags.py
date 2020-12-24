@@ -142,6 +142,11 @@ def main(argv=None):
   '''
   return FSTagsCommand().run(argv)
 
+def is_valid_basename(name: str):
+  ''' Test whether `name` is a valid basefile for something in a directory.
+  '''
+  return name and name not in ('.', '..') and os.sep not in name
+
 state = State(verbose=False)
 
 def verbose(msg, *a):
