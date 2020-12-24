@@ -2,6 +2,8 @@
 #
 # Single line status updates.
 #   - Cameron Simpson <cs@cskk.id.au>
+#
+# pylint: disable=too-many-lines
 
 r'''
 Single and multiple line status updates with minimal update sequences.
@@ -81,7 +83,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20201102-post'
+__version__ = '20201202-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -347,6 +349,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
+    global curses   # pylint: disable=global-statement
     try:
       return self._ti_strs[ti_name]
     except KeyError:
@@ -355,7 +358,12 @@ class Upd(SingletonMixin):
           s = None
         else:
           if not self._ti_ready:
-            curses.setupterm()
+            try:
+              curses.setupterm()
+            except TypeError:
+              curses = None
+              self._ti_ready = True
+              return None
             self._ti_ready = True
           s = curses.tigetstr(ti_name)
           if s is not None:
@@ -717,13 +725,6 @@ class Upd(SingletonMixin):
       )
     slots = self._slot_text
     proxies = self._proxies
-    cursor_up = self.ti_str('cuu1')
-    if not cursor_up:
-      raise IndexError(
-          "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
-          % (os.environ.get('TERM'),)
-      )
-    insert_line = self.ti_str('il1')
     txts = []
     with self._lock:
       if index < 0:
@@ -755,22 +756,33 @@ class Upd(SingletonMixin):
         slots.insert(index, txt)
         proxies.insert(index, proxy)
       else:
+        cursor_up = self.ti_str('cuu1')
+        insert_line = self.ti_str('il1')
         # adjust the display, insert the slot
         first_slot = self._current_slot is None
-        if insert_line:
-          # make sure insert line does not push the bottom line off the screen
-          # by forcing a scroll
-          if first_slot:
-            cursor_to_ll = self.ti_str('ll')  # move to lower left
-            if cursor_to_ll:
-              txts.append(cursor_to_ll)
-            else:
-              txts.append('\r')
-          else:
-            txts.extend(self._move_to_slot_v(self._current_slot, 0))
+        if first_slot:
+          txts.append('\v\r')
           self._current_slot = 0
-          txts.append('\v')
-          txts.append(cursor_up)
+        else:
+          if not cursor_up:
+            raise IndexError(
+                "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+                % (os.environ.get('TERM'),)
+            )
+          if insert_line:
+            # make sure insert line does not push the bottom line off the screen
+            # by forcing a scroll
+            if first_slot:
+              cursor_to_ll = self.ti_str('ll')  # move to lower left
+              if cursor_to_ll:
+                txts.append(cursor_to_ll)
+              else:
+                txts.append('\r')
+            else:
+              txts.extend(self._move_to_slot_v(self._current_slot, 0))
+            self._current_slot = 0
+            txts.append('\v')
+            txts.append(cursor_up)
         if index == 0:
           # move to bottom slot, add line below
           if not first_slot:
@@ -814,7 +826,9 @@ class Upd(SingletonMixin):
     slots = self._slot_text
     proxies = self._proxies
     with self._lock:
-      if index < 0 or index >= len(self):
+      if len(slots) == 0 and index == 0:
+        return None
+      if index < 0 or index >= len(slots):
         raise ValueError(
             "index should be in the range 0..%d inclusive: got %s" %
             (len(self), index)

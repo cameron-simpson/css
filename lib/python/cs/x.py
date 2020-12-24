@@ -145,3 +145,8 @@ def Xtty(msg, *args, **kw):
   X_via_tty = True
   X(msg, *args, **kw)
   X_via_tty = old
+
+def Y(msg, *a, **kw):
+  ''' Wrapper for `X()` rendering in yellow.
+  '''
+  X(msg, *a, colour='yellow', **kw)

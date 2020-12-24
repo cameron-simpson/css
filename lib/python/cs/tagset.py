@@ -157,18 +157,18 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from datetime import date, datetime
 import fnmatch
+from fnmatch import fnmatchcase
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
 import re
-import time
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.dateutils import unixtime2datetime
+from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -176,10 +176,11 @@ from cs.lex import (
     FormatableMixin
 )
 from cs.logutils import warning, error, ifverbose
-from cs.mappings import AttrableMappingMixin
+from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
+from cs.resources import MultiOpenMixin
 
 __version__ = '20200716-post'
 
@@ -191,7 +192,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
-        'cs.dateutils',
+        'cs.deco',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
@@ -205,6 +206,74 @@ DISTINFO = {
 }
 
 EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
+
+@decorator
+def tag_or_tag_value(func, no_self=False):
+  ''' A decorator for functions or methods which may be called as:
+
+          func(name, [value])
+
+      or as:
+
+          func(Tag, [None])
+
+      The optional decorator argument `no_self` (default `False`)
+      should be supplied for plain functions
+      as they have no leading `self` parameter to accomodate.
+
+      Example:
+
+          @tag_or_tag_value
+          def add(self, tag_name, value, *, verbose=None):
+
+      This defines a `.add()` method
+      which can be called with `name` and `value`
+      or with single `Tag`like object
+      (something with `.name` and `.value` attributes),
+      for example:
+
+          tags = TagSet()
+          ....
+          tags.add('colour', 'blue')
+          ....
+          tag = Tag('size', 9)
+          tags.add(tag)
+  '''
+
+  if no_self:
+
+    def accept_tag_or_tag_value(name, value=None, *a, **kw):
+      ''' Plain function flavour of `tag_or_tag_value`,
+          accepting `(name,value=None,...)`.
+      '''
+      if not isinstance(name, str):
+        if value is not None:
+          raise ValueError(
+              "name is not a str (%s) and value is not None (%s)" %
+              (type(name), type(value))
+          )
+        name, value = name.name, name.value
+      return func(name, value, *a, **kw)
+  else:
+
+    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
+      ''' Method flavour of `tag_or_tag_value`,
+          accepting `(self,name,value=None,...)`.
+      '''
+      if not isinstance(name, str):
+        if value is not None:
+          raise ValueError(
+              "name is not a str (%s) and value is not None (%s)" %
+              (type(name), type(value))
+          )
+        name, value = name.name, name.value
+      return func(self, name, value, *a, **kw)
+
+  accept_tag_or_tag_value.__name__ = "@accept_tag_or_tag_value(%s)" % (
+      func.__name__,
+  )
+  accept_tag_or_tag_value.__doc__ = func.__doc__
+  return accept_tag_or_tag_value
 
 class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
@@ -223,15 +292,36 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       Subclasses should override the `set` and `discard` methods;
       the `dict` and mapping methods
       are defined in terms of these two basic operations.
+
+      `TagSet`s have a few special properties:
+      * `id`: a domain specific identifier;
+        this may reasonably be `None` for entities
+        not associated with database rows;
+        the `cs.sqltags.SQLTags` class associates this
+        with the database row id.
+      * `name`: the entity's name;
+        a read only alias for the `'name'` `Tag`.
+        The `cs.sqltags.SQLTags` class defines "log entries"
+        as `TagSet`s with no `name`.
+      * `unixtime`: a UNIX timestamp,
+        a `float` holding seconds since the UNIX epoch
+        (midnight, 1 January 1970 UTC).
+        This is typically the row creation time
+        for entities associated with database rows.
   '''
 
   @pfx_method
-  def __init__(self, *a, _ontology=None, **kw):
+  @require(
+      lambda _ontology: _ontology is None or
+      isinstance(_ontology, TagsOntology)
+  )
+  def __init__(self, *a, _id=None, _ontology=None, **kw):
     ''' Initialise the `TagSet`.
 
         Parameters:
         * positional parameters initialise the `dict`
           and are passed to `dict.__init__`
+        * `_id`: optional identity value for databaselike implementations
         * `_ontology`: optional `TagsOntology to use for this `TagSet`
         * other alphabetic keyword parameters are also used to initialise the
           `dict` and are passed to `dict.__init__`
@@ -246,6 +336,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if okw:
       raise ValueError("unrecognised keywords: %r" % (okw,))
     super().__init__(*a, **dict_kw)
+    self.id = _id
     self.ontology = _ontology
     self.modified = False
 
@@ -277,7 +368,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         return True
     return False
 
-  def tag(self, tag_name, prefix=None):
+  def tag(self, tag_name, prefix=None, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
     '''
     try:
@@ -287,7 +378,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     return Tag(
         prefix + '.' + tag_name if prefix else tag_name,
         value,
-        ontology=self.ontology
+        ontology=ontology or self.ontology
     )
 
   def as_tags(self, prefix=None):
@@ -306,7 +397,8 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def __setitem__(self, tag_name, value):
     self.set(tag_name, value)
 
-  def add(self, tag_name, value=None, *, verbose=None):
+  @tag_or_tag_value
+  def add(self, tag_name, value, *, verbose=None):
     ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
     '''
     tag = Tag(tag_name, value)
@@ -333,7 +425,8 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       raise KeyError(tag_name)
     self.discard(tag_name)
 
-  def discard(self, tag_name, value=None, *, verbose=None):
+  @tag_or_tag_value
+  def discard(self, tag_name, value, *, verbose=None):
     ''' Discard the tag matching `(tag_name,value)`.
         Return a `Tag` with the old value,
         or `None` if there was no matching tag.
@@ -390,6 +483,43 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
 
+  def subtags(self, prefix):
+    ''' Return a new `TagSet` containing tags commencing with `prefix+'.'`
+        with the key prefixes stripped off.
+
+        Example:
+
+            >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
+            >>> tags.subtags('a')
+            TagSet:{'b': 1, 'd': 2}
+    '''
+    prefix_ = prefix + '.'
+    return TagSet(
+        {
+            cutprefix(k, prefix_): v
+            for k, v in self.items()
+            if k.startswith(prefix_)
+        }
+    )
+
+  @property
+  def name(self):
+    ''' Read only `name` property, `None` if there is no `'name'` tag.
+    '''
+    return self.get('name')
+
+  @property
+  def unixtime(self):
+    ''' `unixtime` property, autosets to `time.time()` if accessed.
+    '''
+    return self.get('unixtime')
+
+  @unixtime.setter
+  def unixtime(self, new_unixtime: float):
+    ''' Set the `unixtime`.
+    '''
+    self['unixtime'] = new_unixtime
+
   @pfx_method
   def ns(self):
     ''' Return a `TagSetNamespace` for this `TagSet`.
@@ -419,6 +549,101 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         tag = Tag.from_str(line)
         new_values[tag.name] = tag.value
     self.set_from(new_values, verbose=verbose)
+
+  @classmethod
+  def _from_named_tags_line(cls, line, ontology=None):
+    ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
+        return the `TagSet`.
+    '''
+    name, offset = Tag.parse_value(line)
+    if offset < len(line) and not line[offset].isspace():
+      _, offset2 = get_nonwhite(line, offset)
+      name = line[:offset2]
+      warning(
+          "offset %d: expected whitespace, adjusted name to %r", offset, name
+      )
+      offset = offset2
+    if offset < len(line) and not line[offset].isspace():
+      warning("offset %d: expected whitespace", offset)
+    tags = TagSet.from_line(line, offset, ontology=ontology)
+    return name, tags
+
+  @classmethod
+  @pfx_method
+  def edit_many(cls, tes, editor=None, verbose=True):
+    ''' Edit an iterable of `TagSet`s.
+        Return a list of the `TagSet`s which were modified.
+
+        This function supports modifying `Tag`s
+        including the `'name'` `Tag`.
+    '''
+    if editor is None:
+      editor = EDITOR
+    te_map = {te.name or te.id: te for te in tes}
+    assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
+        "not all entities have str or int keys: %r" % list(te_map.keys())
+    lines = list(
+        map(
+            lambda te: ' '.join(
+                [te.transcribe_value(te.name or te.id)] + [
+                    str(te.tag(tag_name))
+                    for tag_name in te.keys()
+                    if tag_name != 'name'
+                ]
+            ), te_map.values()
+        )
+    )
+    changes = edit_strings(lines, editor=editor)
+    changed_tes = []
+    for old_line, new_line in changes:
+      old_name, _ = cls.from_editable_line(old_line)
+      assert isinstance(old_name, (str, int))
+      with Pfx("%r", old_name):
+        te = te_map[old_name]
+        changed_tes.append(te)
+        new_name, new_tags = cls._from_named_tags_line(new_line)
+        # modify Tags
+        te.set_from(new_tags, verbose=verbose)
+        if old_name != new_name:
+          # update name
+          with Pfx("=> %r", new_name):
+            if not isinstance(new_name, (str, int)):
+              error("illegal value, expected str or int")
+            elif new_name in te_map:
+              error("already in map, not changing")
+            elif isinstance(new_name, int):
+              if isinstance(old_name, int):
+                error("may not change ids")
+              else:
+                te.id = new_name
+                te.discard('name')
+            elif new_name:
+              te.set('name', new_name)
+            else:
+              te.discard('name')
+    return changed_tes
+
+  @classmethod
+  def from_csvrow(cls, csvrow):
+    ''' Construct a `TagSet` from a CSV row like that from
+        `TagSet.csvrow`, being `unixtime,id,name,tags...`.
+    '''
+    with Pfx("%s.from_csvrow", cls.__name__):
+      te_unixtime, te_id, te_name = csvrow[:3]
+      tags = TagSet()
+      for i, csv_value in enumerate(csvrow[3:], 3):
+        with Pfx("field %d %r", i, csv_value):
+          tag = Tag.from_str(csv_value)
+          tags.add(tag)
+      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
+
+  @property
+  def csvrow(self):
+    ''' This `TagSet` as a list useful to a `csv.writer`.
+        The inverse of `from_csvrow`.
+    '''
+    return [self.unixtime, self.id, self.name
+            ] + [str(tag) for tag in self.tags]
 
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
@@ -452,6 +677,9 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         if the `ontology` parameter is not `None`
   '''
 
+  @require(
+      lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
+  )
   def __new__(cls, name, value=None, *, ontology=None):
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
@@ -586,7 +814,8 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     '''
     return get_dotted_identifier(s, offset=offset)
 
-  def matches(self, tag_name, value=None):
+  @tag_or_tag_value
+  def matches(self, tag_name, value):
     ''' Test whether this `Tag` matches `(tag_name,value)`.
     '''
     other_tag = type(self)(tag_name, value)
@@ -659,7 +888,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           except JSONDecodeError as e:
             raise ValueError(
                 "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
-            )
+            ) from e
           offset += suboffset
     return value, offset
 
@@ -805,7 +1034,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     typedata = self.typedata
     if typedata is None:
       return None
-    type_name = typedata.get('type')
+    type_name = typedata.type
     if type_name is None:
       type_name = self.ontology.value_to_tag_name(self.name)
     return type_name
@@ -824,11 +1053,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     return ont.basetype(self.type)
 
-  @property
-  @require(lambda self: isinstance(self.type, str))
-  def metadata(self):
-    ''' The metadata information about this specific tag value,
-        derived through the ontology from the tag name and value.
+  def metadata(self, ontology=None, convert=None):
+    ''' Fetch the metadata information about this specific tag value,
+        derived through the `ontology` from the tag name and value.
+        The default `ontology` is `self.onotology`.
 
         For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
         for `self.value`.
@@ -838,11 +1066,14 @@ class Tag(namedtuple('Tag', 'name value ontology')):
 
         For a mapping (`dict`) this is mapping of `key->value_metadata`.
     '''
-    ont = self.ontology
+    ont = ontology or self.ontology
     basetype = self.basetype
     if basetype == 'list':
       member_type = self.member_type
-      return [ont.value_metadata(member_type, value) for value in self.value]
+      return [
+          ont.value_metadata(member_type, value, convert=convert)
+          for value in self.value
+      ]
     if basetype == 'dict':
       member_type = self.member_type
       return {
@@ -850,6 +1081,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
           for key, value in self.value.items()
       }
     return ont.value_metadata(self.name, self.value)
+
+  @property
+  def meta(self):
+    ''' The `Tag` metadata derived from the `Tag`'s ontology.
+    '''
+    return self.metadata()
 
   @property
   def key_type(self):
@@ -860,7 +1097,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     try:
       return self.typedata['key_type']
     except KeyError:
-      raise AttributeError('key_type')
+      raise AttributeError('key_type')  # pylint: disable=raise-missing-from
 
   @property
   @pfx_method
@@ -872,27 +1109,27 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     try:
       return self.typedata['member_type']
     except KeyError:
-      raise AttributeError('member_type')
+      raise AttributeError('member_type')  # pylint: disable=raise-missing-from
 
-class TaggedEntityCriterion(ABC):
+class TagSetCriterion(ABC):
   ''' A testable criterion for a `TagSet`.
   '''
 
-  # list of TaggedEntityCriterion classes
+  # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 
   @abstractmethod
   @typechecked
-  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
-    ''' Apply this `TaggedEntityCriterion` to a `TagSet`.
+  def match_tagged_entity(self, te: "TagSet") -> bool:
+    ''' Apply this `TagSetCriterion` to a `TagSet`.
     '''
     raise NotImplementedError("match")
 
   @classmethod
   @pfx_method
   def from_str(cls, s):
-    ''' Prepare a `TaggedEntityCriterion` from the string `s`.
+    ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
     criterion, offset = cls.from_str2(s)
     if offset != len(s):
@@ -901,7 +1138,7 @@ class TaggedEntityCriterion(ABC):
 
   @classmethod
   def from_str2(cls, s, offset=0, delim=None):
-    ''' Parse a criterion from `s` at `offset` and return `(TaggedEntityCriterion,offset)`.
+    ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
         indicating negation of the test,
@@ -932,14 +1169,14 @@ class TaggedEntityCriterion(ABC):
   @classmethod
   @pfx_method
   def from_any(cls, o):
-    ''' Convert some suitable object `o` into a `TaggedEntityCriterion`.
+    ''' Convert some suitable object `o` into a `TagSetCriterion`.
 
         Various possibilities for `o` are:
-        * `TaggedEntityCriterion`: returned unchanged
+        * `TagSetCriterion`: returned unchanged
         * `str`: a string tests for the presence
           of a tag with that name and optional value;
         * an object with a `.choice` attribute;
-          this is taken to be a `TaggedEntityCriterion` ducktype and returned unchanged
+          this is taken to be a `TagSetCriterion` ducktype and returned unchanged
         * an object with `.name` and `.value` attributes;
           this is taken to be `Tag`-like and a positive test is constructed
         * `Tag`: an object with a `.name` and `.value`
@@ -948,7 +1185,7 @@ class TaggedEntityCriterion(ABC):
           is equivalent to a positive equality `TagBasedTest`
     '''
     tag_based_test_class = getattr(cls, 'TAG_BASED_TEST_CLASS', TagBasedTest)
-    if isinstance(o, (cls, TaggedEntityCriterion)):
+    if isinstance(o, (cls, TagSetCriterion)):
       # already suitable
       return o
     if isinstance(o, str):
@@ -977,7 +1214,7 @@ class TaggedEntityCriterion(ABC):
     raise TypeError("cannot infer %s from %s:%s" % (cls, type(o), o))
 
 class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
-                   TaggedEntityCriterion):
+                   TagSetCriterion):
   ''' A test based on a `Tag`.
 
       Attributes:
@@ -995,17 +1232,27 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       * `'>'`: test that the tag value is greater than `tag.value`
       * `'>='`: test that the tag value is greater than or equal to `tag.value`
       * `'~/'`: test if the tag value as a regexp is present in `tag.value`
-      * '~': test if the tag value is present in `tag.value`
+      * '~': test if a matching tag value is present in `tag.value`
   '''
 
   COMPARISON_FUNCS = {
-      '=': lambda tag_value, cmp_value: tag_value == cmp_value,
-      '<=': lambda tag_value, cmp_value: tag_value <= cmp_value,
-      '<': lambda tag_value, cmp_value: tag_value < cmp_value,
-      '>=': lambda tag_value, cmp_value: tag_value >= cmp_value,
-      '>': lambda tag_value, cmp_value: tag_value > cmp_value,
-      '~/': lambda tag_value, cmp_value: re.match(cmp_value, tag_value),
-      '~': lambda tag_value, cmp_value: cmp_value in tag_value,
+      '=':
+      lambda tag_value, cmp_value: tag_value == cmp_value,
+      '<=':
+      lambda tag_value, cmp_value: tag_value <= cmp_value,
+      '<':
+      lambda tag_value, cmp_value: tag_value < cmp_value,
+      '>=':
+      lambda tag_value, cmp_value: tag_value >= cmp_value,
+      '>':
+      lambda tag_value, cmp_value: tag_value > cmp_value,
+      '~/':
+      lambda tag_value, cmp_value: re.match(cmp_value, tag_value),
+      '~':
+      lambda tag_value, cmp_value: (
+          fnmatchcase(tag_value, cmp_value) if isinstance(tag_value, str) else
+          any(map(lambda value: fnmatchcase(value, cmp_value), tag_value))
+      ),
   }
 
   # These are ordered so that longer operators
@@ -1047,11 +1294,15 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
       raise ValueError("expected one of %r" % (cls.COMPARISON_OPS,))
     # tag_name present with specific value
     offset += len(comparison)
-    value, offset = Tag.parse_value(s, offset)
+    if comparison == '~':
+      value = s[offset:]
+      offset = len(s)
+    else:
+      value, offset = Tag.parse_value(s, offset)
     return dict(tag=Tag(tag_name, value), comparison=comparison), offset
 
   @typechecked
-  def match_tagged_entity(self, te: "TaggedEntity") -> bool:
+  def match_tagged_entity(self, te: "TagSet") -> bool:
     ''' Test against the `Tag`s in `tags`.
 
         *Note*: comparisons when `self.tag.name` is not in `tags`
@@ -1082,8 +1333,8 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
           result = False
     return result if self.choice else not result
 
-TaggedEntityCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
-TaggedEntityCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
+TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
+TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
 class ExtendedNamespace(SimpleNamespace):
   ''' Subclass `SimpleNamespace` with inferred attributes
@@ -1162,7 +1413,7 @@ class ExtendedNamespace(SimpleNamespace):
       try:
         value = getattr(self, attr)
       except AttributeError:
-        raise KeyError(attr)
+        raise KeyError(attr)  # pylint: disable=raise-missing-from
       return value
 
 class TagSetNamespace(ExtendedNamespace):
@@ -1316,7 +1567,7 @@ class TagSetNamespace(ExtendedNamespace):
           meaningful if `self._tag.value` has a `keys` method
         * `_meta`: a namespace containing the meta information
           for the `Tag` associated with this node:
-          `self._tag.metadata.ns()`
+          `self._tag.meta.ns()`
         * `_type`: a namespace containing the type definition
           for the `Tag` associated with this node:
           `self._tag.typedata.ns()`
@@ -1349,7 +1600,7 @@ class TagSetNamespace(ExtendedNamespace):
       if attr == '_type':
         return self._tag.typedata.ns()
       if attr == '_meta':
-        return self._tag.metadata.ns()
+        return self._tag.meta.ns()
       if attr == '_keys':
         tag = getns('_tag')
         if tag is not None:
@@ -1475,7 +1726,140 @@ class ValueMetadataNamespace(TagSetNamespace):
         "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
     ).__format__(spec)
 
-class TagsOntology(SingletonMixin):
+class TagSets(MultiOpenMixin, ABC):
+  ''' Base class for collections of `TagSet` instances
+      such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
+
+      Examples of this include:
+      * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSets`
+      * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
+
+      Subclasses must implement:
+      * `default_factory(self,name)`: as with `defaultdict` this is called as
+        `default_factory(name)` from `__getitem__` for missing names,
+        and also from `add`.
+        If set to `None` then `__getitem__` will raise `KeyError`
+        for missing names.
+      * `get(name,default=None)`: return the `TagSet` associated
+        with `name`, or `default`.
+
+      Subclasses may reasonably want to define the following:
+      * `startup(self)`: allocate any needed resources
+        such as database connections
+      * `shutdown(self)`: write pending changes to a backing store,
+        release resources acquired during `startup`
+      * `keys(self)`: return an iterable of names
+      * `__len__(self)`: return the number of names
+  '''
+
+  _missing = object()
+
+  default_factory = lambda name: None
+
+  def __init__(self):
+    ''' Initialise the collection.
+    '''
+
+  def __str__(self):
+    return "%s<%s>" % (type(self).__name__, id(self))
+
+  __repr__ = __str__
+
+  def startup(self):
+    ''' Allocate any needed resources such as database connections.
+    '''
+
+  def shutdown(self):
+    ''' Write any pending changes to a backing store,
+        release resources allocated during `startup`.
+    '''
+
+  @pfx_method(use_str=True)
+  def __missing__(self, name: str):
+    ''' Like `dict`, the `__missing__` method autocreates new `TagSet`.
+
+        This is called from `__getitem__` is `name` is missing
+        and uses the factory `self.default_factory`.
+        If that is `None` raise `KeyError`,
+        otherwise call `self.default_factory(name)`.
+        If that returns `None` raise `KeyError`,
+        otherwise return the entity.
+    '''
+    te_factory = self.default_factory
+    if te_factory is None:
+      raise KeyError(name)
+    te = te_factory(name)
+    if te is None:
+      raise KeyError(name)
+    return te
+
+  def add(self, name: str, **kw):
+    ''' Return a new `TagSet` associated with `name`,
+        which should not already be in use.
+    '''
+    te = self.get(name, default=self._missing)
+    if te is not self._missing:
+      raise ValueError("%r: name already present" % (name,))
+    return self.default_factory(name, **kw)
+
+  @abstractmethod
+  def get(self, name: str, default=None):
+    ''' Return the `TagSet` associated with `name`,
+        or `default` if there is no such entity.
+    '''
+    raise NotImplementedError(
+        "%s: no .get(name,default=None) method" % (type(self).__name__,)
+    )
+
+  def __getitem__(self, name: str):
+    ''' Obtain the `TagSet` associated with `name`.
+
+        If `name` is not presently mapped,
+        return `self.__missing__(name)`.
+    '''
+    te = self.get(name, default=self._missing)
+    if te is self._missing:
+      te = self.__missing__(name)
+    return te
+
+  def __contains__(self, name: str):
+    ''' Test whether `name` is present in `self.te_mapping`.
+    '''
+    missing = object()
+    return self.get(name) is not missing
+
+  def __len__(self):
+    ''' Return the length of `self.te_mapping`.
+    '''
+    raise NotImplementedError(
+        "%s: no .__len__() method" % (type(self).__name__,)
+    )
+
+  def subdomain(self, subname):
+    ''' Return a proxy for this `TagSets` for the `name`s
+        starting with `subname+'.'`.
+    '''
+    return TagSetsSubdomain(self, subname)
+
+class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
+  ''' A view into a `TagSets` for keys commencing with a prefix.
+  '''
+
+  @classmethod
+  def _singleton_key(cls, tes, subdomain: str):
+    return id(tes), subdomain
+
+  def __init__(self, tes, subdomain: str):
+    PrefixedMappingProxy.__init__(self, tes, subdomain + '.')
+    self.tes = tes
+
+  @property
+  def TAGGED_ENTITY_FACTORY(self):
+    ''' The entity factory comes from the parent collection.
+    '''
+    return self.tes.TAGGED_ENTITY_FACTORY
+
+class TagsOntology(SingletonMixin, TagSets):
   ''' An ontology for tag names.
 
       This is based around a mapping of names
@@ -1539,34 +1923,19 @@ class TagsOntology(SingletonMixin):
   }
 
   @classmethod
-  def _singleton_key(cls, tagset_mapping):
-    return id(tagset_mapping)
+  def _singleton_key(cls, te_mapping):
+    return id(te_mapping)
 
-  def __init__(self, tagset_mapping):
-    if hasattr(self, 'tagsets'):
+  def __init__(self, te_mapping):
+    if hasattr(self, 'te_mapping'):
       return
-    self.tagsets = tagset_mapping
+    self.te_mapping = te_mapping
+    self.default_factory = te_mapping.default_factory
 
-  def __str__(self):
-    return "%s(%s)" % (type(self).__name__, self.tagsets)
-
-  __repr__ = __str__
-
-  def __getitem__(self, name: str):
-    assert isinstance(name, str)
-    try:
-      tags = self.tagsets[name]
-    except KeyError:
-      tags = self.tagsets[name] = TagSet(_ontology=self)
-    return tags
-
-  def entity(self, index, name=None):
-    ''' Return a `TaggedEntity` for the entry `index`.
-        If specified, `name` is used for the entity name instead of `index`.
-
-        The entity returned is not a singleton, but its `tags` attribute is.
+  def get(self, name, default=None):
+    ''' Proxy `.get` through to `self.te_mapping`.
     '''
-    return TaggedEntity(name=name or index, tags=self[index])
+    return self.te_mapping.get(name, default=default)
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -1663,7 +2032,7 @@ class TagsOntology(SingletonMixin):
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_metadata(self, type_name, value):
+  def value_metadata(self, type_name, value, convert=None):
     ''' Return a `ValueMetadata` for `type_name` and `value`.
         This provides the mapping between a type's value and its semantics.
 
@@ -1673,18 +2042,20 @@ class TagsOntology(SingletonMixin):
             characters=["Captain America (Marvel)","Black Widow (Marvel)"]
 
         then these values could be converted to the dotted identifiers
-        `character.marvel.captain_america`
-        and `character.marvel.black_widow` respectively,
+        `characters.marvel.captain_america`
+        and `characters.marvel.black_widow` respectively,
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    if isinstance(value, (int, str)):
+    if convert:
+      value_tag_name = convert(value)
+      assert isinstance(value_tag_name, str) and value_tag_name
+    else:
       value_tag_name = self.value_to_tag_name(str(value))
-      ontkey = 'meta.' + type_name + '.' + '_'.join(
-          value_tag_name.lower().split()
-      )
-      return self[ontkey]
-    return None
+    ontkey = 'meta.' + type_name + '.' + '_'.join(
+        value_tag_name.lower().split()
+    )
+    return self[ontkey]
 
   def basetype(self, typename):
     ''' Infer the base type name from a type name.
@@ -1736,7 +2107,7 @@ class TagsOntology(SingletonMixin):
   @pfx_method
   def edit_indices(self, indices, prefix=None):
     ''' Edit the entries specified by indices.
-        Return `TaggedEntity`s for the entries which were changed.
+        Return `TagSet`s for the entries which were changed.
     '''
     tes = []
     te_old_names = {}
@@ -1750,7 +2121,7 @@ class TagsOntology(SingletonMixin):
       tes.append(te)
       te_old_names[id(te)] = name
     # modify tagsets
-    changed_tes = TaggedEntity.edit_entities(tes)
+    changed_tes = TagSet.edit_entities(tes)
     # rename entries
     for te in changed_tes:
       old_name = te_old_names[id(te)]
@@ -1831,8 +2202,8 @@ class TagsCommandMixin:
   ''' Utility methods for `cs.cmdutils.BaseCommand` classes working with tags.
 
       Optional subclass attributes:
-      * `TAGSET_CRITERION_CLASS`: a `TaggedEntityCriterion` duck class,
-        default `TaggedEntityCriterion`.
+      * `TAGSET_CRITERION_CLASS`: a `TagSetCriterion` duck class,
+        default `TagSetCriterion`.
         For example, `cs.sqltags` has a subclass
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
@@ -1846,16 +2217,16 @@ class TagsCommandMixin:
         Raises `ValueError` in a misparse.
         The default `tag_based_test_class`
         comes from `cls.TAGSET_CRITERION_CLASS`,
-        which itself defaults to class `TaggedEntityCriterion`.
+        which itself defaults to class `TagSetCriterion`.
 
-        The default `TaggedEntityCriterion.from_str` recognises:
+        The default `TagSetCriterion.from_str` recognises:
         * `-`*tag_name*: a negative requirement for *tag_name*
         * *tag_name*[`=`*value*]: a positive requirement for a *tag_name*
           with optional *value*.
     '''
     if tag_based_test_class is None:
       tag_based_test_class = getattr(
-          cls, 'TAGSET_CRITERION_CLASS', TaggedEntityCriterion
+          cls, 'TAGSET_CRITERION_CLASS', TagSetCriterion
       )
     return tag_based_test_class.from_str(arg)
 
@@ -1892,229 +2263,13 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TaggedEntityCriterion.from_str(arg)
+          tag_choice = TagSetCriterion.from_str(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':
           raise ValueError("only tag_name or tag_name=value accepted")
         tag_choices.append(tag_choice)
     return tag_choices
-
-class TaggedEntityMixin(FormatableMixin):
-  ''' A mixin for classes like `TaggedEntity`.
-
-      A `TaggedEntity`like instance has the following attributes:
-      * `id`: a domain specific identifier;
-        this may reasonably be `None` for entities
-        not associated with database rows.
-      * `name`: the entity's name;
-        this is typically `None` for log entries.
-      * `unixtime`: a UNIX timestamp,
-        a `float` holding seconds since the UNIX epoch
-        (midnight, 1 January 1970 UTC).
-        This is typically the row creation time
-        for entities associated with database rows.
-      * `tags`: a `TagSet`, a mapping of names to values.
-
-      This is a common representation of some tagged entity,
-      and also is the intermediary form used by the `cs.fstags` and
-      `cs.sqltags` import/export CSV format.
-
-      The `id` column has domain specific use.
-      For `cs.sqltags` the `id` attribute will be the database row id.
-      For `cs.fstags` the `id` attribute will be `None`.
-      It is available for other domains as an arbitrary identifier/key value,
-      should that be useful.
-  '''
-
-  @classmethod
-  def from_csvrow(cls, csvrow):
-    ''' Construct a `TaggedEntity` from a CSV row like that from
-        `TaggedEntity.csvrow`, being `unixtime,id,name,tags...`.
-    '''
-    with Pfx("%s.from_csvrow", cls.__name__):
-      te_unixtime, te_id, te_name = csvrow[:3]
-      tags = TagSet()
-      for i, csv_value in enumerate(csvrow[3:], 3):
-        with Pfx("field %d %r", i, csv_value):
-          tag = Tag.from_str(csv_value)
-          tags.add(tag)
-      return cls(id=te_id, name=te_name, unixtime=te_unixtime, tags=tags)
-
-  @property
-  def csvrow(self):
-    ''' This `TaggedEntity` as a list useful to a `csv.writer`.
-        The inverse of `from_csvrow`.
-    '''
-    return [self.unixtime, self.id, self.name
-            ] + [str(tag) for tag in self.tags]
-
-  def format_tagset(self):
-    ''' Compute a `TagSet` from the tags
-        with additional derived tags.
-
-        This can be converted into an `ExtendedNamespace`
-        suitable for use with `str.format_map`
-        via the `TagSet`'s `.format_kwargs()` method.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `entity.id`: the id of the entity database record
-        * `entity.name`: the name of the entity database record, if not `None`
-        * `entity.unixtime`: the UNIX timestamp of the entity database record
-        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
-    '''
-    kwtags = TagSet()
-    kwtags.update(self.tags)
-    if self.id is not None:
-      kwtags.add('entity.id', self.id)
-    if self.name is not None:
-      kwtags.add('entity.name', self.name)
-    kwtags.add('entity.unixtime', self.unixtime)
-    dt = unixtime2datetime(self.unixtime)
-    kwtags.add('entity.datetime', dt)
-    kwtags.add('entity.isodatetime', dt.isoformat())
-    kwtags.add('entity.isodate', dt.strftime('%Y-%m-%d'))
-    return kwtags
-
-  def format_kwargs(self):
-    ''' Format arguments suitable for `str.format_map`.
-
-        This returns an `ExtendedNamespace` from `TagSet.ns()`
-        for a computed `TagSet`.
-
-        In addition to the normal `TagSet.ns()` names
-        the following additional names are available:
-        * `entity.id`: the id of the entity database record
-        * `entity.name`: the name of the entity database record, if not `None`
-        * `entity.unixtime`: the UNIX timestamp of the entity database record
-        * `entity.datetime`: the UNIX timestamp as a UTC `datetime`
-    '''
-    kwtags = self.format_tagset()
-    kwtags['tags'] = str(kwtags)
-    # convert the TagSet to an ExtendedNamespace
-    kwargs = kwtags.format_kwargs()
-    return kwargs
-
-class TaggedEntity(TaggedEntityMixin):
-  ''' An entity record with its `Tag`s.
-
-      This is a common representation of some tagged entity,
-      and also is the intermediary form used by the `cs.fstags` and
-      `cs.sqltags` import/export CSV format.
-
-      The `id` column has domain specific use.
-      For `cs.sqltags` the `id` attribute will be the database row id.
-      For `cs.fstags` the `id` attribute will be `None`.
-      It is available for other domains as an arbitrary identifier/key value,
-      should that be useful.
-  '''
-
-  # pylint: disable=redefined-builtin
-  def __init__(self, *, id=None, name=None, unixtime=None, tags=None):
-    if unixtime is None:
-      unixtime = time.time()
-    if tags is None:
-      tags = TagSet()
-    self.id = id
-    self.name = name
-    self.unixtime = unixtime
-    self.tags = tags
-
-  def __str__(self):
-    return "%s(name=%s,id=%s,unixtime=%s,tags=%s)" % (
-        type(self).__name__, self.name, self.id, self.unixtime, self.tags
-    )
-
-  def set(self, tag_name, value, *, verbose=None):
-    ''' Set a tag on `self.tags`.
-    '''
-    self.tags.set(tag_name, value, verbose=verbose)
-
-  def discard(self, tag_name, value=None, *, verbose=None):
-    ''' Discard a tag from `self.tags`.
-    '''
-    self.discard(tag_name, value, verbose=verbose)
-
-  def edit(self, verbose=None):
-    ''' Edit the `Tag`s of this `TaggedEntity`.
-    '''
-    return self.tags.edit(verbose=verbose)
-
-  def as_editable_line(self):
-    ''' Transcribe the entity as *name*` `*tags...*
-        for use in a text file
-        for modifying entities.
-    '''
-    return ' '.join(
-        [Tag.transcribe_value(self.name or self.id)] +
-        [str(tag) for tag in self.tags]
-    )
-
-  @classmethod
-  def from_editable_line(cls, line, ontology=None):
-    ''' Parse a "value tags..." line as from `to_editable_line()`,
-        return `(name,TagSet)`.
-    '''
-    name, offset = Tag.parse_value(line)
-    if offset < len(line) and not line[offset].isspace():
-      _, offset2 = get_nonwhite(line, offset)
-      name = line[:offset2]
-      warning(
-          "offset %d: expected whitespace, adjusted name to %r", offset, name
-      )
-      offset = offset2
-    if offset < len(line) and not line[offset].isspace():
-      warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, ontology=ontology)
-    return name, tags
-
-  @classmethod
-  @pfx_method
-  def edit_entities(cls, tes, editor=None, verbose=True):
-    ''' Edit an iterable of `TaggedEntities`.
-        Return a list of the entities which were modified.
-
-        This function supports modifying `Tag`s
-        and changing the entity name.
-    '''
-    if editor is None:
-      editor = EDITOR
-    te_map = {te.name or te.id: te for te in tes}
-    assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
-        "not all entities have str or int keys: %r" % list(te_map.keys())
-    lines = list(map(cls.as_editable_line, te_map.values()))
-    changes = edit_strings(lines, editor=editor)
-    changed_tes = []
-    for old_line, new_line in changes:
-      old_name, _ = cls.from_editable_line(old_line)
-      assert isinstance(old_name, (str, int))
-      with Pfx("%r", old_name):
-        te = te_map[old_name]
-        changed_tes.append(te)
-        new_name, new_tags = cls.from_editable_line(new_line)
-        # modify Tags
-        te.tags.set_from(new_tags, verbose=verbose)
-        if old_name != new_name:
-          # update name
-          with Pfx("=> %r", new_name):
-            if not isinstance(new_name, (str, int)):
-              error("illegal value, expected str or int")
-            elif new_name in te_map:
-              error("already in map, not changing")
-            elif isinstance(new_name, int):
-              if isinstance(old_name, int):
-                error("may not change ids")
-              else:
-                te.name = None
-                ifverbose(verbose, "cleared name")
-            elif new_name:
-              te.name = new_name
-              ifverbose(verbose, "set name=%r", new_name)
-            else:
-              te.name = None
-              ifverbose(verbose, "cleared name")
-    return changed_tes
 
 class RegexpTagRule:
   ''' A regular expression based `Tag` rule.

@@ -939,14 +939,16 @@ class AttrableMappingMixin(object):
   '''
 
   def __getattr__(self, attr):
-    ''' Unknown attributes are obtained from the `dict` entries.
+    ''' Unknown attributes are obtained from the mapping entries.
     '''
     try:
       value = self[attr]
     except KeyError:
       raise AttributeError(
-          "%s.%s (attrs=%s)" %
-          (type(self).__name__, attr, ','.join(sorted(self.keys())))
+          "%s.%s (attrs=%s, __dict__=%r)" % (
+              type(self).__name__, attr, ','.join(sorted(self.keys())
+                                                  ), self.__dict__
+          )
       )
     return value
 
@@ -1198,7 +1200,10 @@ class PrefixedMappingProxy:
 
   def keys(self):
     prefix = self.prefix
-    return filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    return map(
+        lambda k: cutprefix(k, prefix),
+        filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    )
 
   def __contains__(self, k):
     return self.prefix + k in self.mapping

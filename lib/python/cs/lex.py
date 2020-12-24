@@ -1056,7 +1056,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TaggedEntityMixin` class
+      For example, the `cs.tagset.TagSetMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
   '''
