@@ -1930,7 +1930,9 @@ class TagsOntology(SingletonMixin, TagSets):
     if hasattr(self, 'te_mapping'):
       return
     self.te_mapping = te_mapping
-    self.default_factory = te_mapping.default_factory
+    self.default_factory = te_mapping.get(
+        'default_factory', lambda name: TagSet(_ontology=self)
+    )
 
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.te_mapping`.
