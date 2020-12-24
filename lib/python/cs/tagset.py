@@ -163,13 +163,11 @@ from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
 import re
-import time
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.dateutils import unixtime2datetime
 from cs.edit import edit_strings, edit as edit_lines
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
@@ -193,7 +191,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
-        'cs.dateutils',
         'cs.edit',
         'cs.lex',
         'cs.logutils',
@@ -1861,11 +1858,6 @@ class TagsOntology(SingletonMixin, TagSets):
       return
     self.te_mapping = te_mapping
     self.default_factory = te_mapping.default_factory
-
-  def add(self, name):
-    ''' Proxy `.add` through to `self.te_mapping`.
-    '''
-    return self.te_mapping.name
 
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.te_mapping`.
