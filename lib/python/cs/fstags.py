@@ -945,11 +945,14 @@ class FSTags(MultiOpenMixin):
       except FileNotFoundError as e:
         error("%s.save: %s", tagfile, e)
 
-  def _tagfile(self, path, *, no_ontology=False):
+  @typechecked
+  def _tagfile(self, path: str, *, no_ontology: bool = False) -> "TagFile":
     ''' Obtain and cache the `TagFile` at `path`.
     '''
     ontology = None if no_ontology else self.ontology(path)
-    tagfile = self._tagfiles[path] = TagFile(path, ontology=ontology)
+    tagfile = self._tagfiles[path] = TagFile(
+        path, ontology=ontology, fstags=self
+    )
     return tagfile
 
   @property
