@@ -933,7 +933,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def tags(self, *, session):
         ''' Return an `SQLTagSet` with the `Tag`s for this entity.
         '''
-        entity_tags = SQLTagSet(sqltags=None, entity_id=self.id)
+        entity_tags = SQLTagSet(sqltags=None, id=self.id)
         entity_tags.update(
             (
                 (tagrow.name, tagrow.value)
@@ -1488,7 +1488,7 @@ class SQLTags(TagSets):
             id=entity_id,
             name=row.name,
             unixtime=row.unixtime,
-            tags=SQLTagSet(sqltags=self, entity_id=entity_id),
+            tags=SQLTagSet(sqltags=self, id=entity_id),
             sqltags=self
         )
       # a None tag_name means no tags
