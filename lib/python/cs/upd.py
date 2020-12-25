@@ -349,7 +349,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
-    global curses   # pylint: disable=global-statement
+    global curses  # pylint: disable=global-statement
     try:
       return self._ti_strs[ti_name]
     except KeyError:
