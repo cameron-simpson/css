@@ -664,58 +664,54 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     use_stdin = cmdline_headline == '-'
     sqltags = options.sqltags
-      for lineno, headline in enumerate(sys.stdin if use_stdin else (
-          cmdline_headline,)):
-        with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))
-                 ):
-          headline = headline.rstrip('\n')
-          unixtime = None
-          if strptime_format:
-            with Pfx("strptime %r", strptime_format):
-              headparts = headline.split(None, strptime_nwords)
-              if len(headparts) < strptime_nwords:
     session = options.session
+    for lineno, headline in enumerate((sys.stdin if use_stdin else
+                                       (cmdline_headline,))):
+      with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
+        headline = headline.rstrip('\n')
+        unixtime = None
+        if strptime_format:
+          with Pfx("strptime %r", strptime_format):
+            headparts = headline.split(None, strptime_nwords)
+            if len(headparts) < strptime_nwords:
+              warning(
+                  "not enough fields in headline, using current time: %r",
+                  headline
+              )
+              xit = 1
+            else:
+              strptime_text = ' '.join(headparts[:strptime_nwords])
+              try:
+                strptime_dt = datetime.strptime(strptime_text, strptime_format)
+              except ValueError as e:
                 warning(
-                    "not enough fields in headline, using current time: %r",
-                    headline
+                    "cannot parse %r, using current time: %s", strptime_text, e
                 )
                 xit = 1
               else:
-                strptime_text = ' '.join(headparts[:strptime_nwords])
-                try:
-                  strptime_dt = datetime.strptime(
-                      strptime_text, strptime_format
-                  )
-                except ValueError as e:
-                  warning(
-                      "cannot parse %r, using current time: %s", strptime_text,
-                      e
-                  )
-                  xit = 1
-                else:
-                  unixtime = datetime2unixtime(strptime_dt)
-                  headline = ' '.join(headparts[strptime_nwords:])
-          if unixtime is None:
-            unixtime = time.time() if dt is None else dt.timestamp()
-          if categories is None:
-            # infer categories from leading "FOO,BAH:" text
-            m = CATEGORIES_PREFIX_re.match(headline)
-            if m:
-              tag_categories = map(
-                  str.lower, filter(None,
-                                    m.group('categories').split(','))
-              )
-              headline = headline[len(m.group()):]
-            else:
-              tag_categories = ()
+                unixtime = datetime2unixtime(strptime_dt)
+                headline = ' '.join(headparts[strptime_nwords:])
+        if unixtime is None:
+          unixtime = time.time() if dt is None else dt.timestamp()
+        if categories is None:
+          # infer categories from leading "FOO,BAH:" text
+          m = CATEGORIES_PREFIX_re.match(headline)
+          if m:
+            tag_categories = map(
+                str.lower, filter(None,
+                                  m.group('categories').split(','))
+            )
+            headline = headline[len(m.group()):]
           else:
-            tag_categories = categories
-          te = sqltags.add(
-              None, session=session, unixtime=unixtime, tags=log_tags
-          )
-          te.set('headline', headline)
-          if tag_categories:
-            te.set('categories', list(tag_categories))
+            tag_categories = ()
+        else:
+          tag_categories = categories
+        log_tags.append(Tag('headline', headline))
+        if tag_categories:
+          log_tags.append(Tag('categories', list(tag_categories)))
+        te = sqltags.default_factory(
+            None, session=session, unixtime=unixtime, tags=log_tags
+        )
     return xit
 
   @staticmethod
