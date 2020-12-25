@@ -1248,17 +1248,19 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Set the `.name`.
     '''
     if new_name != self._name:
-      e = self.db_entity()
+      e = self.get_db_entity(session=session)
       e.name = new_name
       self._name = new_name
 
   @property
-  def db_entity(self):
-    ''' The database `Entities` instance for this `SQLTagSet`.
   def unixtime(self):
     return self._unixtime
+
+  @auto_session
+  def get_db_entity(self, *, session):
+    ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
-    return self.sqltags.db_entity(self.id)
+    return self.sqltags.db_entity(self.id, session=session)
 
   @tag_or_tag_value
   @auto_session
@@ -1279,7 +1281,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def add_db_tag(self, tag_name, value=None, *, session):
     ''' Add a tag to the database.
     '''
-    e = self.sqltags.db_entity(self.id)
+    e = self.get_db_entity(session=session)
     return e.add_tag(tag_name, value, session=session)
 
   @tag_or_tag_value
@@ -1300,7 +1302,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def discard_db_tag(self, tag_name, value=None, *, session):
     ''' Discard a tag from the database.
     '''
-    return self.sqltags.db_entity(self.id).discard_tag(
+    return self.get_db_entity(session=session).discard_tag(
         tag_name, value, session=session
     )
 
