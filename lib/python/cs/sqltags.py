@@ -1214,6 +1214,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.entities = Entities
 
 # TODO: unixtime property accessing the db_entity
+# TODO: name special cases, excluded from tags
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
   '''
@@ -1257,9 +1258,20 @@ class SQLTagSet(SingletonMixin, TagSet):
   @tag_or_tag_value
   @auto_session
   def set(self, tag_name, value, *, session, skip_db=False):
-    super().set(tag_name, value)
-    if not skip_db:
-      self.add_db_tag(tag_name, value, session=session)
+    if tag_name == 'name':
+      assert value is None or isinstance(value, str)
+      if skip_db:
+        self._name = value
+      else:
+        self.name = value
+    elif tag_name == 'unixtime':
+      assert value is None or isinstance(value, (int, float))
+      assert not skip_db
+      self.db_entity().unixtime = value
+    else:
+      super().set(tag_name, value)
+      if not skip_db:
+        self.add_db_tag(tag_name, value, session=session)
 
   @auto_session
   @pfx_method
@@ -1271,9 +1283,20 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @tag_or_tag_value
   def discard(self, tag_name, value, *, session, skip_db=False):
-    super().discard(tag_name, value)
-    if not skip_db:
-      self.discard_db_tag(tag_name, value, session=session)
+    if tag_name == 'name':
+      if value is None or self._name == value:
+        if skip_db:
+          self._name = None
+        else:
+          self.name = None
+    elif tag_name == 'unixtime':
+      assert value is None
+      assert not skip_db
+      self.db_entity().unixtime = None
+    else:
+      super().discard(tag_name, value)
+      if not skip_db:
+        self.discard_db_tag(tag_name, value, session=session)
 
   @auto_session
   def discard_db_tag(self, tag_name, value=None, *, session):
