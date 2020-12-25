@@ -664,8 +664,6 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     xit = 0
     use_stdin = cmdline_headline == '-'
     sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session() as session:
       for lineno, headline in enumerate(sys.stdin if use_stdin else (
           cmdline_headline,)):
         with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))
@@ -676,6 +674,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             with Pfx("strptime %r", strptime_format):
               headparts = headline.split(None, strptime_nwords)
               if len(headparts) < strptime_nwords:
+    session = options.session
                 warning(
                     "not enough fields in headline, using current time: %r",
                     headline
