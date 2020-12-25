@@ -64,8 +64,8 @@ from cs.sqlalchemy_utils import (
     _state as sqla_state,
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, TagSet, TagSets
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
+    TagSets, tag_or_tag_value
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -1254,6 +1254,13 @@ class SQLTagSet(SingletonMixin, TagSet):
     '''
     return self.sqltags.db_entity(self.id)
 
+  @tag_or_tag_value
+  @auto_session
+  def set(self, tag_name, value, *, session, skip_db=False):
+    super().set(tag_name, value)
+    if not skip_db:
+      self.add_db_tag(tag_name, value, session=session)
+
   @auto_session
   @pfx_method
   def add_db_tag(self, tag_name, value=None, *, session):
@@ -1261,6 +1268,12 @@ class SQLTagSet(SingletonMixin, TagSet):
     '''
     e = self.sqltags.db_entity(self.id)
     return e.add_tag(tag_name, value, session=session)
+
+  @tag_or_tag_value
+  def discard(self, tag_name, value, *, session, skip_db=False):
+    super().discard(tag_name, value)
+    if not skip_db:
+      self.discard_db_tag(tag_name, value, session=session)
 
   @auto_session
   def discard_db_tag(self, tag_name, value=None, *, session):
@@ -1452,7 +1465,7 @@ class SQLTags(TagSets):
         tag_value = tags.pick_value(
             row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
-        te.tags.set(row.tag_name, tag_value, skip_db=True)
+        te.set(row.tag_name, tag_value, skip_db=True)
     for te in entity_map.values():
       if all(criterion.match_tagged_entity(te) for criterion in criteria):
         yield te
