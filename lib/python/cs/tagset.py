@@ -1443,6 +1443,21 @@ class TagSetNamespace(ExtendedNamespace):
       This provides an assortment of special names derived from the `TagSet`.
       See the docstring for `__getattr__` for the special attributes provided
       beyond those already provided by `ExtendedNamespace.__getattr__`.
+
+      Example with a simple `TagSet`:
+
+          >>> tags = TagSet(colour='blue', labels=['a','b','c'], size=9)
+          >>> 'The colour is {colour}.'.format_map(tags)
+          'The colour is blue.'
+          >>> # the natural way to obtain a TagSetNamespace from a TagSet
+          >>> ns = tags.ns()  # returns TagSetNamespace.from_tagset(tags)
+          >>> # the ns object has additional computed attributes
+          >>> 'The colour tag is {colour._tag}.'.format_map(ns)
+          'The colour tag is colour=blue.'
+          >>> 'The colours are {colours}. The labels are {labels}.'.format_map(ns)
+          "The colours are ['blue']. The labels are ['a', 'b', 'c']."
+          >>> 'The first label is {label}.'.format_map(ns)
+          'The first label is a.'
   '''
 
   @classmethod
