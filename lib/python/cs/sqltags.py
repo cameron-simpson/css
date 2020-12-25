@@ -1222,8 +1222,8 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @staticmethod
   # pylint: disable=redefined-builtin
-  def _singleton_key(*, sqltags, id, **_):
-    return builtin_id(sqltags), id
+  def _singleton_key(*, sqltags, _id, **_):
+    return builtin_id(sqltags), _id
 
   def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
     try:
