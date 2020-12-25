@@ -420,9 +420,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     db_url = options.db_url
     sqltags = SQLTags(db_url)
-    with stackattrs(options, sqltags=sqltags, verbose=True):
-      with sqltags:
-        with sqltags.orm.session():
+    with sqltags:
+      with sqltags.orm.session() as session:
+        with stackattrs(options, sqltags=sqltags, session=session,
+                        verbose=True):
           yield
 
   @classmethod
