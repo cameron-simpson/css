@@ -1363,7 +1363,10 @@ class SQLTags(TagSets):
     if isinstance(index, int):
       tes = self.find([SQTEntityIdTest([index])], session=session)
     elif isinstance(index, str):
-      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
+      tes = self.find(
+          [SQLTagBasedTest(index, True, Tag('name', index), '=')],
+          session=session
+      )
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
     tes = list(tes)
