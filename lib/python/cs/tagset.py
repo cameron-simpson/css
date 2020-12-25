@@ -242,6 +242,7 @@ def tag_or_tag_value(func, no_self=False):
 
   if no_self:
 
+    # pylint: disable=keyword-arg-before-vararg
     def accept_tag_or_tag_value(name, value=None, *a, **kw):
       ''' Plain function flavour of `tag_or_tag_value`,
           accepting `(name,value=None,...)`.
@@ -256,6 +257,7 @@ def tag_or_tag_value(func, no_self=False):
       return func(name, value, *a, **kw)
   else:
 
+    # pylint: disable=keyword-arg-before-vararg
     def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
       ''' Method flavour of `tag_or_tag_value`,
           accepting `(self,name,value=None,...)`.
@@ -2361,6 +2363,7 @@ class RegexpTagRule:
 def main(_):
   ''' Test code.
   '''
+  # pylint: disable=import-outside-toplevel
   from cs.logutils import setup_logging
   from cs.x import X  # pylint: disable=import-outside-toplevel
   setup_logging()
