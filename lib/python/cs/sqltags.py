@@ -1216,8 +1216,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
-# TODO: unixtime property accessing the db_entity
-# TODO: name special cases, excluded from tags
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
   '''
@@ -1227,12 +1225,13 @@ class SQLTagSet(SingletonMixin, TagSet):
   def _singleton_key(*, sqltags, id, **_):
     return builtin_id(sqltags), id
 
-  def __init__(self, *, sqltags, name=None, **kw):
+  def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
     try:
       pre_sqltags = self.sqltags
     except AttributeError:
+      super().__init__(_id=_id, **kw)
       self._name = name
-      super().__init__(name=name, **kw)
+      self._unixtime = unixtime
       self.sqltags = sqltags
     else:
       assert pre_sqltags is sqltags
@@ -1244,7 +1243,8 @@ class SQLTagSet(SingletonMixin, TagSet):
     return self._name
 
   @name.setter
-  def name(self, new_name):
+  @auto_session
+  def name(self, new_name, *, session):
     ''' Set the `.name`.
     '''
     if new_name != self._name:
@@ -1255,22 +1255,20 @@ class SQLTagSet(SingletonMixin, TagSet):
   @property
   def db_entity(self):
     ''' The database `Entities` instance for this `SQLTagSet`.
+  def unixtime(self):
+    return self._unixtime
     '''
     return self.sqltags.db_entity(self.id)
 
   @tag_or_tag_value
   @auto_session
   def set(self, tag_name, value, *, session, skip_db=False):
-    if tag_name == 'name':
-      assert value is None or isinstance(value, str)
-      if skip_db:
-        self._name = value
-      else:
-        self.name = value
-    elif tag_name == 'unixtime':
-      assert value is None or isinstance(value, (int, float))
-      assert not skip_db
-      self.db_entity().unixtime = value
+    if tag_name == 'id':
+      raise ValueError("may not set pseudoTag %r" % (tag_name,))
+    if tag_name in ('name', 'unixtime'):
+      setattr(self, '_' + tag_name, value)
+      if not skip_db:
+        setattr(self.get_db_entity(session=session), tag_name, value)
     else:
       super().set(tag_name, value)
       if not skip_db:
@@ -1286,16 +1284,13 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @tag_or_tag_value
   def discard(self, tag_name, value, *, session, skip_db=False):
-    if tag_name == 'name':
-      if value is None or self._name == value:
-        if skip_db:
-          self._name = None
-        else:
-          self.name = None
-    elif tag_name == 'unixtime':
-      assert value is None
-      assert not skip_db
-      self.db_entity().unixtime = None
+    if tag_name == 'id':
+      raise ValueError("may not discard pseudoTag %r" % (tag_name,))
+    if tag_name in ('name', 'unixtime'):
+      if value is None or getattr(self, tag_name) == value:
+        setattr(self, '_' + tag_name, None)
+        if not skip_db:
+          setattr(self.get_db_entity(session=session), tag_name, None)
     else:
       super().discard(tag_name, value)
       if not skip_db:
