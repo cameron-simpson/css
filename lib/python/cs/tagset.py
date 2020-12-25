@@ -416,6 +416,9 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
 
+  # "set" mode
+  add = set
+
   def __delitem__(self, tag_name):
     if tag_name not in self:
       raise KeyError(tag_name)
