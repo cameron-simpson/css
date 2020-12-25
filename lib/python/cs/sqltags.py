@@ -149,6 +149,9 @@ class SQTEntityIdTest(SQTCriterion):
   def __init__(self, ids: List[int]):
     self.entity_ids = ids
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.entity_ids)
+
   @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse a decimal entity id from `s`.
