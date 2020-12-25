@@ -396,6 +396,7 @@ class SingletonMixin:
         This creates the class registry if missing,
         and then
     '''
+    super_new = super().__new__
     try:
       registry = cls._singleton_registry
     except AttributeError:
@@ -407,7 +408,6 @@ class SingletonMixin:
           registry = cls._singleton_registry = WeakValueDictionary()
           registry._singleton_lock = Lock()
 
-    # TODO: what happens with fargs and fkwargs? unused yet supplied?
     # TODO: docstring wrong - there is no _singleton_init any more
     def factory(*fargs, **fkwargs):
       ''' Prepare a new object.
@@ -415,11 +415,11 @@ class SingletonMixin:
           Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
           on the new object.
       '''
-      return object.__new__(cls)
+      return super_new(cls)
 
     okey = cls._singleton_key(*a, **kw)
     with registry._singleton_lock:
-      _, instance = singleton(registry, okey, factory, a, kw)
+      _, instance = singleton(registry, okey, factory, (), {})
     return instance
 
 if __name__ == '__main__':

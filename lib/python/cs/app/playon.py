@@ -275,13 +275,13 @@ class PlayOnAPI(MultiOpenMixin):
 
   @typechecked
   def __getitem__(self, download_id: int):
-    ''' Return the `TaggedEntity` associated with `download_id`.
+    ''' Return the `TagSet` associated with `download_id`.
     '''
     return self._sqltags.make('recording.' + str(download_id))
 
   @_api_call('library/all')
   def recordings(self, rqm):
-    ''' Return the `TaggedEntity` instances for the available recordings.
+    ''' Return the `TagSet` instances for the available recordings.
     '''
     result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
