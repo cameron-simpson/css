@@ -1344,9 +1344,9 @@ class SQLTags(TagSets):
       if unixtime is None:
         unixtime = time.time()
       entity = self.orm.entities(name=name, unixtime=unixtime)
+      session.add(entity)
       for tag in tags:
         entity.add_tag(tag.name, tag.value, session=session)
-      session.add(entity)
       session.flush()
       te = self.get(entity.id, session=session)
     else:
