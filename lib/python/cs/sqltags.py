@@ -1465,7 +1465,8 @@ class SQLTags(TagSets):
       if not te:
         # not seen before
         te = entity_map[entity_id] = self.TagSetClass(
-            id=entity_id,
+            _id=entity_id,
+            _ontology=self.ontology,
             name=row.name,
             unixtime=row.unixtime,
             sqltags=self
