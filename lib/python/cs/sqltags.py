@@ -1357,19 +1357,6 @@ class SQLTags(TagSets):
     return te
 
   @orm_auto_session
-  def add(self, name: [str, None], *, session, unixtime=None, tags=None):
-    ''' Add a new `SQLTagSet` named `name` (`None` for "log" entries)
-        with `unixtime` (default `time.time()`
-        and the supplied `tags` (optional iterable of `Tag`s).
-        Return the new `SQLTagSet`.
-    '''
-    if name is not None and name in self:
-      raise KeyError("%r: name already exists" % (name,))
-    return self.default_factory(
-        name, session=session, unixtime=unixtime, tags=tags
-    )
-
-  @orm_auto_session
   def get(self, index, default=None, *, session):
     ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
     '''
