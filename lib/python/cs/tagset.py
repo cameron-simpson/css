@@ -400,12 +400,6 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     self.set(tag_name, value)
 
   @tag_or_tag_value
-  def add(self, tag_name, value, *, verbose=None):
-    ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
-    '''
-    tag = Tag(tag_name, value)
-    self.set(tag.name, tag.value, verbose=verbose)
-
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
