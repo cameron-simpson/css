@@ -156,8 +156,8 @@ class Upd(SingletonMixin):
   '''
 
   # pylint: disable=unused-argument
-  @classmethod
-  def _singleton_key(cls, backend=None, columns=None, disabled=False):
+  @staticmethod
+  def _singleton_key(backend=None, columns=None, disabled=False):
     if backend is None:
       backend = sys.stderr
     return id(backend)
