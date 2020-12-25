@@ -1345,6 +1345,7 @@ class SQLTags(TagSets):
         entity.add_tag(tag.name, tag.value, session=session)
       session.flush()
       te = self.get(entity.id, session=session)
+      assert te is not None
     else:
       if unixtime is not None:
         te.unixtime = unixtime
