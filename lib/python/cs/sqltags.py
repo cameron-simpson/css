@@ -1213,52 +1213,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
-class SQLTagSet(TagSet, SingletonMixin):
-  ''' A singleton `TagSet` associated with a tagged entity.
-  '''
-
-  @staticmethod
-  def _singleton_key(*, sqltags, entity_id, **_):
-    return builtin_id(sqltags), entity_id
-
-  @require(
-      lambda _ontology: _ontology is None or
-      isinstance(_ontology, TagsOntology)
-  )
-  def __init__(self, *a, sqltags, entity_id, _ontology=None, **kw):
-    try:
-      pre_sqltags = self.sqltags
-    except AttributeError:
-      if _ontology is None:
-        _ontology = TagsOntology(sqltags)
-      super().__init__(*a, _ontology=_ontology, **kw)
-      self.sqltags = sqltags
-      self.entity_id = entity_id
-    else:
-      assert pre_sqltags is sqltags
-
-  @property
-  def entity(self):
-    ''' The `SQLTagSet` associated with this `TagSet`.
-    '''
-    return self.sqltags[self.entity_id]
-
-  @auto_session
-  def set(self, tag_name, value=None, *, session, skip_db=False, **kw):
-    ''' Add `tag_name`=`value` to this `TagSet`.
-    '''
-    if not skip_db:
-      self.entity.add_db_tag(tag_name, value, session=session)
-    super().set(tag_name, value=value, **kw)
-
-  @auto_session
-  def discard(self, tag_name, value=None, *, session, skip_db=False, **kw):
-    ''' Discard `tag_name`=`value` from this `TagSet`.
-    '''
-    if not skip_db:
-      self.entity.discard_db_tag(tag_name, value, session=session)
-    super().discard(tag_name, value, **kw)
-
 # TODO: unixtime property accessing the db_entity
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
