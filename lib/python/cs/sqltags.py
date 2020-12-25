@@ -356,7 +356,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
                                               ](te.unixtime, tag_value)
     else:
-      te_tag_value = te.tags.get(tag_name)
+      te_tag_value = te.get(tag_name)
       if te_tag_value is None:
         result = False
       else:
@@ -530,7 +530,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             xit = 1
             continue
           print(output.replace('\n', ' '))
-          for tag in sorted(te.tags):
+          for tag in sorted(te):
             if tag.name != 'headline':
               print(" ", tag)
     return xit
@@ -1481,7 +1481,6 @@ class SQLTags(TagSets):
             id=entity_id,
             name=row.name,
             unixtime=row.unixtime,
-            tags=SQLTagSet(sqltags=self, id=entity_id),
             sqltags=self
         )
       # a None tag_name means no tags
