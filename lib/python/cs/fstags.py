@@ -160,18 +160,41 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
+  GETOPT_SPEC = 'o:'
+
+  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] subcommand [...]
+  -o ontology   Specify the path to an ontology file.'''
+
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
+
+  @staticmethod
+  def apply_defaults(options):
+    ''' Set up the default values in `options`.
+    '''
+    options.ontology_path = None
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-o':
+          options.ontology_path = val
+        else:
+          raise RuntimeError("unhandled option")
 
   @staticmethod
   @contextmanager
   def run_context(argv, options):
     ''' Push the `FSTags`.
     '''
-    with options.fstags:
-      yield
+    fstags = FSTags(ontologyfile=options.ontology_path)
+    with fstags:
+      with stackattrs(options, fstags=fstags):
+        yield
 
   @staticmethod
   def cmd_autotag(argv, options):
