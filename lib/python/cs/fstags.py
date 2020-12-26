@@ -664,17 +664,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def cmd_ont(argv, options):
     ''' Ontology operations.
 
-        Usage: {cmd} [-o ontology] [subcommand [args...]]
+        Usage: {cmd} [subcommand [args...]]
           With no arguments, print the ontology.
     '''
-    ont_path = None
-    opts, argv = getopt(argv, 'o:', longopts=['ontology='])
-    for opt, value in opts:
-      with Pfx(opt):
-        if opt in ('-o', '--ontology'):
-          ont_path = value
-        else:
-          raise RuntimeError("unsupported option")
     if ont_path is None or isdirpath(ont_path):
       ont = options.fstags.ontology(ont_path or '.')
     else:
