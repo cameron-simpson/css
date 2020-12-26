@@ -1625,7 +1625,9 @@ class BaseTagFile(SingletonMixin, TagSets):
     '''
     if name in self.tagsets:
       raise ValueError("name already exists: %r" % (name,))
-    te = te.tagsets[name] = self.TagSetClass(name=name)
+    te = te.tagsets[name] = self.TagSetClass(
+        name=name, _ontology=self.ontology
+    )
     return te
 
   def get(self, name, default=None):
