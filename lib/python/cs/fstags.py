@@ -212,7 +212,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           spath = shortpath(path)
           U.out(spath)
           with Pfx(spath):
-            ont = fstags.ontology(path)
+            ont = fstags.ontology_for(path)
             tagged_path = fstags[path]
             direct_tags = tagged_path.direct_tags
             all_tags = tagged_path.merged_tags()
@@ -485,7 +485,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     with state(verbose=True):
       for path in paths:
         with Pfx(path):
-          ont = fstags.ontology(path)
+          ont = fstags.ontology_for(path)
           tagged_path = fstags[path]
           for key, value in data.items():
             tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
@@ -668,7 +668,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           With no arguments, print the ontology.
     '''
     if ont_path is None or isdirpath(ont_path):
-      ont = options.fstags.ontology(ont_path or '.')
+      ont = options.fstags.ontology_for(ont_path or '.')
     else:
       raise GetoptError(
           "unhandled ontology path, expected directory: %r" % (ont_path,)
@@ -971,7 +971,7 @@ class FSTags(MultiOpenMixin):
   def _tagfile(self, path: str, *, no_ontology: bool = False) -> "TagFile":
     ''' Obtain and cache the `TagFile` at `path`.
     '''
-    ontology = None if no_ontology else self.ontology(path)
+    ontology = None if no_ontology else self.ontology_for(path)
     tagfile = self._tagfiles[path] = TagFile(
         path, ontology=ontology, fstags=self
     )
@@ -1022,11 +1022,25 @@ class FSTags(MultiOpenMixin):
           warning("config clause entry %r not found: %s", format_string, e)
     return format_string
 
+  @property
+  def ontology(self):
+    ''' The primary `TagsOntology`, or `None` if `self.ontologyfile` was `None`.
+    '''
+    if not self.ontologyfile:
+      return None
+    ont_tagfile = self._tagfile(self.ontologyfile, no_ontology=True)
+    ont = TagsOntology(ont_tagfile)
+    ont_tagfile.ontology = ont
+    return ont
+
   @locked
-  def ontology(self, path):
+  def ontology_for(self, path):
     ''' Return the `TagsOntology` associated with `path`.
         Returns `None` if an ontology cannot be found.
     '''
+    ont = self.ontology
+    if ont:
+      return ont
     cache = self._dirpath_ontologies
     path = abspath(path)
     dirpath = path if isdirpath(path) else dirname(path)
