@@ -1600,7 +1600,7 @@ class BaseTagFile(SingletonMixin, TagSets):
   def get(self, name, default=None):
     ''' Get from the tagsets.
     '''
-    return self.tagsets.get(name, default=default)
+    return self.tagsets.get(name, default)
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
