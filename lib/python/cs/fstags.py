@@ -1819,9 +1819,11 @@ class TagFile(BaseTagFile, HasFSTagsMixin):
   '''
 
   @typechecked
-  def __init__(self, filepath: str, *, ontology=None, fstags=None):
+  def __init__(self, filepath: str, *, ontology=Ellipsis, fstags=None):
     if fstags is None:
       fstags = FSTags()
+    if ontology is Ellipsis:
+      ontology = fstags.ontology
     super().__init__(filepath, ontology=ontology)
     self.fstags = fstags
 
