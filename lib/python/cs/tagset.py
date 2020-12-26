@@ -380,14 +380,14 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     return Tag(
         prefix + '.' + tag_name if prefix else tag_name,
         value,
-        ontology=ontology or self.ontology
+        ontology=ontology or self.ontology,
     )
 
   def as_tags(self, prefix=None):
     ''' Yield the tag data as `Tag`s.
     '''
     for tag_name in self.keys():
-      yield self.tag(tag_name, prefix=prefix)
+      yield self.tag(tag_name, prefix=prefix, ontology=self.ontology)
 
   __iter__ = as_tags
 
@@ -1066,6 +1066,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         For a mapping (`dict`) this is mapping of `key->value_metadata`.
     '''
     ont = ontology or self.ontology
+    assert ont, "ont is false: %r" % (ont,)
     basetype = self.basetype
     if basetype == 'list':
       member_type = self.member_type
