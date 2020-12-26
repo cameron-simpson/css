@@ -1949,6 +1949,12 @@ class TagsOntology(SingletonMixin, TagSets):
         'default_factory', lambda name: TagSet(_ontology=self)
     )
 
+  def __bool__(self):
+    ''' Support easy `ontology or some_default` tests,
+        since ontologies are broadly optional.
+    '''
+    return True
+
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.te_mapping`.
     '''
