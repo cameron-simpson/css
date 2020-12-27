@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20201108-post'
+__version__ = '20201227.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1082,13 +1082,13 @@ def iter_file(f, **kw):
 def byteses_as_fd(bss, **kw):
   ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
       Return the file descriptor.
-      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+      Any keyword arguments are passed to `CornuCopyBuffer.as_fd`.
 
       Example:
 
-         # present a passphrase for use as in input file descrptor
-         # for a subprocess
-         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+           # present a passphrase for use as in input file descrptor
+           # for a subprocess
+           rfd = byteses_as_fd([(passphrase + '\n').encode()])
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 

@@ -156,8 +156,8 @@ class Upd(SingletonMixin):
   '''
 
   # pylint: disable=unused-argument
-  @classmethod
-  def _singleton_key(cls, backend=None, columns=None, disabled=False):
+  @staticmethod
+  def _singleton_key(backend=None, columns=None, disabled=False):
     if backend is None:
       backend = sys.stderr
     return id(backend)
@@ -349,7 +349,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
-    global curses   # pylint: disable=global-statement
+    global curses  # pylint: disable=global-statement
     try:
       return self._ti_strs[ti_name]
     except KeyError:

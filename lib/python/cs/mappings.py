@@ -945,9 +945,10 @@ class AttrableMappingMixin(object):
       value = self[attr]
     except KeyError:
       raise AttributeError(
-          "%s.%s (attrs=%s, __dict__=%r)" % (
-              type(self).__name__, attr, ','.join(sorted(self.keys())
-                                                  ), self.__dict__
+          "%s.%s (attrs=%s)" % (
+              type(self).__name__,
+              attr,
+              ','.join(sorted(set(self.keys()) | set(self.__dict__.keys()))),
           )
       )
     return value

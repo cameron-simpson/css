@@ -1052,12 +1052,16 @@ class Module(object):
       else:
         vcstag = self.latest.vcstag
     paths = self.paths()
+    latest_release_line = 'Release information for ' + self.latest.vcstag + '.'
     return (
         ([filename
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
-        if ignored or 'IGNORE' not in firstline
+        if (
+            ignored or
+            ('IGNORE' not in firstline and firstline != latest_release_line)
+        )
     )
 
   def uncommitted_paths(self):

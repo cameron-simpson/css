@@ -1,0 +1,2 @@
+lib/python/cs/obj.py: Release information for cs.obj-20201021.
+lib/python/cs/obj.py: cs.obj: SingletonMixin: correctly invoke __new__, a surprisingly fiddly task to get right

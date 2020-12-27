@@ -151,6 +151,26 @@ which is computed as:
   and moving a bracketed suffix to the front as an unbracketed prefix.
   The full conversion process is defined
   by the `TagsOntology.value_to_tag_name` function.
+
+== Format Strings ==
+
+While you can just use `str.format_map` as shown above
+for the directvalues in a `TagSet`
+(and some command line tools like `fstags` use this in output format specifications
+you can also use `TagSet`s in format strings.
+
+There is a `TagSet.ns()` method which constructs
+an enhanced type of `SimpleNamespace`
+from the tags in the set
+which allows convenient dot notation use in format strings,
+for example:
+
+      tags = TagSet(colour='blue', labels=['a','b','c'], size=9, _ontology=ont)
+      ns = tags.ns()
+      print(f'colour={ns.colour}, info URL={ns.colour._meta.url}')
+      colour=blue, info URL=https://en.wikipedia.org/wiki/Blue
+
+There is a detailed run down of this in the `TagSetNamespace` docstring below.
 '''
 
 from abc import ABC, abstractmethod
@@ -242,6 +262,7 @@ def tag_or_tag_value(func, no_self=False):
 
   if no_self:
 
+    # pylint: disable=keyword-arg-before-vararg
     def accept_tag_or_tag_value(name, value=None, *a, **kw):
       ''' Plain function flavour of `tag_or_tag_value`,
           accepting `(name,value=None,...)`.
@@ -256,6 +277,7 @@ def tag_or_tag_value(func, no_self=False):
       return func(name, value, *a, **kw)
   else:
 
+    # pylint: disable=keyword-arg-before-vararg
     def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
       ''' Method flavour of `tag_or_tag_value`,
           accepting `(self,name,value=None,...)`.
@@ -378,14 +400,14 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     return Tag(
         prefix + '.' + tag_name if prefix else tag_name,
         value,
-        ontology=ontology or self.ontology
+        ontology=ontology or self.ontology,
     )
 
   def as_tags(self, prefix=None):
     ''' Yield the tag data as `Tag`s.
     '''
     for tag_name in self.keys():
-      yield self.tag(tag_name, prefix=prefix)
+      yield self.tag(tag_name, prefix=prefix, ontology=self.ontology)
 
   __iter__ = as_tags
 
@@ -398,12 +420,6 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     self.set(tag_name, value)
 
   @tag_or_tag_value
-  def add(self, tag_name, value, *, verbose=None):
-    ''' Add a `Tag` or a `tag_name,value` to this `TagSet`.
-    '''
-    tag = Tag(tag_name, value)
-    self.set(tag.name, tag.value, verbose=verbose)
-
   def set(self, tag_name, value, *, verbose=None):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
@@ -419,6 +435,9 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         )
         ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
+
+  # "set" mode
+  add = set
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
@@ -1067,6 +1086,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         For a mapping (`dict`) this is mapping of `key->value_metadata`.
     '''
     ont = ontology or self.ontology
+    assert ont, "ont is false: %r" % (ont,)
     basetype = self.basetype
     if basetype == 'list':
       member_type = self.member_type
@@ -1443,6 +1463,69 @@ class TagSetNamespace(ExtendedNamespace):
       This provides an assortment of special names derived from the `TagSet`.
       See the docstring for `__getattr__` for the special attributes provided
       beyond those already provided by `ExtendedNamespace.__getattr__`.
+
+      Example with a simple `TagSet`:
+
+          >>> tags = TagSet(colour='blue', labels=['a','b','c'], size=9)
+          >>> 'The colour is {colour}.'.format_map(tags)
+          'The colour is blue.'
+          >>> # the natural way to obtain a TagSetNamespace from a TagSet
+          >>> ns = tags.ns()  # returns TagSetNamespace.from_tagset(tags)
+          >>> # the ns object has additional computed attributes
+          >>> 'The colour tag is {colour._tag}.'.format_map(ns)
+          'The colour tag is colour=blue.'
+          >>> 'The colours are {colours}. The labels are {labels}.'.format_map(ns)
+          "The colours are ['blue']. The labels are ['a', 'b', 'c']."
+          >>> 'The first label is {label}.'.format_map(ns)
+          'The first label is a.'
+
+      The same `TagSet` with an ontology:
+
+          >>> ont = TagsOntology({
+          ...   'type.colour': TagSet(description="a colour, a hue", type="str"),
+          ...   'meta.colour.blue': TagSet(
+          ...     url='https://en.wikipedia.org/wiki/Blue',
+          ...     wavelengths='450nm-495nm'),
+          ... })
+          >>> tags = TagSet(colour='blue', labels=['a','b','c'], size=9, _ontology=ont)
+          >>> # the colour Tag
+          >>> tags.tag('colour')  # doctest: +ELLIPSIS
+          Tag(name='colour',value='blue',ontology=TagsOntology<...>)
+          >>> # type information about a colour
+          >>> tags.tag('colour').type
+          'str'
+          >>> tags.tag('colour').typedata
+          TagSet:{'description': 'a colour, a hue', 'type': 'str'}
+          >>> # metadata about this particular colour value
+          >>> tags.tag('colour').meta
+          TagSet:{'url': 'https://en.wikipedia.org/wiki/Blue', 'wavelengths': '450nm-495nm'}
+
+      Using a namespace view of the Tag, useful for format strings:
+
+          >>> # the TagSet as a namespace for use in format strings
+          >>> ns = tags.ns()
+          >>> # the namespace .colour node, which has the Tag attached
+          >>> ns.colour         # doctest: +ELLIPSIS
+          TagSetNamespace(..., _tag=Tag(name='colour',value='blue',...))
+          >>> # the underlying colour Tag itself
+          >>> ns.colour._tag    # doctest: +ELLIPSIS
+          Tag(name='colour',value='blue',ontology=TagsOntology<...>)
+          >>> # str() of a namespace with a ._tag is the Tag value
+          >>> # making for easy use in a format string
+          >>> f'{ns.colour}'
+          'blue'
+          >>> # the type information about the colour Tag
+          >>> ns.colour._tag.typedata
+          TagSet:{'description': 'a colour, a hue', 'type': 'str'}
+          >>> # the metadata
+          >>> ns.colour._meta   # doctest: +ELLIPSIS
+          TagSetNamespace(..., url=TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...)), ...)
+          >>> # the _meta.url is itself a namespace with a ._tag for the URL
+          >>> ns.colour._meta.url   # doctest: +ELLIPSIS
+          TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...))
+          >>> # but it formats nicely because it has a ._tag
+          >>> f'colour={ns.colour}, info URL={ns.colour._meta.url}'
+          'colour=blue, info URL=https://en.wikipedia.org/wiki/Blue'
   '''
 
   @classmethod
@@ -1489,6 +1572,15 @@ class TagSetNamespace(ExtendedNamespace):
               ns = subns
           ns._tag = tag
     return ns0
+
+  def __str__(self):
+    ''' A `TagSetNamespace` with a `._tag` renders `str(_tag.value)`,
+        otherwise `ExtendedNamespace.__str__` is used.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return str(tag.value)
+    return super().__str__()
 
   def __bool__(self):
     ''' Truthiness: `True` unless the `._bool` attribute overrides that.
@@ -1930,12 +2022,20 @@ class TagsOntology(SingletonMixin, TagSets):
     if hasattr(self, 'te_mapping'):
       return
     self.te_mapping = te_mapping
-    self.default_factory = te_mapping.default_factory
+    self.default_factory = te_mapping.get(
+        'default_factory', lambda name: TagSet(_ontology=self)
+    )
+
+  def __bool__(self):
+    ''' Support easy `ontology or some_default` tests,
+        since ontologies are broadly optional.
+    '''
+    return True
 
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.te_mapping`.
     '''
-    return self.te_mapping.get(name, default=default)
+    return self.te_mapping.get(name, default)
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -2340,3 +2440,41 @@ class RegexpTagRule:
           tag = Tag(tag_name, value)
           tags.append(tag)
     return tags
+
+def main(_):
+  ''' Test code.
+  '''
+  # pylint: disable=import-outside-toplevel
+  from cs.logutils import setup_logging
+  from cs.x import X  # pylint: disable=import-outside-toplevel
+  setup_logging()
+  ont = TagsOntology(
+      {
+          'type.colour':
+          TagSet(description="a colour, a hue", type="str"),
+          'meta.colour.blue':
+          TagSet(
+              url='https://en.wikipedia.org/wiki/Blue',
+              wavelengths='450nm-495nm'
+          ),
+      }
+  )
+  tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+  X("tags.colour = %s", tags.colour)
+  colour = tags.tag('colour')
+  X("colour = %s", colour)
+  X("type = %s", colour.typedata)
+  X("meta = %s", colour.metadata)
+  X("meta.url = %s", colour.meta.url)
+  X("meta.ns = %s", colour.meta.ns())
+  X("meta.url = %s", colour.meta.ns().url_s)
+  ns = tags.ns()
+  X("colour = %s", ns.colour._tag)
+  X("colour.metadata = %s", ns.colour._meta)
+  X("colour.metadata.url = %s", ns.colour._meta.url)
+  ##X("colour.metadata.ns() = %s", ns.colour._tag.metadata.ns())
+  ##X(repr(list(ns.colour._tag.metadata.ns().__dict__.items())))
+
+if __name__ == '__main__':
+  import sys  # pylint: disable=import-outside-toplevel
+  sys.exit(main(sys.argv))
