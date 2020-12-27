@@ -815,7 +815,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             if badopts:
               raise GetoptError("bad arguments")
             with state(verbose=True):
-              with TagFile(tagfilepath, fstags=fstags) as tagfile:
+              with FSTagsTagFile(tagfilepath, fstags=fstags) as tagfile:
                 tags = tagfile[tagset_name]
                 for choice in tag_choices:
                   with Pfx(choice.spec):
@@ -942,7 +942,7 @@ class FSTags(MultiOpenMixin):
     self.config = FSTagsConfig()
     self.config.tagsfile_basename = tagsfile_basename
     self.config.ontologyfile = ontologyfile
-    self._tagfiles = {}  # cache of `TagFile`s from their actual paths
+    self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
     self._lock = RLock()
@@ -968,11 +968,13 @@ class FSTags(MultiOpenMixin):
         error("%s.save: %s", tagfile, e)
 
   @typechecked
-  def _tagfile(self, path: str, *, no_ontology: bool = False) -> "TagFile":
-    ''' Obtain and cache the `TagFile` at `path`.
+  def _tagfile(
+      self, path: str, *, no_ontology: bool = False
+  ) -> "FSTagsTagFile":
+    ''' Obtain and cache the `FSTagsTagFile` at `path`.
     '''
     ontology = None if no_ontology else self.ontology_for(path)
-    tagfile = self._tagfiles[path] = TagFile(
+    tagfile = self._tagfiles[path] = FSTagsTagFile(
         path, ontology=ontology, fstags=self
     )
     return tagfile
@@ -1064,9 +1066,9 @@ class FSTags(MultiOpenMixin):
     return ont
 
   def path_tagfiles(self, filepath):
-    ''' Generator yielding a sequence of `(TagFile,name)` pairs
-        where `name` is the key within the `TagFile`
-        for the `TagFile`s affecting `filepath`
+    ''' Generator yielding a sequence of `(FSTagsTagFile,name)` pairs
+        where `name` is the key within the `FSTagsTagFile`
+        for the `FSTagsTagFile`s affecting `filepath`
         in order from the root to `dirname(filepath)`.
     '''
     absfilepath = abspath(filepath)
@@ -1081,13 +1083,13 @@ class FSTags(MultiOpenMixin):
 
   @locked
   @typechecked
-  def dir_tagfile(self, dirpath: str) -> "TagFile":
-    ''' Return the `TagFile` associated with `dirpath`.
+  def dir_tagfile(self, dirpath: str) -> "FSTagsTagFile":
+    ''' Return the `FSTagsTagFile` associated with `dirpath`.
     '''
     return self._tagfile(joinpath(abspath(dirpath), self.tagsfile_basename))
 
   def tagfile_for(self, filepath):
-    ''' Return the `TagFile` storing the `Tag`s for `filepath`.
+    ''' Return the `FSTagsTagFile` storing the `Tag`s for `filepath`.
     '''
     return self.dir_tagfile(dirname(abspath(filepath)))
 
@@ -1467,12 +1469,12 @@ class TaggedPath(TagSet, HasFSTagsMixin):
 
   @property
   def tagfile(self):
-    ''' Return the `TagFile` storing the state for this `TaggedPath`.
+    ''' Return the `FSTagsTagFile` storing the state for this `TaggedPath`.
     '''
     return self.fstags.tagfile_for(self.filepath)
 
   def save(self):
-    ''' Update the associated `TagFile`.
+    ''' Update the associated `FSTagsTagFile`.
     '''
     self.tagfile.save()
 
@@ -1692,7 +1694,7 @@ class BaseTagFile(SingletonMixin, TagSets):
 
   @property
   def names(self):
-    ''' The names from this `TagFile` as a list.
+    ''' The names from this `FSTagsTagFile` as a list.
     '''
     return list(self.tagsets.keys())
 
@@ -1815,8 +1817,8 @@ class BaseTagFile(SingletonMixin, TagSets):
     '''
     return self[name].update(tags, prefix=prefix, verbose=state.verbose)
 
-class TagFile(BaseTagFile, HasFSTagsMixin):
-  ''' A `TagFile` indexing `TagSet`s for file paths
+class FSTagsTagFile(BaseTagFile, HasFSTagsMixin):
+  ''' A `FSTagsTagFile` indexing `TagSet`s for file paths
       which lives in the file path's directory.
   '''
 
@@ -1846,7 +1848,7 @@ class TagFile(BaseTagFile, HasFSTagsMixin):
 
   @property
   def dirpath(self):
-    ''' Return the path of the directory associated with this `TagFile`.
+    ''' Return the path of the directory associated with this `FSTagsTagFile`.
     '''
     return dirname(self.filepath)
 
