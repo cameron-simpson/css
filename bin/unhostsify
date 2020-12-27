@@ -17,4 +17,4 @@ badopts=
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-exec re-subst -H "$etc_hosts" 's/{(?P<hostname>[^}]+)}/{{{hostname}}}/f'
+exec re-subst -H "$etc_hosts" 's/{(?P<hostname>[^}]+)}/{{{hostname}}}/gf'
