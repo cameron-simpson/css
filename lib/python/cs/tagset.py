@@ -1505,6 +1505,15 @@ class TagSetNamespace(ExtendedNamespace):
           ns._tag = tag
     return ns0
 
+  def __str__(self):
+    ''' A `TagSetNamespace` with a `._tag` renders `str(_tag.value)`,
+        otherwise `ExtendedNamespace.__str__` is used.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return str(tag.value)
+    return super().__str__()
+
   def __bool__(self):
     ''' Truthiness: `True` unless the `._bool` attribute overrides that.
     '''
