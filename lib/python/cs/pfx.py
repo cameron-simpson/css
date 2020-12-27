@@ -53,7 +53,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201227'
+__version__ = '20201227-post'
 
 DISTINFO = {
     'description':
