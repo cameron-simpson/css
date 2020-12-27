@@ -34,7 +34,6 @@ from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fstags import TagFile
 from cs.lex import cutsuffix, get_dotted_identifier
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
@@ -44,6 +43,7 @@ from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.sh import quotestr as shq, quotecmd as shqv
+from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
 
@@ -675,6 +675,14 @@ class Module(object):
     self.options.pkg_tagsets.save()
     return self.options.pkg_tagsets.filepath
 
+  @tag_or_tag_value
+  def set_tag(self, tag_name, value, *,msg):
+    ''' Set a tag value and commit the modified tag file.
+    '''
+    self.pkg_tags.set(tag_name, value)
+    pkg_tags_filename = self.save_pkg_tags()
+    self.vcs.commit(f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',PKG_TAGS)
+
   @cachedmethod
   def release_tags(self):
     ''' Return the `ReleaseTag`s for this package.
@@ -725,12 +733,7 @@ class Module(object):
   def latest_pypi_version(self, new_version):
     ''' Update the last PyPI version.
     '''
-    self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
-    pkg_tags_filename = self.save_pkg_tags()
-    self.vcs.commit(
-        '%s: %s: set %s=%s [IGNORE]' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
-    )
+    self.set_tag(TAG_PYPI_RELEASE, new_version,msg='update PyPI release')
 
   def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
