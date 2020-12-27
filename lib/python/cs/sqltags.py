@@ -1232,6 +1232,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     else:
       assert pre_sqltags is sqltags
 
+  def __hash__(self):
+    return id(self)
+
   @property
   def name(self):
     ''' Return the `.name`.
