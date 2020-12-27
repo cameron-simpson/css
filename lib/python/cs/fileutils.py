@@ -1082,7 +1082,7 @@ def iter_file(f, **kw):
 def byteses_as_fd(bss, **kw):
   ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
       Return the file descriptor.
-      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+      Any keyword arguments are passed to `CornuCopyBuffer.as_fd`.
 
       Example:
 
