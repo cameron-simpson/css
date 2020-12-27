@@ -676,12 +676,15 @@ class Module(object):
     return self.options.pkg_tagsets.filepath
 
   @tag_or_tag_value
-  def set_tag(self, tag_name, value, *,msg):
+  def set_tag(self, tag_name, value, *, msg):
     ''' Set a tag value and commit the modified tag file.
     '''
     self.pkg_tags.set(tag_name, value)
     pkg_tags_filename = self.save_pkg_tags()
-    self.vcs.commit(f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',PKG_TAGS)
+    self.vcs.commit(
+        f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',
+        PKG_TAGS
+    )
 
   @cachedmethod
   def release_tags(self):
@@ -733,7 +736,7 @@ class Module(object):
   def latest_pypi_version(self, new_version):
     ''' Update the last PyPI version.
     '''
-    self.set_tag(TAG_PYPI_RELEASE, new_version,msg='update PyPI release')
+    self.set_tag(TAG_PYPI_RELEASE, new_version, msg='update PyPI release')
 
   def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
