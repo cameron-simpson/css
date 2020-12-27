@@ -161,10 +161,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   USAGE_FORMAT = '''Usage: {cmd} [-o ontology] subcommand [...]
   -o ontology   Specify the path to an ontology file.'''
 
-  def apply_defaults(self, options):
-    ''' Set up the default values in `options`.
-    '''
-
   @staticmethod
   def apply_defaults(options):
     ''' Set up the default values in `options`.
@@ -663,6 +659,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         Usage: {cmd} [subcommand [args...]]
           With no arguments, print the ontology.
     '''
+    ont_path = options.ontology_path
     if ont_path is None or isdirpath(ont_path):
       ont = options.fstags.ontology_for(ont_path or '.')
     else:
@@ -799,7 +796,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           try:
             tagset_name = argv.pop(0)
           except IndexError:
-            raise GetoptError("missing tagset_name")
+            raise GetoptError("missing tagset_name")  # pylint: disable=raise-missing-from
           with Pfx(tagset_name):
             if not argv:
               raise GetoptError("missing tags")
@@ -1599,10 +1596,12 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
 
   @typechecked
   @require(
-      lambda name: is_valid_basename(name),
+      lambda name: is_valid_basename(name),  # pylint: disable=unnecessary-lambda
       "name should be a clean file basename"
   )
   def TagSetClass(self, name: str) -> TaggedPath:
+    ''' factory to create a `TaggedPath` from a `name`.
+    '''
     if name in self.tagsets:
       raise ValueError("name already exists: %r" % (name,))
     filepath = joinpath(dirname(self.filepath), name)
