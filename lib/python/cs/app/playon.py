@@ -277,7 +277,7 @@ class PlayOnAPI(MultiOpenMixin):
   def __getitem__(self, download_id: int):
     ''' Return the `TagSet` associated with `download_id`.
     '''
-    return self._sqltags.make('recording.' + str(download_id))
+    return self._sqltags[f'recording.{download_id}']
 
   @_api_call('library/all')
   def recordings(self, rqm):
