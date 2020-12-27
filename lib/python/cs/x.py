@@ -38,7 +38,7 @@ import os
 import sys
 from cs.ansi_colour import colourise
 
-__version__ = '20201227'
+__version__ = '20201227-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
