@@ -307,7 +307,7 @@ class PlayOnAPI(MultiOpenMixin):
         of the download.
     '''
     rq = requests.get(
-        self.API_BASE + 'library/' + str(download_id) + '/download',
+        f'{self.API_BASE}library/{download_id}/download',
         auth=_RequestsNoAuth(),
         headers=dict(Authorization=self.jwt),
     )
