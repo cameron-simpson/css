@@ -1386,7 +1386,7 @@ class SQLTags(TagSets):
     if te is None:
       if isinstance(index, int):
         raise IndexError(index)
-      raise KeyError(index)
+      te = self.__missing__(index)
     return te
 
   @orm_auto_session
