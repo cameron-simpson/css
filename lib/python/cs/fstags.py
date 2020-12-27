@@ -160,18 +160,41 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
 
+  GETOPT_SPEC = 'o:'
+
+  USAGE_FORMAT = '''Usage: {cmd} [-o ontology] subcommand [...]
+  -o ontology   Specify the path to an ontology file.'''
+
   def apply_defaults(self, options):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
+
+  @staticmethod
+  def apply_defaults(options):
+    ''' Set up the default values in `options`.
+    '''
+    options.ontology_path = None
+
+  @staticmethod
+  def apply_opts(opts, options):
+    ''' Apply command line options.
+    '''
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-o':
+          options.ontology_path = val
+        else:
+          raise RuntimeError("unhandled option")
 
   @staticmethod
   @contextmanager
   def run_context(argv, options):
     ''' Push the `FSTags`.
     '''
-    with options.fstags:
-      yield
+    fstags = FSTags(ontologyfile=options.ontology_path)
+    with fstags:
+      with stackattrs(options, fstags=fstags):
+        yield
 
   @staticmethod
   def cmd_autotag(argv, options):
@@ -189,7 +212,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           spath = shortpath(path)
           U.out(spath)
           with Pfx(spath):
-            ont = fstags.ontology(path)
+            ont = fstags.ontology_for(path)
             tagged_path = fstags[path]
             direct_tags = tagged_path.direct_tags
             all_tags = tagged_path.merged_tags()
@@ -462,7 +485,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     with state(verbose=True):
       for path in paths:
         with Pfx(path):
-          ont = fstags.ontology(path)
+          ont = fstags.ontology_for(path)
           tagged_path = fstags[path]
           for key, value in data.items():
             tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
@@ -641,19 +664,11 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def cmd_ont(argv, options):
     ''' Ontology operations.
 
-        Usage: {cmd} [-o ontology] [subcommand [args...]]
+        Usage: {cmd} [subcommand [args...]]
           With no arguments, print the ontology.
     '''
-    ont_path = None
-    opts, argv = getopt(argv, 'o:', longopts=['ontology='])
-    for opt, value in opts:
-      with Pfx(opt):
-        if opt in ('-o', '--ontology'):
-          ont_path = value
-        else:
-          raise RuntimeError("unsupported option")
     if ont_path is None or isdirpath(ont_path):
-      ont = options.fstags.ontology(ont_path or '.')
+      ont = options.fstags.ontology_for(ont_path or '.')
     else:
       raise GetoptError(
           "unhandled ontology path, expected directory: %r" % (ont_path,)
@@ -956,7 +971,7 @@ class FSTags(MultiOpenMixin):
   def _tagfile(self, path: str, *, no_ontology: bool = False) -> "TagFile":
     ''' Obtain and cache the `TagFile` at `path`.
     '''
-    ontology = None if no_ontology else self.ontology(path)
+    ontology = None if no_ontology else self.ontology_for(path)
     tagfile = self._tagfiles[path] = TagFile(
         path, ontology=ontology, fstags=self
     )
@@ -1007,11 +1022,25 @@ class FSTags(MultiOpenMixin):
           warning("config clause entry %r not found: %s", format_string, e)
     return format_string
 
+  @property
+  def ontology(self):
+    ''' The primary `TagsOntology`, or `None` if `self.ontologyfile` was `None`.
+    '''
+    if not self.ontologyfile:
+      return None
+    ont_tagfile = self._tagfile(self.ontologyfile, no_ontology=True)
+    ont = TagsOntology(ont_tagfile)
+    ont_tagfile.ontology = ont
+    return ont
+
   @locked
-  def ontology(self, path):
+  def ontology_for(self, path):
     ''' Return the `TagsOntology` associated with `path`.
         Returns `None` if an ontology cannot be found.
     '''
+    ont = self.ontology
+    if ont:
+      return ont
     cache = self._dirpath_ontologies
     path = abspath(path)
     dirpath = path if isdirpath(path) else dirname(path)
@@ -1359,11 +1388,13 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   '''
 
   def __init__(self, filepath, fstags=None, _id=None, _ontology=None):
-    super().__init__(_id=_id, _ontology=_ontology)
     if fstags is None:
       fstags = self.fstags
     else:
       self.fstags = fstags
+    if _ontology is None:
+      _ontology = fstags.ontology_for(filepath)
+    super().__init__(_id=_id, _ontology=_ontology)
     self.filepath = filepath
     self._lock = Lock()
 
@@ -1594,13 +1625,15 @@ class BaseTagFile(SingletonMixin, TagSets):
     '''
     if name in self.tagsets:
       raise ValueError("name already exists: %r" % (name,))
-    te = te.tagsets[name] = self.TagSetClass(name=name)
+    te = te.tagsets[name] = self.TagSetClass(
+        name=name, _ontology=self.ontology
+    )
     return te
 
   def get(self, name, default=None):
     ''' Get from the tagsets.
     '''
-    return self.tagsets.get(name, default=default)
+    return self.tagsets.get(name, default)
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
@@ -1788,9 +1821,11 @@ class TagFile(BaseTagFile, HasFSTagsMixin):
   '''
 
   @typechecked
-  def __init__(self, filepath: str, *, ontology=None, fstags=None):
+  def __init__(self, filepath: str, *, ontology=Ellipsis, fstags=None):
     if fstags is None:
       fstags = FSTags()
+    if ontology is Ellipsis:
+      ontology = fstags.ontology
     super().__init__(filepath, ontology=ontology)
     self.fstags = fstags
 
