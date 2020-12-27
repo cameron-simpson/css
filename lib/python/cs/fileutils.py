@@ -1086,9 +1086,9 @@ def byteses_as_fd(bss, **kw):
 
       Example:
 
-         # present a passphrase for use as in input file descrptor
-         # for a subprocess
-         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+           # present a passphrase for use as in input file descrptor
+           # for a subprocess
+           rfd = byteses_as_fd([(passphrase + '\n').encode()])
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 
