@@ -1232,6 +1232,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     else:
       assert pre_sqltags is sqltags
 
+  def __hash__(self):
+    return id(self)
+
   @property
   def name(self):
     ''' Return the `.name`.
@@ -1260,15 +1263,16 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @tag_or_tag_value
   @auto_session
-  def set(self, tag_name, value, *, session, skip_db=False):
+  def set(self, tag_name, value, *, session, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError("may not set pseudoTag %r" % (tag_name,))
     if tag_name in ('name', 'unixtime'):
       setattr(self, '_' + tag_name, value)
       if not skip_db:
+        ifverbose(verbose, "+ %s", Tag(tag_name, value))
         setattr(self.get_db_entity(session=session), tag_name, value)
     else:
-      super().set(tag_name, value)
+      super().set(tag_name, value, verbose=verbose)
       if not skip_db:
         self.add_db_tag(tag_name, value, session=session)
 
@@ -1281,16 +1285,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     return e.add_tag(tag_name, value, session=session)
 
   @tag_or_tag_value
-  def discard(self, tag_name, value, *, session, skip_db=False):
+  def discard(self, tag_name, value, *, session, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError("may not discard pseudoTag %r" % (tag_name,))
     if tag_name in ('name', 'unixtime'):
       if value is None or getattr(self, tag_name) == value:
         setattr(self, '_' + tag_name, None)
         if not skip_db:
+          ifverbose(verbose, "- %s", Tag(tag_name, value))
           setattr(self.get_db_entity(session=session), tag_name, None)
     else:
-      super().discard(tag_name, value)
+      super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
         self.discard_db_tag(tag_name, value, session=session)
 
@@ -1381,7 +1386,7 @@ class SQLTags(TagSets):
     if te is None:
       if isinstance(index, int):
         raise IndexError(index)
-      raise KeyError(index)
+      te = self.__missing__(index)
     return te
 
   @orm_auto_session
