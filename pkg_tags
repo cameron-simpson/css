@@ -1,6 +1,6 @@
 cs.ansi_colour pypi.release="20200729"
 cs.app.beyonwiz pypi.release=20160828
-cs.app.flag pypi.release=20190729
+cs.app.flag pypi.release="20201228"
 cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release=20160310
