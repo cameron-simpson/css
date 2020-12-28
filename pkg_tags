@@ -49,7 +49,7 @@ cs.py.doc pypi.release="20200718"
 cs.py.func pypi.release="20200518"
 cs.py.modules pypi.release="20200521"
 cs.py.stack pypi.release=20190812
-cs.py3 pypi.release="20200517"
+cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3c46
 cs.queues pypi.release="20201025"
 cs.range pypi.release=20190102
 cs.resources pypi.release="20201025"
