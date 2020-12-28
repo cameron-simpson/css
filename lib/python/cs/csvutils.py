@@ -22,6 +22,8 @@ from cs.logutils import warning
 from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
+__version__ = '20201228-post'
+
 DISTINFO = {
     'description':
     "CSV file related facilities",

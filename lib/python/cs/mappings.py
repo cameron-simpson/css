@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20201102-post'
+__version__ = '20201228-post'
 
 DISTINFO = {
     'description':
@@ -939,14 +939,17 @@ class AttrableMappingMixin(object):
   '''
 
   def __getattr__(self, attr):
-    ''' Unknown attributes are obtained from the `dict` entries.
+    ''' Unknown attributes are obtained from the mapping entries.
     '''
     try:
       value = self[attr]
     except KeyError:
       raise AttributeError(
-          "%s.%s (attrs=%s)" %
-          (type(self).__name__, attr, ','.join(sorted(self.keys())))
+          "%s.%s (attrs=%s)" % (
+              type(self).__name__,
+              attr,
+              ','.join(sorted(set(self.keys()) | set(self.__dict__.keys()))),
+          )
       )
     return value
 

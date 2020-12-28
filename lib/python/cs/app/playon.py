@@ -86,14 +86,14 @@ class PlayOnCommand(BaseCommand):
         if dlrq == 'pending':
           if available is None:
             available = api.recordings()
-          tes = [te for te in available if 'download_path' not in te.tags]
+          tes = [te for te in available if 'download_path' not in te]
           if not tes:
             warning("no undownloaded recordings")
           else:
             for te in tes:
-              dl_id = te.tags.playon.ID
+              dl_id = te.playon.ID
               with Pfx(dl_id):
-                if not _dl(te.tags.playon.ID):
+                if not _dl(te.playon.ID):
                   xit = 1
         else:
           try:
@@ -123,7 +123,7 @@ class PlayOnCommand(BaseCommand):
       entry = te.subtags('playon')
       print(int(entry.ID), entry.HumanSize, entry.Series, entry.Name)
       if long_format:
-        for tag in sorted(te.tags):
+        for tag in sorted(te):
           print(" ", tag)
 
 # pylint: disable=too-few-public-methods
@@ -275,13 +275,13 @@ class PlayOnAPI(MultiOpenMixin):
 
   @typechecked
   def __getitem__(self, download_id: int):
-    ''' Return the `TaggedEntity` associated with `download_id`.
+    ''' Return the `TagSet` associated with `download_id`.
     '''
-    return self._sqltags.make('recording.' + str(download_id))
+    return self._sqltags[f'recording.{download_id}']
 
   @_api_call('library/all')
   def recordings(self, rqm):
-    ''' Return the `TaggedEntity` instances for the available recordings.
+    ''' Return the `TagSet` instances for the available recordings.
     '''
     result = rqm(headers=dict(Authorization=self.jwt)).json()
     ok = result.get('success')
@@ -291,7 +291,7 @@ class PlayOnAPI(MultiOpenMixin):
     tes = set()
     for entry in entries:
       te = self[entry['ID']]
-      te.tags.update(entry, prefix='playon')
+      te.update(entry, prefix='playon')
       tes.add(te)
     return tes
 
@@ -307,7 +307,7 @@ class PlayOnAPI(MultiOpenMixin):
         of the download.
     '''
     rq = requests.get(
-        self.API_BASE + 'library/' + str(download_id) + '/download',
+        f'{self.API_BASE}library/{download_id}/download',
         auth=_RequestsNoAuth(),
         headers=dict(Authorization=self.jwt),
     )

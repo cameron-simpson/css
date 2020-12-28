@@ -53,7 +53,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201105-post'
+__version__ = '20201227-post'
 
 DISTINFO = {
     'description':
@@ -257,7 +257,12 @@ class Pfx(object):
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
           )
-    _state.pop()
+    try:
+      _state.pop()
+    except IndexError as e:
+      print(
+          "warning: %s.__exit__: _state.pop(): %s" % (type(self).__name__, e)
+      )
     if _state.trace:
       _state.trace(_state.prefix)
     return False
