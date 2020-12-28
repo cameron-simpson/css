@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20201108-post'
+__version__ = '20201227.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -329,10 +329,13 @@ def rewrite_cmgr(filepath, mode='w', **kw):
       rewrite(filepath, mode='wb', srcf=f, **kw)
 
 @strable
-def scan_ndjson(f, dictclass=dict):
+def scan_ndjson(f, dictclass=dict, error_list=None):
   ''' Read a newline delimited JSON file, yield instances of `dictclass`
       (default `dict`, otherwise a class which can be instantiated
       by `dictclass(a_dict)`).
+
+      `error_list` is an optional list to accrue `(lineno,exception)` tuples
+      for errors encountered during the scan.
   '''
   for lineno, line in enumerate(f, 1):
     with Pfx("line %d", lineno):
@@ -340,6 +343,8 @@ def scan_ndjson(f, dictclass=dict):
         d = json.loads(line)
       except json.JSONDecodeError as e:
         warning("%s", e)
+        if error_list:
+          error_list.append((lineno, e))
         continue
       if dictclass is not dict:
         d = dictclass(**d)
@@ -815,8 +820,7 @@ def mkdirn(path, sep=''):
       if sep:
         raise ValueError(
             "mkdirn(path=%r, sep=%r): using non-empty sep"
-            " with a trailing %r seems nonsensical"
-            % (path, sep, os.sep)
+            " with a trailing %r seems nonsensical" % (path, sep, os.sep)
         )
       dirpath = path[:-len(os.sep)]
       pfx = ''
@@ -1078,13 +1082,13 @@ def iter_file(f, **kw):
 def byteses_as_fd(bss, **kw):
   ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
       Return the file descriptor.
-      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+      Any keyword arguments are passed to `CornuCopyBuffer.as_fd`.
 
       Example:
 
-         # present a passphrase for use as in input file descrptor
-         # for a subprocess
-         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+           # present a passphrase for use as in input file descrptor
+           # for a subprocess
+           rfd = byteses_as_fd([(passphrase + '\n').encode()])
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 
@@ -1807,7 +1811,9 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
     ''' Scan the backing file, yield records.
     '''
     if existspath(self.__ndjson_filename):
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass):
+      self.scan_errors = []
+      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
+                                error_list=self.scan_errors):
         yield record
 
   def append_to_mapping(self, record):

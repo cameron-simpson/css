@@ -21,6 +21,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
+from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import os
 from os.path import abspath, expanduser, exists as existspath
@@ -31,29 +32,40 @@ import time
 from typing import List
 from icontract import require
 from sqlalchemy import (
-    create_engine, Column, Integer, Float, String, JSON, ForeignKey,
-    UniqueConstraint
+    create_engine,
+    select,
+    Column,
+    Integer,
+    Float,
+    String,
+    JSON,
+    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
-from sqlalchemy.sql.expression import and_, or_
+from sqlalchemy.sql.expression import and_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import stackattrs, pushattrs, popattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix, get_decimal_value
 from cs.logutils import error, warning, ifverbose
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
-from cs.resources import MultiOpenMixin
+from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
-    ORM, orm_method, auto_session, orm_auto_session, BasicTableMixin,
-    HasIdMixin
+    ORM,
+    orm_method,
+    auto_session,
+    orm_auto_session,
+    BasicTableMixin,
+    HasIdMixin,
+    _state as sqla_state,
 )
 from cs.tagset import (
-    TagSet, Tag, TaggedEntityCriterion, TagBasedTest, TagsCommandMixin,
-    TaggedEntity
+    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
+    TagSets, tag_or_tag_value
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -69,7 +81,7 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
-        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx', 'cs.resources',
+        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx',
         'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025',
         'icontract', 'sqlalchemy', 'typeguard'
     ],
@@ -98,20 +110,27 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
+def glob2like(glob: str) -> str:
+  ''' Convert a filename glob to an SQL LIKE pattern.
+  '''
+  assert '[' not in glob
+  return glob.replace('*', '%').replace('?', '_')
+
 class SQLParameters(namedtuple(
     'SQLParameters', 'criterion table alias entity_id_column constraint')):
-  ''' The parameters required for constructing queries or extending queries with JOINs.
+  ''' The parameters required for constructing queries
+      or extending queries with JOINs.
   '''
 
-class SQTCriterion(TaggedEntityCriterion):
-  ''' Subclass of `TaggedEntityCriterion` requiring an `.sql_parameters` method
+class SQTCriterion(TagSetCriterion):
+  ''' Subclass of `TagSetCriterion` requiring an `.sql_parameters` method
       which returns an `SQLParameters` providing the information required
       to construct an sqlalchemy query.
       It also resets `.CRITERION_PARSE_CLASSES`, which will pick up
       the SQL capable criterion classes below.
   '''
 
-  # list of TaggedEntityCriterion classes
+  # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
 
@@ -129,6 +148,9 @@ class SQTEntityIdTest(SQTCriterion):
   @typechecked
   def __init__(self, ids: List[int]):
     self.entity_ids = ids
+
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.entity_ids)
 
   @classmethod
   def parse(cls, s, offset=0, delim=None):
@@ -150,8 +172,8 @@ class SQTEntityIdTest(SQTCriterion):
     )
     return sqlp
 
-  def match_tagged_entity(self, te: TaggedEntity) -> bool:
-    ''' Test the `TaggedEntity` `te` against `self.entity_ids`.
+  def match_tagged_entity(self, te: TagSet) -> bool:
+    ''' Test the `TagSet` `te` against `self.entity_ids`.
     '''
     return te.id in self.entity_ids
 
@@ -165,58 +187,65 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
-      lambda alias, tag_value: and_(
+      lambda alias, cmp_value: and_(
           alias.float_value is None, alias.string_value is None, alias.
           structured_value is None
       ),
       '=':
-      lambda alias, tag_value: (
-          alias.float_value == tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value == tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value == tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value == cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value == cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value == cmp_value)
           )
       ),
       '<=':
-      lambda alias, tag_value: (
-          alias.float_value <= tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value <= tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value <= tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value <= cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value <= cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value <= cmp_value)
           )
       ),
       '<':
-      lambda alias, tag_value: (
-          alias.float_value < tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value < tag_value if isinstance(tag_value, str) else
-              (alias.structured_value < tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value < cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value < cmp_value if isinstance(cmp_value, str) else
+              (alias.structured_value < cmp_value)
           )
       ),
       '>=':
-      lambda alias, tag_value: (
-          alias.float_value >= tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value >= tag_value
-              if isinstance(tag_value, str) else
-              (alias.structured_value >= tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value >= cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value >= cmp_value
+              if isinstance(cmp_value, str) else
+              (alias.structured_value >= cmp_value)
           )
       ),
       '>':
-      lambda alias, tag_value: (
-          alias.float_value > tag_value
-          if isinstance(tag_value, (int, float)) else (
-              alias.string_value > tag_value if isinstance(tag_value, str) else
-              (alias.structured_value > tag_value)
+      lambda alias, cmp_value: (
+          alias.float_value > cmp_value
+          if isinstance(cmp_value, (int, float)) else (
+              alias.string_value > cmp_value if isinstance(cmp_value, str) else
+              (alias.structured_value > cmp_value)
           )
       ),
       '~':
-      lambda alias, tag_value: None,
-      # requires sqlalchemy 1.4
-      ##'~/':
-      ##lambda alias, tag_value: alias.string_value.regexp_match(tag_value),
+      lambda alias, cmp_value: case(
+          [
+              (
+                  alias.string_value.isnot(None),
+                  alias.string_value.like(glob2like(cmp_value))
+              ),
+          ],
+          else_=True,
+      )
+      ##'~/': # requires sqlalchemy 1.4
+      ##lambda alias, cmp_value: alias.string_value.regexp_match(cmp_value),
   }
 
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
@@ -226,7 +255,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       '<': lambda entity, name_value: entity.name < name_value,
       '>=': lambda entity, name_value: entity.name >= name_value,
       '>': lambda entity, name_value: entity.name > name_value,
-      '~': lambda entity, name_value: entity.name.like(f'%{name_value}%'),
+      '~': lambda entity, name_value: entity.name.like(glob2like(name_value)),
       ##'~/': lambda entity, name_value: re.search(name_value, entity.name),
   }
 
@@ -241,20 +270,23 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 
   TE_VALUE_COMPARISON_FUNCS = {
       '=':
-      lambda te_value, value: te_value == value,
+      lambda te_value, cmp_value: te_value == cmp_value,
       '<=':
-      lambda te_value, value: te_value <= value,
+      lambda te_value, cmp_value: te_value <= cmp_value,
       '<':
-      lambda te_value, value: te_value < value,
+      lambda te_value, cmp_value: te_value < cmp_value,
       '>=':
-      lambda te_value, value: te_value >= value,
+      lambda te_value, cmp_value: te_value >= cmp_value,
       '>':
-      lambda te_value, value: te_value > value,
+      lambda te_value, cmp_value: te_value > cmp_value,
       '~':
-      lambda te_value, value: value in te_value,
+      lambda te_value, cmp_value: (
+          fnmatchcase(te_value, cmp_value) if isinstance(te_value, str) else
+          any(map(lambda value: fnmatchcase(value, cmp_value), te_value))
+      ),
       '~/':
-      lambda te_value, value:
-      (isinstance(te_value, str) and re.search(value, te_value)),
+      lambda te_value, cmp_value:
+      (isinstance(te_value, str) and re.search(cmp_value, te_value)),
   }
 
   @pfx_method
@@ -297,7 +329,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       if constraint2 is not None:
         constraint = and_(constraint, constraint2)
       else:
-        warning("no SQL side value test for comparison=%r", self.comparison)
+        warning("no SQLside value test for comparison=%r", self.comparison)
     sqlp = SQLParameters(
         criterion=self,
         table=table,
@@ -307,7 +339,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
     )
     return sqlp
 
-  def match_tagged_entity(self, te: TaggedEntity) -> bool:
+  def match_tagged_entity(self, te: TagSet) -> bool:
     ''' Match this criterion against `te`.
     '''
     tag = self.tag
@@ -324,7 +356,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
                                               ](te.unixtime, tag_value)
     else:
-      te_tag_value = te.tags.get(tag_name)
+      te_tag_value = te.get(tag_name)
       if te_tag_value is None:
         result = False
       else:
@@ -388,9 +420,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     db_url = options.db_url
     sqltags = SQLTags(db_url)
-    with stackattrs(options, sqltags=sqltags, verbose=True):
-      with sqltags:
-        with sqltags.orm.session():
+    with sqltags:
+      with sqltags.orm.session() as session:
+        with stackattrs(options, sqltags=sqltags, session=session,
+                        verbose=True):
           yield
 
   @classmethod
@@ -413,7 +446,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
   @classmethod
   def cmd_edit(cls, argv, options):
-    ''' Usage: edit name
+    ''' Usage: edit criteria...
+          Edit the entities specified by criteria.
     '''
     sqltags = options.sqltags
     badopts = False
@@ -427,7 +461,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(sqltags.find(tag_criteria))
-    changed_tes = SQLTaggedEntity.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
@@ -455,6 +489,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         with Pfx(te):
           csvw.writerow(te.csvrow)
 
+  # pylint: disable=too-many-locals
   @classmethod
   def cmd_find(cls, argv, options):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
@@ -496,7 +531,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             xit = 1
             continue
           print(output.replace('\n', ' '))
-          for tag in sorted(te.tags):
+          for tag in sorted(te):
             if tag.name != 'headline':
               print(" ", tag)
     return xit
@@ -545,7 +580,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options.sqltags.orm.define_schema()
+    options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
   @classmethod
@@ -605,73 +640,78 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       if sys.stdin.isatty():
         warning("reading log lines from stdin...")
     cmdline_headline = argv.pop(0)
-    log_tags, argv = cls.parse_tagset_criteria(argv)
-    for log_tag in log_tags:
-      with Pfx(log_tag):
-        if not log_tag.choice:
-          warning("negative tag choice")
-          badopts = True
+    log_tags = []
+    while argv:
+      tag_s = argv.pop(0)
+      with Pfx("tag %r", tag_s):
+        try:
+          tag = Tag.from_str(tag_s)
+        except ValueError:
+          argv.insert(0, tag_s)
+          break
+        else:
+          if tag.value is None:
+            argv.insert(0, tag_s)
+            break
+        log_tags.append(tag)
     if argv:
-      warning("extra arguments (invalid tag choices?): %r", argv)
+      warning(
+          "extra arguments after %d tags: %s", len(log_tags), ' '.join(argv)
+      )
       badopts = True
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
+    use_stdin = cmdline_headline == '-'
     sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session() as session:
-      for lineno, headline in enumerate(sys.stdin if cmdline_headline ==
-                                        '-' else (cmdline_headline,)):
-        with Pfx(lineno):
-          headline = headline.rstrip('\n')
-          unixtime = None
-          if strptime_format:
-            with Pfx("strptime %r", strptime_format):
-              headparts = headline.split(None, strptime_nwords)
-              if len(headparts) < strptime_nwords:
+    session = options.session
+    for lineno, headline in enumerate((sys.stdin if use_stdin else
+                                       (cmdline_headline,))):
+      with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
+        headline = headline.rstrip('\n')
+        unixtime = None
+        if strptime_format:
+          with Pfx("strptime %r", strptime_format):
+            headparts = headline.split(None, strptime_nwords)
+            if len(headparts) < strptime_nwords:
+              warning(
+                  "not enough fields in headline, using current time: %r",
+                  headline
+              )
+              xit = 1
+            else:
+              strptime_text = ' '.join(headparts[:strptime_nwords])
+              try:
+                strptime_dt = datetime.strptime(strptime_text, strptime_format)
+              except ValueError as e:
                 warning(
-                    "not enough fields in headline, using current time: %r",
-                    headline
+                    "cannot parse %r, using current time: %s", strptime_text, e
                 )
                 xit = 1
               else:
-                strptime_text = ' '.join(headparts[:strptime_nwords])
-                try:
-                  strptime_dt = datetime.strptime(
-                      strptime_text, strptime_format
-                  )
-                except ValueError as e:
-                  warning(
-                      "cannot parse %r, using current time: %s", strptime_text,
-                      e
-                  )
-                  xit = 1
-                else:
-                  unixtime = datetime2unixtime(strptime_dt)
-                  headline = ' '.join(headparts[strptime_nwords:])
-          if unixtime is None:
-            unixtime = time.time() if dt is None else dt.timestamp()
-          if categories is None:
-            # infer categories from leading "FOO,BAH:" text
-            m = CATEGORIES_PREFIX_re.match(headline)
-            if m:
-              tag_categories = map(
-                  str.lower, filter(None,
-                                    m.group('categories').split(','))
-              )
-              headline = headline[len(m.group()):]
-            else:
-              tag_categories = ()
+                unixtime = datetime2unixtime(strptime_dt)
+                headline = ' '.join(headparts[strptime_nwords:])
+        if unixtime is None:
+          unixtime = time.time() if dt is None else dt.timestamp()
+        if categories is None:
+          # infer categories from leading "FOO,BAH:" text
+          m = CATEGORIES_PREFIX_re.match(headline)
+          if m:
+            tag_categories = map(
+                str.lower, filter(None,
+                                  m.group('categories').split(','))
+            )
+            headline = headline[len(m.group()):]
           else:
-            tag_categories = categories
-          entity = orm.entities(unixtime=unixtime)
-          for log_tag in log_tags:
-            entity.add_tag(log_tag.tag, session=session)
-          entity.add_tag('headline', headline, session=session)
-          if tag_categories:
-            entity.add_tag('categories', list(tag_categories), session=session)
-          session.add(entity)
-          session.flush()
+            tag_categories = ()
+        else:
+          tag_categories = categories
+        log_tags.append(Tag('headline', headline))
+        if tag_categories:
+          log_tags.append(Tag('categories', list(tag_categories)))
+        te = sqltags.default_factory(
+            None, session=session, unixtime=unixtime, tags=log_tags
+        )
     return xit
 
   @staticmethod
@@ -719,7 +759,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     try:
       tag_choices = cls.parse_tag_choices(argv)
     except ValueError as e:
-      raise GetoptError(str(e))
+      raise GetoptError(str(e)) from e
     if badopts:
       raise GetoptError("bad arguments")
     if name == '-':
@@ -892,7 +932,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def tags(self, *, session):
         ''' Return an `SQLTagSet` with the `Tag`s for this entity.
         '''
-        entity_tags = SQLTagSet(sqltags=None, entity_id=self.id)
+        entity_tags = SQLTagSet(sqltags=None, id=self.id)
         entity_tags.update(
             (
                 (tagrow.name, tagrow.value)
@@ -902,7 +942,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         return entity_tags
 
       @auto_session
-      def add_tag(self, name, value=None, *, session):
+      def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
         '''
@@ -1012,9 +1052,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
           else:
             raise ValueError("unrecognised mode")
-        XP("******\nSQL =\n%s", query)
-        ##for row in query:
-        ##  print("=>", row)
         return query
 
     class Tags(Base, BasicTableMixin, HasIdMixin):
@@ -1079,7 +1116,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           if string_value is None:
             return structured_value
           return string_value
-        return float_value
+        i = int(float_value)
+        return i if i == float_value else float_value
 
       @property
       def value(self):
@@ -1094,7 +1132,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         new_values = None, None, new_value
         if isinstance(new_value, datetime):
           # store datetime as unixtime
-          new_value = self.datetime2unixtime(new_value)
+          new_value = datetime2unixtime(new_value)
         elif isinstance(new_value, float):
           new_values = new_value, None, None
         elif isinstance(new_value, int):
@@ -1117,12 +1155,12 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             will just be `other_value`,
             but for certain types the `test_value` will be:
             * `NoneType`: `None`, and the column will also be `None`
-            * `datetime`: `cls.datetime2unixtime(other_value)`
+            * `datetime`: `datetime2unixtime(other_value)`
         '''
         if other_value is None:
           return None, None
         if isinstance(other_value, datetime):
-          return cls.float_value, cls.datetime2unixtime(other_value)
+          return cls.float_value, datetime2unixtime(other_value)
         if isinstance(other_value, float):
           return cls.float_value, other_value
         if isinstance(other_value, int):
@@ -1174,19 +1212,191 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
-class SQLTags(MultiOpenMixin):
+class SQLTagSet(SingletonMixin, TagSet):
+  ''' A singleton `TagSet` attached to an `SQLTags` instance.
+  '''
+
+  @staticmethod
+  # pylint: disable=redefined-builtin
+  def _singleton_key(*, sqltags, _id, **_):
+    return builtin_id(sqltags), _id
+
+  def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
+    try:
+      pre_sqltags = self.sqltags
+    except AttributeError:
+      super().__init__(_id=_id, **kw)
+      self._name = name
+      self._unixtime = unixtime
+      self.sqltags = sqltags
+    else:
+      assert pre_sqltags is sqltags
+
+  def __hash__(self):
+    return id(self)
+
+  @property
+  def name(self):
+    ''' Return the `.name`.
+    '''
+    return self._name
+
+  @name.setter
+  @auto_session
+  def name(self, new_name, *, session):
+    ''' Set the `.name`.
+    '''
+    if new_name != self._name:
+      e = self.get_db_entity(session=session)
+      e.name = new_name
+      self._name = new_name
+
+  @property
+  def unixtime(self):
+    return self._unixtime
+
+  @auto_session
+  def get_db_entity(self, *, session):
+    ''' Return database `Entities` instance for this `SQLTagSet`.
+    '''
+    return self.sqltags.db_entity(self.id, session=session)
+
+  @tag_or_tag_value
+  @auto_session
+  def set(self, tag_name, value, *, session, skip_db=False, verbose=None):
+    if tag_name == 'id':
+      raise ValueError("may not set pseudoTag %r" % (tag_name,))
+    if tag_name in ('name', 'unixtime'):
+      setattr(self, '_' + tag_name, value)
+      if not skip_db:
+        ifverbose(verbose, "+ %s", Tag(tag_name, value))
+        setattr(self.get_db_entity(session=session), tag_name, value)
+    else:
+      super().set(tag_name, value, verbose=verbose)
+      if not skip_db:
+        self.add_db_tag(tag_name, value, session=session)
+
+  @auto_session
+  @pfx_method
+  def add_db_tag(self, tag_name, value=None, *, session):
+    ''' Add a tag to the database.
+    '''
+    e = self.get_db_entity(session=session)
+    return e.add_tag(tag_name, value, session=session)
+
+  @tag_or_tag_value
+  def discard(self, tag_name, value, *, session, skip_db=False, verbose=None):
+    if tag_name == 'id':
+      raise ValueError("may not discard pseudoTag %r" % (tag_name,))
+    if tag_name in ('name', 'unixtime'):
+      if value is None or getattr(self, tag_name) == value:
+        setattr(self, '_' + tag_name, None)
+        if not skip_db:
+          ifverbose(verbose, "- %s", Tag(tag_name, value))
+          setattr(self.get_db_entity(session=session), tag_name, None)
+    else:
+      super().discard(tag_name, value, verbose=verbose)
+      if not skip_db:
+        self.discard_db_tag(tag_name, value, session=session)
+
+  @auto_session
+  def discard_db_tag(self, tag_name, value=None, *, session):
+    ''' Discard a tag from the database.
+    '''
+    return self.get_db_entity(session=session).discard_tag(
+        tag_name, value, session=session
+    )
+
+class SQLTags(TagSets):
   ''' A class to embodying an database and its entities and tags.
   '''
 
-  def __init__(self, db_url=None):
+  TagSetClass = SQLTagSet
+
+  @require(
+      lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
+  )
+  def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
+    self.orm = SQLTagsORM(db_url=db_url)
+    if ontology is None:
+      ontology = TagsOntology(self)
     self.db_url = db_url
-    self.orm = None
+    self.ontology = ontology
     self._lock = RLock()
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
+
+  @orm_auto_session
+  @typechecked
+  def default_factory(
+      self, name: [str, None], *, session, unixtime=None, tags=None
+  ):
+    ''' Fetch or create an `SQLTagSet` for `name`.
+
+        Note that `name` may be `None` to create a new "log" entry.
+    '''
+    if tags is None:
+      tags = ()
+    te = None if name is None else self.get(name)
+    if te is None:
+      if unixtime is None:
+        unixtime = time.time()
+      entity = self.orm.entities(name=name, unixtime=unixtime)
+      session.add(entity)
+      for tag in tags:
+        entity.add_tag(tag.name, tag.value, session=session)
+      session.flush()
+      te = self.get(entity.id, session=session)
+      assert te is not None
+    else:
+      if unixtime is not None:
+        te.unixtime = unixtime
+      for tag in tags:
+        te.set(tag.name, tag.value, session=session)
+    return te
+
+  @orm_auto_session
+  def get(self, index, default=None, *, session):
+    ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
+    '''
+    if isinstance(index, int):
+      tes = self.find([SQTEntityIdTest([index])], session=session)
+    elif isinstance(index, str):
+      tes = self.find(
+          [SQLTagBasedTest(index, True, Tag('name', index), '=')],
+          session=session
+      )
+    else:
+      raise TypeError("unsupported index: %s:%r" % (type(index), index))
+    tes = list(tes)
+    if not tes:
+      return default
+    te, = tes
+    return te
+
+  @locked
+  @orm_auto_session
+  def __getitem__(self, index, *, session):
+    ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
+    '''
+    te = self.get(index, session=session)
+    if te is None:
+      if isinstance(index, int):
+        raise IndexError(index)
+      te = self.__missing__(index)
+    return te
+
+  @orm_auto_session
+  def keys(self, *, session):
+    ''' Return all the nonNULL names.
+    '''
+    return session.execute(
+        select(self.orm.entities.name
+               ).filter_by(self.orm.entities.name.isnot(None))
+    ).all()
 
   @staticmethod
   @fmtdoc
@@ -1210,11 +1420,19 @@ class SQLTags(MultiOpenMixin):
     ''' Stub for startup: prepare the ORM.
     '''
     self.orm = SQLTagsORM(db_url=self.db_url)
+    self._pre_startup_attrs = pushattrs(sqla_state, orm=self.orm)
 
   def shutdown(self):
     ''' Stub for shutdown.
     '''
+    popattrs(sqla_state, 'orm', self._pre_startup_attrs)
+    self._pre_startup_attrs = None
     self.orm = None
+
+  def init(self):
+    ''' Initialise the database.
+    '''
+    self.orm.define_schema()
 
   @orm_auto_session
   def db_entity(self, index, *, session):
@@ -1230,80 +1448,29 @@ class SQLTags(MultiOpenMixin):
     )
 
   @orm_auto_session
-  def get(self, index, default=None, *, session):
-    ''' Return an `SQLTaggedEntity` matching `index`, or `None` if there is no such entity.
-    '''
-    if isinstance(index, int):
-      tes = self.tagged_entities(SQTEntityIdTest([index]))
-    elif isinstance(index, str):
-      tes = self.tagged_entities(
-          SQLTagBasedTest(index, True, Tag('name', index), '=')
-      )
-    else:
-      raise TypeError("unsupported index: %s:%r" % (type(index), index))
-    tes = list(tes)
-    if not tes:
-      return default
-    te, = tes
-    return te
-
-  @locked
-  @orm_auto_session
-  def __getitem__(self, index, *, session):
-    ''' Return an `SQLTaggedEntity` for `index` (an `int` or `str`).
-    '''
-    te = self.get(index, session=session)
-    if te is None:
-      if isinstance(index, int):
-        raise IndexError("%s[%r]" % (self, index))
-      raise KeyError("%s[%r]" % (self, index))
-    return te
-
-  def __contains__(self, index):
-    return self.get(index) is not None
-
-  @orm_auto_session
-  def find(self, criteria, *, session, without_tags=False):
+  def find(self, criteria, *, session):
     ''' Generate and run a query derived from `criteria`
-        yielding `SQLTaggedEntity` instances.
-
-        If the optional `without_tags` parameter (default `False`)
-        is true, this function does not JOIN against the `tags` table,
-        resulting in empty `.tags` `SQLTagSet`s
-        in the resulting `SQLTaggedEntity` instances.
+        yielding `SQLTagSet` instances.
     '''
     orm = self.orm
     query = orm.entities.search(
         criteria,
         session=session,
-        mode=('entity' if without_tags else 'tagged')
+        mode='tagged',
     )
-    if without_tags:
-      # just assmble the TEs directly
-      for row in query:
-        te = SQLTaggedEntity(
-            id=row.entity_id,
-            name=row.name,
-            unixtime=row.unixtime,
-            tags=SQLTagSet(sqltags=self, entity_id=row.entity_id),
-            sqltags=self,
-        )
-        if all(criterion.match_tagged_entity(te) for criterion in criteria):
-          yield te
-      return
-    # obtain entities and tag information which must be merged
+    # merge entities and tag information
     tags = self.orm.tags
     entity_map = {}
     for row in query:
       entity_id = row.id
-      e = entity_map.get(entity_id)
-      if not e:
+      te = entity_map.get(entity_id)
+      if not te:
         # not seen before
-        e = entity_map[entity_id] = SQLTaggedEntity(
-            id=entity_id,
+        te = entity_map[entity_id] = self.TagSetClass(
+            _id=entity_id,
+            _ontology=self.ontology,
             name=row.name,
             unixtime=row.unixtime,
-            tags=SQLTagSet(sqltags=self, entity_id=entity_id),
             sqltags=self
         )
       # a None tag_name means no tags
@@ -1313,7 +1480,7 @@ class SQLTags(MultiOpenMixin):
         tag_value = tags.pick_value(
             row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
-        e.tags.set(row.tag_name, tag_value, skip_db=True)
+        te.set(row.tag_name, tag_value, skip_db=True)
     for te in entity_map.values():
       if all(criterion.match_tagged_entity(te) for criterion in criteria):
         yield te
@@ -1329,124 +1496,38 @@ class SQLTags(MultiOpenMixin):
     csvr = csv.reader(f)
     for csvrow in csvr:
       with Pfx(csvr.line_num):
-        te = TaggedEntity.from_csvrow(csvrow)
-        self.add_tagged_entity(te, session=session, update_mode=update_mode)
+        te = TagSet.from_csvrow(csvrow)
+        self.import_tagged_entity(te, session=session, update_mode=update_mode)
 
   @orm_auto_session
-  def add_tagged_entity(self, te, *, session, update_mode=False):
-    ''' Add the `TaggedEntity` `te`.
+  def import_tagged_entity(self, te, *, session, update_mode=False) -> None:
+    ''' Import the `TagSet` `te`.
+
+        This updates the database with the contents of the supplied `TagSet`,
+        which has no inherent relationship to the database.
 
         If `update_mode` is true
         named records which already exist will update from `te`,
         otherwise the conflict will raise a `ValueError`.
     '''
-    e = self[te.name
-             ] if te.name else self[te.id] if te.id is not None else None
-    if e and not update_mode:
-      raise ValueError("entity named %r already exists" % (te.name,))
-    if e is None:
-      e = self.orm.entities(name=te.name or None, unixtime=te.unixtime)
+    entities = self.orm.entities
+    if te.name is None:
+      # new log entry
+      e = entities(name=None, unixtime=te.unixtime)
       session.add(e)
+    else:
+      e = self.orm.entities.lookup1(name=te.name, session=session)
+      if e:
+        if not update_mode:
+          raise ValueError("entity named %r already exists" % (te.name,))
+      else:
+        # new named entry
+        e = entities(name=te.name, unixtime=te.unixtime)
+        session.add(e)
+    # update the db entry
     for tag in te.tags:
       with Pfx(tag):
         e.add_tag(tag, session=session)
-
-class SQLTagSet(TagSet, SingletonMixin):
-  ''' A singleton `TagSet` associated with a tagged entity.
-  '''
-
-  @staticmethod
-  def _singleton_key(*, sqltags, entity_id, **_):
-    return builtin_id(sqltags), entity_id
-
-  def __init__(self, *, sqltags, entity_id, **kw):
-    try:
-      pre_sqltags = self.sqltags
-    except AttributeError:
-      super().__init__(**kw)
-      self.sqltags = sqltags
-      self.entity_id = entity_id
-    else:
-      assert pre_sqltags is sqltags
-
-  @property
-  def entity(self):
-    ''' The `SQLTaggedEntity` associated with this `TagSet`.
-    '''
-    return self.sqltags[self.entity_id]
-
-  @auto_session
-  def set(self, tag_name, value=None, *, session, skip_db=False, **kw):
-    ''' Add `tag_name`=`value` to this `TagSet`.
-    '''
-    if not skip_db:
-      self.entity.add_db_tag(tag_name, value, session=session)
-    super().set(tag_name, value=value, **kw)
-
-  @auto_session
-  def discard(self, tag_name, value=None, *, session, skip_db=False, **kw):
-    ''' Discard `tag_name`=`value` from this `TagSet`.
-    '''
-    if not skip_db:
-      self.entity.discard_db_tag(tag_name, value, session=session)
-    super().discard(tag_name, value, **kw)
-
-class SQLTaggedEntity(TaggedEntity, SingletonMixin):
-  ''' A singleton `TaggedEntity` attached to an `SQLTags` instance.
-  '''
-
-  @staticmethod
-  # pylint: disable=redefined-builtin
-  def _singleton_key(*, sqltags, id, **_):
-    return builtin_id(sqltags), id
-
-  def __init__(self, *, name=None, sqltags, **kw):
-    try:
-      pre_sqltags = self.sqltags
-    except AttributeError:
-      self._name = name
-      super().__init__(name=name, **kw)
-      self.sqltags = sqltags
-    else:
-      assert pre_sqltags is sqltags
-
-  @property
-  def name(self):
-    ''' Return the `.name`.
-    '''
-    return self._name
-
-  @name.setter
-  def name(self, new_name):
-    ''' Set the `.name`.
-    '''
-    if new_name != self._name:
-      e = self.sqltags.db_entity(self.id)
-      e.name = new_name
-      self._name = new_name
-
-  @property
-  def db_entity(self):
-    ''' The database `Entities` instance for this `SQLTaggedEntity`.
-    '''
-    return self.sqltags.db_entity(self.id)
-
-  @auto_session
-  @pfx_method
-  def add_db_tag(self, tag_name, value=None, *, session):
-    ''' Add a tag to the database.
-    '''
-    e = self.sqltags.db_entity(self.id)
-    XP("tag_name=%r, value=%r: entity=%s:%s", tag_name, value, type(e), e)
-    return e.add_tag(tag_name, value, session=session)
-
-  @auto_session
-  def discard_db_tag(self, tag_name, value=None, *, session):
-    ''' Discard a tag from the database.
-    '''
-    return self.sqltags.db_entity(self.id).discard_tag(
-        tag_name, value, session=session
-    )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

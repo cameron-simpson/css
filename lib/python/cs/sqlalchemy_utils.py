@@ -6,12 +6,10 @@
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
-from threading import local as thread_local
 from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
 from icontract import require
-from cs.context import stackattrs
 from cs.deco import decorator, contextdecorator
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
@@ -34,10 +32,11 @@ DISTINFO = {
         'cs.deco',
         'cs.py.func',
         'cs.resources',
+        'cs.threads',
     ],
 }
 
-_state = State()
+_state = State(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
@@ -266,23 +265,25 @@ def orm_auto_session(method):
 
   if isgeneratorfunction(method):
 
-    def wrapper(self, *a, session=None, **kw):
+    def orm_auto_session_wrapper(self, *a, session=None, **kw):
       ''' Yield from the method with a session.
       '''
       with using_session(orm=self.orm, session=session) as active_session:
         yield from method(self, *a, session=active_session, **kw)
   else:
 
-    def wrapper(self, *a, session=None, **kw):
+    def orm_auto_session_wrapper(self, *a, session=None, **kw):
       ''' Call the method with a session.
       '''
       with using_session(orm=self.orm, session=session) as active_session:
         return method(self, *a, session=active_session, **kw)
 
-  wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
-  wrapper.__doc__ = method.__doc__
-  wrapper.__module__ = getattr(method, '__module__', None)
-  return wrapper
+  orm_auto_session_wrapper.__name__ = "@orm_auto_session(%s)" % (
+      funcname(method),
+  )
+  orm_auto_session_wrapper.__doc__ = method.__doc__
+  orm_auto_session_wrapper.__module__ = getattr(method, '__module__', None)
+  return orm_auto_session_wrapper
 
 class BasicTableMixin:
   ''' Useful methods for most tables.
