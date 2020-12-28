@@ -65,6 +65,8 @@ from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
 from cs.pfx import Pfx
 
+__version__ = '20201228'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
