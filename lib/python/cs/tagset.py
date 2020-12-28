@@ -379,6 +379,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         If `attr` is in `self.__dict__` then that is updated,
         supporting "normal" attributes set on the instance.
         Otherwise the `Tag` named `attr` is set to `value`.
+
+        The `__init__` methods of subclasses should do something like this
+        (from `TagSet.__init__`)
+        to set up the ordinary instance attributes
+        which are not to be treated as `Tag`s:
+
+            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
     '''
     if attr in self.__dict__:
       self.__dict__[attr] = value
