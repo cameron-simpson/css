@@ -363,9 +363,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if okw:
       raise ValueError("unrecognised keywords: %r" % (okw,))
     super().__init__(*a, **dict_kw)
-    self.id = _id
-    self.ontology = _ontology
-    self.modified = False
+    self.__dict__.update(id=_id, ontology=_ontology, modified=False)
 
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
@@ -374,6 +372,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def __setattr__(self, attr, value):
+    ''' Attribute based `Tag` access.
+
+        If `attr` is in `self.__dict__` then that is updated,
+        supporting "normal" attributes set on the instance.
+        Otherwise the `Tag` named `attr` is set to `value`.
+    '''
+    if attr in self.__dict__:
+      self.__dict__[attr] = value
+    else:
+      self[attr] = value
 
   @classmethod
   def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
