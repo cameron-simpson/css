@@ -24,7 +24,7 @@ from cs.pfx import Pfx
 from cs.range import Range
 from cs.timeutils import TimeoutError
 
-__version__ = '20201228'
+__version__ = '20201228-post'
 
 DISTINFO = {
     'description':
