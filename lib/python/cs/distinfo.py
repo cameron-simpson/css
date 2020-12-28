@@ -291,6 +291,34 @@ class CSReleaseCommand(BaseCommand):
         print(pkg.name, pkg.next().version)
 
   @staticmethod
+  def cmd_ok(argv, options):
+    ''' Usage: {cmd} pkg_name [changset-hash]
+          Print the commit log since the latest release.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      changeset_hash=argv.pop(0)
+    else:
+      changeset_hash=None
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    pkg = options.modules[pkg_name]
+    if changeset_hash is None:
+      paths=pkg.paths()
+      path_revs = options.vcs.file_revisions(pkg.paths())
+      rev_latest = None
+      for rev, node in sorted(path_revs.values()):
+        if rev_latest is None or rev_latest < rev:
+          changeset_hash=node
+      if changeset_hash is None:
+        error("no changeset revisions for paths: %r",pkg.paths())
+        return 1
+    print("%s: set ok_revision=%s"%(pkg_name,changeset_hash))
+    pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
+
+  @staticmethod
   def cmd_package(argv, options):
     ''' Usage: package pkg_name [version]
           Export the package contents as a prepared package.
