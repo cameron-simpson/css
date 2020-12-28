@@ -1160,6 +1160,14 @@ class Module(object):
     if problems is not None:
       return problems
     problems = self._module_problems = []
+    latest_ok_rev = self.pkg_tags.get('ok_revision')
+    # see if this package has been marked "ok" as of a particular revision
+    unreleased_logs=None
+    if latest_ok_rev:
+      post_ok_commits=list(self.log_since(vcstag=latest_ok_rev))
+      if not post_ok_commits:
+        return problems
+      unreleased_logs=post_ok_commits
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1217,8 +1225,9 @@ class Module(object):
     # check that this package has files
     if not self.paths():
       problems.append("no files")
-    # check for unrelease commit logs
-    unreleased_logs = list(self.log_since())
+    # check for unreleased commit logs
+    if unreleased_logs is None:
+      unreleased_logs = list(self.log_since())
     if unreleased_logs:
       problems.append(['unreleased commits'] + unreleased_logs)
     # check for uncommited changes
