@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20201228'
+__version__ = '20201228-post'
 
 DISTINFO = {
     'description':
