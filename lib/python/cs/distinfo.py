@@ -310,7 +310,6 @@ class CSReleaseCommand(BaseCommand):
       if changeset_hash is None:
         error("no changeset revisions for paths: %r",pkg.paths())
         return 1
-    print("%s: set ok_revision=%s"%(pkg_name,changeset_hash))
     pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
 
   @staticmethod
@@ -445,6 +444,9 @@ class CSReleaseCommand(BaseCommand):
     vcs.commit(
         '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
         % (pkg.name, next_release.version + '-post'), versioned_filename
+    )
+    pkg.set_tag(
+        'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
