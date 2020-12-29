@@ -954,21 +954,21 @@ class AttrableMappingMixin(object):
       pass
     else:
       try:
-        value = _d[attr]
+        return _d[attr]
       except KeyError:
-        try:
-          value = self[attr]
-        except KeyError:
-          raise AttributeError(
-              "%s.%s (attrs=%s)" % (
-                  type(self).__name__,
-                  attr,
-                  ','.join(
-                      sorted(set(self.keys()) | set(self.__dict__.keys()))
-                  ),
-              )
+        pass
+    try:
+      return self[attr]
+    except KeyError:
+      raise AttributeError(
+          "%s.%s (attrs=%s)" % (
+              type(self).__name__,
+              attr,
+              ','.join(
+                  sorted(set(self.keys()) | set(self.__dict__.keys()))
+              ),
           )
-    return value
+      )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
