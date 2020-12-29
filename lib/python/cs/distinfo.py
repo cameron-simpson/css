@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 #
+# pylint: disable=too-many-lines
 
 ''' My Python package release script.
 '''
@@ -37,7 +38,7 @@ from cs.deco import cachedmethod
 from cs.lex import cutsuffix, get_dotted_identifier
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.func import prop
@@ -118,8 +119,7 @@ class CSReleaseCommand(BaseCommand):
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
     options.last_values = LastValues()
-    options.modules = Modules()
-    options.modules.options = options
+    options.modules = Modules(options=options)
 
   @staticmethod
   def apply_opts(opts, options):
@@ -254,7 +254,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r", argv)
+      raise GetoptError("extra arguments: %r" % (argv,))
     pkg = options.modules[pkg_name]
     for files, firstline in pkg.log_since():
       files = [
@@ -304,18 +304,19 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      changeset_hash=argv.pop(0)
+      changeset_hash = argv.pop(0)
     else:
-      changeset_hash=None
+      changeset_hash = None
     if argv:
-      raise GetoptError("extra arguments: %r", argv)
+      raise GetoptError("extra arguments: %r" % (argv,))
     pkg = options.modules[pkg_name]
     if changeset_hash is None:
       changeset_hash = pkg.latest_changeset_hash
       if changeset_hash is None:
-        error("no changeset revisions for paths: %r",pkg.paths())
+        error("no changeset revisions for paths: %r", pkg.paths())
         return 1
     pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
+    return 0
 
   @staticmethod
   def cmd_package(argv, options):
@@ -377,6 +378,7 @@ class CSReleaseCommand(BaseCommand):
     docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
+  # pylint: disable=too-many-locals
   @staticmethod
   def cmd_release(argv, options):
     ''' Usage: {cmd} pkg_name
@@ -445,12 +447,14 @@ class CSReleaseCommand(BaseCommand):
     )
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
-        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
-        % (pkg.name, next_release.version + '-post'), versioned_filename
+        '%s: bump __version__ to %s to avoid misleading value'
+        ' for future unreleased changes [IGNORE]' %
+        (pkg.name, next_release.version + '-post'), versioned_filename
     )
     pkg.set_tag(
         'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
+    return 0
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
@@ -568,12 +572,17 @@ class Modules(defaultdict):
   ''' An autopopulating dict of mod_name->Module.
   '''
 
+  def __init__(self, *, options):
+    super().__init__()
+    self.options = options
+
   def __missing__(self, mod_name):
     assert isinstance(mod_name, str), "mod_name=%r" % (mod_name,)
     M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
 
+# pylint: disable=too-many-public-methods
 class Module(object):
   ''' Metadata about a Python module.
   '''
@@ -675,6 +684,9 @@ class Module(object):
   @prop
   @pfx_method(use_str=True)
   def package(self):
+    ''' The python package Module for this Module
+        (which may be the package Module or some submodule).
+    '''
     name = self.package_name
     if name is None:
       raise ValueError("self.package_name is None")
@@ -711,7 +723,7 @@ class Module(object):
     '''
     print("%s: set %s=%s" % (self.name, tag_name, value))
     self.pkg_tags.set(tag_name, value)
-    pkg_tags_filename = self.save_pkg_tags()
+    self.save_pkg_tags()
     self.vcs.commit(
         f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',
         PKG_TAGS
@@ -818,7 +830,6 @@ class Module(object):
   def latest_changeset_hash(self):
     ''' The most recent changeset hash of the files in the module.
     '''
-    paths = self.paths()
     path_revs = self.vcs.file_revisions(self.paths())
     rev_latest = None
     for rev, node in sorted(path_revs.values()):
@@ -827,6 +838,7 @@ class Module(object):
         rev_latest = rev
     return changeset_hash
 
+  # pylint: disable=too-many-branches
   @pfx_method
   def compute_distinfo(
       self,
@@ -956,7 +968,7 @@ class Module(object):
     pathlist = []
     basepath = self.basepath
     if isdirpath(basepath):
-      for subpath, dirnames, filenames in os.walk(basepath):
+      for subpath, _, filenames in os.walk(basepath):
         if not subpath.startswith(basepath):
           info("SKIP %s", subpath)
           continue
@@ -980,6 +992,7 @@ class Module(object):
       raise ValueError("no paths for %s" % (self,))
     return pathlist
 
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @pfx_method
   def prepare_package(self, pkg_dir):
     ''' Prepare an existing package checkout as a package for upload or install.
@@ -1062,7 +1075,12 @@ class Module(object):
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
-  def reldistfiles(self, pkg_dir):
+  @staticmethod
+  def reldistfiles(pkg_dir):
+    ''' Return the relative paths existing within `pkg_dir`.
+
+        TODO: does not recurse: should this just run listdir?
+    '''
     return [
         relpath(fullpath, pkg_dir)
         for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
@@ -1192,6 +1210,7 @@ class Module(object):
     '''
     return self.DISTINFO.get('install_requires', [])
 
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @pfx_method(use_str=True)
   def problems(self):
     ''' Sanity check of this module.
@@ -1206,12 +1225,12 @@ class Module(object):
     problems = self._module_problems = []
     latest_ok_rev = self.pkg_tags.get('ok_revision')
     # see if this package has been marked "ok" as of a particular revision
-    unreleased_logs=None
+    unreleased_logs = None
     if latest_ok_rev:
-      post_ok_commits=list(self.log_since(vcstag=latest_ok_rev))
+      post_ok_commits = list(self.log_since(vcstag=latest_ok_rev))
       if not post_ok_commits:
         return problems
-      unreleased_logs=post_ok_commits
+      unreleased_logs = post_ok_commits
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1313,6 +1332,7 @@ class ModulePackageDir(SingletonMixin):
   ''' A singleton class for module package distributions.
   '''
 
+  # pylint: disable=unused-argument
   @classmethod
   def _singleton_key(cls, pkg, vcs, revision):
     return pkg.name, revision
@@ -1328,12 +1348,16 @@ class ModulePackageDir(SingletonMixin):
     self._setup()
 
   def __del__(self):
+    ''' Clean out the scratch directory on deletion.
+    '''
     if self.pkg_dir and not self.persist:
       self.pkg_dir.cleanup()
       self.pkg_dir = None
 
   @pfx_method
   def _setup(self):
+    ''' Set up the prepared package in a temporary scratch directory.
+    '''
     pkg = self.pkg
     vcs = self.vcs
     vcs_revision = self.revision
@@ -1343,6 +1367,8 @@ class ModulePackageDir(SingletonMixin):
 
   @staticmethod
   def fill(dirpath, pkg, vcs, vcs_revision, *, do_mkdir=False, bare=False):
+    ''' Fill in `dirpath` with the prepared package.
+    '''
     with Pfx(dirpath):
       if do_mkdir:
         with Pfx("mkdir(%r)", dirpath):
