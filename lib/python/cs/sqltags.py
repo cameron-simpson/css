@@ -1226,9 +1226,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       pre_sqltags = self.sqltags
     except AttributeError:
       super().__init__(_id=_id, **kw)
-      self._name = name
-      self._unixtime = unixtime
-      self.sqltags = sqltags
+      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
     else:
       assert pre_sqltags is sqltags
 
