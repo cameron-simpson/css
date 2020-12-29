@@ -709,6 +709,7 @@ class Module(object):
   def set_tag(self, tag_name, value, *, msg):
     ''' Set a tag value and commit the modified tag file.
     '''
+    print("%s: set %s=%s" % (self.name, tag_name, value))
     self.pkg_tags.set(tag_name, value)
     pkg_tags_filename = self.save_pkg_tags()
     self.vcs.commit(
