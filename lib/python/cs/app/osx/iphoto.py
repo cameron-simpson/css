@@ -171,11 +171,11 @@ def cmd_fstags_export(I, argv):
           for master in sorted(I.masters, key=lambda m: m.pathname):
             U.out(master.pathname)
             with Pfx(master.pathname):
-              tags = fstags[master.pathname].direct_tags
+              tags = fstags[master.pathname]
               for tag in master.tags():
                 export_tag = Tag('iphoto.' + tag.name, tag.value)
                 if export_tag not in tags:
-                  tags.add(export_tag, verbose=True)
+                  tags.set(export_tag, verbose=True)
         else:
           raise GetoptError("unknown class: %r" % (obclass,))
   return xit

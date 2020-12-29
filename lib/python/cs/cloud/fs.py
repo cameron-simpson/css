@@ -97,7 +97,7 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     if file_info or content_type:
       with FSTags() as fstags:
-        tags = fstags[filename].direct_tags
+        tags = fstags[filename]
         if content_type:
           tags['mime.content_type'] = content_type
         if file_info:
@@ -242,5 +242,5 @@ class FSCloud(SingletonMixin, Cloud):
       with open(filename, 'rb') as f:
         bfr = CornuCopyBuffer.from_fd(f.fileno(), progress=download_progress)
     with FSTags() as fstags:
-      file_info = dict(fstags[filename].direct_tags)
+      file_info = fstags[filename].as_dict()
     return bfr, file_info

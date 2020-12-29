@@ -448,15 +448,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     '''
     old_value = self.get(tag_name)
     if tag_name not in self or old_value is not value:
+      # setting to the same object is not a change,
+      # but setting to an equivalent value is a change
       self.modified = True
-      if tag_name not in self or old_value != value:
+      if old_value != value:
+        # report different values
         tag = Tag(tag_name, value, ontology=self.ontology)
         msg = (
             "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
             (tag, old_value)
         )
         ifverbose(verbose, msg)
-    super().__setitem__(tag_name, value)
+      super().__setitem__(tag_name, value)
 
   # "set" mode
   add = set

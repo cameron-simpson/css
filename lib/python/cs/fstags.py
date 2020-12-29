@@ -206,26 +206,25 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           with Pfx(spath):
             ont = fstags.ontology_for(path)
             tagged_path = fstags[path]
-            direct_tags = tagged_path.direct_tags
             all_tags = tagged_path.merged_tags()
             for autotag in tagged_path.infer_from_basename(filename_rules):
               U.out(spath + ' ' + str(autotag))
               if ont:
                 autotag = ont.convert_tag(autotag)
               if autotag not in all_tags:
-                direct_tags.add(autotag, verbose=state.verbose)
+                tagged_path.add(autotag, verbose=state.verbose)
             if not isdir:
               try:
                 S = os.stat(path)
               except OSError:
                 pass
               else:
-                direct_tags.add('filesize', S.st_size)
-            # update the
+                tagged_path.add('filesize', S.st_size)
+            # update the merged tags
             all_tags = tagged_path.merged_tags()
             for tag in fstags.cascade_tags(all_tags):
-              if tag.name not in direct_tags:
-                direct_tags.add(tag)
+              if tag.name not in tagged_path:
+                tagged_path.add(tag)
 
   @staticmethod
   def cmd_edit(argv, options):
@@ -252,8 +251,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     with state(verbose=True):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
-          tags = fstags[path].direct_tags
-          tags.edit(verbose=state.verbose)
+          fstags[path].edit(verbose=state.verbose)
         elif not fstags.edit_dirpath(path):
           xit = 1
     return xit
@@ -481,7 +479,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tagged_path = fstags[path]
           for key, value in data.items():
             tag_name = '.'.join((tag_prefix, key)) if tag_prefix else key
-            tagged_path.direct_tags.add(
+            tagged_path.add(
                 Tag(tag_name, value, ontology=ont), verbose=verbose
             )
     return 0
@@ -1341,8 +1339,8 @@ class FSTags(MultiOpenMixin):
         else:
           raise
       old_modified = dst_taggedpath.modified
-      for tag in src_taggedpath.direct_tags:
-        dst_taggedpath.direct_tags.add(tag)
+      for tag in src_taggedpath:
+        dst_taggedpath.add(tag)
       try:
         dst_taggedpath.save()
       except OSError as e:
@@ -1390,8 +1388,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     if _ontology is None:
       _ontology = fstags.ontology_for(filepath)
     super().__init__(_id=_id, _ontology=_ontology)
-    self.filepath = filepath
-    self._lock = Lock()
+    self.__dict__.update(filepath=filepath, self._lock=Lock())
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.filepath)
@@ -1504,18 +1501,6 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     self.tagfile[self.basename].discard(tag_name, value)
 
-  def update(self, tags, *, prefix=None):
-    ''' Update the direct tags from `tags`
-        as for `TagSet.update`.
-    '''
-    self.tagfile[self.basename].update(tags, prefix=prefix)
-
-  def pop(self, tag_name):
-    ''' Remove the tag named `tag_name` from the direct tags.
-        Raises `KeyError` if `tag_name` is not present in the direct tags.
-    '''
-    self.direct_tags.pop(tag_name)
-
   def infer_from_basename(self, rules=None):
     ''' Apply `rules` to the basename of this `TaggedPath`,
         return a `TagSet` of inferred `Tag`s.
@@ -1561,18 +1546,16 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     # if missing from the all_tags
     # TODO: common merge_tags method
     all_tags = self.all_tags
-    direct_tags = self.direct_tags
     for tag in xa_tags:
       if tag not in all_tags:
-        direct_tags.add(tag)
+        self.add(tag)
 
   def export_xattrs(self):
     ''' Update the extended attributes of the file.
     '''
     filepath = self.filepath
     all_tags = self.all_tags
-    direct_tags = self.direct_tags
-    update_xattr_value(filepath, XATTR_B, str(direct_tags))
+    update_xattr_value(filepath, XATTR_B, str(self))
     # export tags to other xattrs
     for xattr_name, tag_name in self.fstags.config['xattr'].items():
       tag_value = all_tags.get(tag_name)
