@@ -1588,10 +1588,9 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
     if name in self.tagsets:
       raise ValueError("name already exists: %r" % (name,))
     filepath = joinpath(dirname(self.filepath), name)
-    te = te.tagsets[name] = TaggedPath(
+    te = self[name] = TaggedPath(
         filepath, fstags=self.fstags, _ontology=self.ontology
     )
-    te.tagfilepath = self.filepath
     return te
 
   @property
