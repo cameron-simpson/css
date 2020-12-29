@@ -306,12 +306,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r", argv)
     pkg = options.modules[pkg_name]
     if changeset_hash is None:
-      paths=pkg.paths()
-      path_revs = options.vcs.file_revisions(pkg.paths())
-      rev_latest = None
-      for rev, node in sorted(path_revs.values()):
-        if rev_latest is None or rev_latest < rev:
-          changeset_hash=node
+      changeset_hash = pkg.latest_changeset_hash
       if changeset_hash is None:
         error("no changeset revisions for paths: %r",pkg.paths())
         return 1
@@ -810,6 +805,19 @@ class Module(object):
         long_description=long_description,
         release_paragraphs=postamble_parts,
     )
+
+  @property
+  def latest_changeset_hash(self):
+    ''' The most recent changeset hash of the files in the module.
+    '''
+    paths = self.paths()
+    path_revs = self.vcs.file_revisions(self.paths())
+    rev_latest = None
+    for rev, node in sorted(path_revs.values()):
+      if rev_latest is None or rev_latest < rev:
+        changeset_hash = node
+        rev_latest = rev
+    return changeset_hash
 
   @pfx_method
   def compute_distinfo(
