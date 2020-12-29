@@ -207,6 +207,8 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
+from cs.x import Y as X
+
 __version__ = '20200716-post'
 
 DISTINFO = {
@@ -390,6 +392,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if attr in self.__dict__:
       self.__dict__[attr] = value
     else:
+      X("self.__dict__=%r",self.__dict__)
       self[attr] = value
 
   @classmethod
@@ -446,6 +449,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
+    X("set %s=%s...",tag_name,value)
     old_value = self.get(tag_name)
     if tag_name not in self or old_value is not value:
       # setting to the same object is not a change,
