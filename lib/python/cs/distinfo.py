@@ -614,7 +614,7 @@ class Module(object):
           M = importlib.import_module(self.name)
         except (ImportError, SyntaxError) as e:
           error("import fails: %s", e)
-          raise
+          M = None
       self._module = M
     return M
 
@@ -652,6 +652,8 @@ class Module(object):
         or `None` if this is not inside a package.
     '''
     M = self.module
+    if M is None:
+      return None
     tested_name = cutsuffix(self.name, '_tests')
     if tested_name is not self.name:
       # foo_tests is considered part of foo
@@ -1216,6 +1218,9 @@ class Module(object):
     else:
       pkg_prefix = pkg_name + '.'
     M = self.module
+    if M is None:
+      problems.append("module import fails")
+      return problems
     import_names = []
     for import_name in direct_imports(M.__file__, self.name):
       if self.modules[import_name].isstdlib():
