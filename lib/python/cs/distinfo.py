@@ -34,7 +34,6 @@ from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fstags import TagFile
 from cs.lex import cutsuffix, get_dotted_identifier
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
@@ -44,6 +43,7 @@ from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.sh import quotestr as shq, quotecmd as shqv
+from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
 
@@ -289,6 +289,34 @@ class CSReleaseCommand(BaseCommand):
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         print(pkg.name, pkg.next().version)
+
+  @staticmethod
+  def cmd_ok(argv, options):
+    ''' Usage: {cmd} pkg_name [changset-hash]
+          Print the commit log since the latest release.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      changeset_hash=argv.pop(0)
+    else:
+      changeset_hash=None
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    pkg = options.modules[pkg_name]
+    if changeset_hash is None:
+      paths=pkg.paths()
+      path_revs = options.vcs.file_revisions(pkg.paths())
+      rev_latest = None
+      for rev, node in sorted(path_revs.values()):
+        if rev_latest is None or rev_latest < rev:
+          changeset_hash=node
+      if changeset_hash is None:
+        error("no changeset revisions for paths: %r",pkg.paths())
+        return 1
+    print("%s: set ok_revision=%s"%(pkg_name,changeset_hash))
+    pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
 
   @staticmethod
   def cmd_package(argv, options):
@@ -675,6 +703,17 @@ class Module(object):
     self.options.pkg_tagsets.save()
     return self.options.pkg_tagsets.filepath
 
+  @tag_or_tag_value
+  def set_tag(self, tag_name, value, *, msg):
+    ''' Set a tag value and commit the modified tag file.
+    '''
+    self.pkg_tags.set(tag_name, value)
+    pkg_tags_filename = self.save_pkg_tags()
+    self.vcs.commit(
+        f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',
+        PKG_TAGS
+    )
+
   @cachedmethod
   def release_tags(self):
     ''' Return the `ReleaseTag`s for this package.
@@ -725,12 +764,7 @@ class Module(object):
   def latest_pypi_version(self, new_version):
     ''' Update the last PyPI version.
     '''
-    self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
-    pkg_tags_filename = self.save_pkg_tags()
-    self.vcs.commit(
-        '%s: %s: set %s=%s [IGNORE]' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
-    )
+    self.set_tag(TAG_PYPI_RELEASE, new_version, msg='update PyPI release')
 
   def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
@@ -1154,6 +1188,14 @@ class Module(object):
     if problems is not None:
       return problems
     problems = self._module_problems = []
+    latest_ok_rev = self.pkg_tags.get('ok_revision')
+    # see if this package has been marked "ok" as of a particular revision
+    unreleased_logs=None
+    if latest_ok_rev:
+      post_ok_commits=list(self.log_since(vcstag=latest_ok_rev))
+      if not post_ok_commits:
+        return problems
+      unreleased_logs=post_ok_commits
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1211,8 +1253,9 @@ class Module(object):
     # check that this package has files
     if not self.paths():
       problems.append("no files")
-    # check for unrelease commit logs
-    unreleased_logs = list(self.log_since())
+    # check for unreleased commit logs
+    if unreleased_logs is None:
+      unreleased_logs = list(self.log_since())
     if unreleased_logs:
       problems.append(['unreleased commits'] + unreleased_logs)
     # check for uncommited changes

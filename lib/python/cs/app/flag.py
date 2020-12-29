@@ -65,6 +65,8 @@ from cs.env import FLAGDIR
 from cs.lex import get_uc_identifier
 from cs.pfx import Pfx
 
+__version__ = '20201228-post'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
@@ -131,6 +133,7 @@ FLAGSET_USAGE = '''Usage: %s prefix [{set|clear}[-all]] [names...]
             set the remainder.
   If no names are supplied, read the names from standard input.'''
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def main_flagset(argv=None, stdin=None):
   ''' Main program for "flagset" command.
   '''
@@ -300,7 +303,10 @@ class FlaggedMixin(object):
       flagname = self.__flagname(attr[5:])
       if flagname:
         return self.flags[flagname]
-    raise AttributeError("%s: no %r" % (type(self).__name__, '.' + attr,))
+    raise AttributeError("%s: no %r" % (
+        type(self).__name__,
+        '.' + attr,
+    ))
 
   def __setattr__(self, attr, value):
     ''' Support .flag_suffix=value.
@@ -314,6 +320,7 @@ class FlaggedMixin(object):
 # factory to make a dummy flagslike object without persistent storage
 DummyFlags = lambda: defaultdict(lambda: False)
 
+# pylint: disable=too-many-ancestors
 class Flags(MutableMapping, FlaggedMixin):
   ''' A mapping which directly inspects the flags directory.
   '''
