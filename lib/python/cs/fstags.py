@@ -1382,13 +1382,13 @@ class TaggedPath(TagSet, HasFSTagsMixin):
 
   def __init__(self, filepath, fstags=None, _id=None, _ontology=None):
     if fstags is None:
-      fstags = self.fstags
-    else:
-      self.fstags = fstags
+      fstags = FSTags()
     if _ontology is None:
       _ontology = fstags.ontology_for(filepath)
+    self.__dict__.update(
+        fstags=fstags, filepath=filepath, _lock=Lock(), tagfile=None
+    )
     super().__init__(_id=_id, _ontology=_ontology)
-    self.__dict__.update(filepath=filepath, _lock=Lock())
 
   def __repr__(self):
     return "%s(%s)" % (type(self).__name__, self.filepath)
