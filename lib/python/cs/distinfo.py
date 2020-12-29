@@ -273,9 +273,14 @@ class CSReleaseCommand(BaseCommand):
     tagsets = options.pkg_tagsets
     for pkg_name in sorted(tagsets.keys()):
       if pkg_name.startswith(MODULE_PREFIX):
-        pypi_release = tagsets[pkg_name].get(TAG_PYPI_RELEASE)
+        pkg = options.modules[pkg_name]
+        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
-          print(pkg_name, pypi_release)
+          problems = pkg.problems()
+          print(
+              pkg_name, pypi_release,
+              "%d problems" % (len(problems),) if problems else "ok"
+          )
     return 0
 
   @staticmethod
