@@ -946,7 +946,7 @@ class AttrableMappingMixin(object):
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
-    # try self.__dict__ first - this is because it appears that 
+    # try self.__dict__ first - this is because it appears that
     # getattr(dict,...) does not consult __dict__
     try:
       _d = self.__dict__
@@ -964,9 +964,7 @@ class AttrableMappingMixin(object):
           "%s.%s (attrs=%s)" % (
               type(self).__name__,
               attr,
-              ','.join(
-                  sorted(set(self.keys()) | set(self.__dict__.keys()))
-              ),
+              ','.join(sorted(set(self.keys()) | set(self.__dict__.keys()))),
           )
       )
 
