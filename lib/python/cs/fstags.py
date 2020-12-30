@@ -1356,18 +1356,14 @@ class HasFSTagsMixin:
   ''' Mixin providing an automatic `.fstags` property.
   '''
 
-  _default_fstags = None
-
   @property
   def fstags(self):
     ''' Return the `.fstags` property,
         default a shared default `FSTags` instance.
     '''
-    _fstags = getattr(self, '_fstags')
+    _fstags = self.__dict__.get('_fstags')
     if _fstags is None:
-      _fstags = self._default_fstags
-      if _fstags is None:
-        _fstags = self._default_fstags = FSTags()
+      _fstags = self.__dict__['_fstags'] = FSTags()
     return _fstags
 
   @fstags.setter
@@ -1381,12 +1377,10 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   '''
 
   def __init__(self, filepath, fstags=None, _id=None, _ontology=None):
-    if fstags is None:
-      fstags = FSTags()
     if _ontology is None:
       _ontology = fstags.ontology_for(filepath)
     self.__dict__.update(
-        fstags=fstags, filepath=filepath, _lock=Lock(), tagfile=None
+        _fstags=fstags, filepath=filepath, _lock=Lock(), tagfile=None
     )
     super().__init__(_id=_id, _ontology=_ontology)
 
@@ -1570,12 +1564,10 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
 
   @typechecked
   def __init__(self, filepath: str, *, ontology=Ellipsis, fstags=None):
-    if fstags is None:
-      fstags = FSTags()
     if ontology is Ellipsis:
       ontology = fstags.ontology
+    self.__dict__.update(_fstags=fstags)
     super().__init__(filepath, ontology=ontology)
-    self.fstags = fstags
 
   @typechecked
   @require(
