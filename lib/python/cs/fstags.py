@@ -1383,7 +1383,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     if _ontology is None:
       _ontology = fstags.ontology_for(filepath)
     self.__dict__.update(
-        _fstags=fstags, filepath=filepath, _lock=Lock(), tagfile=None
+        _fstags=fstags, filepath=filepath, _lock=Lock(), _all_tags=None,tagfile=None
     )
     super().__init__(_id=_id, _ontology=_ontology)
 
