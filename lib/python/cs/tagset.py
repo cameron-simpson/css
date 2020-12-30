@@ -335,7 +335,25 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
         for entities associated with database rows.
+
+      Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
+      you can also access tag values as attributes
+      provided that they do conflict with instance attributes
+      or class methods or properties.
+      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
+      as `None` which causes attribute access to return `None`
+      for missing tag names.
+      This supports code like:
+
+          if tags.title:
+              # use the title in something
+          else:
+              # handle a missing title tag
   '''
+
+  # arrange to return None for missing mapping attributes
+  # supporting tags.foo being None if there is no 'foo' tag
+  ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
   @require(
