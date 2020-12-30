@@ -621,7 +621,7 @@ class Module(object):
       with Pfx("importlib.import_module(%r)", self.name):
         try:
           M = importlib.import_module(self.name)
-        except (ImportError, SyntaxError) as e:
+        except (ImportError, NameError, SyntaxError) as e:
           error("import fails: %s", e)
           M = None
       self._module = M
