@@ -960,13 +960,23 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
-      raise AttributeError(
-          "%s.%s (attrs=%s)" % (
-              type(self).__name__,
-              attr,
-              ','.join(sorted(set(self.keys()) | set(self.__dict__.keys()))),
-          )
-      )
+      try:
+        return self.ATTRABLE_MAPPING_DEFAULT
+      except AttributeError:
+        names_msgs = []
+        ks = list(self.keys())
+        if ks:
+          names_msgs.append('keys=' + ','.join(sorted(ks)))
+        dks = self.__dict__.keys()
+        if dks:
+          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        raise AttributeError(
+            "%s.%s (attrs=%s)" % (
+                type(self).__name__,
+                attr,
+                ','.join(names_msgs),
+            )
+        )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
