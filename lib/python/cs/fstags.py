@@ -297,9 +297,12 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     csvw = csv.writer(sys.stdout)
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
-      te = fstags[filepath].as_TagSet(indirect=not use_direct_tags)
-      if all_paths or te.tags:
-        csvw.writerow(te.csvrow)
+      tagged_path = fstags[filepath]
+      if (not all_paths and
+          not (tagged_path if use_direct_tags else tagged_path.all_tags)):
+        continue
+      # TODO: this always writes the direct tags only
+      csvw.writerow(te.csvrow)
     return xit
 
   # pylint: disable=too-many-branches
