@@ -992,7 +992,8 @@ class FSTags(MultiOpenMixin):
     path = abspath(path)
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
-      tagged_path = self._tagged_paths[path] = TaggedPath(path, self)
+      tagfile = self.tagfile_for(path)
+      tagged_path = self._tagged_paths[path] = tagfile[basename(path)] ##TaggedPath(path, self)
     return tagged_path
 
   @pfx_method
