@@ -412,12 +412,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             path = convert_name(te.name)
         else:
           path = te.name
-        self.add_tagged_entity(te, path=path)
-
-  def add_tagged_entity(self, te, path=None):
-    ''' Import a `TagSet` as `path` (default `te.name`).
-    '''
-    TaggedPath.from_TagSet(te, fstags=self, path=path)
+        self[path].update(te)
 
   # pylint: disable=too-many-branches
   @classmethod
