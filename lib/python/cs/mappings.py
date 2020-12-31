@@ -951,6 +951,7 @@ class AttrableMappingMixin(object):
     try:
       _d = self.__dict__
     except AttributeError:
+      # no __dict__? skip this step
       pass
     else:
       try:
