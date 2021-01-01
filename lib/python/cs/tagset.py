@@ -640,10 +640,9 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   @pfx_method
   def edit_many(cls, tes, editor=None, verbose=True):
     ''' Edit an iterable of `TagSet`s.
-        Return a list of the `TagSet`s which were modified.
+        Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
-        This function supports modifying `Tag`s
-        including the `'name'` `Tag`.
+        This function supports modifying both `name` and `Tag`s.
     '''
     if editor is None:
       editor = EDITOR
@@ -668,27 +667,10 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       assert isinstance(old_name, (str, int))
       with Pfx("%r", old_name):
         te = te_map[old_name]
-        changed_tes.append(te)
         new_name, new_tags = cls._from_named_tags_line(new_line)
         # modify Tags
         te.set_from(new_tags, verbose=verbose)
-        if old_name != new_name:
-          # update name
-          with Pfx("=> %r", new_name):
-            if not isinstance(new_name, (str, int)):
-              error("illegal value, expected str or int")
-            elif new_name in te_map:
-              error("already in map, not changing")
-            elif isinstance(new_name, int):
-              if isinstance(old_name, int):
-                error("may not change ids")
-              else:
-                te.id = new_name
-                te.discard('name')
-            elif new_name:
-              te.set('name', new_name)
-            else:
-              te.discard('name')
+        changed_tes.append((old_name, new_name, te))
     return changed_tes
 
   @classmethod
