@@ -1856,11 +1856,13 @@ class TagSets(MultiOpenMixin, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name)`: as with `defaultdict` this is called as
-        `default_factory(name)` from `__getitem__` for missing names,
+      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called as
+        from `__missing__` for missing names,
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
         for missing names.
+        _Unlike_ `defaultdict`, the factory is called with the key `name`
+        and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
 
@@ -1896,22 +1898,23 @@ class TagSets(MultiOpenMixin, ABC):
     '''
 
   @pfx_method(use_str=True)
-  def __missing__(self, name: str):
-    ''' Like `dict`, the `__missing__` method autocreates new `TagSet`.
+  def __missing__(self, name: str, **kw):
+    ''' Like `dict`, the `__missing__` method may autocreate a new `TagSet`.
 
-        This is called from `__getitem__` is `name` is missing
-        and uses the factory `self.default_factory`.
+        This is called from `__getitem__` if `name` is missing
+        and uses the factory `cls.default_factory`.
         If that is `None` raise `KeyError`,
-        otherwise call `self.default_factory(name)`.
+        otherwise call `self.default_factory(name,**kw)`.
         If that returns `None` raise `KeyError`,
-        otherwise return the entity.
+        otherwise save the entity under `name` and return the entity.
     '''
     te_factory = self.default_factory
     if te_factory is None:
       raise KeyError(name)
-    te = te_factory(name)
+    te = te_factory(name, **kw)
     if te is None:
       raise KeyError(name)
+    self[name] = te
     return te
 
   def add(self, name: str, **kw):
