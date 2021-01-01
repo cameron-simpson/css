@@ -298,8 +298,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
       tagged_path = fstags[filepath]
-      if (not all_paths and
-          not (tagged_path if use_direct_tags else tagged_path.all_tags)):
+      if (not all_paths
+          and not (tagged_path if use_direct_tags else tagged_path.all_tags)):
         continue
       # TODO: this always writes the direct tags only
       csvw.writerow(te.csvrow)
@@ -993,7 +993,8 @@ class FSTags(MultiOpenMixin):
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
       tagfile = self.tagfile_for(path)
-      tagged_path = self._tagged_paths[path] = tagfile[basename(path)] ##TaggedPath(path, self)
+      X("tagfile_for(%r)=>%r", path, tagfile)
+      tagged_path = self._tagged_paths[path] = tagfile[basename(path)]
     return tagged_path
 
   @pfx_method
@@ -1374,12 +1375,16 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     if _ontology is None:
       _ontology = fstags.ontology_for(filepath)
     self.__dict__.update(
-        _fstags=fstags, filepath=filepath, _lock=Lock(), _all_tags=None,tagfile=None
+        _fstags=fstags,
+        filepath=filepath,
+        _lock=Lock(),
+        _all_tags=None,
+        tagfile=None
     )
     super().__init__(_id=_id, _ontology=_ontology)
 
   def __repr__(self):
-    return "%s(%s)" % (type(self).__name__, self.filepath)
+    return "%s(%s):%r" % (type(self).__name__, self.filepath, self.as_dict())
 
   def __str__(self):
     return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
@@ -1587,9 +1592,7 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
     ''' factory to create a `TaggedPath` from a `name`.
     '''
     filepath = joinpath(dirname(self.filepath), name)
-    return TaggedPath(
-        filepath, fstags=self.fstags
-    )
+    return TaggedPath(filepath, fstags=self.fstags)
 
   @property
   def dirpath(self):
