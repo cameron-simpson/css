@@ -2383,8 +2383,14 @@ class TagFile(SingletonMixin, TagSets):
 
         This is loaded on demand.
     '''
-    ts, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    ts = self._tagsets = {}
+    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
     self.unparsed = unparsed
+    ont = self.ontology
+    for name, tags in loaded_tagsets.items():
+      te = ts[name] = self.default_factory(name)
+      te.ontology = ont
+      te.update(tags)
     return ts
 
   @property
