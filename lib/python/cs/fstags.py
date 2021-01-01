@@ -1398,6 +1398,19 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     assert tag_name != 'name'
     super().set(tag_name, value, **kw)
 
+  def as_tags(self, prefix=None, all_tags=False):
+    ''' Yield the tag data as `Tag`s.
+
+        This overrides `TagSet.as_tags`,
+        honouring an `optional `all_tags` parameter.
+    '''
+    if not all_tags:
+      return super().as_tags(prefix=prefix)
+    tags = self.all_tags
+    if not prefix:
+      return tags
+    return tags.as_tags(prefix=prefix)
+
   def format_tagset(self, *, direct=False):
     ''' Compute a `TagSet` from this file's tags
         with additional derived tags.
