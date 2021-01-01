@@ -118,7 +118,9 @@ def convert(src, srcfmt, dst, dstfmt, meta=None, overwrite=False,
 
 def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False, extra_opts=None):
     ''' Convert multiple supplied video `sources` to a single `dst`, return a subprocess.Popen object and the ffmpeg argv.
-        `sources`: input source.
+
+        Parameters:
+        * `sources`: input source.
           An iterable of input sources, each of which is a 4-tuple of:
             (src, srcfmt, start_s, end_s)
           For each such input:
@@ -132,16 +134,16 @@ def multiconvert(sources, dst, dstfmt, meta=None, overwrite=False, extra_opts=No
               `src` is an open file.
             `start_s`: start offset in seconds. Used for cropping.
             `end_s`: end offset in seconds. Used for cropping.
-        `dst`: output destination.
+        * `dst`: output destination.
           If `dst` is None, pass '-' as the output path and attach a
             pipe to its standard output.
           If `dst` is a string it is considered to be a filename and
             passed as ffmpeg's output argument.
           Otherwise `dst` is considered to be an open file and is
             attached to ffmpeg's standard output.
-        `dstfmt`: FFmpeg output format string. It is required if `dst` is
+        * `dstfmt`: FFmpeg output format string. It is required if `dst` is
           None or `dst` is an open file.
-        `meta`: a MetaData object used to populate ffmpeg's -metadata
+        * `meta`: a MetaData object used to populate ffmpeg's -metadata
           options. If meta is not None, meta.format must match
           `dstfmt` if that not None. If `dstfmt` is None, it is set
           from `meta.format`.
