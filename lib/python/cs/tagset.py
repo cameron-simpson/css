@@ -2302,6 +2302,7 @@ class TagFile(SingletonMixin, TagSets):
       return
     self.filepath = filepath
     self.ontology = ontology
+    self._tagsets = None
     self._lock = Lock()
 
   def __str__(self):
