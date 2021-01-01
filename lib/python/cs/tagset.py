@@ -652,7 +652,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     lines = list(
         map(
             lambda te: ' '.join(
-                [te.transcribe_value(te.name or te.id)] + [
+                [Tag.transcribe_value(te.name or te.id)] + [
                     str(te.tag(tag_name))
                     for tag_name in te.keys()
                     if tag_name != 'name'
@@ -663,12 +663,11 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     changes = edit_strings(lines, editor=editor)
     changed_tes = []
     for old_line, new_line in changes:
-      old_name, _ = cls.from_editable_line(old_line)
+      old_name, _ = cls._from_named_tags_line(old_line)
       assert isinstance(old_name, (str, int))
       with Pfx("%r", old_name):
         te = te_map[old_name]
         new_name, new_tags = cls._from_named_tags_line(new_line)
-        # modify Tags
         te.set_from(new_tags, verbose=verbose)
         changed_tes.append((old_name, new_name, te))
     return changed_tes
