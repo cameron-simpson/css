@@ -1387,6 +1387,15 @@ class SQLTags(TagSets):
       te = self.__missing__(index)
     return te
 
+  @locked
+  @orm_auto_session
+  def __setitem__(self, index, te):
+    ''' Dummy `__setitem__` which checks `te` against the db by type
+        because the factory inserts it into the database.
+    '''
+    assert isinstance(te, SQLTagSet)
+    assert te.sqltags is self
+
   @orm_auto_session
   def keys(self, *, session):
     ''' Return all the nonNULL names.
