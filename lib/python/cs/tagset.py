@@ -443,11 +443,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         ontology=ontology or self.ontology,
     )
 
-  def as_tags(self, prefix=None):
+  def as_tags(self, prefix=None, ontology=None):
     ''' Yield the tag data as `Tag`s.
     '''
+    if ontology is None:
+      ontology = self.ontology
     for tag_name in self.keys():
-      yield self.tag(tag_name, prefix=prefix, ontology=self.ontology)
+      yield self.tag(tag_name, prefix=prefix, ontology=ontology)
 
   __iter__ = as_tags
 
