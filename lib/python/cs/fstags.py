@@ -1194,7 +1194,6 @@ class FSTags(MultiOpenMixin):
         )
     )
     tes = []
-    te_id_map = {}
     for name in names:
       if not name or os.sep in name:
         warning("skip bogus name %r", name)
@@ -1202,14 +1201,9 @@ class FSTags(MultiOpenMixin):
       path = joinpath(dirpath, name)
       tagged_path = self[path]
       tes.append(tagged_path)
-      te_id_map[id(tagged_path)] = name, tagged_path
     # edit entities, return modified entities
     changed_tes = TagSet.edit_entities(tes)  # verbose-state.verbose
     # now apply any file renames
-    for te in changed_tes:
-      old_name, tagged_path = te_id_map[id(te)]
-      assert te is tagged_path
-      new_name = te.name
       if old_name == new_name:
         continue
       with Pfx("%r => %r", old_name, new_name):
