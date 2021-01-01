@@ -2447,6 +2447,9 @@ class TagFile(SingletonMixin, TagSets):
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
               else:
+                if 'name' in tags:
+                  warning("discard explicit tag %s", tags.name)
+                  tags.discard('name')
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
