@@ -2324,11 +2324,8 @@ class TagFile(SingletonMixin, TagSets):
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
     '''
-    if name in self.tagsets:
-      raise ValueError("name already exists: %r" % (name,))
-    te = te.tagsets[name] = self.TagSetClass(
-        name=name, _ontology=self.ontology
-    )
+    te = self.TagSetClass(name=name)
+    te.ontology = self.ontology
     return te
 
   def get(self, name, default=None):
