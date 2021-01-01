@@ -1879,11 +1879,12 @@ class TagSets(MultiOpenMixin, ABC):
 
   _missing = object()
 
-  default_factory = lambda name: None
+  TagSetClass = TagSet
 
-  def __init__(self):
+  def __init__(self,*,ontology=None):
     ''' Initialise the collection.
     '''
+    self.ontology = ontology
 
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
@@ -1898,6 +1899,13 @@ class TagSets(MultiOpenMixin, ABC):
     ''' Write any pending changes to a backing store,
         release resources allocated during `startup`.
     '''
+
+  def default_factory(self, name: str):
+    ''' Create a new `TagSet` named `name`.
+    '''
+    te = self.TagSetClass(name=name)
+    te.ontology = self.ontology
+    return te
 
   @pfx_method(use_str=True)
   def __missing__(self, name: str, **kw):
@@ -2300,8 +2308,8 @@ class TagFile(SingletonMixin, TagSets):
   def __init__(self, filepath: str, *, ontology=None):
     if hasattr(self, 'filepath'):
       return
+    super().__init__(ontology=ontology)
     self.filepath = filepath
-    self.ontology = ontology
     self._tagsets = None
     self._lock = Lock()
 
@@ -2319,13 +2327,6 @@ class TagFile(SingletonMixin, TagSets):
     ''' Save the tagsets if modified.
     '''
     self.save()
-
-  def default_factory(self, name: str):
-    ''' Create a new `TagSet` named `name`.
-    '''
-    te = self.TagSetClass(name=name)
-    te.ontology = self.ontology
-    return te
 
   def get(self, name, default=None):
     ''' Get from the tagsets.
