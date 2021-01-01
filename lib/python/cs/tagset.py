@@ -805,18 +805,6 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return name
     return name + '=' + self.transcribe_value(value)
 
-  def prefix_name(self, prefix):
-    ''' Return a `Tag` whose `.name` has an additional prefix.
-
-        If `prefix` is `None` or empty, return this `Tag`.
-        Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
-    '''
-    if not prefix:
-      return self
-    return type(self)(
-        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
-    )
-
   @classmethod
   def transcribe_value(cls, value):
     ''' Transcribe `value` for use in `Tag` transcription.
