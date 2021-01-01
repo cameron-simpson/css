@@ -2320,7 +2320,6 @@ class TagFile(SingletonMixin, TagSets):
     '''
     self.save()
 
-  @typechecked
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
     '''
