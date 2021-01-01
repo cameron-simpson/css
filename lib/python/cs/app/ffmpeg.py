@@ -11,8 +11,8 @@ Wrapper for the ffmpeg command for video conversion.
 from collections import namedtuple
 import os.path
 from subprocess import Popen, PIPE
-from types import SimpleNamespace
 from cs.pfx import Pfx
+from cs.tagset import TagSet
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -24,7 +24,7 @@ DISTINFO = {
     'install_requires': ['cs.pfx'],
 }
 
-class MetaData(SimpleNamespace):
+class MetaData(TagSet):
   ''' Object containing fields which may be supplied to ffmpeg's -metadata option.
   '''
 
@@ -51,30 +51,24 @@ class MetaData(SimpleNamespace):
   }
 
   def __init__(self, format, **kw):
-    ''' Initialise .format, .fields and .values.
-    '''
+    super().__init__()
     try:
-      fields = MetaData.FIELDNAMES[format]
+      allowed_fields = MetaData.FIELDNAMES[format]
     except KeyError:
       raise ValueError("unsupported target format %r" % (format,))
-    self.format = format
-    self.fields = fields
-    self.values = {}
+    self.__dict__.update(format = format,allow_fields=allowed_fields)
     for k, v in kw.items():
-      if k == 'format':
-        raise ValueError("forbidden keyword name %r" % (k,))
-      if k not in fields:
+      if k not in allowed_fields:
         raise ValueError("format %r does not support field %r" % (format, k))
-      self.values[k] = v
+      self[k] = v
 
   def options(self):
     ''' Compute the FFmpeg -metadata option strings and return as a list.
     '''
     opts = []
-    for field in self.fields:
-      value = self.values.get(field)
+    for field_name, value in self.items():
       if value is not None:
-        opts.extend( ('-metadata', '='.join( (field, value) ) ) )
+        opts.extend( ('-metadata', '='.join( (field_name, value) ) ) )
     return opts
 
 # source specification
