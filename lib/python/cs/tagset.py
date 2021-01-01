@@ -2333,6 +2333,11 @@ class TagFile(SingletonMixin, TagSets):
     '''
     return self.tagsets.get(name, default)
 
+  def __setitem__(self, name, te):
+    ''' Set item `name` to `te`.
+    '''
+    self.tagsets[name] = te
+
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
     ''' `tagsets.keys`
