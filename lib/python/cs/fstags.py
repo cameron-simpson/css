@@ -1384,6 +1384,20 @@ class TaggedPath(TagSet, HasFSTagsMixin):
   def __str__(self):
     return Tag.transcribe_value(str(self.filepath)) + ' ' + str(self.all_tags)
 
+  @property
+  def name(self):
+    ''' The `.name` is `basename(self.filepath)`.
+    '''
+    return basename(self.filepath)
+
+  def discard(self, tag_name):
+    assert tag_name != 'name'
+    super().discard(tag_name)
+
+  def set(self, tag_name, value, **kw):
+    assert tag_name != 'name'
+    super().set(tag_name, value, **kw)
+
   def format_tagset(self, *, direct=False):
     ''' Compute a `TagSet` from this file's tags
         with additional derived tags.
