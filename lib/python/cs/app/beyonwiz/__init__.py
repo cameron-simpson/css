@@ -337,20 +337,18 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Return a new `FFmpegMetaData` containing our metadata.
     '''
     M = self.metadata
-    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
-              % (self.path, M.start_dt_iso)
+    comment = f'Transcoded from {self.path!r} using ffmpeg.'
+    recording_dt = M.get('file.datetime')
+    if recording_dt:
+      comment += f' Recording date {recording_dt.isoformat()}.'
     if M.tags:
-      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
+      comment += ' tags=' + ','.join(sorted(M.tags))
     episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(
         dstfmt,
-        title=(
-            '%s: %s' % (M.series_name, episode_marker)
-            if episode_marker else M.series_name
-        ),
-        show=M.series_name,
-        episode_id=episode_marker,
-        synopsis=M.description,
-        network=M.source_name,
+        title=M['meta.title'],
+        show=M['meta.title'],
+        synopsis=M['meta.description'],
+        network=M['file.channel'],
         comment=comment,
     )
