@@ -1491,18 +1491,6 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     return self.merged_tags()
 
-  @tag_or_tag_value
-  def add(self, tag_name, value):
-    ''' Add the `tag_name`=`value` to the direct tags.
-    '''
-    self.tagfile[self.basename].set(tag_name, value)
-
-  @tag_or_tag_value
-  def discard(self, tag_name, value):
-    ''' Discard the `tag_name`=`value` from the direct tags.
-    '''
-    self.tagfile[self.basename].discard(tag_name, value)
-
   def infer_from_basename(self, rules=None):
     ''' Apply `rules` to the basename of this `TaggedPath`,
         return a `TagSet` of inferred `Tag`s.
