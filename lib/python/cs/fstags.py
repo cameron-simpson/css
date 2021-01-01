@@ -1586,13 +1586,10 @@ class FSTagsTagFile(TagFile, HasFSTagsMixin):
   def TagSetClass(self, name: str) -> TaggedPath:
     ''' factory to create a `TaggedPath` from a `name`.
     '''
-    if name in self.tagsets:
-      raise ValueError("name already exists: %r" % (name,))
     filepath = joinpath(dirname(self.filepath), name)
-    te = self[name] = TaggedPath(
-        filepath, fstags=self.fstags, _ontology=self.ontology
+    return TaggedPath(
+        filepath, fstags=self.fstags
     )
-    return te
 
   @property
   def dirpath(self):
