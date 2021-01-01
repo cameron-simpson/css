@@ -2372,12 +2372,6 @@ class TagFile(SingletonMixin, TagSets):
       return self.tagsets.items()
     return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
 
-  def __getitem__(self, name):
-    ''' Return the `TagSet` associated with `name`.
-    '''
-    with Pfx("%s.__getitem__[%r]", self, name):
-      return self.tagsets[name]
-
   def __delitem__(self, name):
     del self.tagsets[name]
 
