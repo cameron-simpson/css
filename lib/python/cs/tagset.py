@@ -1865,6 +1865,8 @@ class TagSets(MultiOpenMixin, ABC):
         and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
+      * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
+        this is called by the `__missing__` method with a newly created `TagSet`.
 
       Subclasses may reasonably want to define the following:
       * `startup(self)`: allocate any needed resources
@@ -1945,6 +1947,14 @@ class TagSets(MultiOpenMixin, ABC):
     if te is self._missing:
       te = self.__missing__(name)
     return te
+
+  @abstractmethod
+  def __setitem__(self, name, te):
+    ''' Save `te` in the backend under the key `name`.
+    '''
+    raise NotImplementedError(
+        "%s: no .__setitem__(name,tagset) method" % (type(self).__name__,)
+    )
 
   def __contains__(self, name: str):
     ''' Test whether `name` is present in `self.te_mapping`.
