@@ -98,8 +98,15 @@ from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
-    Tag, TagSet, TagBasedTest, TagsOntology, TagFile, TagsOntologyCommand,
-    TagsCommandMixin, RegexpTagRule, tag_or_tag_value
+    Tag,
+    TagSet,
+    TagBasedTest,
+    TagsOntology,
+    TagFile,
+    TagsOntologyCommand,
+    TagsCommandMixin,
+    RegexpTagRule,
+    tag_or_tag_value,
 )
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -152,6 +159,7 @@ def verbose(msg, *a):
   '''
   ifverbose(state.verbose, msg, *a)
 
+# pylint: disable=too-many-public-methods
 class FSTagsCommand(BaseCommand, TagsCommandMixin):
   ''' `fstags` main command line utility.
   '''
@@ -302,7 +310,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           and not (tagged_path if use_direct_tags else tagged_path.all_tags)):
         continue
       # TODO: this always writes the direct tags only
-      csvw.writerow(te.csvrow)
+      csvw.writerow(tagged_path.csvrow)
     return xit
 
   # pylint: disable=too-many-branches
@@ -993,7 +1001,6 @@ class FSTags(MultiOpenMixin):
     tagged_path = self._tagged_paths.get(path)
     if tagged_path is None:
       tagfile = self.tagfile_for(path)
-      X("tagfile_for(%r)=>%r", path, tagfile)
       tagged_path = self._tagged_paths[path] = tagfile[basename(path)]
     return tagged_path
 
@@ -1395,6 +1402,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     return basename(self.filepath)
 
+  # pylint: disable=redefined-outer-name
   @tag_or_tag_value
   def discard(self, tag_name, value, *, verbose=None):
     assert tag_name != 'name'
@@ -1404,6 +1412,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     assert tag_name != 'name'
     super().set(tag_name, value, **kw)
 
+  # pylint: disable=arguments-differ
   def as_tags(self, prefix=None, all_tags=False):
     ''' Yield the tag data as `Tag`s.
 
