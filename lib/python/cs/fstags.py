@@ -1395,9 +1395,10 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     return basename(self.filepath)
 
-  def discard(self, tag_name):
+  @tag_or_tag_value
+  def discard(self, tag_name, value, *, verbose=None):
     assert tag_name != 'name'
-    super().discard(tag_name)
+    super().discard(tag_name, value, verbose=verbose)
 
   def set(self, tag_name, value, **kw):
     assert tag_name != 'name'
