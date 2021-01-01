@@ -2281,7 +2281,7 @@ class TagsOntology(SingletonMixin, TagSets):
           warning("new name already exists, not renaming")
           continue
         old_index = prefix + old_name if prefix else old_name
-        self[new_index] = te.tags
+        self[new_index] = te
         del self[old_index]
     return changed_tes
 
