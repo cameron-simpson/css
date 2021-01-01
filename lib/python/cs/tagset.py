@@ -2079,6 +2079,11 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     return self.te_mapping.get(name, default)
 
+  def __setitem__(self, name, te):
+    ''' Save `te` against the key `name`.
+    '''
+    self.te_mapping[name] = te
+
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
