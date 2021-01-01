@@ -615,6 +615,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     self.set_from(new_values, verbose=verbose)
 
   @classmethod
+  @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
     ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
         return the `TagSet`.
@@ -630,6 +631,9 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
     tags = TagSet.from_line(line, offset, ontology=ontology)
+    if 'name' in tags:
+      warning("discard explicit tag name=%r", tags.name)
+      tags.discard('name')
     return name, tags
 
   @classmethod
