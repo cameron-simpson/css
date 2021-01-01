@@ -1358,14 +1358,13 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
         *Note*: comparisons when `self.tag.name` is not in `tags`
         always return `False` (possibly inverted by `self.choice`).
     '''
-    tags = te.tags
     tag_name = self.tag.name
     comparison = self.comparison
     if comparison is None:
-      result = tag_name in tags
+      result = tag_name in te
     else:
       try:
-        tag_value = tags[tag_name]
+        tag_value = te[tag_name]
       except KeyError:
         # tag not present, base test fails
         result = False
