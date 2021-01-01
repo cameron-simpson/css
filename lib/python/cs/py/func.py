@@ -72,13 +72,14 @@ def prop(func):
       into RuntimeErrors.
   '''
 
-  def wrapper(*a, **kw):
+  def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)
     except AttributeError as e:
       raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
 
-  return property(wrapper)
+  prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
+  return property(prop_wrapper)
 
 def derived_property(
     func,

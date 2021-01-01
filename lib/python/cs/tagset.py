@@ -335,7 +335,25 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
         for entities associated with database rows.
+
+      Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
+      you can also access tag values as attributes
+      provided that they do conflict with instance attributes
+      or class methods or properties.
+      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
+      as `None` which causes attribute access to return `None`
+      for missing tag names.
+      This supports code like:
+
+          if tags.title:
+              # use the title in something
+          else:
+              # handle a missing title tag
   '''
+
+  # arrange to return None for missing mapping attributes
+  # supporting tags.foo being None if there is no 'foo' tag
+  ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
   @require(
@@ -425,11 +443,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         ontology=ontology or self.ontology,
     )
 
-  def as_tags(self, prefix=None):
+  def as_tags(self, prefix=None, ontology=None):
     ''' Yield the tag data as `Tag`s.
     '''
+    if ontology is None:
+      ontology = self.ontology
     for tag_name in self.keys():
-      yield self.tag(tag_name, prefix=prefix, ontology=self.ontology)
+      yield self.tag(tag_name, prefix=prefix, ontology=ontology)
 
   __iter__ = as_tags
 
@@ -448,15 +468,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     '''
     old_value = self.get(tag_name)
     if tag_name not in self or old_value is not value:
+      # setting to the same object is not a change,
+      # but setting to an equivalent value is a change
       self.modified = True
-      if tag_name not in self or old_value != value:
+      if old_value != value:
+        # report different values
         tag = Tag(tag_name, value, ontology=self.ontology)
         msg = (
             "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
             (tag, old_value)
         )
         ifverbose(verbose, msg)
-    super().__setitem__(tag_name, value)
+      super().__setitem__(tag_name, value)
 
   # "set" mode
   add = set
@@ -592,6 +615,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     self.set_from(new_values, verbose=verbose)
 
   @classmethod
+  @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
     ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
         return the `TagSet`.
@@ -607,16 +631,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
     tags = TagSet.from_line(line, offset, ontology=ontology)
+    if 'name' in tags:
+      warning("discard explicit tag name=%r", tags.name)
+      tags.discard('name')
     return name, tags
 
   @classmethod
   @pfx_method
   def edit_many(cls, tes, editor=None, verbose=True):
     ''' Edit an iterable of `TagSet`s.
-        Return a list of the `TagSet`s which were modified.
+        Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
-        This function supports modifying `Tag`s
-        including the `'name'` `Tag`.
+        This function supports modifying both `name` and `Tag`s.
     '''
     if editor is None:
       editor = EDITOR
@@ -626,7 +652,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     lines = list(
         map(
             lambda te: ' '.join(
-                [te.transcribe_value(te.name or te.id)] + [
+                [Tag.transcribe_value(te.name or te.id)] + [
                     str(te.tag(tag_name))
                     for tag_name in te.keys()
                     if tag_name != 'name'
@@ -637,31 +663,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     changes = edit_strings(lines, editor=editor)
     changed_tes = []
     for old_line, new_line in changes:
-      old_name, _ = cls.from_editable_line(old_line)
+      old_name, _ = cls._from_named_tags_line(old_line)
       assert isinstance(old_name, (str, int))
       with Pfx("%r", old_name):
         te = te_map[old_name]
-        changed_tes.append(te)
         new_name, new_tags = cls._from_named_tags_line(new_line)
-        # modify Tags
         te.set_from(new_tags, verbose=verbose)
-        if old_name != new_name:
-          # update name
-          with Pfx("=> %r", new_name):
-            if not isinstance(new_name, (str, int)):
-              error("illegal value, expected str or int")
-            elif new_name in te_map:
-              error("already in map, not changing")
-            elif isinstance(new_name, int):
-              if isinstance(old_name, int):
-                error("may not change ids")
-              else:
-                te.id = new_name
-                te.discard('name')
-            elif new_name:
-              te.set('name', new_name)
-            else:
-              te.discard('name')
+        changed_tes.append((old_name, new_name, te))
     return changed_tes
 
   @classmethod
@@ -684,7 +692,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         The inverse of `from_csvrow`.
     '''
     return [self.unixtime, self.id, self.name
-            ] + [str(tag) for tag in self.tags]
+            ] + [str(tag) for tag in self if tag.name != 'name']
 
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
@@ -1350,14 +1358,13 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
         *Note*: comparisons when `self.tag.name` is not in `tags`
         always return `False` (possibly inverted by `self.choice`).
     '''
-    tags = te.tags
     tag_name = self.tag.name
     comparison = self.comparison
     if comparison is None:
-      result = tag_name in tags
+      result = tag_name in te
     else:
       try:
-        tag_value = tags[tag_name]
+        tag_value = te[tag_name]
       except KeyError:
         # tag not present, base test fails
         result = False
@@ -1861,13 +1868,17 @@ class TagSets(MultiOpenMixin, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name)`: as with `defaultdict` this is called as
-        `default_factory(name)` from `__getitem__` for missing names,
+      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called as
+        from `__missing__` for missing names,
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
         for missing names.
+        _Unlike_ `defaultdict`, the factory is called with the key `name`
+        and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
+      * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
+        this is called by the `__missing__` method with a newly created `TagSet`.
 
       Subclasses may reasonably want to define the following:
       * `startup(self)`: allocate any needed resources
@@ -1880,11 +1891,12 @@ class TagSets(MultiOpenMixin, ABC):
 
   _missing = object()
 
-  default_factory = lambda name: None
+  TagSetClass = TagSet
 
-  def __init__(self):
+  def __init__(self,*,ontology=None):
     ''' Initialise the collection.
     '''
+    self.ontology = ontology
 
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
@@ -1900,23 +1912,31 @@ class TagSets(MultiOpenMixin, ABC):
         release resources allocated during `startup`.
     '''
 
-  @pfx_method(use_str=True)
-  def __missing__(self, name: str):
-    ''' Like `dict`, the `__missing__` method autocreates new `TagSet`.
+  def default_factory(self, name: str):
+    ''' Create a new `TagSet` named `name`.
+    '''
+    te = self.TagSetClass(name=name)
+    te.ontology = self.ontology
+    return te
 
-        This is called from `__getitem__` is `name` is missing
-        and uses the factory `self.default_factory`.
+  @pfx_method(use_str=True)
+  def __missing__(self, name: str, **kw):
+    ''' Like `dict`, the `__missing__` method may autocreate a new `TagSet`.
+
+        This is called from `__getitem__` if `name` is missing
+        and uses the factory `cls.default_factory`.
         If that is `None` raise `KeyError`,
-        otherwise call `self.default_factory(name)`.
+        otherwise call `self.default_factory(name,**kw)`.
         If that returns `None` raise `KeyError`,
-        otherwise return the entity.
+        otherwise save the entity under `name` and return the entity.
     '''
     te_factory = self.default_factory
     if te_factory is None:
       raise KeyError(name)
-    te = te_factory(name)
+    te = te_factory(name, **kw)
     if te is None:
       raise KeyError(name)
+    self[name] = te
     return te
 
   def add(self, name: str, **kw):
@@ -1947,6 +1967,14 @@ class TagSets(MultiOpenMixin, ABC):
     if te is self._missing:
       te = self.__missing__(name)
     return te
+
+  @abstractmethod
+  def __setitem__(self, name, te):
+    ''' Save `te` in the backend under the key `name`.
+    '''
+    raise NotImplementedError(
+        "%s: no .__setitem__(name,tagset) method" % (type(self).__name__,)
+    )
 
   def __contains__(self, name: str):
     ''' Test whether `name` is present in `self.te_mapping`.
@@ -2070,6 +2098,11 @@ class TagsOntology(SingletonMixin, TagSets):
     ''' Proxy `.get` through to `self.te_mapping`.
     '''
     return self.te_mapping.get(name, default)
+
+  def __setitem__(self, name, te):
+    ''' Save `te` against the key `name`.
+    '''
+    self.te_mapping[name] = te
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -2268,7 +2301,7 @@ class TagsOntology(SingletonMixin, TagSets):
           warning("new name already exists, not renaming")
           continue
         old_index = prefix + old_name if prefix else old_name
-        self[new_index] = te.tags
+        self[new_index] = te
         del self[old_index]
     return changed_tes
 
@@ -2287,8 +2320,9 @@ class TagFile(SingletonMixin, TagSets):
   def __init__(self, filepath: str, *, ontology=None):
     if hasattr(self, 'filepath'):
       return
+    super().__init__(ontology=ontology)
     self.filepath = filepath
-    self.ontology = ontology
+    self._tagsets = None
     self._lock = Lock()
 
   def __str__(self):
@@ -2306,21 +2340,15 @@ class TagFile(SingletonMixin, TagSets):
     '''
     self.save()
 
-  @typechecked
-  def default_factory(self, name: str):
-    ''' Create a new `TagSet` named `name`.
-    '''
-    if name in self.tagsets:
-      raise ValueError("name already exists: %r" % (name,))
-    te = te.tagsets[name] = self.TagSetClass(
-        name=name, _ontology=self.ontology
-    )
-    return te
-
   def get(self, name, default=None):
     ''' Get from the tagsets.
     '''
     return self.tagsets.get(name, default)
+
+  def __setitem__(self, name, te):
+    ''' Set item `name` to `te`.
+    '''
+    self.tagsets[name] = te
 
   # Mapping mathods, proxying through to .tagsets.
   def keys(self, prefix=None):
@@ -2356,12 +2384,6 @@ class TagFile(SingletonMixin, TagSets):
       return self.tagsets.items()
     return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
 
-  def __getitem__(self, name):
-    ''' Return the `TagSet` associated with `name`.
-    '''
-    with Pfx("%s.__getitem__[%r]", self, name):
-      return self.tagsets[name]
-
   def __delitem__(self, name):
     del self.tagsets[name]
 
@@ -2373,8 +2395,14 @@ class TagFile(SingletonMixin, TagSets):
 
         This is loaded on demand.
     '''
-    ts, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    ts = self._tagsets = {}
+    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
     self.unparsed = unparsed
+    ont = self.ontology
+    for name, tags in loaded_tagsets.items():
+      te = ts[name] = self.default_factory(name)
+      te.ontology = ont
+      te.update(tags)
     return ts
 
   @property
@@ -2431,6 +2459,9 @@ class TagFile(SingletonMixin, TagSets):
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
               else:
+                if 'name' in tags:
+                  warning("discard explicit tag %s", tags.name)
+                  tags.discard('name')
                 tagsets[name] = tags
       except OSError as e:
         if e.errno != errno.ENOENT:
@@ -2482,14 +2513,14 @@ class TagFile(SingletonMixin, TagSets):
   def save(self):
     ''' Save the tag map to the tag file.
     '''
-    tagsets = getattr(self, '_tagsets', None)
+    tagsets = self._tagsets
     if tagsets is None:
       # TagSets never loaded
       return
     with self._lock:
       if any(map(lambda tagset: tagset.modified, tagsets.values())):
-        # modified TagSets
-        self.save_tagsets(self.filepath, self.tagsets, self.unparsed)
+        # there are modified TagSets
+        self.save_tagsets(self.filepath, tagsets, self.unparsed)
         for tagset in tagsets.values():
           tagset.modified = False
 

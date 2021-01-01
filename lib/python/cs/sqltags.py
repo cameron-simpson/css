@@ -1223,14 +1223,12 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
     try:
-      pre_sqltags = self.sqltags
-    except AttributeError:
+      pre_sqltags = self.__dict__['sqltags']
+    except KeyError:
       super().__init__(_id=_id, **kw)
-      self._name = name
-      self._unixtime = unixtime
-      self.sqltags = sqltags
+      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
     else:
-      assert pre_sqltags is sqltags
+      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s"%(pre_sqltags,sqltags)
 
   def __hash__(self):
     return id(self)
@@ -1388,6 +1386,15 @@ class SQLTags(TagSets):
         raise IndexError(index)
       te = self.__missing__(index)
     return te
+
+  @locked
+  @orm_auto_session
+  def __setitem__(self, index, te):
+    ''' Dummy `__setitem__` which checks `te` against the db by type
+        because the factory inserts it into the database.
+    '''
+    assert isinstance(te, SQLTagSet)
+    assert te.sqltags is self
 
   @orm_auto_session
   def keys(self, *, session):

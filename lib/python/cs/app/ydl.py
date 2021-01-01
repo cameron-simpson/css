@@ -327,7 +327,7 @@ class YDL:
         tagged_path = self.fstags[output_path]
         for key, value in ie_result.items():
           tag_name = FSTAGS_PREFIX + '.' + key
-          tagged_path.direct_tags.add(Tag(tag_name, value))
+          tagged_path.set(tag_name, value)
         self.fstags.sync()
         print(output_path)
       except DownloadError as e:
