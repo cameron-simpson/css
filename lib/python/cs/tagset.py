@@ -692,7 +692,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         The inverse of `from_csvrow`.
     '''
     return [self.unixtime, self.id, self.name
-            ] + [str(tag) for tag in self.tags]
+            ] + [str(tag) for tag in self if tag.name != 'name']
 
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
