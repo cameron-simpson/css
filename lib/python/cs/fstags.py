@@ -1202,8 +1202,9 @@ class FSTags(MultiOpenMixin):
       tagged_path = self[path]
       tes.append(tagged_path)
     # edit entities, return modified entities
-    changed_tes = TagSet.edit_entities(tes)  # verbose-state.verbose
+    changed_tes = TagSet.edit_many(tes)  # verbose-state.verbose
     # now apply any file renames
+    for old_name, new_name, te in changed_tes:
       if old_name == new_name:
         continue
       with Pfx("%r => %r", old_name, new_name):
@@ -1229,9 +1230,10 @@ class FSTags(MultiOpenMixin):
             continue
           else:
             ifverbose(True, "renamed")
-        # update tags of new path
-        self.dir_tagfile(dirname(new_path)).tagsets[new_name].set_from(te.tags)
-        del tagsets[old_name]
+            # update tags of new path
+            new_tagged_path = self[new_path]
+            new_tagged_path.set_from(te)
+            del tagsets[old_name]
     return ok
 
   def scrub(self, path):
