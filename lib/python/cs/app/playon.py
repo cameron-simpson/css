@@ -51,7 +51,7 @@ class PlayOnCommand(BaseCommand):
   @staticmethod
   @contextmanager
   def run_context(argv, options):
-    ''' Prepare the `SQLTags` around each command invocation.
+    ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
     api = PlayOnAPI(options.user, options.password)
     with stackattrs(options, api=api):
@@ -60,11 +60,13 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def cmd_dl(argv, options):
-    ''' Usage: {cmd} recording_ids...
+    ''' Usage: {cmd} [recording_ids...]
           Download the specified recording_ids.
+          The default is "pending", meaning all recordings not
+          previously downloaded.
     '''
     if not argv:
-      raise GetoptError("missing recording_ids")
+      argv = ['pending']
     api = options.api
 
     @typechecked
