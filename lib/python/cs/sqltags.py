@@ -709,7 +709,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         log_tags.append(Tag('headline', headline))
         if tag_categories:
           log_tags.append(Tag('categories', list(tag_categories)))
-        te = sqltags.default_factory(
+        sqltags.default_factory(
             None, session=session, unixtime=unixtime, tags=log_tags
         )
     return xit
@@ -1228,7 +1228,9 @@ class SQLTagSet(SingletonMixin, TagSet):
       super().__init__(_id=_id, **kw)
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
     else:
-      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s"%(pre_sqltags,sqltags)
+      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
+          pre_sqltags, sqltags
+      )
 
   def __hash__(self):
     return id(self)
