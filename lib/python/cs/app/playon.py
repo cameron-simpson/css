@@ -15,7 +15,6 @@ from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
-from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
@@ -32,7 +31,6 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
-from cs.x import Y as X
 
 DEFAULT_FILENAME_FORMAT = (
     '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
@@ -333,7 +331,9 @@ class PlayOnAPI(MultiOpenMixin):
   @pfx_method
   @typechecked
   def download(self, download_id: int, filename=None):
-    ''' Download th file with `download_id` to `filename`.
+    ''' Download the file with `download_id` to `filename_basis`.
+        Return the `TagSet` for the recording.
+
         The default `filename` is the basename of the filename
         from the download.
         If the filename is supplied with a trailing dot (`'.'`)
@@ -356,7 +356,9 @@ class PlayOnAPI(MultiOpenMixin):
       _, dl_ext = splitext(basename(dl_url))
       filename = filename[:-1] + dl_ext
     if pathexists(filename):
-      warning("SKIPPING download of %r: already exists, just tagging", filename)
+      warning(
+          "SKIPPING download of %r: already exists, just tagging", filename
+      )
       dlrq = None
     else:
       dl_cookies = result['data']['data']
