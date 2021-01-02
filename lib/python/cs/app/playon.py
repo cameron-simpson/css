@@ -34,6 +34,10 @@ from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 from cs.x import Y as X
 
+DEFAULT_FILENAME_FORMAT = (
+    '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
+)
+
 def main(argv=None):
   ''' Playon command line mode.
   '''
@@ -43,10 +47,27 @@ class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
 
+  USAGE_KEYWORDS = {
+      'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+  }
+
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
+
+    Environment:
+      PLAYON_USER               PlayOn login name.
+      PLAYON_PASSWORD           PlayOn password.
+                                This is obtained from .netrc if omitted).
+      PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
+                                Default: {DEFAULT_FILENAME_FORMAT}
+  '''
+
   @staticmethod
   def apply_defaults(options):
     options.user = environ.get('PLAYON_USER')
     options.password = environ.get('PLAYON_PASSWORD')
+    options.filename_format = environ.get(
+        'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
+    )
 
   @staticmethod
   @contextmanager
@@ -68,12 +89,16 @@ class PlayOnCommand(BaseCommand):
     if not argv:
       argv = ['pending']
     api = options.api
+    filename_format = options.filename_format
 
     @typechecked
     def _dl(dl_id: int):
-      filename = api[dl_id].format_as(
-          '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}.'
-      ).lower().replace(' - ', '--').replace('_', ':').replace(' ', '-')
+      filename = api[dl_id].format_as(filename_format)
+      filename = (
+          filename.lower().replace(' - ',
+                                   '--').replace('_', ':').replace(' ', '-') +
+          '.'
+      )
       try:
         api.download(dl_id, filename=filename)
       except ValueError as e:
