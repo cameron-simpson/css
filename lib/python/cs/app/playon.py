@@ -78,8 +78,8 @@ class PlayOnCommand(BaseCommand):
         api.download(dl_id, filename=filename)
       except ValueError as e:
         warning("download fails: %s", e)
-        return False
-      return True
+        return None
+      return filename
 
     available = None
     xit = 0
