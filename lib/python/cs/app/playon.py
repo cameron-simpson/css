@@ -91,9 +91,9 @@ class PlayOnCommand(BaseCommand):
             warning("no undownloaded recordings")
           else:
             for te in tes:
-              dl_id = te.playon.ID
+              dl_id = te['playon.ID']
               with Pfx(dl_id):
-                if not _dl(te.playon.ID):
+                if not _dl(dl_id):
                   xit = 1
         else:
           try:
