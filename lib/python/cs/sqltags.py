@@ -1384,7 +1384,7 @@ class SQLTags(TagSets):
     if te is None:
       if isinstance(index, int):
         raise IndexError(index)
-      te = self.__missing__(index)
+      te = self.default_factory(index, session=session)
     return te
 
   @locked
