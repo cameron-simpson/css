@@ -386,7 +386,7 @@ class PlayOnAPI(MultiOpenMixin):
     fullpath = realpath(filename)
     te = self[download_id]
     if dlrq is not None:
-      te.set('downloaded_path', fullpath)
+      te.set('download_path', fullpath)
     pl_tags = te.subtags('playon')
     fse = self._fstags[fullpath]
     fse.update(pl_tags, prefix='playon')
