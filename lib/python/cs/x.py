@@ -61,6 +61,7 @@ else:
 X_logger = None
 # set to true to write direct to /dev/tty
 X_via_tty = os.environ.get('CS_X_VIA_TTY', '')
+X_default_colour = os.environ.get('CS_X_COLOUR')
 
 def X(msg, *args, **kw):
   ''' Unconditionally write the message `msg`.
@@ -87,7 +88,7 @@ def X(msg, *args, **kw):
       `X_discard` is true unless `sys.stderr.isatty()` is true.
   '''
   fp = kw.pop('file', None)
-  colour = kw.pop('colour', None)
+  colour = kw.pop('colour', X_default_colour)
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)

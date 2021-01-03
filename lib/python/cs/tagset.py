@@ -87,7 +87,7 @@
         >>> subtopic2 in tags
         False
 
-== Ontologies ===
+== Ontologies ==
 
 `Tag`s and `TagSet`s suffice to apply simple annotations to things.
 However, an ontology brings meaning to those annotations.
@@ -805,18 +805,6 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return name
     return name + '=' + self.transcribe_value(value)
 
-  def prefix_name(self, prefix):
-    ''' Return a `Tag` whose `.name` has an additional prefix.
-
-        If `prefix` is `None` or empty, return this `Tag`.
-        Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
-    '''
-    if not prefix:
-      return self
-    return type(self)(
-        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
-    )
-
   @classmethod
   def transcribe_value(cls, value):
     ''' Transcribe `value` for use in `Tag` transcription.
@@ -1454,7 +1442,7 @@ class ExtendedNamespace(SimpleNamespace):
     ''' Just a stub so that (a) subclasses can call `super().__getattr__`
         and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    raise AttributeError("%s:.%s" % (self._path, attr))
+    raise AttributeError("%s:%s.%s" % (self._path, type(self).__name__, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -1611,6 +1599,14 @@ class TagSetNamespace(ExtendedNamespace):
       return str(tag.value)
     return super().__str__()
 
+  def __repr__(self):
+    ''' Return `repr(self._tag.value)` if defined, otherwise use the superclass `__repr__`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return repr(tag.value)
+    return super().__repr__()
+
   def __bool__(self):
     ''' Truthiness: `True` unless the `._bool` attribute overrides that.
     '''
@@ -1732,6 +1728,10 @@ class TagSetNamespace(ExtendedNamespace):
             pass
           else:
             return list(keys())
+      if attr == '_value':
+        tag = getns('_tag')
+        if tag is not None:
+          return tag.value
       if attr == '_values':
         tag = getns('_tag')
         if tag is not None:

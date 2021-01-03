@@ -54,6 +54,8 @@ DISTINFO = {
     },
 }
 
+DEFAULT_FORMAT = 'mp4'
+
 # UNUSED
 def trailing_nul(bs):
   ''' Strip trailing `NUL`s
@@ -194,6 +196,8 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     if format is None:
       format = self.DEFAULT_FILENAME_BASIS
+    if not ext.startswith('.'):
+      ext = '.' + ext
     return format.format_map(self.metadata.ns()) + ext
 
   @abstractmethod
@@ -253,10 +257,12 @@ class _Recording(ABC, HasFSTagsMixin):
     )
 
   def convert(
-      self, dstpath, dstfmt='mp4', max_n=None, timespans=(), extra_opts=None
+      self, dstpath, dstfmt=None, max_n=None, timespans=(), extra_opts=None
   ):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
+    if dstfmt is None:
+      dstfmt = DEFAULT_FORMAT
     if not timespans:
       timespans = ((None, None),)
     srcfmt = 'mpegts'
@@ -333,24 +339,24 @@ class _Recording(ABC, HasFSTagsMixin):
         ok = False
       return ok
 
-  def ffmpeg_metadata(self, dstfmt='mp4'):
+  def ffmpeg_metadata(self, dstfmt=None):
     ''' Return a new `FFmpegMetaData` containing our metadata.
     '''
+    if dstfmt is None:
+      dstfmt = DEFAULT_FORMAT
     M = self.metadata
-    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
-              % (self.path, M.start_dt_iso)
+    comment = f'Transcoded from {self.path!r} using ffmpeg.'
+    recording_dt = M.get('file.datetime')
+    if recording_dt:
+      comment += f' Recording date {recording_dt.isoformat()}.'
     if M.tags:
-      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
+      comment += ' tags=' + ','.join(sorted(M.tags))
     episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(
         dstfmt,
-        title=(
-            '%s: %s' % (M.series_name, episode_marker)
-            if episode_marker else M.series_name
-        ),
-        show=M.series_name,
-        episode_id=episode_marker,
-        synopsis=M.description,
-        network=M.source_name,
+        title=M['meta.title'],
+        show=M['meta.title'],
+        synopsis=M['meta.description'],
+        network=M['file.channel'],
         comment=comment,
     )
