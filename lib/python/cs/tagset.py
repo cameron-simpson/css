@@ -2448,7 +2448,7 @@ class TagFile(SingletonMixin, TagSets):
                 unparsed.append((lineno, line0))
               else:
                 if 'name' in tags:
-                  warning("discard explicit tag %s", tags.name)
+                  warning("discard explicit tag name=%s", tags.name)
                   tags.discard('name')
                 tagsets[name] = tags
       except OSError as e:
@@ -2493,7 +2493,7 @@ class TagFile(SingletonMixin, TagSets):
             f.write(cls.tags_line(name, tags))
             f.write('\n')
       except OSError as e:
-        error("save fails: %s", e)
+        error("save(%r) fails: %s", filename, e)
       else:
         for _, tags in name_tags:
           tags.modified = False

@@ -8,6 +8,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+##from datetime import datetime
 from functools import partial
 from getopt import GetoptError
 from netrc import netrc
@@ -15,7 +16,6 @@ from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
-from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
@@ -32,7 +32,10 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
-from cs.x import Y as X
+
+DEFAULT_FILENAME_FORMAT = (
+    '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
+)
 
 def main(argv=None):
   ''' Playon command line mode.
@@ -43,15 +46,32 @@ class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
 
+  USAGE_KEYWORDS = {
+      'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+  }
+
+  USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
+
+    Environment:
+      PLAYON_USER               PlayOn login name.
+      PLAYON_PASSWORD           PlayOn password.
+                                This is obtained from .netrc if omitted).
+      PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
+                                Default: {DEFAULT_FILENAME_FORMAT}
+  '''
+
   @staticmethod
   def apply_defaults(options):
     options.user = environ.get('PLAYON_USER')
     options.password = environ.get('PLAYON_PASSWORD')
+    options.filename_format = environ.get(
+        'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
+    )
 
   @staticmethod
   @contextmanager
   def run_context(argv, options):
-    ''' Prepare the `SQLTags` around each command invocation.
+    ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
     api = PlayOnAPI(options.user, options.password)
     with stackattrs(options, api=api):
@@ -60,24 +80,30 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def cmd_dl(argv, options):
-    ''' Usage: {cmd} recording_ids...
+    ''' Usage: {cmd} [recording_ids...]
           Download the specified recording_ids.
+          The default is "pending", meaning all recordings not
+          previously downloaded.
     '''
     if not argv:
-      raise GetoptError("missing recording_ids")
+      argv = ['pending']
     api = options.api
+    filename_format = options.filename_format
 
     @typechecked
     def _dl(dl_id: int):
-      filename = api[dl_id].format_as(
-          '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}.'
-      ).lower().replace(' - ', '--').replace('_', ':').replace(' ', '-')
+      filename = api[dl_id].format_as(filename_format)
+      filename = (
+          filename.lower().replace(' - ',
+                                   '--').replace('_', ':').replace(' ', '-') +
+          '.'
+      )
       try:
         api.download(dl_id, filename=filename)
       except ValueError as e:
         warning("download fails: %s", e)
-        return False
-      return True
+        return None
+      return filename
 
     available = None
     xit = 0
@@ -91,9 +117,9 @@ class PlayOnCommand(BaseCommand):
             warning("no undownloaded recordings")
           else:
             for te in tes:
-              dl_id = te.playon.ID
+              dl_id = te['playon.ID']
               with Pfx(dl_id):
-                if not _dl(te.playon.ID):
+                if not _dl(dl_id):
                   xit = 1
         else:
           try:
@@ -280,6 +306,7 @@ class PlayOnAPI(MultiOpenMixin):
     return self._sqltags[f'recording.{download_id}']
 
   @_api_call('library/all')
+  @pfx_method
   def recordings(self, rqm):
     ''' Return the `TagSet` instances for the available recordings.
     '''
@@ -290,16 +317,43 @@ class PlayOnAPI(MultiOpenMixin):
     entries = result['data']['entries']
     tes = set()
     for entry in entries:
-      te = self[entry['ID']]
-      te.update(entry, prefix='playon')
-      tes.add(te)
+      entry_id = entry['ID']
+      with Pfx(entry_id):
+        for field, conv in sorted(dict(
+            Episode=int,
+            ReleaseYear=int,
+            Season=int,
+            ##Created=datetime.fromisoformat,
+            ##Expires=datetime.fromisoformat,
+            ##Updated=datetime.fromisoformat,
+        ).items()):
+          try:
+            value = entry[field]
+          except KeyError:
+            pass
+          else:
+            with Pfx("%s=%r", field, value):
+              if value is None:
+                del entry[field]
+              else:
+                try:
+                  value2 = conv(value)
+                except ValueError as e:
+                  warning("%r: %s", value, e)
+                else:
+                  entry[field] = value2
+        te = self[entry_id]
+        te.update(entry, prefix='playon')
+        tes.add(te)
     return tes
 
   # pylint: disable=too-many-locals
   @pfx_method
   @typechecked
   def download(self, download_id: int, filename=None):
-    ''' Download th file with `download_id` to `filename`.
+    ''' Download the file with `download_id` to `filename_basis`.
+        Return the `TagSet` for the recording.
+
         The default `filename` is the basename of the filename
         from the download.
         If the filename is supplied with a trailing dot (`'.'`)
@@ -322,7 +376,9 @@ class PlayOnAPI(MultiOpenMixin):
       _, dl_ext = splitext(basename(dl_url))
       filename = filename[:-1] + dl_ext
     if pathexists(filename):
-      warning("SKIPPING download of %r: already exists, just tagging", filename)
+      warning(
+          "SKIPPING download of %r: already exists, just tagging", filename
+      )
       dlrq = None
     else:
       dl_cookies = result['data']['data']
@@ -350,7 +406,7 @@ class PlayOnAPI(MultiOpenMixin):
     fullpath = realpath(filename)
     te = self[download_id]
     if dlrq is not None:
-      te.set('downloaded_path', fullpath)
+      te.set('download_path', fullpath)
     pl_tags = te.subtags('playon')
     fse = self._fstags[fullpath]
     fse.update(pl_tags, prefix='playon')
