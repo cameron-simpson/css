@@ -1881,7 +1881,7 @@ class TagSets(MultiOpenMixin, ABC):
 
   TagSetClass = TagSet
 
-  def __init__(self,*,ontology=None):
+  def __init__(self, *, ontology=None):
     ''' Initialise the collection.
     '''
     self.ontology = ontology
@@ -2448,7 +2448,7 @@ class TagFile(SingletonMixin, TagSets):
                 unparsed.append((lineno, line0))
               else:
                 if 'name' in tags:
-                  warning("discard explicit tag %s", tags.name)
+                  warning("discard explicit tag name=%s", tags.name)
                   tags.discard('name')
                 tagsets[name] = tags
       except OSError as e:
