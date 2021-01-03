@@ -118,10 +118,7 @@ class PlayOnCommand(BaseCommand):
             for te in tes:
               dl_id = te['playon.ID']
               with Pfx(dl_id):
-                filename = _dl(dl_id)
-                if filename:
-                  te.download_path = filename
-                else:
+                if not _dl(dl_id):
                   xit = 1
         else:
           try:
@@ -130,11 +127,7 @@ class PlayOnCommand(BaseCommand):
             warning("not an int")
             xit = 2
           else:
-            filename = _dl(dl_id)
-            if filename:
-              te = api[dl_id]
-              te.download_path = filename
-            else:
+            if not _dl(dl_id):
               xit = 1
     return xit
 
