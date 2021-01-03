@@ -1442,7 +1442,7 @@ class ExtendedNamespace(SimpleNamespace):
     ''' Just a stub so that (a) subclasses can call `super().__getattr__`
         and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    raise AttributeError("%s:.%s" % (self._path, attr))
+    raise AttributeError("%s:%s.%s" % (self._path, type(self).__name__, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -1881,7 +1881,7 @@ class TagSets(MultiOpenMixin, ABC):
 
   TagSetClass = TagSet
 
-  def __init__(self,*,ontology=None):
+  def __init__(self, *, ontology=None):
     ''' Initialise the collection.
     '''
     self.ontology = ontology
