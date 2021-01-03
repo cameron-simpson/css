@@ -8,6 +8,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
+##from datetime import datetime
 from functools import partial
 from getopt import GetoptError
 from netrc import netrc
@@ -305,6 +306,7 @@ class PlayOnAPI(MultiOpenMixin):
     return self._sqltags[f'recording.{download_id}']
 
   @_api_call('library/all')
+  @pfx_method
   def recordings(self, rqm):
     ''' Return the `TagSet` instances for the available recordings.
     '''
@@ -315,9 +317,34 @@ class PlayOnAPI(MultiOpenMixin):
     entries = result['data']['entries']
     tes = set()
     for entry in entries:
-      te = self[entry['ID']]
-      te.update(entry, prefix='playon')
-      tes.add(te)
+      entry_id = entry['ID']
+      with Pfx(entry_id):
+        for field, conv in sorted(dict(
+            Episode=int,
+            ReleaseYear=int,
+            Season=int,
+            ##Created=datetime.fromisoformat,
+            ##Expires=datetime.fromisoformat,
+            ##Updated=datetime.fromisoformat,
+        ).items()):
+          try:
+            value = entry[field]
+          except KeyError:
+            pass
+          else:
+            with Pfx("%s=%r", field, value):
+              if value is None:
+                del entry[field]
+              else:
+                try:
+                  value2 = conv(value)
+                except ValueError as e:
+                  warning("%r: %s", value, e)
+                else:
+                  entry[field] = value2
+        te = self[entry_id]
+        te.update(entry, prefix='playon')
+        tes.add(te)
     return tes
 
   # pylint: disable=too-many-locals
