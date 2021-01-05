@@ -168,6 +168,7 @@ def multiconvert(
   with Pfx("multiconvert"):
     argv = [
         'ffmpeg',
+        '-loglevel', 'repeat+error',
         '-y' if overwrite else '-n',
         '-strict',
         '-2',  # enables experimental codes
