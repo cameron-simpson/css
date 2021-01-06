@@ -55,7 +55,7 @@ class PlayOnCommand(BaseCommand):
     Environment:
       PLAYON_USER               PlayOn login name.
       PLAYON_PASSWORD           PlayOn password.
-                                This is obtained from .netrc if omitted).
+                                This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
   '''
