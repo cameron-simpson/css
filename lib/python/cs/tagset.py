@@ -2541,7 +2541,7 @@ class TagFile(SingletonMixin, TagSets):
             f.write(cls.tags_line(name, tags))
             f.write('\n')
       except OSError as e:
-        error("save(%r) fails: %s", filename, e)
+        error("save(%r) fails: %s", filepath, e)
       else:
         for _, tags in name_tags:
           tags.modified = False
