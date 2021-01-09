@@ -408,9 +408,7 @@ class PlayOnAPI(MultiOpenMixin):
     te = self[download_id]
     if dlrq is not None:
       te.set('download_path', fullpath)
-    pl_tags = te.subtags('playon')
-    fse = self._fstags[fullpath]
-    fse.update(pl_tags, prefix='playon')
+    fse = self._fstags[fullpath].update(te.subtags('playon'), prefix='playon')
     return te
 
 if __name__ == '__main__':
