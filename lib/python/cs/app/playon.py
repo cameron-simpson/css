@@ -370,10 +370,11 @@ class PlayOnAPI(MultiOpenMixin):
     if not ok:
       raise ValueError("failed: %r" % (result,))
     dl_url = result['data']['url']
+    dl_basename = unpercent(basename(dl_url))
     if filename is None:
-      filename = unpercent(basename(dl_url))
+      filename = dl_basename
     elif filename.endswith('.'):
-      _, dl_ext = splitext(basename(dl_url))
+      _, dl_ext = splitext(dl_basename)
       filename = filename[:-1] + dl_ext
     if pathexists(filename):
       warning(
