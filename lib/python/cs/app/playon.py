@@ -16,6 +16,7 @@ from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
+from pprint import pformat
 import sys
 import time
 from urllib.parse import unquote as unpercent
@@ -151,6 +152,22 @@ class PlayOnCommand(BaseCommand):
       if long_format:
         for tag in sorted(te):
           print(" ", tag)
+
+  @staticmethod
+  def cmd_queue(argv, options):
+    ''' Usage: {cmd} [-l]
+          List the recording queue.
+          -l  Long format.
+    '''
+    long_format = False
+    if argv and argv[0] == '-l':
+      argv.pop(0)
+      long_format = True
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = options.api
+    for entry in api.queue():
+      print(pformat(entry))
 
 # pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
@@ -305,6 +322,22 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[f'recording.{download_id}']
 
+  @_api_call('queue')
+  @pfx_method
+  def queue(self, rqm):
+    ''' Return the recording queue.
+    '''
+    result = rqm(headers=dict(Authorization=self.jwt)).json()
+    ok = result.get('success')
+    if not ok:
+      raise ValueError("failed: %r" % (result,))
+    entries = result['data']['entries']
+    assert len(entries) == result['data']['total_entries'], \
+        "len(entries)=%d but result.data.total_entries=%r" % (
+            len(entries), result['data']['total_entries']
+        )
+    return entries
+
   @_api_call('library/all')
   @pfx_method
   def recordings(self, rqm):
@@ -404,7 +437,7 @@ class PlayOnAPI(MultiOpenMixin):
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
           ):
-            with Pfx("write %d bytes",len(chunk)):
+            with Pfx("write %d bytes", len(chunk)):
               f.write(chunk)
     fullpath = realpath(filename)
     te = self[download_id]
