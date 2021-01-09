@@ -208,13 +208,13 @@ class PlayOnAPI(MultiOpenMixin):
     self._jwt = None
     self._cookies = {}
     self._storage = defaultdict(str)
-    self._sqltags = SQLTags(expanduser(self.STATEDBPATH))
+    self.sqltags = SQLTags(expanduser(self.STATEDBPATH))
     self._fstags = FSTags()
 
   def startup(self):
     ''' Start up: open and init the `SQLTags`, open the `FSTags`.
     '''
-    sqltags = self._sqltags
+    sqltags = self.sqltags
     sqltags.open()
     sqltags.init()
     self._fstags.open()
@@ -223,7 +223,7 @@ class PlayOnAPI(MultiOpenMixin):
     ''' Shutdown: close the `SQLTags`, close the `FSTags`.
     '''
     self._fstags.close()
-    self._sqltags.close()
+    self.sqltags.close()
 
   @property
   @pfx_method
@@ -303,7 +303,7 @@ class PlayOnAPI(MultiOpenMixin):
   def __getitem__(self, download_id: int):
     ''' Return the `TagSet` associated with `download_id`.
     '''
-    return self._sqltags[f'recording.{download_id}']
+    return self.sqltags[f'recording.{download_id}']
 
   @_api_call('library/all')
   @pfx_method
