@@ -358,7 +358,7 @@ class PlayOnAPI(MultiOpenMixin):
         from the download.
         If the filename is supplied with a trailing dot (`'.'`)
         then the file extension will be taken from the filename
-        of the download.
+        of the download URL.
     '''
     rq = requests.get(
         f'{self.API_BASE}library/{download_id}/download',
@@ -395,15 +395,17 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dlrq.headers['Content-Length'])
-      with open(filename, 'wb') as f:
-        for chunk in progressbar(
-            dlrq.iter_content(chunk_size=131072),
-            label=filename,
-            total=dl_length,
-            units_scale=BINARY_BYTES_SCALE,
-            itemlenfunc=len,
-        ):
-          f.write(chunk)
+      with Pfx("open(%r,'wb')"):
+        with open(filename, 'wb') as f:
+          for chunk in progressbar(
+              dlrq.iter_content(chunk_size=131072),
+              label=filename,
+              total=dl_length,
+              units_scale=BINARY_BYTES_SCALE,
+              itemlenfunc=len,
+          ):
+            with Pfx("write %d bytes",len(chunk)):
+              f.write(chunk)
     fullpath = realpath(filename)
     te = self[download_id]
     if dlrq is not None:
