@@ -80,6 +80,17 @@ class PlayOnCommand(BaseCommand):
         yield
 
   @staticmethod
+  def cmd_account(argv, options):
+    ''' Usage: {cmd}
+          Report account state.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = options.api
+    for k, v in sorted(api.account().items()):
+      print(k, pformat(v))
+
+  @staticmethod
   def cmd_dl(argv, options):
     ''' Usage: {cmd} [recording_ids...]
           Download the specified recording_ids.
