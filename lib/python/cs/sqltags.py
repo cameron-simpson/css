@@ -117,9 +117,17 @@ def glob2like(glob: str) -> str:
   return glob.replace('*', '%').replace('?', '_')
 
 class SQLParameters(namedtuple(
-    'SQLParameters', 'criterion table alias entity_id_column constraint')):
+    'SQLParameters', 'criterion alias entity_id_column constraint')):
   ''' The parameters required for constructing queries
       or extending queries with JOINs.
+
+      Attributes:
+      * `criterion`: the source criterion, usually an `SQTCriterion` subinstance
+      * `alias`: an alias of the source table for use in queries
+      * `entity_id_column`: the `entities` id column,
+        `alias.id` if the alias is of `entities`,
+        `alias.entity_id` if the alias is of `tags`
+      * `constraint`: a filter query based on `alias`
   '''
 
 class SQTCriterion(TagSetCriterion):
@@ -165,7 +173,6 @@ class SQTEntityIdTest(SQTCriterion):
     alias = aliased(entities)
     sqlp = SQLParameters(
         criterion=self,
-        table=entities,
         alias=alias,
         entity_id_column=alias.id,
         constraint=alias.id.in_(self.entity_ids),
@@ -332,7 +339,6 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         warning("no SQLside value test for comparison=%r", self.comparison)
     sqlp = SQLParameters(
         criterion=self,
-        table=table,
         alias=alias,
         entity_id_column=entity_id_column,
         constraint=constraint if self.choice else -alias.has(constraint),
