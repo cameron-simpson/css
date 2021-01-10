@@ -177,57 +177,6 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
-@decorator
-def _api_call(func, suburl, method='GET'):
-  ''' Decorator for API call methods requiring the `suburl`
-      and optional `method` (default `'GET'`).
-
-      Returns `func(self,requests.method,url,*a,**kw)`.
-  '''
-
-  def prep_call(self, *a, **kw):
-    ''' Prepare the API call and pass to `func`.
-    '''
-    url = self.API_BASE + suburl
-    with Pfx("%s %r", method, url):
-      return func(
-          self,
-          partial(
-              {
-                  'GET': requests.get,
-                  'POST': requests.post,
-                  'HEAD': requests.head,
-              }[method],
-              url,
-              auth=_RequestsNoAuth(),
-          ),
-          *a,
-          **kw,
-      )
-
-  return prep_call
-
-@decorator
-def _api_data(func, suburl, method='GET'):
-  ''' Decorator for API call methods requiring the `suburl`
-      and optional `method` (default `'GET'`),
-      returning the `'data'` component of the successful call.
-
-      Returns `func(self,requests.method,url,*a,**kw)`.
-  '''
-
-  @_api_call(suburl, method=method)
-  def datacall(self, rqm, *a, **kw):
-    ''' Prepare the API call and pass to `func`.
-    '''
-    result = rqm(headers=dict(Authorization=self.jwt)).json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    return func(self,result['data'], *a, **kw)
-
-  return datacall
-
 # pylint: disable=too-many-instance-attributes
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
@@ -284,8 +233,7 @@ class PlayOnAPI(MultiOpenMixin):
     return state
 
   @pfx_method
-  @_api_call('login', 'POST')
-  def _dologin(self, rqm):
+  def _dologin(self):
     ''' Perform a login, return the resulting `dict`.
         Does not update the state of `self`.
     '''
@@ -309,16 +257,12 @@ class PlayOnAPI(MultiOpenMixin):
             "netrc: supplied login:%r != netrc login:%r" % (login, n_login)
         )
       password = n_password
-    result = rqm(
-        headers={
-            'x-mmt-app': 'web'
-        },
-        params=dict(email=login, password=password),
-    ).json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("login failed: %r" % (result,))
-    return result['data']
+    return self.suburl_data(
+        'login',
+        _method='POST',
+        headers={'x-mmt-app': 'web'},
+        params=dict(email=login, password=password)
+    )
 
   @property
   def jwt(self):
@@ -328,28 +272,69 @@ class PlayOnAPI(MultiOpenMixin):
     self.login_state  # pylint: disable=pointless-statement
     return self._jwt
 
-  @_api_call('login/at', 'POST')
-  def _renew_jwt(self, rqm):
+  def _renew_jwt(self):
     at = self.auth_token
-    result = rqm(params=dict(auth_token=at)).json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    self._jwt = result['data']['token']
+    data = self.suburl_data('login/at', _method='POST',params=dict(auth_token=at))
+    self._jwt = data['token']
 
   @typechecked
   def __getitem__(self, download_id: int):
-    ''' Return the `TagSet` associated with `download_id`.
+    ''' Return the `TagSet` associated with the recording `download_id`.
     '''
     return self.sqltags[f'recording.{download_id}']
 
-  @_api_data('account')
-  @pfx_method
-  @_api_data('queue')
-  @pfx_method
-  def queue(self, data):
-    ''' Return the recording queue.
+  def suburl_request(self, method, suburl):
+    ''' Return a curried `requests` method
+        to fetch `API_BASE/suburl`.
     '''
+    url = self.API_BASE + suburl
+    rqm = partial(
+        {
+            'GET': requests.get,
+            'POST': requests.post,
+            'HEAD': requests.head,
+        }[method],
+        url,
+        auth=_RequestsNoAuth(),
+    )
+
+    def request(*a, **kw):
+      with Pfx("%s %r", method, url):
+        return rqm(*a, **kw)
+
+    return rqm
+
+  def suburl_data(self, suburl, _method='GET', headers=None, **kw):
+    ''' Call `suburl` and return the `'data'` component on success.
+
+        Parameters:
+        * `suburl`: the API subURL designating the endpoint.
+        * `_method`: optional HTTP method, default `'GET'`.
+        * `headers`: hreaders to accompany the request;
+          default `{'Authorization':self.jwt}`.
+        Other keyword arguments are passed to the `requests` method
+        used to perform the HTTP call.
+    '''
+    if headers is None:
+      headers = dict(Authorization=self.jwt)
+    rqm = self.suburl_request(_method, suburl)
+    result = rqm(headers=headers, **kw).json()
+    ok = result.get('success')
+    if not ok:
+      raise ValueError("failed: %r" % (result,))
+    return result['data']
+
+  @pfx_method
+  def account(self):
+    ''' Return account information.
+    '''
+    return self.suburl_data('account')
+
+  @pfx_method
+  def queue(self):
+    ''' Return the recording queue entries, a list of `dict`s.
+    '''
+    data = self.suburl('queue')
     entries = data['entries']
     assert len(entries) == data['total_entries'], \
         "len(entries)=%d but result.data.total_entries=%r" % (
@@ -357,11 +342,11 @@ class PlayOnAPI(MultiOpenMixin):
         )
     return entries
 
-  @_api_data('library/all')
   @pfx_method
-  def recordings(self, data):
+  def recordings(self):
     ''' Return the `TagSet` instances for the available recordings.
     '''
+    data = self.suburl_data('library/all')
     entries = data['entries']
     tes = set()
     for entry in entries:
@@ -408,16 +393,8 @@ class PlayOnAPI(MultiOpenMixin):
         then the file extension will be taken from the filename
         of the download URL.
     '''
-    rq = requests.get(
-        f'{self.API_BASE}library/{download_id}/download',
-        auth=_RequestsNoAuth(),
-        headers=dict(Authorization=self.jwt),
-    )
-    result = rq.json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    dl_url = result['data']['url']
+    dl_data = self.suburl_data(f'library/{download_id}/download')
+    dl_url = dl_data['url']
     dl_basename = unpercent(basename(dl_url))
     if filename is None:
       filename = dl_basename
@@ -430,7 +407,7 @@ class PlayOnAPI(MultiOpenMixin):
       )
       dlrq = None
     else:
-      dl_cookies = result['data']['data']
+      dl_cookies = dl_data['data']
       jar = requests.cookies.RequestsCookieJar()
       for ck_name in 'CloudFront-Expires', 'CloudFront-Key-Pair-Id', 'CloudFront-Signature':
         jar.set(
