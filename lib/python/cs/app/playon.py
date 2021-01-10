@@ -207,6 +207,27 @@ def _api_call(func, suburl, method='GET'):
 
   return prep_call
 
+@decorator
+def _api_data(func, suburl, method='GET'):
+  ''' Decorator for API call methods requiring the `suburl`
+      and optional `method` (default `'GET'`),
+      returning the `'data'` component of the successful call.
+
+      Returns `func(self,requests.method,url,*a,**kw)`.
+  '''
+
+  @_api_call(suburl, method=method)
+  def datacall(self, rqm, *a, **kw):
+    ''' Prepare the API call and pass to `func`.
+    '''
+    result = rqm(headers=dict(Authorization=self.jwt)).json()
+    ok = result.get('success')
+    if not ok:
+      raise ValueError("failed: %r" % (result,))
+    return func(self,result['data'], *a, **kw)
+
+  return datacall
+
 # pylint: disable=too-many-instance-attributes
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
@@ -322,32 +343,26 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[f'recording.{download_id}']
 
-  @_api_call('queue')
+  @_api_data('account')
   @pfx_method
-  def queue(self, rqm):
+  @_api_data('queue')
+  @pfx_method
+  def queue(self, data):
     ''' Return the recording queue.
     '''
-    result = rqm(headers=dict(Authorization=self.jwt)).json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    entries = result['data']['entries']
-    assert len(entries) == result['data']['total_entries'], \
+    entries = data['entries']
+    assert len(entries) == data['total_entries'], \
         "len(entries)=%d but result.data.total_entries=%r" % (
-            len(entries), result['data']['total_entries']
+            len(entries), data['total_entries']
         )
     return entries
 
-  @_api_call('library/all')
+  @_api_data('library/all')
   @pfx_method
-  def recordings(self, rqm):
+  def recordings(self, data):
     ''' Return the `TagSet` instances for the available recordings.
     '''
-    result = rqm(headers=dict(Authorization=self.jwt)).json()
-    ok = result.get('success')
-    if not ok:
-      raise ValueError("failed: %r" % (result,))
-    entries = result['data']['entries']
+    entries = data['entries']
     tes = set()
     for entry in entries:
       entry_id = entry['ID']
