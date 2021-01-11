@@ -23,6 +23,7 @@ import csv
 from datetime import datetime
 from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
+import operator
 import os
 from os.path import abspath, expanduser, exists as existspath
 import re
@@ -129,6 +130,117 @@ class SQLParameters(namedtuple(
         `alias.entity_id` if the alias is of `tags`
       * `constraint`: a filter query based on `alias`
   '''
+
+class SQLTagProxy:
+  ''' An object based on a `Tag` name
+      which produces an `SQLParameters` when comparsed with some value.
+
+      Example:
+
+          >>> sqltags = SQLTags('sqlite://')
+          >>> sqltags.init()
+          >>> # make a SQLParameters for testing the tag 'name.thing'==5
+          >>> sqlp = sqltags.tags.name.thing == 5
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.float_value = :float_value_1'
+          >>> sqlp = sqltags.tags.name.thing == 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
+  '''
+
+  def __init__(self, orm, tag_name):
+    self._orm = orm
+    self._tag_name = tag_name
+
+  def __str__(self):
+    return "%s(tag_name=%r)" % (type(self).__name__, self._tag_name)
+
+  def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
+    ''' Parameterised translator from an operator to an `SQLParameters`.
+
+        Parameters:
+        * `op_label`: a text label for the operator for use in messages,
+          such as `'=='` for `operator.eq`.
+        * `other`: the other value to which to compare.
+        * `op`: the operator callable returning an SQLAlchemy filter condition
+          from an SQLAlchemy column and the derived avlue from `other`;
+          usually this will be supplied as something like `operator.eq`.
+        * `op_takes_alias`: a Boolean (default `False`).
+          If false, `op` is handed a column from the table alias as above.
+          If true, `op` is handed the table alias itself.
+
+        The `op_takes_alias` parameter exists to support multicolumn 
+        conditions such as `==None`, which needs to test that all the value 
+        columns are `NULL`.
+
+        The default case (`op_takes_alias` is false)
+        obtains the condition from `op(column,value)`
+        where `column` and `value` are inferred from the type of `other`:
+        - if `other` is an `int` or `float`
+          then `column=alias.float_value` and `value=float(other)`
+        - if `other` is a `str`
+          then `column=alias.string_value` and `value=other`
+
+        When `op_takes_alias` is true
+        then the condition is obtained from `op(alias,other)`
+        where `alias` is the new table alias for `tags`
+        and `other` is the value supplied.
+        It is up to `op` to construct the required condition.
+    '''
+    pf = f'{self}{op_label}{other!r}'
+    with Pfx(pf):
+      tags = aliased(self._orm.tags)
+      if op_takes_alias:
+        other_condition = op(tags, other)
+      else:
+        if isinstance(other, (int, float)):
+          tag_value = float(other)
+          column = tags.float_value
+        elif isinstance(other, str):
+          tag_value = other
+          column = tags.string_value
+        else:
+          raise TypeError("not supported for type %s" % (type(other),))
+        other_condition = op(column, tag_value)
+      return SQLParameters(
+          criterion=pf,
+          alias=tags,
+          entity_id_column=tags.entity_id,
+          constraint=and_(tags.name == self._tag_name, other_condition),
+      )
+
+  def __eq__(self, other):
+    if other is None:
+      # special test for ==None
+      return self._cmp(
+          "==",
+          other,
+          lambda alias, value: and_(
+              alias.float_value is None, alias.stringvalue is None, alias.
+              structured_value is None
+          ),
+          op_takes_alias=True
+      )
+    return self._cmp("==", other, operator.eq)
+
+  def __getattr__(self, sub_tag_name):
+    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
+    '''
+    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
+
+class SQLTagProxies:
+  ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
+
+      Example:
+
+          sqltags.tags.dotted.name.here == 'foo'
+  '''
+
+  def __init__(self, orm):
+    self.orm = orm
+
+  def __getattr__(self, tag_name):
+    return SQLTagProxy(self.orm, tag_name)
 
 class SQTCriterion(TagSetCriterion):
   ''' Subclass of `TagSetCriterion` requiring an `.sql_parameters` method
