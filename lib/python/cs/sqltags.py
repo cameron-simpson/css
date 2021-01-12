@@ -117,8 +117,8 @@ def glob2like(glob: str) -> str:
   assert '[' not in glob
   return glob.replace('*', '%').replace('?', '_')
 
-class SQLParameters(namedtuple(
-    'SQLParameters', 'criterion alias entity_id_column constraint')):
+class SQLParameters(namedtuple('SQLParameters',
+                               'criterion alias entity_id_column constraint')):
   ''' The parameters required for constructing queries
       or extending queries with JOINs.
 
@@ -412,7 +412,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   def sql_parameters(self, orm) -> SQLParameters:
     tag = self.tag
     if tag.name in ('name', 'unixtime'):
-      table = entities = orm.entities
+      entities = orm.entities
       alias = aliased(entities)
       entity_id_column = alias.id
       if tag.name == 'name':
@@ -438,7 +438,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       else:
         raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
     else:
-      table = tag = self.tag
+      tag = self.tag
       tags = orm.tags
       alias = aliased(tags)
       entity_id_column = alias.entity_id
