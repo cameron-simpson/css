@@ -1443,6 +1443,7 @@ class SQLTags(TagSets):
     self.db_url = db_url
     self.ontology = ontology
     self._lock = RLock()
+    self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
