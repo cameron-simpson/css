@@ -176,7 +176,7 @@ case "$op" in
       ;;
   exec)
       docker_exec_opts=-i
-      [ -t 0 ] && docker_exec_opts="$docker_exec_opts -t"
+      [ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
       then
