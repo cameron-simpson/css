@@ -123,7 +123,9 @@ class PlayOnCommand(BaseCommand):
         return None
       return filename
 
-    available = None
+    print("update recordings from API ...")
+    api.recordings()
+
     xit = 0
     for arg in argv:
       with Pfx(arg):
