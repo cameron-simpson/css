@@ -188,6 +188,21 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
+class PlayOnSQLTagSet(SQLTagSet):
+  ''' An `SQLTagSet` with some special methods.
+  '''
+
+  def recording_id(self):
+    ''' The recording id or `None`.
+    '''
+    return self.get('playon.ID')
+
+  def is_downloaded(self):
+    return self.download_path is not None
+
+  def is_expired(self):
+    return False
+
 # pylint: disable=too-many-instance-attributes
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
