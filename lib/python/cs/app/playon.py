@@ -74,8 +74,9 @@ class PlayOnCommand(BaseCommand):
   def run_context(argv, options):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
-    api = PlayOnAPI(options.user, options.password)
-    with stackattrs(options, api=api):
+    sqltags = PlayOnSQLTags()
+    api = PlayOnAPI(options.user, options.password, sqltags)
+    with stackattrs(options, api=api, sqltags=sqltags):
       with api:
         yield
 
