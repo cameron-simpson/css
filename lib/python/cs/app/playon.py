@@ -189,6 +189,27 @@ class PlayOnCommand(BaseCommand):
     for entry in api.queue():
       print(pformat(entry))
 
+  @staticmethod
+  def cmd_update(argv, options):
+    ''' Usage: {cmd} [queue] [recordings]
+          Update the db state from the PlayOn service.
+    '''
+    api = options.api
+    if not argv:
+      argv = ['queue', 'pending']
+    xit = 0
+    for state in argv:
+      with Pfx(state):
+        if state == 'queue':
+          for qentry in api.queue():
+            print(qentry)
+        elif state == 'recordings':
+          api.recording()
+        else:
+          warning("unsupported update target")
+          xit = 1
+    return xit
+
 # pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
   ''' The API has a distinct login call, avoid basic auth from netrc etc.
