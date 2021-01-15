@@ -203,6 +203,64 @@ class PlayOnSQLTagSet(SQLTagSet):
   def is_expired(self):
     return False
 
+class PlayOnSQLTags(SQLTags):
+
+  STATEDBPATH = '~/var/playon.sqlite'
+
+  TagSetClass = PlayOnSQLTagSet
+
+  def __init__(self, dbpath=None):
+    if dbpath is None:
+      dbpath = expanduser(self.STATEDBPATH)
+    super().__init__(db_url=dbpath)
+
+  def __getitem__(self, index):
+    if isinstance(index, int):
+      index = f'recording.{index}'
+    return super().__getitem__(index)
+
+  def recordings(self):
+    return map(lambda k: self[k], self.keys(prefix='recording.'))
+
+  __iter__ = recordings
+
+  @pfx_method
+  def recording_ids_from_str(self, arg):
+    ''' Convert a string to a list of recording ids.
+    '''
+    with Pfx(arg):
+      tes = []
+      if arg == 'all':
+        tes.extend(iter(self))
+      elif arg == 'downloaded':
+        tes.extend(te for te in self if 'download_path' in te)
+      elif arg == 'pending':
+        tes.extend(te for te in self if 'download_path' not in te)
+      elif arg.startswith('/'):
+        # match regexp against playon.Series or playon.Name
+        r_text = arg[1:]
+        with Pfx("re.compile(%r, re.I)", r_text):
+          r = re.compile(r_text, re.I)
+        for te in self:
+          pl_tags = te.subtags('playon')
+          if (pl_tags.Series and r.search(pl_tags.Series)
+              or pl_tags.Name and r.search(pl_tags.Name)):
+            tes.append(te)
+      else:
+        # integer recording id
+        try:
+          dl_id = int(arg)
+        except ValueError:
+          warning("unsupported word")
+        else:
+          tes.append(self[dl_id])
+      return list(
+          filter(
+              lambda dl_id: dl_id is not None,
+              map(lambda te: te.get('playon.ID'), tes)
+          )
+      )
+
 # pylint: disable=too-many-instance-attributes
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
