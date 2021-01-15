@@ -395,7 +395,7 @@ class PlayOnAPI(MultiOpenMixin):
   def __getitem__(self, download_id: int):
     ''' Return the `TagSet` associated with the recording `download_id`.
     '''
-    return self.sqltags[f'recording.{download_id}']
+    return self.sqltags[download_id]
 
   def suburl_request(self, method, suburl):
     ''' Return a curried `requests` method
