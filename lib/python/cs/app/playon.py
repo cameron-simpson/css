@@ -141,25 +141,35 @@ class PlayOnCommand(BaseCommand):
               xit = 1
     return xit
 
-  @staticmethod
-  def cmd_ls(argv, options):
-    ''' Usage: {cmd} [-l]
+  def cmd_ls(self, argv, options):
+    ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l  Long format.
     '''
+    sqltags = options.sqltags
     long_format = False
     if argv and argv[0] == '-l':
       argv.pop(0)
       long_format = True
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    api = options.api
-    for te in api.recordings():
-      entry = te.subtags('playon')
-      print(int(entry.ID), entry.HumanSize, entry.Series, entry.Name)
-      if long_format:
-        for tag in sorted(te):
-          print(" ", tag)
+    if not argv:
+      argv = ['all']
+    xit = 0
+    for arg in argv:
+      with Pfx(arg):
+        recording_ids = sqltags.recording_ids_from_str(arg)
+        if not recording_ids:
+          warning("no recording ids")
+          xit = 1
+          continue
+        for dl_id in recording_ids:
+          te = sqltags[dl_id]
+          with Pfx(te.name):
+            entry = te.subtags('playon')
+            print(int(entry.ID), entry.HumanSize, entry.Series, entry.Name)
+            if long_format:
+              for tag in sorted(te):
+                print(" ", tag)
+    return xit
 
   @staticmethod
   def cmd_queue(argv, options):
