@@ -120,27 +120,18 @@ class PlayOnCommand(BaseCommand):
 
     available = None
     xit = 0
-    for dlrq in argv:
-      with Pfx(dlrq):
-        if dlrq == 'pending':
-          if available is None:
-            available = api.recordings()
-          tes = [te for te in available if 'download_path' not in te]
-          if not tes:
-            warning("no undownloaded recordings")
-          else:
-            for te in tes:
-              dl_id = te['playon.ID']
-              with Pfx(dl_id):
-                if not _dl(dl_id):
-                  xit = 1
-        else:
-          try:
-            dl_id = int(dlrq)
-          except ValueError:
-            warning("not an int")
-            xit = 2
-          else:
+    for arg in argv:
+      with Pfx(arg):
+        recording_ids = sqltags.recording_ids_from_str(arg)
+        if not recording_ids:
+          warning("no recording ids")
+          xit = 1
+          continue
+        for dl_id in recording_ids:
+          te = sqltags[dl_id]
+          with Pfx(te.name):
+            if te.is_downloaded():
+              warning("already downloaded to %r", te.download_path)
             if not _dl(dl_id):
               xit = 1
     return xit
