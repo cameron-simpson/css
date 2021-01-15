@@ -299,9 +299,10 @@ class PlayOnAPI(MultiOpenMixin):
   API_HOSTNAME = 'api.playonrecorder.com'
   API_BASE = f'https://{API_HOSTNAME}/v3/'
   API_AUTH_GRACETIME = 30
-  STATEDBPATH = '~/var/playon.sqlite'
 
-  def __init__(self, login, password):
+  def __init__(self, login, password, sqltags=None):
+    if sqltags is None:
+      sqltags = PlayOnSQLTags()
     self._auth_token = None
     self._login = login
     self._password = password
@@ -309,7 +310,7 @@ class PlayOnAPI(MultiOpenMixin):
     self._jwt = None
     self._cookies = {}
     self._storage = defaultdict(str)
-    self.sqltags = SQLTags(expanduser(self.STATEDBPATH))
+    self.sqltags = sqltags
     self._fstags = FSTags()
 
   def startup(self):
