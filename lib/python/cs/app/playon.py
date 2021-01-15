@@ -389,7 +389,9 @@ class PlayOnAPI(MultiOpenMixin):
 
   def _renew_jwt(self):
     at = self.auth_token
-    data = self.suburl_data('login/at', _method='POST',params=dict(auth_token=at))
+    data = self.suburl_data(
+        'login/at', _method='POST', params=dict(auth_token=at)
+    )
     self._jwt = data['token']
 
   @typechecked
