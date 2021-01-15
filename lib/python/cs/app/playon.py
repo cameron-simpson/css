@@ -59,6 +59,14 @@ class PlayOnCommand(BaseCommand):
                                 This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
+
+    Recording specification:
+      an int        The specific recording id.
+      all           All known recordings.
+      downloaded    Recordings already downloaded.
+      pending       Recordings not already downloaded.
+      /regexp       Recordings whose Series or Name match the regexp,
+                    case insensitive.
   '''
 
   @staticmethod
