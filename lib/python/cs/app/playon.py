@@ -99,12 +99,9 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
-  @staticmethod
-  def cmd_dl(argv, options):
-    ''' Usage: {cmd} [recording_ids...]
-          Download the specified recording_ids.
-          The default is "pending", meaning all recordings not
-          previously downloaded.
+  def cmd_dl(self, argv, options):
+    ''' Usage: {cmd} [recordings...]
+          Download the specified recordings, default "pending".
     '''
     if not argv:
       argv = ['pending']
