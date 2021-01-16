@@ -577,9 +577,10 @@ class PlayOnAPI(MultiOpenMixin):
                   length -= written
     fullpath = realpath(filename)
     te = self[download_id]
-    if dlrq is not None:
+    if dl_rsp is not None:
       te.set('download_path', fullpath)
-    fse = self._fstags[fullpath].update(te.subtags('playon'), prefix='playon')
+    # apply the SQLTagSet to the FSTags TagSet
+    self._fstags[fullpath].update(te.subtags('playon'), prefix='playon')
     return te
 
 if __name__ == '__main__':
