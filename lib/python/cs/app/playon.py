@@ -183,10 +183,10 @@ class PlayOnCommand(BaseCommand):
           List the recording queue.
           -l  Long format.
     '''
-    long_format = False
+    long_mode = False
     if argv and argv[0] == '-l':
       argv.pop(0)
-      long_format = True
+      long_mode = True
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     api = options.api
