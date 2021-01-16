@@ -155,6 +155,11 @@ class SQLTagProxy:
   def __str__(self):
     return "%s(tag_name=%r)" % (type(self).__name__, self._tag_name)
 
+  def __getattr__(self, sub_tag_name):
+    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
+    '''
+    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
+
   def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
 
