@@ -17,6 +17,7 @@ from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
 )
 from pprint import pformat
+import re
 import sys
 import time
 from urllib.parse import unquote as unpercent
@@ -24,13 +25,12 @@ import requests
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
-from cs.deco import decorator
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
-from cs.sqltags import SQLTags
+from cs.sqltags import SQLTags, SQLTagSet
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -99,7 +99,8 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
-  def cmd_dl(self, argv, options):
+  @staticmethod
+  def cmd_dl(argv, options):
     ''' Usage: {cmd} [-n] [recordings...]
           Download the specified recordings, default "pending".
           -n  No download. List the specified recordings.
@@ -151,7 +152,8 @@ class PlayOnCommand(BaseCommand):
               xit = 1
     return xit
 
-  def cmd_ls(self, argv, options):
+  @staticmethod
+  def cmd_ls(argv, options):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l  Long format.
@@ -235,24 +237,33 @@ class PlayOnSQLTagSet(SQLTagSet):
     return self.get('playon.ID')
 
   def is_downloaded(self):
+    ''' Test whether this recording has been downloaded
+        based on the presence of a `download_path` `Tag`.
+    '''
     return self.download_path is not None
 
   def is_expired(self):
+    ''' Test whether this recording is expired,
+        should imply no longer available for download.
+    '''
     return False
 
+  # pylint: disable=redefined-builtin
   def ls(self, format=None, long_mode=False, print_func=None):
     ''' List a recording.
     '''
     if format is None:
-      format=self.LS_FORMAT
+      format = self.LS_FORMAT
     if print_func is None:
-      print_func=print
+      print_func = print
     print_func(format.format_map(self.ns()))
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
 
 class PlayOnSQLTags(SQLTags):
+  ''' `SQLTags` subclass with PlayOn related methods.
+  '''
 
   STATEDBPATH = '~/var/playon.sqlite'
 
@@ -269,6 +280,8 @@ class PlayOnSQLTags(SQLTags):
     return super().__getitem__(index)
 
   def recordings(self):
+    ''' Yield recording `TagSet`s, those named `"recording.*"`.
+    '''
     return map(lambda k: self[k], self.keys(prefix='recording.'))
 
   __iter__ = recordings
@@ -433,11 +446,6 @@ class PlayOnAPI(MultiOpenMixin):
         url,
         auth=_RequestsNoAuth(),
     )
-
-    def request(*a, **kw):
-      with Pfx("%s %r", method, url):
-        return rqm(*a, **kw)
-
     return rqm
 
   def suburl_data(self, suburl, _method='GET', headers=None, **kw):
@@ -470,12 +478,12 @@ class PlayOnAPI(MultiOpenMixin):
   def queue(self):
     ''' Return the recording queue entries, a list of `dict`s.
     '''
-    data = self.suburl('queue')
+    data = self.suburl_data('queue')
     entries = data['entries']
-    assert len(entries) == data['total_entries'], \
-        "len(entries)=%d but result.data.total_entries=%r" % (
-            len(entries), data['total_entries']
-        )
+    assert len(entries) == data['total_entries'], (
+        "len(entries)=%d but result.data.total_entries=%r" %
+        (len(entries), data['total_entries'])
+    )
     return entries
 
   @pfx_method
