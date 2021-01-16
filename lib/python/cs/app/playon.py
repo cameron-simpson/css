@@ -157,10 +157,10 @@ class PlayOnCommand(BaseCommand):
           -l  Long format.
     '''
     sqltags = options.sqltags
-    long_format = False
+    long_mode = False
     if argv and argv[0] == '-l':
       argv.pop(0)
-      long_format = True
+      long_mode = True
     if not argv:
       argv = ['all']
     xit = 0
@@ -174,11 +174,7 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           te = sqltags[dl_id]
           with Pfx(te.name):
-            entry = te.subtags('playon')
-            print(int(entry.ID), entry.HumanSize, entry.Series, entry.Name)
-            if long_format:
-              for tag in sorted(te):
-                print(" ", tag)
+            te.ls(long_mode=long_mode)
     return xit
 
   @staticmethod
