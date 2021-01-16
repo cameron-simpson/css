@@ -565,8 +565,16 @@ class PlayOnAPI(MultiOpenMixin):
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
           ):
-            with Pfx("write %d bytes", len(chunk)):
-              f.write(chunk)
+            offset = 0
+            length = len(chunk)
+            while length > 0:
+              with Pfx("write %d bytes", length):
+                written = f.write(chunk[offset:length])
+                if written < 1:
+                  warning("write %d bytes")
+                else:
+                  offset += written
+                  length -= written
     fullpath = realpath(filename)
     te = self[download_id]
     if dlrq is not None:
