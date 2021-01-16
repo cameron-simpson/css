@@ -228,10 +228,6 @@ class SQLTagProxy:
       )
     return self._cmp("==", other, operator.eq)
 
-  def __getattr__(self, sub_tag_name):
-    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
-    '''
-    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
 
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
