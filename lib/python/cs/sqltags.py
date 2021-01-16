@@ -34,7 +34,6 @@ from typing import List
 from icontract import require
 from sqlalchemy import (
     create_engine,
-    select,
     Column,
     Integer,
     Float,
@@ -44,6 +43,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
@@ -174,8 +174,8 @@ class SQLTagProxy:
           If false, `op` is handed a column from the table alias as above.
           If true, `op` is handed the table alias itself.
 
-        The `op_takes_alias` parameter exists to support multicolumn 
-        conditions such as `==None`, which needs to test that all the value 
+        The `op_takes_alias` parameter exists to support multicolumn
+        conditions such as `==None`, which needs to test that all the value
         columns are `NULL`.
 
         The default case (`op_takes_alias` is false)
@@ -187,7 +187,7 @@ class SQLTagProxy:
           then `column=alias.string_value` and `value=other`
 
         When `op_takes_alias` is true
-        then the condition is obtained from `op(alias,other)`
+        the condition is obtained from `op(alias,other)`
         where `alias` is the new table alias for `tags`
         and `other` is the value supplied.
         It is up to `op` to construct the required condition.
