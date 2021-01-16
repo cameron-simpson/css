@@ -100,9 +100,15 @@ class PlayOnCommand(BaseCommand):
       print(k, pformat(v))
 
   def cmd_dl(self, argv, options):
-    ''' Usage: {cmd} [recordings...]
+    ''' Usage: {cmd} [-n] [recordings...]
           Download the specified recordings, default "pending".
+          -n  No download. List the specified recordings.
     '''
+    sqltags = options.sqltags
+    no_download = False
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      no_download = True
     if not argv:
       argv = ['pending']
     api = options.api
@@ -139,7 +145,9 @@ class PlayOnCommand(BaseCommand):
           with Pfx(te.name):
             if te.is_downloaded():
               warning("already downloaded to %r", te.download_path)
-            if not _dl(dl_id):
+            if no_download:
+              te.ls()
+            elif not _dl(dl_id):
               xit = 1
     return xit
 
