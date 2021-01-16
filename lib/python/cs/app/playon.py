@@ -222,6 +222,9 @@ class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
 
+  # default "ls" output format
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+
   def recording_id(self):
     ''' The recording id or `None`.
     '''
@@ -232,6 +235,18 @@ class PlayOnSQLTagSet(SQLTagSet):
 
   def is_expired(self):
     return False
+
+  def ls(self, format=None, long_mode=False, print_func=None):
+    ''' List a recording.
+    '''
+    if format is None:
+      format=self.LS_FORMAT
+    if print_func is None:
+      print_func=print
+    print_func(format.format_map(self.ns()))
+    if long_mode:
+      for tag in sorted(self):
+        print_func(" ", tag)
 
 class PlayOnSQLTags(SQLTags):
 
