@@ -391,6 +391,54 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  def __getattr__(self, attr):
+    ''' Support access to dotted name attributes
+        if `attr` is not found via the superclass `__getattr__`.
+
+        This is done by returning a subtags of those tags
+        commencing with `attr+'.'`.
+
+        Example:
+
+            >>> tags=TagSet(a=1,b=2)
+            >>> tags.a
+            1
+            >>> tags.c
+            >>> tags['c.z']=9
+            >>> tags['c.x']=8
+            >>> tags
+            TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
+            >>> tags.c
+            TagSet:{'z': 9, 'x': 8}
+            >>> tags.c.z
+            9
+
+        However, this is not supported when there is a tag named `'c'`
+        because `tags.c` has to return the `'c'` tag value:
+
+            >>> tags=TagSet(a=1,b=2,c=3)
+            >>> tags.a
+            1
+            >>> tags.c
+            3
+            >>> tags['c.z']=9
+            >>> tags.c.z
+            Traceback (most recent call last):
+              File "<stdin>", line 1, in <module>
+            AttributeError: 'int' object has no attribute 'z'
+
+    '''
+    try:
+      return self[attr]
+    except KeyError:
+      # magic dotted name access to foo.bar if there are keys
+      # starting with "attr."
+      if attr and attr[0].isalpha():
+        attr_ = attr + '.'
+        if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
+          return self.subtags(attr)
+      return super().__getattr__(attr)
+
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
 
@@ -2493,7 +2541,7 @@ class TagFile(SingletonMixin, TagSets):
             f.write(cls.tags_line(name, tags))
             f.write('\n')
       except OSError as e:
-        error("save(%r) fails: %s", filename, e)
+        error("save(%r) fails: %s", filepath, e)
       else:
         for _, tags in name_tags:
           tags.modified = False
