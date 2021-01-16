@@ -1518,14 +1518,23 @@ class SQLTags(TagSets):
     assert isinstance(te, SQLTagSet)
     assert te.sqltags is self
 
-  @orm_auto_session
-  def keys(self, *, session):
-    ''' Return all the nonNULL names.
+  def keys(self, *, prefix=None):
+    ''' Yield all the nonNULL names.
+
+        Constrain the names to those starting with `prefix`
+        if not `None`.
     '''
-    return session.execute(
-        select(self.orm.entities.name
-               ).filter_by(self.orm.entities.name.isnot(None))
-    ).all()
+    entities = self.orm.entities
+    entities_table = entities.__table__
+    name_column = entities_table.c.name
+    q = select([name_column]).where(name_column.isnot(None))
+    conn = self.orm.engine.connect()
+    result = conn.execute(q)
+    for row in result:
+      name = row.name
+      if prefix is None or name.startswith(prefix):
+        yield name
+    conn.close()
 
   @staticmethod
   @fmtdoc
