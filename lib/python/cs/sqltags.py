@@ -34,7 +34,6 @@ from typing import List
 from icontract import require
 from sqlalchemy import (
     create_engine,
-    select,
     Column,
     Integer,
     Float,
@@ -44,6 +43,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
@@ -155,6 +155,11 @@ class SQLTagProxy:
   def __str__(self):
     return "%s(tag_name=%r)" % (type(self).__name__, self._tag_name)
 
+  def __getattr__(self, sub_tag_name):
+    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
+    '''
+    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
+
   def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
 
@@ -169,8 +174,8 @@ class SQLTagProxy:
           If false, `op` is handed a column from the table alias as above.
           If true, `op` is handed the table alias itself.
 
-        The `op_takes_alias` parameter exists to support multicolumn 
-        conditions such as `==None`, which needs to test that all the value 
+        The `op_takes_alias` parameter exists to support multicolumn
+        conditions such as `==None`, which needs to test that all the value
         columns are `NULL`.
 
         The default case (`op_takes_alias` is false)
@@ -182,7 +187,7 @@ class SQLTagProxy:
           then `column=alias.string_value` and `value=other`
 
         When `op_takes_alias` is true
-        then the condition is obtained from `op(alias,other)`
+        the condition is obtained from `op(alias,other)`
         where `alias` is the new table alias for `tags`
         and `other` is the value supplied.
         It is up to `op` to construct the required condition.
@@ -223,10 +228,6 @@ class SQLTagProxy:
       )
     return self._cmp("==", other, operator.eq)
 
-  def __getattr__(self, sub_tag_name):
-    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
-    '''
-    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
 
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
@@ -1517,14 +1518,23 @@ class SQLTags(TagSets):
     assert isinstance(te, SQLTagSet)
     assert te.sqltags is self
 
-  @orm_auto_session
-  def keys(self, *, session):
-    ''' Return all the nonNULL names.
+  def keys(self, *, prefix=None):
+    ''' Yield all the nonNULL names.
+
+        Constrain the names to those starting with `prefix`
+        if not `None`.
     '''
-    return session.execute(
-        select(self.orm.entities.name
-               ).filter_by(self.orm.entities.name.isnot(None))
-    ).all()
+    entities = self.orm.entities
+    entities_table = entities.__table__
+    name_column = entities_table.c.name
+    q = select([name_column]).where(name_column.isnot(None))
+    conn = self.orm.engine.connect()
+    result = conn.execute(q)
+    for row in result:
+      name = row.name
+      if prefix is None or name.startswith(prefix):
+        yield name
+    conn.close()
 
   @staticmethod
   @fmtdoc
