@@ -214,7 +214,17 @@ class SQLTagProxy:
           constraint=and_(tags.name == self._tag_name, other_condition),
       )
 
-  def __eq__(self, other):
+  def __eq__(self, other) -> SQLParameters:
+    ''' Return an SQL = test `SQLParameters`.
+
+        Example:
+
+          >>> sqltags = SQLTags('sqlite://')
+          >>> sqltags.init()
+          >>> sqlp = sqltags.tags.name.thing == 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
+    '''
     if other is None:
       # special test for ==None
       return self._cmp(
@@ -228,6 +238,23 @@ class SQLTagProxy:
       )
     return self._cmp("==", other, operator.eq)
 
+  def startswith(self, prefix: str) -> SQLParameters:
+    ''' Return an SQL LIKE prefix test `SQLParameters`.
+
+        Example:
+
+          >>> sqltags = SQLTags('sqlite://')
+          >>> sqltags.init()
+          >>> sqlp = sqltags.tags.name.thing.startswith('foo')
+          >>> str(sqlp.constraint)
+          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+    '''
+    esc = '\\'
+    lprefix = prefix.replace('%', esc + '%')
+    return self._cmp(
+        "startswith", prefix,
+        lambda column, prefix: column.like(lprefix + '%', esc)
+    )
 
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
