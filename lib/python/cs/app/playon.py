@@ -541,7 +541,7 @@ class PlayOnAPI(MultiOpenMixin):
       warning(
           "SKIPPING download of %r: already exists, just tagging", filename
       )
-      dlrq = None
+      dl_rsp = None
     else:
       dl_cookies = dl_data['data']
       jar = requests.cookies.RequestsCookieJar()
@@ -552,14 +552,14 @@ class PlayOnAPI(MultiOpenMixin):
             domain='playonrecorder.com',
             secure=True,
         )
-      dlrq = requests.get(
+      dl_rsp = requests.get(
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
-      dl_length = int(dlrq.headers['Content-Length'])
+      dl_length = int(dl_rsp.headers['Content-Length'])
       with Pfx("open(%r,'wb')"):
         with open(filename, 'wb') as f:
           for chunk in progressbar(
-              dlrq.iter_content(chunk_size=131072),
+              dl_rsp.iter_content(chunk_size=131072),
               label=filename,
               total=dl_length,
               units_scale=BINARY_BYTES_SCALE,
