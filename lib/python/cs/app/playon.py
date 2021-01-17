@@ -8,7 +8,7 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
-##from datetime import datetime
+from datetime import datetime, timezone
 from functools import partial
 from getopt import GetoptError
 from netrc import netrc
@@ -425,6 +425,13 @@ class PlayOnAPI(MultiOpenMixin):
         'login/at', _method='POST', params=dict(auth_token=at)
     )
     self._jwt = data['token']
+
+  @staticmethod
+  def from_playon_date(date_s):
+    ''' The PlayOnAPI seems to use UTC date strings.
+    '''
+    return datetime.strptime(date_s,
+                             "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
   @typechecked
   def __getitem__(self, download_id: int):
