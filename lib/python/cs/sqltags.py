@@ -417,6 +417,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.sql_parameters` method.
   '''
 
+  # TODO: REMOVE SQL_TAG_VALUE_COMPARISON_FUNCS, unused
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
@@ -522,6 +523,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       (isinstance(te_value, str) and re.search(cmp_value, te_value)),
   }
 
+  # TODO: handle tag named "id" specially as well
   @pfx_method
   def sql_parameters(self, orm) -> SQLParameters:
     tag = self.tag
@@ -551,18 +553,15 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         constraint = constraint_fn and constraint_fn(alias, tag.value)
       else:
         raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
+      sqlp = SQLParameters(
+          criterion=self,
+          alias=alias,
+          entity_id_column=entity_id_column,
+          constraint=constraint if self.choice else -alias.has(constraint),
+      )
     else:
-      tag = self.tag
-      tags = orm.tags
-      alias = aliased(tags)
-      entity_id_column = alias.entity_id
-      constraint = alias.name == tag.name
-      constraint2_fn = self.SQL_TAG_VALUE_COMPARISON_FUNCS.get(self.comparison)
-      constraint2 = constraint2_fn and constraint2_fn(alias, tag.value)
-      if constraint2 is not None:
-        constraint = and_(constraint, constraint2)
-      else:
-        warning("no SQLside value test for comparison=%r", self.comparison)
+      # general tag_name
+      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(self.comparison)
     sqlp = SQLParameters(
         criterion=self,
         alias=alias,
