@@ -592,8 +592,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
                                                 ](te.name, tag_value)
     elif tag_name == 'unixtime':
-      result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                              ](te.unixtime, tag_value)
+      result = self.TE_VALUE_COMPARISON_FUNCS[
+          self.comparison](te.unixtime, as_unixtime(tag_value))
     else:
       te_tag_value = te.get(tag_name)
       if te_tag_value is None:
