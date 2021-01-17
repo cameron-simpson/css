@@ -152,8 +152,7 @@ class PlayOnCommand(BaseCommand):
               xit = 1
     return xit
 
-  @staticmethod
-  def cmd_ls(argv, options):
+  def _list(self, argv, options, default_argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l  Long format.
@@ -164,7 +163,7 @@ class PlayOnCommand(BaseCommand):
       argv.pop(0)
       long_mode = True
     if not argv:
-      argv = ['all']
+      argv = list(default_argv)
     xit = 0
     for arg in argv:
       with Pfx(arg):
@@ -179,21 +178,19 @@ class PlayOnCommand(BaseCommand):
             te.ls(long_mode=long_mode)
     return xit
 
-  @staticmethod
-  def cmd_queue(argv, options):
-    ''' Usage: {cmd} [-l]
-          List the recording queue.
+  def cmd_ls(self, argv, options):
+    ''' Usage: {cmd} [-l] [recordings...]
+          List available downloads.
           -l  Long format.
     '''
-    long_mode = False
-    if argv and argv[0] == '-l':
-      argv.pop(0)
-      long_mode = True
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    api = options.api
-    for entry in api.queue():
-      print(pformat(entry))
+    return self._list(argv, options, ['available'])
+
+  def cmd_queue(self, argv, options):
+    ''' Usage: {cmd} [-l] [recordings...]
+          List queued recordings.
+          -l  Long format.
+    '''
+    return self._list(argv, options, ['queued'])
 
   @staticmethod
   def cmd_update(argv, options):
