@@ -543,32 +543,30 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   @pfx_method
   def sql_parameters(self, orm) -> SQLParameters:
     tag = self.tag
-    if tag.name in ('name', 'unixtime'):
+    tag_name = tag.name
+    tag_value = tag.value
+    if tag_name in ('name', 'unixtime'):
       entities = orm.entities
       alias = aliased(entities)
       entity_id_column = alias.id
-      if tag.name == 'name':
-        if not isinstance(tag.value, str):
+      if tag_name == 'name':
+        if not isinstance(tag_value, str):
           raise ValueError(
               "name comparison requires a str, got %s:%r" %
-              (type(tag.value), tag.value)
+              (type(tag_value), tag_value)
           )
         constraint_fn = self.SQL_NAME_VALUE_COMPARISON_FUNCS.get(
             self.comparison
         )
-        constraint = constraint_fn and constraint_fn(alias, tag.value)
-      elif tag.name == 'unixtime':
-        if not isinstance(tag.value, (int, float)):
-          raise ValueError(
-              "unixtime comparison requires a float, got %s:%r" %
-              (type(tag.value), tag.value)
-          )
+        constraint = constraint_fn and constraint_fn(alias, tag_value)
+      elif tag_name == 'unixtime':
+        timestamp = as_unixtime(tag_value)
         constraint_fn = self.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS.get(
             self.comparison
         )
-        constraint = constraint_fn and constraint_fn(alias, tag.value)
+        constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
+        raise RuntimeError("unhandled non-tag field %r" % (tag_name,))
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -577,13 +575,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       )
     else:
       # general tag_name
-      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(self.comparison)
-    sqlp = SQLParameters(
-        criterion=self,
-        alias=alias,
-        entity_id_column=entity_id_column,
-        constraint=constraint if self.choice else -alias.has(constraint),
-    )
+      sqlp = SQLTagProxy(orm, tag_name).by_op_text(self.comparison, tag_value)
     return sqlp
 
   def match_tagged_entity(self, te: TagSet) -> bool:
