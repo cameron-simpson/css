@@ -233,6 +233,12 @@ class PlayOnSQLTagSet(SQLTagSet):
     '''
     return self.get('playon.ID')
 
+  def is_available(self):
+    return 'playon.Created' in self and not self.is_expired()
+
+  def is_queued(self):
+    return 'playon.Created' not in self
+
   def is_downloaded(self):
     ''' Test whether this recording has been downloaded
         based on the presence of a `download_path` `Tag`.
@@ -243,7 +249,10 @@ class PlayOnSQLTagSet(SQLTagSet):
     ''' Test whether this recording is expired,
         should imply no longer available for download.
     '''
-    return False
+    expires = self['playon.Expires']
+    if not expires:
+      return False
+    return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
   # pylint: disable=redefined-builtin
   def ls(self, format=None, long_mode=False, print_func=None):
@@ -291,10 +300,16 @@ class PlayOnSQLTags(SQLTags):
       tes = []
       if arg == 'all':
         tes.extend(iter(self))
+      elif arg == 'available':
+        tes.extend(te for te in self if te.is_available())
       elif arg == 'downloaded':
-        tes.extend(te for te in self if 'download_path' in te)
+        tes.extend(te for te in self if te.is_downloaded())
       elif arg == 'pending':
-        tes.extend(te for te in self if 'download_path' not in te)
+        tes.extend(
+            te for te in self if not te.is_downloaded() and te.is_available()
+        )
+      elif arg == 'queued':
+        tes.extend(te for te in self if te.is_queued())
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
         r_text = arg[1:]
