@@ -4,8 +4,8 @@
 ''' A few conveniences to do with dates and times.
 '''
 
-from datetime import datetime, tzinfo, timedelta
-from time import localtime, strftime
+from datetime import date, datetime, tzinfo, timedelta
+from time import localtime, mktime, strftime
 
 DISTINFO = {
     'keywords': ["date", "time", "datetime", "python", "python3"],
@@ -49,7 +49,7 @@ class tzinfoHHMM(tzinfo):
     return self._tzname
 
 try:
-  from datetime import timezone
+  from datetime import timezone  # pylint: disable=ungrouped-imports
 except ImportError:
   UTC = tzinfoHHMM('+0000')
 else:
@@ -88,6 +88,11 @@ def unixtime2datetime(unixtime, tz=None):
   if tz is None:
     tz = UTC
   return datetime.fromtimestamp(unixtime, tz=tz)
+
+def localdate2unixtime(d):
+  ''' Convert a localtime `date` into a UNIX timestamp.
+  '''
+  return mktime(date(d.year, d.month, d.day).timetuple())
 
 class UNIXTimeMixin:
   ''' A mixin for classes with a `.unixtime` attribute,
