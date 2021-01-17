@@ -199,7 +199,7 @@ class PlayOnCommand(BaseCommand):
     '''
     api = options.api
     if not argv:
-      argv = ['queue', 'pending']
+      argv = ['queue', 'recordings']
     xit = 0
     for state in argv:
       with Pfx(state):
@@ -207,7 +207,7 @@ class PlayOnCommand(BaseCommand):
           for qentry in api.queue():
             print(qentry)
         elif state == 'recordings':
-          api.recording()
+          api.recordings()
         else:
           warning("unsupported update target")
           xit = 1
