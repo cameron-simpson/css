@@ -519,9 +519,9 @@ class PlayOnAPI(MultiOpenMixin):
             Episode=int,
             ReleaseYear=int,
             Season=int,
-            ##Created=datetime.fromisoformat,
-            ##Expires=datetime.fromisoformat,
-            ##Updated=datetime.fromisoformat,
+            ##Created=self.from_playon_date,
+            ##Expires=self.from_playon_date,
+            ##Updated=self.from_playon_date,
         ).items()):
           try:
             value = entry[field]
