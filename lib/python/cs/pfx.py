@@ -53,7 +53,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201105-post'
+__version__ = '20201227-post'
 
 DISTINFO = {
     'description':
@@ -565,15 +565,15 @@ def pfx_method(method, use_str=False):
 
   fname = method.__name__
 
-  def wrapper(self, *a, **kw):
+  def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
       return method(self, *a, **kw)
 
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = fname
-  return wrapper
+  pfx_method_wrapper.__doc__ = method.__doc__
+  pfx_method_wrapper.__name__ = fname
+  return pfx_method_wrapper
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`

@@ -431,7 +431,7 @@ def locked_property(
     prop_name = '_' + func.__name__
 
   @transmute(exc_from=AttributeError)
-  def getprop(self):
+  def locked_property_getprop(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset.
     '''
@@ -456,7 +456,7 @@ def locked_property(
       pass
     return p
 
-  return prop(getprop)
+  return prop(locked_property_getprop)
 
 class LockableMixin(object):
   ''' Trite mixin to control access to an object via its `._lock` attribute.

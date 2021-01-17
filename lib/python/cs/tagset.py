@@ -87,7 +87,7 @@
         >>> subtopic2 in tags
         False
 
-== Ontologies ===
+== Ontologies ==
 
 `Tag`s and `TagSet`s suffice to apply simple annotations to things.
 However, an ontology brings meaning to those annotations.
@@ -174,15 +174,18 @@ There is a detailed run down of this in the `TagSetNamespace` docstring below.
 '''
 
 from abc import ABC, abstractmethod
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import date, datetime
+import errno
 import fnmatch
 from fnmatch import fnmatchcase
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
+from os.path import dirname, isdir as isdirpath
 import re
+from threading import Lock
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
@@ -190,6 +193,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
+from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, lc_, titleify_lc,
@@ -201,6 +205,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method, XP
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
+from cs.threads import locked_property
 
 __version__ = '20200716-post'
 
@@ -330,7 +335,25 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
         for entities associated with database rows.
+
+      Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
+      you can also access tag values as attributes
+      provided that they do conflict with instance attributes
+      or class methods or properties.
+      The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
+      as `None` which causes attribute access to return `None`
+      for missing tag names.
+      This supports code like:
+
+          if tags.title:
+              # use the title in something
+          else:
+              # handle a missing title tag
   '''
+
+  # arrange to return None for missing mapping attributes
+  # supporting tags.foo being None if there is no 'foo' tag
+  ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
   @require(
@@ -358,9 +381,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if okw:
       raise ValueError("unrecognised keywords: %r" % (okw,))
     super().__init__(*a, **dict_kw)
-    self.id = _id
-    self.ontology = _ontology
-    self.modified = False
+    self.__dict__.update(id=_id, ontology=_ontology, modified=False)
 
   def __str__(self):
     ''' The `TagSet` suitable for writing to a tag file.
@@ -369,6 +390,73 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def __getattr__(self, attr):
+    ''' Support access to dotted name attributes
+        if `attr` is not found via the superclass `__getattr__`.
+
+        This is done by returning a subtags of those tags
+        commencing with `attr+'.'`.
+
+        Example:
+
+            >>> tags=TagSet(a=1,b=2)
+            >>> tags.a
+            1
+            >>> tags.c
+            >>> tags['c.z']=9
+            >>> tags['c.x']=8
+            >>> tags
+            TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
+            >>> tags.c
+            TagSet:{'z': 9, 'x': 8}
+            >>> tags.c.z
+            9
+
+        However, this is not supported when there is a tag named `'c'`
+        because `tags.c` has to return the `'c'` tag value:
+
+            >>> tags=TagSet(a=1,b=2,c=3)
+            >>> tags.a
+            1
+            >>> tags.c
+            3
+            >>> tags['c.z']=9
+            >>> tags.c.z
+            Traceback (most recent call last):
+              File "<stdin>", line 1, in <module>
+            AttributeError: 'int' object has no attribute 'z'
+
+    '''
+    try:
+      return self[attr]
+    except KeyError:
+      # magic dotted name access to foo.bar if there are keys
+      # starting with "attr."
+      if attr and attr[0].isalpha():
+        attr_ = attr + '.'
+        if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
+          return self.subtags(attr)
+      return super().__getattr__(attr)
+
+  def __setattr__(self, attr, value):
+    ''' Attribute based `Tag` access.
+
+        If `attr` is in `self.__dict__` then that is updated,
+        supporting "normal" attributes set on the instance.
+        Otherwise the `Tag` named `attr` is set to `value`.
+
+        The `__init__` methods of subclasses should do something like this
+        (from `TagSet.__init__`)
+        to set up the ordinary instance attributes
+        which are not to be treated as `Tag`s:
+
+            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+    '''
+    if attr in self.__dict__:
+      self.__dict__[attr] = value
+    else:
+      self[attr] = value
 
   @classmethod
   def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
@@ -403,11 +491,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         ontology=ontology or self.ontology,
     )
 
-  def as_tags(self, prefix=None):
+  def as_tags(self, prefix=None, ontology=None):
     ''' Yield the tag data as `Tag`s.
     '''
+    if ontology is None:
+      ontology = self.ontology
     for tag_name in self.keys():
-      yield self.tag(tag_name, prefix=prefix, ontology=self.ontology)
+      yield self.tag(tag_name, prefix=prefix, ontology=ontology)
 
   __iter__ = as_tags
 
@@ -426,15 +516,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     '''
     old_value = self.get(tag_name)
     if tag_name not in self or old_value is not value:
+      # setting to the same object is not a change,
+      # but setting to an equivalent value is a change
       self.modified = True
-      if tag_name not in self or old_value != value:
+      if old_value != value:
+        # report different values
         tag = Tag(tag_name, value, ontology=self.ontology)
         msg = (
             "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
             (tag, old_value)
         )
         ifverbose(verbose, msg)
-    super().__setitem__(tag_name, value)
+      super().__setitem__(tag_name, value)
 
   # "set" mode
   add = set
@@ -570,6 +663,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     self.set_from(new_values, verbose=verbose)
 
   @classmethod
+  @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
     ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
         return the `TagSet`.
@@ -585,16 +679,18 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
     tags = TagSet.from_line(line, offset, ontology=ontology)
+    if 'name' in tags:
+      warning("discard explicit tag name=%r", tags.name)
+      tags.discard('name')
     return name, tags
 
   @classmethod
   @pfx_method
   def edit_many(cls, tes, editor=None, verbose=True):
     ''' Edit an iterable of `TagSet`s.
-        Return a list of the `TagSet`s which were modified.
+        Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
-        This function supports modifying `Tag`s
-        including the `'name'` `Tag`.
+        This function supports modifying both `name` and `Tag`s.
     '''
     if editor is None:
       editor = EDITOR
@@ -604,7 +700,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     lines = list(
         map(
             lambda te: ' '.join(
-                [te.transcribe_value(te.name or te.id)] + [
+                [Tag.transcribe_value(te.name or te.id)] + [
                     str(te.tag(tag_name))
                     for tag_name in te.keys()
                     if tag_name != 'name'
@@ -615,31 +711,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
     changes = edit_strings(lines, editor=editor)
     changed_tes = []
     for old_line, new_line in changes:
-      old_name, _ = cls.from_editable_line(old_line)
+      old_name, _ = cls._from_named_tags_line(old_line)
       assert isinstance(old_name, (str, int))
       with Pfx("%r", old_name):
         te = te_map[old_name]
-        changed_tes.append(te)
         new_name, new_tags = cls._from_named_tags_line(new_line)
-        # modify Tags
         te.set_from(new_tags, verbose=verbose)
-        if old_name != new_name:
-          # update name
-          with Pfx("=> %r", new_name):
-            if not isinstance(new_name, (str, int)):
-              error("illegal value, expected str or int")
-            elif new_name in te_map:
-              error("already in map, not changing")
-            elif isinstance(new_name, int):
-              if isinstance(old_name, int):
-                error("may not change ids")
-              else:
-                te.id = new_name
-                te.discard('name')
-            elif new_name:
-              te.set('name', new_name)
-            else:
-              te.discard('name')
+        changed_tes.append((old_name, new_name, te))
     return changed_tes
 
   @classmethod
@@ -662,7 +740,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         The inverse of `from_csvrow`.
     '''
     return [self.unixtime, self.id, self.name
-            ] + [str(tag) for tag in self.tags]
+            ] + [str(tag) for tag in self if tag.name != 'name']
 
 class Tag(namedtuple('Tag', 'name value ontology')):
   ''' A Tag has a `.name` (`str`) and a `.value`
@@ -774,18 +852,6 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     if value is None:
       return name
     return name + '=' + self.transcribe_value(value)
-
-  def prefix_name(self, prefix):
-    ''' Return a `Tag` whose `.name` has an additional prefix.
-
-        If `prefix` is `None` or empty, return this `Tag`.
-        Otherwise return a new `Tag` whose name is `prefix+'.'+self.name`.
-    '''
-    if not prefix:
-      return self
-    return type(self)(
-        '.'.join((prefix, self.name)), self.value, ontology=self.ontology
-    )
 
   @classmethod
   def transcribe_value(cls, value):
@@ -1328,14 +1394,13 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
         *Note*: comparisons when `self.tag.name` is not in `tags`
         always return `False` (possibly inverted by `self.choice`).
     '''
-    tags = te.tags
     tag_name = self.tag.name
     comparison = self.comparison
     if comparison is None:
-      result = tag_name in tags
+      result = tag_name in te
     else:
       try:
-        tag_value = tags[tag_name]
+        tag_value = te[tag_name]
       except KeyError:
         # tag not present, base test fails
         result = False
@@ -1425,7 +1490,7 @@ class ExtendedNamespace(SimpleNamespace):
     ''' Just a stub so that (a) subclasses can call `super().__getattr__`
         and (b) a pathbased `AttributeError` gets raised for better context.
     '''
-    raise AttributeError("%s:.%s" % (self._path, attr))
+    raise AttributeError("%s:%s.%s" % (self._path, type(self).__name__, attr))
 
   @pfx_method
   def __getitem__(self, attr):
@@ -1582,6 +1647,14 @@ class TagSetNamespace(ExtendedNamespace):
       return str(tag.value)
     return super().__str__()
 
+  def __repr__(self):
+    ''' Return `repr(self._tag.value)` if defined, otherwise use the superclass `__repr__`.
+    '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      return repr(tag.value)
+    return super().__repr__()
+
   def __bool__(self):
     ''' Truthiness: `True` unless the `._bool` attribute overrides that.
     '''
@@ -1703,6 +1776,10 @@ class TagSetNamespace(ExtendedNamespace):
             pass
           else:
             return list(keys())
+      if attr == '_value':
+        tag = getns('_tag')
+        if tag is not None:
+          return tag.value
       if attr == '_values':
         tag = getns('_tag')
         if tag is not None:
@@ -1827,13 +1904,17 @@ class TagSets(MultiOpenMixin, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name)`: as with `defaultdict` this is called as
-        `default_factory(name)` from `__getitem__` for missing names,
+      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called as
+        from `__missing__` for missing names,
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
         for missing names.
+        _Unlike_ `defaultdict`, the factory is called with the key `name`
+        and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
+      * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
+        this is called by the `__missing__` method with a newly created `TagSet`.
 
       Subclasses may reasonably want to define the following:
       * `startup(self)`: allocate any needed resources
@@ -1846,11 +1927,12 @@ class TagSets(MultiOpenMixin, ABC):
 
   _missing = object()
 
-  default_factory = lambda name: None
+  TagSetClass = TagSet
 
-  def __init__(self):
+  def __init__(self, *, ontology=None):
     ''' Initialise the collection.
     '''
+    self.ontology = ontology
 
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
@@ -1866,23 +1948,31 @@ class TagSets(MultiOpenMixin, ABC):
         release resources allocated during `startup`.
     '''
 
-  @pfx_method(use_str=True)
-  def __missing__(self, name: str):
-    ''' Like `dict`, the `__missing__` method autocreates new `TagSet`.
+  def default_factory(self, name: str):
+    ''' Create a new `TagSet` named `name`.
+    '''
+    te = self.TagSetClass(name=name)
+    te.ontology = self.ontology
+    return te
 
-        This is called from `__getitem__` is `name` is missing
-        and uses the factory `self.default_factory`.
+  @pfx_method(use_str=True)
+  def __missing__(self, name: str, **kw):
+    ''' Like `dict`, the `__missing__` method may autocreate a new `TagSet`.
+
+        This is called from `__getitem__` if `name` is missing
+        and uses the factory `cls.default_factory`.
         If that is `None` raise `KeyError`,
-        otherwise call `self.default_factory(name)`.
+        otherwise call `self.default_factory(name,**kw)`.
         If that returns `None` raise `KeyError`,
-        otherwise return the entity.
+        otherwise save the entity under `name` and return the entity.
     '''
     te_factory = self.default_factory
     if te_factory is None:
       raise KeyError(name)
-    te = te_factory(name)
+    te = te_factory(name, **kw)
     if te is None:
       raise KeyError(name)
+    self[name] = te
     return te
 
   def add(self, name: str, **kw):
@@ -1913,6 +2003,14 @@ class TagSets(MultiOpenMixin, ABC):
     if te is self._missing:
       te = self.__missing__(name)
     return te
+
+  @abstractmethod
+  def __setitem__(self, name, te):
+    ''' Save `te` in the backend under the key `name`.
+    '''
+    raise NotImplementedError(
+        "%s: no .__setitem__(name,tagset) method" % (type(self).__name__,)
+    )
 
   def __contains__(self, name: str):
     ''' Test whether `name` is present in `self.te_mapping`.
@@ -2036,6 +2134,11 @@ class TagsOntology(SingletonMixin, TagSets):
     ''' Proxy `.get` through to `self.te_mapping`.
     '''
     return self.te_mapping.get(name, default)
+
+  def __setitem__(self, name, te):
+    ''' Save `te` against the key `name`.
+    '''
+    self.te_mapping[name] = te
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -2234,9 +2337,234 @@ class TagsOntology(SingletonMixin, TagSets):
           warning("new name already exists, not renaming")
           continue
         old_index = prefix + old_name if prefix else old_name
-        self[new_index] = te.tags
+        self[new_index] = te
         del self[old_index]
     return changed_tes
+
+class TagFile(SingletonMixin, TagSets):
+  ''' A reference to a specific file containing tags.
+
+      This manages a mapping of `name` => `TagSet`,
+      itself a mapping of tag name => tag value.
+  '''
+
+  @classmethod
+  def _singleton_key(cls, filepath, **kw):
+    return filepath
+
+  @typechecked
+  def __init__(self, filepath: str, *, ontology=None):
+    if hasattr(self, 'filepath'):
+      return
+    super().__init__(ontology=ontology)
+    self.filepath = filepath
+    self._tagsets = None
+    self._lock = Lock()
+
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, shortpath(self.filepath))
+
+  def __repr__(self):
+    return "%s(%r)" % (type(self).__name__, self.filepath)
+
+  def startup(self):
+    ''' No special startup.
+    '''
+
+  def shutdown(self):
+    ''' Save the tagsets if modified.
+    '''
+    self.save()
+
+  def get(self, name, default=None):
+    ''' Get from the tagsets.
+    '''
+    return self.tagsets.get(name, default)
+
+  def __setitem__(self, name, te):
+    ''' Set item `name` to `te`.
+    '''
+    self.tagsets[name] = te
+
+  # Mapping mathods, proxying through to .tagsets.
+  def keys(self, prefix=None):
+    ''' `tagsets.keys`
+
+        If the options `prefix` is supplied,
+        yield only those keys starting with `prefix`.
+    '''
+    ks = self.tagsets.keys()
+    if prefix:
+      ks = filter(lambda k: k.startswith(prefix), ks)
+    return ks
+
+  def values(self, prefix=None):
+    ''' `tagsets.values`
+
+        If the options `prefix` is supplied,
+        yield only those values whose keys start with `prefix`.
+    '''
+    if not prefix:
+      # use native values, faster
+      return self.tagsets.values()
+    return map(lambda kv: kv[1], self.items(prefix=prefix))
+
+  def items(self, prefix=None):
+    ''' `tagsets.items`
+
+        If the options `prefix` is supplied,
+        yield only those items whose keys start with `prefix`.
+    '''
+    if not prefix:
+      # use native items, faster
+      return self.tagsets.items()
+    return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
+
+  def __delitem__(self, name):
+    del self.tagsets[name]
+
+  @locked_property
+  @pfx_method
+  def tagsets(self):
+    ''' The tag map from the tag file,
+        a mapping of name=>`TagSet`.
+
+        This is loaded on demand.
+    '''
+    ts = self._tagsets = {}
+    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    self.unparsed = unparsed
+    ont = self.ontology
+    for name, tags in loaded_tagsets.items():
+      te = ts[name] = self.default_factory(name)
+      te.ontology = ont
+      te.update(tags)
+    return ts
+
+  @property
+  def names(self):
+    ''' The names from this `FSTagsTagFile` as a list.
+    '''
+    return list(self.tagsets.keys())
+
+  @classmethod
+  @pfx_method
+  def parse_tags_line(cls, line, ontology=None, verbose=None):
+    ''' Parse a "name tags..." line as from a `.fstags` file,
+        return `(name,TagSet)`.
+    '''
+    name, offset = Tag.parse_value(line)
+    if offset < len(line) and not line[offset].isspace():
+      _, offset2 = get_nonwhite(line, offset)
+      name = line[:offset2]
+      # This is normal.
+      ##warning(
+      ##    "offset %d: expected whitespace, adjusted name to %r", offset, name
+      ##)
+      offset = offset2
+    if offset < len(line) and not line[offset].isspace():
+      warning("offset %d: expected whitespace", offset)
+    tags = TagSet.from_line(line, offset, ontology=ontology, verbose=verbose)
+    return name, tags
+
+  @classmethod
+  def load_tagsets(cls, filepath, ontology):
+    ''' Load `filepath` and return `(tagsets,unparsed)`.
+
+        The returned `tagsets` are a mapping of `name`=>`tag_name`=>`value`.
+        The returned `unparsed` is a list of `(lineno,line)`
+        for lines which failed the parse (excluding the trailing newline).
+    '''
+    with Pfx("%r", filepath):
+      tagsets = defaultdict(lambda: TagSet(_ontology=ontology))
+      unparsed = []
+      try:
+        with open(filepath) as f:
+          for lineno, line in enumerate(f, 1):
+            with Pfx(lineno):
+              line0 = cutsuffix(line, '\n')
+              line = line0.strip()
+              if not line:
+                continue
+              if line.startswith('#'):
+                unparsed.append((lineno, line0))
+                continue
+              try:
+                name, tags = cls.parse_tags_line(line, ontology=ontology)
+              except ValueError as e:
+                warning("parse error: %s", e)
+                unparsed.append((lineno, line0))
+              else:
+                if 'name' in tags:
+                  warning("discard explicit tag name=%s", tags.name)
+                  tags.discard('name')
+                tagsets[name] = tags
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
+      return tagsets, unparsed
+
+  @classmethod
+  def tags_line(cls, name, tags):
+    ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
+    '''
+    fields = [Tag.transcribe_value(name)]
+    for tag in tags:
+      fields.append(str(tag))
+    return ' '.join(fields)
+
+  @classmethod
+  @pfx_method
+  def save_tagsets(cls, filepath, tagsets, unparsed):
+    ''' Save `tagsets` and `unparsed` to `filepath`.
+
+        This method will create the required intermediate directories
+        if missing.
+    '''
+    with Pfx(filepath):
+      dirpath = dirname(filepath)
+      if not isdirpath(dirpath):
+        ifverbose("makedirs(%r)", dirpath)
+        with Pfx("os.makedirs(%r)", dirpath):
+          os.makedirs(dirpath)
+      name_tags = sorted(tagsets.items())
+      try:
+        with open(filepath, 'w') as f:
+          for _, line in unparsed:
+            if not line.startswith('#'):
+              f.write('##  ')
+            f.write(line)
+            f.write('\n')
+          for name, tags in name_tags:
+            if not tags:
+              continue
+            f.write(cls.tags_line(name, tags))
+            f.write('\n')
+      except OSError as e:
+        error("save(%r) fails: %s", filepath, e)
+      else:
+        for _, tags in name_tags:
+          tags.modified = False
+
+  def save(self):
+    ''' Save the tag map to the tag file.
+    '''
+    tagsets = self._tagsets
+    if tagsets is None:
+      # TagSets never loaded
+      return
+    with self._lock:
+      if any(map(lambda tagset: tagset.modified, tagsets.values())):
+        # there are modified TagSets
+        self.save_tagsets(self.filepath, tagsets, self.unparsed)
+        for tagset in tagsets.values():
+          tagset.modified = False
+
+  def update(self, name, tags, *, prefix=None, verbose=None):
+    ''' Update the tags for `name` from the supplied `tags`
+        as for `Tagset.update`.
+    '''
+    return self[name].update(tags, prefix=prefix, verbose=verbose)
 
 class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.

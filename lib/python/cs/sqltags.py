@@ -23,6 +23,7 @@ import csv
 from datetime import datetime
 from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
+import operator
 import os
 from os.path import abspath, expanduser, exists as existspath
 import re
@@ -33,7 +34,6 @@ from typing import List
 from icontract import require
 from sqlalchemy import (
     create_engine,
-    select,
     Column,
     Integer,
     Float,
@@ -43,6 +43,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
@@ -116,11 +117,131 @@ def glob2like(glob: str) -> str:
   assert '[' not in glob
   return glob.replace('*', '%').replace('?', '_')
 
-class SQLParameters(namedtuple(
-    'SQLParameters', 'criterion table alias entity_id_column constraint')):
+class SQLParameters(namedtuple('SQLParameters',
+                               'criterion alias entity_id_column constraint')):
   ''' The parameters required for constructing queries
       or extending queries with JOINs.
+
+      Attributes:
+      * `criterion`: the source criterion, usually an `SQTCriterion` subinstance
+      * `alias`: an alias of the source table for use in queries
+      * `entity_id_column`: the `entities` id column,
+        `alias.id` if the alias is of `entities`,
+        `alias.entity_id` if the alias is of `tags`
+      * `constraint`: a filter query based on `alias`
   '''
+
+class SQLTagProxy:
+  ''' An object based on a `Tag` name
+      which produces an `SQLParameters` when comparsed with some value.
+
+      Example:
+
+          >>> sqltags = SQLTags('sqlite://')
+          >>> sqltags.init()
+          >>> # make a SQLParameters for testing the tag 'name.thing'==5
+          >>> sqlp = sqltags.tags.name.thing == 5
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.float_value = :float_value_1'
+          >>> sqlp = sqltags.tags.name.thing == 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
+  '''
+
+  def __init__(self, orm, tag_name):
+    self._orm = orm
+    self._tag_name = tag_name
+
+  def __str__(self):
+    return "%s(tag_name=%r)" % (type(self).__name__, self._tag_name)
+
+  def __getattr__(self, sub_tag_name):
+    ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
+    '''
+    return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
+
+  def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
+    ''' Parameterised translator from an operator to an `SQLParameters`.
+
+        Parameters:
+        * `op_label`: a text label for the operator for use in messages,
+          such as `'=='` for `operator.eq`.
+        * `other`: the other value to which to compare.
+        * `op`: the operator callable returning an SQLAlchemy filter condition
+          from an SQLAlchemy column and the derived avlue from `other`;
+          usually this will be supplied as something like `operator.eq`.
+        * `op_takes_alias`: a Boolean (default `False`).
+          If false, `op` is handed a column from the table alias as above.
+          If true, `op` is handed the table alias itself.
+
+        The `op_takes_alias` parameter exists to support multicolumn
+        conditions such as `==None`, which needs to test that all the value
+        columns are `NULL`.
+
+        The default case (`op_takes_alias` is false)
+        obtains the condition from `op(column,value)`
+        where `column` and `value` are inferred from the type of `other`:
+        - if `other` is an `int` or `float`
+          then `column=alias.float_value` and `value=float(other)`
+        - if `other` is a `str`
+          then `column=alias.string_value` and `value=other`
+
+        When `op_takes_alias` is true
+        the condition is obtained from `op(alias,other)`
+        where `alias` is the new table alias for `tags`
+        and `other` is the value supplied.
+        It is up to `op` to construct the required condition.
+    '''
+    pf = f'{self}{op_label}{other!r}'
+    with Pfx(pf):
+      tags = aliased(self._orm.tags)
+      if op_takes_alias:
+        other_condition = op(tags, other)
+      else:
+        if isinstance(other, (int, float)):
+          tag_value = float(other)
+          column = tags.float_value
+        elif isinstance(other, str):
+          tag_value = other
+          column = tags.string_value
+        else:
+          raise TypeError("not supported for type %s" % (type(other),))
+        other_condition = op(column, tag_value)
+      return SQLParameters(
+          criterion=pf,
+          alias=tags,
+          entity_id_column=tags.entity_id,
+          constraint=and_(tags.name == self._tag_name, other_condition),
+      )
+
+  def __eq__(self, other):
+    if other is None:
+      # special test for ==None
+      return self._cmp(
+          "==",
+          other,
+          lambda alias, value: and_(
+              alias.float_value is None, alias.stringvalue is None, alias.
+              structured_value is None
+          ),
+          op_takes_alias=True
+      )
+    return self._cmp("==", other, operator.eq)
+
+
+class SQLTagProxies:
+  ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
+
+      Example:
+
+          sqltags.tags.dotted.name.here == 'foo'
+  '''
+
+  def __init__(self, orm):
+    self.orm = orm
+
+  def __getattr__(self, tag_name):
+    return SQLTagProxy(self.orm, tag_name)
 
 class SQTCriterion(TagSetCriterion):
   ''' Subclass of `TagSetCriterion` requiring an `.sql_parameters` method
@@ -165,7 +286,6 @@ class SQTEntityIdTest(SQTCriterion):
     alias = aliased(entities)
     sqlp = SQLParameters(
         criterion=self,
-        table=entities,
         alias=alias,
         entity_id_column=alias.id,
         constraint=alias.id.in_(self.entity_ids),
@@ -293,7 +413,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   def sql_parameters(self, orm) -> SQLParameters:
     tag = self.tag
     if tag.name in ('name', 'unixtime'):
-      table = entities = orm.entities
+      entities = orm.entities
       alias = aliased(entities)
       entity_id_column = alias.id
       if tag.name == 'name':
@@ -319,7 +439,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       else:
         raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
     else:
-      table = tag = self.tag
+      tag = self.tag
       tags = orm.tags
       alias = aliased(tags)
       entity_id_column = alias.entity_id
@@ -332,7 +452,6 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         warning("no SQLside value test for comparison=%r", self.comparison)
     sqlp = SQLParameters(
         criterion=self,
-        table=table,
         alias=alias,
         entity_id_column=entity_id_column,
         constraint=constraint if self.choice else -alias.has(constraint),
@@ -709,7 +828,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         log_tags.append(Tag('headline', headline))
         if tag_categories:
           log_tags.append(Tag('categories', list(tag_categories)))
-        te = sqltags.default_factory(
+        sqltags.default_factory(
             None, session=session, unixtime=unixtime, tags=log_tags
         )
     return xit
@@ -1223,14 +1342,17 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
     try:
-      pre_sqltags = self.sqltags
-    except AttributeError:
+      pre_sqltags = self.__dict__['sqltags']
+    except KeyError:
       super().__init__(_id=_id, **kw)
-      self._name = name
-      self._unixtime = unixtime
-      self.sqltags = sqltags
+      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
     else:
-      assert pre_sqltags is sqltags
+      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
+          pre_sqltags, sqltags
+      )
+
+  def __hash__(self):
+    return id(self)
 
   @property
   def name(self):
@@ -1260,15 +1382,16 @@ class SQLTagSet(SingletonMixin, TagSet):
 
   @tag_or_tag_value
   @auto_session
-  def set(self, tag_name, value, *, session, skip_db=False):
+  def set(self, tag_name, value, *, session, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError("may not set pseudoTag %r" % (tag_name,))
     if tag_name in ('name', 'unixtime'):
       setattr(self, '_' + tag_name, value)
       if not skip_db:
+        ifverbose(verbose, "+ %s", Tag(tag_name, value))
         setattr(self.get_db_entity(session=session), tag_name, value)
     else:
-      super().set(tag_name, value)
+      super().set(tag_name, value, verbose=verbose)
       if not skip_db:
         self.add_db_tag(tag_name, value, session=session)
 
@@ -1281,16 +1404,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     return e.add_tag(tag_name, value, session=session)
 
   @tag_or_tag_value
-  def discard(self, tag_name, value, *, session, skip_db=False):
+  def discard(self, tag_name, value, *, session, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError("may not discard pseudoTag %r" % (tag_name,))
     if tag_name in ('name', 'unixtime'):
       if value is None or getattr(self, tag_name) == value:
         setattr(self, '_' + tag_name, None)
         if not skip_db:
+          ifverbose(verbose, "- %s", Tag(tag_name, value))
           setattr(self.get_db_entity(session=session), tag_name, None)
     else:
-      super().discard(tag_name, value)
+      super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
         self.discard_db_tag(tag_name, value, session=session)
 
@@ -1320,6 +1444,7 @@ class SQLTags(TagSets):
     self.db_url = db_url
     self.ontology = ontology
     self._lock = RLock()
+    self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
@@ -1381,17 +1506,35 @@ class SQLTags(TagSets):
     if te is None:
       if isinstance(index, int):
         raise IndexError(index)
-      raise KeyError(index)
+      te = self.default_factory(index, session=session)
     return te
 
+  @locked
   @orm_auto_session
-  def keys(self, *, session):
-    ''' Return all the nonNULL names.
+  def __setitem__(self, index, te):
+    ''' Dummy `__setitem__` which checks `te` against the db by type
+        because the factory inserts it into the database.
     '''
-    return session.execute(
-        select(self.orm.entities.name
-               ).filter_by(self.orm.entities.name.isnot(None))
-    ).all()
+    assert isinstance(te, SQLTagSet)
+    assert te.sqltags is self
+
+  def keys(self, *, prefix=None):
+    ''' Yield all the nonNULL names.
+
+        Constrain the names to those starting with `prefix`
+        if not `None`.
+    '''
+    entities = self.orm.entities
+    entities_table = entities.__table__
+    name_column = entities_table.c.name
+    q = select([name_column]).where(name_column.isnot(None))
+    conn = self.orm.engine.connect()
+    result = conn.execute(q)
+    for row in result:
+      name = row.name
+      if prefix is None or name.startswith(prefix):
+        yield name
+    conn.close()
 
   @staticmethod
   @fmtdoc
