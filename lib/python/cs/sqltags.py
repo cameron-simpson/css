@@ -177,6 +177,7 @@ class SQLTagProxy:
           '<': self.__lt__,
           '>=': self.__ge__,
           '>': self.__gt__,
+          '~': self.globlike,
       }[op_text]
     except KeyError:
       raise ValueError("unknown comparison operator text %r" % (op_text,))
