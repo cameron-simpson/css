@@ -44,7 +44,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.sql import select
-from sqlalchemy.sql.expression import and_, case
+from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, pushattrs, popattrs
@@ -133,7 +133,7 @@ class SQLParameters(namedtuple('SQLParameters',
 
 class SQLTagProxy:
   ''' An object based on a `Tag` name
-      which produces an `SQLParameters` when comparsed with some value.
+      which produces an `SQLParameters` when compared with some value.
 
       Example:
 
@@ -159,6 +159,29 @@ class SQLTagProxy:
     ''' Magic access to dotted tag names: produce a new `SQLTagProxy` from ourself.
     '''
     return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
+
+  def by_op_text(self, op_text, other):
+    ''' Return an `SQLParameters` based on the comparison's text representation.
+
+        Parameters:
+        * `op_text`: the comparsion operation text, one of:
+          `'='`, `'<='`, `'<'`, `'>='`, `'>'`, `'~'`.
+        * `other`: the other value for the comparison,
+          used to infer the SQL column name
+          and kept to provide the SQL value parameter
+    '''
+    try:
+      cmp_func = {
+          '=': self.__eq__,
+          '<=': self.__le__,
+          '<': self.__lt__,
+          '>=': self.__ge__,
+          '>': self.__gt__,
+          '~': self.globlike,
+      }[op_text]
+    except KeyError:
+      raise ValueError("unknown comparison operator text %r" % (op_text,))
+    return cmp_func(other)
 
   def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
@@ -214,20 +237,111 @@ class SQLTagProxy:
           constraint=and_(tags.name == self._tag_name, other_condition),
       )
 
-  def __eq__(self, other):
+  def __eq__(self, other) -> SQLParameters:
+    ''' Return an SQL `=` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing == 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
+    '''
     if other is None:
       # special test for ==None
       return self._cmp(
           "==",
           other,
           lambda alias, value: and_(
-              alias.float_value is None, alias.stringvalue is None, alias.
-              structured_value is None
+              alias.float_value is None,
+              alias.stringvalue is None,
+              alias.structured_value is None,
           ),
           op_takes_alias=True
       )
     return self._cmp("==", other, operator.eq)
 
+  def __ne__(self, other) -> SQLParameters:
+    ''' Return an SQL `<>` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing != 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value != :string_value_1'
+    '''
+    if other is None:
+      # special test for ==None
+      return self._cmp(
+          "==",
+          other,
+          lambda alias, value: or_(
+              alias.float_value is not None,
+              alias.stringvalue is not None,
+              alias.structured_value is not None,
+          ),
+          op_takes_alias=True
+      )
+    return self._cmp("!=", other, operator.ne)
+
+  def __lt__(self, other):
+    ''' Return an SQL `<` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing < 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value < :string_value_1'
+    '''
+    return self._cmp("<", other, operator.lt)
+
+  def __le__(self, other):
+    ''' Return an SQL `<=` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing <= 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value <= :string_value_1'
+    '''
+    return self._cmp("<=", other, operator.le)
+
+  def __gt__(self, other):
+    ''' Return an SQL `>` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing > 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value > :string_value_1'
+    '''
+    return self._cmp(">", other, operator.gt)
+
+  def __ge__(self, other):
+    ''' Return an SQL `>=` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing >= 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value >= :string_value_1'
+    '''
+    return self._cmp(">=", other, operator.ge)
+
+  def startswith(self, prefix: str) -> SQLParameters:
+    ''' Return an SQL LIKE prefix test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing.startswith('foo')
+          >>> str(sqlp.constraint)
+          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+    '''
+    esc = '\\'
+    lprefix = prefix.replace('%', esc + '%')
+    return self._cmp(
+        "startswith", prefix,
+        lambda column, prefix: column.like(lprefix + '%', esc)
+    )
 
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
@@ -304,6 +418,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.sql_parameters` method.
   '''
 
+  # TODO: REMOVE SQL_TAG_VALUE_COMPARISON_FUNCS, unused
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
@@ -409,6 +524,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       (isinstance(te_value, str) and re.search(cmp_value, te_value)),
   }
 
+  # TODO: handle tag named "id" specially as well
   @pfx_method
   def sql_parameters(self, orm) -> SQLParameters:
     tag = self.tag
@@ -438,18 +554,15 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         constraint = constraint_fn and constraint_fn(alias, tag.value)
       else:
         raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
+      sqlp = SQLParameters(
+          criterion=self,
+          alias=alias,
+          entity_id_column=entity_id_column,
+          constraint=constraint if self.choice else -alias.has(constraint),
+      )
     else:
-      tag = self.tag
-      tags = orm.tags
-      alias = aliased(tags)
-      entity_id_column = alias.entity_id
-      constraint = alias.name == tag.name
-      constraint2_fn = self.SQL_TAG_VALUE_COMPARISON_FUNCS.get(self.comparison)
-      constraint2 = constraint2_fn and constraint2_fn(alias, tag.value)
-      if constraint2 is not None:
-        constraint = and_(constraint, constraint2)
-      else:
-        warning("no SQLside value test for comparison=%r", self.comparison)
+      # general tag_name
+      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(self.comparison)
     sqlp = SQLParameters(
         criterion=self,
         alias=alias,
