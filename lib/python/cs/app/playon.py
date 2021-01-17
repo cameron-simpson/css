@@ -152,7 +152,8 @@ class PlayOnCommand(BaseCommand):
               xit = 1
     return xit
 
-  def _list(self, argv, options, default_argv):
+  @staticmethod
+  def _list(argv, options, default_argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l  Long format.
@@ -235,6 +236,8 @@ class PlayOnSQLTagSet(SQLTagSet):
 
   @property
   def status(self):
+    ''' A short status string.
+    '''
     if self.is_queued():
       return 'QUEUED'
     if self.is_expired():
@@ -244,9 +247,13 @@ class PlayOnSQLTagSet(SQLTagSet):
     return 'PENDING'
 
   def is_available(self):
+    ''' Is a recording available for download?
+    '''
     return 'playon.Created' in self and not self.is_expired()
 
   def is_queued(self):
+    ''' Is a recording still in the queue?
+    '''
     return 'playon.Created' not in self
 
   def is_downloaded(self):
