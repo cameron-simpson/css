@@ -503,24 +503,9 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.suburl_data('account')
 
-  @pfx_method
-  def queue(self):
-    ''' Return the recording queue entries, a list of `dict`s.
+  def _entities_from_entries(self, entries):
+    ''' Return the `TagSet` instances from PlayOn data entries.
     '''
-    data = self.suburl_data('queue')
-    entries = data['entries']
-    assert len(entries) == data['total_entries'], (
-        "len(entries)=%d but result.data.total_entries=%r" %
-        (len(entries), data['total_entries'])
-    )
-    return entries
-
-  @pfx_method
-  def recordings(self):
-    ''' Return the `TagSet` instances for the available recordings.
-    '''
-    data = self.suburl_data('library/all')
-    entries = data['entries']
     tes = set()
     for entry in entries:
       entry_id = entry['ID']
@@ -552,6 +537,22 @@ class PlayOnAPI(MultiOpenMixin):
         te.update(entry, prefix='playon')
         tes.add(te)
     return tes
+
+  @pfx_method
+  def queue(self):
+    ''' Return the `TagSet` instances for the queued recordings.
+    '''
+    data = self.suburl_data('queue')
+    entries = data['entries']
+    return self._entities_from_entries(entries)
+
+  @pfx_method
+  def recordings(self):
+    ''' Return the `TagSet` instances for the available recordings.
+    '''
+    data = self.suburl_data('library/all')
+    entries = data['entries']
+    return self._entities_from_entries(entries)
 
   # pylint: disable=too-many-locals
   @pfx_method
