@@ -233,6 +233,16 @@ class PlayOnSQLTagSet(SQLTagSet):
     '''
     return self.get('playon.ID')
 
+  @property
+  def status(self):
+    if self.is_queued():
+      return 'QUEUED'
+    if self.is_expired():
+      return 'EXPIRED'
+    if self.is_downloaded():
+      return 'DOWNLOADED'
+    return 'PENDING'
+
   def is_available(self):
     return 'playon.Created' in self and not self.is_expired()
 
@@ -262,7 +272,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       format = self.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(format.format_map(self.ns()))
+    print_func(format.format_map(self.ns()), f'{self.status}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
