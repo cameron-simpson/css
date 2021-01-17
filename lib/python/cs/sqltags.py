@@ -160,6 +160,28 @@ class SQLTagProxy:
     '''
     return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
 
+  def by_op_text(self, op_text, other):
+    ''' Return an `SQLParameters` based on the comparison's text representation.
+
+        Parameters:
+        * `op_text`: the comparsion operation text, one of:
+          `'='`, `'<='`, `'<'`, `'>='`, `'>'`, `'~'`.
+        * `other`: the other value for the comparison,
+          used to infer the SQL column name
+          and kept to provide the SQL value parameter
+    '''
+    try:
+      cmp_func = {
+          '=': self.__eq__,
+          '<=': self.__le__,
+          '<': self.__lt__,
+          '>=': self.__ge__,
+          '>': self.__gt__,
+      }[op_text]
+    except KeyError:
+      raise ValueError("unknown comparison operator text %r" % (op_text,))
+    return cmp_func(other)
+
   def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
 
