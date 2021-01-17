@@ -177,7 +177,7 @@ class SQLTagProxy:
           '<': self.__lt__,
           '>=': self.__ge__,
           '>': self.__gt__,
-          '~': self.globlike,
+          '~': self.likeglob,
       }[op_text]
     except KeyError:
       raise ValueError("unknown comparison operator text %r" % (op_text,))
@@ -341,6 +341,21 @@ class SQLTagProxy:
     return self._cmp(
         "startswith", prefix,
         lambda column, prefix: column.like(lprefix + '%', esc)
+    )
+
+  def likeglob(self, globptn: str) -> SQLParameters:
+    ''' Return an SQL LIKE test approximating a glob as an `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing.likeglob('foo*')
+          >>> str(sqlp.constraint)
+          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+    '''
+    esc = '\\'
+    return self._cmp(
+        "likeglob", globptn, lambda column, globptn: column.
+        like(globptn.replace('%', esc + '%').replace('*', '%'), esc)
     )
 
 class SQLTagProxies:
