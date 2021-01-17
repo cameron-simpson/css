@@ -44,7 +44,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.sql import select
-from sqlalchemy.sql.expression import and_, case
+from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs, pushattrs, popattrs
@@ -133,7 +133,7 @@ class SQLParameters(namedtuple('SQLParameters',
 
 class SQLTagProxy:
   ''' An object based on a `Tag` name
-      which produces an `SQLParameters` when comparsed with some value.
+      which produces an `SQLParameters` when compared with some value.
 
       Example:
 
@@ -237,13 +237,11 @@ class SQLTagProxy:
       )
 
   def __eq__(self, other) -> SQLParameters:
-    ''' Return an SQL = test `SQLParameters`.
+    ''' Return an SQL `=` test `SQLParameters`.
 
         Example:
 
-          >>> sqltags = SQLTags('sqlite://')
-          >>> sqltags.init()
-          >>> sqlp = sqltags.tags.name.thing == 'foo'
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing == 'foo'
           >>> str(sqlp.constraint)
           'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
     '''
@@ -253,21 +251,87 @@ class SQLTagProxy:
           "==",
           other,
           lambda alias, value: and_(
-              alias.float_value is None, alias.stringvalue is None, alias.
-              structured_value is None
+              alias.float_value is None,
+              alias.stringvalue is None,
+              alias.structured_value is None,
           ),
           op_takes_alias=True
       )
     return self._cmp("==", other, operator.eq)
+
+  def __ne__(self, other) -> SQLParameters:
+    ''' Return an SQL `<>` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing != 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value != :string_value_1'
+    '''
+    if other is None:
+      # special test for ==None
+      return self._cmp(
+          "==",
+          other,
+          lambda alias, value: or_(
+              alias.float_value is not None,
+              alias.stringvalue is not None,
+              alias.structured_value is not None,
+          ),
+          op_takes_alias=True
+      )
+    return self._cmp("!=", other, operator.ne)
+
+  def __lt__(self, other):
+    ''' Return an SQL `<` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing < 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value < :string_value_1'
+    '''
+    return self._cmp("<", other, operator.lt)
+
+  def __le__(self, other):
+    ''' Return an SQL `<=` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing <= 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value <= :string_value_1'
+    '''
+    return self._cmp("<=", other, operator.le)
+
+  def __gt__(self, other):
+    ''' Return an SQL `>` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing > 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value > :string_value_1'
+    '''
+    return self._cmp(">", other, operator.gt)
+
+  def __ge__(self, other):
+    ''' Return an SQL `>=` test `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing >= 'foo'
+          >>> str(sqlp.constraint)
+          'tags_1.name = :name_1 AND tags_1.string_value >= :string_value_1'
+    '''
+    return self._cmp(">=", other, operator.ge)
 
   def startswith(self, prefix: str) -> SQLParameters:
     ''' Return an SQL LIKE prefix test `SQLParameters`.
 
         Example:
 
-          >>> sqltags = SQLTags('sqlite://')
-          >>> sqltags.init()
-          >>> sqlp = sqltags.tags.name.thing.startswith('foo')
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing.startswith('foo')
           >>> str(sqlp.constraint)
           "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
     '''
