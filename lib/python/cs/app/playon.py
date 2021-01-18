@@ -10,7 +10,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import partial
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 from netrc import netrc
 from os import environ
 from os.path import (
@@ -47,8 +47,16 @@ class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
 
+  # default "ls" output format
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+
+  # default "queue" output format
+  QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
+
   USAGE_KEYWORDS = {
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+      'LS_FORMAT': LS_FORMAT,
+      'QUEUE_FORMAT': QUEUE_FORMAT,
   }
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
@@ -77,15 +85,15 @@ class PlayOnCommand(BaseCommand):
         'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
     )
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(self, argv, options):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
     sqltags = PlayOnSQLTags()
     api = PlayOnAPI(options.user, options.password, sqltags)
     with stackattrs(options, api=api, sqltags=sqltags):
       with api:
+        self._refresh_sqltags_data(api, sqltags)
         yield
 
   @staticmethod
@@ -153,16 +161,37 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   @staticmethod
-  def _list(argv, options, default_argv):
-    ''' Usage: {cmd} [-l] [recordings...]
+  def _refresh_sqltags_data(api, sqltags, max_age=None):
+    ''' Refresh the queue and recordings if any unexpired records are stale.
+    '''
+    tes = set(sqltags.recordings())
+    if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
+               tes)):
+      print("refresh queue...")
+      api.queue()
+      print("refresh recordings...")
+      api.recordings()
+
+  @staticmethod
+  def _list(argv, options, default_argv, default_format):
+    ''' Inner workings of "ls" and "queue".
+
+        Usage: {ls|queue} [-l] [-o format] [recordings...]
           List available downloads.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
     '''
     sqltags = options.sqltags
     long_mode = False
-    if argv and argv[0] == '-l':
-      argv.pop(0)
-      long_mode = True
+    listing_format = default_format
+    opts, argv = getopt(argv, 'lo:', '')
+    for opt, val in opts:
+      if opt == '-l':
+        long_mode = True
+      elif opt == '-o':
+        listing_format = val
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
       argv = list(default_argv)
     xit = 0
@@ -176,22 +205,26 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           te = sqltags[dl_id]
           with Pfx(te.name):
-            te.ls(long_mode=long_mode)
+            te.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
   def cmd_ls(self, argv, options):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
+          Default format: {LS_FORMAT}
     '''
-    return self._list(argv, options, ['available'])
+    return self._list(argv, options, ['available'], self.LS_FORMAT)
 
   def cmd_queue(self, argv, options):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
+          Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, options, ['queued'])
+    return self._list(argv, options, ['queued'], self.QUEUE_FORMAT)
 
   @staticmethod
   def cmd_update(argv, options):
@@ -205,9 +238,10 @@ class PlayOnCommand(BaseCommand):
     for state in argv:
       with Pfx(state):
         if state == 'queue':
-          for qentry in api.queue():
-            print(qentry)
+          print("refresh queue...")
+          api.queue()
         elif state == 'recordings':
+          print("refresh recordings...")
           api.recordings()
         else:
           warning("unsupported update target")
@@ -226,8 +260,7 @@ class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
 
-  # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+  STALE_AGE = 3600
 
   def recording_id(self):
     ''' The recording id or `None`.
@@ -266,20 +299,33 @@ class PlayOnSQLTagSet(SQLTagSet):
     ''' Test whether this recording is expired,
         should imply no longer available for download.
     '''
-    expires = self['playon.Expires']
+    expires = self.get('playon.Expires')
     if not expires:
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
-  # pylint: disable=redefined-builtin
-  def ls(self, format=None, long_mode=False, print_func=None):
+  def is_stale(self, max_age=None):
+    ''' Test whether this entry is stale
+        i.e. the time since `self.last_updated` exceeds `max_age` seconds,
+        default from `self.STALE_AGE`.
+    '''
+    if max_age is None:
+      max_age = self.STALE_AGE
+    if max_age <= 0:
+      return True
+    last_updated = self.last_updated
+    if not last_updated:
+      return True
+    return time.time() >= last_updated + max_age
+
+  def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
     '''
-    if format is None:
-      format = self.LS_FORMAT
+    if ls_format is None:
+      ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(format.format_map(self.ns()), f'{self.status}')
+    print_func(ls_format.format_map(self.ns()), f'{self.status}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
@@ -304,8 +350,10 @@ class PlayOnSQLTags(SQLTags):
 
   def recordings(self):
     ''' Yield recording `TagSet`s, those named `"recording.*"`.
+
+        Note that this includes both recorded and queued items.
     '''
-    return map(lambda k: self[k], self.keys(prefix='recording.'))
+    return filter(None, map(lambda k: self[k], self.keys(prefix='recording.')))
 
   __iter__ = recordings
 
@@ -513,6 +561,7 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
+    now = time.time()
     tes = set()
     for entry in entries:
       entry_id = entry['ID']
@@ -542,6 +591,7 @@ class PlayOnAPI(MultiOpenMixin):
                   entry[field] = value2
         te = self[entry_id]
         te.update(entry, prefix='playon')
+        te.update(dict(last_updated=now))
         tes.add(te)
     return tes
 
