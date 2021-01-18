@@ -85,15 +85,15 @@ class PlayOnCommand(BaseCommand):
         'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
     )
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(self, argv, options):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
     sqltags = PlayOnSQLTags()
     api = PlayOnAPI(options.user, options.password, sqltags)
     with stackattrs(options, api=api, sqltags=sqltags):
       with api:
+        self._refresh_sqltags_data(api, sqltags)
         yield
 
   @staticmethod
@@ -159,6 +159,18 @@ class PlayOnCommand(BaseCommand):
             elif not _dl(dl_id):
               xit = 1
     return xit
+
+  @staticmethod
+  def _refresh_sqltags_data(api, sqltags, max_age=None):
+    ''' Refresh the queue and recordings if any unexpired records are stale.
+    '''
+    tes = set(sqltags.recordings())
+    if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
+               tes)):
+      print("refresh queue...")
+      api.queue()
+      print("refresh recordings...")
+      api.recordings()
 
   @staticmethod
   def _list(argv, options, default_argv, default_format):
