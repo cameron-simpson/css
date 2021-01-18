@@ -247,6 +247,8 @@ class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
 
+  STALE_AGE = 3600
+
   def recording_id(self):
     ''' The recording id or `None`.
     '''
@@ -288,6 +290,20 @@ class PlayOnSQLTagSet(SQLTagSet):
     if not expires:
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
+
+  def is_stale(self, max_age=None):
+    ''' Test whether this entry is stale
+        i.e. the time since `self.last_updated` exceeds `max_age` seconds,
+        default from `self.STALE_AGE`.
+    '''
+    if max_age is None:
+      max_age = self.STALE_AGE
+    if max_age <= 0:
+      return True
+    last_updated = self.last_updated
+    if not last_updated:
+      return True
+    return time.time() >= last_updated + max_age
 
   def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
@@ -532,6 +548,7 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
+    now = time.time()
     tes = set()
     for entry in entries:
       entry_id = entry['ID']
@@ -561,6 +578,7 @@ class PlayOnAPI(MultiOpenMixin):
                   entry[field] = value2
         te = self[entry_id]
         te.update(entry, prefix='playon')
+        te.update(dict(last_updated=now))
         tes.add(te)
     return tes
 
