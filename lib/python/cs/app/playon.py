@@ -47,6 +47,12 @@ class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
   '''
 
+  # default "ls" output format
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+
+  # default "queue" output format
+  QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
+
   USAGE_KEYWORDS = {
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
   }
@@ -226,9 +232,6 @@ class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
 
-  # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
-
   def recording_id(self):
     ''' The recording id or `None`.
     '''
@@ -271,15 +274,14 @@ class PlayOnSQLTagSet(SQLTagSet):
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
-  # pylint: disable=redefined-builtin
-  def ls(self, format=None, long_mode=False, print_func=None):
+  def ls(self, ls_format=None, long_mode=False, print_func=None):
     ''' List a recording.
     '''
-    if format is None:
-      format = self.LS_FORMAT
+    if ls_format is None:
+      ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(format.format_map(self.ns()), f'{self.status}')
+    print_func(ls_format.format_map(self.ns()), f'{self.status}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
