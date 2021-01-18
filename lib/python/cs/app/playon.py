@@ -238,9 +238,10 @@ class PlayOnCommand(BaseCommand):
     for state in argv:
       with Pfx(state):
         if state == 'queue':
-          for qentry in api.queue():
-            print(qentry)
+          print("refresh queue...")
+          api.queue()
         elif state == 'recordings':
+          print("refresh recordings...")
           api.recordings()
         else:
           warning("unsupported update target")
@@ -352,7 +353,7 @@ class PlayOnSQLTags(SQLTags):
 
         Note that this includes both recorded and queued items.
     '''
-    return filter(None,map(lambda k: self[k], self.keys(prefix='recording.')))
+    return filter(None, map(lambda k: self[k], self.keys(prefix='recording.')))
 
   __iter__ = recordings
 
