@@ -286,7 +286,7 @@ class PlayOnSQLTagSet(SQLTagSet):
     ''' Test whether this recording is expired,
         should imply no longer available for download.
     '''
-    expires = self['playon.Expires']
+    expires = self.get('playon.Expires')
     if not expires:
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
