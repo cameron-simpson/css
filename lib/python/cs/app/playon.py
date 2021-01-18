@@ -10,7 +10,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import partial
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 from netrc import netrc
 from os import environ
 from os.path import (
@@ -55,6 +55,8 @@ class PlayOnCommand(BaseCommand):
 
   USAGE_KEYWORDS = {
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+      'LS_FORMAT': LS_FORMAT,
+      'QUEUE_FORMAT': QUEUE_FORMAT,
   }
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
@@ -159,16 +161,25 @@ class PlayOnCommand(BaseCommand):
     return xit
 
   @staticmethod
-  def _list(argv, options, default_argv):
-    ''' Usage: {cmd} [-l] [recordings...]
+  def _list(argv, options, default_argv, default_format):
+    ''' Inner workings of "ls" and "queue".
+
+        Usage: {ls|queue} [-l] [-o format] [recordings...]
           List available downloads.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
     '''
     sqltags = options.sqltags
     long_mode = False
-    if argv and argv[0] == '-l':
-      argv.pop(0)
-      long_mode = True
+    listing_format = default_format
+    opts, argv = getopt(argv, 'lo:', '')
+    for opt, val in opts:
+      if opt == '-l':
+        long_mode = True
+      elif opt == '-o':
+        listing_format = val
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
       argv = list(default_argv)
     xit = 0
@@ -182,22 +193,26 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           te = sqltags[dl_id]
           with Pfx(te.name):
-            te.ls(long_mode=long_mode)
+            te.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
   def cmd_ls(self, argv, options):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
+          Default format: {LS_FORMAT}
     '''
-    return self._list(argv, options, ['available'])
+    return self._list(argv, options, ['available'], self.LS_FORMAT)
 
   def cmd_queue(self, argv, options):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
-          -l  Long format.
+          -l        Long listing: list tags below each entry.
+          -o format Format string for each entry.
+          Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, options, ['queued'])
+    return self._list(argv, options, ['queued'], self.QUEUE_FORMAT)
 
   @staticmethod
   def cmd_update(argv, options):
