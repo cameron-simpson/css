@@ -198,7 +198,9 @@ class BaseCommand:
       subusages = []
       for attr in sorted(subcmds):
         with Pfx(attr):
-          subusage = cls.subcommand_usage_text(attr)
+          subusage = cls.subcommand_usage_text(
+              attr, usage_format_mapping=usage_format_mapping
+          )
           if subusage:
             subusages.append(subusage.replace('\n', '\n  '))
       if subusages:
@@ -211,7 +213,9 @@ class BaseCommand:
     return usage_message
 
   @classmethod
-  def subcommand_usage_text(cls, subcmd, fulldoc=False):
+  def subcommand_usage_text(
+      cls, subcmd, fulldoc=False, usage_format_mapping=None
+  ):
     ''' Return the usage text for a subcommand.
 
         Parameters:
@@ -238,6 +242,8 @@ class BaseCommand:
         subusage_format = stripped_dedent(post_usage_format)
         if subusage_format:
           mapping = dict(sys.modules[method.__module__].__dict__)
+          if usage_format_mapping:
+            mapping.update(usage_format_mapping)
           mapping.update(cmd=subcmd)
           subusage = subusage_format.format_map(mapping)
           if fulldoc:
