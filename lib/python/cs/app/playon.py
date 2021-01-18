@@ -321,8 +321,10 @@ class PlayOnSQLTags(SQLTags):
 
   def recordings(self):
     ''' Yield recording `TagSet`s, those named `"recording.*"`.
+
+        Note that this includes both recorded and queued items.
     '''
-    return map(lambda k: self[k], self.keys(prefix='recording.'))
+    return filter(None,map(lambda k: self[k], self.keys(prefix='recording.')))
 
   __iter__ = recordings
 
