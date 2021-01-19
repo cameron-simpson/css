@@ -260,7 +260,8 @@ class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
 
-  STALE_AGE = 3600
+  # recording data stale after 10 minutes
+  STALE_AGE = 600
 
   def recording_id(self):
     ''' The recording id or `None`.
