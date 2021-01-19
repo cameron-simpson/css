@@ -32,7 +32,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
-from cs.threads import monitor
+from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -169,10 +169,10 @@ class PlayOnCommand(BaseCommand):
     tes = set(sqltags.recordings())
     if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
                tes)):
-      print("refresh queue...")
-      api.queue()
-      print("refresh recordings...")
-      api.recordings()
+      print("refresh queue and recordings...")
+      Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
+      for T in Ts:
+        T.join()
 
   @staticmethod
   def _list(argv, options, default_argv, default_format):
@@ -237,17 +237,21 @@ class PlayOnCommand(BaseCommand):
     if not argv:
       argv = ['queue', 'recordings']
     xit = 0
+    Ts = []
     for state in argv:
       with Pfx(state):
         if state == 'queue':
           print("refresh queue...")
-          api.queue()
+          Ts.append(bg_thread(api.queue))
         elif state == 'recordings':
           print("refresh recordings...")
-          api.recordings()
+          Ts.append(bg_thread(api.recordings))
         else:
           warning("unsupported update target")
           xit = 1
+    print("wait for API...")
+    for T in Ts:
+      T.join()
     return xit
 
 # pylint: disable=too-few-public-methods
