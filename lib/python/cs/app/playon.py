@@ -565,39 +565,40 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
-    now = time.time()
-    tes = set()
-    for entry in entries:
-      entry_id = entry['ID']
-      with Pfx(entry_id):
-        for field, conv in sorted(dict(
-            Episode=int,
-            ReleaseYear=int,
-            Season=int,
-            ##Created=self.from_playon_date,
-            ##Expires=self.from_playon_date,
-            ##Updated=self.from_playon_date,
-        ).items()):
-          try:
-            value = entry[field]
-          except KeyError:
-            pass
-          else:
-            with Pfx("%s=%r", field, value):
-              if value is None:
-                del entry[field]
-              else:
-                try:
-                  value2 = conv(value)
-                except ValueError as e:
-                  warning("%r: %s", value, e)
+    with self.sqltags.sql_session():
+      now = time.time()
+      tes = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          for field, conv in sorted(dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+              ##Created=self.from_playon_date,
+              ##Expires=self.from_playon_date,
+              ##Updated=self.from_playon_date,
+          ).items()):
+            try:
+              value = entry[field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", field, value):
+                if value is None:
+                  del entry[field]
                 else:
-                  entry[field] = value2
-        te = self[entry_id]
-        te.update(entry, prefix='playon')
-        te.update(dict(last_updated=now))
-        tes.add(te)
-    return tes
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
+                  else:
+                    entry[field] = value2
+          te = self[entry_id]
+          te.update(entry, prefix='playon')
+          te.update(dict(last_updated=now))
+          tes.add(te)
+      return tes
 
   @pfx_method
   def queue(self):
