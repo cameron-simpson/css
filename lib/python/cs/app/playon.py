@@ -19,6 +19,7 @@ from os.path import (
 from pprint import pformat
 import re
 import sys
+from threading import RLock
 import time
 from urllib.parse import unquote as unpercent
 import requests
@@ -31,6 +32,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
+from cs.threads import monitor
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -401,6 +403,7 @@ class PlayOnSQLTags(SQLTags):
       )
 
 # pylint: disable=too-many-instance-attributes
+@monitor
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
   '''
@@ -412,6 +415,7 @@ class PlayOnAPI(MultiOpenMixin):
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
+    self._lock = RLock()
     self._auth_token = None
     self._login = login
     self._password = password
