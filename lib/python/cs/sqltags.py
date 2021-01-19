@@ -62,7 +62,7 @@ from cs.sqlalchemy_utils import (
     orm_auto_session,
     BasicTableMixin,
     HasIdMixin,
-    _state as sqla_state,
+    state as sqla_state,
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
@@ -1561,6 +1561,12 @@ class SQLTags(TagSets):
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
+
+  @contextmanager
+  def sql_session(self):
+    with self.orm.session() as new_session:
+      with sqla_state(session=new_session):
+        yield
 
   @orm_auto_session
   @typechecked
