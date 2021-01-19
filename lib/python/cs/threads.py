@@ -11,6 +11,7 @@ from __future__ import with_statement
 from collections import defaultdict, deque, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
+from inspect import ismethod
 import sys
 from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
 from cs.context import stackattrs
@@ -636,6 +637,34 @@ class PriorityLock(object):
       yield my_lock
     finally:
       self.release()
+
+@decorator
+def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
+  ''' Turn a class into a monitor, all of whose public methods are `@locked`.
+
+      This is a simple approach requires class instances to have a `._lock`
+      which is an `RLock` or compatible
+      because methods may naively call each other.
+
+      Parameters:
+      * `attrs`: optional iterable of attribute names to wrap in `@locked`.
+        If omitted, all names commencing with a letter are chosen.
+      * `initial_timeout`: optional initial lock timeout, default `10.0`s.
+      * `lockattr`: optional lock attribute name, default `'_lock'`.
+
+      Only attributes satifying `inspect.ismethod` are wrapped
+      because `@locked` requires access to the instance `._lock` attribute.
+  '''
+  if attrs is None:
+    attrs = filter(lambda attr: attr and attr[0].isalpha(), dir(cls))
+  for name in attrs:
+    method = getattr(cls, name)
+    if ismethod(method):
+      setattr(
+          cls, name,
+          locked(method, initial_timeout=initial_timeout, lockattr=lockattr)
+      )
+  return cls
 
 if __name__ == '__main__':
   import cs.threads_tests
