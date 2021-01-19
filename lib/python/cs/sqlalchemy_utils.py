@@ -36,16 +36,16 @@ DISTINFO = {
     ],
 }
 
-_state = State(orm=None, session=None)
+state = State(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
   '''
   if orm is None:
-    orm = _state.orm
+    orm = state.orm
     if orm is None:
-      raise RuntimeError("no ORM supplied and no _state.orm")
-  with _state(orm=orm):
+      raise RuntimeError("no ORM supplied and no state.orm")
+  with state(orm=orm):
     return function(*a, orm=orm, **kw)
 
 @contextmanager
@@ -56,13 +56,13 @@ def using_session(orm=None, session=None):
       Parameters:
       * `orm`: optional reference ORM,
         an object with a `.session()` method for creating a new session.
-        Default: if needed, obtained from the global `_state.orm`.
+        Default: if needed, obtained from the global `state.orm`.
       * `session`: optional existing session.
-        Default: the global `_state.session` if not `None`,
+        Default: the global `state.session` if not `None`,
         otherwise created by `orm.session()`.
 
       If a new session is created, the new session and reference ORM
-      are pushed onto the globals `_state.session` and `_state.orm`
+      are pushed onto the globals `state.session` and `state.orm`
       respectively.
 
       If an existing session is reused,
@@ -70,16 +70,16 @@ def using_session(orm=None, session=None):
   '''
   # use the shared state session if no session is supplied
   if session is None:
-    session = _state.session
+    session = state.session
   # we have a session, push to the global context
   if session is not None:
-    with _state(session=session):
+    with state(session=session):
       yield session
   else:
     # no session, we need to create one
     if orm is None:
       # use the shared state ORM if no orm is supplied
-      orm = _state.orm
+      orm = state.orm
       if orm is None:
         raise ValueError(
             "no orm supplied from which to make a session,"
@@ -87,7 +87,7 @@ def using_session(orm=None, session=None):
         )
     # create a new session and run the function within it
     with orm.session() as new_session:
-      with _state(orm=orm, session=new_session):
+      with state(orm=orm, session=new_session):
         yield new_session
 
 def with_session(function, *a, orm=None, session=None, **kw):
@@ -239,14 +239,14 @@ class ORM(MultiOpenMixin):
       def wrapper(self, *a, **kw):
         ''' Call `method` with its ORM as the shared state `orm`.
         '''
-        with _state(orm=self):
+        with state(orm=self):
           yield from method(self, *a, **kw)
     else:
 
       def wrapper(self, *a, **kw):
         ''' Call `method` with its ORM as the shared state `orm`.
         '''
-        with _state(orm=self):
+        with state(orm=self):
           return method(self, *a, **kw)
 
     wrapper.__name__ = method.__name__

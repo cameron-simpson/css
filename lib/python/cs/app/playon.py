@@ -19,6 +19,7 @@ from os.path import (
 from pprint import pformat
 import re
 import sys
+from threading import RLock
 import time
 from urllib.parse import unquote as unpercent
 import requests
@@ -31,6 +32,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet
+from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -167,10 +169,10 @@ class PlayOnCommand(BaseCommand):
     tes = set(sqltags.recordings())
     if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
                tes)):
-      print("refresh queue...")
-      api.queue()
-      print("refresh recordings...")
-      api.recordings()
+      print("refresh queue and recordings...")
+      Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
+      for T in Ts:
+        T.join()
 
   @staticmethod
   def _list(argv, options, default_argv, default_format):
@@ -235,17 +237,21 @@ class PlayOnCommand(BaseCommand):
     if not argv:
       argv = ['queue', 'recordings']
     xit = 0
+    Ts = []
     for state in argv:
       with Pfx(state):
         if state == 'queue':
           print("refresh queue...")
-          api.queue()
+          Ts.append(bg_thread(api.queue))
         elif state == 'recordings':
           print("refresh recordings...")
-          api.recordings()
+          Ts.append(bg_thread(api.recordings))
         else:
           warning("unsupported update target")
           xit = 1
+    print("wait for API...")
+    for T in Ts:
+      T.join()
     return xit
 
 # pylint: disable=too-few-public-methods
@@ -402,6 +408,7 @@ class PlayOnSQLTags(SQLTags):
       )
 
 # pylint: disable=too-many-instance-attributes
+@monitor
 class PlayOnAPI(MultiOpenMixin):
   ''' Access to the PlayOn API.
   '''
@@ -413,6 +420,7 @@ class PlayOnAPI(MultiOpenMixin):
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
+    self._lock = RLock()
     self._auth_token = None
     self._login = login
     self._password = password
@@ -562,39 +570,40 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
-    now = time.time()
-    tes = set()
-    for entry in entries:
-      entry_id = entry['ID']
-      with Pfx(entry_id):
-        for field, conv in sorted(dict(
-            Episode=int,
-            ReleaseYear=int,
-            Season=int,
-            ##Created=self.from_playon_date,
-            ##Expires=self.from_playon_date,
-            ##Updated=self.from_playon_date,
-        ).items()):
-          try:
-            value = entry[field]
-          except KeyError:
-            pass
-          else:
-            with Pfx("%s=%r", field, value):
-              if value is None:
-                del entry[field]
-              else:
-                try:
-                  value2 = conv(value)
-                except ValueError as e:
-                  warning("%r: %s", value, e)
+    with self.sqltags.sql_session():
+      now = time.time()
+      tes = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          for field, conv in sorted(dict(
+              Episode=int,
+              ReleaseYear=int,
+              Season=int,
+              ##Created=self.from_playon_date,
+              ##Expires=self.from_playon_date,
+              ##Updated=self.from_playon_date,
+          ).items()):
+            try:
+              value = entry[field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", field, value):
+                if value is None:
+                  del entry[field]
                 else:
-                  entry[field] = value2
-        te = self[entry_id]
-        te.update(entry, prefix='playon')
-        te.update(dict(last_updated=now))
-        tes.add(te)
-    return tes
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
+                  else:
+                    entry[field] = value2
+          te = self[entry_id]
+          te.update(entry, prefix='playon')
+          te.update(dict(last_updated=now))
+          tes.add(te)
+      return tes
 
   @pfx_method
   def queue(self):
