@@ -19,7 +19,7 @@ from os.path import (
 from pprint import pformat
 import re
 import sys
-from threading import RLock
+from threading import RLock, Semaphore
 import time
 from urllib.parse import unquote as unpercent
 import requests
@@ -125,22 +125,26 @@ class PlayOnCommand(BaseCommand):
       argv = ['pending']
     api = options.api
     filename_format = options.filename_format
+    sem = Semaphore(2)
 
     @typechecked
-    def _dl(dl_id: int):
-      with sqltags.sql_session():
-        filename = api[dl_id].format_as(filename_format)
-        filename = (
-            filename.lower().replace(' - ',
-                                     '--').replace('_', ':').replace(' ', '-') +
-            '.'
-        )
-        try:
-          api.download(dl_id, filename=filename)
-        except ValueError as e:
-          warning("download fails: %s", e)
-          return None
-        return filename
+    def _dl(dl_id: int, sem):
+      try:
+        with sqltags.sql_session():
+          filename = api[dl_id].format_as(filename_format)
+          filename = (
+              filename.lower().replace(' - ',
+                                       '--').replace('_', ':').replace(' ', '-') +
+              '.'
+          )
+          try:
+            api.download(dl_id, filename=filename)
+          except ValueError as e:
+            warning("download fails: %s", e)
+            return None
+          return filename
+      finally:
+        sem.release()
 
     xit = 0
     Rs = []
@@ -159,7 +163,8 @@ class PlayOnCommand(BaseCommand):
             if no_download:
               te.ls()
             else:
-              Rs.append(bg_result(_dl, dl_id, _extra=dict(dl_id=dl_id)))
+              sem.acquire()
+              Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
 
     if Rs:
       for R in report_results(Rs):
