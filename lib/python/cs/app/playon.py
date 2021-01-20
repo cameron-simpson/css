@@ -31,6 +31,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
+from cs.result import bg as bg_result, report as report_results
 from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
@@ -127,20 +128,22 @@ class PlayOnCommand(BaseCommand):
 
     @typechecked
     def _dl(dl_id: int):
-      filename = api[dl_id].format_as(filename_format)
-      filename = (
-          filename.lower().replace(' - ',
-                                   '--').replace('_', ':').replace(' ', '-') +
-          '.'
-      )
-      try:
-        api.download(dl_id, filename=filename)
-      except ValueError as e:
-        warning("download fails: %s", e)
-        return None
-      return filename
+      with sqltags.sql_session():
+        filename = api[dl_id].format_as(filename_format)
+        filename = (
+            filename.lower().replace(' - ',
+                                     '--').replace('_', ':').replace(' ', '-') +
+            '.'
+        )
+        try:
+          api.download(dl_id, filename=filename)
+        except ValueError as e:
+          warning("download fails: %s", e)
+          return None
+        return filename
 
     xit = 0
+    Rs = []
     for arg in argv:
       with Pfx(arg):
         recording_ids = sqltags.recording_ids_from_str(arg)
@@ -155,8 +158,19 @@ class PlayOnCommand(BaseCommand):
               warning("already downloaded to %r", te.download_path)
             if no_download:
               te.ls()
-            elif not _dl(dl_id):
-              xit = 1
+            else:
+              Rs.append(bg_result(_dl, dl_id, _extra=dict(dl_id=dl_id)))
+
+    if Rs:
+      for R in report_results(Rs):
+        dl_id = R.extra['dl_id']
+        te = sqltags[dl_id]
+        if R():
+          print("OK ", dl_id, te.download_path)
+        else:
+          print("BAD", dl_id)
+          xit = 1
+
     return xit
 
   @staticmethod
