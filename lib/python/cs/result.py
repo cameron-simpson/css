@@ -421,9 +421,16 @@ class Result(object):
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
+
+      Parameters:
+      * `_name`: optional name for the `Result`, passed to the initialiser
+      * `_extra`: optional extra data for the `Result`, passed to the initialiser
+
+      Other parameters are passed to `func`.
   '''
-  _name = kw.pop('_name', None)
-  R = Result(name=_name)
+  name = kw.pop('_name', None)
+  extra = kw.pop('_extra', None)
+  R = Result(name=name, extra=extra)
   R.bg(func, *a, **kw)
   return R
 
