@@ -38,7 +38,7 @@ cs.mappings name=cs.mappings pypi.release="20201228"
 cs.mixin.ucattrs name=cs.mixin.ucattrs pypi.release=20150118
 cs.nodedb name=cs.nodedb pypi.release=20160828
 cs.numeric name=cs.numeric pypi.release=20190309
-cs.obj name=cs.obj pypi.release="20201227" ok_revision="27c34175101cc96dd896587d78f3bd05bd80a9eb"
+cs.obj name=cs.obj pypi.release="20210122" ok_revision="27c34175101cc96dd896587d78f3bd05bd80a9eb"
 cs.packetstream name=cs.packetstream pypi.release=20191004
 cs.pfx name=cs.pfx pypi.release="20201227"
 cs.pipeline name=cs.pipeline pypi.release=20191007.1
