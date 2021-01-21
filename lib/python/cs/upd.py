@@ -99,7 +99,7 @@ DISTINFO = {
 def _cleanup():
   ''' Cleanup function called at programme exit to clear the status lines.
   '''
-  for U in Upd._singleton_instances():
+  for U in Upd._singleton_instances():  # pylint: disable=protected-access
     U.shutdown()
 
 atexit.register(_cleanup)
@@ -181,6 +181,7 @@ class Upd(SingletonMixin):
     self._ti_ready = False
     self._ti_strs = {}
     self._cursor_visible = True
+    self._current_slot = None
     self._reset()
     self._lock = RLock()
 
@@ -1012,7 +1013,7 @@ class UpdProxy(object):
           overflow = len(txt) - upd.columns + 1
           if overflow > 0:
             txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt
+          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
 
   @property
   def width(self):
@@ -1030,7 +1031,7 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    with self.upd._lock:
+    with self.upd._lock:  # pylint: disable=protected-access
       index = self.index
       if index is not None:
         self.upd.delete(index)
@@ -1046,13 +1047,15 @@ class UpdProxy(object):
     upd = self.upd
     if not upd:
       raise ValueError("no .upd, cannot create a new proxy")
-    with upd._lock:
+    with upd._lock:  # pylint: disable=protected-access
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
 
-if __name__ == '__main__':
-  from time import sleep
+def demo():
+  ''' A tiny demo function for visual checking of the basic functionality.
+  '''
+  from time import sleep  # pylint: disable=import-outside-toplevel
   U = Upd()
   p = U.proxy(0)
   for n in range(20):
@@ -1065,3 +1068,6 @@ if __name__ == '__main__':
     p(str(n))
     p2(str(n))
     sleep(0.1)
+
+if __name__ == '__main__':
+  demo()
