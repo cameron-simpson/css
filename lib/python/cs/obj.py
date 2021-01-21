@@ -422,6 +422,22 @@ class SingletonMixin:
       _, instance = singleton(registry, okey, factory, (), {})
     return instance
 
+  @classmethod
+  def _singleton_instances(cls):
+    ''' Return a list of the current class instances.
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      return []
+    else:
+      return list(
+          filter(
+              lambda obj: obj is not None,
+              map(lambda ref: ref(), registry.valuerefs())
+          )
+      )
+
 if __name__ == '__main__':
   import cs.obj_tests
   cs.obj_tests.selftest(sys.argv)
