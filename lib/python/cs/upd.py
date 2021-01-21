@@ -849,6 +849,7 @@ class Upd(SingletonMixin):
         proxy = proxies[index]
         proxy.index = None
         del proxies[index]
+        self._update_proxies()
       else:
         delete_line = self.ti_str('dl1')
         cursor_up = self.ti_str('cuu1')
