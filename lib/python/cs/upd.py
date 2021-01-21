@@ -93,20 +93,16 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
 }
 
-instances = []
-
-def cleanupAtExit():
-  ''' Cleanup function called at programme exit to clear the status line.
+def _cleanup():
+  ''' Cleanup function called at programme exit to clear the status lines.
   '''
-  global instances  # pylint: disable=global-statement
-  for i in instances:
-    i.close()
-  instances = ()
+  for U in Upd._singleton_instances():
+    U.shutdown()
 
-atexit.register(cleanupAtExit)
+atexit.register(_cleanup)
 
 # A couple of convenience functions.
 
@@ -187,8 +183,6 @@ class Upd(SingletonMixin):
     self._cursor_visible = True
     self._reset()
     self._lock = RLock()
-    global instances  # pylint: disable=global-statement
-    instances.append(self)
 
   def _reset(self):
     ''' Set up the initial internal empty state.
@@ -245,7 +239,7 @@ class Upd(SingletonMixin):
     )
     self.shutdown(preserve_display)
 
-  def shutdown(self, preserve_display):
+  def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
     '''
     slots = self._slot_text
