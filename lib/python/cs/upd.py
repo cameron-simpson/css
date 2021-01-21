@@ -185,13 +185,19 @@ class Upd(SingletonMixin):
     self._ti_ready = False
     self._ti_strs = {}
     self._cursor_visible = True
+    self._reset()
+    self._lock = RLock()
+    global instances  # pylint: disable=global-statement
+    instances.append(self)
+
+  def _reset(self):
+    ''' Set up the initial internal empty state.
+        This does *not* do anything with the display.
+    '''
     self._slot_text = []
     self._current_slot = None
     self._above = None
     self._proxies = []
-    self._lock = RLock()
-    global instances  # pylint: disable=global-statement
-    instances.append(self)
 
   def __str__(self):
     return "%s(backend=%s)" % (type(self).__name__, self._backend)
@@ -229,13 +235,22 @@ class Upd(SingletonMixin):
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
+    preserve_display = not (
+        exc_type is None or (
+            issubclass(exc_type, SystemExit) and (
+                exc_val.code == 0
+                if isinstance(exc_val.code, int) else exc_val.code is None
+            )
+        )
+    )
+    self.shutdown(preserve_display)
+
+  def shutdown(self, preserve_display):
+    ''' Clean out this `Upd`, optionally preserving the displayed status lines.
+    '''
     slots = self._slot_text
     if slots:
-      if (exc_type is None
-          or (issubclass(exc_type, SystemExit) and
-              (exc_val.code == 0
-               if isinstance(exc_val.code, int) else exc_val.code is None))):
-        # no exception or SystemExit(0) or SystemExit(None)
+      if not preserve_display:
         # remove the Upd display
         with self._lock:
           while len(slots) > 1:
@@ -253,6 +268,7 @@ class Upd(SingletonMixin):
           self._backend.write(''.join(txts))
           self.cursor_visible()
           self._backend.flush()
+    self._reset()
 
   def _set_cursor_visible(self, mode):
     ''' Set the cursor visibility mode, return terminal sequence.
