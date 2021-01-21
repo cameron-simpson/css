@@ -1,4 +1,3 @@
-cs.upd: upd.proxy(0) returns None when there are no proxies - should autocreate slot 0
 maybe we want an intermeidate TagSetsWithMapping subclass between this and TagSets proviing .te_maping based methods
 cs.mp3: should it yield various Binary packets or is that overkill?
 cs.mp3: parse tags? pull names etc from cs.id3
