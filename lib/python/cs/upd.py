@@ -435,8 +435,6 @@ class Upd(SingletonMixin):
     if from_slot is None:
       from_slot = self._current_slot
     movetxts = []
-    oldtxt = self._slot_text[to_slot]
-    from_slot = self._current_slot
     if to_slot != from_slot:
       # move cursor to target slot
       if to_slot < from_slot:
@@ -447,6 +445,7 @@ class Upd(SingletonMixin):
         cursor_up = self.ti_str('cuu1')
         movetxts.append(cursor_up * (to_slot - from_slot))
       # adjust horizontal position
+      oldtxt = self._slot_text[to_slot]
       vpos_cur = len(self._slot_text[from_slot])
       vpos_slot = len(oldtxt)
       if vpos_cur > vpos_slot:
