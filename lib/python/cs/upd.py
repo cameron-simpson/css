@@ -746,46 +746,46 @@ class Upd(SingletonMixin):
       if proxy is None:
         # create the proxy, which inserts it
         return UpdProxy(index, self)
+
       # associate the proxy with self
       assert proxy.upd is None
       proxy.index = index
       proxy.upd = self
+
+      # no display? just insert the slot
       if self._disabled or self._backend is None:
-        # just insert the slot
+        return proxy
+
+      # not disabled: manage the display
+      cursor_up = self.ti_str('cuu1')
+      insert_line = self.ti_str('il1')
+      first_slot = not slots
+      if first_slot:
+        # move to the start of the current cursor line, set _current_slot=0
+        txts.append('\r')
+        txts.extend(self._redraw_line_v(txt))
+        self._current_slot = 0
         slots.insert(index, txt)
         proxies.insert(index, proxy)
+        self._update_proxies()
       else:
-        cursor_up = self.ti_str('cuu1')
-        insert_line = self.ti_str('il1')
-        # adjust the display, insert the slot
-        first_slot = self._current_slot is None
-        if first_slot:
-          txts.append('\v\r')
+        # we're inserting an additional line to a nonempty display
+        if not cursor_up:
+          raise IndexError(
+              "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+              % (os.environ.get('TERM'),)
+          )
+        # make sure insert line does not push the bottom line off the screen
+        # by forcing a scroll: move to bottom, VT, cursor up
+        if insert_line:
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
-        else:
-          if not cursor_up:
-            raise IndexError(
-                "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
-                % (os.environ.get('TERM'),)
-            )
-          if insert_line:
-            # make sure insert line does not push the bottom line off the screen
-            # by forcing a scroll
-            if first_slot:
-              cursor_to_ll = self.ti_str('ll')  # move to lower left
-              if cursor_to_ll:
-                txts.append(cursor_to_ll)
-              else:
-                txts.append('\r')
-            else:
-              txts.extend(self._move_to_slot_v(self._current_slot, 0))
-            self._current_slot = 0
-            txts.append('\v')
-            txts.append(cursor_up)
+          txts.append('\v')
+          txts.append(cursor_up)
+          # post: inserting a line will not drive the lowest line off the screen
         if index == 0:
           # move to bottom slot, add line below
-          if not first_slot:
-            txts.extend(self._move_to_slot_v(self._current_slot, 0))
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           txts.append('\v\r')
           if insert_line:
             txts.append(insert_line)
@@ -797,24 +797,26 @@ class Upd(SingletonMixin):
           self._update_proxies()
           self._current_slot = 0
         else:
-          # move to the line which is to be below the inserted line
-          if not first_slot:
-            txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
+          # move to the line which is to be below the inserted line,
+          # insert line above that
+          txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
           if insert_line:
+            # insert a line with `txt`
             txts.append(insert_line)
             txts.append('\r')
             txts.append(txt)
             self._current_slot = index
           else:
+            # no insert, just redraw from here down completely
             txts.extend(
                 self._redraw_trailing_slots_v(index, skip_first_vt=True)
             )
             self._current_slot = 0
-        self._backend.write(''.join(txts))
-        self._backend.flush()
+      self._backend.write(''.join(txts))
+      self._backend.flush()
     return proxy
 
   def delete(self, index):
