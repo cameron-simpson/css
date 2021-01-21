@@ -1050,3 +1050,18 @@ class UpdProxy(object):
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
+
+if __name__ == '__main__':
+  from time import sleep
+  U = Upd()
+  p = U.proxy(0)
+  for n in range(20):
+    p(str(n))
+    sleep(0.1)
+  # proxy line above
+  p2 = U.insert(1)
+  p2.prefix = 'above: '
+  for n in range(20):
+    p(str(n))
+    p2(str(n))
+    sleep(0.1)
