@@ -67,7 +67,7 @@ cs.threads name=cs.threads pypi.release="20201025"
 cs.timeutils name=cs.timeutils pypi.release=20190220
 cs.tty name=cs.tty pypi.release="20201102"
 cs.units name=cs.units pypi.release="20201025"
-cs.upd name=cs.upd pypi.release="20201202" ok_revision="140a1af3ce93e8670a8c2cd305935111b3fdeea8"
+cs.upd name=cs.upd pypi.release="20201202" ok_revision="9e82bfef4662102d65ace9416ed939d4590ef4ba"
 cs.urlutils name=cs.urlutils pypi.release=20191004
 cs.vt name=cs.vt pypi.release=20190309
 cs.wol name=cs.wol pypi.release=20171228
