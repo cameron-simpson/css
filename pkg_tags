@@ -46,7 +46,7 @@ cs.predicate name=cs.predicate pypi.release=20190221
 cs.progress name=cs.progress pypi.release="20201102.1"
 cs.psutils name=cs.psutils pypi.release=20190101
 cs.py.doc name=cs.py.doc pypi.release="20200718"
-cs.py.func name=cs.py.func pypi.release="20200518" ok_revision="138dcc88536a12fd4c0cae0003a083057ea7265e"
+cs.py.func name=cs.py.func pypi.release="20200518" ok_revision=d79dcd4f7daf043b7590ba8f1a3cc6ad4dc0c326
 cs.py.modules name=cs.py.modules pypi.release="20200521"
 cs.py.stack name=cs.py.stack pypi.release=20190812 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.py3 name=cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3c46
