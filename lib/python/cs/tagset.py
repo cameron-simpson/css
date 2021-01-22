@@ -2515,6 +2515,15 @@ class TagFile(SingletonMixin, TagSets):
     '''
     fields = [Tag.transcribe_value(name)]
     for tag in tags:
+      if tag.name == 'name':
+        # we don't write this one out, but we do expect it to match
+        # the `name` parameter
+        if tag.value != name:
+          warning(
+              "%s.tags_line(name=%r,tags=%s): tags['name']:%r != name)",
+              cls.__name__, name, tags, tag.value
+          )
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
