@@ -2406,7 +2406,7 @@ class TagFile(SingletonMixin, TagSets):
   def values(self, prefix=None):
     ''' `tagsets.values`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those values whose keys start with `prefix`.
     '''
     if not prefix:
@@ -2417,7 +2417,7 @@ class TagFile(SingletonMixin, TagSets):
   def items(self, prefix=None):
     ''' `tagsets.items`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those items whose keys start with `prefix`.
     '''
     if not prefix:
