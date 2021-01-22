@@ -1,0 +1,5 @@
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: check in self.__dict__ first, subclasses of builtins like dict may not have done this
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: bugfix lookup fall through logic
+lib/python/cs/mappings.py: cs.mappings: autoformat
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: AttributeError: improve recitation of available attribute names
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin: clarifying comment
