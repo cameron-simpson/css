@@ -34,7 +34,7 @@ cs.later pypi.release=20191007
 cs.lex pypi.release="20201228" ok_revision=c2c972a1895dbffb256d616b09ff1105828ea302
 cs.logutils pypi.release="20201021"
 cs.mailutils pypi.release=20171231.1
-cs.mappings pypi.release="20201228" ok_revision="1c6729280fe13d6f16dae30f781b3a683fe17ca1"
+cs.mappings pypi.release="20210123" ok_revision="1c6729280fe13d6f16dae30f781b3a683fe17ca1"
 cs.mixin.ucattrs pypi.release=20150118
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
