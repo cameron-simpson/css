@@ -20,7 +20,7 @@ cs.context pypi.release="20200725.1"
 cs.csvutils pypi.release="20201228"
 cs.debug pypi.release=20200318
 cs.deco pypi.release="20210123" ok_revision=af258d12a144bf2526a6cd9d204d15c6bfd31c24
-cs.edit pypi.release=20191201.1
+cs.edit pypi.release=20191201.1 ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
 cs.env pypi.release=20190103
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
