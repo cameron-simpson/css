@@ -53,7 +53,7 @@ cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3
 cs.queues pypi.release="20201025"
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
 cs.resources pypi.release="20201025"
-cs.result pypi.release="20201102"
+cs.result pypi.release="20201102" ok_revision=d3240f904e7faa73672dc78c1920986f0245e451
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828
 cs.seq pypi.release="20201025"
