@@ -201,7 +201,8 @@ class _Recording(ABC, HasFSTagsMixin):
       ext = '.' + ext
     return crop_name(
         format.format_map(self.metadata.ns()
-                          ).replace('\r', '_').replace('\n', '_') + ext, ext
+                          ).replace('\r', '_').replace('\n', '_') + ext,
+        ext=ext
     )
 
   @abstractmethod
