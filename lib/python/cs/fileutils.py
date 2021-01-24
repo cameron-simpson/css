@@ -770,7 +770,7 @@ def crop_name(name, name_max=255, ext=None):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name %r before ext %r to <=%s" % (name, ext, name_max)
+        "cannot crop name before ext %r to <=%s: name=%r" % (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
