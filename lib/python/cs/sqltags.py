@@ -102,7 +102,7 @@ FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline}'
 def main(argv=None):
   ''' Command line mode.
   '''
-  return SQLTagsCommand().run(argv)
+  return SQLTagsCommand(argv).run()
 
 state = State(verbose=sys.stderr.isatty())
 
@@ -599,8 +599,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class SQLTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' `sqltags` main command line utility.
+class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
+  ''' Common features for commands oriented around an `SQLTags` database.
   '''
 
   TAGSET_CRITERION_CLASS = SQTCriterion
@@ -626,18 +626,18 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       'DBURL_ENVVAR': DBURL_ENVVAR,
   }
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
+    options = self.options
     db_url = SQLTags.infer_db_url()
     options.db_url = db_url
     options.sqltags = None
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
+    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-f':
@@ -645,11 +645,11 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise RuntimeError("unhandled option")
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
+    options = self.options
     db_url = options.db_url
     sqltags = SQLTags(db_url)
     with sqltags:
@@ -658,8 +658,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                         verbose=True):
           yield
 
-  @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+  def parse_tagset_criterion(self, arg, tag_based_test_class=None):
     ''' Parse tag criteria from `argv`.
 
         The criteria may be either:
@@ -676,14 +675,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       return SQTEntityIdTest([index])
 
-  @classmethod
-  def cmd_edit(cls, argv, options):
+  def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -697,8 +696,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
-  @classmethod
-  def cmd_export(cls, argv, options):
+  def cmd_export(self, argv):
     ''' Usage: {cmd} {{tag[=value]|-tag}}...
           Export entities matching all the constraints.
           The output format is CSV data with the following columns:
@@ -707,9 +705,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           * `name`: the entity name
           * `tags`: a column per `Tag`
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -722,8 +721,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           csvw.writerow(te.csvrow)
 
   # pylint: disable=too-many-locals
-  @classmethod
-  def cmd_find(cls, argv, options):
+  def cmd_find(self, argv):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
           List entities matching all the constraints.
           -o output_format
@@ -731,6 +729,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                       the listing.
                       Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
@@ -743,7 +742,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           output_format = value
         else:
           raise RuntimeError("unsupported option")
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -768,8 +767,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               print(" ", tag)
     return xit
 
-  @staticmethod
-  def cmd_import(argv, options):
+  def cmd_import(self, argv):
     ''' Usage: {cmd} [{{-u|--update}}] {{-|srcpath}}...
           Import CSV data in the format emitted by "export".
           Each argument is a file path or "-", indicating standard input.
@@ -779,6 +777,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
         TODO: should this be a transaction so that an import is all or nothing?
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
     update_mode = False
@@ -804,19 +803,17 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             with open(srcpath) as f:
               sqltags.import_csv_file(f, update_mode=update_mode)
 
-  @classmethod
-  def cmd_init(cls, argv, options):
+  def cmd_init(self, argv):
     ''' Usage: {cmd}
           Initialise the database.
           This includes defining the schema and making the root metanode.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options.sqltags.init()
+    self.options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
-  @classmethod
-  def cmd_log(cls, argv, options):
+  def cmd_log(self, argv):
     ''' Record a log entry.
 
         Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
@@ -831,6 +828,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             Read the time from the start of the headline
             according to the provided strptime specification.
     '''
+    options = self.options
     categories = None
     dt = None
     strptime_format = None
@@ -946,36 +944,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         )
     return xit
 
-  @staticmethod
-  def cmd_ns(argv, options):
-    ''' Usage: {cmd} entity-names...
-          List entities and their tags.
-    '''
-    if not argv:
-      raise GetoptError("missing entity_names")
-    xit = 0
-    sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session() as session:
-      for name in argv:
-        with Pfx(name):
-          try:
-            index = int(name)
-          except ValueError:
-            index = name
-          entity = sqltags.get(index, session=session)
-          if entity is None:
-            error("missing")
-            xit = 1
-            continue
-          print(name)
-          for tag in sorted(entity.tags(session=session)):
-            print(" ", tag)
-    return xit
-
   # pylint: disable=too-many-branches
-  @classmethod
-  def cmd_tag(cls, argv, options):
+  def cmd_tag(self, argv):
     ''' Usage: {cmd} {{-|entity-name}} {{tag[=value]|-tag}}...
           Tag an entity with multiple tags.
           With the form "-tag", remove that tag from the direct tags.
@@ -989,7 +959,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = self.parse_tag_choices(argv)
     except ValueError as e:
       raise GetoptError(str(e)) from e
     if badopts:
@@ -999,6 +969,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       names = [name]
     xit = 0
+    options = self.options
     sqltags = options.sqltags
     orm = sqltags.orm
     with orm.session():
@@ -1022,6 +993,37 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               else:
                 if tag_choice.tag in tags:
                   te.discard(tag_choice.tag)
+    return xit
+
+class SQLTagsCommand(BaseSQLTagsCommand):
+  ''' `sqltags` main command line utility.
+  '''
+
+  def cmd_ns(self, argv):
+    ''' Usage: {cmd} entity-names...
+          List entities and their tags.
+    '''
+    if not argv:
+      raise GetoptError("missing entity_names")
+    xit = 0
+    options = self.options
+    sqltags = options.sqltags
+    orm = sqltags.orm
+    with orm.session() as session:
+      for name in argv:
+        with Pfx(name):
+          try:
+            index = int(name)
+          except ValueError:
+            index = name
+          entity = sqltags.get(index, session=session)
+          if entity is None:
+            error("missing")
+            xit = 1
+            continue
+          print(name)
+          for tag in sorted(entity.tags(session=session)):
+            print(" ", tag)
     return xit
 
 SQLTagsCommand.add_usage_to_docstring()
