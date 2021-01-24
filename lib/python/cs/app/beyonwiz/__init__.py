@@ -355,7 +355,7 @@ class _Recording(ABC, HasFSTagsMixin):
       comment += f' Recording date {recording_dt.isoformat()}.'
     if M.tags:
       comment += ' tags=' + ','.join(sorted(M.tags))
-    episode_marker = str(M.episodeinfo)
+    ## unused ## episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(
         dstfmt,
         title=M['meta.title'],
