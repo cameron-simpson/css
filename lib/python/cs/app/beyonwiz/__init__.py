@@ -198,7 +198,8 @@ class _Recording(ABC, HasFSTagsMixin):
       format = self.DEFAULT_FILENAME_BASIS
     if not ext.startswith('.'):
       ext = '.' + ext
-    return format.format_map(self.metadata.ns()) + ext
+    return format.format_map(self.metadata.ns()
+                             ).replace('\r', '_').replace('\n', '_') + ext
 
   @abstractmethod
   def data(self):
