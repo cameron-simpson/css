@@ -426,7 +426,7 @@ class BaseCommand:
         main_cmd = self.cmd  # used in "except" below
         raise GetoptError("bad invocation")
       main, main_cmd, main_argv, main_context = self._run
-      upd_context = options.loginfo.upd
+      upd_context = self.loginfo.upd
       if upd_context is None:
         upd_context = nullcontext()
       with RunState(main_cmd) as runstate:
@@ -435,7 +435,7 @@ class BaseCommand:
               options,
               cmd=main_cmd,
               runstate=runstate,
-              upd=options.loginfo.upd,
+              upd=self.loginfo.upd,
           ):
             with self.run_context():
               with main_context:
