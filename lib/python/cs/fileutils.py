@@ -749,7 +749,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
     with Pfx("remove %r", lockpath):
       os.remove(lockpath)
 
-def crop_name(name, name_max=255, ext=None):
+def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
       Return the original `name` if it already short enough.
       Otherwise crop `name` before the file extension
@@ -757,9 +757,9 @@ def crop_name(name, name_max=255, ext=None):
 
       Parameters:
       * `name`: the file basename to crop
-      * `name_max`: optional maximum length, default: `255`
       * `ext`: optional file extension;
         the default is to infer the extension with `os.path.splitext`.
+      * `name_max`: optional maximum length, default: `255`
   '''
   if ext is None:
     base, ext = splitext(name)
