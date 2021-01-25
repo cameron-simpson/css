@@ -1049,7 +1049,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     engine = self.engine = create_engine(
         db_url,
         case_sensitive=True,
-        echo=bool(os.environ.get('DEBUG')),  # 'debug'
+        echo=(
+            bool(os.environ.get('DEBUG'))
+            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
+        ),  # 'debug'
     )
     meta = self.meta = self.Base.metadata
     meta.bind = engine
