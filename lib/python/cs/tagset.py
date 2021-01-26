@@ -2537,7 +2537,7 @@ class TagFile(SingletonMixin, TagSets):
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
-      if not isdirpath(dirpath):
+      if dirpath and not isdirpath(dirpath):
         ifverbose("makedirs(%r)", dirpath)
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
