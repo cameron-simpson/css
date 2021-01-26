@@ -1463,7 +1463,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         new_values = None, None, new_value
         if isinstance(new_value, datetime):
           # store datetime as unixtime
-          new_value = datetime2unixtime(new_value)
+          new_values = datetime2unixtime(new_value), None, None
         elif isinstance(new_value, float):
           new_values = new_value, None, None
         elif isinstance(new_value, int):
