@@ -624,9 +624,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def unixtime(self):
     ''' `unixtime` property, autosets to `time.time()` if accessed.
     '''
-    return self.get('unixtime')
+    ts = self.get('unixtime')
+    if ts is None:
+      self.unixtime = ts = time.time()
+    return ts
 
   @unixtime.setter
+  @typechecked
   def unixtime(self, new_unixtime: float):
     ''' Set the `unixtime`.
     '''
