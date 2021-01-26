@@ -648,9 +648,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def unixtime(self):
     ''' `unixtime` property, autosets to `time.time()` if accessed.
     '''
-    return self.get('unixtime')
+    ts = self.get('unixtime')
+    if ts is None:
+      self.unixtime = ts = time.time()
+    return ts
 
   @unixtime.setter
+  @typechecked
   def unixtime(self, new_unixtime: float):
     ''' Set the `unixtime`.
     '''
@@ -1563,6 +1567,10 @@ class TagSetNamespace(ExtendedNamespace):
           >>> # the ns object has additional computed attributes
           >>> 'The colour tag is {colour._tag}.'.format_map(ns)
           'The colour tag is colour=blue.'
+          >>> # also, the direct name for any Tag can be used
+          >>> # which returns its value
+          >>> 'The colour is {colour}.'.format_map(ns)
+          'The colour is blue.'
           >>> 'The colours are {colours}. The labels are {labels}.'.format_map(ns)
           "The colours are ['blue']. The labels are ['a', 'b', 'c']."
           >>> 'The first label is {label}.'.format_map(ns)
@@ -1593,25 +1601,26 @@ class TagSetNamespace(ExtendedNamespace):
 
           >>> # the TagSet as a namespace for use in format strings
           >>> ns = tags.ns()
-          >>> # the namespace .colour node, which has the Tag attached
+          >>> # The namespace .colour node, which has the Tag attached.
+          >>> # When there is a Tag attached, the repr is that of the Tag value.
           >>> ns.colour         # doctest: +ELLIPSIS
-          TagSetNamespace(..., _tag=Tag(name='colour',value='blue',...))
-          >>> # the underlying colour Tag itself
+          'blue'
+          >>> # The underlying colour Tag itself.
           >>> ns.colour._tag    # doctest: +ELLIPSIS
           Tag(name='colour',value='blue',ontology=TagsOntology<...>)
-          >>> # str() of a namespace with a ._tag is the Tag value
-          >>> # making for easy use in a format string
+          >>> # The str() of a namespace with a ._tag is the Tag value
+          >>> # making for easy use in a format string.
           >>> f'{ns.colour}'
           'blue'
           >>> # the type information about the colour Tag
           >>> ns.colour._tag.typedata
           TagSet:{'description': 'a colour, a hue', 'type': 'str'}
-          >>> # the metadata
+          >>> # The metadata: a TagSetNamespace for the metadata TagSet
           >>> ns.colour._meta   # doctest: +ELLIPSIS
-          TagSetNamespace(..., url=TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...)), ...)
+          TagSetNamespace(_path='.', _pathnames=(), _ontology=None, wavelengths='450nm-495nm', url='https://en.wikipedia.org/wiki/Blue')
           >>> # the _meta.url is itself a namespace with a ._tag for the URL
           >>> ns.colour._meta.url   # doctest: +ELLIPSIS
-          TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...))
+          'https://en.wikipedia.org/wiki/Blue'
           >>> # but it formats nicely because it has a ._tag
           >>> f'colour={ns.colour}, info URL={ns.colour._meta.url}'
           'colour=blue, info URL=https://en.wikipedia.org/wiki/Blue'
@@ -2425,7 +2434,7 @@ class TagFile(SingletonMixin, TagSets):
   def values(self, prefix=None):
     ''' `tagsets.values`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those values whose keys start with `prefix`.
     '''
     if not prefix:
@@ -2436,7 +2445,7 @@ class TagFile(SingletonMixin, TagSets):
   def items(self, prefix=None):
     ''' `tagsets.items`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those items whose keys start with `prefix`.
     '''
     if not prefix:
@@ -2534,6 +2543,15 @@ class TagFile(SingletonMixin, TagSets):
     '''
     fields = [Tag.transcribe_value(name)]
     for tag in tags:
+      if tag.name == 'name':
+        # we don't write this one out, but we do expect it to match
+        # the `name` parameter
+        if tag.value != name:
+          warning(
+              "%s.tags_line(name=%r,tags=%s): tags['name']:%r != name)",
+              cls.__name__, name, tags, tag.value
+          )
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
@@ -2547,7 +2565,7 @@ class TagFile(SingletonMixin, TagSets):
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
-      if not isdirpath(dirpath):
+      if dirpath and not isdirpath(dirpath):
         ifverbose("makedirs(%r)", dirpath)
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)

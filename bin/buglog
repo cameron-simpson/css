@@ -46,7 +46,7 @@ badopts=
 #
 # =over 4
 #
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     # =item B<-B> I<bugsystems>
@@ -206,6 +206,7 @@ do
           [ -n "${PARAM_subject:-}" ] && subj="$PARAM_subject: $subj"
 
           echo "To: $addr"
+          echo "From: ${NAME:-} <${EMAIL:-$USER}>"
           echo "Subject: $subj"
           echo "Date: `date -d "$when" '+%d %b %Y %H:%M:S %z'`"
           echo "X-Buglog-Date: $when"

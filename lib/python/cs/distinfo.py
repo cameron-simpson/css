@@ -973,7 +973,8 @@ class Module(object):
           info("SKIP %s", subpath)
           continue
         for filename in sorted(filenames):
-          if not (filename.endswith('.pyc') or filename.endswith('.o')):
+          if not any(map(lambda dotext: filename.endswith(dotext),
+                         ('.pyc', '.o', '.so'))):
             filepath = joinpath(subpath, filename)
             pathlist.append(filepath)
     else:

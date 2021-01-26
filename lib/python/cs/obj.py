@@ -17,7 +17,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20201227-post'
+__version__ = '20210122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -421,6 +421,22 @@ class SingletonMixin:
     with registry._singleton_lock:
       _, instance = singleton(registry, okey, factory, (), {})
     return instance
+
+  @classmethod
+  def _singleton_instances(cls):
+    ''' Return a list of the current class instances.
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      return []
+    else:
+      return list(
+          filter(
+              lambda obj: obj is not None,
+              map(lambda ref: ref(), registry.valuerefs())
+          )
+      )
 
 if __name__ == '__main__':
   import cs.obj_tests

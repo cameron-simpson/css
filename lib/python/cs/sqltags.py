@@ -17,7 +17,7 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
@@ -62,7 +62,7 @@ from cs.sqlalchemy_utils import (
     orm_auto_session,
     BasicTableMixin,
     HasIdMixin,
-    _state as sqla_state,
+    state as sqla_state,
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
@@ -102,7 +102,7 @@ FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline}'
 def main(argv=None):
   ''' Command line mode.
   '''
-  return SQLTagsCommand().run(argv)
+  return SQLTagsCommand(argv).run()
 
 state = State(verbose=sys.stderr.isatty())
 
@@ -160,7 +160,7 @@ class SQLTagProxy:
     '''
     return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
 
-  def by_op_text(self, op_text, other):
+  def by_op_text(self, op_text, other, alias=None):
     ''' Return an `SQLParameters` based on the comparison's text representation.
 
         Parameters:
@@ -169,6 +169,7 @@ class SQLTagProxy:
         * `other`: the other value for the comparison,
           used to infer the SQL column name
           and kept to provide the SQL value parameter
+        * `alias`: optional SQLAlchemy table alias
     '''
     try:
       cmp_func = {
@@ -181,9 +182,16 @@ class SQLTagProxy:
       }[op_text]
     except KeyError:
       raise ValueError("unknown comparison operator text %r" % (op_text,))
-    return cmp_func(other)
+    return cmp_func(other, alias=alias)
 
-  def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
+  def _cmp(
+      self,
+      op_label,
+      other,
+      op,
+      op_takes_alias=False,
+      alias=None
+  ) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
 
         Parameters:
@@ -196,6 +204,7 @@ class SQLTagProxy:
         * `op_takes_alias`: a Boolean (default `False`).
           If false, `op` is handed a column from the table alias as above.
           If true, `op` is handed the table alias itself.
+        * `alias`: optional SQLAlchemy table alias
 
         The `op_takes_alias` parameter exists to support multicolumn
         conditions such as `==None`, which needs to test that all the value
@@ -217,7 +226,7 @@ class SQLTagProxy:
     '''
     pf = f'{self}{op_label}{other!r}'
     with Pfx(pf):
-      tags = aliased(self._orm.tags)
+      tags = alias or aliased(self._orm.tags)
       if op_takes_alias:
         other_condition = op(tags, other)
       else:
@@ -237,7 +246,7 @@ class SQLTagProxy:
           constraint=and_(tags.name == self._tag_name, other_condition),
       )
 
-  def __eq__(self, other) -> SQLParameters:
+  def __eq__(self, other, alias=None) -> SQLParameters:
     ''' Return an SQL `=` test `SQLParameters`.
 
         Example:
@@ -256,11 +265,12 @@ class SQLTagProxy:
               alias.stringvalue is None,
               alias.structured_value is None,
           ),
-          op_takes_alias=True
+          op_takes_alias=True,
+          alias=alias,
       )
     return self._cmp("==", other, operator.eq)
 
-  def __ne__(self, other) -> SQLParameters:
+  def __ne__(self, other, alias=None) -> SQLParameters:
     ''' Return an SQL `<>` test `SQLParameters`.
 
         Example:
@@ -279,7 +289,8 @@ class SQLTagProxy:
               alias.stringvalue is not None,
               alias.structured_value is not None,
           ),
-          op_takes_alias=True
+          op_takes_alias=True,
+          alias=alias,
       )
     return self._cmp("!=", other, operator.ne)
 
@@ -380,6 +391,10 @@ class SQTCriterion(TagSetCriterion):
       the SQL capable criterion classes below.
   '''
 
+  # require the match_tagged_entity method to confirm selection if False,
+  # no need if true
+  SQL_COMPLETE = False
+
   # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
@@ -391,9 +406,20 @@ class SQTCriterion(TagSetCriterion):
     '''
     raise NotImplementedError("sql_parameters")
 
+  @abstractmethod
+  def match_tagged_entity(self, te: TagSet) -> bool:
+    ''' Perform the criterion test on the Python object directly.
+        This is used at the end of a query to implement tests which
+        cannot be sufficiently implemented in SQL.
+        If `self.SQL_COMPLETE` it is not necessary to call this method.
+    '''
+    raise NotImplementedError("sql_parameters")
+
 class SQTEntityIdTest(SQTCriterion):
   ''' A test on `entity.id`.
   '''
+
+  SQL_COMPLETE = True
 
   @typechecked
   def __init__(self, ids: List[int]):
@@ -433,6 +459,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.sql_parameters` method.
   '''
 
+  SQL_COMPLETE = True
+
   # TODO: REMOVE SQL_TAG_VALUE_COMPARISON_FUNCS, unused
   # functions returning SQL tag.value tests based on self.comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
@@ -443,11 +471,16 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       ),
       '=':
       lambda alias, cmp_value: (
-          alias.float_value == cmp_value
-          if isinstance(cmp_value, (int, float)) else (
-              alias.string_value == cmp_value
-              if isinstance(cmp_value, str) else
-              (alias.structured_value == cmp_value)
+          or_(
+              alias.float_value != None, alias.string_value != None, alias.
+              structured_value != None
+          ) if cmp_value is None else (
+              alias.float_value == cmp_value
+              if isinstance(cmp_value, (int, float)) else (
+                  alias.string_value == cmp_value
+                  if isinstance(cmp_value, str) else
+                  (alias.structured_value == cmp_value)
+              )
           )
       ),
       '<=':
@@ -498,6 +531,16 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       ##lambda alias, cmp_value: alias.string_value.regexp_match(cmp_value),
   }
 
+  SQL_ID_VALUE_COMPARISON_FUNCS = {
+      None: lambda entity, id_value: entity.id is not None,
+      '=': lambda entity, id_value: entity.id == id_value,
+      '<=': lambda entity, id_value: entity.id <= id_value,
+      '<': lambda entity, id_value: entity.id < id_value,
+      '>=': lambda entity, id_value: entity.id >= id_value,
+      '>': lambda entity, id_value: entity.id > id_value,
+      '~': lambda entity, id_value: entity.id in id_value,
+  }
+
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
       None: lambda entity, name_value: entity.name is not None,
       '=': lambda entity, name_value: entity.name == name_value,
@@ -541,13 +584,14 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 
   # TODO: handle tag named "id" specially as well
   @pfx_method
-  def sql_parameters(self, orm) -> SQLParameters:
+  def sql_parameters(self, orm, alias=None) -> SQLParameters:
     tag = self.tag
     tag_name = tag.name
     tag_value = tag.value
     if tag_name in ('name', 'unixtime'):
       entities = orm.entities
-      alias = aliased(entities)
+      if alias is None:
+        alias = aliased(entities)
       entity_id_column = alias.id
       if tag_name == 'name':
         if not isinstance(tag_value, str):
@@ -575,7 +619,9 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       )
     else:
       # general tag_name
-      sqlp = SQLTagProxy(orm, tag_name).by_op_text(self.comparison, tag_value)
+      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(
+          self.comparison, tag_value, alias=alias
+      )
     return sqlp
 
   def match_tagged_entity(self, te: TagSet) -> bool:
@@ -595,19 +641,22 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       result = self.TE_VALUE_COMPARISON_FUNCS[
           self.comparison](te.unixtime, as_unixtime(tag_value))
     else:
-      te_tag_value = te.get(tag_name)
-      if te_tag_value is None:
-        result = False
+      if tag_value is None:
+        result = tag_name in te
       else:
-        result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                                ](te_tag_value, tag_value)
+        te_tag_value = te.get(tag_name)
+        if te_tag_value is None:
+          result = False
+        else:
+          result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
+                                                  ](te_tag_value, tag_value)
     return result if self.choice else not result
 
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class SQLTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' `sqltags` main command line utility.
+class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
+  ''' Common features for commands oriented around an `SQLTags` database.
   '''
 
   TAGSET_CRITERION_CLASS = SQTCriterion
@@ -633,18 +682,18 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
       'DBURL_ENVVAR': DBURL_ENVVAR,
   }
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
+    options = self.options
     db_url = SQLTags.infer_db_url()
     options.db_url = db_url
     options.sqltags = None
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
+    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-f':
@@ -652,11 +701,11 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise RuntimeError("unhandled option")
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
+    options = self.options
     db_url = options.db_url
     sqltags = SQLTags(db_url)
     with sqltags:
@@ -665,8 +714,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                         verbose=True):
           yield
 
-  @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+  def parse_tagset_criterion(self, arg, tag_based_test_class=None):
     ''' Parse tag criteria from `argv`.
 
         The criteria may be either:
@@ -683,14 +731,14 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       return SQTEntityIdTest([index])
 
-  @classmethod
-  def cmd_edit(cls, argv, options):
+  def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -704,8 +752,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
-  @classmethod
-  def cmd_export(cls, argv, options):
+  def cmd_export(self, argv):
     ''' Usage: {cmd} {{tag[=value]|-tag}}...
           Export entities matching all the constraints.
           The output format is CSV data with the following columns:
@@ -714,9 +761,10 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           * `name`: the entity name
           * `tags`: a column per `Tag`
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -729,8 +777,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           csvw.writerow(te.csvrow)
 
   # pylint: disable=too-many-locals
-  @classmethod
-  def cmd_find(cls, argv, options):
+  def cmd_find(self, argv):
     ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
           List entities matching all the constraints.
           -o output_format
@@ -738,6 +785,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                       the listing.
                       Default: {FIND_OUTPUT_FORMAT_DEFAULT}
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
     output_format = FIND_OUTPUT_FORMAT_DEFAULT
@@ -750,7 +798,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
           output_format = value
         else:
           raise RuntimeError("unsupported option")
-    tag_criteria, argv = cls.parse_tagset_criteria(argv)
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
       badopts = True
@@ -775,8 +823,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
               print(" ", tag)
     return xit
 
-  @staticmethod
-  def cmd_import(argv, options):
+  def cmd_import(self, argv):
     ''' Usage: {cmd} [{{-u|--update}}] {{-|srcpath}}...
           Import CSV data in the format emitted by "export".
           Each argument is a file path or "-", indicating standard input.
@@ -786,6 +833,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
 
         TODO: should this be a transaction so that an import is all or nothing?
     '''
+    options = self.options
     sqltags = options.sqltags
     badopts = False
     update_mode = False
@@ -811,19 +859,17 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             with open(srcpath) as f:
               sqltags.import_csv_file(f, update_mode=update_mode)
 
-  @classmethod
-  def cmd_init(cls, argv, options):
+  def cmd_init(self, argv):
     ''' Usage: {cmd}
           Initialise the database.
           This includes defining the schema and making the root metanode.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options.sqltags.init()
+    self.options.sqltags.init()
 
   # pylint: disable=too-many-locals.too-many-branches.too-many-statements
-  @classmethod
-  def cmd_log(cls, argv, options):
+  def cmd_log(self, argv):
     ''' Record a log entry.
 
         Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
@@ -838,6 +884,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
             Read the time from the start of the headline
             according to the provided strptime specification.
     '''
+    options = self.options
     categories = None
     dt = None
     strptime_format = None
@@ -953,36 +1000,8 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
         )
     return xit
 
-  @staticmethod
-  def cmd_ns(argv, options):
-    ''' Usage: {cmd} entity-names...
-          List entities and their tags.
-    '''
-    if not argv:
-      raise GetoptError("missing entity_names")
-    xit = 0
-    sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session() as session:
-      for name in argv:
-        with Pfx(name):
-          try:
-            index = int(name)
-          except ValueError:
-            index = name
-          entity = sqltags.get(index, session=session)
-          if entity is None:
-            error("missing")
-            xit = 1
-            continue
-          print(name)
-          for tag in sorted(entity.tags(session=session)):
-            print(" ", tag)
-    return xit
-
   # pylint: disable=too-many-branches
-  @classmethod
-  def cmd_tag(cls, argv, options):
+  def cmd_tag(self, argv):
     ''' Usage: {cmd} {{-|entity-name}} {{tag[=value]|-tag}}...
           Tag an entity with multiple tags.
           With the form "-tag", remove that tag from the direct tags.
@@ -996,7 +1015,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = cls.parse_tag_choices(argv)
+      tag_choices = self.parse_tag_choices(argv)
     except ValueError as e:
       raise GetoptError(str(e)) from e
     if badopts:
@@ -1006,6 +1025,7 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       names = [name]
     xit = 0
+    options = self.options
     sqltags = options.sqltags
     orm = sqltags.orm
     with orm.session():
@@ -1031,6 +1051,37 @@ class SQLTagsCommand(BaseCommand, TagsCommandMixin):
                   te.discard(tag_choice.tag)
     return xit
 
+class SQLTagsCommand(BaseSQLTagsCommand):
+  ''' `sqltags` main command line utility.
+  '''
+
+  def cmd_ns(self, argv):
+    ''' Usage: {cmd} entity-names...
+          List entities and their tags.
+    '''
+    if not argv:
+      raise GetoptError("missing entity_names")
+    xit = 0
+    options = self.options
+    sqltags = options.sqltags
+    orm = sqltags.orm
+    with orm.session() as session:
+      for name in argv:
+        with Pfx(name):
+          try:
+            index = int(name)
+          except ValueError:
+            index = name
+          entity = sqltags.get(index, session=session)
+          if entity is None:
+            error("missing")
+            xit = 1
+            continue
+          print(name)
+          for tag in sorted(entity.tags(session=session)):
+            print(" ", tag)
+    return xit
+
 SQLTagsCommand.add_usage_to_docstring()
 
 # pylint: disable=too-many-instance-attributes
@@ -1054,7 +1105,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     engine = self.engine = create_engine(
         db_url,
         case_sensitive=True,
-        echo=bool(os.environ.get('DEBUG')),  # 'debug'
+        echo=(
+            bool(os.environ.get('DEBUG'))
+            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
+        ),  # 'debug'
     )
     meta = self.meta = self.Base.metadata
     meta.bind = engine
@@ -1245,6 +1299,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             used to construct the query.
         '''
         entities = orm.entities
+        tags = orm.tags
         query = session.query(entities)
         # first condition:
         #   select tags as alias where constraint
@@ -1253,23 +1308,80 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         # inner join entities on
         query = None
         sqlps = []
+        entity_tests = []
+        per_tag_aliases = {}
+        per_tag_tests = defaultdict(list)  # tag_name=>[tests...]
+        sqlps = []
         for criterion in criteria:
           with Pfx(criterion):
-            sqlp = criterion.sql_parameters(orm)
-            if not query:
-              query = session.query(sqlp.entity_id_column)
+            assert isinstance(criterion, SQTCriterion), (
+                "not an SQTCriterion: %s:%r" %
+                (type(criterion).__name__, criterion)
+            )
+            if isinstance(criterion, TagBasedTest):
+              # we know how to treat these efficiently
+              # by mergeing conditions on the same tag name
+              tag = criterion.tag
+              tag_name = tag.name
+              tag_value = tag.value
+              if tag_name == 'id':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_ID_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              elif tag_name == 'name':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              elif tag_name == 'unixtime':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              else:
+                tag_tests = per_tag_tests[tag_name]
+                if tag_tests:
+                  # reuse existing alias - same tag name
+                  alias = per_tag_aliases[tag_name]
+                else:
+                  # first test for this tag - make an alias
+                  per_tag_aliases[tag_name] = aliased(self.tags)
+                tag_tests.append(
+                    criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison]
+                    (per_tag_aliases[tag_name], tag_value)
+                )
             else:
-              previous = sqlps[-1]
-              # join on the entity_id column
-              query = query.join(
-                  sqlp.alias,
-                  sqlp.entity_id_column == previous.entity_id_column,
-              )
-            # apply conditions
-            query = query.filter(sqlp.constraint)
-            sqlps.append(sqlp)
-        if query is None:
-          query = session.query(entities.id)
+              try:
+                sqlp = criterion.sql_parameters(orm)
+              except ValueError:
+                warning("SKIP, cannot compute sql_parameters")
+                continue
+              sqlps.append(sqlp)
+        query = session.query(entities.id, entities.unixtime, entities.name)
+        prev_entity_id_column = entities.id
+        if entity_tests:
+          query = query.filter(*entity_tests)
+        for tag_name, tag_tests in per_tag_tests.items():
+          alias = per_tag_aliases[tag_name]
+          alias_entity_id_column = alias.entity_id
+          query = query.join(
+              alias, alias_entity_id_column == prev_entity_id_column
+          ).filter(alias.name == tag_name, *tag_tests)
+          prev_entity_id_column = alias_entity_id_column
+        # further JOINs on less direct SQL tests
+        for sqlp in sqlps:
+          sqlp_entity_id_column = sqlp.entity_id_column
+          query = query.join(
+              sqlp.alias,
+              sqlp_entity_id_column == prev_entity_id_column,
+          )
+          query = query.filter(sqlp.constraint)
+          prev_entity_id_column = sqlp_entity_id_column
         with Pfx("mode=%r", mode):
           if mode == 'id':
             pass
@@ -1278,10 +1390,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 entities.id, entities.unixtime, entities.name
             ).filter(entities.id.in_(query.distinct()))
           elif mode == 'tagged':
-            tags = orm.tags
-            query = session.query(
-                entities.id, entities.unixtime, entities.name
-            ).filter(entities.id.in_(query.distinct())).join(
+            query = query.join(
                 tags, isouter=True
             ).filter(entities.id is not None).add_columns(
                 tags.name.label('tag_name'),
@@ -1371,7 +1480,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         new_values = None, None, new_value
         if isinstance(new_value, datetime):
           # store datetime as unixtime
-          new_value = datetime2unixtime(new_value)
+          new_values = datetime2unixtime(new_value), None, None
         elif isinstance(new_value, float):
           new_values = new_value, None, None
         elif isinstance(new_value, int):
@@ -1569,6 +1678,12 @@ class SQLTags(TagSets):
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
 
+  @contextmanager
+  def sql_session(self):
+    with self.orm.session() as new_session:
+      with sqla_state(session=new_session):
+        yield
+
   @orm_auto_session
   @typechecked
   def default_factory(
@@ -1709,7 +1824,20 @@ class SQLTags(TagSets):
   def find(self, criteria, *, session):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
+
+        Parameters:
+        * `criteria`: an iterable of search criteria
+          which should be `SQTCriterion`s
+          or a `str` suitable for `SQTCriterion.from_str`.
     '''
+    criteria = list(criteria)
+    post_criteria = []
+    for i, criterion in enumerate(criteria):
+      with Pfx(str(criterion)):
+        if isinstance(criterion, str):
+          criterion = criteria[i] = SQTCriterion.from_str(criterion)
+        if not criterion.SQL_COMPLETE:
+          post_criteria.append(criterion)
     orm = self.orm
     query = orm.entities.search(
         criteria,
@@ -1739,9 +1867,14 @@ class SQLTags(TagSets):
             row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
         te.set(row.tag_name, tag_value, skip_db=True)
-    for te in entity_map.values():
-      if all(criterion.match_tagged_entity(te) for criterion in criteria):
-        yield te
+    if not post_criteria:
+      yield from entity_map.values()
+    else:
+      # verify all the entities for criteria which do not express well as SQL
+      for te in entity_map.values():
+        if all(criterion.match_tagged_entity(te)
+               for criterion in post_criteria):
+          yield te
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
