@@ -516,6 +516,16 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       ##lambda alias, cmp_value: alias.string_value.regexp_match(cmp_value),
   }
 
+  SQL_ID_VALUE_COMPARISON_FUNCS = {
+      None: lambda entity, id_value: entity.id is not None,
+      '=': lambda entity, id_value: entity.id == id_value,
+      '<=': lambda entity, id_value: entity.id <= id_value,
+      '<': lambda entity, id_value: entity.id < id_value,
+      '>=': lambda entity, id_value: entity.id >= id_value,
+      '>': lambda entity, id_value: entity.id > id_value,
+      '~': lambda entity, id_value: entity.id in id_value,
+  }
+
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
       None: lambda entity, name_value: entity.name is not None,
       '=': lambda entity, name_value: entity.name == name_value,
