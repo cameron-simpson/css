@@ -456,11 +456,16 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       ),
       '=':
       lambda alias, cmp_value: (
-          alias.float_value == cmp_value
-          if isinstance(cmp_value, (int, float)) else (
-              alias.string_value == cmp_value
-              if isinstance(cmp_value, str) else
-              (alias.structured_value == cmp_value)
+          or_(
+              alias.float_value != None, alias.string_value != None,
+              alias.structured_value != None
+          ) if cmp_value is None else (
+              alias.float_value == cmp_value
+              if isinstance(cmp_value, (int, float)) else (
+                  alias.string_value == cmp_value
+                  if isinstance(cmp_value, str) else
+                  (alias.structured_value == cmp_value)
+              )
           )
       ),
       '<=':
