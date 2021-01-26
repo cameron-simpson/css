@@ -542,9 +542,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           -n  No remove: fail if the destination exists.
           -v  Verbose: show copied files.
     '''
-    return self._cmd_mvcpln(self.options.fstags.copy, argv)
+    return self._cmd_mvcpln(argv, self.options.fstags.copy)
 
-  def cmd_ln(self, argv, options):
+  def cmd_ln(self, argv):
     ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
           POSIX ln(1) equivalent, but also copying the tags:
           link files and their tags into targetdir.
@@ -553,9 +553,9 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           -n  No remove: fail if the destination exists.
           -v  Verbose: show linked files.
     '''
-    return self._cmd_mvcpln(options.fstags.link, argv)
+    return self._cmd_mvcpln(argv, self.options.fstags.link)
 
-  def cmd_mv(self, argv, options):
+  def cmd_mv(self, argv):
     ''' Usage: {cmd} [-finv] srcpath dstpath, {cmd} [-finv] srcpaths... dstdirpath
           POSIX mv(1) equivalent, but also copying the tags:
           move files and their tags into targetdir.
@@ -564,10 +564,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           -n  No remove: fail if the destination exists.
           -v  Verbose: show moved files.
     '''
-    return self._cmd_mvcpln(options.fstags.move, argv)
+    return self._cmd_mvcpln(argv, self.options.fstags.move)
 
   # pylint: disable=too-many-branches
-  def _cmd_mvcpln(self, attach, argv):
+  def _cmd_mvcpln(self, argv, attach):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
