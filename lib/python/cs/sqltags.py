@@ -376,6 +376,10 @@ class SQTCriterion(TagSetCriterion):
       the SQL capable criterion classes below.
   '''
 
+  # require the match_tagged_entity method to confirm selection if False,
+  # no need if true
+  SQL_COMPLETE = False
+
   # list of TagSetCriterion classes
   # whose .parse methods are used by .parse
   CRITERION_PARSE_CLASSES = []
@@ -387,9 +391,20 @@ class SQTCriterion(TagSetCriterion):
     '''
     raise NotImplementedError("sql_parameters")
 
+  @abstractmethod
+  def match_tagged_entity(self, te: TagSet) -> bool:
+    ''' Perform the criterion test on the Python object directly.
+        This is used at the end of a query to implement tests which
+        cannot be sufficiently implemented in SQL.
+        If `self.SQL_COMPLETE` it is not necessary to call this method.
+    '''
+    raise NotImplementedError("sql_parameters")
+
 class SQTEntityIdTest(SQTCriterion):
   ''' A test on `entity.id`.
   '''
+
+  SQL_COMPLETE = True
 
   @typechecked
   def __init__(self, ids: List[int]):
@@ -428,6 +443,8 @@ SQTCriterion.TAG_BASED_TEST_CLASS = SQTEntityIdTest
 class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   ''' A `cs.tagset.TagBasedTest` extended with a `.sql_parameters` method.
   '''
+
+  SQL_COMPLETE = True
 
   # TODO: REMOVE SQL_TAG_VALUE_COMPARISON_FUNCS, unused
   # functions returning SQL tag.value tests based on self.comparison
