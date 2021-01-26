@@ -1807,7 +1807,20 @@ class SQLTags(TagSets):
   def find(self, criteria, *, session):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
+
+        Parameters:
+        * `criteria`: an iterable of search criteria
+          which should be `SQTCriterion`s
+          or a `str` suitable for `SQTCriterion.from_str`.
     '''
+    criteria = list(criteria)
+    post_criteria = []
+    for i, criterion in enumerate(criteria):
+      with Pfx(str(criterion)):
+        if isinstance(criterion, str):
+          criterion = criteria[i] = SQTCriterion.from_str(criterion)
+        if not criterion.SQL_COMPLETE:
+          post_criteria.append(criterion)
     orm = self.orm
     query = orm.entities.search(
         criteria,
@@ -1837,9 +1850,13 @@ class SQLTags(TagSets):
             row.tag_float_value, row.tag_string_value, row.tag_structured_value
         )
         te.set(row.tag_name, tag_value, skip_db=True)
-    for te in entity_map.values():
-      if all(criterion.match_tagged_entity(te) for criterion in criteria):
-        yield te
+    if not post_criteria:
+      yield from entity_map.values()
+    else:
+      # verify all the entities for criteria which do not express well as SQL
+      for te in entity_map.values():
+        if all(criterion.match_tagged_entity(te) for criterion in post_criteria):
+          yield te
 
   @orm_auto_session
   def import_csv_file(self, f, *, session, update_mode=False):
