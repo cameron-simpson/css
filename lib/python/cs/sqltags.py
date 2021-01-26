@@ -160,7 +160,7 @@ class SQLTagProxy:
     '''
     return SQLTagProxy(self._orm, self._tag_name + '.' + sub_tag_name)
 
-  def by_op_text(self, op_text, other):
+  def by_op_text(self, op_text, other, alias=None):
     ''' Return an `SQLParameters` based on the comparison's text representation.
 
         Parameters:
@@ -169,6 +169,7 @@ class SQLTagProxy:
         * `other`: the other value for the comparison,
           used to infer the SQL column name
           and kept to provide the SQL value parameter
+        * `alias`: optional SQLAlchemy table alias
     '''
     try:
       cmp_func = {
@@ -181,9 +182,16 @@ class SQLTagProxy:
       }[op_text]
     except KeyError:
       raise ValueError("unknown comparison operator text %r" % (op_text,))
-    return cmp_func(other)
+    return cmp_func(other, alias=alias)
 
-  def _cmp(self, op_label, other, op, op_takes_alias=False) -> SQLParameters:
+  def _cmp(
+      self,
+      op_label,
+      other,
+      op,
+      op_takes_alias=False,
+      alias=None
+  ) -> SQLParameters:
     ''' Parameterised translator from an operator to an `SQLParameters`.
 
         Parameters:
@@ -196,6 +204,7 @@ class SQLTagProxy:
         * `op_takes_alias`: a Boolean (default `False`).
           If false, `op` is handed a column from the table alias as above.
           If true, `op` is handed the table alias itself.
+        * `alias`: optional SQLAlchemy table alias
 
         The `op_takes_alias` parameter exists to support multicolumn
         conditions such as `==None`, which needs to test that all the value
@@ -217,7 +226,7 @@ class SQLTagProxy:
     '''
     pf = f'{self}{op_label}{other!r}'
     with Pfx(pf):
-      tags = aliased(self._orm.tags)
+      tags = alias or aliased(self._orm.tags)
       if op_takes_alias:
         other_condition = op(tags, other)
       else:
@@ -237,7 +246,7 @@ class SQLTagProxy:
           constraint=and_(tags.name == self._tag_name, other_condition),
       )
 
-  def __eq__(self, other) -> SQLParameters:
+  def __eq__(self, other, alias=None) -> SQLParameters:
     ''' Return an SQL `=` test `SQLParameters`.
 
         Example:
@@ -256,11 +265,12 @@ class SQLTagProxy:
               alias.stringvalue is None,
               alias.structured_value is None,
           ),
-          op_takes_alias=True
+          op_takes_alias=True,
+          alias=alias,
       )
     return self._cmp("==", other, operator.eq)
 
-  def __ne__(self, other) -> SQLParameters:
+  def __ne__(self, other, alias=None) -> SQLParameters:
     ''' Return an SQL `<>` test `SQLParameters`.
 
         Example:
@@ -279,7 +289,8 @@ class SQLTagProxy:
               alias.stringvalue is not None,
               alias.structured_value is not None,
           ),
-          op_takes_alias=True
+          op_takes_alias=True,
+          alias=alias,
       )
     return self._cmp("!=", other, operator.ne)
 
