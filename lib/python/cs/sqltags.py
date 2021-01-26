@@ -66,7 +66,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
-    TagSets, tag_or_tag_value
+    TagSets, tag_or_tag_value, as_unixtime
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
