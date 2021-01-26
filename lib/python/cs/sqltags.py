@@ -17,7 +17,7 @@
 
 from abc import abstractmethod
 from builtins import id as builtin_id
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 import csv
 from datetime import datetime
