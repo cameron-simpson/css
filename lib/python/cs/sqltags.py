@@ -1282,6 +1282,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             used to construct the query.
         '''
         entities = orm.entities
+        tags = orm.tags
         query = session.query(entities)
         # first condition:
         #   select tags as alias where constraint
@@ -1290,23 +1291,80 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         # inner join entities on
         query = None
         sqlps = []
+        entity_tests = []
+        per_tag_aliases = {}
+        per_tag_tests = defaultdict(list)  # tag_name=>[tests...]
+        sqlps = []
         for criterion in criteria:
           with Pfx(criterion):
-            sqlp = criterion.sql_parameters(orm)
-            if not query:
-              query = session.query(sqlp.entity_id_column)
+            assert isinstance(criterion, SQTCriterion), (
+                "not an SQTCriterion: %s:%r" %
+                (type(criterion).__name__, criterion)
+            )
+            if isinstance(criterion, TagBasedTest):
+              # we know how to treat these efficiently
+              # by mergeing conditions on the same tag name
+              tag = criterion.tag
+              tag_name = tag.name
+              tag_value = tag.value
+              if tag_name == 'id':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_ID_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              elif tag_name == 'name':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              elif tag_name == 'unixtime':
+                alias = entities
+                entity_tests.append(
+                    criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison](entities, tag_value)
+                )
+              else:
+                tag_tests = per_tag_tests[tag_name]
+                if tag_tests:
+                  # reuse existing alias - same tag name
+                  alias = per_tag_aliases[tag_name]
+                else:
+                  # first test for this tag - make an alias
+                  per_tag_aliases[tag_name] = aliased(self.tags)
+                tag_tests.append(
+                    criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[
+                        criterion.comparison]
+                    (per_tag_aliases[tag_name], tag_value)
+                )
             else:
-              previous = sqlps[-1]
-              # join on the entity_id column
-              query = query.join(
-                  sqlp.alias,
-                  sqlp.entity_id_column == previous.entity_id_column,
-              )
-            # apply conditions
-            query = query.filter(sqlp.constraint)
-            sqlps.append(sqlp)
-        if query is None:
-          query = session.query(entities.id)
+              try:
+                sqlp = criterion.sql_parameters(orm)
+              except ValueError:
+                warning("SKIP, cannot compute sql_parameters")
+                continue
+              sqlps.append(sqlp)
+        query = session.query(entities.id,entities.unixtime,entities.name)
+        prev_entity_id_column = entities.id
+        if entity_tests:
+          query = query.filter(*entity_tests)
+        for tag_name, tag_tests in per_tag_tests.items():
+          alias = per_tag_aliases[tag_name]
+          alias_entity_id_column = alias.entity_id
+          query = query.join(
+              alias, alias_entity_id_column == prev_entity_id_column
+          ).filter(alias.name == tag_name, *tag_tests)
+          prev_entity_id_column = alias_entity_id_column
+        # further JOINs on less direct SQL tests
+        for sqlp in sqlps:
+          sqlp_entity_id_column = sqlp.entity_id_column
+          query = query.join(
+              sqlp.alias,
+              sqlp_entity_id_column == prev_entity_id_column,
+          )
+          query = query.filter(sqlp.constraint)
+          prev_entity_id_column = sqlp_entity_id_column
         with Pfx("mode=%r", mode):
           if mode == 'id':
             pass
@@ -1315,10 +1373,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 entities.id, entities.unixtime, entities.name
             ).filter(entities.id.in_(query.distinct()))
           elif mode == 'tagged':
-            tags = orm.tags
-            query = session.query(
-                entities.id, entities.unixtime, entities.name
-            ).filter(entities.id.in_(query.distinct())).join(
+            query = query.join(
                 tags, isouter=True
             ).filter(entities.id is not None).add_columns(
                 tags.name.label('tag_name'),
