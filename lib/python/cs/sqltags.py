@@ -554,11 +554,12 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 
   # TODO: handle tag named "id" specially as well
   @pfx_method
-  def sql_parameters(self, orm) -> SQLParameters:
+  def sql_parameters(self, orm, alias=None) -> SQLParameters:
     tag = self.tag
     if tag.name in ('name', 'unixtime'):
       entities = orm.entities
-      alias = aliased(entities)
+      if alias is None:
+        alias = aliased(entities)
       entity_id_column = alias.id
       if tag.name == 'name':
         if not isinstance(tag.value, str):
@@ -590,7 +591,9 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       )
     else:
       # general tag_name
-      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(self.comparison)
+      sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(
+          self.comparison, alias=alias
+      )
     sqlp = SQLParameters(
         criterion=self,
         alias=alias,
