@@ -714,7 +714,8 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
                         verbose=True):
           yield
 
-  def parse_tagset_criterion(self, arg, tag_based_test_class=None):
+  @classmethod
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
     ''' Parse tag criteria from `argv`.
 
         The criteria may be either:
