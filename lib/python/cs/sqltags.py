@@ -66,7 +66,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
-    TagSets, tag_or_tag_value
+    TagSets, tag_or_tag_value, as_unixtime
 )
 from cs.threads import locked, State
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -178,7 +178,7 @@ class SQLTagProxy:
           '<': self.__lt__,
           '>=': self.__ge__,
           '>': self.__gt__,
-          '~': self.globlike,
+          '~': self.likeglob,
       }[op_text]
     except KeyError:
       raise ValueError("unknown comparison operator text %r" % (op_text,))
@@ -354,6 +354,21 @@ class SQLTagProxy:
         lambda column, prefix: column.like(lprefix + '%', esc)
     )
 
+  def likeglob(self, globptn: str) -> SQLParameters:
+    ''' Return an SQL LIKE test approximating a glob as an `SQLParameters`.
+
+        Example:
+
+          >>> sqlp = SQLTags('sqlite://').tags.name.thing.likeglob('foo*')
+          >>> str(sqlp.constraint)
+          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+    '''
+    esc = '\\'
+    return self._cmp(
+        "likeglob", globptn, lambda column, globptn: column.
+        like(globptn.replace('%', esc + '%').replace('*', '%'), esc)
+    )
+
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
 
@@ -457,8 +472,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
       '=':
       lambda alias, cmp_value: (
           or_(
-              alias.float_value != None, alias.string_value != None,
-              alias.structured_value != None
+              alias.float_value != None, alias.string_value != None, alias.
+              structured_value != None
           ) if cmp_value is None else (
               alias.float_value == cmp_value
               if isinstance(cmp_value, (int, float)) else (
@@ -571,33 +586,31 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   @pfx_method
   def sql_parameters(self, orm, alias=None) -> SQLParameters:
     tag = self.tag
-    if tag.name in ('name', 'unixtime'):
+    tag_name = tag.name
+    tag_value = tag.value
+    if tag_name in ('name', 'unixtime'):
       entities = orm.entities
       if alias is None:
         alias = aliased(entities)
       entity_id_column = alias.id
-      if tag.name == 'name':
-        if not isinstance(tag.value, str):
+      if tag_name == 'name':
+        if not isinstance(tag_value, str):
           raise ValueError(
               "name comparison requires a str, got %s:%r" %
-              (type(tag.value), tag.value)
+              (type(tag_value), tag_value)
           )
         constraint_fn = self.SQL_NAME_VALUE_COMPARISON_FUNCS.get(
             self.comparison
         )
-        constraint = constraint_fn and constraint_fn(alias, tag.value)
-      elif tag.name == 'unixtime':
-        if not isinstance(tag.value, (int, float)):
-          raise ValueError(
-              "unixtime comparison requires a float, got %s:%r" %
-              (type(tag.value), tag.value)
-          )
+        constraint = constraint_fn and constraint_fn(alias, tag_value)
+      elif tag_name == 'unixtime':
+        timestamp = as_unixtime(tag_value)
         constraint_fn = self.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS.get(
             self.comparison
         )
-        constraint = constraint_fn and constraint_fn(alias, tag.value)
+        constraint = constraint_fn and constraint_fn(alias, timestamp)
       else:
-        raise RuntimeError("unhandled non-tag field %r" % (tag.name,))
+        raise RuntimeError("unhandled non-tag field %r" % (tag_name,))
       sqlp = SQLParameters(
           criterion=self,
           alias=alias,
@@ -607,14 +620,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
     else:
       # general tag_name
       sqlp = SQLTagProxy(orm, tag.self.tag_name).by_op_text(
-          self.comparison, alias=alias
+          self.comparison, tag_value, alias=alias
       )
-    sqlp = SQLParameters(
-        criterion=self,
-        alias=alias,
-        entity_id_column=entity_id_column,
-        constraint=constraint if self.choice else -alias.has(constraint),
-    )
     return sqlp
 
   def match_tagged_entity(self, te: TagSet) -> bool:
@@ -631,8 +638,8 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
         result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
                                                 ](te.name, tag_value)
     elif tag_name == 'unixtime':
-      result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                              ](te.unixtime, tag_value)
+      result = self.TE_VALUE_COMPARISON_FUNCS[
+          self.comparison](te.unixtime, as_unixtime(tag_value))
     else:
       if tag_value is None:
         result = tag_name in te
@@ -642,7 +649,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
           result = False
         else:
           result = self.TE_VALUE_COMPARISON_FUNCS[self.comparison
-                                                ](te_tag_value, tag_value)
+                                                  ](te_tag_value, tag_value)
     return result if self.choice else not result
 
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
@@ -707,7 +714,8 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
                         verbose=True):
           yield
 
-  def parse_tagset_criterion(self, arg, tag_based_test_class=None):
+  @classmethod
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
     ''' Parse tag criteria from `argv`.
 
         The criteria may be either:
@@ -1355,7 +1363,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                 warning("SKIP, cannot compute sql_parameters")
                 continue
               sqlps.append(sqlp)
-        query = session.query(entities.id,entities.unixtime,entities.name)
+        query = session.query(entities.id, entities.unixtime, entities.name)
         prev_entity_id_column = entities.id
         if entity_tests:
           query = query.filter(*entity_tests)
@@ -1865,7 +1873,8 @@ class SQLTags(TagSets):
     else:
       # verify all the entities for criteria which do not express well as SQL
       for te in entity_map.values():
-        if all(criterion.match_tagged_entity(te) for criterion in post_criteria):
+        if all(criterion.match_tagged_entity(te)
+               for criterion in post_criteria):
           yield te
 
   @orm_auto_session

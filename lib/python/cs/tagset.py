@@ -186,6 +186,7 @@ import os
 from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
+from time import mktime
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
@@ -301,6 +302,29 @@ def tag_or_tag_value(func, no_self=False):
   )
   accept_tag_or_tag_value.__doc__ = func.__doc__
   return accept_tag_or_tag_value
+
+@pfx
+def as_unixtime(tag_value):
+  ''' Convert a tag value to a UNIX timestamp.
+
+      This accepts `int`, `float` (already a timestamp)
+      and `date` or `datetime`
+      (use `datetime.timestamp() for a nonnaive `datetime`,
+      otherwise `mktime(tag_value.time_tuple())`,
+      which assumes the local time zone).
+  '''
+  if isinstance(tag_value, (date, datetime)):
+    if isinstance(tag_value, datetime) and tag_value.tzinfo is not None:
+      # nonnaive datetime
+      return tag_value.timestamp()
+      # plain date or naive datetime: pretend it is localtime
+    return mktime(tag_value.timetuple())
+  if isinstance(tag_value, (int, float)):
+    return float(tag_value)
+  raise ValueError(
+      "requires an int, float, date or datetime, got %s:%r" %
+      (type(tag_value), tag_value)
+  )
 
 class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
