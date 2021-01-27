@@ -690,16 +690,14 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     options.db_url = db_url
     options.sqltags = None
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt, val):
+    ''' Apply a command line option.
     '''
     options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-f':
-          options.db_url = val
-        else:
-          raise RuntimeError("unhandled option")
+    if opt == '-f':
+      options.db_url = val
+    else:
+      super().apply_opt(opt, val)
 
   @contextmanager
   def run_context(self):
