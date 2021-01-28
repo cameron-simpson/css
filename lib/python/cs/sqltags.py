@@ -117,6 +117,11 @@ def glob2like(glob: str) -> str:
   assert '[' not in glob
   return glob.replace('*', '%').replace('?', '_')
 
+def prefix2like(prefix: str, esc='\\') -> str:
+  ''' Convert a prefix string to an SQL LIKE pattern.
+  '''
+  return prefix.replace('%', esc + '%') + '%'
+
 class SQLParameters(namedtuple('SQLParameters',
                                'criterion alias entity_id_column constraint')):
   ''' The parameters required for constructing queries
