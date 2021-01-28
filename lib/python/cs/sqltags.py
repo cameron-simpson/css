@@ -1583,6 +1583,9 @@ class SQLTagSet(SingletonMixin, TagSet):
           pre_sqltags, sqltags
       )
 
+  def __str__(self):
+    return "%d:%s(%s)" % (self.id, self.name, super().__str__())
+
   def __hash__(self):
     return id(self)
 
@@ -1680,7 +1683,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return children
 
 class SQLTags(TagSets):
-  ''' A class to embodying an database and its entities and tags.
+  ''' A class using an SQL database to store its `TagSet`s.
   '''
 
   TagSetClass = SQLTagSet
@@ -1804,7 +1807,7 @@ class SQLTags(TagSets):
         Constrain the names to those starting with `prefix`
         if not `None`.
     '''
-    return map(lambda key: (key,self[key]),self.keys(prefix=prefix))
+    return map(lambda key: (key, self[key]), self.keys(prefix=prefix))
 
   def values(self, *, prefix=None):
     ''' Return an iterable of the named `TagSet`s.
