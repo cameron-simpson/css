@@ -1766,6 +1766,8 @@ class SQLTags(TagSets):
     entities_table = entities.__table__
     name_column = entities_table.c.name
     q = select([name_column]).where(name_column.isnot(None))
+    if prefix is not None:
+      q = q.where(name_column.like(prefix2like(prefix, '\\'), '\\'))
     conn = self.orm.engine.connect()
     result = conn.execute(q)
     for row in result:
