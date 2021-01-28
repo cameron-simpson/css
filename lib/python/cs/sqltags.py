@@ -1379,7 +1379,7 @@ class SQLTags(TagSets):
         Constrain the names to those starting with `prefix`
         if not `None`.
     '''
-    return map(lambda key: (key, self[key]), self.keys(prefix=prefix))
+    return map(lambda te: (te.name, te), self.values(prefix=prefix))
 
   def values(self, *, prefix=None):
     ''' Return an iterable of the named `TagSet`s.
@@ -1388,7 +1388,11 @@ class SQLTags(TagSets):
         Constrain the names to those starting with `prefix`
         if not `None`.
     '''
-    return map(lambda kv: kv[1], self.items(prefix=prefix))
+    if prefix is None:
+      criterion = "name"
+    else:
+      criterion = f"name~{prefix}*"
+    return self.find(criterion)
 
   @staticmethod
   @fmtdoc
@@ -1448,8 +1452,12 @@ class SQLTags(TagSets):
         * `criteria`: an iterable of search criteria
           which should be `SQTCriterion`s
           or a `str` suitable for `SQTCriterion.from_str`.
+          A string may also be supplied, suitable for `SQTCriterion.from_str`.
     '''
-    criteria = list(criteria)
+    if isinstance(criteria, str):
+      criteria = [criteria]
+    else:
+      criteria = list(criteria)
     post_criteria = []
     for i, criterion in enumerate(criteria):
       with Pfx(str(criterion)):
