@@ -1658,6 +1658,27 @@ class SQLTagSet(SingletonMixin, TagSet):
         tag_name, value, session=session
     )
 
+  def parent_tagset(self, tag_name='parent'):
+    ''' Return the parent `TagSet` as defined by a `Tag`,
+        by default the `Tag` named `'parent'`.
+    '''
+    return self.sqltags[self[tag_name]]
+
+  def child_tagsets(self, tag_name='parent'):
+    ''' Return the child `TagSet`s as defined by their parent `Tag`,
+        by default the `Tag` named `'parent'`.
+    '''
+    children = set(
+        self.sqltags.find([SQLTagBasedTest.by_tag_value(tag_name, self.id)])
+    )
+    if self.name:
+      children += set(
+          self.sqltags.find(
+              [SQLTagBasedTest.by_tag_value(tag_name, self.name)]
+          )
+      )
+    return children
+
 class SQLTags(TagSets):
   ''' A class to embodying an database and its entities and tags.
   '''
