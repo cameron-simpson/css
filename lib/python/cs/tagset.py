@@ -1383,6 +1383,14 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     )
 
   @classmethod
+  @tag_or_tag_value
+  def by_tag_value(self, tag_name, tag_value, *, choice=True, comparison='='):
+    ''' Return a `TagBasedTest` based on a `Tag` or `tag_name,tag_value`.
+    '''
+    tag=Tag(tag_name, tag_value)
+    return cls(str(tag),choice,tag,comparison)
+
+  @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse *tag_name*[{`<`|`<=`|'='|'>='|`>`|'~'}*value*]
         and return `(dict,offset)`
