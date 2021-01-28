@@ -353,10 +353,9 @@ class SQLTagProxy:
           "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
     '''
     esc = '\\'
-    lprefix = prefix.replace('%', esc + '%')
     return self._cmp(
         "startswith", prefix,
-        lambda column, prefix: column.like(lprefix + '%', esc)
+        lambda column, prefix: column.like(prefix2like(prefix, esc), esc)
     )
 
   def likeglob(self, globptn: str) -> SQLParameters:
