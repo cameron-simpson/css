@@ -1797,6 +1797,24 @@ class SQLTags(TagSets):
         yield name
     conn.close()
 
+  def items(self, *, prefix=None):
+    ''' Return an iterable of `(tagset_name,TagSet)`.
+        Excludes unnamed `TagSet`s.
+
+        Constrain the names to those starting with `prefix`
+        if not `None`.
+    '''
+    return map(lambda key: (key,self[key]),self.keys(prefix=prefix))
+
+  def values(self, *, prefix=None):
+    ''' Return an iterable of the named `TagSet`s.
+        Excludes unnamed `TagSet`s.
+
+        Constrain the names to those starting with `prefix`
+        if not `None`.
+    '''
+    return map(lambda kv: kv[1], self.items(prefix=prefix))
+
   @staticmethod
   @fmtdoc
   def infer_db_url(envvar=None, default_path=None):
