@@ -659,434 +659,6 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
-  ''' Common features for commands oriented around an `SQLTags` database.
-  '''
-
-  TAGSET_CRITERION_CLASS = SQTCriterion
-
-  TAG_BASED_TEST_CLASS = SQLTagBasedTest
-
-  GETOPT_SPEC = 'f:'
-
-  # TODO:
-  # export_csv [criteria...] >csv_data
-  #   Export selected items to CSV data.
-  # import_csv <csv_data
-  #   Import CSV data.
-  # init
-  #   Initialise the database.
-
-  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
-  -f db_url SQLAlchemy database URL or filename.
-            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
-
-  USAGE_KEYWORDS = {
-      'DBURL_DEFAULT': DBURL_DEFAULT,
-      'DBURL_ENVVAR': DBURL_ENVVAR,
-  }
-
-  def apply_defaults(self):
-    ''' Set up the default values in `options`.
-    '''
-    options = self.options
-    db_url = SQLTags.infer_db_url()
-    options.db_url = db_url
-    options.sqltags = None
-
-  def apply_opt(self, opt, val):
-    ''' Apply a command line option.
-    '''
-    options = self.options
-    if opt == '-f':
-      options.db_url = val
-    else:
-      super().apply_opt(opt, val)
-
-  @contextmanager
-  def run_context(self):
-    ''' Prepare the `SQLTags` around each command invocation.
-    '''
-    options = self.options
-    db_url = options.db_url
-    sqltags = SQLTags(db_url)
-    with sqltags:
-      with sqltags.orm.session() as session:
-        with stackattrs(options, sqltags=sqltags, session=session,
-                        verbose=True):
-          yield
-
-  @classmethod
-  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
-    ''' Parse tag criteria from `argv`.
-
-        The criteria may be either:
-        * an integer specifying a `Tag` id
-        * a sequence of tag criteria
-    '''
-    # try a single int argument
-    try:
-      index = int(arg)
-    except ValueError:
-      return super().parse_tagset_criterion(
-          arg, tag_based_test_class=tag_based_test_class
-      )
-    else:
-      return SQTEntityIdTest([index])
-
-  def cmd_edit(self, argv):
-    ''' Usage: edit criteria...
-          Edit the entities specified by criteria.
-    '''
-    options = self.options
-    sqltags = options.sqltags
-    badopts = False
-    tag_criteria, argv = self.parse_tagset_criteria(argv)
-    if not tag_criteria:
-      warning("missing tag criteria")
-      badopts = True
-    if argv:
-      warning("remaining unparsed arguments: %r", argv)
-      badopts = True
-    if badopts:
-      raise GetoptError("bad arguments")
-    tes = list(sqltags.find(tag_criteria))
-    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
-    for te in changed_tes:
-      print("changed", repr(te.name or te.id))
-
-  def cmd_export(self, argv):
-    ''' Usage: {cmd} {{tag[=value]|-tag}}...
-          Export entities matching all the constraints.
-          The output format is CSV data with the following columns:
-          * `unixtime`: the entity unixtime, a float
-          * `id`: the entity database row id, an integer
-          * `name`: the entity name
-          * `tags`: a column per `Tag`
-    '''
-    options = self.options
-    sqltags = options.sqltags
-    badopts = False
-    tag_criteria, argv = self.parse_tagset_criteria(argv)
-    if not tag_criteria:
-      warning("missing tag criteria")
-      badopts = True
-    if badopts:
-      raise GetoptError("bad arguments")
-    csvw = csv.writer(sys.stdout)
-    with sqltags.orm.session() as session:
-      for te in sqltags.find(tag_criteria, session=session):
-        with Pfx(te):
-          csvw.writerow(te.csvrow)
-
-  # pylint: disable=too-many-locals
-  def cmd_find(self, argv):
-    ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
-          List entities matching all the constraints.
-          -o output_format
-                      Use output_format as a Python format string to lay out
-                      the listing.
-                      Default: {FIND_OUTPUT_FORMAT_DEFAULT}
-    '''
-    options = self.options
-    sqltags = options.sqltags
-    badopts = False
-    output_format = FIND_OUTPUT_FORMAT_DEFAULT
-    opts, argv = getopt(argv, 'o:')
-    for option, value in opts:
-      with Pfx(option):
-        if option == '-o':
-          ## TODO: indirects through the config file
-          ## output_format = sqltags.resolve_format_string(value)
-          output_format = value
-        else:
-          raise RuntimeError("unsupported option")
-    tag_criteria, argv = self.parse_tagset_criteria(argv)
-    if not tag_criteria:
-      warning("missing tag criteria")
-      badopts = True
-    if argv:
-      warning("unparsed arguments: %r", argv)
-      badopts = True
-    if badopts:
-      raise GetoptError("bad arguments")
-    xit = 0
-    with sqltags.orm.session() as session:
-      for te in sqltags.find(tag_criteria, session=session):
-        with Pfx(te):
-          try:
-            output = te.format_as(output_format, error_sep='\n  ')
-          except FormatAsError as e:
-            error(str(e))
-            xit = 1
-            continue
-          print(output.replace('\n', ' '))
-          for tag in sorted(te):
-            if tag.name != 'headline':
-              print(" ", tag)
-    return xit
-
-  def cmd_import(self, argv):
-    ''' Usage: {cmd} [{{-u|--update}}] {{-|srcpath}}...
-          Import CSV data in the format emitted by "export".
-          Each argument is a file path or "-", indicating standard input.
-          -u, --update  If a named entity already exists then update its tags.
-                        Otherwise this will be seen as a conflict
-                        and the import aborted.
-
-        TODO: should this be a transaction so that an import is all or nothing?
-    '''
-    options = self.options
-    sqltags = options.sqltags
-    badopts = False
-    update_mode = False
-    opts, argv = getopt(argv, 'u')
-    for option, _ in opts:
-      with Pfx(option):
-        if option in ('-u', '--update'):
-          update_mode = True
-        else:
-          raise RuntimeError("unsupported option")
-    if not argv:
-      warning("missing srcpaths")
-      badopts = True
-    if badopts:
-      raise GetoptError("bad arguments")
-    for srcpath in argv:
-      with sqltags.orm.session():
-        if srcpath == '-':
-          with Pfx("stdin"):
-            sqltags.import_csv_file(sys.stdin, update_mode=update_mode)
-        else:
-          with Pfx(srcpath):
-            with open(srcpath) as f:
-              sqltags.import_csv_file(f, update_mode=update_mode)
-
-  def cmd_init(self, argv):
-    ''' Usage: {cmd}
-          Initialise the database.
-          This includes defining the schema and making the root metanode.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    self.options.sqltags.init()
-
-  # pylint: disable=too-many-locals.too-many-branches.too-many-statements
-  def cmd_log(self, argv):
-    ''' Record a log entry.
-
-        Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
-          Record entries into the database.
-          If headline is '-', read headlines from standard input.
-          -c categories
-            Specify the categories for this log entry.
-            The default is to recognise a leading CAT,CAT,...: prefix.
-          -d when
-            Use when, an ISO8601 date, as the log entry timestamp.
-          -D strptime
-            Read the time from the start of the headline
-            according to the provided strptime specification.
-    '''
-    options = self.options
-    categories = None
-    dt = None
-    strptime_format = None
-    badopts = False
-    opts, argv = getopt(argv, 'c:d:D:', '')
-    for opt, val in opts:
-      with Pfx(opt if val is None else f"{opt} {val!r}"):
-        if opt == '-c':
-          categories = map(str.lower, filter(None, val.split(',')))
-        elif opt == '-d':
-          try:
-            dt = datetime.fromisoformat(val)
-          except ValueError as e:
-            warning("unhandled ISO format date: %s", e)
-            badopts = True
-          if dt.tzinfo is None:
-            # create a nonnaive datetime in the local zone
-            dt = dt.astimezone()
-        elif opt == '-D':
-          strptime_format = val
-        else:
-          raise RuntimeError("unhandled option")
-    if dt is not None and strptime_format is not None:
-      warning("-d and -D are mutually exclusive")
-      badopts = True
-    if strptime_format is not None:
-      with Pfx("strptime format %r", strptime_format):
-        if '%' not in strptime_format:
-          warning("no time fields!")
-          badopts = True
-        else:
-          # normalise the format and count the words
-          strptime_format = strptime_format.strip()
-          strptime_words = strptime_format.split()
-          strptime_nwords = len(strptime_words)
-          strptime_format = ' '.join(strptime_words)
-    if not argv:
-      argv = ['-']
-      if sys.stdin.isatty():
-        warning("reading log lines from stdin...")
-    cmdline_headline = argv.pop(0)
-    log_tags = []
-    while argv:
-      tag_s = argv.pop(0)
-      with Pfx("tag %r", tag_s):
-        try:
-          tag = Tag.from_str(tag_s)
-        except ValueError:
-          argv.insert(0, tag_s)
-          break
-        else:
-          if tag.value is None:
-            argv.insert(0, tag_s)
-            break
-        log_tags.append(tag)
-    if argv:
-      warning(
-          "extra arguments after %d tags: %s", len(log_tags), ' '.join(argv)
-      )
-      badopts = True
-    if badopts:
-      raise GetoptError("bad invocation")
-    xit = 0
-    use_stdin = cmdline_headline == '-'
-    sqltags = options.sqltags
-    session = options.session
-    for lineno, headline in enumerate((sys.stdin if use_stdin else
-                                       (cmdline_headline,))):
-      with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
-        headline = headline.rstrip('\n')
-        unixtime = None
-        if strptime_format:
-          with Pfx("strptime %r", strptime_format):
-            headparts = headline.split(None, strptime_nwords)
-            if len(headparts) < strptime_nwords:
-              warning(
-                  "not enough fields in headline, using current time: %r",
-                  headline
-              )
-              xit = 1
-            else:
-              strptime_text = ' '.join(headparts[:strptime_nwords])
-              try:
-                strptime_dt = datetime.strptime(strptime_text, strptime_format)
-              except ValueError as e:
-                warning(
-                    "cannot parse %r, using current time: %s", strptime_text, e
-                )
-                xit = 1
-              else:
-                unixtime = datetime2unixtime(strptime_dt)
-                headline = ' '.join(headparts[strptime_nwords:])
-        if unixtime is None:
-          unixtime = time.time() if dt is None else dt.timestamp()
-        if categories is None:
-          # infer categories from leading "FOO,BAH:" text
-          m = CATEGORIES_PREFIX_re.match(headline)
-          if m:
-            tag_categories = map(
-                str.lower, filter(None,
-                                  m.group('categories').split(','))
-            )
-            headline = headline[len(m.group()):]
-          else:
-            tag_categories = ()
-        else:
-          tag_categories = categories
-        log_tags.append(Tag('headline', headline))
-        if tag_categories:
-          log_tags.append(Tag('categories', list(tag_categories)))
-        sqltags.default_factory(
-            None, session=session, unixtime=unixtime, tags=log_tags
-        )
-    return xit
-
-  # pylint: disable=too-many-branches
-  def cmd_tag(self, argv):
-    ''' Usage: {cmd} {{-|entity-name}} {{tag[=value]|-tag}}...
-          Tag an entity with multiple tags.
-          With the form "-tag", remove that tag from the direct tags.
-          A entity-name named "-" indicates that entity-names should
-          be read from the standard input.
-    '''
-    badopts = False
-    if not argv:
-      raise GetoptError("missing entity-name")
-    name = argv.pop(0)
-    if not argv:
-      raise GetoptError("missing tags")
-    try:
-      tag_choices = self.parse_tag_choices(argv)
-    except ValueError as e:
-      raise GetoptError(str(e)) from e
-    if badopts:
-      raise GetoptError("bad arguments")
-    if name == '-':
-      names = [line.rstrip('\n') for line in sys.stdin]
-    else:
-      names = [name]
-    xit = 0
-    options = self.options
-    sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session():
-      with stackattrs(state, verbose=True):
-        for name in names:
-          with Pfx(name):
-            try:
-              index = int(name)
-            except ValueError:
-              index = name
-            te = sqltags.get(index)
-            if te is None:
-              error("missing")
-              xit = 1
-              continue
-            tags = te.tags
-            for tag_choice in tag_choices:
-              if tag_choice.choice:
-                if tag_choice.tag not in tags:
-                  te.set(tag_choice.tag)
-              else:
-                if tag_choice.tag in tags:
-                  te.discard(tag_choice.tag)
-    return xit
-
-class SQLTagsCommand(BaseSQLTagsCommand):
-  ''' `sqltags` main command line utility.
-  '''
-
-  def cmd_ns(self, argv):
-    ''' Usage: {cmd} entity-names...
-          List entities and their tags.
-    '''
-    if not argv:
-      raise GetoptError("missing entity_names")
-    xit = 0
-    options = self.options
-    sqltags = options.sqltags
-    orm = sqltags.orm
-    with orm.session() as session:
-      for name in argv:
-        with Pfx(name):
-          try:
-            index = int(name)
-          except ValueError:
-            index = name
-          entity = sqltags.get(index, session=session)
-          if entity is None:
-            error("missing")
-            xit = 1
-            continue
-          print(name)
-          for tag in sorted(entity.tags(session=session)):
-            print(" ", tag)
-    return xit
-
-SQLTagsCommand.add_usage_to_docstring()
-
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
@@ -1966,6 +1538,436 @@ class SQLTags(TagSets):
     for tag in te.tags:
       with Pfx(tag):
         e.add_tag(tag, session=session)
+
+class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
+  ''' Common features for commands oriented around an `SQLTags` database.
+  '''
+
+  TAGSETS_CLASS = SQLTags
+
+  TAGSET_CRITERION_CLASS = SQTCriterion
+
+  TAG_BASED_TEST_CLASS = SQLTagBasedTest
+
+  GETOPT_SPEC = 'f:'
+
+  # TODO:
+  # export_csv [criteria...] >csv_data
+  #   Export selected items to CSV data.
+  # import_csv <csv_data
+  #   Import CSV data.
+  # init
+  #   Initialise the database.
+
+  USAGE_FORMAT = '''Usage: {cmd} [-f db_url] subcommand [...]
+  -f db_url SQLAlchemy database URL or filename.
+            Default from ${DBURL_ENVVAR} (default '{DBURL_DEFAULT}').'''
+
+  USAGE_KEYWORDS = {
+      'DBURL_DEFAULT': DBURL_DEFAULT,
+      'DBURL_ENVVAR': DBURL_ENVVAR,
+  }
+
+  def apply_defaults(self):
+    ''' Set up the default values in `options`.
+    '''
+    options = self.options
+    db_url = self.TAGSETS_CLASS.infer_db_url()
+    options.db_url = db_url
+    options.sqltags = None
+
+  def apply_opt(self, opt, val):
+    ''' Apply a command line option.
+    '''
+    options = self.options
+    if opt == '-f':
+      options.db_url = val
+    else:
+      super().apply_opt(opt, val)
+
+  @contextmanager
+  def run_context(self):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    options = self.options
+    db_url = options.db_url
+    sqltags = self.TAGSETS_CLASS(db_url)
+    with sqltags:
+      with sqltags.orm.session() as session:
+        with stackattrs(options, sqltags=sqltags, session=session,
+                        verbose=True):
+          yield
+
+  @classmethod
+  def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
+    ''' Parse tag criteria from `argv`.
+
+        The criteria may be either:
+        * an integer specifying a `Tag` id
+        * a sequence of tag criteria
+    '''
+    # try a single int argument
+    try:
+      index = int(arg)
+    except ValueError:
+      return super().parse_tagset_criterion(
+          arg, tag_based_test_class=tag_based_test_class
+      )
+    else:
+      return SQTEntityIdTest([index])
+
+  def cmd_edit(self, argv):
+    ''' Usage: edit criteria...
+          Edit the entities specified by criteria.
+    '''
+    options = self.options
+    sqltags = options.sqltags
+    badopts = False
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("remaining unparsed arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    tes = list(sqltags.find(tag_criteria))
+    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
+    for te in changed_tes:
+      print("changed", repr(te.name or te.id))
+
+  def cmd_export(self, argv):
+    ''' Usage: {cmd} {{tag[=value]|-tag}}...
+          Export entities matching all the constraints.
+          The output format is CSV data with the following columns:
+          * `unixtime`: the entity unixtime, a float
+          * `id`: the entity database row id, an integer
+          * `name`: the entity name
+          * `tags`: a column per `Tag`
+    '''
+    options = self.options
+    sqltags = options.sqltags
+    badopts = False
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    csvw = csv.writer(sys.stdout)
+    with sqltags.orm.session() as session:
+      for te in sqltags.find(tag_criteria, session=session):
+        with Pfx(te):
+          csvw.writerow(te.csvrow)
+
+  # pylint: disable=too-many-locals
+  def cmd_find(self, argv):
+    ''' Usage: {cmd} [-o output_format] {{tag[=value]|-tag}}...
+          List entities matching all the constraints.
+          -o output_format
+                      Use output_format as a Python format string to lay out
+                      the listing.
+                      Default: {FIND_OUTPUT_FORMAT_DEFAULT}
+    '''
+    options = self.options
+    sqltags = options.sqltags
+    badopts = False
+    output_format = FIND_OUTPUT_FORMAT_DEFAULT
+    opts, argv = getopt(argv, 'o:')
+    for option, value in opts:
+      with Pfx(option):
+        if option == '-o':
+          ## TODO: indirects through the config file
+          ## output_format = sqltags.resolve_format_string(value)
+          output_format = value
+        else:
+          raise RuntimeError("unsupported option")
+    tag_criteria, argv = self.parse_tagset_criteria(argv)
+    if not tag_criteria:
+      warning("missing tag criteria")
+      badopts = True
+    if argv:
+      warning("unparsed arguments: %r", argv)
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    xit = 0
+    with sqltags.orm.session() as session:
+      for te in sqltags.find(tag_criteria, session=session):
+        with Pfx(te):
+          try:
+            output = te.format_as(output_format, error_sep='\n  ')
+          except FormatAsError as e:
+            error(str(e))
+            xit = 1
+            continue
+          print(output.replace('\n', ' '))
+          for tag in sorted(te):
+            if tag.name != 'headline':
+              print(" ", tag)
+    return xit
+
+  def cmd_import(self, argv):
+    ''' Usage: {cmd} [{{-u|--update}}] {{-|srcpath}}...
+          Import CSV data in the format emitted by "export".
+          Each argument is a file path or "-", indicating standard input.
+          -u, --update  If a named entity already exists then update its tags.
+                        Otherwise this will be seen as a conflict
+                        and the import aborted.
+
+        TODO: should this be a transaction so that an import is all or nothing?
+    '''
+    options = self.options
+    sqltags = options.sqltags
+    badopts = False
+    update_mode = False
+    opts, argv = getopt(argv, 'u')
+    for option, _ in opts:
+      with Pfx(option):
+        if option in ('-u', '--update'):
+          update_mode = True
+        else:
+          raise RuntimeError("unsupported option")
+    if not argv:
+      warning("missing srcpaths")
+      badopts = True
+    if badopts:
+      raise GetoptError("bad arguments")
+    for srcpath in argv:
+      with sqltags.orm.session():
+        if srcpath == '-':
+          with Pfx("stdin"):
+            sqltags.import_csv_file(sys.stdin, update_mode=update_mode)
+        else:
+          with Pfx(srcpath):
+            with open(srcpath) as f:
+              sqltags.import_csv_file(f, update_mode=update_mode)
+
+  def cmd_init(self, argv):
+    ''' Usage: {cmd}
+          Initialise the database.
+          This includes defining the schema and making the root metanode.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    self.options.sqltags.init()
+
+  # pylint: disable=too-many-locals.too-many-branches.too-many-statements
+  def cmd_log(self, argv):
+    ''' Record a log entry.
+
+        Usage: {cmd} [-c category,...] [-d when] [-D strptime] {{-|headline}} [tags...]
+          Record entries into the database.
+          If headline is '-', read headlines from standard input.
+          -c categories
+            Specify the categories for this log entry.
+            The default is to recognise a leading CAT,CAT,...: prefix.
+          -d when
+            Use when, an ISO8601 date, as the log entry timestamp.
+          -D strptime
+            Read the time from the start of the headline
+            according to the provided strptime specification.
+    '''
+    options = self.options
+    categories = None
+    dt = None
+    strptime_format = None
+    badopts = False
+    opts, argv = getopt(argv, 'c:d:D:', '')
+    for opt, val in opts:
+      with Pfx(opt if val is None else f"{opt} {val!r}"):
+        if opt == '-c':
+          categories = map(str.lower, filter(None, val.split(',')))
+        elif opt == '-d':
+          try:
+            dt = datetime.fromisoformat(val)
+          except ValueError as e:
+            warning("unhandled ISO format date: %s", e)
+            badopts = True
+          if dt.tzinfo is None:
+            # create a nonnaive datetime in the local zone
+            dt = dt.astimezone()
+        elif opt == '-D':
+          strptime_format = val
+        else:
+          raise RuntimeError("unhandled option")
+    if dt is not None and strptime_format is not None:
+      warning("-d and -D are mutually exclusive")
+      badopts = True
+    if strptime_format is not None:
+      with Pfx("strptime format %r", strptime_format):
+        if '%' not in strptime_format:
+          warning("no time fields!")
+          badopts = True
+        else:
+          # normalise the format and count the words
+          strptime_format = strptime_format.strip()
+          strptime_words = strptime_format.split()
+          strptime_nwords = len(strptime_words)
+          strptime_format = ' '.join(strptime_words)
+    if not argv:
+      argv = ['-']
+      if sys.stdin.isatty():
+        warning("reading log lines from stdin...")
+    cmdline_headline = argv.pop(0)
+    log_tags = []
+    while argv:
+      tag_s = argv.pop(0)
+      with Pfx("tag %r", tag_s):
+        try:
+          tag = Tag.from_str(tag_s)
+        except ValueError:
+          argv.insert(0, tag_s)
+          break
+        else:
+          if tag.value is None:
+            argv.insert(0, tag_s)
+            break
+        log_tags.append(tag)
+    if argv:
+      warning(
+          "extra arguments after %d tags: %s", len(log_tags), ' '.join(argv)
+      )
+      badopts = True
+    if badopts:
+      raise GetoptError("bad invocation")
+    xit = 0
+    use_stdin = cmdline_headline == '-'
+    sqltags = options.sqltags
+    session = options.session
+    for lineno, headline in enumerate((sys.stdin if use_stdin else
+                                       (cmdline_headline,))):
+      with Pfx(*(("%d: %s", lineno, headline) if use_stdin else (headline,))):
+        headline = headline.rstrip('\n')
+        unixtime = None
+        if strptime_format:
+          with Pfx("strptime %r", strptime_format):
+            headparts = headline.split(None, strptime_nwords)
+            if len(headparts) < strptime_nwords:
+              warning(
+                  "not enough fields in headline, using current time: %r",
+                  headline
+              )
+              xit = 1
+            else:
+              strptime_text = ' '.join(headparts[:strptime_nwords])
+              try:
+                strptime_dt = datetime.strptime(strptime_text, strptime_format)
+              except ValueError as e:
+                warning(
+                    "cannot parse %r, using current time: %s", strptime_text, e
+                )
+                xit = 1
+              else:
+                unixtime = datetime2unixtime(strptime_dt)
+                headline = ' '.join(headparts[strptime_nwords:])
+        if unixtime is None:
+          unixtime = time.time() if dt is None else dt.timestamp()
+        if categories is None:
+          # infer categories from leading "FOO,BAH:" text
+          m = CATEGORIES_PREFIX_re.match(headline)
+          if m:
+            tag_categories = map(
+                str.lower, filter(None,
+                                  m.group('categories').split(','))
+            )
+            headline = headline[len(m.group()):]
+          else:
+            tag_categories = ()
+        else:
+          tag_categories = categories
+        log_tags.append(Tag('headline', headline))
+        if tag_categories:
+          log_tags.append(Tag('categories', list(tag_categories)))
+        sqltags.default_factory(
+            None, session=session, unixtime=unixtime, tags=log_tags
+        )
+    return xit
+
+  # pylint: disable=too-many-branches
+  def cmd_tag(self, argv):
+    ''' Usage: {cmd} {{-|entity-name}} {{tag[=value]|-tag}}...
+          Tag an entity with multiple tags.
+          With the form "-tag", remove that tag from the direct tags.
+          A entity-name named "-" indicates that entity-names should
+          be read from the standard input.
+    '''
+    badopts = False
+    if not argv:
+      raise GetoptError("missing entity-name")
+    name = argv.pop(0)
+    if not argv:
+      raise GetoptError("missing tags")
+    try:
+      tag_choices = self.parse_tag_choices(argv)
+    except ValueError as e:
+      raise GetoptError(str(e)) from e
+    if badopts:
+      raise GetoptError("bad arguments")
+    if name == '-':
+      names = [line.rstrip('\n') for line in sys.stdin]
+    else:
+      names = [name]
+    xit = 0
+    options = self.options
+    sqltags = options.sqltags
+    orm = sqltags.orm
+    with orm.session():
+      with stackattrs(state, verbose=True):
+        for name in names:
+          with Pfx(name):
+            try:
+              index = int(name)
+            except ValueError:
+              index = name
+            te = sqltags.get(index)
+            if te is None:
+              error("missing")
+              xit = 1
+              continue
+            tags = te.tags
+            for tag_choice in tag_choices:
+              if tag_choice.choice:
+                if tag_choice.tag not in tags:
+                  te.set(tag_choice.tag)
+              else:
+                if tag_choice.tag in tags:
+                  te.discard(tag_choice.tag)
+    return xit
+
+class SQLTagsCommand(BaseSQLTagsCommand):
+  ''' `sqltags` main command line utility.
+  '''
+
+  def cmd_ns(self, argv):
+    ''' Usage: {cmd} entity-names...
+          List entities and their tags.
+    '''
+    if not argv:
+      raise GetoptError("missing entity_names")
+    xit = 0
+    options = self.options
+    sqltags = options.sqltags
+    orm = sqltags.orm
+    with orm.session() as session:
+      for name in argv:
+        with Pfx(name):
+          try:
+            index = int(name)
+          except ValueError:
+            index = name
+          entity = sqltags.get(index, session=session)
+          if entity is None:
+            error("missing")
+            xit = 1
+            continue
+          print(name)
+          for tag in sorted(entity.tags(session=session)):
+            print(" ", tag)
+    return xit
+
+SQLTagsCommand.add_usage_to_docstring()
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
