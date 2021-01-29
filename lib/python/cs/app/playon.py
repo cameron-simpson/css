@@ -44,7 +44,7 @@ DEFAULT_FILENAME_FORMAT = (
 def main(argv=None):
   ''' Playon command line mode.
   '''
-  return PlayOnCommand().run(argv)
+  return PlayOnCommand(argv).run()
 
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
@@ -80,8 +80,8 @@ class PlayOnCommand(BaseCommand):
                     case insensitive.
   '''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
+    options = self.options
     options.user = environ.get('PLAYON_USER')
     options.password = environ.get('PLAYON_PASSWORD')
     options.filename_format = environ.get(
@@ -89,9 +89,10 @@ class PlayOnCommand(BaseCommand):
     )
 
   @contextmanager
-  def run_context(self, argv, options):
+  def run_context(self):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
+    options = self.options
     sqltags = PlayOnSQLTags()
     api = PlayOnAPI(options.user, options.password, sqltags)
     with stackattrs(options, api=api, sqltags=sqltags):
@@ -99,23 +100,22 @@ class PlayOnCommand(BaseCommand):
         self._refresh_sqltags_data(api, sqltags)
         yield
 
-  @staticmethod
-  def cmd_account(argv, options):
+  def cmd_account(self, argv):
     ''' Usage: {cmd}
           Report account state.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    api = options.api
+    api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
-  @staticmethod
-  def cmd_dl(argv, options):
+  def cmd_dl(self, argv):
     ''' Usage: {cmd} [-n] [recordings...]
           Download the specified recordings, default "pending".
           -n  No download. List the specified recordings.
     '''
+    options = self.options
     sqltags = options.sqltags
     no_download = False
     if argv and argv[0] == '-n':
@@ -134,7 +134,8 @@ class PlayOnCommand(BaseCommand):
           filename = api[dl_id].format_as(filename_format)
           filename = (
               filename.lower().replace(' - ',
-                                       '--').replace('_', ':').replace(' ', '-') +
+                                       '--').replace('_',
+                                                     ':').replace(' ', '-') +
               '.'
           )
           try:
@@ -226,30 +227,29 @@ class PlayOnCommand(BaseCommand):
             te.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
-  def cmd_ls(self, argv, options):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l        Long listing: list tags below each entry.
           -o format Format string for each entry.
           Default format: {LS_FORMAT}
     '''
-    return self._list(argv, options, ['available'], self.LS_FORMAT)
+    return self._list(argv, self.options, ['available'], self.LS_FORMAT)
 
-  def cmd_queue(self, argv, options):
+  def cmd_queue(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
           -l        Long listing: list tags below each entry.
           -o format Format string for each entry.
           Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, options, ['queued'], self.QUEUE_FORMAT)
+    return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
 
-  @staticmethod
-  def cmd_update(argv, options):
+  def cmd_update(self, argv):
     ''' Usage: {cmd} [queue] [recordings]
           Update the db state from the PlayOn service.
     '''
-    api = options.api
+    api = self.options.api
     if not argv:
       argv = ['queue', 'recordings']
     xit = 0
