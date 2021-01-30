@@ -195,7 +195,9 @@ class Upd(SingletonMixin):
     self._proxies = []
 
   def __str__(self):
-    return "%s(backend=%s)" % (type(self).__name__, self._backend)
+    return "%s(backend=%s)" % (
+        type(self).__name__, getattr(self, '_backend', None)
+    )
 
   ############################################################
   # Sequence methods.
@@ -243,7 +245,7 @@ class Upd(SingletonMixin):
   def shutdown(self, preserve_display=False):
     ''' Clean out this `Upd`, optionally preserving the displayed status lines.
     '''
-    slots = self._slot_text
+    slots = getattr(self, '_slot_text', None)
     if slots:
       if not preserve_display:
         # remove the Upd display
