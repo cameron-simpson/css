@@ -407,6 +407,8 @@ class PlayOnSQLTags(SQLTags):
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
         r_text = arg[1:]
+        if r_text.endswith('/'):
+          r_text = r_text[:-1]
         with Pfx("re.compile(%r, re.I)", r_text):
           r = re.compile(r_text, re.I)
         for te in self:
