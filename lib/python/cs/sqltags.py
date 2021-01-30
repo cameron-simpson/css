@@ -1144,7 +1144,6 @@ class SQLTagSet(SingletonMixin, TagSet):
   def _singleton_key(*, sqltags, _id, **_):
     return builtin_id(sqltags), _id
 
-  def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
   def _singleton_also_indexmap(self):
     ''' Return the map of secondary key names and their values.
     '''
@@ -1156,6 +1155,8 @@ class SQLTagSet(SingletonMixin, TagSet):
       d.update(name=name)
     return d
 
+  @typechecked
+  def __init__(self, *, sqltags, name=None, _id:int, unixtime=None, **kw):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
@@ -1168,7 +1169,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       )
 
   def __str__(self):
-    return "%d:%s(%s)" % (self.id, self.name, super().__str__())
+    return "id=%r:%s(%s)" % (self.id, self.name, super().__str__())
 
   def __hash__(self):
     return id(self)
@@ -1288,7 +1289,7 @@ class SQLTags(TagSets):
     self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
-    return "%s(db_url=%r)" % (type(self).__name__, self.db_url)
+    return "%s(db_url=%r)" % (type(self).__name__, getattr(self,'db_url',None))
 
   @contextmanager
   def sql_session(self):
