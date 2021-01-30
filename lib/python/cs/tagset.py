@@ -2166,9 +2166,10 @@ class TagsOntology(SingletonMixin, TagSets):
       return
     self.__dict__.update(
         te_mapping=te_mapping,
-        default_factory=getattr(te_mapping,
-            'default_factory', lambda name: TagSet(_ontology=self)),
-        )
+        default_factory=getattr(
+            te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
+        ),
+    )
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
