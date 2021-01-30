@@ -67,7 +67,7 @@ cs.threads pypi.release="20210123" ok_revision="49cb0ffa1b8a5a25e2e08169aea76306
 cs.timeutils pypi.release=20190220
 cs.tty pypi.release="20201102"
 cs.units pypi.release="20201025"
-cs.upd pypi.release="20210122" ok_revision="9e82bfef4662102d65ace9416ed939d4590ef4ba"
+cs.upd pypi.release="20210122" ok_revision=e53c7026abb3b3a1ad774121054e77c3e23efb20
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
