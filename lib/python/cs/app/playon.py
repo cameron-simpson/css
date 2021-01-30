@@ -376,7 +376,7 @@ class PlayOnSQLTags(SQLTags):
 
         Note that this includes both recorded and queued items.
     '''
-    return filter(None, map(lambda k: self[k], self.keys(prefix='recording.')))
+    return self.find('name~recording.*')
 
   __iter__ = recordings
 
