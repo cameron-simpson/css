@@ -99,7 +99,8 @@ class PlayOnCommand(BaseCommand):
       with api:
         # preload all the recordings from the db
         all_recordings = list(sqltags.recordings())
-        # if there are unexpired stale entries, refresh them
+        # if there are unexpired stale entries or no unexpired entries,
+        # refresh them
         self._refresh_sqltags_data(api, sqltags)
         yield
 
@@ -184,11 +185,13 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def _refresh_sqltags_data(api, sqltags, max_age=None):
-    ''' Refresh the queue and recordings if any unexpired records are stale.
+    ''' Refresh the queue and recordings if any unexpired records are stale
+        or if all records are expired.
     '''
     tes = set(sqltags.recordings())
-    if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
-               tes)):
+    if (any(map(
+        lambda te: not te.is_expired() and te.is_stale(max_age=max_age), tes))
+        or all(map(lambda te: te.is_expired(), tes))):
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
