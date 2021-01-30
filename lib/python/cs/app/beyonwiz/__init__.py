@@ -4,8 +4,7 @@ r'''
 Beyonwiz PVR and TVWiz recording utilities.
 
 Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
-structures and to access Beyonwiz devices via the net. Also support for
-newer Beyonwiz devices running Enigma and their recording format.
+structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
@@ -37,7 +36,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'requires': [
+    'install_requires': [
         'cs.app.ffmpeg',
         'cs.binary',
         'cs.deco',
