@@ -69,13 +69,16 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
+        'cs.mappings',
         'cs.obj',
         'cs.pfx',
+        'cs.progress',
         'cs.py3',
         'cs.range',
         'cs.result',
         'cs.threads',
         'cs.timeutils',
+        'cs.units',
     ],
 }
 
