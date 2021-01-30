@@ -4,8 +4,7 @@ r'''
 Beyonwiz PVR and TVWiz recording utilities.
 
 Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
-structures and to access Beyonwiz devices via the net. Also support for
-newer Beyonwiz devices running Enigma and their recording format.
+structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
@@ -23,6 +22,7 @@ from cs.app.ffmpeg import (
     ConversionSource as FFSource,
 )
 from cs.deco import strable
+from cs.fileutils import crop_name
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
@@ -36,7 +36,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'requires': [
+    'install_requires': [
         'cs.app.ffmpeg',
         'cs.binary',
         'cs.deco',
@@ -198,7 +198,11 @@ class _Recording(ABC, HasFSTagsMixin):
       format = self.DEFAULT_FILENAME_BASIS
     if not ext.startswith('.'):
       ext = '.' + ext
-    return format.format_map(self.metadata.ns()) + ext
+    return crop_name(
+        format.format_map(self.metadata.ns()
+                          ).replace('\r', '_').replace('\n', '_') + ext,
+        ext=ext
+    )
 
   @abstractmethod
   def data(self):
@@ -351,7 +355,7 @@ class _Recording(ABC, HasFSTagsMixin):
       comment += f' Recording date {recording_dt.isoformat()}.'
     if M.tags:
       comment += ' tags=' + ','.join(sorted(M.tags))
-    episode_marker = str(M.episodeinfo)
+    ## unused ## episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(
         dstfmt,
         title=M['meta.title'],

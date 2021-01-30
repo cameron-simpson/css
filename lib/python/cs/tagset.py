@@ -186,6 +186,7 @@ import os
 from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
+import time
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
@@ -302,6 +303,29 @@ def tag_or_tag_value(func, no_self=False):
   accept_tag_or_tag_value.__doc__ = func.__doc__
   return accept_tag_or_tag_value
 
+@pfx
+def as_unixtime(tag_value):
+  ''' Convert a tag value to a UNIX timestamp.
+
+      This accepts `int`, `float` (already a timestamp)
+      and `date` or `datetime`
+      (use `datetime.timestamp() for a nonnaive `datetime`,
+      otherwise `time.mktime(tag_value.time_tuple())`,
+      which assumes the local time zone).
+  '''
+  if isinstance(tag_value, (date, datetime)):
+    if isinstance(tag_value, datetime) and tag_value.tzinfo is not None:
+      # nonnaive datetime
+      return tag_value.timestamp()
+      # plain date or naive datetime: pretend it is localtime
+    return time.mktime(tag_value.timetuple())
+  if isinstance(tag_value, (int, float)):
+    return float(tag_value)
+  raise ValueError(
+      "requires an int, float, date or datetime, got %s:%r" %
+      (type(tag_value), tag_value)
+  )
+
 class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
@@ -390,6 +414,58 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def __getattr__(self, attr):
+    ''' Support access to dotted name attributes
+        if `attr` is not found via the superclass `__getattr__`.
+
+        This is done by returning a subtags of those tags
+        commencing with `attr+'.'`.
+
+        Example:
+
+            >>> tags=TagSet(a=1,b=2)
+            >>> tags.a
+            1
+            >>> tags.c
+            >>> tags['c.z']=9
+            >>> tags['c.x']=8
+            >>> tags
+            TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
+            >>> tags.c
+            TagSet:{'z': 9, 'x': 8}
+            >>> tags.c.z
+            9
+
+        However, this is not supported when there is a tag named `'c'`
+        because `tags.c` has to return the `'c'` tag value:
+
+            >>> tags=TagSet(a=1,b=2,c=3)
+            >>> tags.a
+            1
+            >>> tags.c
+            3
+            >>> tags['c.z']=9
+            >>> tags.c.z
+            Traceback (most recent call last):
+              File "<stdin>", line 1, in <module>
+            AttributeError: 'int' object has no attribute 'z'
+
+    '''
+    try:
+      return self[attr]
+    except KeyError:
+      # magic dotted name access to foo.bar if there are keys
+      # starting with "attr."
+      if attr and attr[0].isalpha():
+        attr_ = attr + '.'
+        if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
+          return self.subtags(attr)
+      try:
+        super_getattr = super().__getattr__
+      except AttributeError:
+        raise AttributeError(type(self).__name__ + '.' + attr)
+      return super_getattr(attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -576,9 +652,13 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
   def unixtime(self):
     ''' `unixtime` property, autosets to `time.time()` if accessed.
     '''
-    return self.get('unixtime')
+    ts = self.get('unixtime')
+    if ts is None:
+      self.unixtime = ts = time.time()
+    return ts
 
   @unixtime.setter
+  @typechecked
   def unixtime(self, new_unixtime: float):
     ''' Set the `unixtime`.
     '''
@@ -1307,6 +1387,14 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     )
 
   @classmethod
+  @tag_or_tag_value
+  def by_tag_value(cls, tag_name, tag_value, *, choice=True, comparison='='):
+    ''' Return a `TagBasedTest` based on a `Tag` or `tag_name,tag_value`.
+    '''
+    tag = Tag(tag_name, tag_value)
+    return cls(str(tag), choice, tag, comparison)
+
+  @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse *tag_name*[{`<`|`<=`|'='|'>='|`>`|'~'}*value*]
         and return `(dict,offset)`
@@ -1491,6 +1579,10 @@ class TagSetNamespace(ExtendedNamespace):
           >>> # the ns object has additional computed attributes
           >>> 'The colour tag is {colour._tag}.'.format_map(ns)
           'The colour tag is colour=blue.'
+          >>> # also, the direct name for any Tag can be used
+          >>> # which returns its value
+          >>> 'The colour is {colour}.'.format_map(ns)
+          'The colour is blue.'
           >>> 'The colours are {colours}. The labels are {labels}.'.format_map(ns)
           "The colours are ['blue']. The labels are ['a', 'b', 'c']."
           >>> 'The first label is {label}.'.format_map(ns)
@@ -1521,25 +1613,26 @@ class TagSetNamespace(ExtendedNamespace):
 
           >>> # the TagSet as a namespace for use in format strings
           >>> ns = tags.ns()
-          >>> # the namespace .colour node, which has the Tag attached
+          >>> # The namespace .colour node, which has the Tag attached.
+          >>> # When there is a Tag attached, the repr is that of the Tag value.
           >>> ns.colour         # doctest: +ELLIPSIS
-          TagSetNamespace(..., _tag=Tag(name='colour',value='blue',...))
-          >>> # the underlying colour Tag itself
+          'blue'
+          >>> # The underlying colour Tag itself.
           >>> ns.colour._tag    # doctest: +ELLIPSIS
           Tag(name='colour',value='blue',ontology=TagsOntology<...>)
-          >>> # str() of a namespace with a ._tag is the Tag value
-          >>> # making for easy use in a format string
+          >>> # The str() of a namespace with a ._tag is the Tag value
+          >>> # making for easy use in a format string.
           >>> f'{ns.colour}'
           'blue'
           >>> # the type information about the colour Tag
           >>> ns.colour._tag.typedata
           TagSet:{'description': 'a colour, a hue', 'type': 'str'}
-          >>> # the metadata
+          >>> # The metadata: a TagSetNamespace for the metadata TagSet
           >>> ns.colour._meta   # doctest: +ELLIPSIS
-          TagSetNamespace(..., url=TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...)), ...)
+          TagSetNamespace(_path='.', _pathnames=(), _ontology=None, wavelengths='450nm-495nm', url='https://en.wikipedia.org/wiki/Blue')
           >>> # the _meta.url is itself a namespace with a ._tag for the URL
           >>> ns.colour._meta.url   # doctest: +ELLIPSIS
-          TagSetNamespace(..., _tag=Tag(name='url',value='https://en.wikipedia.org/wiki/Blue',...))
+          'https://en.wikipedia.org/wiki/Blue'
           >>> # but it formats nicely because it has a ._tag
           >>> f'colour={ns.colour}, info URL={ns.colour._meta.url}'
           'colour=blue, info URL=https://en.wikipedia.org/wiki/Blue'
@@ -2071,9 +2164,11 @@ class TagsOntology(SingletonMixin, TagSets):
   def __init__(self, te_mapping):
     if hasattr(self, 'te_mapping'):
       return
-    self.te_mapping = te_mapping
-    self.default_factory = te_mapping.get(
-        'default_factory', lambda name: TagSet(_ontology=self)
+    self.__dict__.update(
+        te_mapping=te_mapping,
+        default_factory=getattr(
+            te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
+        ),
     )
 
   def __bool__(self):
@@ -2353,7 +2448,7 @@ class TagFile(SingletonMixin, TagSets):
   def values(self, prefix=None):
     ''' `tagsets.values`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those values whose keys start with `prefix`.
     '''
     if not prefix:
@@ -2364,7 +2459,7 @@ class TagFile(SingletonMixin, TagSets):
   def items(self, prefix=None):
     ''' `tagsets.items`
 
-        If the options `prefix` is supplied,
+        If the optional `prefix` is supplied,
         yield only those items whose keys start with `prefix`.
     '''
     if not prefix:
@@ -2462,6 +2557,15 @@ class TagFile(SingletonMixin, TagSets):
     '''
     fields = [Tag.transcribe_value(name)]
     for tag in tags:
+      if tag.name == 'name':
+        # we don't write this one out, but we do expect it to match
+        # the `name` parameter
+        if tag.value != name:
+          warning(
+              "%s.tags_line(name=%r,tags=%s): tags['name']:%r != name)",
+              cls.__name__, name, tags, tag.value
+          )
+        continue
       fields.append(str(tag))
     return ' '.join(fields)
 
@@ -2475,7 +2579,7 @@ class TagFile(SingletonMixin, TagSets):
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
-      if not isdirpath(dirpath):
+      if dirpath and not isdirpath(dirpath):
         ifverbose("makedirs(%r)", dirpath)
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
@@ -2493,7 +2597,7 @@ class TagFile(SingletonMixin, TagSets):
             f.write(cls.tags_line(name, tags))
             f.write('\n')
       except OSError as e:
-        error("save(%r) fails: %s", filename, e)
+        error("save(%r) fails: %s", filepath, e)
       else:
         for _, tags in name_tags:
           tags.modified = False

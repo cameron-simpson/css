@@ -1,0 +1,1 @@
+lib/python/cs/x.py: cs.x: honour new $CS_X_COLOUR environment variable setting the default colour for X() output, default uncoloured

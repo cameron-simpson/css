@@ -54,10 +54,10 @@ URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return CSReleaseCommand().run(argv, cmd=cmd)
+  return CSReleaseCommand(argv).run()
 
 DISTINFO_CLASSIFICATION = {
     "Programming Language": "Python",
@@ -102,12 +102,12 @@ class CSReleaseCommand(BaseCommand):
       -v  Verbose.
   '''
 
-  @classmethod
-  def apply_defaults(cls, options):
-    cmd = basename(options.cmd)
+  def apply_defaults(self):
+    options = self.options
+    cmd = basename(self.cmd)
     if cmd.endswith('.py'):
       cmd = 'cs-release'
-    options.cmd = cmd
+    self.cmd = cmd
     # verbose if stderr is a tty
     try:
       options.verbose = sys.stderr.isatty()
@@ -121,10 +121,10 @@ class CSReleaseCommand(BaseCommand):
     options.last_values = LastValues()
     options.modules = Modules(options=options)
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
     '''
+    options = self.options
     for opt, _ in opts:
       if opt == '-f':
         options.force = True
@@ -138,13 +138,13 @@ class CSReleaseCommand(BaseCommand):
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
 
-  @staticmethod
-  def cmd_check(argv, options):
+  def cmd_check(self, argv):
     ''' Usage: {cmd} pkg_name...
           Perform sanity checks on the names packages.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     xit = 0
     with Upd(sys.stderr):
       for pkg_name in argv:
@@ -195,13 +195,13 @@ class CSReleaseCommand(BaseCommand):
                   )
     return xit
 
-  @staticmethod
-  def cmd_checkout(argv, options):
+  def cmd_checkout(self, argv):
     ''' Usage: {cmd} pkg_name [revision]
           Check out the named package.
     '''
     if not argv:
       raise GetoptError("missing package name")
+    options = self.options
     vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
@@ -219,8 +219,7 @@ class CSReleaseCommand(BaseCommand):
     )
     print(checkout_dir)
 
-  @staticmethod
-  def cmd_distinfo(argv, options):
+  def cmd_distinfo(self, argv):
     ''' Usage: {cmd} pkg_name
           Print out the package distinfo mapping.
     '''
@@ -229,24 +228,23 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    pkg = options.modules[pkg_name]
+    pkg = self.options.modules[pkg_name]
     pprint(pkg.compute_distinfo())
 
-  @staticmethod
-  def cmd_last(argv, options):
+  def cmd_last(self, argv):
     ''' Usage: {cmd} pkg_names...
           Print the latest release tags for the names packages.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         latest = pkg.latest
         print(pkg.name, latest.version if latest else "NONE")
 
-  @staticmethod
-  def cmd_log(argv, options):
+  def cmd_log(self, argv):
     ''' Usage: {cmd} pkg_name
           Print the commit log since the latest release.
     '''
@@ -255,7 +253,7 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    pkg = options.modules[pkg_name]
+    pkg = self.options.modules[pkg_name]
     for files, firstline in pkg.log_since():
       files = [
           filename[11:] if filename.startswith('lib/python/') else filename
@@ -263,13 +261,13 @@ class CSReleaseCommand(BaseCommand):
       ]
       print(' '.join(files) + ':', firstline)
 
-  @staticmethod
-  def cmd_ls(argv, options):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd}
           List package names and their latst PyPI releases.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     tagsets = options.pkg_tagsets
     for pkg_name in sorted(tagsets.keys()):
       if pkg_name.startswith(MODULE_PREFIX):
@@ -283,20 +281,19 @@ class CSReleaseCommand(BaseCommand):
           )
     return 0
 
-  @staticmethod
-  def cmd_next(argv, options):
+  def cmd_next(self, argv):
     ''' Usage: next pkg_names...
           Print package names and their next release tag.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         print(pkg.name, pkg.next().version)
 
-  @staticmethod
-  def cmd_ok(argv, options):
+  def cmd_ok(self, argv):
     ''' Usage: {cmd} pkg_name [changset-hash]
           Print the commit log since the latest release.
     '''
@@ -309,6 +306,7 @@ class CSReleaseCommand(BaseCommand):
       changeset_hash = None
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     pkg = options.modules[pkg_name]
     if changeset_hash is None:
       changeset_hash = pkg.latest_changeset_hash
@@ -318,13 +316,13 @@ class CSReleaseCommand(BaseCommand):
     pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
     return 0
 
-  @staticmethod
-  def cmd_package(argv, options):
+  def cmd_package(self, argv):
     ''' Usage: package pkg_name [version]
           Export the package contents as a prepared package.
     '''
     if not argv:
       raise GetoptError("missing package name")
+    options = self.options
     vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
@@ -340,13 +338,13 @@ class CSReleaseCommand(BaseCommand):
     ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True)
     print(checkout_dir)
 
-  @staticmethod
-  def cmd_pypi(argv, options):
+  def cmd_pypi(self, argv):
     ''' Usage: {cmd} pkg_names...
           Push the named packages to PyPI.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
@@ -358,8 +356,7 @@ class CSReleaseCommand(BaseCommand):
         pkg.upload_dist(dirpath)
         pkg.latest_pypi_version = release.version
 
-  @staticmethod
-  def cmd_readme(argv, options):
+  def cmd_readme(self, argv):
     ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
           -a  Document all public class members (default is just
@@ -374,13 +371,13 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     pkg = options.modules[pkg_name]
     docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
   # pylint: disable=too-many-locals
-  @staticmethod
-  def cmd_release(argv, options):
+  def cmd_release(self, argv):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
     '''
@@ -389,6 +386,7 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     pkg = options.modules[pkg_name]
     vcs = options.vcs
     # issue new release tag
@@ -973,7 +971,8 @@ class Module(object):
           info("SKIP %s", subpath)
           continue
         for filename in sorted(filenames):
-          if not (filename.endswith('.pyc') or filename.endswith('.o')):
+          if not any(map(lambda dotext: filename.endswith(dotext),
+                         ('.pyc', '.o', '.so'))):
             filepath = joinpath(subpath, filename)
             pathlist.append(filepath)
     else:
@@ -1268,9 +1267,17 @@ class Module(object):
             get_dotted_identifier(dirq)[0] for dirq in distinfo_requires
         ]
         if sorted(distinfo_requires_names) != import_names:
+          new_import_names = set(import_names) - set(distinfo_requires_names)
+          old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
-              "DISTINFO[install_requires=%r] != direct_imports=%r" %
-              (distinfo_requires, sorted(import_names))
+              (
+                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "  new imports %r\n"
+                  "  removed imports %r"
+              ) % (
+                  distinfo_requires, sorted(import_names),
+                  sorted(new_import_names), sorted(old_import_names)
+              )
           )
         for import_name in import_names:
           if not import_name.startswith(MODULE_PREFIX):

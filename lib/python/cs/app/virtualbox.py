@@ -19,10 +19,10 @@ from cs.pfx import Pfx
 
 VBOXMANAGE = 'VBoxManage'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return VBoxCommand().run(argv, cmd=cmd)
+  return VBoxCommand(argv).run()
 
 class VBoxCommand(BaseCommand):
   ''' "vbox" command line implementation.
@@ -54,15 +54,14 @@ class VBoxCommand(BaseCommand):
       argv = [argv]
     return run([VBOXMANAGE] + pre_argv + argv + list(post_argv), logger=True)
 
-  @classmethod
-  def cmd_ls(cls, argv, _):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [VBoxManage list options...]
           List various things, by default "vms".
     '''
-    return cls.vbmg('list', argv)
+    return self.vbmg('list', argv)
 
   @staticmethod
-  def cmd_mkimg(argv, _):
+  def cmd_mkimg(argv):
     ''' Usage: {cmd} {{path.vdi|uuid}} [VBoxManage clonemedium options...]
           Create a .img file from a disc image file.
     '''
@@ -81,7 +80,7 @@ class VBoxCommand(BaseCommand):
       return 1
 
   @staticmethod
-  def cmd_mkvdi(argv, _):
+  def cmd_mkvdi(argv):
     ''' Usage: {cmd} img [VBoxManage convertfromraw options...]
           Create a .vdi file from a .img file.
     '''
@@ -99,52 +98,47 @@ class VBoxCommand(BaseCommand):
       error("mkvdi fails: %s", e)
       return 1
 
-  @classmethod
-  def cmd_pause(cls, argv, _):
+  def cmd_pause(self, argv):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Pause the specified VM using "controlvm .. pause".
     '''
     if not argv:
       raise GetoptError("missing vmname")
     vmspec = argv.pop(0)
-    return cls.vbmg(['controlvm', vmspec, 'pause'], argv)
+    return self.vbmg(['controlvm', vmspec, 'pause'], argv)
 
-  @classmethod
-  def cmd_ps(cls, argv, _):
+  def cmd_ps(self, argv):
     ''' Usage: {cmd} [VBoxManage list options...]
           List runnings VMs.
     '''
-    return cls.vbmg('list', argv, ['runningvms'])
+    return self.vbmg('list', argv, ['runningvms'])
 
-  @classmethod
-  def cmd_resume(cls, argv, _):
+  def cmd_resume(self, argv):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Resume the specified VM using "controlvm .. resume".
     '''
     if not argv:
       raise GetoptError("missing vmname")
     vmspec = argv.pop(0)
-    return cls.vbmg(['controlvm', vmspec, 'resume'], argv)
+    return self.vbmg(['controlvm', vmspec, 'resume'], argv)
 
-  @classmethod
-  def cmd_start(cls, argv, _):
+  def cmd_start(self, argv):
     ''' Usage: {cmd} vmname [VBoxManage startvm options...]
           Start the specified VM using "startvm".
     '''
     if not argv:
       raise GetoptError("missing vmname")
     vmspec = argv.pop(0)
-    return cls.vbmg(['startvm', vmspec], argv)
+    return self.vbmg(['startvm', vmspec], argv)
 
-  @classmethod
-  def cmd_suspend(cls, argv, _):
+  def cmd_suspend(self, argv):
     ''' Usage: {cmd} vmname [VBoxManage controlvm options...]
           Suspend the specified VM using "controlvm .. savestate".
     '''
     if not argv:
       raise GetoptError("missing vmname")
     vmspec = argv.pop(0)
-    return cls.vbmg(['controlvm', vmspec, 'savestate'], argv)
+    return self.vbmg(['controlvm', vmspec, 'savestate'], argv)
 
 def parse_clauses(fp):
   ''' Generator that parses VBoxManage clause output

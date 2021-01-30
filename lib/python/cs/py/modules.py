@@ -13,7 +13,7 @@ import sys
 from cs.context import stackattrs
 from cs.pfx import Pfx
 
-__version__ = '20200521-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

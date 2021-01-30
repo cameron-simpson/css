@@ -487,7 +487,7 @@ def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
