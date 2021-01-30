@@ -186,7 +186,7 @@ import os
 from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
-from time import mktime
+import time
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
@@ -310,7 +310,7 @@ def as_unixtime(tag_value):
       This accepts `int`, `float` (already a timestamp)
       and `date` or `datetime`
       (use `datetime.timestamp() for a nonnaive `datetime`,
-      otherwise `mktime(tag_value.time_tuple())`,
+      otherwise `time.mktime(tag_value.time_tuple())`,
       which assumes the local time zone).
   '''
   if isinstance(tag_value, (date, datetime)):
@@ -318,7 +318,7 @@ def as_unixtime(tag_value):
       # nonnaive datetime
       return tag_value.timestamp()
       # plain date or naive datetime: pretend it is localtime
-    return mktime(tag_value.timetuple())
+    return time.mktime(tag_value.timetuple())
   if isinstance(tag_value, (int, float)):
     return float(tag_value)
   raise ValueError(
@@ -1388,11 +1388,11 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 
   @classmethod
   @tag_or_tag_value
-  def by_tag_value(self, tag_name, tag_value, *, choice=True, comparison='='):
+  def by_tag_value(cls, tag_name, tag_value, *, choice=True, comparison='='):
     ''' Return a `TagBasedTest` based on a `Tag` or `tag_name,tag_value`.
     '''
-    tag=Tag(tag_name, tag_value)
-    return cls(str(tag),choice,tag,comparison)
+    tag = Tag(tag_name, tag_value)
+    return cls(str(tag), choice, tag, comparison)
 
   @classmethod
   def parse(cls, s, offset=0, delim=None):
