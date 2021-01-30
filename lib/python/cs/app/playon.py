@@ -163,6 +163,9 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           te = sqltags[dl_id]
           with Pfx(te.name):
+            if te.is_expired():
+              warning("expired, skipping")
+              continue
             if te.is_downloaded():
               warning("already downloaded to %r", te.download_path)
             if no_download:
