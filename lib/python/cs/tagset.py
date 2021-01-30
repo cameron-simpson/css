@@ -461,7 +461,11 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         attr_ = attr + '.'
         if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
           return self.subtags(attr)
-      return super().__getattr__(attr)
+      try:
+        super_getattr = super().__getattr__
+      except AttributeError:
+        raise AttributeError(type(self).__name__ + '.' + attr)
+      return super_getattr(attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
