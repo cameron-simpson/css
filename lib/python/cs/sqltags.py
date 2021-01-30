@@ -1145,11 +1145,23 @@ class SQLTagSet(SingletonMixin, TagSet):
     return builtin_id(sqltags), _id
 
   def __init__(self, *, sqltags, name=None, _id, unixtime=None, **kw):
+  def _singleton_also_indexmap(self):
+    ''' Return the map of secondary key names and their values.
+    '''
+    d = super()._singleton_also_indexmap()
+    assert self.id is not None
+    d.update(id=self.id)
+    name = self.name
+    if name is not None:
+      d.update(name=name)
+    return d
+
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
       super().__init__(_id=_id, **kw)
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
+      self._singleton_also_index()
     else:
       assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
           pre_sqltags, sqltags
@@ -1176,6 +1188,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       e = self.get_db_entity(session=session)
       e.name = new_name
       self._name = new_name
+      self._singleton_also_index()
 
   @property
   def unixtime(self):
@@ -1317,8 +1330,14 @@ class SQLTags(TagSets):
     ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
     '''
     if isinstance(index, int):
+      te = self.TagSetClass._singleton_also_by('id', index)
+      if te is not None:
+        return te
       tes = self.find([SQTEntityIdTest([index])], session=session)
     elif isinstance(index, str):
+      te = self.TagSetClass._singleton_also_by('name', index)
+      if te is not None:
+        return te
       tes = self.find(
           [SQLTagBasedTest(index, True, Tag('name', index), '=')],
           session=session
