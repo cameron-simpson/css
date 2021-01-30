@@ -1267,9 +1267,17 @@ class Module(object):
             get_dotted_identifier(dirq)[0] for dirq in distinfo_requires
         ]
         if sorted(distinfo_requires_names) != import_names:
+          new_import_names = set(import_names) - set(distinfo_requires_names)
+          old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
-              "DISTINFO[install_requires=%r] != direct_imports=%r" %
-              (distinfo_requires, sorted(import_names))
+              (
+                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "  new imports %r\n"
+                  "  removed imports %r"
+              ) % (
+                  distinfo_requires, sorted(import_names),
+                  sorted(new_import_names), sorted(old_import_names)
+              )
           )
         for import_name in import_names:
           if not import_name.startswith(MODULE_PREFIX):
