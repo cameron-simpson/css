@@ -1,0 +1,1 @@
+crop_name: put ext before name_max, more likely to be specified, I think.
