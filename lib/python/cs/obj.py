@@ -417,12 +417,10 @@ class SingletonMixin:
     super_new = super().__new__
     registry = cls._singleton_get_registry()
 
-    # TODO: docstring wrong - there is no _singleton_init any more
+    # pylint: disable=unused-argument
     def factory(*fargs, **fkwargs):
-      ''' Prepare a new object.
-
-          Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
-          on the new object.
+      ''' Prepare a new object; does not yet call `__init__`.
+          This accepts arguments to support use via the `singleton()` function.
       '''
       return super_new(cls)
 
