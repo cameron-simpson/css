@@ -166,6 +166,9 @@ class PlayOnCommand(BaseCommand):
             if te.is_expired():
               warning("expired, skipping")
               continue
+            if not te.is_available():
+              warning("not yet available, skipping")
+              continue
             if te.is_downloaded():
               warning("already downloaded to %r", te.download_path)
             if no_download:
