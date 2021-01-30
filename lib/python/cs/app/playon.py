@@ -257,7 +257,9 @@ class PlayOnCommand(BaseCommand):
     '''
     return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
 
-  def cmd_update(self, argv):
+  cmd_q = cmd_queue
+
+  def cmd_refresh(self, argv):
     ''' Usage: {cmd} [queue] [recordings]
           Update the db state from the PlayOn service.
     '''
