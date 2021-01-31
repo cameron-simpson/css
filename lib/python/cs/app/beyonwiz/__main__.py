@@ -11,7 +11,7 @@ from pprint import pformat
 import sys
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
-from . import Recording, DEFAULT_FORMAT
+from . import Recording, DEFAULT_MEDIAFILE_FORMAT
 from .tvwiz import TVWiz
 from .wizpnp import WizPnP
 
@@ -120,7 +120,7 @@ class BWizCmd(BaseCommand):
         print(filename)
         print(pformat(R.metadata))
         print(R.DEFAULT_FILENAME_BASIS)
-        print(R.filename(ext=DEFAULT_FORMAT))
+        print(R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
     return 0
 
   def cmd_scan(self, args):

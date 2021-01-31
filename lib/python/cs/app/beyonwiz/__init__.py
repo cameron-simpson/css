@@ -54,7 +54,7 @@ DISTINFO = {
     },
 }
 
-DEFAULT_FORMAT = 'mp4'
+DEFAULT_MEDIAFILE_FORMAT = 'mp4'
 
 # UNUSED
 def trailing_nul(bs):
@@ -266,7 +266,7 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
     if dstfmt is None:
-      dstfmt = DEFAULT_FORMAT
+      dstfmt = DEFAULT_MEDIAFILE_FORMAT
     if not timespans:
       timespans = ((None, None),)
     srcfmt = 'mpegts'
@@ -347,7 +347,7 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' Return a new `FFmpegMetaData` containing our metadata.
     '''
     if dstfmt is None:
-      dstfmt = DEFAULT_FORMAT
+      dstfmt = DEFAULT_MEDIAFILE_FORMAT
     M = self.metadata
     comment = f'Transcoded from {self.path!r} using ffmpeg.'
     recording_dt = M.get('file.datetime')
