@@ -366,7 +366,11 @@ class _Recording(ABC, HasFSTagsMixin):
               timespans
           )
       )
-    ff = ff.output(dstpath, format=dstfmt)
+    ff = ff.output(
+        dstpath,
+        format=dstfmt,
+        metadata=list(map('='.join, ffmeta_kw.items()))
+    )
     print(ff)
     ff.run()
     return ok
