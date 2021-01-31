@@ -37,6 +37,7 @@ class Enigma2(_Recording):
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
+    self.srcfmt = 'mpegts'
     self.tspath = tspath
     self.metapath = tspath + '.meta'
     self.appath = tspath + '.ap'
