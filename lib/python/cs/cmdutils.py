@@ -257,7 +257,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError(
-              "%s: unrecognised subcommand, expected one of: %s" % (
+              "unrecognised subcommand %r, expected one of: %s" % (
                   subcmd,
                   ', '.join(sorted(subcmds.keys())),
               )
@@ -412,7 +412,6 @@ class BaseCommand:
   def apply_opts(self, opts):
     ''' Apply command line options.
     '''
-    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
