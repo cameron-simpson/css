@@ -356,7 +356,6 @@ class _Recording(ABC, HasFSTagsMixin):
         'strict': None,
         ##'2': None,
         ('y' if overwrite else 'n'): None,
-        ##'metadata': list(map('='.join, ffmeta_kw.items())),
     }
     ff = ffmpeg.input(srcpath, **ffinopts)
     if timespans:
