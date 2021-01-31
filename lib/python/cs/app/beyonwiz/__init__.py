@@ -268,6 +268,7 @@ class _Recording(ABC, HasFSTagsMixin):
   def convert(
       self,
       dstpath,
+      *,
       dstfmt=None,
       max_n=None,
       timespans=(),
