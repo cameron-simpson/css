@@ -164,11 +164,6 @@ class _Recording(ABC, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
-  PATH_FIELDS = (
-      'series_name', 'episode_info_part', 'episode_name', 'tags_part',
-      'source_name', 'start_dt_iso', 'description'
-  )
-
   def __init__(self, path, fstags=None):
     self._fstags = fstags
     self.path = path
@@ -229,21 +224,6 @@ class _Recording(ABC, HasFSTagsMixin):
     ''' A filename component representing the episode info.
     '''
     return str(self.metadata.episodeinfo)
-
-  def converted_path(self, outext):
-    ''' Generate the output filename with parts separated by '--'.
-    '''
-    parts = []
-    for field in self.PATH_FIELDS:
-      part = getattr(self, field, None)
-      if part:
-        part = str(part).lower().replace('/', '|').replace(' ', '-')
-        part = re.sub('--+', '-', part)
-        parts.append(part)
-    filename = '--'.join(parts)
-    filename = filename[:250 - (len(outext) + 1)]
-    filename += '.' + outext
-    return filename
 
   # TODO: move into cs.fileutils?
   @staticmethod
