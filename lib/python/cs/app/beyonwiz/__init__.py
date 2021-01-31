@@ -374,7 +374,7 @@ class _Recording(ABC, HasFSTagsMixin):
     )
     if overwrite:
       ff = ff.overwrite_output()
-    print(ff)
+    print(ff.get_args())
     ff.run()
     return ok
 
