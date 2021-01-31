@@ -360,9 +360,10 @@ class _Recording(ABC, HasFSTagsMixin):
     }
     ff = ffmpeg.input(srcpath, **ffinopts)
     if timespans:
-      ff = ff.concat(
+      ffin = ff
+      ff = ffmpeg.concat(
           *map(
-              lambda timespan: ff.trim(start=timespan[0], end=timespan[1]),
+              lambda timespan: ffin.trim(start=timespan[0], end=timespan[1]),
               timespans
           )
       )
