@@ -10,6 +10,7 @@ import os.path
 from pprint import pformat
 import sys
 from cs.cmdutils import BaseCommand
+from cs.logutils import warning
 from cs.pfx import Pfx
 from . import Recording, DEFAULT_MEDIAFILE_FORMAT
 from .tvwiz import TVWiz
@@ -17,10 +18,10 @@ from .wizpnp import WizPnP
 
 TRY_N = 32
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return BWizCmd(argv, cmd=cmd).run()
+  return BWizCmd(argv).run()
 
 class BWizCmd(BaseCommand):
   ''' Command line handler.
@@ -183,4 +184,4 @@ class BWizCmd(BaseCommand):
     return 0
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv, cmd=__package__))
+  sys.exit(main(sys.argv))
