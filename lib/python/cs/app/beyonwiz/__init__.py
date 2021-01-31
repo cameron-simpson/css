@@ -355,7 +355,6 @@ class _Recording(ABC, HasFSTagsMixin):
         'loglevel': 'repeat+error',
         'strict': None,
         ##'2': None,
-        ('y' if overwrite else 'n'): None,
     }
     ff = ffmpeg.input(srcpath, **ffinopts)
     if timespans:
@@ -370,6 +369,8 @@ class _Recording(ABC, HasFSTagsMixin):
         format=dstfmt,
         metadata=list(map('='.join, ffmeta_kw.items()))
     )
+    if overwrite:
+      ff = ff.overwrite_output()
     print(ff)
     ff.run()
     return ok
