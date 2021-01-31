@@ -326,7 +326,9 @@ class _Recording(ABC, HasFSTagsMixin):
         dstfmt = ext[1:]
       fstags = self.fstags
       with fstags:
-        fstags[dstpath].update(self.metadata.as_tags(prefix='beyonwiz'))
+        metatags = list(self.metadata.as_tags(prefix='beyonwiz'))
+        fstags[dstpath].update(metatags)
+        fstags.sync()
     # compute the metadata for the output format
     # which may be passed with the input arguments
     M = self.metadata
