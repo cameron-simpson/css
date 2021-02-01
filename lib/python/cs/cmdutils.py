@@ -126,10 +126,14 @@ class BaseCommand:
       * `apply_defaults()`:
         prepare the initial state of `self.options`
         before any command line options are applied.
+      * `apply_opt(opt,val)`:
+        apply an individual getopt global command line option
+        to `self.options`.
       * `apply_opts(opts)`:
         apply the `opts` to `self.options`.
         `opts` is an `(option,value)` sequence
         as returned by `getopot.getopt`.
+        The default implementation iterates over these and calls `apply_opt`.
       * `cmd_`*subcmd*`(argv)`:
         if the command line options are followed by an argument
         whose value is *subcmd*,
@@ -399,6 +403,19 @@ class BaseCommand:
 
         Subclasses can override this to set up the initial state of `self.options`.
     '''
+
+  def apply_opt(self, opt, val):
+    ''' Handle a individual global command line option.
+    '''
+    raise RuntimeError("unhandled option %r" % (opt,))
+
+  def apply_opts(self, opts):
+    ''' Apply command line options.
+    '''
+    options = self.options
+    for opt, val in opts:
+      with Pfx(opt):
+        self.apply_opt(opt, val)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self):

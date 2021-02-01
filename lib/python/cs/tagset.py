@@ -186,7 +186,7 @@ import os
 from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
-from time import mktime
+import time
 from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
@@ -310,7 +310,7 @@ def as_unixtime(tag_value):
       This accepts `int`, `float` (already a timestamp)
       and `date` or `datetime`
       (use `datetime.timestamp() for a nonnaive `datetime`,
-      otherwise `mktime(tag_value.time_tuple())`,
+      otherwise `time.mktime(tag_value.time_tuple())`,
       which assumes the local time zone).
   '''
   if isinstance(tag_value, (date, datetime)):
@@ -318,7 +318,7 @@ def as_unixtime(tag_value):
       # nonnaive datetime
       return tag_value.timestamp()
       # plain date or naive datetime: pretend it is localtime
-    return mktime(tag_value.timetuple())
+    return time.mktime(tag_value.timetuple())
   if isinstance(tag_value, (int, float)):
     return float(tag_value)
   raise ValueError(
@@ -461,7 +461,11 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
         attr_ = attr + '.'
         if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
           return self.subtags(attr)
-      return super().__getattr__(attr)
+      try:
+        super_getattr = super().__getattr__
+      except AttributeError:
+        raise AttributeError(type(self).__name__ + '.' + attr)
+      return super_getattr(attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
@@ -1383,6 +1387,14 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
     )
 
   @classmethod
+  @tag_or_tag_value
+  def by_tag_value(cls, tag_name, tag_value, *, choice=True, comparison='='):
+    ''' Return a `TagBasedTest` based on a `Tag` or `tag_name,tag_value`.
+    '''
+    tag = Tag(tag_name, tag_value)
+    return cls(str(tag), choice, tag, comparison)
+
+  @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse *tag_name*[{`<`|`<=`|'='|'>='|`>`|'~'}*value*]
         and return `(dict,offset)`
@@ -2152,9 +2164,11 @@ class TagsOntology(SingletonMixin, TagSets):
   def __init__(self, te_mapping):
     if hasattr(self, 'te_mapping'):
       return
-    self.te_mapping = te_mapping
-    self.default_factory = te_mapping.get(
-        'default_factory', lambda name: TagSet(_ontology=self)
+    self.__dict__.update(
+        te_mapping=te_mapping,
+        default_factory=getattr(
+            te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
+        ),
     )
 
   def __bool__(self):

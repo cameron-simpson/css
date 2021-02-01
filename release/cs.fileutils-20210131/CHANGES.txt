@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: docstring grammer fix
+lib/python/cs/fileutils.py: cs.fileutils: crop_name: reorder exception message for readability
+lib/python/cs/fileutils.py: cs.fileutils: crop_name: put ext before name_max, more likely to be specified, I think
+lib/python/cs/fileutils.py: cs.fileutils: DISTINFO: update for imports

@@ -21,29 +21,29 @@ cs.csvutils pypi.release="20201228"
 cs.debug pypi.release=20200318
 cs.deco pypi.release="20210123" ok_revision=af258d12a144bf2526a6cd9d204d15c6bfd31c24
 cs.edit pypi.release=20191201.1 ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
-cs.env pypi.release=20190103
+cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20201227.1"
+cs.fileutils pypi.release="20210131" ok_revision="82134e048cf41a8ab2f600bb6db085cb4b4c1c42"
 cs.fstags pypi.release="20200717.1"
 cs.html pypi.release=20160828
 cs.id3 pypi.release=20150116.2
 cs.inttypes pypi.release=20150120
 cs.iso14496 pypi.release=20200229
 cs.later pypi.release=20191007
-cs.lex pypi.release="20201228" ok_revision=c2c972a1895dbffb256d616b09ff1105828ea302
+cs.lex pypi.release="20201228" ok_revision="4d6d71885f0e22256e19a6c315e07c22cc157913"
 cs.logutils pypi.release="20201021"
 cs.mailutils pypi.release=20171231.1
 cs.mappings pypi.release="20210123" ok_revision="1c6729280fe13d6f16dae30f781b3a683fe17ca1"
 cs.mixin.ucattrs pypi.release=20150118
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
-cs.obj pypi.release="20210122" ok_revision="27c34175101cc96dd896587d78f3bd05bd80a9eb"
+cs.obj pypi.release="20210131" ok_revision="0beb9776b0e87575cbff287909057c1b4c55a475"
 cs.packetstream pypi.release=20191004
 cs.pfx pypi.release="20201227" ok_revision="00b30b7f58a02044616eae6d50e1abb7c263c678"
 cs.pipeline pypi.release=20191007.1
 cs.predicate pypi.release=20190221
-cs.progress pypi.release="20201102.1"
+cs.progress pypi.release="20201102.1" ok_revision="2df831cd13a4bd9ee4b37df2a312a6e547dddf2e"
 cs.psutils pypi.release=20190101
 cs.py.doc pypi.release="20210123" ok_revision=edb27e4268f4d38493037966334239150e1e7300
 cs.py.func pypi.release="20200518" ok_revision=d79dcd4f7daf043b7590ba8f1a3cc6ad4dc0c326
@@ -67,7 +67,7 @@ cs.threads pypi.release="20210123" ok_revision="49cb0ffa1b8a5a25e2e08169aea76306
 cs.timeutils pypi.release=20190220
 cs.tty pypi.release="20201102"
 cs.units pypi.release="20201025"
-cs.upd pypi.release="20210122" ok_revision="9e82bfef4662102d65ace9416ed939d4590ef4ba"
+cs.upd pypi.release="20210122" ok_revision=e53c7026abb3b3a1ad774121054e77c3e23efb20
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228

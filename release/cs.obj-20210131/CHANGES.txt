@@ -1,0 +1,2 @@
+lib/python/cs/obj.py: cs.obj: SingletonMixin: new _singleton_also_indexmap method to return a mapping of secondary keys to values to secondary lookup, _singleton_also_index() to update these indices, _singleton_also_by to look up a secondary index
+lib/python/cs/obj.py: cs.obj: SingletonMixin: fix docstring

@@ -44,7 +44,7 @@ DEFAULT_FILENAME_FORMAT = (
 def main(argv=None):
   ''' Playon command line mode.
   '''
-  return PlayOnCommand().run(argv)
+  return PlayOnCommand(argv).run()
 
 class PlayOnCommand(BaseCommand):
   ''' Playon command line implementation.
@@ -80,8 +80,8 @@ class PlayOnCommand(BaseCommand):
                     case insensitive.
   '''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
+    options = self.options
     options.user = environ.get('PLAYON_USER')
     options.password = environ.get('PLAYON_PASSWORD')
     options.filename_format = environ.get(
@@ -89,33 +89,37 @@ class PlayOnCommand(BaseCommand):
     )
 
   @contextmanager
-  def run_context(self, argv, options):
+  def run_context(self):
     ''' Prepare the `PlayOnAPI` around each command invocation.
     '''
+    options = self.options
     sqltags = PlayOnSQLTags()
     api = PlayOnAPI(options.user, options.password, sqltags)
     with stackattrs(options, api=api, sqltags=sqltags):
       with api:
+        # preload all the recordings from the db
+        all_recordings = list(sqltags.recordings())
+        # if there are unexpired stale entries or no unexpired entries,
+        # refresh them
         self._refresh_sqltags_data(api, sqltags)
         yield
 
-  @staticmethod
-  def cmd_account(argv, options):
+  def cmd_account(self, argv):
     ''' Usage: {cmd}
           Report account state.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    api = options.api
+    api = self.options.api
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
-  @staticmethod
-  def cmd_dl(argv, options):
+  def cmd_dl(self, argv):
     ''' Usage: {cmd} [-n] [recordings...]
           Download the specified recordings, default "pending".
           -n  No download. List the specified recordings.
     '''
+    options = self.options
     sqltags = options.sqltags
     no_download = False
     if argv and argv[0] == '-n':
@@ -134,7 +138,8 @@ class PlayOnCommand(BaseCommand):
           filename = api[dl_id].format_as(filename_format)
           filename = (
               filename.lower().replace(' - ',
-                                       '--').replace('_', ':').replace(' ', '-') +
+                                       '--').replace('_',
+                                                     ':').replace(' ', '-') +
               '.'
           )
           try:
@@ -158,6 +163,12 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           te = sqltags[dl_id]
           with Pfx(te.name):
+            if te.is_expired():
+              warning("expired, skipping")
+              continue
+            if not te.is_available():
+              warning("not yet available, skipping")
+              continue
             if te.is_downloaded():
               warning("already downloaded to %r", te.download_path)
             if no_download:
@@ -180,11 +191,13 @@ class PlayOnCommand(BaseCommand):
 
   @staticmethod
   def _refresh_sqltags_data(api, sqltags, max_age=None):
-    ''' Refresh the queue and recordings if any unexpired records are stale.
+    ''' Refresh the queue and recordings if any unexpired records are stale
+        or if all records are expired.
     '''
     tes = set(sqltags.recordings())
-    if any(map(lambda te: not te.is_expired() and te.is_stale(max_age=max_age),
-               tes)):
+    if (any(map(
+        lambda te: not te.is_expired() and te.is_stale(max_age=max_age), tes))
+        or all(map(lambda te: te.is_expired(), tes))):
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -226,30 +239,31 @@ class PlayOnCommand(BaseCommand):
             te.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
-  def cmd_ls(self, argv, options):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List available downloads.
           -l        Long listing: list tags below each entry.
           -o format Format string for each entry.
           Default format: {LS_FORMAT}
     '''
-    return self._list(argv, options, ['available'], self.LS_FORMAT)
+    return self._list(argv, self.options, ['available'], self.LS_FORMAT)
 
-  def cmd_queue(self, argv, options):
+  def cmd_queue(self, argv):
     ''' Usage: {cmd} [-l] [recordings...]
           List queued recordings.
           -l        Long listing: list tags below each entry.
           -o format Format string for each entry.
           Default format: {QUEUE_FORMAT}
     '''
-    return self._list(argv, options, ['queued'], self.QUEUE_FORMAT)
+    return self._list(argv, self.options, ['queued'], self.QUEUE_FORMAT)
 
-  @staticmethod
-  def cmd_update(argv, options):
+  cmd_q = cmd_queue
+
+  def cmd_refresh(self, argv):
     ''' Usage: {cmd} [queue] [recordings]
           Update the db state from the PlayOn service.
     '''
-    api = options.api
+    api = self.options.api
     if not argv:
       argv = ['queue', 'recordings']
     xit = 0
@@ -294,18 +308,15 @@ class PlayOnSQLTagSet(SQLTagSet):
   def status(self):
     ''' A short status string.
     '''
-    if self.is_queued():
-      return 'QUEUED'
-    if self.is_expired():
-      return 'EXPIRED'
-    if self.is_downloaded():
-      return 'DOWNLOADED'
-    return 'PENDING'
+    for status_label in 'queued', 'expired', 'downloaded', 'pending':
+      if getattr(self, f'is_{status_label}')():
+        return status_label
+    raise RuntimeError("cannot infer a status string: %s" % (self,))
 
   def is_available(self):
     ''' Is a recording available for download?
     '''
-    return 'playon.Created' in self and not self.is_expired()
+    return not self.is_expired() and not self.is_queued()
 
   def is_queued(self):
     ''' Is a recording still in the queue?
@@ -317,6 +328,11 @@ class PlayOnSQLTagSet(SQLTagSet):
         based on the presence of a `download_path` `Tag`.
     '''
     return self.download_path is not None
+
+  def is_pending(self):
+    ''' A pending download: available and not already downloaded.
+    '''
+    return self.is_available() and not self.is_downloaded()
 
   def is_expired(self):
     ''' Test whether this recording is expired,
@@ -348,7 +364,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(ls_format.format_map(self.ns()), f'{self.status}')
+    print_func(ls_format.format_map(self.ns()), f'{self.status.upper()}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
@@ -376,7 +392,7 @@ class PlayOnSQLTags(SQLTags):
 
         Note that this includes both recorded and queued items.
     '''
-    return filter(None, map(lambda k: self[k], self.keys(prefix='recording.')))
+    return self.find('name~recording.*')
 
   __iter__ = recordings
 
@@ -401,6 +417,8 @@ class PlayOnSQLTags(SQLTags):
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
         r_text = arg[1:]
+        if r_text.endswith('/'):
+          r_text = r_text[:-1]
         with Pfx("re.compile(%r, re.I)", r_text):
           r = re.compile(r_text, re.I)
         for te in self:
