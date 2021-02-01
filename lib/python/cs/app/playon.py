@@ -308,18 +308,15 @@ class PlayOnSQLTagSet(SQLTagSet):
   def status(self):
     ''' A short status string.
     '''
-    if self.is_queued():
-      return 'QUEUED'
-    if self.is_expired():
-      return 'EXPIRED'
-    if self.is_downloaded():
-      return 'DOWNLOADED'
-    return 'PENDING'
+    for status_label in 'queued', 'expired', 'downloaded', 'pending':
+      if getattr(self, f'is_{status_label}')():
+        return status_label
+    raise RuntimeError("cannot infer a status string: %s" % (self,))
 
   def is_available(self):
     ''' Is a recording available for download?
     '''
-    return 'playon.Created' in self and not self.is_expired()
+    return not self.is_expired() and not self.is_queued()
 
   def is_queued(self):
     ''' Is a recording still in the queue?
@@ -331,6 +328,11 @@ class PlayOnSQLTagSet(SQLTagSet):
         based on the presence of a `download_path` `Tag`.
     '''
     return self.download_path is not None
+
+  def is_pending(self):
+    ''' A pending download: available and not already downloaded.
+    '''
+    return self.is_available() and not self.is_downloaded()
 
   def is_expired(self):
     ''' Test whether this recording is expired,
@@ -362,7 +364,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(ls_format.format_map(self.ns()), f'{self.status}')
+    print_func(ls_format.format_map(self.ns()), f'{self.status.upper()}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
