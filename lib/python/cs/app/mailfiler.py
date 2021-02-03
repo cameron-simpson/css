@@ -32,7 +32,6 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from email import message_from_file
@@ -53,7 +52,6 @@ from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
-from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
@@ -66,7 +64,7 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, status, STATUS, info, track, warning, error, exception,
+    with_log, debug, status, info, track, warning, error, exception,
     LogTime
 )
 from cs.mailutils import (
