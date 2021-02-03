@@ -170,15 +170,6 @@ class MailFilerCommand(BaseCommand):
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
-  @contextmanager
-  def run_context(self):
-    ''' Run commands at STATUS logging level (or lower if already lower).
-    '''
-    with super().run_context():
-      loginfo = self.loginfo
-      with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
-        yield
-
   def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
           Monitor Maildirs for new messages and file them.
@@ -188,7 +179,6 @@ class MailFilerCommand(BaseCommand):
               Default is to make only one run over the Maildirs.
           -n  No remove. Keep filed messages in the origin Maildir.
     '''
-    warning("test warning")
     justone = False
     delay = None
     no_remove = False
@@ -438,7 +428,7 @@ class MailFiler(NS):
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
     '''
-    debug("monitor: self.cfg=%s", self.cfg)
+    debug("cfg=%s", self.cfg)
     debug("maildb_path=%r", self.maildb_path)
     debug("msgiddb_path=%r", self.msgiddb_path)
     debug("rules_pattern=%r", self.rules_pattern)
