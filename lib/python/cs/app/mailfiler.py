@@ -175,7 +175,7 @@ class MailFilerCommand(BaseCommand):
     ''' Run commands at STATUS logging level (or lower if already lower).
     '''
     with super().run_context():
-      loginfo = options.loginfo
+      loginfo = self.loginfo
       with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
         yield
 
@@ -223,7 +223,7 @@ class MailFilerCommand(BaseCommand):
         delay=delay,
         justone=justone,
         no_remove=no_remove,
-        upd=options.loginfo.upd
+        upd=self.loginfo.upd
     )
 
   def cmd_save(self, argv):
