@@ -133,7 +133,7 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
-  return MailFilerCommand().run(argv, options=NS(stdin=stdin, log_level=logging.INFO))
+  return MailFilerCommand(argv, stdin=stdin, log_level=logging.INFO).run()
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -149,10 +149,10 @@ class MailFilerCommand(BaseCommand):
           Maildir names.
           Default: {DEFAULT_RULES_PATTERN}'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up default options.
     '''
+    options = self.options
     options.stdin = getattr(options, 'stdin', None) or sys.stdin
     options.config_path = None
     options.maildb_path = None
@@ -160,10 +160,10 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = DEFAULT_RULES_PATTERN
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
+    options = self.options
     for opt, val in opts:
       if opt == '-R':
         options.rules_pattern = val
@@ -171,15 +171,15 @@ class MailFilerCommand(BaseCommand):
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
   @contextmanager
-  def run_context(self, argv, options):
+  def run_context(self):
     ''' Run commands at STATUS logging level (or lower if already lower).
     '''
-    with super().run_context(argv, options):
+    with super().run_context():
       loginfo = options.loginfo
       with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
         yield
 
-  def cmd_monitor(self, argv, options):
+  def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
           Monitor Maildirs for new messages and file them.
           -1  File at most 1 message per Maildir.
@@ -218,7 +218,7 @@ class MailFilerCommand(BaseCommand):
       raise GetoptError("invalid arguments")
     if not mdirpaths:
       mdirpaths = None
-    return self.mailfiler(options).monitor(
+    return self.mailfiler().monitor(
         mdirpaths,
         delay=delay,
         justone=justone,
@@ -226,7 +226,7 @@ class MailFilerCommand(BaseCommand):
         upd=options.loginfo.upd
     )
 
-  def cmd_save(self, argv, options):
+  def cmd_save(self, argv):
     ''' Usage: {cmd} target[,target...] <message
           Save a message from standard input to the specified targets.
 
@@ -234,6 +234,7 @@ class MailFilerCommand(BaseCommand):
         a single command line argument of the form
         of a mailfiler targets field.
     '''
+    options = self.options
     badopts = False
     if not argv:
       warning("missing targets")
@@ -249,23 +250,23 @@ class MailFilerCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("invalid arguments")
-    return self.mailfiler(options).save(targets, message_fp)
+    return self.mailfiler().save(targets, message_fp)
 
-  def cmd_report(self, argv, options):
+  def cmd_report(self, argv):
     ''' Usage: {cmd} <message
           Report various things about a message from standard input.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    return self.mailfiler(options).report(options.stdin)
+    return self.mailfiler().report(self.options.stdin)
 
-  def mailfiler(self, options):
-    ''' Prepare a `MailFiler` from the `options`.
+  def mailfiler(self):
+    ''' Prepare a `MailFiler` from `self.options`.
     '''
     return MailFiler(
         **{
             k: v
-            for k, v in options.__dict__.items()
+            for k, v in self.options.__dict__.items()
             if k in ('config_path', 'environ',
                      'rules_pattern') and v is not None
         }
