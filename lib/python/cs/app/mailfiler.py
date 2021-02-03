@@ -64,15 +64,14 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, status, info, track, warning, error, exception,
-    LogTime
+    with_log, debug, status, info, track, warning, error, exception, LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
     ismaildir, make_maildir
 )
 from cs.obj import singleton
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
@@ -569,18 +568,26 @@ class MailFiler(NS):
           print('  ==>', repr(uqs))
     return 0
 
+  @pfx_method
   def file_wmdir_key(self, wmdir, key):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
-        This does not remove a successfully filed message or update the lurking list.
+
+        This does not remove a successfully filed message or update
+        the lurking list.
     '''
-    with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
-      M = wmdir[key]
-      filer = MessageFiler(self)
-      ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
-      if ok:
-        if filer.save_to_self:
-          wmdir.filed.add(key)
-      return ok
+    with Pfx("%s[%r]", wmdir, key):
+      with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
+        try:
+          M = wmdir[key]
+        except KeyError as e:
+          warning("unknown key: %s", e)
+          return False
+        filer = MessageFiler(self)
+        ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
+        if ok:
+          if filer.save_to_self:
+            wmdir.filed.add(key)
+        return ok
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
   ''' Return the Maildir derived from mdirpath.
