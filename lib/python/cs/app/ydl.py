@@ -85,7 +85,7 @@ FSTAGS_PREFIX = 'youtube_dl'
 def main(argv=None, cmd=None):
   ''' Main command line.
   '''
-  return YDLCommand().run(argv, cmd=cmd)
+  return YDLCommand(argv).run()
 
 class YDLCommand(BaseCommand):
   ''' `ydl` command line implementation.
@@ -95,28 +95,27 @@ class YDLCommand(BaseCommand):
   USAGE_FORMAT = '''Usage: {cmd} [-f] {{URLs|-}}...
     -f  Force download - do not use the cache.'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Initial defaults options.
     '''
-    options.ydl_opts = dict(logger=options.loginfo.logger)
+    self.options.ydl_opts = dict(logger=self.loginfo.logger)
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Command line main switches.
     '''
+    options = self.options
     for opt, val in opts:
       if opt == '-f':
         options.ydl_opts.update(cachedir=False)
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
-  @staticmethod
-  def main(argv, options):
+  def main(self, argv):
     ''' Command line main programme.
     '''
     if not argv:
       raise GetoptError("missing URLs")
+    options = self.options
     with FSTags() as fstags:
       over_ydl = OverYDL(fstags=fstags, ydl_opts=options.ydl_opts)
       for url in argv:
