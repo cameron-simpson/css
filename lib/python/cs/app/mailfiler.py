@@ -455,7 +455,7 @@ class MailFiler(NS):
           idle = 0
         if delay is None:
           break
-        if upd:
+        if upd is not None:
           if idle > 0:
             status("sleep %ds; idle %ds", delay, idle)
           else:
