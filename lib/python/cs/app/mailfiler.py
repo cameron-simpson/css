@@ -568,26 +568,24 @@ class MailFiler(NS):
           print('  ==>', repr(uqs))
     return 0
 
-  @pfx_method
   def file_wmdir_key(self, wmdir, key):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
 
         This does not remove a successfully filed message or update
         the lurking list.
     '''
-    with Pfx("%s[%r]", wmdir, key):
-      with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
-        try:
-          M = wmdir[key]
-        except KeyError as e:
-          warning("unknown key: %s", e)
-          return False
-        filer = MessageFiler(self)
-        ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
-        if ok:
-          if filer.save_to_self:
-            wmdir.filed.add(key)
-        return ok
+    with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
+      try:
+        M = wmdir[key]
+      except KeyError as e:
+        warning("unknown key: %s", e)
+        return False
+      filer = MessageFiler(self)
+      ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
+      if ok:
+        if filer.save_to_self:
+          wmdir.filed.add(key)
+      return ok
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
   ''' Return the Maildir derived from mdirpath.
