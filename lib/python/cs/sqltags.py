@@ -47,7 +47,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs, pushattrs, popattrs
+from cs.context import stackattrs, pushattrs, popattrs, setup_cmgr
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
@@ -1281,21 +1281,35 @@ class SQLTags(TagSets):
     if not db_url:
       db_url = self.infer_db_url()
     self.orm = SQLTagsORM(db_url=db_url)
+    self._orm_state = SQLAState(orm=self.orm, session=None)
     if ontology is None:
       ontology = TagsOntology(self)
     self.db_url = db_url
     self.ontology = ontology
     self._lock = RLock()
     self.tags = SQLTagProxies(self.orm)
+    self.__exit__teardowns = []
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, getattr(self,'db_url',None))
 
-  @contextmanager
-  def sql_session(self):
-    with self.orm.session() as new_session:
-      with sqla_state(session=new_session):
-        yield
+  def __enter__(self):
+    ''' Set up an ORM session if there isn't already one active
+        then run the superclass `__enter__`.
+    '''
+    self.__exit__teardowns.append(
+        setup_cmgr(self.self._orm_state.auto_session())
+    )
+    super().__enter__()
+
+  def __exit__(self, *exc):
+    ''' Run the superclass `__exit__` and then tear down the new session if any.
+    '''
+    try:
+      return super.__exit__()
+    finally:
+      # run the tear down phase of auto_session
+      self.__exit__teardowns.pop()()
 
   @orm_auto_session
   @typechecked
