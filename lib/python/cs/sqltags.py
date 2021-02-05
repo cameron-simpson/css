@@ -1196,7 +1196,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return self._unixtime
 
   @auto_session
-  def get_db_entity(self, *, session):
+  def _get_db_entity(self, *, session):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
     return self.sqltags.db_entity(self.id, session=session)
@@ -1210,7 +1210,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       setattr(self, '_' + tag_name, value)
       if not skip_db:
         ifverbose(verbose, "+ %s", Tag(tag_name, value))
-        setattr(self.get_db_entity(session=session), tag_name, value)
+        setattr(self._get_db_entity(session=session), tag_name, value)
     else:
       super().set(tag_name, value, verbose=verbose)
       if not skip_db:
@@ -1221,7 +1221,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def add_db_tag(self, tag_name, value=None, *, session):
     ''' Add a tag to the database.
     '''
-    e = self.get_db_entity(session=session)
+    e = self._get_db_entity(session=session)
     return e.add_tag(tag_name, value, session=session)
 
   @tag_or_tag_value
@@ -1233,7 +1233,7 @@ class SQLTagSet(SingletonMixin, TagSet):
         setattr(self, '_' + tag_name, None)
         if not skip_db:
           ifverbose(verbose, "- %s", Tag(tag_name, value))
-          setattr(self.get_db_entity(session=session), tag_name, None)
+          setattr(self._get_db_entity(session=session), tag_name, None)
     else:
       super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
@@ -1243,7 +1243,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def discard_db_tag(self, tag_name, value=None, *, session):
     ''' Discard a tag from the database.
     '''
-    return self.get_db_entity(session=session).discard_tag(
+    return self._get_db_entity(session=session).discard_tag(
         tag_name, value, session=session
     )
 
