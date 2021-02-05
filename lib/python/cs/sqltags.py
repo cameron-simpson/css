@@ -1312,6 +1312,11 @@ class SQLTags(TagSets):
       # run the tear down phase of auto_session
       self.__tstate.teardowns.pop()()
 
+  def flush(self):
+    ''' Flush the current session state to the database.
+    '''
+    self._orm_state.session.flush()
+
   @orm_auto_session
   @typechecked
   def default_factory(
