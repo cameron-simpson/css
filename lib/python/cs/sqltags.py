@@ -1280,6 +1280,7 @@ class SQLTags(TagSets):
   def __init__(self, db_url=None, ontology=None):
     if not db_url:
       db_url = self.infer_db_url()
+    self.__tstate = ThreadState()
     self.orm = SQLTagsORM(db_url=db_url)
     self._orm_state = SQLAState(orm=self.orm, session=None)
     if ontology is None:
@@ -1288,7 +1289,6 @@ class SQLTags(TagSets):
     self.ontology = ontology
     self._lock = RLock()
     self.tags = SQLTagProxies(self.orm)
-    self.__exit__teardowns = []
 
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, getattr(self,'db_url',None))
@@ -1297,9 +1297,10 @@ class SQLTags(TagSets):
     ''' Set up an ORM session if there isn't already one active
         then run the superclass `__enter__`.
     '''
-    self.__exit__teardowns.append(
-        setup_cmgr(self.self._orm_state.auto_session())
+    teardowns = self.__tstate.teardowns = getattr(
+        self.__tstate, 'teardowns', []
     )
+    teardowns.append(setup_cmgr(self.self._orm_state.auto_session()))
     super().__enter__()
 
   def __exit__(self, *exc):
@@ -1309,7 +1310,7 @@ class SQLTags(TagSets):
       return super.__exit__()
     finally:
       # run the tear down phase of auto_session
-      self.__exit__teardowns.pop()()
+      self.__tstate.teardowns.pop()()
 
   @orm_auto_session
   @typechecked
