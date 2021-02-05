@@ -68,7 +68,7 @@ from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
     TagSets, tag_or_tag_value, as_unixtime
 )
-from cs.threads import locked, State
+from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
@@ -104,7 +104,7 @@ def main(argv=None):
   '''
   return SQLTagsCommand(argv).run()
 
-state = State(verbose=sys.stderr.isatty())
+state = ThreadState(verbose=sys.stderr.isatty())
 
 def verbose(msg, *a):
   ''' Emit message if in verbose mode.
