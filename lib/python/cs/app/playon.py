@@ -605,7 +605,7 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
-    with self.sqltags.sql_session():
+    with self.sqltags:
       now = time.time()
       tes = set()
       for entry in entries:
