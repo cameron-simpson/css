@@ -597,6 +597,11 @@ def track(msg, *args, **kwargs):
 
 @logging_wrapper(stacklevel_increment=1)
 def ifverbose(verbose, msg, *args, **kwargs):
+def verbose(msg, *args, **kwargs):
+  ''' Emit a log at `VERBOSE` level with the current `Pfx` prefix.
+  '''
+  log(VERBOSE, msg, *args, **kwargs)
+
   ''' Conditionally log a message.
       If verbose is `None`
       then the caller has not indicated a specific verbosity
