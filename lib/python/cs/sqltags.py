@@ -834,13 +834,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         '''
         entities = orm.entities
         tags = orm.tags
-        query = session.query(entities)
         # first condition:
         #   select tags as alias where constraint
         # following:
         #   inner join tags as alias using entity_id where constraint
         # inner join entities on
-        query = None
         sqlps = []
         entity_tests = []
         per_tag_aliases = {}
