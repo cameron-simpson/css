@@ -756,21 +756,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
         )
 
-      @auto_session
-      def tag_rows(self, *, session):
-        ''' Return a list of the `Tags` rows for this entity.
-        '''
-        return list(Tags.lookup(session=session, entity_id=self.id))
-
-      def tags(self, *, session):
-        ''' Return an `SQLTagSet` with the `Tag`s for this entity.
-        '''
-        entity_tags = SQLTagSet(sqltags=None, id=self.id)
-        entity_tags.update(
-            ((tagrow.name, tagrow.value) for tagrow in self.tag_rows())
-        )
-        return entity_tags
-
       def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
