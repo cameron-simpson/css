@@ -307,6 +307,7 @@ def setup_logging(
   loginfo = NS(
       logger=root_logger,
       level=level,
+      verbose=verbose,
       trace_level=trace_level,
       flags=flags,
       module_names=module_names,
