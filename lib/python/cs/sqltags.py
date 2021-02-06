@@ -1259,6 +1259,12 @@ class SQLTags(TagSets):
   def __str__(self):
     return "%s(db_url=%r)" % (type(self).__name__, getattr(self,'db_url',None))
 
+  @property
+  def _session(self):
+    ''' The current SQLAlchemy Session.
+    '''
+    return self._orm_state.session
+
   def __enter__(self):
     ''' Set up an ORM session if there isn't already one active
         then run the superclass `__enter__`.
@@ -1266,14 +1272,14 @@ class SQLTags(TagSets):
     teardowns = self.__tstate.teardowns = getattr(
         self.__tstate, 'teardowns', []
     )
-    teardowns.append(setup_cmgr(self.self._orm_state.auto_session()))
+    teardowns.append(setup_cmgr(self._orm_state.auto_session()))
     super().__enter__()
 
   def __exit__(self, *exc):
     ''' Run the superclass `__exit__` and then tear down the new session if any.
     '''
     try:
-      return super.__exit__()
+      return super().__exit__(*exc)
     finally:
       # run the tear down phase of auto_session
       self.__tstate.teardowns.pop()()
