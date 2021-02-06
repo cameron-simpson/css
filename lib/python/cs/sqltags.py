@@ -1195,7 +1195,9 @@ class SQLTagSet(SingletonMixin, TagSet):
   def discard_db_tag(self, tag_name, value=None):
     ''' Discard a tag from the database.
     '''
-    return self._get_db_entity().discard_tag(tag_name, value)
+    return self._get_db_entity().discard_tag(
+        tag_name, value, session=self.sqltags._session
+    )
 
   def parent_tagset(self, tag_name='parent'):
     ''' Return the parent `TagSet` as defined by a `Tag`,
