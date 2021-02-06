@@ -604,11 +604,9 @@ def verbose(msg, *args, **kwargs):
 @logging_wrapper(stacklevel_increment=1)
 def ifverbose(is_verbose, msg, *args, **kwargs):
   ''' Conditionally log a message.
-      If verbose is `None`
-      then the caller has not indicated a specific verbosity
-      and we use the `track` function.
-      If verbose is true
-      then we use the `info` function.
+
+      If `is_verbose` is `None`, log at `VERBOSE` level and rely on the logging setup.
+      Otherwise, if `is_verbose` is true, log at `INFO` level.
   '''
   if is_verbose is None:
     # emit at VERBOSE level, use the logging handler levels to emit or not
