@@ -90,11 +90,15 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
-assert TRACK < logging.WARNING
 
 # Special status line tracking, above INFO and below TRACK and WARNING
 STATUS = TRACK - 1
-assert logging.INFO < STATUS < logging.WARNING
+
+# Special verbose value, below INFO but above DEBUG.
+VERBOSE = logging.INFO - 1
+
+# check the hierarchy
+assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
 
 loginfo = None
 D_mode = False
