@@ -1402,19 +1402,6 @@ class SQLTags(TagSets):
       db_url = expanduser(default_path)
     return db_url
 
-  def startup(self):
-    ''' Stub for startup: prepare the ORM.
-    '''
-    self.orm = SQLTagsORM(db_url=self.db_url)
-    self._pre_startup_attrs = pushattrs(sqla_state, orm=self.orm)
-
-  def shutdown(self):
-    ''' Stub for shutdown.
-    '''
-    popattrs(sqla_state, 'orm', self._pre_startup_attrs)
-    self._pre_startup_attrs = None
-    self.orm = None
-
   def init(self):
     ''' Initialise the database.
     '''
