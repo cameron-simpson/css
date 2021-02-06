@@ -1446,7 +1446,7 @@ class SQLTags(TagSets):
         if not criterion.SQL_COMPLETE:
           post_criteria.append(criterion)
     orm = self.orm
-    query = orm.entities.search(
+    query = orm.search(
         criteria,
         mode='tagged',
         session=self._session,
