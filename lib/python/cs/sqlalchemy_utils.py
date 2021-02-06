@@ -55,7 +55,7 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.Session() as session:
+    with orm.session() as session:
       with self(orm=orm, session=session):
         yield session
 
@@ -217,7 +217,7 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
-    self.sqla_state = SQLState(orm=self)
+    self.sqla_state = SQLAState(orm=self)
 
   @contextmanager
   def session(self, *a, **kw):
