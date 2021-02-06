@@ -713,7 +713,24 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     ''' Instantiate the schema and define the root metanode.
     '''
     self.meta.create_all()
-    self.make_metanode()
+    with self.session() as session:
+      self.prepare_metanode(session=session)
+
+  def prepare_metanode(self, *, session):
+    ''' Ensure row id 0, the metanode, exists.
+    '''
+    entities = self.entities
+    entity = entities.lookup1(session=session, id=0)
+    if entity is None:
+      # force creation of the desired row id
+      entity = entities(id=0, unixtime=time.time())
+      entity.add_tag(
+          'headline',
+          "%s node 0: the metanode." % (type(self).__name__,),
+          session=session,
+      )
+      session.add(entity)
+    return entity
 
   # pylint: disable=too-many-statements
   def declare_schema(self):
@@ -1404,34 +1421,9 @@ class SQLTags(TagSets):
 
   @property
   def metanode(self):
-    ''' The metadata node, creating it if missing.
+    ''' The metadata node.
     '''
-    return self.make_metanode()
-
-  def get_metanode(self):
-    ''' Return the metanode, whose `Entities` row has `id`=`0`.
-        Returns `None` if the node does not exist.
-
-        Accessing the property `.metanode` always returns the metanode entity,
-        creating it if necessary.
-    '''
-    return self.get(0)
-
-  def make_metanode(self):
-    ''' Return the metadata node, creating it if missing.
-    '''
-    te = self.get(0)
-    if te is None:
-      # force creation of the desired row id
-      entity = self.entities(id=0, unixtime=time.time())
-      entity.add_tag(
-          'headline',
-          "%s node 0: the metanode." % (type(self).__name__,),
-      )
-      self._session.add(entity)
-      te = self.get(0)
-      assert te is not None
-    return te
+    return self[0]
 
   def find(self, criteria):
     ''' Generate and run a query derived from `criteria`
