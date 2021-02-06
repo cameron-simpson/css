@@ -135,7 +135,7 @@ class PlayOnCommand(BaseCommand):
     @typechecked
     def _dl(dl_id: int, sem):
       try:
-        with sqltags.sql_session():
+        with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
               filename.lower().replace(' - ',
