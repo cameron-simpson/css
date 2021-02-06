@@ -34,7 +34,6 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
-from cs.sqlalchemy_utils import orm_auto_session
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
 
@@ -288,10 +287,9 @@ class MBSQLTags(SQLTags):
 
   TagSetClass = MBTagSet
 
-  @orm_auto_session
   @pfx_method
-  def default_factory(self, name: str, *, session, unixtime=None):
-    te = super().default_factory(name, session=session, unixtime=unixtime)
+  def default_factory(self, name: str, *, unixtime=None):
+    te = super().default_factory(name, unixtime=unixtime)
     assert te.name == name
     mbdb = te.sqltags.mbdb
     if name.startswith('meta.'):
