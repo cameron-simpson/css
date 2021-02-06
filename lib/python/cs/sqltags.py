@@ -467,6 +467,7 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 
   # TODO: REMOVE SQL_TAG_VALUE_COMPARISON_FUNCS, unused
   # functions returning SQL tag.value tests based on self.comparison
+  # pylint: disable=singleton-comparison
   SQL_TAG_VALUE_COMPARISON_FUNCS = {
       None:
       lambda alias, cmp_value: and_(
