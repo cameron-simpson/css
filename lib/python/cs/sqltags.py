@@ -47,7 +47,7 @@ from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs, pushattrs, popattrs, setup_cmgr
+from cs.context import stackattrs, setup_cmgr
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
@@ -57,12 +57,9 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
     ORM,
-    orm_method,
-    auto_session,
-    orm_auto_session,
     BasicTableMixin,
     HasIdMixin,
-    state as sqla_state,
+    SQLAState,
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
@@ -1113,7 +1110,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, sqltags, name=None, _id:int, unixtime=None, **kw):
+  def __init__(self, *, sqltags, name=None, _id: int, unixtime=None, **kw):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
@@ -1243,7 +1240,9 @@ class SQLTags(TagSets):
     self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
-    return "%s(db_url=%r)" % (type(self).__name__, getattr(self,'db_url',None))
+    return "%s(db_url=%r)" % (
+        type(self).__name__, getattr(self, 'db_url', None)
+    )
 
   @property
   def _session(self):
@@ -1349,7 +1348,7 @@ class SQLTags(TagSets):
         if not `None`.
     '''
     entities = self.orm.entities
-    entities_table = entities.__table__
+    entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
     q = select([name_column]).where(name_column.isnot(None))
     if prefix is not None:
