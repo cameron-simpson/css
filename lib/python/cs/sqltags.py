@@ -787,138 +787,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             session.delete(etag)
         return etag
 
-      @classmethod
-      @pfx_method
-      def search(cls, criteria, *, session, mode='tagged'):
-        ''' Construct a query to match `Entity` rows
-            matching the supplied `criteria` iterable.
-            Return an SQLAlchemy `Query`.
-
-            The `mode` parameter has the following values:
-            * `'id'`: the query only yields entity ids
-            * `'entity'`: (default) the query yields entities without tags
-            * `'tagged'`: (default) the query yields entities left
-            outer joined with their matching tags
-
-            Note that the `'tagged'` result produces multiple rows for any
-            entity with multiple tags, and that this requires the caller to
-            fold entities with multiple tags together.
-
-            *Note*:
-            due to implementation limitations
-            the SQL query itself may not apply all the criteria,
-            so every criterion must still be applied
-            to the results
-            using its `.match_entity` method.
-
-            If `name` is omitted or `None` the query will match log entities
-            otherwise the entity with the specified `name`.
-
-            The `criteria` should be an iterable of `SQTCriterion` instances
-            used to construct the query.
-        '''
-        entities = orm.entities
-        tags = orm.tags
-        # first condition:
-        #   select tags as alias where constraint
-        # following:
-        #   inner join tags as alias using entity_id where constraint
-        # inner join entities on
-        sqlps = []
-        entity_tests = []
-        per_tag_aliases = {}
-        per_tag_tests = defaultdict(list)  # tag_name=>[tests...]
-        sqlps = []
-        for criterion in criteria:
-          with Pfx(criterion):
-            assert isinstance(criterion, SQTCriterion), (
-                "not an SQTCriterion: %s:%r" %
-                (type(criterion).__name__, criterion)
-            )
-            if isinstance(criterion, TagBasedTest):
-              # we know how to treat these efficiently
-              # by mergeing conditions on the same tag name
-              tag = criterion.tag
-              tag_name = tag.name
-              tag_value = tag.value
-              if tag_name == 'id':
-                alias = entities
-                entity_tests.append(
-                    criterion.SQL_ID_VALUE_COMPARISON_FUNCS[
-                        criterion.comparison](entities, tag_value)
-                )
-              elif tag_name == 'name':
-                alias = entities
-                entity_tests.append(
-                    criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[
-                        criterion.comparison](entities, tag_value)
-                )
-              elif tag_name == 'unixtime':
-                alias = entities
-                entity_tests.append(
-                    criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
-                        criterion.comparison](entities, tag_value)
-                )
-              else:
-                tag_tests = per_tag_tests[tag_name]
-                if tag_tests:
-                  # reuse existing alias - same tag name
-                  alias = per_tag_aliases[tag_name]
-                else:
-                  # first test for this tag - make an alias
-                  per_tag_aliases[tag_name] = aliased(self.tags)
-                tag_tests.append(
-                    criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[
-                        criterion.comparison]
-                    (per_tag_aliases[tag_name], tag_value)
-                )
-            else:
-              try:
-                sqlp = criterion.sql_parameters(orm)
-              except ValueError:
-                warning("SKIP, cannot compute sql_parameters")
-                continue
-              sqlps.append(sqlp)
-        query = session.query(entities.id, entities.unixtime, entities.name)
-        prev_entity_id_column = entities.id
-        if entity_tests:
-          query = query.filter(*entity_tests)
-        for tag_name, tag_tests in per_tag_tests.items():
-          alias = per_tag_aliases[tag_name]
-          alias_entity_id_column = alias.entity_id
-          query = query.join(
-              alias, alias_entity_id_column == prev_entity_id_column
-          ).filter(alias.name == tag_name, *tag_tests)
-          prev_entity_id_column = alias_entity_id_column
-        # further JOINs on less direct SQL tests
-        for sqlp in sqlps:
-          sqlp_entity_id_column = sqlp.entity_id_column
-          query = query.join(
-              sqlp.alias,
-              sqlp_entity_id_column == prev_entity_id_column,
-          )
-          query = query.filter(sqlp.constraint)
-          prev_entity_id_column = sqlp_entity_id_column
-        with Pfx("mode=%r", mode):
-          if mode == 'id':
-            pass
-          elif mode == 'entity':
-            query = session.query(
-                entities.id, entities.unixtime, entities.name
-            ).filter(entities.id.in_(query.distinct()))
-          elif mode == 'tagged':
-            query = query.join(
-                tags, isouter=True
-            ).filter(entities.id is not None).add_columns(
-                tags.name.label('tag_name'),
-                tags.float_value.label('tag_float_value'),
-                tags.string_value.label('tag_string_value'),
-                tags.structured_value.label('tag_structured_value'),
-            )
-          else:
-            raise ValueError("unrecognised mode")
-        return query
-
     class Tags(Base, BasicTableMixin, HasIdMixin):
       ''' The table of tags associated with entities.
       '''
@@ -1076,6 +944,137 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
     self.tags = Tags
     self.entities = Entities
+
+  @pfx_method
+  def search(self, criteria, *, session, mode='tagged'):
+    ''' Construct a query to match `Entity` rows
+        matching the supplied `criteria` iterable.
+        Return an SQLAlchemy `Query`.
+
+        The `mode` parameter has the following values:
+        * `'id'`: the query only yields entity ids
+        * `'entity'`: (default) the query yields entities without tags
+        * `'tagged'`: (default) the query yields entities left
+        outer joined with their matching tags
+
+        Note that the `'tagged'` result produces multiple rows for any
+        entity with multiple tags, and that this requires the caller to
+        fold entities with multiple tags together.
+
+        *Note*:
+        due to implementation limitations
+        the SQL query itself may not apply all the criteria,
+        so every criterion must still be applied
+        to the results
+        using its `.match_entity` method.
+
+        If `name` is omitted or `None` the query will match log entities
+        otherwise the entity with the specified `name`.
+
+        The `criteria` should be an iterable of `SQTCriterion` instances
+        used to construct the query.
+    '''
+    entities = self.entities
+    tags = self.tags
+    # first condition:
+    #   select tags as alias where constraint
+    # following:
+    #   inner join tags as alias using entity_id where constraint
+    # inner join entities on
+    sqlps = []
+    entity_tests = []
+    per_tag_aliases = {}
+    per_tag_tests = defaultdict(list)  # tag_name=>[tests...]
+    sqlps = []
+    for criterion in criteria:
+      with Pfx(criterion):
+        assert isinstance(criterion, SQTCriterion), (
+            "not an SQTCriterion: %s:%r" %
+            (type(criterion).__name__, criterion)
+        )
+        if isinstance(criterion, TagBasedTest):
+          # we know how to treat these efficiently
+          # by mergeing conditions on the same tag name
+          tag = criterion.tag
+          tag_name = tag.name
+          tag_value = tag.value
+          if tag_name == 'id':
+            alias = entities
+            entity_tests.append(
+                criterion.SQL_ID_VALUE_COMPARISON_FUNCS[criterion.comparison]
+                (entities, tag_value)
+            )
+          elif tag_name == 'name':
+            alias = entities
+            entity_tests.append(
+                criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[criterion.comparison]
+                (entities, tag_value)
+            )
+          elif tag_name == 'unixtime':
+            alias = entities
+            entity_tests.append(
+                criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
+                    criterion.comparison](entities, tag_value)
+            )
+          else:
+            tag_tests = per_tag_tests[tag_name]
+            if tag_tests:
+              # reuse existing alias - same tag name
+              alias = per_tag_aliases[tag_name]
+            else:
+              # first test for this tag - make an alias
+              per_tag_aliases[tag_name] = aliased(tags)
+            tag_tests.append(
+                criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[criterion.comparison]
+                (per_tag_aliases[tag_name], tag_value)
+            )
+        else:
+          try:
+            sqlp = criterion.sql_parameters(self)
+          except ValueError:
+            warning("SKIP, cannot compute sql_parameters")
+            continue
+          sqlps.append(sqlp)
+    query = session.query(entities.id, entities.unixtime, entities.name)
+    prev_entity_id_column = entities.id
+    if entity_tests:
+      query = query.filter(*entity_tests)
+    for tag_name, tag_tests in per_tag_tests.items():
+      alias = per_tag_aliases[tag_name]
+      alias_entity_id_column = alias.entity_id
+      query = query.join(
+          alias, alias_entity_id_column == prev_entity_id_column
+      ).filter(alias.name == tag_name, *tag_tests)
+      prev_entity_id_column = alias_entity_id_column
+    # further JOINs on less direct SQL tests
+    for sqlp in sqlps:
+      sqlp_entity_id_column = sqlp.entity_id_column
+      query = query.join(
+          sqlp.alias,
+          sqlp_entity_id_column == prev_entity_id_column,
+      )
+      query = query.filter(sqlp.constraint)
+      prev_entity_id_column = sqlp_entity_id_column
+    with Pfx("mode=%r", mode):
+      if mode == 'id':
+        pass
+      elif mode == 'entity':
+        query = session.query(entities.id, entities.unixtime,
+                              entities.name).filter(
+                                  entities.id.in_(query.distinct())
+                              )
+      elif mode == 'tagged':
+        query = query.join(
+            tags, isouter=True
+        ).filter(entities.id is not None).add_columns(
+            tags.name.label('tag_name'),
+            tags.float_value.label('tag_float_value'),
+            tags.string_value.label('tag_string_value'),
+            tags.structured_value.label('tag_structured_value'),
+        )
+      else:
+        raise ValueError("unrecognised mode")
+    return query
 
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
