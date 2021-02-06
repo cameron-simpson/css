@@ -1175,7 +1175,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Add a tag to the database.
     '''
     e = self._get_db_entity()
-    return e.add_tag(tag_name, value)
+    return e.add_tag(tag_name, value, session=self.sqltags._session)
 
   @tag_or_tag_value
   def discard(self, tag_name, value, *, skip_db=False, verbose=None):
