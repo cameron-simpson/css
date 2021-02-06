@@ -777,17 +777,16 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
         '''
-        tag = Tag(name, value)
         tags = orm.tags
         if self.id is None:
           # obtain the id value from the database
           session.add(self)
           session.flush()
         # TODO: upsert!
-        etag = tags.lookup1(session=session, entity_id=self.id, name=tag.name)
+        etag = tags.lookup1(session=session, entity_id=self.id, name=name)
         if etag is None:
-          etag = tags(entity_id=self.id, name=tag.name)
-          etag.value = tag.value
+          etag = tags(entity_id=self.id, name=name)
+          etag.value = value
           session.add(etag)
         else:
           etag.value = value
