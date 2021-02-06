@@ -715,40 +715,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.meta.create_all()
     self.make_metanode()
 
-  @property
-  def metanode(self):
-    ''' The metadata node, creating it if missing.
-    '''
-    return self.make_metanode()
-
-  @orm_method
-  @auto_session
-  def make_metanode(self, *, session):
-    ''' Return the metadata node, creating it if missing.
-    '''
-    entity = self.get_metanode(session=session)
-    if entity is None:
-      entity = self.entities(id=0, unixtime=time.time())
-      entity.add_tag(
-          'headline',
-          "%s node 0: the metanode." % (type(self).__name__,),
-          session=session
-      )
-      session.add(entity)
-    return entity
-
-  @orm_method
-  @auto_session
-  def get_metanode(self, *, session):
-    ''' Return the metanode, the `Entities` row with `id`=`0`.
-        Returns `None` if the node does not exist.
-
-        Accessing the property `.metanode` always returns the metanode entity,
-        creating it if necessary.
-        Note that it is not associated with any session.
-    '''
-    return self.entities.lookup1(id=0, session=session)
-
   # pylint: disable=too-many-statements
   def declare_schema(self):
     ''' Define the database schema / ORM mapping.
@@ -1485,6 +1451,37 @@ class SQLTags(TagSets):
 
   @orm_auto_session
   def find(self, criteria, *, session):
+  @property
+  def metanode(self):
+    ''' The metadata node, creating it if missing.
+    '''
+    return self.make_metanode()
+
+  def get_metanode(self):
+    ''' Return the metanode, whose `Entities` row has `id`=`0`.
+        Returns `None` if the node does not exist.
+
+        Accessing the property `.metanode` always returns the metanode entity,
+        creating it if necessary.
+    '''
+    return self.get(0)
+
+  def make_metanode(self):
+    ''' Return the metadata node, creating it if missing.
+    '''
+    te = self.get(0)
+    if te is None:
+      # force creation of the desired row id
+      entity = self.entities(id=0, unixtime=time.time())
+      entity.add_tag(
+          'headline',
+          "%s node 0: the metanode." % (type(self).__name__,),
+      )
+      self._session.add(entity)
+      te = self.get(0)
+      assert te is not None
+    return te
+
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
