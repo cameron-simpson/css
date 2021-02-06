@@ -547,7 +547,7 @@ class TagSet(dict, FormatableMixin, AttrableMappingMixin):
       # setting to the same object is not a change,
       # but setting to an equivalent value is a change
       self.modified = True
-      if old_value != value:
+      if old_value != value and (verbose is None or verbose):
         # report different values
         tag = Tag(tag_name, value, ontology=self.ontology)
         msg = (
