@@ -108,8 +108,17 @@ class Invoices(SQLTags):
         break
     return cls(name=name, **kw)
 
+  def __iter__(self):
+    ''' Yield the invoice `TagSet`s.
     '''
-
+    for invoice in self.values(prefix=Invoice.PREFIX):
+      with Pfx(invoice.name):
+        try:
+          invoice.number
+        except ValueError as e:
+          warning("skip bad invoice number: %s", e)
+          continue
+        yield invoice
 
   def timespan_criteria(self, dt=None, span=None):
     ''' Given a start time and a time span,
@@ -176,19 +185,7 @@ class Invoices(SQLTags):
   def daily_log(self, dt):
     ''' Return a list of log entries covering `dt` to `dt+1day`.
     '''
-    return list(self.sqltags.find(self.criteria_daily_log(dt)))
-
-  def __iter__(self):
-    ''' Yield the invoice `TagSet`s.
-    '''
-    for invoice in self.values(prefix=Invoice.PREFIX):
-      with Pfx(invoice.name):
-        try:
-          invoice.number
-        except ValueError as e:
-          warning("skip bad invoice number: %s", e)
-          continue
-        yield invoice
+    return list(self.find(self.criteria_daily_log(dt)))
 
   @typechecked
   def invoice(self, number: int) -> TagSet:
