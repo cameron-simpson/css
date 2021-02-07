@@ -688,9 +688,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.declare_schema()
     self.Session = sessionmaker(bind=engine)
     if db_path is not None and not existspath(db_path):
+      track("create and init %r", db_path)
       with Pfx("init %r", db_path):
         self.define_schema()
-        verbose('created database')
+        info('created database')
 
   def startup(self):
     ''' Startup: define the tables if not present.
