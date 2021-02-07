@@ -48,7 +48,7 @@ DEFAULT_MBDB_PATH = '~/var/cache/mbdb.sqlite'
 def main(argv=None):
   ''' Call the command line main programme.
   '''
-  return CDRipCommand().run(argv)
+  return CDRipCommand(argv).run()
 
 class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
