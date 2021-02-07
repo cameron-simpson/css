@@ -40,7 +40,6 @@ from sqlalchemy import (
     String,
     JSON,
     ForeignKey,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.sql import select
@@ -52,7 +51,7 @@ from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix, get_decimal_value
-from cs.logutils import error, warning, ifverbose
+from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
@@ -688,9 +687,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.declare_schema()
     self.Session = sessionmaker(bind=engine)
     if db_path is not None and not existspath(db_path):
+      track("create and init %r", db_path)
       with Pfx("init %r", db_path):
         self.define_schema()
-        verbose('created database')
+        info('created database')
 
   def startup(self):
     ''' Startup: define the tables if not present.
@@ -800,7 +800,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             session.delete(etag)
         return etag
 
-    class Tags(Base, BasicTableMixin, HasIdMixin):
+    class Tags(Base, BasicTableMixin):
       ''' The table of tags associated with entities.
       '''
 
@@ -810,9 +810,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           ForeignKey("entities.id"),
           nullable=False,
           index=True,
+          primary_key=True,
           comment='entity id'
       )
-      name = Column(String, comment='tag name', index=True)
+      name = Column(String, comment='tag name', index=True, primary_key=True)
       float_value = Column(
           Float,
           nullable=True,
@@ -830,9 +831,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       structured_value = Column(
           JSON, nullable=True, default=None, comment='tag value in JSON form'
       )
-
-      # one tag value per name, use structured_value for complex values
-      UniqueConstraint('entity_id', 'name')
 
       @staticmethod
       @require(
