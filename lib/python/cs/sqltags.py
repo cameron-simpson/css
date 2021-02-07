@@ -40,7 +40,6 @@ from sqlalchemy import (
     String,
     JSON,
     ForeignKey,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import sessionmaker, aliased
 from sqlalchemy.sql import select
@@ -52,7 +51,7 @@ from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import makelockfile
 from cs.lex import FormatAsError, cutprefix, get_decimal_value
-from cs.logutils import error, warning, ifverbose
+from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.sqlalchemy_utils import (
