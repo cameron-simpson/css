@@ -103,7 +103,7 @@ class Invoices(SQLTags):
     '''
     cls = SQLTagSet
     for match_cls in Invoice, Client:
-      if name.startswith(match_cls.PREFIX):
+      if name is not None and name.startswith(match_cls.PREFIX):
         cls = match_cls
         break
     return cls(name=name, **kw)
