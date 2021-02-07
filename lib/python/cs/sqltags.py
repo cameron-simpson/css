@@ -801,7 +801,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             session.delete(etag)
         return etag
 
-    class Tags(Base, BasicTableMixin, HasIdMixin):
+    class Tags(Base, BasicTableMixin):
       ''' The table of tags associated with entities.
       '''
 
@@ -811,9 +811,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           ForeignKey("entities.id"),
           nullable=False,
           index=True,
+          primary_key=True,
           comment='entity id'
       )
-      name = Column(String, comment='tag name', index=True)
+      name = Column(String, comment='tag name', index=True, primary_key=True)
       float_value = Column(
           Float,
           nullable=True,
@@ -831,9 +832,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       structured_value = Column(
           JSON, nullable=True, default=None, comment='tag value in JSON form'
       )
-
-      # one tag value per name, use structured_value for complex values
-      UniqueConstraint('entity_id', 'name')
 
       @staticmethod
       @require(
