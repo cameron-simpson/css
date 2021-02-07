@@ -24,6 +24,41 @@ def main(argv=None):
   '''
   return InvoiceCommand(argv).run()
 
+def parse_ymd(ymd):
+  ''' Parse a YYYY-MM-DD or YYYYMMDD date string,
+      return the matching naive `datetime`.
+  '''
+  with Pfx("parse_ymd(%r)"):
+    try:
+      dt = datetime.strptime(ymd, '%Y-%m-%d')
+    except ValueError:
+      dt = datetime.strptime(ymd, '%Y%m%d')
+    return dt
+
+def parse_ym(yyyymm):
+  ''' Parse a YYYY-MM or YYYYMM date string,
+      return the matching naive `datetime`s
+      for the first day of the corresponding month
+      and the first day of the following month.
+  '''
+  with Pfx("parse_ym(YYYY-DD:%r)"):
+    try:
+      start_dt = datetime.strptime(yyyy_mm, "%Y-%m")
+    except ValueError:
+      start_dt = datetime.strptime(yyyy_mm, "%Y%m")
+    yyyy, mm = start_dt.year, start_dt.month
+    mm += 1
+    if mm > 12:
+      mm -= 12
+      yyyy += 1
+    end_dt = datetime(year=yyyy, month=mm, day=1)
+    return start_dt, end_dt
+
+def next_day(dt):
+  ''' The `datetime` for a day after `dt`.
+  '''
+  return dt + timedelta(days=1)
+
 class PrefixedNameSQLTagSet(SQLTagSet):
 
   # a prefix ending in a dot, for example "invoice."
@@ -73,22 +108,8 @@ class Invoices(SQLTags):
         break
     return cls(name=name, **kw)
 
-  @staticmethod
-  def parse_ymd(ymd):
-    ''' Parse a YYYY-MM-DD or YYYYMMDD date string,
-        return the matching naive `datetime`.
     '''
-    with Pfx("parse_ymd(%r)"):
-      try:
-        return datetime.strptime(ymd, '%Y-%m-%d')
-      except ValueError:
-        return datetime.strptime(ymd, '%Y%m%d')
 
-  @staticmethod
-  def next_day(dt):
-    ''' The `datetime` for a day after `dt`.
-    '''
-    return dt + timedelta(days=1)
 
   def timespan_criteria(self, dt=None, span=None):
     ''' Given a start time and a time span,
@@ -110,7 +131,7 @@ class Invoices(SQLTags):
       if span is None:
         span = timedelta(days=1)
     elif isinstance(dt, str):
-      dt = self.parse_ymd(dt)
+      dt = parse_ymd(dt)
       if span is None:
         span = timedelta(days=1)
     elif isinstance(dt, date):
@@ -136,7 +157,7 @@ class Invoices(SQLTags):
       raise TypeError(
           "unhandled span type %s: %r" % (type(span).__name__, span)
       )
-    end_ts = self.next_day(dt).timestamp()
+    end_ts = next_day(dt).timestamp()
     return [
         f"unixtime>={start_ts}",
         f"unixtime<{end_ts}",
@@ -195,12 +216,12 @@ class InvoiceCommand(SQLTagsCommand):
     ''' Usage: {cmd} [yyyy-mm-dd]
           Edit the tally for yyyy-mm-dd or today.
     '''
-    invoices = self.options.invoices
+    invoices = self.options.sqltags
     badopts = False
     if argv:
       date_arg = argv.pop(0)
       try:
-        dt = invoices.parse_ymd(date_arg)
+        dt = parse_ymd(date_arg)
       except ValueError as e:
         warning("bad YYYY-MM-DD argument: %s", e)
         badopts = True
