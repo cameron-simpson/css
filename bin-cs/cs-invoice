@@ -297,7 +297,7 @@ class InvoiceCommand(SQLTagsCommand):
         invoices = self.options.sqltags
         X("invoices=%s:%s",type(invoices),invoices)
         entry = invoices.new_invoice()
-        entry.client = client.name
+        entry.client = client.short_name
         entry.unixtime_start = start_dt.timestamp()
         entry.unixtime_end = end_dt.timestamp()
       else:
