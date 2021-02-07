@@ -330,17 +330,17 @@ class BasicTableMixin:
   def lookup(cls, *, session, **criteria):
     ''' Return iterable of row entities matching `criteria`.
     '''
-    return state.session.query(cls).filter_by(**criteria)
+    return session.query(cls).filter_by(**criteria)
 
   @classmethod
   def lookup1(cls, *, session, **criteria):
     ''' Return the row entity matching `criteria`, or `None` if no match.
     '''
-    return state.session.query(cls).filter_by(**criteria).one_or_none()
+    return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
   def __getitem__(cls, index):
-    row = cls.lookup1(id=index)
+    row = cls.lookup1(id=index, session=state.session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
           cls,
