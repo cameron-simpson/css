@@ -304,12 +304,18 @@ class CornuCopyBuffer(object):
         Other keyword arguments are passed to the buffer constructor.
     '''
     try:
-      foffset = f.tell()
-    except OSError:
+      ftell = f.tell
+    except AttributeError:
       is_seekable = False
       foffset = None
     else:
-      is_seekable = True
+      try:
+        foffset = f.tell()
+      except OSError:
+        is_seekable = False
+        foffset = None
+      else:
+        is_seekable = True
     if offset is None:
       offset = foffset
     it = (
