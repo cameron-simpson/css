@@ -132,9 +132,9 @@ class Packet(PacketField):
     bss = [
         BSUInt.transcribe_value(self.tag),
         BSUInt.transcribe_value(
-            ( self.flags << 2 )
-            | ( 0x01 if channel != 0 else 0x00 )
-            | ( 0x02 if is_request else 0x00 )
+            (0x01 if channel != 0 else 0x00)
+            | (0x02 if is_request else 0x00)
+            | (self.flags << 2)
         ),
         BSUInt.transcribe_value(channel) if channel != 0 else b'',
         BSUInt.transcribe_value(self.rq_type) if is_request else b'',
