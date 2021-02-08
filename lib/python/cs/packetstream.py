@@ -108,10 +108,10 @@ class Packet(PacketField):
     '''
     raw_payload = BSData.parse_value(bfr)
     pkt_bfr = CornuCopyBuffer([raw_payload])
-    has_channel = ( flags & 0x01 ) != 0
-    is_request = ( flags & 0x02 ) != 0
     tag = BSUInt.parse_value(pkt_bfr)
     flags = BSUInt.parse_value(pkt_bfr)
+    has_channel = (flags & 0x01) != 0
+    is_request = (flags & 0x02) != 0
     flags >>= 2
     if has_channel:
       channel = BSUInt.parse_value(pkt_bfr)
