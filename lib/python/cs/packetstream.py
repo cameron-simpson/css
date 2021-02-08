@@ -13,12 +13,12 @@ import os
 import sys
 from time import sleep
 from threading import Lock
-from cs.binary import PacketField, BSUInt, BSData
+from cs.binary import BaseBinaryMultiValue, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import debug, warning, error, exception
-from cs.pfx import Pfx, PrePfx, PfxThread as Thread, pfx_method
+from cs.pfx import Pfx, PrePfx, pfx_method
 from cs.predicate import post_condition
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
@@ -64,7 +64,7 @@ DISTINFO = {
 # default pause before flush to allow for additional packet data to arrive
 DEFAULT_PACKET_GRACE = 0.01
 
-class Packet(PacketField):
+class Packet(BaseBinaryMultiValue):
   ''' A protocol packet.
   '''
 
@@ -103,7 +103,7 @@ class Packet(PacketField):
     )
 
   @classmethod
-  def from_buffer(cls, bfr):
+  def parse(cls, bfr):
     ''' Parse a packet from a buffer.
     '''
     raw_payload = BSData.parse_value(bfr)
@@ -450,7 +450,7 @@ class PacketConnection(object):
         while True:
           try:
             XX(b'<')
-            packet = Packet.from_buffer(self._recv)
+            packet = Packet.parse(self._recv)
           except EOFError:
             break
           if packet == self.EOF_Packet:
