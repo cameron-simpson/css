@@ -310,7 +310,7 @@ class CornuCopyBuffer(object):
       foffset = None
     else:
       try:
-        foffset = f.tell()
+        foffset = ftell()
       except OSError:
         is_seekable = False
         foffset = None
