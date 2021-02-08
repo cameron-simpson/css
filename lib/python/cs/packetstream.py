@@ -36,7 +36,8 @@ def tick_fd_2(bs):
   os.write(2, bs)
 
 DISTINFO = {
-    'description': "general purpose bidirectional packet stream connection",
+    'description':
+    "general purpose bidirectional packet stream connection",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -56,7 +57,7 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.seq',
-        'cs.threads'
+        'cs.threads',
     ]
 }
 
@@ -87,22 +88,17 @@ class Packet(PacketField):
     else:
       payload_s = repr(payload)
     return (
-        "%s(is_request=%s,channel=%s,tag=%s,flags=0x%02x,payload=%s)"
-        % (
-            type(self).__name__,
-            self.is_request,
-            self.channel,
-            self.tag,
-            self.flags,
-            payload_s))
+        "%s(is_request=%s,channel=%s,tag=%s,flags=0x%02x,payload=%s)" % (
+            type(self).__name__, self.is_request, self.channel, self.tag,
+            self.flags, payload_s
+        )
+    )
 
   def __eq__(self, other):
     return (
         bool(self.is_request) == bool(other.is_request)
-        and self.channel == other.channel
-        and self.tag == other.tag
-        and self.flags == other.flags
-        and self.rq_type == other.rq_type
+        and self.channel == other.channel and self.tag == other.tag
+        and self.flags == other.flags and self.rq_type == other.rq_type
         and self.payload == other.payload
     )
 
@@ -144,7 +140,7 @@ class Packet(PacketField):
         BSUInt.transcribe_value(self.rq_type) if is_request else b'',
         self.payload
     ]
-    length = sum( len(bs) for bs in bss )
+    length = sum(len(bs) for bs in bss)
     yield BSUInt.transcribe_value(length)
     yield bss
 
@@ -157,10 +153,15 @@ class PacketConnection(object):
   # special packet indicating end of stream
   EOF_Packet = Packet(True, 0, 0, 0, 0, b'')
 
-  def __init__(self,
-      recv, send,
-      request_handler=None, name=None,
-      packet_grace=None, tick=None):
+  def __init__(
+      self,
+      recv,
+      send,
+      request_handler=None,
+      name=None,
+      packet_grace=None,
+      tick=None
+  ):
     ''' Initialise the PacketConnection.
 
         Parameters:
@@ -244,10 +245,14 @@ class PacketConnection(object):
     self.__sent = set()
     self.__send_queued = set()
     # dispatch Thread to process received packets
-    self._recv_thread = bg_thread(self._receive_loop, name="%s[_receive_loop]" % (self.name,))
+    self._recv_thread = bg_thread(
+        self._receive_loop, name="%s[_receive_loop]" % (self.name,)
+    )
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
-    self._send_thread = bg_thread(self._send_loop, name="%s[_send]" % (self.name,))
+    self._send_thread = bg_thread(
+        self._send_loop, name="%s[_send]" % (self.name,)
+    )
 
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
@@ -296,7 +301,7 @@ class PacketConnection(object):
     pending = self._pending
     for channel, channel_states in sorted(pending.items()):
       for tag, channel_state in sorted(channel_states.items()):
-        states.append( ( (channel, tag), channel_state) )
+        states.append(((channel, tag), channel_state))
     return states
 
   @locked
@@ -350,8 +355,7 @@ class PacketConnection(object):
     error("rejecting request: " + str(payload))
     if isinstance(payload, str):
       payload = payload.encode('utf-8')
-    self._queue_packet(
-        Packet(False, channel, tag, 0, None, payload))
+    self._queue_packet(Packet(False, channel, tag, 0, None, payload))
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
@@ -361,12 +365,13 @@ class PacketConnection(object):
     assert isinstance(tag, int)
     assert isinstance(flags, int)
     assert isinstance(payload, bytes)
-    flags = (flags<<1) | 1
-    self._queue_packet(
-        Packet(False, channel, tag, flags, None, payload))
+    flags = (flags << 1) | 1
+    self._queue_packet(Packet(False, channel, tag, flags, None, payload))
 
   @not_closed
-  def request(self, rq_type, flags=0, payload=b'', decode_response=None, channel=0):
+  def request(
+      self, rq_type, flags=0, payload=b'', decode_response=None, channel=0
+  ):
     ''' Compose and dispatch a new request, returns a `Result`.
 
         Allocates a new tag, a Result to deliver the response, and
@@ -396,8 +401,7 @@ class PacketConnection(object):
     tag = self._new_tag()
     R = Result()
     self._pending_add(channel, tag, Request_State(decode_response, R))
-    self._queue_packet(
-        Packet(True, channel, tag, flags, rq_type, payload))
+    self._queue_packet(Packet(True, channel, tag, flags, rq_type, payload))
     return R
 
   @not_closed
@@ -414,8 +418,7 @@ class PacketConnection(object):
     with Pfx(
         "_run_request[channel=%d,tag=%d,rq_type=%d,flags=0x%02x,payload=%s",
         channel, tag, rq_type, flags,
-        repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'
-    ):
+        repr(payload) if len(payload) <= 32 else repr(payload[:32]) + '...'):
       result_flags = 0
       result_payload = b''
       try:
@@ -426,7 +429,9 @@ class PacketConnection(object):
           elif isinstance(result, bytes):
             result_payload = result
           elif isinstance(result, str):
-            result_payload = result.encode(encoding='utf-8', errors='xmlcharrefreplace')
+            result_payload = result.encode(
+                encoding='utf-8', errors='xmlcharrefreplace'
+            )
           else:
             result_flags, result_payload = result
       except Exception as e:
@@ -441,7 +446,7 @@ class PacketConnection(object):
     '''
     XX = self.tick
     with PrePfx("_RECEIVE [%s]", self):
-      with post_condition( ("_recv is None", lambda: self._recv is None) ):
+      with post_condition(("_recv is None", lambda: self._recv is None)):
         while True:
           try:
             XX(b'<')
@@ -470,7 +475,8 @@ class PacketConnection(object):
                 elif tag in self._channel_request_tags[channel]:
                   self._reject(
                       channel, tag,
-                      "channel %d: tag already in use: %d" % (channel, tag))
+                      "channel %d: tag already in use: %d" % (channel, tag)
+                  )
                 else:
                   # payload for requests is the request enum and data
                   rq_type = packet.rq_type
@@ -483,9 +489,9 @@ class PacketConnection(object):
                   requests[channel].add(tag)
                   # queue the work function and track it
                   LF = self._later.defer(
-                      self._run_request,
-                      channel, tag, self.request_handler,
-                      rq_type, flags, payload)
+                      self._run_request, channel, tag, self.request_handler,
+                      rq_type, flags, payload
+                  )
                   self._running.add(LF)
                   LF.notify(self._running.remove)
           else:
@@ -495,7 +501,9 @@ class PacketConnection(object):
                 rq_state = self._pending_pop(channel, tag)
               except ValueError as e:
                 # no such pending pair - response to unknown request
-                error("%d.%d: response to unknown request: %s", channel, tag, e)
+                error(
+                    "%d.%d: response to unknown request: %s", channel, tag, e
+                )
               else:
                 decode_response, R = rq_state
                 # first flag is "ok"
@@ -535,7 +543,7 @@ class PacketConnection(object):
     XX = self.tick
     ##with Pfx("%s._send", self):
     with PrePfx("_SEND [%s]", self):
-      with post_condition( ("_send is None", lambda: self._send is None) ):
+      with post_condition(("_send is None", lambda: self._send is None)):
         fp = self._send
         Q = self._sendQ
         grace = self.packet_grace
