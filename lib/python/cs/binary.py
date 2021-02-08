@@ -1120,7 +1120,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       it is constructed by iterating over `field_map`.
       Prior to Python 3.6, `dict`s do not provide a reliable order
       and should be accompanied by an explicit `field_order`.
-      From 4.6 onward a `dict` is enough and its insertion order
+      From 3.6 onward a `dict` is enough and its insertion order
       will dicate the default `field_order`.
 
       For a fixed record structure
