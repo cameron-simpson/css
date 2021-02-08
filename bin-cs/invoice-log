@@ -7,10 +7,29 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd org startdate enddate"
+usage="Usage: $cmd org startdate enddate [git-dirs...]"
 
-[ $# = 3 ] || { echo "$usage" >&2; exit 2; }
-org=$1 start=$2 end=$3
+badopts=
+
+if [ $# -lt 3 ]
+then
+  echo "$cmd: missing org startdate enddate" >&2
+  badopts=1
+else
+  org=$1 start=$2 end=$3
+  shift; shift; shift
+  gitdirs=$*
+  for d in $gitdirs
+  do
+    [ -d "$d/.git" ] || {
+      echo "$cmd: gitdir $d: no .git subdir" >&2
+      badopts=1
+    }
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 
 rcfile=$HOME/rc/invoice/$org.sh
 [ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
@@ -18,6 +37,7 @@ rcfile=$HOME/rc/invoice/$org.sh
 
 set -x
 (
+  set -ue
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
   [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
   for d in $gitdirs
