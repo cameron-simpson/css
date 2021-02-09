@@ -83,7 +83,6 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.seq',
-        'cs.serialise',
         'cs.socketutils',
         'cs.threads',
         'cs.tty',
