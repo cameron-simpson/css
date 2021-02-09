@@ -979,7 +979,7 @@ def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
     inner_max_length = max_length // 2
   if isinstance(o, (tuple, list)):
     left = '(' if isinstance(o, tuple) else '['
-    right = ')' if isinstance(o, tuple) else ']'
+    right = (',)' if len(o) == 1 else ')') if isinstance(o, tuple) else ']'
     o_repr = left + ','.join(
         map(
             lambda m:
