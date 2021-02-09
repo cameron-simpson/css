@@ -801,7 +801,8 @@ class BSUInt(BinarySingleValue):
         The value is big-endian.
 
         This is the go for reading from a stream. If you already have
-        a bare bytes instance then `cs.serialise.get_uint` may be better.
+        a bare bytes instance then the `.parse_bytes` static method
+        is probably more direct.
     '''
     n = 0
     b = 0x80
