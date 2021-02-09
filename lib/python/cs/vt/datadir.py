@@ -179,6 +179,9 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
 
   @classmethod
   def _resolve(cls, *, hashclass, indexclass, rollover, flags, flags_prefix):
+    ''' Resolve the `__init__()` arguments,
+        shared by `__init__` and `_singleton_key`.
+    '''
     if indexclass is None:
       indexclass = choose_indexclass(
           cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
