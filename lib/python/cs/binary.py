@@ -811,6 +811,30 @@ class BSUInt(BinarySingleValue):
       n = (n << 7) | (b & 0x7f)
     return n
 
+  @staticmethod
+  def parse_bytes(data, offset=0):
+    ''' Read an extensible byte serialised unsigned int from `data` at `offset`.
+        Return value and new offset.
+
+        Continuation octets have their high bit set.
+        The value is big-endian.
+
+        If you just have a `bytes` instance, this is the go. If you're
+        reading from a stream you're better off with `cs.binary.BSUInt`.
+
+        Examples:
+
+            >>> BSUInt.parse_bytes(b'\\0')
+            (0, 1)
+    '''
+    n = 0
+    b = 0x80
+    while b & 0x80:
+      b = data[offset]
+      offset += 1
+      n = (n << 7) | (b & 0x7f)
+    return n, offset
+
   # pylint: disable=arguments-differ
   @staticmethod
   def transcribe_value(n):
