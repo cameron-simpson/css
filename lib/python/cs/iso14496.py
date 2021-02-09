@@ -285,9 +285,7 @@ class MP4Command(BaseCommand):
           Run self tests.
     '''
     import cs.iso14496_tests
-    cs.iso14496_tests.selftest(
-        ["%s: %s" % (options.cmd, options.subcmd)] + argv
-    )
+    cs.iso14496_tests.selftest([options.cmd] + argv)
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
