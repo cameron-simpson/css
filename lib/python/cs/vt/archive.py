@@ -19,7 +19,7 @@ import os
 from os.path import isfile
 import time
 from icontract import require
-from cs.binary import PacketField, BSSFloat
+from cs.binary import BinaryMultiValue, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
@@ -31,36 +31,10 @@ from .meta import NOUSERID, NOGROUPID
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
-class ArchiveEntry(PacketField):
+class ArchiveEntry(BinaryMultiValue('ArchiveEntry',
+                                    dict(when=BSSFloat, dirent=DirentRecord))):
   ''' An Archive entry record.
   '''
-
-  @require(lambda when: when is None or isinstance(when, float))
-  @require(lambda dirent: dirent is None or isinstance(dirent, _Dirent))
-  @require(
-      lambda when, dirent: (
-          (when is None and dirent is None) or
-          (when is not None and dirent is not None)
-      )
-  )
-  def __init__(self, when, dirent):
-    super().__init__(None)
-    self.when = when
-    self.dirent = dirent
-
-  @classmethod
-  def from_buffer(cls, bfr, **kw):
-    ''' Parse the `when` and `dirent` values from `bfr`.
-    '''
-    when = BSSFloat.parse_value(bfr)
-    dirent = DirentRecord.parse_value(bfr)
-    return cls(when, dirent, **kw)
-
-  def transcribe(self):
-    ''' Transcribe the `when` and `dirent` fields.
-    '''
-    yield BSSFloat(self.when).transcribe()
-    yield DirentRecord(self.dirent).transcribe()
 
 def Archive(path, missing_ok=False, weird_ok=False, config=None):
   ''' Return an Archive from the specification `path`.
