@@ -24,7 +24,7 @@ from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
 from cs.lex import unctrl, get_ini_clause_entryname
 from cs.logutils import warning, exception, debug
-from cs.pfx import Pfx, gen as pfxgen
+from cs.pfx import Pfx, pfx
 from cs.py.func import prop
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
@@ -98,7 +98,7 @@ class BaseArchive(ABC):
     return last_entry
 
   @staticmethod
-  @pfxgen
+  @pfx
   def parse(fp, first_lineno=1):
     ''' Parse lines from an open archive file, yield `(when, E)`.
     '''
@@ -217,7 +217,7 @@ class FilePathArchive(BaseArchive):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, shortpath(self.path))
 
-  @pfxgen
+  @pfx
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
     '''
