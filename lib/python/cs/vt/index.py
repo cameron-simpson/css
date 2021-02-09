@@ -14,10 +14,10 @@ from contextlib import contextmanager
 from os import pread
 from os.path import exists as pathexists
 from zlib import decompress
+from cs.binary import BinaryMultiValue, BSUInt
 from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
-from cs.serialise import get_bs, put_bs
 from . import Lock
 from .hash import HashCodeUtilsMixin
 
@@ -67,8 +67,12 @@ def choose(basepath, preferred_indexclass=None):
       "no supported index classes available: tried %r" % (indexclasses,)
   )
 
-class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
-                                    'filenum data_offset data_length flags')):
+class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
+    'filenum': BSUInt,
+    'data_offset': BSUInt,
+    'data_length': BSUInt,
+    'flags': BSUInt,
+})):
   ''' An index entry describing a data chunk in a `DataDir`.
 
       This has the following attributes:
@@ -91,26 +95,6 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
     ''' Whether the chunk data are compressed.
     '''
     return self.flags & self.FLAG_COMPRESSED
-
-  @classmethod
-  def from_bytes(cls, bs: bytes, offset: int = 0):
-    ''' Parse a binary index entry, return `(FileDataIndexEntry,offset)`.
-    '''
-    filenum, offset = get_bs(bs, offset)
-    data_offset, offset = get_bs(bs, offset)
-    data_length, offset = get_bs(bs, offset)
-    flags, offset = get_bs(bs, offset)
-    return cls(filenum, data_offset, data_length, flags), offset
-
-  def __bytes__(self) -> bytes:
-    ''' Encode to binary form for use as an index entry.
-    '''
-    return b''.join(
-        (
-            put_bs(self.filenum), put_bs(self.data_offset),
-            put_bs(self.data_length), put_bs(self.flags)
-        )
-    )
 
   def fetch_fd(self, rfd):
     ''' Fetch the decompressed data from an open binary file.
