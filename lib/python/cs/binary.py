@@ -655,7 +655,7 @@ def BinarySingleStruct(class_name, struct_format, field_name=None):
           >>> UInt16BE.format
           '>H'
           >>> UInt16BE.struct   #doctest: +ELLIPSIS
-          <Struct object at ...>
+          <_struct.Struct object at ...>
           >>> field = UInt16BE.from_bytes(bytes((2,3)))
           >>> field
           UInt16BE(value=515)
@@ -983,7 +983,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     )
 
   __str__ = s
-  __repr__ = s
+  ##__repr__ = s
 
   @classmethod
   def parse(cls, bfr):
@@ -1193,8 +1193,10 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ... })):
           ...     pass
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
+          >>> bmv.n2
+          UInt8(value=34)
           >>> bmv
-          BMV(data1=b'AB',data2=b'DEFG',n1=17,n2=UInt8(value=34),n3=UInt8(value=119),nd=nd(short=33154, bs=b'zyxw'))
+          BMV(n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'), data1=b'AB', data2=BSData(b'DEFG'))
           >>> bmv.n1
           17
           >>> bmv.n2
