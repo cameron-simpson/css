@@ -370,8 +370,10 @@ class StreamStore(BasicStoreSync):
     return missing_hashcodes_by_checksum(self, other, **kw)
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: (
+          start_hashcode is None or self.hashclass is None or
+          isinstance(start_hashcode, self.hashclass)
+      )
   )
   def hashcodes(
       self, start_hashcode=None, reverse=False, after=False, length=None
