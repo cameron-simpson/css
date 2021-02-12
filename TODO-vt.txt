@@ -1,3 +1,4 @@
+replace HASHCLASS_BY_ENUM with HashCode.by_enum
 replace HASHCLASS_BY_NAME with HashCode.by_name
 drop hashenum throughout, just use hashname
 cs.iso14496: a HasSubBoxes mixin for things with .boxes, provides __len__, .length, __iter__ and whatever else
