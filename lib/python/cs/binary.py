@@ -76,6 +76,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning
 from cs.lex import cropped, cropped_repr
 from cs.pfx import Pfx
+from cs.seq import Seq
 
 __version__ = '20200229'
 
@@ -87,6 +88,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx'],
+    'install_requires':
+    ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx', 'cs.seq'],
     'python_requires':
     '>=3.6',
 }
@@ -131,34 +134,75 @@ def flatten(chunks):
     for subchunk in chunks:
       yield from flatten(subchunk)
 
-def pt_spec(pt, field_name=None):
-  ''' Convert a parse/transcribe specification `pt`
-      into a tuple `(func_parse,func_transcribe)`
-      being a parse and transcribe function.
+_pt_spec_seq = Seq()
 
-      Each specification `pt` may be one of:
-      * an object with `.parse` and `.transcribe` callable attributes,
-        usually an instance of some subclass of `AbstractBinary`
-      * a 2-tuple of `(struct_format:str,field_names:str)`
-      * a 2-tuple of `(parse,transcribe)`
+def pt_spec(pt, name=None):
+  ''' Convert a parse/transcribe specification `pt`
+      into an `AbstractBinary` subclass.
+
+      This is largely used to provide flexibility
+      in the specifications for the `BinaryMultiValue` factory
+      but can be used as a factory for other simple classes.
+
+      If the specification `pt` is a subclass of `AbstractBinary`
+      this is returned directly.
+
+      If `pt` is a 2-tuple of `str`
+      the values are presumed to be a format string for `struct.struct`
+      and filed names separated by spaces;
+      a new `BinaryMultiStruct` class is created from these and returned.
+
+      Otherwise two functions
+      `f_parse_value(bfr)` and `f_transcribe_value(value)`
+      are obtained and used to construct a new `BinarySingleValue` class
+      as follows:
+
+      If `pt` has `.parse_value` and `.transcribe_value` callable attributes,
+      use those for `f_parse_value` and `f_transcribe_value` respectively.
+
+      Otherwise, if `pt` is an `int`
+      define `f_parse_value` to obtain exactly that many bytes from a buffer
+      and `f_transcribe_value` to return those bytes directly.
+
+      Otherwise presume `pt` is a 2-tuple of `(f_parse_value,f_transcribe_value)`.
   '''
   try:
-    func_parse = pt.parse
-    func_transcribe = pt.transcribe
+    is_binary_class = issubclass(pt, AbstractBinary)
+  except TypeError:
+    is_binary_class = False
+  if is_binary_class:
+    return pt
+  try:
+    f_parse_value = pt.parse_value
+    f_transcribe_value = pt.transcribe_value
   except AttributeError:
     if isinstance(pt, int):
-      func_parse = lambda bfr: bfr.take(pt)
-      func_transcribe = lambda bs: bs
-    elif isinstance(pt[0], str) and isinstance(pt[1], str):
-      struct_format, struct_field_names = pt
-      bms = BinaryMultiStruct(
-          field_name or struct_format, struct_format, struct_field_names
-      )
-      func_parse = bms.parse
-      func_transcribe = bms.transcribe
+      f_parse_value = lambda bfr: bfr.take(pt)
+      f_transcribe_value = lambda value: value
     else:
-      func_parse, func_transcribe = pt
-  return func_parse, func_transcribe
+      pt0, pt1 = pt
+      if isinstance(pt0, str) and isinstance(pt1, str):
+        # struct format and field names
+        return BinaryMultiStruct(
+            '_'.join(
+                ("PTStruct", str(next(_pt_spec_seq)), pt1.replace(' ', '_'))
+            ), pt0, pt1
+        )
+      f_parse_value = pt0
+      f_transcribe_value = pt1
+
+  class PTValue(BinarySingleValue):
+
+    @staticmethod
+    def parse_value(bfr):
+      return f_parse_value(bfr)
+
+    @staticmethod
+    def transcribe_value(value):
+      return f_transcribe_value(value)
+
+  PTValue.__name__ += '_' + str(next(_pt_spec_seq))
+  return PTValue
 
 class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
@@ -526,13 +570,13 @@ class BinaryListValues(AbstractBinary):
       )
     self = cls()
     values = self.values
-    func_parse, _ = pt_spec(pt)
+    func_parse = pt_spec(pt).parse
     while max_count is None or len(values) < max_count:
       try:
-        value = func_parse(bfr)
+        instance = func_parse(bfr)
       except EOFError:
         break
-      values.append(value)
+      values.append(instance)
     if min_count is not None and len(values) < min_count:
       warning(
           "%s.parse: insufficient instances of %r found: required at least %s, found %d",
