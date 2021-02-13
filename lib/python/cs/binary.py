@@ -1015,12 +1015,35 @@ class BSSFloat(BinarySingleValue):
     '''
     return BSString.transcribe_value(str(f))
 
-class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
+class BaseBinaryMultiValue(SimpleBinary):
   ''' The base class underlying classes constructed by `BinaryMultiValue`.
+      This is used for compound objects whose components
+      are themselves `AbstractBinary` instances.
+
+      The `parse`, `parse_field`, `transcribe` and `transcribe_field` methods
+      supplied by this base class rely on the class attributes:
+      * `FIELD_ORDER`: a list of field names to parse or transcribe
+        by the defaule `parse` and `transcribe` methods
+      * `FIELD_CLASSES`: a mapping of field names to `AbstractBinary` subclasses
+
+      These are _not_ defined on this base class
+      and must be defined on the subclass
+      in order that subclasses to have their own mappings.
+      See the code for the `BinaryMultiValue` class factory
+      for an example implementation.
   '''
 
-  FIELD_PARSERS = {}
-  FIELD_TRANSCRIBERS = {}
+  @pfx_method
+  def __init__(self, **fields):
+    for field_name, field_value in fields.items():
+      with Pfx("%s=%r", field_name, field_value):
+        if field_value is None:
+          pass
+        elif not isinstance(field_value, AbstractBinary):
+          field_value0 = field_value
+          field_cls = self.FIELD_CLASSES[field_name]
+          field_value = field_cls(value=field_value)
+        setattr(self, field_name, field_value)
 
   def s(self, *, crop_length=64, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
@@ -1056,15 +1079,46 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
   @classmethod
   def parse(cls, bfr):
     ''' Default parse: parse each predefined field from the buffer in order.
+
+        Subclasses might override this if they have a flexible structure
+        where not all fields necessarily appear.
+
+        A `parse(bfr)` method for a flexible structure
+        may expect some subfields only in certain circumstances
+        and use `parse_field` to parse them as required.
+        This requires a matching `transcribe()` method.
+
+        Example:
+
+            def parse(cls, bfr):
+              """ Read a leading unsigned 8 bit integer
+                  holding a structure version.
+                  If the version is 0,
+                  read 7 raw bytes into the `.v0data` field;
+                  if the version is 1,
+                  read a `V1DataType` in the `.v1data` field;
+                  otherwise raise a `ValueError` for an unsupported version byte.
+              """
+              self = cls()
+              self.parse_field('version', bfr, UInt8.parse_value)
+              if version == 0:
+                self.parse_field('v0data', bfr, 7)
+              elif self.version == 1:
+                self.parse_field('v1data', bfr, V1DataType)
+              else:
+                raise ValueError("unsupported version %d" % (self.version,))
+              return self
     '''
     self = cls()
-    for field_name, parse in cls.FIELD_PARSERS.items():
-      self.parse_field(field_name, bfr, pt=(parse, None))
+    for field_name in cls.FIELD_ORDER:
+      field_cls = cls.FIELD_CLASSES[field_name]
+      self.parse_field(field_name, bfr, field_cls)
     return self
 
-  def parse_field(self, field_name, bfr, pt=None):
-    ''' Parse a field named `field_name` from `bfr`.
-        Apply the parsed value to `self` as the attribute `field_name`.
+  def parse_field(self, field_name, bfr, pt):
+    ''' Parse a field named `field_name` from `bfr`
+        using the class derived from `pt`
+        saving the resulting instance to `self` as the attribute `field_name`.
 
         Parameters:
         * `field_name`: the name of the field to add
@@ -1074,8 +1128,7 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         If `pt` is omitted or `None`,
         the parser is obtained from `self.FIELD_PARSERS[field_name]`,
         which is defined from the `field_map` supplied at class creation.
-        Otherwise, `parse` is obtained from the `(parse,transcribe)` tuple
-        returned by `pt_spec(pt)`.
+        Otherwise, `parse` is obtained from the class returned by `pt_spec(pt)`.
 
         The field value is the obtained from `parse(bfr)`.
 
@@ -1102,74 +1155,41 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
         This allows you to use the field directly in calculations
         instead of indirecting through `.value` attribute
         and also saves some memory.
-
-        A `parse(bfr)` method for a flexible structure
-        may expect some subfields only in certain circumstances
-        and use `parse_field` to parse them as required.
-        Example:
-
-            def parse(cls, bfr):
-              """ Read a leading unsigned 8 bit integer
-                  holding a structure version.
-                  If the version is 0,
-                  read 7 raw bytes into the `.v0data` field;
-                  if the version is 1,
-                  read a `V1DataType` in the `.v1data` field;
-                  otherwise raise a `ValueError` for an unsupported version byte.
-              """
-              self = cls()
-              self.parse_field('version', UInt8.parse_value)
-              if version == 0:
-                self.parse_field('v0data', 7)
-              elif self.version == 1:
-                self.parse_field('v1data', V1DataType)
-              else:
-                raise ValueError("unsupported version %d" % (self.version,))
-              return self
     '''
-    if hasattr(self, field_name):
-      raise ValueError("attribute .%s already defined" % (field_name,))
-    if pt is None:
-      # infer the parser from the defined FIELD_PARSERS
-      parse = self.FIELD_PARSERS[field_name]
-    else:
-      parse, _ = pt_spec(pt)
-    value = parse(bfr)
-    setattr(self, field_name, value)
+    with Pfx("%s.parse_field(%r,bfr,%r)", type(self).__name__, field_name, pt):
+      if hasattr(self, field_name):
+        raise ValueError("attribute .%s already defined" % (field_name,))
+      field_cls = pt_spec(pt)
+      value = field_cls.parse(bfr)
+      setattr(self, field_name, value)
 
   # pylint: disable=arguments-differ
   def transcribe(self, exclude_names=()):
-    ''' Default transcribe: yield each field's transcription in order.
-        Fields whose name starts with an underscore are skipped.
-        The transcription is obtained
-        from `self.transcribe_field(field_name,field_value)`.
+    ''' Default transcribe: yield each field's transcription in order
+        using the `transcribe_field` method.
+
+        If a subclass overrides `parse(bfr)` to implement a flexible structure
+        the must also override this method to match.
+        See the notes in the default `parse()` method.
     '''
-    for field_name, field_value in self.__dict__.items():
-      with Pfx(
-          "%s.transcribe: %s=%s",
-          type(self).__name__,
-          field_name,
-          field_value,
-      ):
-        if field_name.startswith('_'):
-          continue
-        if field_name in exclude_names:
-          continue
-        transcription = self.transcribe_field(field_name, field_value)
-      yield transcription
+    for field_name in self.FIELD_ORDER:
+      with Pfx("%s.transcribe: %s", type(self).__name__, field_name):
+        field_value = getattr(self, field_name)
+        with Pfx("value=%s", field_value):
+          yield self.transcribe_field(field_name, field_value)
 
   def transcribe_field(self, field_name, field_value):
     ''' Transcribe a field named `field_name` with value `field_value`.
 
         The transcribe function is chosen from the following in order:
-        * `field_value.transcribe`
-        * `self.FIELD_TRANSCRIBERS[field_name]`
+        * `field_value.transcribe` if `field_value` is an instance of `AbstractBinary`
+        * `self.FIELD_CLASSES[field_name]`
         * `field_value` if `field_value` is `None` or a `bytes`-like object
         * `field_value.encode('ascii')` if `field_value` is a `str`
 
         A `ValueError` is raised if no transcription can be chosen.
 
-        An entry in `self.FIELD_TRANSCRIBERS` may be `None`,
+        An entry in `self.FIELD_CLASSES` may be `None`,
         in which case that field is not transcribed.
         This accomodates informational attributes
         already covered elsewhere in the transcription
@@ -1178,28 +1198,29 @@ class BaseBinaryMultiValue(SimpleNamespace, AbstractBinary):
     '''
     with Pfx("%s.transcribe_field: %s=%r", type(self).__name__, field_name,
              field_value):
-      if hasattr(field_value, 'transcribe'):
-        transcribe = lambda field_value: field_value.transcribe()
-      else:
-        try:
-          transcribe = self.FIELD_TRANSCRIBERS[field_name]
-        except KeyError:
-          # pylint: disable=raise-missing-from
-          if (field_value is None or isinstance(field_value,
-                                                (bytes, memoryview))):
-            transcribe = lambda value: value
-          elif isinstance(field_value, str):
-            transcribe = lambda s: s.encode(encoding='ascii')
-          else:
-            raise ValueError(
-                ".%s=<%s>%s has no .transcribe method, no FIELD_TRANSCRIBERS entry,"
-                " and is neither None nor bytes nor str" %
-                (field_name, type(field_value).__name__, field_value)
-            )
+      if field_value is None:
+        return None
+      if isinstance(field_value, AbstractBinary):
+        # use the field's own transcribe if present
+        return field_value.transcribe()
+      try:
+        field_cls = self.FIELD_CLASSES[field_name]
+      except KeyError:
+        # pylint: disable=raise-missing-from
+        if (field_value is None or isinstance(field_value,
+                                              (bytes, memoryview))):
+          transcribe = lambda value: value
+        elif isinstance(field_value, str):
+          transcribe = lambda s: s.encode(encoding='ascii')
         else:
-          if transcribe is None:
-            return None
-    return transcribe(field_value)
+          raise ValueError(
+              ".%s=<%s>%s has no .transcribe method, no FIELD_CLASSES entry,"
+              " and is neither None nor bytes nor str" %
+              (field_name, type(field_value).__name__, field_value)
+          )
+      else:
+        transcribe = field_cls.transcribe
+      return transcribe(field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct an `AbstractBinary` `SimpleNamespace` subclass named `class_name`
