@@ -1219,7 +1219,7 @@ class BaseBinaryMultiValue(SimpleBinary):
       return transcribe(field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
-  ''' Construct an `AbstractBinary` `SimpleNamespace` subclass named `class_name`
+  ''' Construct a `SimpleBinary` subclass named `class_name`
       whose fields are specified by the mapping `field_map`.
 
       The `field_map` is a mapping of field name to buffer parsers and transcribers.
@@ -1230,7 +1230,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       Prior to Python 3.6, `dict`s do not provide a reliable order
       and should be accompanied by an explicit `field_order`.
       From 3.6 onward a `dict` is enough and its insertion order
-      will dicate the default `field_order`.
+      will dictate the default `field_order`.
 
       For a fixed record structure
       the default `.parse` and `.transcribe` methods will suffice.
@@ -1239,36 +1239,31 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       accordingly.
 
       The `field_map` is a mapping of field name
-      to a specification of the parse and transcribe functions
-      as implemented by the `pt_spec()` function.
+      to a specification accepted by the `pt_spec()` function.
       Each specification may be one of:
-      * an object with `.parse` and `.transcribe` callable attributes,
-        usually a subclass of `AbstractBinary`
-      * a 2-tuple of `(struct_format,field_names)`
-      * a tuple of `(parse,transcribe)`
 
       Here is an example exhibiting various ways of defining each field:
       * `n1`: defined with the *`_value` methods of `UInt8`,
         which return or transcribe the `int` from an unsigned 8 bit value;
-        this stores an `int`
+        this stores a `BinarySingleValue` whole `.value` is an `int`
       * `n2`: defined from the `UInt8` class,
         which parses an unsigned 8 bit value;
         this stores an `UInt8` instance
-      * `n3`: defined with the `parse` and `transcribe` methods of `UInt8`,
-        which return or transcribe ` UInt8` instance;
-        this also stores an `UInt8` instance
+        (also a `BinarySingleValue` whole `.value` is an `int`)
+      * `n3`: like `n2`
       * `data1`: defined with the *`_value` methods of `BSData`,
         which return or transcribe the data `bytes`
         from a run length encoded data chunk;
-        this stores the `bytes` value
+        this stores a `BinarySingleValue` whole `.value` is a `bytes`
       * `data2`: defined from the `BSData` class
         which parses a run length encoded data chunk;
         this stores a `BSData` instance
+        (also a `BinarySingleValue` whole `.value` is a `bytes`)
 
           >>> class BMV(BinaryMultiValue("BMV", {
           ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
           ...         'n2': UInt8,
-          ...         'n3': (UInt8.parse, UInt8.transcribe),
+          ...         'n3': UInt8,
           ...         'nd': ('>H4s', 'short bs'),
           ...         'data1': (
           ...             BSData.parse_value,
@@ -1278,28 +1273,26 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ... })):
           ...     pass
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
+          >>> bmv.n1  #doctest: +ELLIPSIS
+          PTValue_...(17)
           >>> bmv.n2
           UInt8(value=34)
-          >>> bmv
-          BMV(n1=17, n2=UInt8(value=34), n3=UInt8(value=119), nd=nd(short=33154, bs=b'zyxw'), data1=b'AB', data2=BSData(b'DEFG'))
-          >>> bmv.n1
-          17
-          >>> bmv.n2
-          UInt8(value=34)
+          >>> bmv  #doctest: +ELLIPSIS
+          BMV(n1=PTValue_...(17), n2=UInt8(value=34), n3=UInt8(value=119), nd=PTStruct_..._short_bs(short=33154, bs=b'zyxw'), data1=PTValue_...(b'AB'), data2=BSData(b'DEFG'))
           >>> bmv.n2.value
           34
           >>> int(bmv.n2)
           34
           >>> bmv.n3
           UInt8(value=119)
-          >>> bmv.nd
-          nd(short=33154, bs=b'zyxw')
+          >>> bmv.nd  #doctest: +ELLIPSIS
+          PTStruct_..._short_bs(short=33154, bs=b'zyxw')
           >>> bmv.nd.bs
           b'zyxw'
           >>> bytes(bmv.nd)
           b'\x81\x82zyxw'
-          >>> bmv.data1
-          b'AB'
+          >>> bmv.data1  #doctest: +ELLIPSIS
+          PTValue_...(b'AB')
           >>> bmv.data2
           BSData(b'DEFG')
           >>> bytes(bmv)
@@ -1308,7 +1301,7 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           [b'\\x11', b'"', b'w', b'\\x81\\x82zyxw', b'\\x02', b'AB', b'\\x04', b'DEFG']
   '''  # pylint: disable=line-too-long
   with Pfx("BinaryMultiValue(%r,...)", class_name):
-    if not field_order:
+    if field_order is None:
       field_order = tuple(field_map)
       if (sys.version_info.major, sys.version_info.minor) < (3, 6):
         warning(
@@ -1320,26 +1313,21 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       field_order = tuple(
           field_order.split() if isinstance(field_order, str) else field_order
       )
-    if not field_order:
-      raise ValueError("empty field order: %r" % (field_order,))
 
     class bmv_class(BaseBinaryMultiValue):
       ''' `BaseBinaryMultiValue` subclass implementation.
       '''
 
-      FIELD_PARSERS = {}
-      FIELD_TRANSCRIBERS = {}
-
       # collate the parse-transcribe functions for each predefined field
-      for field_name in field_order:
-        pt = field_map[field_name]
-        func_parse, func_transcribe = pt_spec(pt, field_name=field_name)
-        FIELD_PARSERS[field_name] = func_parse
-        FIELD_TRANSCRIBERS[field_name] = func_transcribe
+      FIELD_ORDER = list(field_order)
+      FIELD_CLASSES = {
+          field_name: pt_spec(field_map[field_name], name=field_name)
+          for field_name in FIELD_ORDER
+      }
 
     bmv_class.__name__ = class_name
     bmv_class.__doc__ = (
-        ''' An `AbstractBinary` `SimpleNamespace` which parses and transcribes
+        ''' An `SimpleBinary` which parses and transcribes
             the fields `%r`.
         ''' % (field_order,)
     )
