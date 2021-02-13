@@ -151,7 +151,9 @@ class PacketConnection(object):
   '''
 
   # special packet indicating end of stream
-  EOF_Packet = Packet(True, 0, 0, 0, 0, b'')
+  EOF_Packet = Packet(
+      is_request=True, channel=0, tag=0, flags=0, rq_type=0, payload=b''
+  )
 
   def __init__(
       self,
