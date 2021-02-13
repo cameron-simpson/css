@@ -357,8 +357,9 @@ class CornuCopyBuffer(object):
       raise ValueError(
           "offset(%d)+length(%d) > len(bs):%d" % (offset, length, len(bs))
       )
+    bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
-      bs = memoryview(bs)[offset:end_offset]
+      bs = bs[offset:end_offset]
     return cls([bs], offset=offset, **kw)
 
   def __str__(self):
