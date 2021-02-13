@@ -87,7 +87,6 @@ DISTINFO = {
         "Environment :: Console",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx'],
     'install_requires':
     ['cs.buffer', 'cs.gimmicks', 'cs.lex', 'cs.pfx', 'cs.seq'],
     'python_requires':
