@@ -426,6 +426,22 @@ class AbstractBinary(ABC, BinaryMixin):
     '''
     raise NotImplementedError("transcribe")
 
+class SimpleBinary(SimpleNamespace, AbstractBinary):
+  ''' Abstract binary class based on a `SimpleNamespace`,
+      thus providing a nice `__str__` and a keyword based `__init__`.
+      Implementors must still define `.parse` and `.transcribe`.
+
+      To constraint the arguments passed to `__init__`,
+      define an `__init__` which accepts specific keyword arguments
+      and pass through to `super().__init__()`. Example:
+
+          def __init__(self, *, field1=None, field2):
+              """ Accept only `field1` (optional)
+                  and `field2` (mandatory).
+              """
+              super().__init__(field1=field1, field2=field2)
+  '''
+
 class BinarySingleValue(AbstractBinary):
   ''' A representation of a single value as the attribute `.value`.
 
