@@ -565,7 +565,7 @@ class BinaryListValues(AbstractBinary):
         * `min_count`: the least acceptable number of values.
         * `max_count`: the most acceptable number of values.
         * `pt`: a parse/transcribe specification
-          as implemented by the `pt_spec()` function.
+          as accepted by the `pt_spec()` factory.
           The values will be returned by its parse function.
     '''
     if end_offset is not None:
@@ -1123,16 +1123,11 @@ class BaseBinaryMultiValue(SimpleBinary):
         Parameters:
         * `field_name`: the name of the field to add
         * `bfr`: a `CornuCopyBuffer` from which to parse
-        * `pt`: an optional parse/transcribe specification as for `pt_spec()`
+        * `pt`: a field class specification suitable for `pt_spec(pt)`
 
-        If `pt` is omitted or `None`,
-        the parser is obtained from `self.FIELD_PARSERS[field_name]`,
-        which is defined from the `field_map` supplied at class creation.
-        Otherwise, `parse` is obtained from the class returned by `pt_spec(pt)`.
+        The field value is the obtained from `pt_spec(pt).parse(bfr)`.
 
-        The field value is the obtained from `parse(bfr)`.
-
-        Note that if `pt` is some `AbstractBinary` subclass
+        Note that if `pt` is already some `AbstractBinary` subclass
         you can rewrite:
 
             self.parse_field(field_name, bfr, binary_class)
@@ -1142,6 +1137,7 @@ class BaseBinaryMultiValue(SimpleBinary):
             self.field_name = binary_class.parse(bfr)
 
         if that feels more readable.
+
         For many simple fields
         it is reasonable to write:
 
