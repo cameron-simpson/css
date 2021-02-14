@@ -84,7 +84,7 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
     yield hashcode
 
 decode_buffer = HashCodeField.parse_value
-decode = HashCodeField.value_from_bytes
+decode = HashCodeField.parse_value_from_bytes
 
 class HashCode(bytes, Transcriber):
   ''' All hashes are bytes subclasses.
