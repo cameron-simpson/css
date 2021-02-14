@@ -10,11 +10,11 @@ from hashlib import sha1, sha256
 from os.path import splitext
 import sys
 from icontract import require
-from cs.binary import PacketField, BSUInt
+from typeguard import typechecked
+from cs.binary import BSUInt, BinarySingleValue
 from cs.excutils import exc_fold
 from cs.lex import get_identifier, hexify
 from cs.resources import MultiOpenMixin
-from cs.serialise import put_bs
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
@@ -36,6 +36,8 @@ def io_fail(func):
   return exc_fold(exc_types=(MissingHashcodeError,))(func)
 
 class HasDotHashclassMixin:
+  ''' Mixin providing `.hashenum` and `.hashname` properties.
+  '''
 
   @property
   def hashenum(self):
@@ -103,6 +105,8 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     '''
 
     class hashclass(HashCode):
+      ''' `HashCode` subclass.
+      '''
       __slotes__ = ()
       HASHNAME = hashname
       HASHFUNC = hashfunc
@@ -209,7 +213,9 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     try:
       hashclass = HASHCLASS_BY_NAME[hashname.lower()]
     except KeyError:
-      raise ValueError("unknown hashclass name %r" % (hashname,))
+      raise ValueError(
+          "unknown hashclass name %r" % (hashname,)
+      )  # pylint: raise-missing-from
     return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
@@ -247,7 +253,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
         hashname = cls.HASHNAME
       except AttributeError as e:
         raise ValueError("no .hashname extension") from e
-    hashclass = HASHCLASS_BY_NAME[hashname]
+    hashclass = cls.by_index(hashname)
     hashbytes = bytes.fromhex(hexpart)
     return hashclass.from_hashbytes(hashbytes)
 
@@ -333,7 +339,7 @@ class HashCodeUtilsMixin:
   @require(
       lambda self, start_hashcode: start_hashcode is None or
       type(start_hashcode) is self.hashclass
-  )
+  )  # pylint: disable=unidiomatic-typecheck
   def hash_of_hashcodes(
       self, *, start_hashcode=None, reverse=None, after=False, length=None
   ):
@@ -372,7 +378,7 @@ class HashCodeUtilsMixin:
       lambda self, start_hashcode: start_hashcode is None or
       type(start_hashcode) is self.hashclass
   )
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,unidiomatic-typecheck
   def hashcodes_from(self, *, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
 
@@ -434,7 +440,7 @@ class HashCodeUtilsMixin:
   @require(
       lambda self, start_hashcode: start_hashcode is None or
       type(start_hashcode) is self.hashclass
-  )
+  )  # pylint: disable=unidiomatic-typecheck
   def hashcodes(
       self, *, start_hashcode=None, reverse=False, after=False, length=None
   ):
