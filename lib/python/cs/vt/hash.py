@@ -169,7 +169,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
     return HashCodeField.parse_value(bfr)
 
   def transcribe_b(self):
-    ''' Binary transcription of this hash via `cs.binary.PacketField.transcribe_value`.
+    ''' Binary transcription of this hash.
     '''
     return HashCodeField.transcribe_value(self)
 
@@ -183,7 +183,7 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
-    ''' Factory function returning a HashCode object from the hash bytes.
+    ''' Factory function returning a `HashCode` object from the hash bytes.
     '''
     if len(hashbytes) != cls.HASHLEN:
       # pylint: disable=bad-string-format-type
