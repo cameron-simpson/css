@@ -296,7 +296,7 @@ class StreamStore(BasicStoreSync):
     try:
       flags, payload = self.do(LengthRequest())
     except StoreError as e:
-      error("h=%s: %s", h, e)
+      error("connection: %s", e)
       return None
     assert flags == 0
     length, offset = BSUInt.parse_value_from_bytes(payload)
