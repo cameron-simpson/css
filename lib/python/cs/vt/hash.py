@@ -35,9 +35,6 @@ def io_fail(func):
   '''
   return exc_fold(exc_types=(MissingHashcodeError,))(func)
 
-# enums for hash types, used in encode/decode
-HASH_SHA1_T = 0
-HASH_SHA256_T = 1
 class HasDotHashclassMixin:
 
   @property
@@ -283,32 +280,18 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
 
 register_transcriber(HashCode)
 
-class Hash_SHA1(HashCode):
-  ''' A hash class for SHA1.
-  '''
-  __slots__ = ()
-  HASHFUNC = sha1
-  HASHNAME = 'sha1'
-  HASHLEN = 20
-  HASHENUM = HASH_SHA1_T
-  HASHENUM_BS = put_bs(HASHENUM)
-  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
-
-class Hash_SHA256(HashCode):
-  ''' A hash class for SHA256.
-  '''
-  __slots__ = ()
-  HASHFUNC = sha256
-  HASHNAME = 'sha256'
-  HASHLEN = 32
-  HASHENUM = HASH_SHA256_T
-  HASHENUM_BS = put_bs(HASHENUM)
-  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
 # legacy names, to be removed (TODO)
 HASHCLASS_BY_NAME = HashCode.by_name
 HASHCLASS_BY_ENUM = HashCode.by_enum
 
+# enums for hash types; TODO: remove and use names throughout
+HASH_SHA1_T = 0
+HASH_SHA256_T = 1
 
+Hash_SHA1 = HashCode.new_class('sha1', HASH_SHA1_T, hashfunc=sha1, hashlen=20)
+Hash_SHA256 = HashCode.new_class(
+    'sha256', HASH_SHA256_T, hashfunc=sha256, hashlen=32
+)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
