@@ -372,6 +372,7 @@ class StreamStore(BasicStoreSync):
     '''
     return missing_hashcodes_by_checksum(self, other, **kw)
 
+  @typechecked
   @require(
       lambda self, start_hashcode: (
           start_hashcode is None or self.hashclass is None or
@@ -379,7 +380,11 @@ class StreamStore(BasicStoreSync):
       )
   )
   def hashcodes(
-      self, start_hashcode=None, reverse=False, after=False, length=None
+      self,
+      start_hashcode=None,
+      reverse: bool = False,
+      after: bool = False,
+      length: Optional[int] = None
   ):
     hashclass = self.hashclass
     if length is not None and length < 1:
