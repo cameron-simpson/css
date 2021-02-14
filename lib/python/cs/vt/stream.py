@@ -426,8 +426,8 @@ class StreamStore(BasicStoreSync):
     return hashary
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, self.hashclass)
   )
   def hash_of_hashcodes(
       self, start_hashcode=None, reverse=False, after=False, length=None
@@ -465,8 +465,8 @@ class StreamStore(BasicStoreSync):
     return hashcode, h_final
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, self.hashclass)
   )
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Unbounded sequence of hashcodes
