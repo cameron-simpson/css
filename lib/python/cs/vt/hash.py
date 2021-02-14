@@ -86,7 +86,7 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
 decode_buffer = HashCodeField.parse_value
 decode = HashCodeField.parse_value_from_bytes
 
-class HashCode(bytes, Transcriber):
+class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   ''' All hashes are bytes subclasses.
   '''
 
@@ -105,6 +105,12 @@ class HashCode(bytes, Transcriber):
 
   def __repr__(self):
     return ':'.join((self.HASHNAME, hexify(self)))
+
+  @property
+  def hashclass(self):
+    ''' The hash class is our own type.
+    '''
+    return type(self)
 
   @property
   def bare_etag(self):
