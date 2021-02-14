@@ -314,8 +314,9 @@ class BinaryMixin:
     '''
     offset = bfr.offset
     while not bfr.at_eof():
+      instance = cls.parse(bfr)
       post_offset = bfr.offset
-      yield offset, cls.parse(bfr), post_offset
+      yield offset, instance, post_offset
       offset = post_offset
 
   @classmethod
