@@ -410,11 +410,19 @@ class StreamStore(BasicStoreSync):
     )
     if flags:
       raise StoreError("unexpected flags: 0x%02x" % (flags,))
-    offset = 0
-    hashary = []
-    while offset < len(payload):
-      hashcode, offset = hash_decode(payload, offset)
-      hashary.append(hashcode)
+    bfr = CornuCopyBuffer([payload])
+    hashary = list(HashCodeField.scan_values(bfr))
+    # verify hashcode types
+    mismatches = set(
+        type(hashcode).__name__
+        for hashcode in hashary
+        if not isinstance(hashcode, hashclass)
+    )
+    if mismatches:
+      raise StoreError(
+          "expected hashcodes of type %s, got %d mismatches of of type %s" %
+          (hashclass.__name__, len(mismatches), sorted(mismatches))
+      )
     return hashary
 
   @require(
