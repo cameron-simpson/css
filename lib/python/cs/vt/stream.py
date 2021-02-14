@@ -613,22 +613,15 @@ class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
     # return the serialised hashcode of the added data
     return local_store.add(self.data.value).encode()
 
-class GetRequest(VTPacket):
+class GetRequest(UnFlaggedPayloadMixin, HashCodeField):
   ''' A get(hashcode) request, returning the associated bytes.
   '''
 
   RQTYPE = RqType.GET
 
-  @staticmethod
-  def parse_value(bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return hash_from_buffer(bfr)
-
-  def transcribe(self):
-    ''' Return the serialised hashcode.
-    '''
-    return self.value.encode()
+  @property
+  def hashcode(self):
+    return self.value
 
   def do(self, stream):
     ''' Return data from the local store by hashcode.
@@ -636,7 +629,7 @@ class GetRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    hashcode = self.value
+    hashcode = self.hashcode
     data = local_store.get(hashcode)
     if data is None:
       return 0
