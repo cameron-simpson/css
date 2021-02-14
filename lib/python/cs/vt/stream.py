@@ -843,33 +843,14 @@ class ArchiveListRequest(UnFlaggedPayloadMixin,
     archive = local_store.get_Archive(self.s)
     return b''.join(bytes(entry) for entry in archive)
 
-class ArchiveUpdateRequest(VTPacket):
+class ArchiveUpdateRequest(UnFlaggedPayloadMixin,
+                           BinaryMultiValue('ArchiveUpdateRequest',
+                                            dict(archive_name=BSString,
+                                                 entry=ArchiveEntry))):
   ''' Add an entry to a remote Archive.
   '''
 
   RQTYPE = RqType.ARCHIVE_UPDATE
-
-  def __init__(self, archive_name, entry, flags=0):
-    super().__init__(None)
-    self.flags = flags
-    self.archive_name = archive_name
-    self.entry = entry
-    assert isinstance(entry,
-                      ArchiveEntry), "entry has type %s" % (type(entry),)
-
-  @classmethod
-  def from_buffer(cls, bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    archive_name = BSString.parse_value(bfr)
-    entry = ArchiveEntry.from_buffer(bfr)
-    return cls(archive_name=archive_name, entry=entry, flags=flags)
-
-  def transcribe(self):
-    ''' Return the serialised archive_name and new entry.
-    '''
-    yield BSString.transcribe_value(self.archive_name)
-    yield self.entry.transcribe()
 
   def do(self, stream):
     ''' Return data from the local store by hashcode.
