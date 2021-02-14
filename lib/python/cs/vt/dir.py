@@ -15,9 +15,8 @@ import sys
 from threading import Lock
 import time
 from uuid import UUID, uuid4
-from cs.binary import PacketField, BSUInt, BSString, BSData
+from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -60,8 +59,8 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20  # extended BSData field
 
-class DirentRecord(PacketField):
-  ''' PacketField subclass to parsing and transcribing Dirents in binary form.
+class DirentRecord(BinarySingleValue):
+  ''' `BaseBinaryMultiValue` subclass to parsing and transcribing Dirents in binary form.
 
       The serialisation format is:
 
@@ -78,8 +77,14 @@ class DirentRecord(PacketField):
       to go in the metadata or the optional extended_data.
   '''
 
-  @classmethod
-  def parse_value(cls, bfr):
+  @property
+  def dirent(self):
+    ''' The dirent comes from `.value`.
+    '''
+    return self.value
+
+  @staticmethod
+  def parse_value(bfr):
     ''' Unserialise a serialised Dirent.
     '''
     type_ = BSUInt.parse_value(bfr)
@@ -115,8 +120,7 @@ class DirentRecord(PacketField):
       extended_data = None
     if flags:
       warning(
-          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__,
-          flags
+          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__, flags
       )
     E = _Dirent.from_components(
         type_, name, meta=metatext, uuid=uu, block=block
@@ -125,10 +129,10 @@ class DirentRecord(PacketField):
     E.ingest_extended_data(extended_data)
     return E
 
-  @staticmethod
-  def transcribe_value(E):
+  def transcribe(self):
     ''' Serialise to binary format.
     '''
+    E = self.dirent
     flags = 0
     type_ = E.type
     if E.name:
@@ -270,7 +274,7 @@ class _Dirent(Transcriber):
     ''' Factory to extract a Dirent from binary data at `offset` (default 0).
         Returns the Dirent and the new offset.
     '''
-    return DirentRecord.value_from_bytes(data, offset=offset)
+    return DirentRecord.parse_value_from_bytes(data, offset=offset)
 
   @staticmethod
   def from_buffer(bfr):
