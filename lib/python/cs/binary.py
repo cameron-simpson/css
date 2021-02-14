@@ -325,9 +325,7 @@ class BinaryMixin:
         until end of input,
         yielding instances of `cls`.
     '''
-    return map(
-        lambda offset, obj, post_offset: obj, cls.scan_with_offsets(bfr, **kw)
-    )
+    return map(lambda scan3: scan3[1], cls.scan_with_offsets(bfr, **kw))
 
   @classmethod
   def scan_file(cls, f):
