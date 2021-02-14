@@ -193,14 +193,21 @@ def pt_spec(pt, name=None):
       f_parse_value = pt0
       f_transcribe_value = pt1
 
-  class PTValue(BinarySingleValue):
+  class PTValue(BinarySingleValue):  # pylint: disable=used-before-assignment
+    ''' A `BinarySingleValue` subclass
+        made from `f_parse_value` and `f_transcribe_value`.
+    '''
 
     @staticmethod
     def parse_value(bfr):
+      ''' Parse value form buffer.
+      '''
       return f_parse_value(bfr)
 
     @staticmethod
     def transcribe_value(value):
+      ''' Transcribe the value.
+      '''
       return f_transcribe_value(value)
 
   if name is not None:
