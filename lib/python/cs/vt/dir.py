@@ -996,7 +996,7 @@ class Dir(_Dirent, DirLike):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      for E in DirentRecord.parse_buffer_values(self._block.bufferfrom()):
+      for E in DirentRecord.scan_values(self._block.bufferfrom()):
         E.parent = self
         emap[E.name] = E
       self._entries = emap
