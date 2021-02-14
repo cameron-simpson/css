@@ -299,7 +299,7 @@ class StreamStore(BasicStoreSync):
       error("h=%s: %s", h, e)
       return None
     assert flags == 0
-    length, offset = BSUInt.value_from_bytes(payload)
+    length, offset = BSUInt.parse_value_from_bytes(payload)
     if offset < len(payload):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
