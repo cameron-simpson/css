@@ -309,30 +309,11 @@ class Hash_SHA256(HashCode):
   HASHENUM = HASH_SHA256_T
   HASHENUM_BS = put_bs(HASHENUM)
   HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+# legacy names, to be removed (TODO)
+HASHCLASS_BY_NAME = HashCode.by_name
+HASHCLASS_BY_ENUM = HashCode.by_enum
 
-HASHCLASS_BY_NAME = {}
-HASHCLASS_BY_ENUM = {}
 
-def register_hashclass(klass):
-  ''' Register a hash class for lookup elsewhere.
-  '''
-  hashname = klass.HASHNAME
-  if hashname in HASHCLASS_BY_NAME:
-    raise ValueError(
-        'cannot register hash class %s: hashname %r already registered to %s' %
-        (klass, hashname, HASHCLASS_BY_NAME[hashname])
-    )
-  hashenum = klass.HASHENUM
-  if hashenum in HASHCLASS_BY_ENUM:
-    raise ValueError(
-        'cannot register hash class %s: hashenum %r already registered to %s' %
-        (klass, hashenum, HASHCLASS_BY_NAME[hashenum])
-    )
-  HASHCLASS_BY_NAME[hashname] = klass
-  HASHCLASS_BY_ENUM[hashenum] = klass
-
-register_hashclass(Hash_SHA1)
-register_hashclass(Hash_SHA256)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
