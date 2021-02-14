@@ -38,10 +38,29 @@ def io_fail(func):
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
 HASH_SHA256_T = 1
+class HasDotHashclassMixin:
 
-class HashCodeField(PacketField):
-  ''' A PacketField for parsing and transcibing hashcodes.
+  @property
+  def hashenum(self):
+    ''' The hashclass enum value.
+    '''
+    return self.hashclass.HASHENUM
+
+  @property
+  def hashname(self):
+    ''' The name token for this hashclass.
+    '''
+    return self.hashclass.HASHNAME
+
+class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
+  ''' Binary transcription of hashcodes.
   '''
+
+  @property
+  def hashclass(self):
+    ''' The hash class comes from the hash code.
+    '''
+    return self.value.hashclass
 
   @staticmethod
   def parse_value(bfr):
