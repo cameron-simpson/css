@@ -184,7 +184,10 @@ def pt_spec(pt, name=None):
         # struct format and field names
         return BinaryMultiStruct(
             '_'.join(
-                ("PTStruct", str(next(_pt_spec_seq)), pt1.replace(' ', '_'))
+                (
+                    name or "PTStruct", str(next(_pt_spec_seq)),
+                    pt1.replace(' ', '_')
+                )
             ), pt0, pt1
         )
       f_parse_value = pt0
@@ -199,6 +202,9 @@ def pt_spec(pt, name=None):
     @staticmethod
     def transcribe_value(value):
       return f_transcribe_value(value)
+
+  if name is not None:
+    PTValue.__name__ = name
 
   PTValue.__name__ += '_' + str(next(_pt_spec_seq))
   return PTValue
