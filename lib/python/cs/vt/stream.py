@@ -249,7 +249,7 @@ class StreamStore(BasicStoreSync):
       if conn is None:
         raise StoreError("no connection")
       try:
-        retval = conn.do(rq.RQTYPE, rq.flags, bytes(rq))
+        retval = conn.do(rq.RQTYPE, getattr(rq, 'packet_flags', 0), bytes(rq))
       except ClosedError as e:
         self._conn = None
         raise StoreError("connection closed: %s" % (e,), request=rq) from e
