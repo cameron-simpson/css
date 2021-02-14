@@ -1038,7 +1038,6 @@ class BaseBinaryMultiValue(SimpleBinary):
       for an example implementation.
   '''
 
-  @pfx_method
   def __init__(self, **fields):
     for field_name, field_value in fields.items():
       with Pfx("%s=%r", field_name, field_value):
