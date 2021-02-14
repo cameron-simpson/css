@@ -686,14 +686,13 @@ class LengthRequest(UnFlaggedPayloadMixin, BinaryMultiValue('LengthRequest',
       raise ValueError("no local_store, request rejected")
     return bytes(BSUInt(len(local_store)))
 
-class HashCodesRequest(Packet):
+class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
   ''' A request for remote hashcodes.
   '''
 
   RQTYPE = RqType.HASHCODES
 
-  @require(lambda reverse: isinstance(reverse, bool))
-  @require(lambda after: isinstance(after, bool))
+  @typechecked
   @require(lambda hashclass: issubclass(hashclass, HashCode))
   @require(
       lambda after, start_hashcode: not after or start_hashcode is not None
@@ -701,50 +700,38 @@ class HashCodesRequest(Packet):
   def __init__(
       self,
       *,
-      reverse=False,
-      after=False,
-      hashclass=None,
+      reverse: bool = False,
+      after: bool = False,
+      hashclass,
       start_hashcode=None,
-      length=None,
+      length: Optional[int] = None,
   ):
     if length is None:
       length = 0
     self.reverse = reverse
     self.after = after
     super().__init__(
-        hashname=BSString(hashclass.HASHNAME),
-        start_hashcode=(
-            HashCodeField(start_hashcode)
-            if start_hashcode is not None else EmptyField
-        ),
-        length=BSUInt(length),
-    )
-
-  @property
-  def flags(self):
-    ''' Compute the flags for the request.
-    '''
-    return (
-        (0x01 if self.reverse else 0x00)
-        | (0x02 if self.after else 0x00)
-        | (0x04 if self.start_hashcode is not None else 0x00)
+        hashclass=hashclass,
+        hashname=hashclass.hashname,
+        start_hashcode=start_hashcode,
+        length=length,
     )
 
   @classmethod
-  def from_buffer(cls, bfr, flags=0):
+  def parse(cls, bfr, *, parse_flags):
     ''' Parse a HashCodesRequest from a buffer and construct.
     '''
-    reverse = (flags & 0x01) != 0
-    after = (flags & 0x02) != 0
-    has_start_hashcode = (flags & 0x04) != 0
-    extra_flags = flags & ~0x07
+    reverse = (parse_flags & 0x01) != 0
+    after = (parse_flags & 0x02) != 0
+    has_start_hashcode = (parse_flags & 0x04) != 0
+    extra_flags = parse_flags & ~0x07
     if extra_flags:
       raise ValueError("extra flags: 0x%02x" % (extra_flags,))
     hashname = BSString.parse_value(bfr)
-    hashclass = HASHCLASS_BY_NAME[hashname]
+    hashclass = HashCode.by_index(hashname)
     if has_start_hashcode:
       start_hashcode = HashCodeField.parse_value(bfr)
-      if type(start_hashcode) is not hashclass:
+      if type(start_hashcode) is not hashclass:  # pylint: disable=unidiomatic-typecheck
         raise ValueError(
             "request hashclass %s does not match start_hashcode class %s" %
             (hashclass, type(start_hashcode))
@@ -759,6 +746,23 @@ class HashCodesRequest(Packet):
         start_hashcode=start_hashcode,
         length=length
     )
+
+  @property
+  def packet_flags(self):
+    ''' Compute the flags for the request packet envelope.
+    '''
+    return (
+        (0x01 if self.reverse else 0x00)
+        | (0x02 if self.after else 0x00)
+        | (0x04 if self.start_hashcode is not None else 0x00)
+    )
+
+  def transcribe(self):
+    yield BSString.transcribe_value(self.hashclass.HASHNAME)
+    start_hashcode = self.start_hashcode
+    if start_hashcode is not None:
+      yield HashCodeField.transcribe_value(start_hashcode)
+    yield BSUInt.transcribe_value(self.length)
 
   def do(self, stream):
     ''' Return serialised hashcodes from the local store.
