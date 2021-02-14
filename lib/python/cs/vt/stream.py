@@ -670,24 +670,12 @@ class FlushRequest(UnFlaggedPayloadMixin, BinaryMultiValue('FlushRequest',
       raise ValueError("no local_store, request rejected")
     local_store.flush()
 
-class LengthRequest(VTPacket):
+class LengthRequest(UnFlaggedPayloadMixin, BinaryMultiValue('LengthRequest',
+                                                            {})):
   ''' Request the length (number of indexed Blocks) of the remote Store.
   '''
 
   RQTYPE = RqType.LENGTH
-
-  @require(lambda value: value is None)
-  def __init__(self, value=None):
-    super().__init__(None)
-
-  @staticmethod
-  def parse_value(bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return None
-
-  def transcribe(self):
-    pass
 
   @staticmethod
   def do(stream):
