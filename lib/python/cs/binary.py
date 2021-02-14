@@ -468,6 +468,12 @@ class BinarySingleValue(AbstractBinary):
     return self.value == other.value
 
   @classmethod
+  def scan_values(cls, bfr, **kw):
+    ''' Scan `bfr`, yield values.
+    '''
+    return map(lambda instance: instance.value, cls.scan(bfr, **kw))
+
+  @classmethod
   def parse(cls, bfr):
     ''' Parse an instance from `bfr`.
 
