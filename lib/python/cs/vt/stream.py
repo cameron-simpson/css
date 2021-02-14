@@ -559,18 +559,33 @@ class StreamStoreArchive(BaseArchive):
 # classes with each RqType value.
 #
 
-class VTPacket(PacketField):
-  ''' Base packet class for VT stream requests and responses.
+class UnFlaggedPayloadMixin:
+  ''' Leading mixin for packets with no parse flags
+      from the `PacketStream` encapsualtion.
 
-      The real stream packet has the `VTPacket.flags` value folded
-      into its flags.
+      This provides `parse(bfr,parse_flags)`
+      and `parse_bytes(bs,parse_flags)`
+      which ensure that `parse_flags==0`
+      and then call the superclass method without flags.
   '''
 
-  def __init__(self, value):
-    super().__init__(value)
-    self.flags = 0
+  @classmethod
+  def parse(cls, bfr, *, parse_flags=0):
+    ''' Check that `parse_flags==0`
+        and then call the superclass `parse` without flags.
+    '''
+    assert parse_flags == 0
+    return super().parse(bfr)
 
 class AddRequest(VTPacket):
+  @classmethod
+  def parse_bytes(cls, payload, *, parse_flags):
+    ''' Check that `parse_flags==0`
+        and then call the superclass `parse_bytes` without flags.
+    '''
+    assert parse_flags == 0
+    return super().parse_bytes(payload)
+
   ''' An add(bytes) request, returning the hashcode for the stored data.
   '''
 
