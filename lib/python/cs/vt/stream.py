@@ -310,7 +310,8 @@ class StreamStore(BasicStoreSync):
     if self.mode_addif:
       if self.contains(h):
         return h
-    flags, payload = self.do(AddRequest(data, self.hashclass))
+    rq = AddRequest(data=data, hashenum=self.hashclass.HASHENUM)
+    flags, payload = self.do(rq)
     h2, offset = hash_decode(payload)
     if offset != len(payload):
       raise StoreError(
@@ -345,7 +346,8 @@ class StreamStore(BasicStoreSync):
   def contains(self, h):
     ''' Dispatch a contains request, return a `Result` for collection.
     '''
-    flags, payload = self.do(ContainsRequest(h))
+    rq = ContainsRequest(h)
+    flags, payload = self.do(rq)
     found = flags & 0x01
     if found:
       flags &= ~0x01
