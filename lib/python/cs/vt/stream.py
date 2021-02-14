@@ -635,22 +635,15 @@ class GetRequest(UnFlaggedPayloadMixin, HashCodeField):
       return 0
     return 1, data
 
-class ContainsRequest(VTPacket):
+class ContainsRequest(UnFlaggedPayloadMixin, HashCodeField):
   ''' A request to test for the presence of a hashcode.
   '''
 
   RQTYPE = RqType.CONTAINS
 
-  @staticmethod
-  def parse_value(bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return hash_from_buffer(bfr)
-
-  def transcribe(self):
-    ''' Return the serialised hashcode.
-    '''
-    return self.value.encode()
+  @property
+  def hashcode(self):
+    return self.value
 
   def do(self, stream):
     ''' Test for hashcode, return `1` for present, `0` otherwise.
@@ -658,7 +651,7 @@ class ContainsRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    hashcode = self.value
+    hashcode = self.hashcode
     return 1 if hashcode in local_store else 0
 
 class FlushRequest(VTPacket):
