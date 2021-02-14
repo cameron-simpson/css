@@ -92,11 +92,6 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
 
   __slots__ = ()
 
-  # to be defined by subclasses
-  HASHNAME = None
-  HASHENUM = None
-  HASHLEN = None
-  HASHFUNC = None
   by_name = {}
   by_enum = {}
 
