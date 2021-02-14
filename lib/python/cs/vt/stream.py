@@ -806,22 +806,13 @@ class HashOfHashCodesRequest(HashCodesRequest):
       payload += final_hashcode.encode()
     return payload
 
-class ArchiveLastRequest(VTPacket):
+class ArchiveLastRequest(UnFlaggedPayloadMixin,
+                         BinaryMultiValue('ArchiveLastRequest',
+                                          dict(s=BSString))):
   ''' Return the last entry in a remote Archive.
   '''
 
   RQTYPE = RqType.ARCHIVE_LAST
-
-  @staticmethod
-  def parse_value(bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    return BSString.parse_value(bfr)
-
-  def transcribe(self):
-    ''' Return the serialised hashcode.
-    '''
-    return BSString.transcribe_value(self.value)
 
   def do(self, stream):
     ''' Return data from the local store by hashcode.
@@ -829,7 +820,7 @@ class ArchiveLastRequest(VTPacket):
     local_store = stream._local_store
     if local_store is None:
       raise ValueError("no local_store, request rejected")
-    archive = local_store.get_Archive(self.value)
+    archive = local_store.get_Archive(self.s)
     entry = archive.last
     if entry.dirent is None:
       return 0
