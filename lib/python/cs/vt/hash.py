@@ -97,6 +97,46 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   HASHENUM = None
   HASHLEN = None
   HASHFUNC = None
+  by_name = {}
+  by_enum = {}
+
+  @classmethod
+  @typechecked
+  @require(lambda cls, hashname: hashname not in cls.by_name)
+  @require(lambda cls, hashenum: hashenum not in cls.by_enum)
+  def new_class(
+      cls, hashname: str, hashenum: int, *, hashfunc: callable, hashlen: int
+  ):
+    ''' Factory t create, register and return a new `HashCode` subclass.
+    '''
+
+    class hashclass(HashCode):
+      __slotes__ = ()
+      HASHNAME = hashname
+      HASHFUNC = hashfunc
+      HASHLEN = hashlen
+      HASHENUM = hashenum
+      HASHENUM_BS = bytes(BSUInt(hashenum))
+      HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+
+    hashclass.__name__ = 'Hash_' + hashname.upper()
+    hashclass.__doc__ = f"HashCode(bytes) subclass for the {hashname} hash function."
+    cls.by_name[hashname] = hashclass
+    cls.by_enum[hashenum] = hashclass
+    return hashclass
+
+  @classmethod
+  def by_index(cls, index):
+    ''' Obtain a hash class from its name or enum.
+    '''
+    if isinstance(index, str):
+      return cls.by_name[index]
+    if isinstance(index, int):
+      return cls.by_enum[index]
+    raise TypeError(
+        "%s.by_index: expected str or int, got %s:%r" %
+        (cls.__name__, type(index).__name__, index)
+    )
 
   transcribe_prefix = 'H'
 
