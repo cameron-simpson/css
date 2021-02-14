@@ -273,12 +273,11 @@ class StreamStore(BasicStoreSync):
     with Pfx("decode_request(rq_type=%s, flags=0x%02x, payload=%d bytes)",
              rq_type, flags, len(payload)):
       request_class = RqType(rq_type).request_class
-      payload_bfr = CornuCopyBuffer.from_bytes(payload)
-      rq = request_class.from_buffer(payload_bfr, flags=flags)
-      if payload_bfr.offset < len(payload):
+      rq, offset = request_class.parse_bytes(payload, parse_flags=flags)
+      if offset < len(payload):
         warning(
             "%d unparsed bytes remaining in payload",
-            len(payload) - payload_bfr.offset
+            len(payload) - offset
         )
       return rq
 
