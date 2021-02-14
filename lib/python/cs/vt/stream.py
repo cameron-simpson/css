@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Stream protocol for stores.
 #       - Cameron Simpson <cs@cskk.id.au> 06dec2007
@@ -15,10 +15,17 @@ from functools import lru_cache
 from subprocess import Popen, PIPE
 from threading import Lock
 import time
+from typing import Optional
 from icontract import require
-from cs.binary import PacketField, EmptyField, Packet, BSString, BSUInt, BSData
+from typeguard import typechecked
+from cs.binary import (
+    BinaryMultiValue,
+    BSString,
+    BSUInt,
+    BSData,
+    SimpleBinary,
+)
 from cs.buffer import CornuCopyBuffer
-from cs.excutils import logexc
 from cs.logutils import debug, warning, error
 from cs.packetstream import PacketConnection
 from cs.pfx import Pfx, pfx_method
@@ -30,9 +37,7 @@ from .archive import BaseArchive, ArchiveEntry
 from .dir import _Dirent
 from .hash import (
     decode as hash_decode,
-    decode_buffer as hash_from_buffer,
-    HASHCLASS_BY_NAME,
-    HASHCLASS_BY_ENUM,
+    HasDotHashclassMixin,
     HashCode,
     HashCodeField,
 )
@@ -130,7 +135,6 @@ class StreamStore(BasicStoreSync):
   def init(self):
     ''' Initialise store prior to any use.
     '''
-    pass
 
   @property
   def local_store(self):
@@ -193,7 +197,7 @@ class StreamStore(BasicStoreSync):
           self._conn_attempt_last = now
           try:
             recv, send = self.connect()
-          except Exception as e:
+          except Exception as e:  # pylint: disable=broad-except
             error("connect fails: %s: %s", type(e).__name__, e)
           else:
             self._conn = conn = self._packet_connection(recv, send)
