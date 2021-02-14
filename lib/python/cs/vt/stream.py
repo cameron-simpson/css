@@ -577,7 +577,6 @@ class UnFlaggedPayloadMixin:
     assert parse_flags == 0
     return super().parse(bfr)
 
-class AddRequest(VTPacket):
   @classmethod
   def parse_bytes(cls, payload, *, parse_flags):
     ''' Check that `parse_flags==0`
@@ -586,36 +585,19 @@ class AddRequest(VTPacket):
     assert parse_flags == 0
     return super().parse_bytes(payload)
 
+class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
+                                                         dict(hashenum=BSUInt,
+                                                              data=BSData))):
   ''' An add(bytes) request, returning the hashcode for the stored data.
   '''
 
   RQTYPE = RqType.ADD
 
-  def __init__(self, data, hashclass):
-    super().__init__(None)
-    self.data = data
-    self.hashclass = hashclass
-
-  def __str__(self):
-    return "%s(%s,%d:%r...)" % (
-        type(self).__name__, type(self.hashclass
-                                  ).__name__, len(self.data), self.data[:16]
-    )
-
-  @classmethod
-  def from_buffer(cls, bfr, flags=0):
-    if flags:
-      raise ValueError("flags should be 0x00, received 0x%02x" % (flags,))
-    hashenum = BSUInt.parse_value(bfr)
-    hashclass = HASHCLASS_BY_ENUM[hashenum]
-    data = BSData.parse_value(bfr)
-    return cls(data, hashclass)
-
-  def transcribe(self):
-    ''' Return the payload as is.
+  @property
+  def hashclass(self):
+    ''' The hash class derived from the hashenum.
     '''
-    yield self.hashclass.HASHENUM_BS
-    yield BSData.transcribe_value(self.data)
+    return HashCode.by_index(self.hashenum.value)
 
   def do(self, stream):
     ''' Add data to the local store, return serialised hashcode.
@@ -629,7 +611,7 @@ class AddRequest(VTPacket):
           (self.hashclass, local_store, local_store.hashclass)
       )
     # return the serialised hashcode of the added data
-    return local_store.add(self.data).encode()
+    return local_store.add(self.data.value).encode()
 
 class GetRequest(VTPacket):
   ''' A get(hashcode) request, returning the associated bytes.
