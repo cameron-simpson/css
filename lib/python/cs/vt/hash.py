@@ -57,6 +57,12 @@ class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
   '''
 
   @property
+  def hashcode(self):
+    ''' The value named `.hashcode`.
+    '''
+    return self.value
+
+  @property
   def hashclass(self):
     ''' The hash class comes from the hash code.
     '''
