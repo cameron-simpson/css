@@ -25,7 +25,7 @@ usage="Usage:
     $cmd start                            Scrub, then kick off \"portfwd -A\"."
 
 portfwd_connected(){
-  connected | sed -n 's/^PORTFWD_\(.*\)_CONNECTED/\1/p' | tr '[A-Z_]' '[a-z-]'
+  connected ${1+"$@"} | sed -n 's/^PORTFWD_\(.*\)_CONNECTED/\1/p' | tr '[A-Z_]' '[a-z-]'
 }
 
 portfwd_running(){
@@ -68,11 +68,11 @@ arg1=$1; shift
 case $arg1 in
   -d|disable)
         set-x portfwd -d ${1+"$@"}
-        conns=$( connected ${1+"$@"} )
+        conns=$( portfwd_connected ${1+"$@"} )
         while [ -n "$conns" ]
         do  necho $conns ...
             while sleep 1
-                  nconns=$( connected ${1+"$@"} )
+                  nconns=$( portfwd_connected ${1+"$@"} )
                   [ "x$nconns" = "x$conns" ]
             do  necho .
             done
