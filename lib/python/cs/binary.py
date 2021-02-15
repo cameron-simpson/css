@@ -1035,7 +1035,6 @@ class BSSFloat(BinarySingleValue):
     '''
     return BSString.transcribe_value(str(f))
 
-class BaseBinaryMultiValue(SimpleBinary):
 class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
                                          'name spec cls parse transcribe')):
   ''' A `namedtuple` supporting `BinaryMultiValue` with the following attributes:
@@ -1046,6 +1045,7 @@ class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
       * `transcribe`: a `transcribe(field_value)` function transcribing the field
   '''
 
+class _BinaryMultiValue_Base(SimpleBinary):
   ''' The base class underlying classes constructed by `BinaryMultiValue`.
       This is used for compound objects whose components
       may themselves be `AbstractBinary` instances.
@@ -1054,25 +1054,13 @@ class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
       supplied by this base class rely on the class attributes:
       * `FIELD_ORDER`: a list of field names to parse or transcribe
         by the defaule `parse` and `transcribe` methods
-      * `FIELD_CLASSES`: a mapping of field names to `AbstractBinary` subclasses
+      * `FIELDS`: a mapping of field names to `_BinaryMultiValue_Field` instances
 
       These are _not_ defined on this base class
       and must be defined on the subclass
       in order that subclasses to have their own mappings.
-      See the code for the `BinaryMultiValue` class factory
-      for an example implementation.
+      That is done by the `BinaryMultiValue` class factory.
   '''
-
-  def __init__(self, **fields):
-    for field_name, field_value in fields.items():
-      with Pfx("%s=%r", field_name, field_value):
-        if field_value is None:
-          pass
-        elif not isinstance(field_value, AbstractBinary):
-          field_value0 = field_value
-          field_cls = self.FIELD_CLASSES[field_name]
-          field_value = field_cls(value=field_value)
-        setattr(self, field_name, field_value)
 
   def s(self, *, crop_length=64, choose_name=None):
     ''' Common implementation of `__str__` and `__repr__`.
@@ -1143,56 +1131,19 @@ class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
     '''
     self = cls()
     for field_name in cls.FIELD_ORDER:
-      field_cls = cls.FIELD_CLASSES[field_name]
-      self.parse_field(field_name, bfr, field_cls)
+      with Pfx(field_name):
+        self.parse_field(field_name, bfr)
     return self
 
-  def parse_field(self, field_name, bfr, pt):
-    ''' Parse a field named `field_name` from `bfr`
-        using the class derived from `pt`
-        saving the resulting instance to `self` as the attribute `field_name`.
-
-        Parameters:
-        * `field_name`: the name of the field to add
-        * `bfr`: a `CornuCopyBuffer` from which to parse
-        * `pt`: a field class specification suitable for `pt_spec(pt)`
-
-        The field value is the obtained from `pt_spec(pt).parse(bfr)`.
-
-        Note that if `pt` is already some `AbstractBinary` subclass
-        you can rewrite:
-
-            self.parse_field(field_name, bfr, binary_class)
-
-        as:
-
-            self.field_name = binary_class.parse(bfr)
-
-        if that feels more readable.
-
-        For many simple fields
-        it is reasonable to write:
-
-            self.field_name = binary_class.parse_value(bfr)
-
-        at the expense of having to use:
-
-            yield binary_class.transcribe_value(self.field_name)
-
-        in the `transcribe` method.
-        This allows you to use the field directly in calculations
-        instead of indirecting through `.value` attribute
-        and also saves some memory.
+  def parse_field(self, field_name, bfr, **kw):
+    ''' Parse `bfr` for the data for `field_name`
+        and set the associated attribute.
     '''
-    with Pfx("%s.parse_field(%r,bfr,%r)", type(self).__name__, field_name, pt):
-      if hasattr(self, field_name):
-        raise ValueError("attribute .%s already defined" % (field_name,))
-      field_cls = pt_spec(pt)
-      value = field_cls.parse(bfr)
-      setattr(self, field_name, value)
+    field = self.FIELDS[field_name]
+    value = field.parse(bfr, **kw)
+    setattr(self, field_name, value)
 
-  # pylint: disable=arguments-differ
-  def transcribe(self, exclude_names=()):
+  def transcribe(self):
     ''' Default transcribe: yield each field's transcription in order
         using the `transcribe_field` method.
 
@@ -1201,54 +1152,18 @@ class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
         See the notes in the default `parse()` method.
     '''
     for field_name in self.FIELD_ORDER:
-      with Pfx("%s.transcribe: %s", type(self).__name__, field_name):
-        field_value = getattr(self, field_name)
-        with Pfx("value=%s", field_value):
-          yield self.transcribe_field(field_name, field_value)
+      with Pfx(field_name):
+        transcription = self.transcribe_field(field_name)
+      # outside Pfx because this is a generator :-(
+      yield transcription
 
-  def transcribe_field(self, field_name, field_value):
-    ''' Transcribe a field named `field_name` with value `field_value`.
-
-        The transcribe function is chosen from the following in order:
-        * `field_value.transcribe` if `field_value` is an instance of `AbstractBinary`
-        * `self.FIELD_CLASSES[field_name]`
-        * `field_value` if `field_value` is `None` or a `bytes`-like object
-        * `field_value.encode('ascii')` if `field_value` is a `str`
-
-        A `ValueError` is raised if no transcription can be chosen.
-
-        An entry in `self.FIELD_CLASSES` may be `None`,
-        in which case that field is not transcribed.
-        This accomodates informational attributes
-        already covered elsewhere in the transcription
-        such as a `.tags` attribute collating metadata tag values
-        parsed during the parse phase.
+  def transcribe_field(self, field_name):
+    ''' Return the transcription of `field_name`.
     '''
-    with Pfx("%s.transcribe_field: %s=%r", type(self).__name__, field_name,
-             field_value):
-      if field_value is None:
-        return None
-      if isinstance(field_value, AbstractBinary):
-        # use the field's own transcribe if present
-        return field_value.transcribe()
-      try:
-        field_cls = self.FIELD_CLASSES[field_name]
-      except KeyError:
-        # pylint: disable=raise-missing-from
-        if (field_value is None or isinstance(field_value,
-                                              (bytes, memoryview))):
-          transcribe = lambda value: value
-        elif isinstance(field_value, str):
-          transcribe = lambda s: s.encode(encoding='ascii')
-        else:
-          raise ValueError(
-              ".%s=<%s>%s has no .transcribe method, no FIELD_CLASSES entry,"
-              " and is neither None nor bytes nor str" %
-              (field_name, type(field_value).__name__, field_value)
-          )
-      else:
-        transcribe = field_cls.transcribe
-      return transcribe(field_value)
+    field = self.FIELDS[field_name]
+    field_value = getattr(self, field_name)
+    with Pfx("transcribe %s", field_value):
+      return field.transcribe(field_value)
 
 def BinaryMultiValue(class_name, field_map, field_order=None):
   ''' Construct a `SimpleBinary` subclass named `class_name`
@@ -1272,8 +1187,12 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       accordingly.
 
       The `field_map` is a mapping of field name
-      to a specification accepted by the `pt_spec()` function.
-      Each specification may be one of:
+      to a class returned by the `pt_spec()` function.
+
+      If the class has both `parse_value` and `transcribe_value` methods
+      then the valueitself will be directly stored.
+      Otherwise the class it presumed to be more complex some `AbstractBinary` subclass
+      and the instance is stored.
 
       Here is an example exhibiting various ways of defining each field:
       * `n1`: defined with the *`_value` methods of `UInt8`,
@@ -1305,29 +1224,25 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           ...         'data2': BSData,
           ... })):
           ...     pass
+          >>> BMV.FIELD_ORDER
+          ['n1', 'n2', 'n3', 'nd', 'data1', 'data2']
           >>> bmv = BMV.from_bytes(b'\\x11\\x22\\x77\\x81\\x82zyxw\\x02AB\\x04DEFG')
           >>> bmv.n1  #doctest: +ELLIPSIS
-          PTValue_...(17)
+          17
           >>> bmv.n2
-          UInt8(value=34)
+          34
           >>> bmv  #doctest: +ELLIPSIS
-          BMV(n1=PTValue_...(17), n2=UInt8(value=34), n3=UInt8(value=119), nd=PTStruct_..._short_bs(short=33154, bs=b'zyxw'), data1=PTValue_...(b'AB'), data2=BSData(b'DEFG'))
-          >>> bmv.n2.value
-          34
-          >>> int(bmv.n2)
-          34
-          >>> bmv.n3
-          UInt8(value=119)
+          BMV(n1=17, n2=34, n3=119, nd=nd_1_short_bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
           >>> bmv.nd  #doctest: +ELLIPSIS
-          PTStruct_..._short_bs(short=33154, bs=b'zyxw')
+          nd_1_short_bs(short=33154, bs=b'zyxw')
           >>> bmv.nd.bs
           b'zyxw'
           >>> bytes(bmv.nd)
           b'\x81\x82zyxw'
           >>> bmv.data1  #doctest: +ELLIPSIS
-          PTValue_...(b'AB')
+          b'AB'
           >>> bmv.data2
-          BSData(b'DEFG')
+          b'DEFG'
           >>> bytes(bmv)
           b'\\x11"w\\x81\\x82zyxw\\x02AB\\x04DEFG'
           >>> list(bmv.transcribe_flat())
@@ -1347,16 +1262,33 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           field_order.split() if isinstance(field_order, str) else field_order
       )
 
-    class bmv_class(BaseBinaryMultiValue):
-      ''' `BaseBinaryMultiValue` subclass implementation.
+    class bmv_class(_BinaryMultiValue_Base):
+      ''' `_BinaryMultiValue_Base` subclass implementation.
       '''
 
       # collate the parse-transcribe functions for each predefined field
       FIELD_ORDER = list(field_order)
-      FIELD_CLASSES = {
-          field_name: pt_spec(field_map[field_name], name=field_name)
-          for field_name in FIELD_ORDER
-      }
+      FIELDS = {}
+
+    # set up the field mappings outside the class
+    # to prevent the work variables leaking into the class attributes
+    for field_name in bmv_class.FIELD_ORDER:
+      spec = field_map[field_name]
+      cls = pt_spec(spec, name=field_name)
+      try:
+        parse = cls.parse_value
+        transcribe = cls.transcribe_value
+      except AttributeError:
+        parse = cls.parse
+        transcribe = cls.transcribe
+      field = _BinaryMultiValue_Field(
+          name=field_name,
+          spec=spec,
+          cls=cls,
+          parse=parse,
+          transcribe=transcribe,
+      )
+      bmv_class.FIELDS[field_name] = field
 
     bmv_class.__name__ = class_name
     bmv_class.__doc__ = (
