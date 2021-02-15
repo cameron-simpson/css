@@ -357,12 +357,16 @@ class BinaryHashCodeIndex(Mapping, HashCodeUtilsMixin, MultiOpenMixin):
   def startup(self):
     ''' Open the binary index.
     '''
-    self.binary_index.open()
+    open_method = getattr(self.binary_index, 'open', None)
+    if open_method:
+      open_method()
 
   def shutdown(self):
     ''' Close the binary index.
     '''
-    self.binary_index.close()
+    close_method = getattr(self.binary_index, 'close', None)
+    if close_method:
+      close_method()
 
   def __len__(self):
     return len(self.binary_index)
