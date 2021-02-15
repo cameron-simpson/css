@@ -13,7 +13,7 @@ import os
 import sys
 from time import sleep
 from threading import Lock
-from cs.binary import BaseBinaryMultiValue, BSUInt, BSData
+from cs.binary import SimpleBinary, BSUInt, BSData
 from cs.buffer import CornuCopyBuffer
 from cs.excutils import logexc
 from cs.later import Later
@@ -64,22 +64,9 @@ DISTINFO = {
 # default pause before flush to allow for additional packet data to arrive
 DEFAULT_PACKET_GRACE = 0.01
 
-class Packet(BaseBinaryMultiValue):
+class Packet(SimpleBinary):
   ''' A protocol packet.
   '''
-
-  def __init__(self, is_request, channel, tag, flags, rq_type, payload):
-    assert isinstance(is_request, bool)
-    assert isinstance(channel, int)
-    assert isinstance(tag, int)
-    assert isinstance(flags, int)
-    assert isinstance(rq_type, int) if is_request else rq_type is None
-    self.is_request = is_request
-    self.channel = channel
-    self.tag = tag
-    self.flags = flags
-    self.rq_type = rq_type
-    self.payload = payload
 
   def __str__(self):
     payload = self.payload
@@ -107,22 +94,23 @@ class Packet(BaseBinaryMultiValue):
     ''' Parse a packet from a buffer.
     '''
     raw_payload = BSData.parse_value(bfr)
-    pkt_bfr = CornuCopyBuffer([raw_payload])
-    tag = BSUInt.parse_value(pkt_bfr)
-    flags = BSUInt.parse_value(pkt_bfr)
+    payload_bfr = CornuCopyBuffer([raw_payload])
+    self = cls()
+    # pylint: disable=attribute-defined-outside-init
+    self.tag = BSUInt.parse_value(payload_bfr)
+    flags = BSUInt.parse_value(payload_bfr)
     has_channel = (flags & 0x01) != 0
-    is_request = (flags & 0x02) != 0
+    self.is_request = (flags & 0x02) != 0
     flags >>= 2
+    self.flags = flags
     if has_channel:
-      channel = BSUInt.parse_value(pkt_bfr)
+      self.channel = BSUInt.parse_value(payload_bfr)
     else:
-      channel = 0
-    if is_request:
-      rq_type = BSUInt.parse_value(pkt_bfr)
-    else:
-      rq_type = None
-    payload = b''.join(pkt_bfr)
-    return cls(is_request, channel, tag, flags, rq_type, payload)
+      self.channel = 0
+    if self.is_request:
+      self.rq_type = BSUInt.parse_value(payload_bfr)
+    self.payload = b''.join(payload_bfr)
+    return self
 
   def transcribe(self):
     ''' Transcribe this packet.
@@ -141,6 +129,7 @@ class Packet(BaseBinaryMultiValue):
         self.payload
     ]
     length = sum(len(bs) for bs in bss)
+    # spit out a BSData manually to avoid pointless bytes.join
     yield BSUInt.transcribe_value(length)
     yield bss
 
@@ -357,7 +346,15 @@ class PacketConnection(object):
     error("rejecting request: " + str(payload))
     if isinstance(payload, str):
       payload = payload.encode('utf-8')
-    self._queue_packet(Packet(False, channel, tag, 0, None, payload))
+    self._queue_packet(
+        Packet(
+            is_request=False,
+            channel=channel,
+            tag=tag,
+            flags=0,
+            payload=payload
+        )
+    )
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
@@ -368,7 +365,15 @@ class PacketConnection(object):
     assert isinstance(flags, int)
     assert isinstance(payload, bytes)
     flags = (flags << 1) | 1
-    self._queue_packet(Packet(False, channel, tag, flags, None, payload))
+    self._queue_packet(
+        Packet(
+            is_request=False,
+            channel=channel,
+            tag=tag,
+            flags=flags,
+            payload=payload
+        )
+    )
 
   @not_closed
   def request(
@@ -403,7 +408,16 @@ class PacketConnection(object):
     tag = self._new_tag()
     R = Result()
     self._pending_add(channel, tag, Request_State(decode_response, R))
-    self._queue_packet(Packet(True, channel, tag, flags, rq_type, payload))
+    self._queue_packet(
+        Packet(
+            is_request=True,
+            channel=channel,
+            tag=tag,
+            flags=flags,
+            rq_type=rq_type,
+            payload=payload
+        )
+    )
     return R
 
   @not_closed
