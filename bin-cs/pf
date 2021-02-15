@@ -67,8 +67,8 @@ connected(){
 arg1=$1; shift
 case $arg1 in
   -d|disable)
-        conns=$( connected ${1+"$@"} )
         set-x portfwd -d ${1+"$@"}
+        conns=$( connected ${1+"$@"} )
         while [ -n "$conns" ]
         do  necho $conns ...
             while sleep 1
