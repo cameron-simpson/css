@@ -599,7 +599,7 @@ class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
   def hashclass(self):
     ''' The hash class derived from the hashenum.
     '''
-    return HashCode.by_index(self.hashenum.value)
+    return HashCode.by_index(self.hashenum)
 
   def do(self, stream):
     ''' Add data to the local store, return serialised hashcode.
@@ -613,7 +613,7 @@ class AddRequest(UnFlaggedPayloadMixin, BinaryMultiValue('AddRequest',
           (self.hashclass, local_store, local_store.hashclass)
       )
     # return the serialised hashcode of the added data
-    return local_store.add(self.data.value).encode()
+    return local_store.add(self.data).encode()
 
 class GetRequest(UnFlaggedPayloadMixin, HashCodeField):
   ''' A get(hashcode) request, returning the associated bytes.
