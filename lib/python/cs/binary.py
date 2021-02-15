@@ -66,7 +66,6 @@
     such as `UInt32BE` (an unsigned 32 bit big endian integer).
 '''
 
-from __future__ import print_function
 from abc import ABC, abstractmethod, abstractclassmethod
 from collections import namedtuple
 from struct import Struct
@@ -165,12 +164,14 @@ def pt_spec(pt, name=None):
 
       Otherwise presume `pt` is a 2-tuple of `(f_parse_value,f_transcribe_value)`.
   '''
+  # AbstractBinary subclasses are returned directly
   try:
     is_binary_class = issubclass(pt, AbstractBinary)
   except TypeError:
     is_binary_class = False
   if is_binary_class:
     return pt
+  # other specifications construct a class
   try:
     f_parse_value = pt.parse_value
     f_transcribe_value = pt.transcribe_value
@@ -898,12 +899,13 @@ class BSUInt(BinarySingleValue):
     return n
 
   @staticmethod
+  # pylint: disable=arguments-differ
   def parse_bytes(data, offset=0):
     ''' Read an extensible byte serialised unsigned int from `data` at `offset`.
         Return value and new offset.
 
         Continuation octets have their high bit set.
-        The value is big-endian.
+        The octets are big-endian.
 
         If you just have a `bytes` instance, this is the go. If you're
         reading from a stream you're better off with `cs.binary.BSUInt`.
@@ -1036,7 +1038,7 @@ class BSSFloat(BinarySingleValue):
 class BaseBinaryMultiValue(SimpleBinary):
   ''' The base class underlying classes constructed by `BinaryMultiValue`.
       This is used for compound objects whose components
-      are themselves `AbstractBinary` instances.
+      may themselves be `AbstractBinary` instances.
 
       The `parse`, `parse_field`, `transcribe` and `transcribe_field` methods
       supplied by this base class rely on the class attributes:
@@ -1095,11 +1097,11 @@ class BaseBinaryMultiValue(SimpleBinary):
 
   @classmethod
   def parse(cls, bfr):
-    ''' Default parse: parse each predefined field from the buffer in order.
+    ''' Default parse: parse each predefined field from the buffer in order
+        and set the associated attributes.
 
         Subclasses might override this if they have a flexible structure
         where not all fields necessarily appear.
-
         A `parse(bfr)` method for a flexible structure
         may expect some subfields only in certain circumstances
         and use `parse_field` to parse them as required.
@@ -1111,17 +1113,20 @@ class BaseBinaryMultiValue(SimpleBinary):
               """ Read a leading unsigned 8 bit integer
                   holding a structure version.
                   If the version is 0,
-                  read 7 raw bytes into the `.v0data` field;
+                  read into the `.v0data` field;
                   if the version is 1,
-                  read a `V1DataType` in the `.v1data` field;
+                  read into the `.v1data` field;
                   otherwise raise a `ValueError` for an unsupported version byte.
+
+                  The data formats for `.v0data` and `.v1data`
+                  come from the specification provided to `BinaryMultiValue()`.
               """
               self = cls()
-              self.parse_field('version', bfr, UInt8.parse_value)
-              if version == 0:
-                self.parse_field('v0data', bfr, 7)
+              self.version = UInt8.parse_value(bfr)
+              if self.version == 0:
+                self.parse_field('v0data', bfr)
               elif self.version == 1:
-                self.parse_field('v1data', bfr, V1DataType)
+                self.parse_field('v1data', bfr)
               else:
                 raise ValueError("unsupported version %d" % (self.version,))
               return self
@@ -1250,7 +1255,8 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       will dictate the default `field_order`.
 
       For a fixed record structure
-      the default `.parse` and `.transcribe` methods will suffice.
+      the default `.parse` and `.transcribe` methods will suffice;
+      they parse or transcribe each field in turn.
       Subclasses with variable records should override
       the `.parse` and `.transcribe` methods
       accordingly.
