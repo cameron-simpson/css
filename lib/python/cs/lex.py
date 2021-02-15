@@ -129,9 +129,9 @@ def typed_str(o, use_cls=False, use_repr=False):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
 
       Parameters:
-      * `use_cls`: default `False;
+      * `use_cls`: default `False`;
         if true, use `str(type(o))` instead of `type(o).__name__`
-      * `use_repr`: default `False;
+      * `use_repr`: default `False`;
         if true, use `repr(o)` instead of `str(o)`
 
       I use this a lot when debugging. Example:
