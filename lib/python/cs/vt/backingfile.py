@@ -10,7 +10,10 @@ from threading import RLock
 from zlib import compress, decompress
 from typeguard import typechecked
 from icontract import require
-from cs.binary import PacketField, BSUInt, BSData
+from cs.binary import (
+    AbstractBinary, BinarySingleValue, BinaryMultiValue, SimpleBinary, BSUInt,
+    BSData
+)
 from cs.fileutils import shortpath
 from cs.lex import cropped_repr
 from cs.logutils import warning
