@@ -1036,6 +1036,16 @@ class BSSFloat(BinarySingleValue):
     return BSString.transcribe_value(str(f))
 
 class BaseBinaryMultiValue(SimpleBinary):
+class _BinaryMultiValue_Field(namedtuple('_BinaryMultiValue_Field',
+                                         'name spec cls parse transcribe')):
+  ''' A `namedtuple` supporting `BinaryMultiValue` with the following attributes:
+      * `name`: the field name
+      * `spec`: the original specification passed to `pt_spec()`
+      * `cls`: the class associated with the field
+      * `parse`: a `parse(bfr)` function returning the value for the field
+      * `transcribe`: a `transcribe(field_value)` function transcribing the field
+  '''
+
   ''' The base class underlying classes constructed by `BinaryMultiValue`.
       This is used for compound objects whose components
       may themselves be `AbstractBinary` instances.
