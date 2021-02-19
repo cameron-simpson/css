@@ -1,0 +1,4 @@
+#!/bin/sh
+set -ue
+: ${SSH:=ssh}
+exec "$SSH" -o protocol=1 ${1+"$@"}
