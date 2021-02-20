@@ -73,8 +73,8 @@ import sys
 from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
 from cs.gimmicks import warning
-from cs.lex import cropped, cropped_repr
-from cs.pfx import Pfx
+from cs.lex import cropped, cropped_repr, typed_str as s
+from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
 
 __version__ = '20200229'
@@ -221,6 +221,7 @@ class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
   '''
 
+  @pfx_method
   def self_check(self):
     ''' Internal self check. Returns `True` if passed.
 
@@ -268,45 +269,43 @@ class BinaryMixin:
         and that it is written as a tuple of `(True,types)` because
         it has more than one acceptable type.
     '''
-    ok = True
-    try:
-      fields_spec = self.FIELD_TYPES
-    except AttributeError:
-      warning("no FIELD_TYPES")
-      ok = False
-    else:
-      for field_name, field_spec in fields_spec.items():
-        if isinstance(field_spec, tuple):
-          required, basetype = field_spec
-        else:
-          required, basetype = True, field_spec
-        try:
-          field = getattr(self, field_name)
-        except AttributeError:
-          if required:
+    with Pfx(s(self)):
+      ok = True
+      try:
+        fields_spec = self.FIELD_TYPES
+      except AttributeError:
+        warning("no FIELD_TYPES")
+        ##ok = False
+      else:
+        for field_name, field_spec in fields_spec.items():
+          with Pfx(".%s=%s", field_name, field_spec):
+            if isinstance(field_spec, tuple):
+              required, basetype = field_spec
+            else:
+              required, basetype = True, field_spec
+            try:
+              field = getattr(self, field_name)
+            except AttributeError:
+              if required:
+                warning("missing: __dict__=%r", self.__dict__)
+                ok = False
+            else:
+              if not isinstance(field, basetype):
+                warning(
+                    "should be an instance of %s:%s but is %s", (
+                        'tuple'
+                        if isinstance(basetype, tuple) else basetype.__name__
+                    ), basetype, s(field)
+                )
+                ok = False
+        for field_name in self.__dict__:
+          if field_name not in fields_spec:
             warning(
-                "field %s.%s missing: __dict__=%r",
-                type(self).__name__, field_name, self.__dict__
+                "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
+                type(self).__name__, field_name, sorted(fields_spec.keys())
             )
             ok = False
-        else:
-          if not isinstance(field, basetype):
-            warning(
-                "field %s.%s should be an instance of %s:%s but is %s:%s: %s",
-                type(self).__name__, field_name,
-                'tuple' if isinstance(basetype, tuple) else basetype.__name__,
-                basetype,
-                type(field).__name__, type(field), field
-            )
-            ok = False
-      for field_name in self.__dict__:
-        if field_name not in fields_spec:
-          warning(
-              "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
-              type(self).__name__, field_name, sorted(fields_spec.keys())
-          )
-          ok = False
-    return ok
+      return ok
 
   def __bytes__(self):
     ''' The binary transcription as a single `bytes` object.
