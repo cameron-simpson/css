@@ -11,6 +11,7 @@ from __future__ import absolute_import
 from inspect import isclass
 import sys
 import unittest
+from cs.lex import typed_str as s
 from cs.py.modules import module_attributes
 from . import binary as binary_module
 from .binary import AbstractBinary, PacketField
@@ -39,13 +40,15 @@ class _TestPacketFields(object):
     self_check = getattr(P, 'self_check', None)
     if self_check:
       self.assertTrue(
-          P.self_check(), "self_check fails on %s:%s" % (
-              type(P),
-              P,
+          self_check(), "self_check %s fails on %s" % (
+              self_check,
+              s(P),
           )
       )
     bs2 = bytes(P)
-    self.assertEqual(bs, bs2, "bytes->%s->bytes fails" % (P,))
+    self.assertEqual(
+        bs, bs2, "bytes->%s->bytes fails: src %r != dst %r" % (s(P), bs, bs2)
+    )
 
   def roundtrip_constructor(self, cls, test_case):
     ''' Perform a cls(args) => bytes => instance round trip test.
