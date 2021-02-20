@@ -11,19 +11,19 @@ set -ue
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] filename [command args...]
-	-0	Rewrite the file even if the input is empty.
-        -c      Create the file if missing.
-        -C      Require the file to change; error if the new file is the same.
-	-d	Do a diff of the file changes.
-        -D diffto Do a diff of file changes and email to \"diffto\".
-        --diff-decode shcmd
-                Pipe file contents through 'sh -c shcmd' before diffing.
-        -n      No action. Recite underlying commands.
-        -N      Make a new file if the content is different.
-                This means \"mv tempfile filename\" instead of
-                \"cat tempfile >filename\".
-	-v	Verbose.
-        -x      Trace execution of underlying commands."
+  -0        Rewrite the file even if the input is empty.
+  -c        Create the file if missing.
+  -C        Require the file to change; error if the new file is the same.
+  -d        Do a diff of the file changes.
+  -D diffto Do a diff of file changes and email to \"diffto\".
+  --diff-decode shcmd
+            Pipe file contents through 'sh -c shcmd' before diffing.
+  -n        No action. Recite underlying commands.
+  -N        Make a new file if the content is different.
+            This means \"mv tempfile filename\" instead of
+            \"cat tempfile >filename\".
+  -v        Verbose.
+  -x        Trace execution of underlying commands."
 
 trace=${DEBUG:+set-x}
 rw0=
