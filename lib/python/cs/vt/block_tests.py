@@ -14,11 +14,10 @@ import unittest
 from cs.binary_tests import _TestPacketFields
 from cs.randutils import rand0, randomish_chunks
 from . import block as block_module
-from .block import Block, \
-    IndirectBlock, \
-    RLEBlock, LiteralBlock, SubBlock, \
-    BlockType, \
+from .block import (
+    Block, _Block, IndirectBlock, RLEBlock, LiteralBlock, SubBlock, BlockType,
     BlockRecord
+)
 from .store import MappingStore
 from .transcribe import hexify
 
@@ -43,10 +42,11 @@ class TestAll(unittest.TestCase):
 
   def _verify_block(self, B, **kw):
     with self.subTest(task="_verify_block", block=B, **kw):
+      assert isinstance(B, _Block)
       BR = BlockRecord(B)
-      BRbs = bytes(BR)
-      BR2, offset = BlockRecord.from_bytes(BRbs)
-      self.assertEqual(offset, len(BRbs))
+      BR_bs = bytes(BR)
+      BR2, offset = BlockRecord.parse_bytes(BR_bs)
+      self.assertEqual(offset, len(BR_bs))
       self.assertEqual(BR, BR2)
       self.assertTrue(B.fsck(recurse=True))
 
@@ -187,7 +187,8 @@ class TestAll(unittest.TestCase):
         with self.subTest(type=block_type, size=size):
           B = self._make_random_Block(block_type=block_type)
           Bserial = B.encode()
-          B2, offset = BlockRecord.value_from_bytes(Bserial)
+          BR2, offset = BlockRecord.parse_bytes(Bserial)
+          B2 = BR2.block
           self.assertEqual(
               offset, len(Bserial),
               "decoded %d bytes but len(Bserial)=%d" % (offset, len(Bserial))
