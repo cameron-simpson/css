@@ -799,7 +799,10 @@ class IndirectBlock(_Block):
     blocks = self._subblocks
     if blocks is None:
       blocks = self._subblocks = tuple(
-          BlockRecord.parse_buffer_values(self.superblock.bufferfrom())
+          map(
+              lambda BR: BR.block,
+              BlockRecord.scan(self.superblock.bufferfrom())
+          )
       )
     return blocks
 
