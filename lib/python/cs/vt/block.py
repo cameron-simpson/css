@@ -182,7 +182,7 @@ class _Block(Transcriber, ABC):
   def encode(self):
     ''' Binary transcription of this Block via BlockRecord.
     '''
-    return b''.join(BlockRecord.transcribe_value_flat(self))
+    return bytes(BlockRecord(self))
 
   def __getitem__(self, index):
     ''' Return specified direct data.
