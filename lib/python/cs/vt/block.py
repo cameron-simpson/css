@@ -1,4 +1,6 @@
 #!/usr/bin/python
+#
+# pylint: disable=too-many-lines
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -40,7 +42,7 @@ from functools import lru_cache
 import sys
 from icontract import require
 from cs.binary import (
-    PacketField, BSUInt, BSData, flatten as flatten_transcription
+    BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import untexthexify, get_decimal_value
@@ -85,6 +87,7 @@ class _Block(Transcriber, ABC):
     self.blockmap = None
     self._lock = RLock()
 
+  # pylint: disable=too-many-branches,too-many-locals,too-many-return-statements
   def __eq__(self, oblock):
     ''' Compare this Block with another Block for data equality.
     '''
@@ -425,7 +428,7 @@ class BlockRecord(BinarySingleValue):
     return self.value
 
   @staticmethod
-  # pylint: disable=arguments-differ
+  # pylint: disable=arguments-differ,too-many-branches,too-many-locals
   def parse_value(bfr):
     ''' Decode a Block reference from a buffer.
 
@@ -633,7 +636,7 @@ class HashCodeBlock(_Block):
       R.join()
 
   @prop
-  def span(self):
+  def span(self):  # pylint: disable=method-hidden
     ''' Return the data length, computing it from the data if required.
     '''
     _span = self._span
@@ -692,7 +695,7 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this HashCodeBlock.
     '''
     ok = True
@@ -926,7 +929,7 @@ class RLEBlock(_Block):
     return cls(span, octet), offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this RLEBlock.
     '''
     ok = True
@@ -989,7 +992,7 @@ class LiteralBlock(_Block):
     yield self.data[start:end]
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this LiteralBlock.
     '''
     ok = True
@@ -1080,7 +1083,7 @@ class _SubBlock(_Block):
     return cls(block, suboffset, subspan), offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this SubBlock.
     '''
     ok = True
