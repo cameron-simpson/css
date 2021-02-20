@@ -68,138 +68,6 @@ class BlockType(IntEnum):
   BT_LITERAL = 2  # span raw-data
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
-class BlockRecord(PacketField):
-  ''' PacketField support for binary parsing and transcription of blockrefs.
-  '''
-
-  TEST_CASES = (
-      # zero length hashcode block
-      # note that the hashcode doesn't match that of b''
-      b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
-  )
-
-  @staticmethod
-  # pylint: disable=arguments-differ
-  def parse_value(bfr):
-    ''' Decode a Block reference from a buffer.
-
-        Format is:
-
-            BS(length)
-            BS(flags)
-              0x01 indirect blockref
-              0x02 typed: type follows, otherwise BT_HASHCODE
-              0x04 type flags: per type flags follow type
-            BS(span)
-            [BS(type)]
-            [BS(type_flags)]
-            union {
-              type BT_HASHCODE: hash
-              type BT_RLE: octet-value (repeat span times to get data)
-              type BT_LITERAL: raw-data (span bytes)
-              type BT_SUBBLOCK: suboffset, super block
-            }
-
-        Even though this is all decodable without the leading length
-        we use a leading length so that future encodings do not
-        prevent parsing any following data.
-    '''
-    raw_encoding = BSData.parse_value(bfr)
-    blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
-    flags = BSUInt.parse_value(blockref_bfr)
-    is_indirect = bool(flags & F_BLOCK_INDIRECT)
-    is_typed = bool(flags & F_BLOCK_TYPED)
-    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
-    unknown_flags = flags & ~(
-        F_BLOCK_INDIRECT | F_BLOCK_TYPED | F_BLOCK_TYPE_FLAGS
-    )
-    if unknown_flags:
-      raise ValueError(
-          "unexpected flags value (0x%02x) with unsupported flags=0x%02x" %
-          (flags, unknown_flags)
-      )
-    span = BSUInt.parse_value(blockref_bfr)
-    if is_indirect:
-      # With indirect blocks, the span is of the implied data, not
-      # the referenced block's data. Therefore we build the referenced
-      # block with a span of None and store the span in the indirect
-      # block.
-      ispan = span
-      span = None
-    # block type, default BT_HASHCODE
-    if is_typed:
-      block_type = BlockType(BSUInt.parse_value(blockref_bfr))
-    else:
-      block_type = BlockType.BT_HASHCODE
-    if has_type_flags:
-      type_flags = BSUInt.parse_value(blockref_bfr)
-      if type_flags:
-        warning("nonzero type_flags: 0x%02x", type_flags)
-    else:
-      type_flags = 0x00
-    # instantiate type specific block ref
-    if block_type == BlockType.BT_HASHCODE:
-      hashcode = HashCode.from_buffer(blockref_bfr)
-      B = HashCodeBlock(hashcode=hashcode, span=span)
-    elif block_type == BlockType.BT_RLE:
-      octet = blockref_bfr.take(1)
-      B = RLEBlock(span, octet)
-    elif block_type == BlockType.BT_LITERAL:
-      data = blockref_bfr.take(span)
-      B = LiteralBlock(data)
-    elif block_type == BlockType.BT_SUBBLOCK:
-      suboffset = BSUInt.parse_value(blockref_bfr)
-      superB = BlockRecord.parse_value(blockref_bfr)
-      # wrap inner Block in subspan
-      B = SubBlock(superB, suboffset, span)
-    else:
-      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
-    if is_indirect:
-      B = IndirectBlock(B, span=ispan)
-    if not blockref_bfr.at_eof():
-      warning(
-          "unparsed data (%d bytes) follow Block %s",
-          len(raw_encoding) - blockref_bfr.offset, B
-      )
-    return B
-
-  @staticmethod
-  # pylint: disable=arguments-differ
-  def transcribe_value(B):
-    ''' Transcribe this Block, the inverse of parse_value.
-    '''
-    transcription = []
-    is_indirect = B.indirect
-    span = B.span
-    if is_indirect:
-      # aside from the span, everything else comes from the superblock
-      B = B.superblock
-    block_type = B.type
-    assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
-    block_typed = block_type != BlockType.BT_HASHCODE
-    flags = (
-        (F_BLOCK_INDIRECT if is_indirect else 0)
-        | (F_BLOCK_TYPED if block_typed else 0)
-        | 0  # no F_BLOCK_TYPE_FLAGS
-    )
-    transcription.append(BSUInt.transcribe_value(flags))
-    transcription.append(BSUInt.transcribe_value(span))
-    if block_typed:
-      transcription.append(BSUInt.transcribe_value(block_type))
-    # no block_type_flags
-    if block_type == BlockType.BT_HASHCODE:
-      transcription.append(B.hashcode.transcribe_b())
-    elif block_type == BlockType.BT_RLE:
-      transcription.append(B.octet)
-    elif block_type == BlockType.BT_LITERAL:
-      transcription.append(B.data)
-    elif block_type == BlockType.BT_SUBBLOCK:
-      transcription.append(BSUInt.transcribe_value(B.offset))
-      transcription.append(BlockRecord.transcribe_value(B.superblock))
-    else:
-      raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
-    return BSData(b''.join(flatten_transcription(transcription))).transcribe()
-
 def isBlock(o):
   ''' Test if an object `o` is a subinstance of `_Block`.
   '''
@@ -533,6 +401,151 @@ class _Block(Transcriber, ABC):
             warning("%s: push cancelled", self)
             break
           subB.pushto_queue(Q, runstate=runstate, progress=progress)
+
+class BlockRecord(BinarySingleValue):
+  ''' Support for binary parsing and transcription of blockrefs.
+  '''
+
+  TEST_CASES = (
+      # zero length hashcode block
+      # note that the hashcode doesn't match that of b''
+      b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+  )
+
+  FIELD_TYPES = dict(value=_Block)
+
+  def __init__(self, B):
+    assert isinstance(B, _Block)
+    super().__init__(B)
+
+  @property
+  def block(self):
+    ''' Alias `.value` as `.block`.
+    '''
+    return self.value
+
+  @staticmethod
+  # pylint: disable=arguments-differ
+  def parse_value(bfr):
+    ''' Decode a Block reference from a buffer.
+
+        Format is a `BSData` holding this encoded data:
+
+            BS(flags)
+              0x01 indirect blockref
+              0x02 typed: type follows, otherwise BT_HASHCODE
+              0x04 type flags: per type flags follow type
+            BS(span)
+            [BS(type)]
+            [BS(type_flags)]
+            union {
+              type BT_HASHCODE: hash
+              type BT_RLE: octet-value (repeat span times to get data)
+              type BT_LITERAL: raw-data (span bytes)
+              type BT_SUBBLOCK: suboffset, super block
+            }
+
+        Even though this is all decodable without the leading length
+        we use a leading length so that future encodings do not
+        prevent parsing any following data.
+    '''
+    raw_encoding = BSData.parse_value(bfr)
+    blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
+    flags = BSUInt.parse_value(blockref_bfr)
+    is_indirect = bool(flags & F_BLOCK_INDIRECT)
+    is_typed = bool(flags & F_BLOCK_TYPED)
+    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
+    unknown_flags = flags & ~(
+        F_BLOCK_INDIRECT | F_BLOCK_TYPED | F_BLOCK_TYPE_FLAGS
+    )
+    if unknown_flags:
+      raise ValueError(
+          "unexpected flags value (0x%02x) with unsupported flags=0x%02x" %
+          (flags, unknown_flags)
+      )
+    span = BSUInt.parse_value(blockref_bfr)
+    if is_indirect:
+      # With indirect blocks, the span is of the implied data, not
+      # the referenced block's data. Therefore we build the referenced
+      # block with a span of None and store the span in the indirect
+      # block.
+      ispan = span
+      span = None
+    # block type, default BT_HASHCODE
+    if is_typed:
+      block_type = BlockType(BSUInt.parse_value(blockref_bfr))
+    else:
+      block_type = BlockType.BT_HASHCODE
+    if has_type_flags:
+      type_flags = BSUInt.parse_value(blockref_bfr)
+      if type_flags:
+        warning("nonzero type_flags: 0x%02x", type_flags)
+    else:
+      type_flags = 0x00
+    # instantiate type specific block ref
+    if block_type == BlockType.BT_HASHCODE:
+      hashcode = HashCode.from_buffer(blockref_bfr)
+      B = HashCodeBlock(hashcode=hashcode, span=span)
+    elif block_type == BlockType.BT_RLE:
+      octet = blockref_bfr.take(1)
+      B = RLEBlock(span, octet)
+    elif block_type == BlockType.BT_LITERAL:
+      data = blockref_bfr.take(span)
+      B = LiteralBlock(data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      suboffset = BSUInt.parse_value(blockref_bfr)
+      superB = BlockRecord.parse_value(blockref_bfr)
+      # wrap inner Block in subspan
+      B = SubBlock(superB, suboffset, span)
+    else:
+      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
+    if is_indirect:
+      B = IndirectBlock(B, span=ispan)
+    if not blockref_bfr.at_eof():
+      warning(
+          "unparsed data (%d bytes) follow Block %s",
+          len(raw_encoding) - blockref_bfr.offset, B
+      )
+    assert isinstance(B, _Block)
+    return B
+
+  @staticmethod
+  # pylint: disable=arguments-differ
+  def transcribe_value(B):
+    ''' Transcribe this `Block`, the inverse of parse_value.
+    '''
+    transcription = []
+    is_indirect = B.indirect
+    span = B.span
+    if is_indirect:
+      # aside from the span, everything else comes from the superblock
+      B = B.superblock
+    block_type = B.type
+    assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
+    block_typed = block_type != BlockType.BT_HASHCODE
+    flags = (
+        (F_BLOCK_INDIRECT if is_indirect else 0)
+        | (F_BLOCK_TYPED if block_typed else 0)
+        | 0  # no F_BLOCK_TYPE_FLAGS
+    )
+    transcription.append(BSUInt.transcribe_value(flags))
+    transcription.append(BSUInt.transcribe_value(span))
+    if block_typed:
+      transcription.append(BSUInt.transcribe_value(block_type))
+    # no block_type_flags
+    if block_type == BlockType.BT_HASHCODE:
+      transcription.append(B.hashcode.transcribe_b())
+    elif block_type == BlockType.BT_RLE:
+      transcription.append(B.octet)
+    elif block_type == BlockType.BT_LITERAL:
+      transcription.append(B.data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      transcription.append(BSUInt.transcribe_value(B.offset))
+      transcription.append(BlockRecord.transcribe_value(B.superblock))
+    else:
+      raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
+    block_bs = b''.join(flatten_transcription(transcription))
+    return BSData(block_bs).transcribe()
 
 @lru_cache(maxsize=1024 * 1024, typed=True)
 def get_HashCodeBlock(hashcode):
