@@ -594,7 +594,7 @@ class BoxBody(SimpleBinary, ABC):
     ''' Utility method to parse the remainder of the buffer as a
         sequence of `Box`es.
     '''
-    self.boxes = BinaryListValues.parse(bfr, pt=Box, **kw)
+    self.boxes = list(Box.scan(bfr, **kw))
     for box in self.boxes.values:
       box.parent = self.parent
 
