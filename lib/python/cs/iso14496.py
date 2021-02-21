@@ -2226,19 +2226,21 @@ class METABoxBody(FullBoxBody):
 
   @pfx_method
   def __getattr__(self, attr):
-    ''' Present the ilst attributes if present.
+    ''' Present the `ilst` attributes if present.
     '''
-    if attr == 'boxes':
-      raise AttributeError("NO BOXES")
-    try:
-      return super().__getattr__(attr)
-    except AttributeError as e:
-      ilst = super().__getattr__('ISLT0')
-      if ilst is not None:
+    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
+      if attr == 'boxes':
+        raise AttributeError("NO BOXES")
+      try:
+        return super().__getattr__(attr)
+      except AttributeError as e:
+        ilst = super().__getattr__('ILST0')
+        if ilst is None:
+          raise AttributeError("no ILST") from e
         value = getattr(ilst, attr, None)
-        if value is not None:
-          return value
-      raise
+        if value is None:
+          raise AttributeError("no ILST.%s" % (attr,)) from e
+        return value
 
 add_body_class(METABoxBody)
 
