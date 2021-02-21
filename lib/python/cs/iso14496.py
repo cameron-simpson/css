@@ -309,26 +309,20 @@ def parse_deref_path(path, offset=0):
   '''
   parts = []
   while offset < len(path):
-    try:
-      # .type
-      if path.startswith('.', offset):
-        name, offset2 = get_identifier(path, offset + 1)
-        if name:
-          parts.append(name)
-          offset = offset2
-          continue
-    except ValueError as e:
-      pass
-    try:
-      # [index]
-      if path.startswith('[', offset):
-        n, offset2 = get_decimal_value(path, offset + 1)
-        if path.startswith(']', offset2):
-          parts.append(n)
-          offset = offset2 + 1
-          continue
-    except ValueError as e:
-      pass
+    # .type
+    if path.startswith('.', offset):
+      name, offset2 = get_identifier(path, offset + 1)
+      if name:
+        parts.append(name)
+        offset = offset2
+        continue
+    # [index]
+    if path.startswith('[', offset):
+      n, offset2 = get_decimal_value(path, offset + 1)
+      if path.startswith(']', offset2):
+        parts.append(n)
+        offset = offset2 + 1
+        continue
     break
   return parts, offset
 
