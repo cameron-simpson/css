@@ -365,7 +365,7 @@ Matrix9Long = BinaryMultiStruct(
     'Matrix9Long', '>lllllllll', 'v0 v1 v2 v3 v4 v5 v6 v7 v8'
 )
 
-class UTF8or16Field(BaseBinaryMultiValue):
+class UTF8or16Field(SimpleBinary):
   ''' An ISO14496 UTF8 or UTF16 encoded string.
   '''
 
@@ -517,7 +517,7 @@ class BoxHeader(BinaryMultiValue('BoxHeader', {
     if self.box_type == b'uuid':
       yield self.user_type
 
-class BoxBody(BaseBinaryMultiValue, ABC):
+class BoxBody(SimpleBinary, ABC):
   ''' Abstract basis for all `Box` bodies.
   '''
 
@@ -636,7 +636,7 @@ class BoxBody(BaseBinaryMultiValue, ABC):
         return class_prefix.replace('_', ' ').lower().encode('ascii')
     raise AttributeError("no automatic box type for %s" % (cls,))
 
-class Box(BaseBinaryMultiValue):
+class Box(SimpleBinary):
   ''' Base class for all boxes - ISO14496 section 4.2.
 
       This has the following fields:
