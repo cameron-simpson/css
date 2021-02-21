@@ -576,31 +576,18 @@ class BoxBody(SimpleBinary, ABC):
     yield from ()
 
   @classmethod
-  def parse(cls, bfr, *, box):
-    ''' Create an emtpy `BoxBody` and fill it in via its `parse_fields`
-        method.
+  def parse(cls, bfr):
+    ''' Create a new instance and gather the `Box` body fields from `bfr`.
 
-        Note that this function is expected to be called from
-        `Box.parse` and therefore that `bfr` is expected to
-        be a bounded `CornuCopyBuffer` if the `Box` length is specified.
-        Various `BoxBody` subclasses gather some data "until the end of the
-        `Box`", and we rely on this bound rather than keeping a close eye on
-        some unsupplied "end offset" value.
+        Subclasses implement a `parse_fields` method to parse additional fields.
     '''
     self = cls()
-    self.parent = box
-    self.offset = bfr.offset
     self.parse_fields(bfr)
-    self.post_offset = bfr.offset
-    self.self_check()
     return self
 
   def parse_fields(self, bfr):
-    ''' Gather the Box body fields from `bfr`.
-
-        A generic BoxBody has no additional fields. Subclasses call
-        their superclass' `parse_buffer` and then gather their
-        specific fields.
+    ''' Parse additional fields.
+        This base class consumes nothing.
     '''
 
   def parse_boxes(self, bfr, **kw):
@@ -609,21 +596,6 @@ class BoxBody(SimpleBinary, ABC):
     self.boxes = BinaryListValues.parse(bfr, pt=Box, **kw)
     for box in self.boxes.values:
       box.parent = self.parent
-
-  @abstractmethod
-  def transcribe(self, exclude_names=None):
-    ''' The default transcription of a `BoxBody`
-        uses `BaseBinaryMultiValue.transcribe`
-        excluding the names `parent`, `offset`, and `post_offset`.
-
-        The `exclude_names` parameter may be used by subclasses
-        to override that list.
-        More complex subclasses should outright replace the transcribe function,
-        as a bare `BoxBody` has no transcribable fields.
-    '''
-    if exclude_names is None:
-      exclude_names = 'parent', 'offset', 'post_offset'
-    return BaseBinaryMultiValue.transcribe(self, exclude_names=exclude_names)
 
   @classmethod
   def boxbody_type_from_klass(cls):
@@ -723,7 +695,12 @@ class Box(SimpleBinary):
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
       body_class = pick_boxbody_class(header.type)
-      self.body = body_class.parse(bfr_tail, box=self)
+      body_offset = bfr_tail.offset
+      self.body = body_class.parse(bfr_tail)
+      self.body.self_check()
+      self.body.parent = self
+      self.body.offset = body_offset
+      self.body.post_offset = bfr_tail.offset
       self.unparsed_offset = bfr_tail.offset
       self.unparsed = BinaryByteses.parse(bfr_tail)
       if bfr_tail is not bfr:
