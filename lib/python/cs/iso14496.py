@@ -1104,7 +1104,11 @@ class MDATBoxBody(BoxBody):
       self.data = None
       bfr.skipto(bfr.end_offset)
     else:
-      self.data = BinaryByteses.parse(bfr)
+      self.data = list(bfr)
+
+  def transcribe(self):
+    assert self.data is not None
+    return self.data
 
 add_body_class(MDATBoxBody)
 
