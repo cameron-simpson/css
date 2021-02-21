@@ -636,11 +636,11 @@ class Box(SimpleBinary):
     try:
       body = self.body
     except AttributeError:
-      s = "%s[%d]:NO_BODY" % (type_name, len(self))
+      s = "%s:NO_BODY" % (type_name,)
     else:
       length = len(self)
       s = "%s[%d]:%s" % (type_name, len(self), body)
-    unparsed_bs = self.unparsed_bs
+    unparsed_bs = getattr(self, 'unparsed_bs', None)
     if unparsed_bs and unparsed_bs != b'\0':
       s += ":unparsed=%r" % (unparsed_bs[:16],)
     return s
