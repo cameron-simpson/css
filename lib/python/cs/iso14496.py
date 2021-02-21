@@ -33,7 +33,7 @@ from cs.binary import (
     UInt64BE,
     BinaryUTF8NUL,
     BinaryUTF16NUL,
-    BaseBinaryMultiValue,
+    SimpleBinary,
     BinaryListValues,
     BinaryByteses,
     BinaryMultiStruct,
@@ -591,7 +591,8 @@ class BoxBody(SimpleBinary, ABC):
     '''
 
   def parse_boxes(self, bfr, **kw):
-    ''' Parse the remainder of the buffer as a sequence of Boxes.
+    ''' Utility method to parse the remainder of the buffer as a
+        sequence of `Box`es.
     '''
     self.boxes = BinaryListValues.parse(bfr, pt=Box, **kw)
     for box in self.boxes.values:
@@ -647,7 +648,7 @@ class Box(SimpleBinary):
   __repr__ = __str__
 
   def __getattr__(self, attr):
-    ''' If there is no direct attribute from `BaseBinaryMultiValue.__getattr__`,
+    ''' If there is no direct attribute from `SimpleBinary.__getattr__`,
         have a look in the `.header` and `.body`.
     '''
     if attr in ('header', 'body'):
@@ -1171,7 +1172,7 @@ class FTYPBoxBody(BoxBody):
 
   @property
   def compatible_brands(self):
-    ''' The compatible brands as a list of 4 bytes bytes instances.
+    ''' The compatible brands as a list of 4 byte bytes instances.
     '''
     return [
         self.brands_bs[offset:offset + 4]
