@@ -15,9 +15,12 @@ usage="Usage: $cmd [-u] mount-path
   -u    Unmount the mount-path.
   mount-path
         ssh://host/path
-        Note that the remote path commences _after_ the slash
-        separating the host from the path, so an absolute path will
-        have 2 slashes after the host."
+          Note that the remote path commences _after_ the slash
+          separating the host from the path, so an absolute path will
+          have 2 slashes after the host.
+        /mount/path
+          Infer an ssh://host/path from the real path of /mount/path
+          and mount that."
 
 badopts=
 
@@ -38,6 +41,22 @@ fi
 }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$mount_path" in
+  /*)       mount_real_path=$( cd "$mount_path" && /bin/pwd -P )
+            case "$mount_real_path" in
+              "$MNT_BASE"/*/*)
+                set -- $( echo "$mount_real_path" | sed "s|^$MNT_BASE/\([^/]*\)/\([^/]*\).*|\1 \2|" )
+                new_mount_path=ssh://$1/$2
+                echo "$cmd: $mount_path: translate -> $new_mount_path"
+                mount_path=$new_mount_path
+                ;;
+              *)echo "$cmd: $mount_path: cannot translate $mount_real_path into an ssh://host/path" >&2
+                exit 1
+                ;;
+            esac
+            ;;
+esac
 
 case "$mount_path" in
   *://*)    type=$( expr "x$mount_path" : 'x\([^:/]*\)://[^/]*/.*' )
