@@ -287,7 +287,7 @@ class BinaryMixin:
               field = getattr(self, field_name)
             except AttributeError:
               if required:
-                warning("missing: __dict__=%r", self.__dict__)
+                warning("missing: __dict__=%s", cropped_repr(self.__dict__))
                 ok = False
             else:
               if not isinstance(field, basetype):
