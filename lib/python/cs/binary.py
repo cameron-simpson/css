@@ -318,19 +318,21 @@ class BinaryMixin:
     return sum(map(len, flatten(self.transcribe())))
 
   @classmethod
-  def scan_with_offsets(cls, bfr):
+  def scan_with_offsets(cls, bfr, count=None):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input,
         yielding `(offset,instance,post_offset)` tuples
         where `offset` is the buffer offset where the instance commenced
         and `post_offset` is the buffer offset after the instance.
     '''
+    scanned = 0
     offset = bfr.offset
-    while not bfr.at_eof():
+    while (count is None or scanned < count) and not bfr.at_eof():
       instance = cls.parse(bfr)
       post_offset = bfr.offset
       yield offset, instance, post_offset
       offset = post_offset
+      scanned += 1
 
   @classmethod
   def scan(cls, bfr, **kw):
