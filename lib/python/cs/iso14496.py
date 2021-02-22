@@ -582,13 +582,48 @@ class BoxBody(SimpleBinary, ABC):
         Subclasses implement a `parse_fields` method to parse additional fields.
     '''
     self = cls()
+    self.parsed_field_names = []
     self.parse_fields(bfr)
     return self
 
   def parse_fields(self, bfr):
     ''' Parse additional fields.
-        This base class consumes nothing.
+        This base class implementation consumes nothing.
     '''
+
+  def parse_field(self, field_name, bfr, binary_cls):
+    ''' Parse an instance of `binary_cls` from `bfr`
+        and store it as the attribute named `field_name`.
+
+        `binary_cls` may also be an `int`, in which case that many
+        bytes are read from `bfr`.
+    '''
+    assert field_name not in self.parsed_field_names
+    if isinstance(binary_cls, int):
+      value = bfr.take(binary_cls)
+    else:
+      value = binary_cls.parse(bfr)
+    setattr(self, field_name, value)
+    self.parsed_field_names.append(field_name)
+
+  def transcribe(self):
+    ''' Transcribe the binary structure.
+
+        This default implementation transcribes the fields parsed with the
+        `parse-field` method in the order parsed.
+    '''
+    return self.transcribe_fields()
+
+  def transcribe_fields(self):
+    ''' Transcribe the fields parsed with the `parse-field` method in the
+        order parsed.
+    '''
+    for field_name in self.parsed_field_names:
+      value = getattr(self, field_name)
+      if isinstance(value, bytes):
+        yield value
+      else:
+        yield value.transcribe()
 
   def parse_boxes(self, bfr, **kw):
     ''' Utility method to parse the remainder of the buffer as a
