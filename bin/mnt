@@ -46,7 +46,7 @@ case "$mount_path" in
   /*)       mount_real_path=$( cd "$mount_path" && /bin/pwd -P )
             case "$mount_real_path" in
               "$MNT_BASE"/*/*)
-                set -- $( echo "$mount_real_path" | sed "s|^$MNT_BASE/\([^/]*\)/\([^/]*\).*|\1 \2|" )
+                set -- $( echo "$mount_real_path" | sed "s|^$MNT_BASE/\([^/]*\)/\([^/]*\).*|\1 \2|; s|__|/|g" )
                 new_mount_path=ssh://$1/$2
                 echo "$cmd: $mount_path: translate -> $new_mount_path"
                 mount_path=$new_mount_path
@@ -68,14 +68,13 @@ case "$mount_path" in
             ;;
 esac
 
-pathbase=$( printf '%s\n' "$path" | sed 's|^//*||; s|//$||; s|//*|__|g' )
+pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g' )
 mnt_point=$MNT_BASE/$host/$pathbase
 
 if [ $umount ]
 then
   set -x
   umount "$mnt_point"
-  rmdir "$mnt_path"
 else
   [ -d "$MNT_BASE/$host" ] || set-x mkdir "$MNT_BASE/$host"
   [ -d "$mnt_point" ] || set-x mkdir "$mnt_point"
@@ -90,5 +89,5 @@ else
         exit 1
         ;;
     esac
-  ) || rmdir "$mnt_point"
+  )
 fi
