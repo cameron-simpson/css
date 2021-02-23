@@ -1,3 +1,4 @@
+IndexClasses to be singletons based on their pathname
 replace HASHCLASS_BY_ENUM and HASHCLASS_BY_NAME with HasCode.by_index([int,str])
 replace HASHCLASS_BY_ENUM with HashCode.by_enum
 replace HASHCLASS_BY_NAME with HashCode.by_name
