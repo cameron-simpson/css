@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, join as joinpath, relpath
+from os.path import dirname, isdir, isfile, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
@@ -34,7 +34,7 @@ from cs.logutils import status, warning, error
 from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
-from cs.units import BINARY_BYTES_SCALE, UNSCALED_SCALE
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 DISTINFO = {
@@ -64,7 +64,7 @@ DISTINFO = {
 def main(argv=None):
   ''' Main command line programme.
   '''
-  return MKLinksCmd().run(argv)
+  return MKLinksCmd(argv).run()
 
 class MKLinksCmd(BaseCommand):
   ''' Main programme command line class.
@@ -76,31 +76,29 @@ class MKLinksCmd(BaseCommand):
 
   GETOPT_SPEC = 'n'
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    options.no_action = False
+    self.options.no_action = False
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
     for opt, _ in opts:
       with Pfx(opt):
         if opt == '-n':
-          options.no_action = True
+          self.options.no_action = True
         else:
           raise RuntimeError("unhandled option")
 
-  @staticmethod
-  def main(argv, options):
+  def main(self, argv):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
           -n    No action. Report proposed actions.
     '''
     if not argv:
       raise GetoptError("missing paths")
+    options = self.options
     linker = Linker()
     with options.upd.insert(1) as step:
       # scan the supplied paths

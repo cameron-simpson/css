@@ -1,0 +1,5 @@
+lib/python/cs/pfx.py: Release information for cs.pfx-20201105.
+lib/python/cs/pfx.py: cs.pfx: improve doc example, improve error message text
+lib/python/cs/pfx.py: cs.pfx: Pfx: new print=False option to issue a print() or other call on entry to the with-suite eg with Pfx(....,print=verbose)
+lib/python/cs/pfx.py: cs.pfx: Pfx: print= now also accepts a file-like object
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: workaround empty Pfx stack - issue warning - this is a bug to be located later

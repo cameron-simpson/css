@@ -1,3 +1,8 @@
+BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
+BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
+maybe we want an intermeidate TagSetsWithMapping subclass between this and TagSets proviing .te_maping based methods
+cs.mp3: should it yield various Binary packets or is that overkill?
+cs.mp3: parse tags? pull names etc from cs.id3
 progress/upd: fixed with trailing units, eg %2d
 run-backups: single file: src type desthost[:dstpath?] [options...]
 cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue
@@ -22,12 +27,12 @@ securer findup: sanity check on ownership or perms to stop walk? tunable?
 BaseCommand: can we provide the expected command name instead of the class name in the docstring?
 cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
 cs.upd: ansi_mode to accept coloured message strings - requires an ansi_len function in cs.tty
+cs.upd: some kind of ANSI escape support so that we can mbed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
 cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
 cs.progress: control over status display - units etc
 cs.upd: rate per proxy, bisect to update counter, autotune?
 incd: remote tmux session to be per target dir
 haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
-cs.upd: UpdProxy: make into context manage with null enter and self-delete on exit
 BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
 new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
@@ -49,7 +54,6 @@ signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
 cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
-cs.upd: some kind of ANSI escape support so that we can mbed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
 cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
 mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
 BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
@@ -59,7 +63,6 @@ resolve bin/maildb vs bin-cs/cs-maildb
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
 setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
 cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
-cs.upd: multiline status area
 logutils: use cs.tty stuff for the status() function
 @strable: treat pathlike things like str?
 @locked: do a timedout acquire with backoff to aid deadlock debugging

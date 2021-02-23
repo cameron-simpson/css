@@ -1,0 +1,2 @@
+lib/python/cs/py/doc.py: cs.py.doc: DISTINFO: not Python 2 compatible
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: include properties/descriptors

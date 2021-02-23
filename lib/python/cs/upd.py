@@ -83,7 +83,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20201202-post'
+__version__ = '20210122-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -93,20 +93,16 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20200716', 'cs.tty'],
+    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
 }
 
-instances = []
-
-def cleanupAtExit():
-  ''' Cleanup function called at programme exit to clear the status line.
+def _cleanup():
+  ''' Cleanup function called at programme exit to clear the status lines.
   '''
-  global instances  # pylint: disable=global-statement
-  for i in instances:
-    i.close()
-  instances = ()
+  for U in Upd._singleton_instances():  # pylint: disable=protected-access
+    U.shutdown()
 
-atexit.register(cleanupAtExit)
+atexit.register(_cleanup)
 
 # A couple of convenience functions.
 
@@ -156,8 +152,8 @@ class Upd(SingletonMixin):
   '''
 
   # pylint: disable=unused-argument
-  @classmethod
-  def _singleton_key(cls, backend=None, columns=None, disabled=False):
+  @staticmethod
+  def _singleton_key(backend=None, columns=None, disabled=False):
     if backend is None:
       backend = sys.stderr
     return id(backend)
@@ -185,16 +181,23 @@ class Upd(SingletonMixin):
     self._ti_ready = False
     self._ti_strs = {}
     self._cursor_visible = True
+    self._current_slot = None
+    self._reset()
+    self._lock = RLock()
+
+  def _reset(self):
+    ''' Set up the initial internal empty state.
+        This does *not* do anything with the display.
+    '''
     self._slot_text = []
     self._current_slot = None
     self._above = None
     self._proxies = []
-    self._lock = RLock()
-    global instances  # pylint: disable=global-statement
-    instances.append(self)
 
   def __str__(self):
-    return "%s(backend=%s)" % (type(self).__name__, self._backend)
+    return "%s(backend=%s)" % (
+        type(self).__name__, getattr(self, '_backend', None)
+    )
 
   ############################################################
   # Sequence methods.
@@ -229,13 +232,22 @@ class Upd(SingletonMixin):
         then we preserve the status lines one screen.
         Otherwise we clean up the status lines.
     '''
-    slots = self._slot_text
+    preserve_display = not (
+        exc_type is None or (
+            issubclass(exc_type, SystemExit) and (
+                exc_val.code == 0
+                if isinstance(exc_val.code, int) else exc_val.code is None
+            )
+        )
+    )
+    self.shutdown(preserve_display)
+
+  def shutdown(self, preserve_display=False):
+    ''' Clean out this `Upd`, optionally preserving the displayed status lines.
+    '''
+    slots = getattr(self, '_slot_text', None)
     if slots:
-      if (exc_type is None
-          or (issubclass(exc_type, SystemExit) and
-              (exc_val.code == 0
-               if isinstance(exc_val.code, int) else exc_val.code is None))):
-        # no exception or SystemExit(0) or SystemExit(None)
+      if not preserve_display:
         # remove the Upd display
         with self._lock:
           while len(slots) > 1:
@@ -253,6 +265,7 @@ class Upd(SingletonMixin):
           self._backend.write(''.join(txts))
           self.cursor_visible()
           self._backend.flush()
+    self._reset()
 
   def _set_cursor_visible(self, mode):
     ''' Set the cursor visibility mode, return terminal sequence.
@@ -319,10 +332,15 @@ class Upd(SingletonMixin):
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
         Returns `None` if `index` if out of range.
+        The index `0` is never out of range;
+        it will be autocreated if there are no slots yet.
     '''
     try:
       return self._proxies[index]
     except IndexError:
+      # autocreate slot 0
+      if index == 0:
+        return self.insert(0)
       return None
 
   def _update_proxies(self):
@@ -349,7 +367,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
-    global curses   # pylint: disable=global-statement
+    global curses  # pylint: disable=global-statement
     try:
       return self._ti_strs[ti_name]
     except KeyError:
@@ -435,8 +453,6 @@ class Upd(SingletonMixin):
     if from_slot is None:
       from_slot = self._current_slot
     movetxts = []
-    oldtxt = self._slot_text[to_slot]
-    from_slot = self._current_slot
     if to_slot != from_slot:
       # move cursor to target slot
       if to_slot < from_slot:
@@ -447,6 +463,7 @@ class Upd(SingletonMixin):
         cursor_up = self.ti_str('cuu1')
         movetxts.append(cursor_up * (to_slot - from_slot))
       # adjust horizontal position
+      oldtxt = self._slot_text[to_slot]
       vpos_cur = len(self._slot_text[from_slot])
       vpos_slot = len(oldtxt)
       if vpos_cur > vpos_slot:
@@ -747,46 +764,46 @@ class Upd(SingletonMixin):
       if proxy is None:
         # create the proxy, which inserts it
         return UpdProxy(index, self)
+
       # associate the proxy with self
       assert proxy.upd is None
       proxy.index = index
       proxy.upd = self
+
+      # no display? just insert the slot
       if self._disabled or self._backend is None:
-        # just insert the slot
+        return proxy
+
+      # not disabled: manage the display
+      cursor_up = self.ti_str('cuu1')
+      insert_line = self.ti_str('il1')
+      first_slot = not slots
+      if first_slot:
+        # move to the start of the current cursor line, set _current_slot=0
+        txts.append('\r')
+        txts.extend(self._redraw_line_v(txt))
+        self._current_slot = 0
         slots.insert(index, txt)
         proxies.insert(index, proxy)
+        self._update_proxies()
       else:
-        cursor_up = self.ti_str('cuu1')
-        insert_line = self.ti_str('il1')
-        # adjust the display, insert the slot
-        first_slot = self._current_slot is None
-        if first_slot:
-          txts.append('\v\r')
+        # we're inserting an additional line to a nonempty display
+        if not cursor_up:
+          raise IndexError(
+              "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
+              % (os.environ.get('TERM'),)
+          )
+        # make sure insert line does not push the bottom line off the screen
+        # by forcing a scroll: move to bottom, VT, cursor up
+        if insert_line:
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           self._current_slot = 0
-        else:
-          if not cursor_up:
-            raise IndexError(
-                "TERM=%s: no cuu1 (cursor_up) capability, cannot support multiple status lines"
-                % (os.environ.get('TERM'),)
-            )
-          if insert_line:
-            # make sure insert line does not push the bottom line off the screen
-            # by forcing a scroll
-            if first_slot:
-              cursor_to_ll = self.ti_str('ll')  # move to lower left
-              if cursor_to_ll:
-                txts.append(cursor_to_ll)
-              else:
-                txts.append('\r')
-            else:
-              txts.extend(self._move_to_slot_v(self._current_slot, 0))
-            self._current_slot = 0
-            txts.append('\v')
-            txts.append(cursor_up)
+          txts.append('\v')
+          txts.append(cursor_up)
+          # post: inserting a line will not drive the lowest line off the screen
         if index == 0:
           # move to bottom slot, add line below
-          if not first_slot:
-            txts.extend(self._move_to_slot_v(self._current_slot, 0))
+          txts.extend(self._move_to_slot_v(self._current_slot, 0))
           txts.append('\v\r')
           if insert_line:
             txts.append(insert_line)
@@ -798,24 +815,26 @@ class Upd(SingletonMixin):
           self._update_proxies()
           self._current_slot = 0
         else:
-          # move to the line which is to be below the inserted line
-          if not first_slot:
-            txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
+          # move to the line which is to be below the inserted line,
+          # insert line above that
+          txts.extend(self._move_to_slot_v(self._current_slot, index - 1))
           slots.insert(index, txt)
           proxies.insert(index, proxy)
           self._update_proxies()
           if insert_line:
+            # insert a line with `txt`
             txts.append(insert_line)
             txts.append('\r')
             txts.append(txt)
             self._current_slot = index
           else:
+            # no insert, just redraw from here down completely
             txts.extend(
                 self._redraw_trailing_slots_v(index, skip_first_vt=True)
             )
             self._current_slot = 0
-        self._backend.write(''.join(txts))
-        self._backend.flush()
+      self._backend.write(''.join(txts))
+      self._backend.flush()
     return proxy
 
   def delete(self, index):
@@ -843,6 +862,7 @@ class Upd(SingletonMixin):
         proxy = proxies[index]
         proxy.index = None
         del proxies[index]
+        self._update_proxies()
       else:
         delete_line = self.ti_str('dl1')
         cursor_up = self.ti_str('cuu1')
@@ -995,7 +1015,7 @@ class UpdProxy(object):
           overflow = len(txt) - upd.columns + 1
           if overflow > 0:
             txt = '<' + txt[overflow + 1:]
-          self.upd[index] = txt
+          self.upd[index] = txt  # pylint: disable=unsupported-assignment-operation
 
   @property
   def width(self):
@@ -1013,7 +1033,7 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    with self.upd._lock:
+    with self.upd._lock:  # pylint: disable=protected-access
       index = self.index
       if index is not None:
         self.upd.delete(index)
@@ -1029,7 +1049,27 @@ class UpdProxy(object):
     upd = self.upd
     if not upd:
       raise ValueError("no .upd, cannot create a new proxy")
-    with upd._lock:
+    with upd._lock:  # pylint: disable=protected-access
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
+
+def demo():
+  ''' A tiny demo function for visual checking of the basic functionality.
+  '''
+  from time import sleep  # pylint: disable=import-outside-toplevel
+  U = Upd()
+  p = U.proxy(0)
+  for n in range(20):
+    p(str(n))
+    sleep(0.1)
+  # proxy line above
+  p2 = U.insert(1)
+  p2.prefix = 'above: '
+  for n in range(20):
+    p(str(n))
+    p2(str(n))
+    sleep(0.1)
+
+if __name__ == '__main__':
+  demo()

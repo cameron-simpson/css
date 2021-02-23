@@ -5,6 +5,15 @@
 
 from contextlib import contextmanager
 import threading
+try:
+  from contextlib import nullcontext  # pylint: disable=unused-import
+except ImportError:
+
+  @contextmanager
+  def nullcontext():
+    ''' A simple `nullcontext` for older Pythons
+    '''
+    yield None
 
 __version__ = '20200725.1-post'
 
@@ -264,3 +273,67 @@ def stackkeys(d, **key_values):
     yield old_values
   finally:
     popkeys(d, key_values.keys(), old_values)
+
+def twostep(cmgr):
+  ''' Return a generator which operates the context manager `cmgr`.
+
+      See also the `setup_cmgr(cmgr)` function
+      which is a convenience wrapper for this low level generator.
+
+      The purpose of `twostep()` is to split any context manager's operation
+      across two steps when the set up and teardown phases must operate
+      in different parts of your code.
+      A common situation is the `__enter__` and `__exit__` methods
+      of another context manager class.
+
+      The first iteration performs the "enter" phase and yields.
+      The second iteration performs the "exit" phase and yields.
+
+      Example use in a class:
+
+          class SomeClass:
+              def __init__(self, foo)
+                  self.foo = foo
+                  self._cmgr = None
+              def __enter__(self):
+                  self._cmgr = next(stackattrs(o, setting=foo))
+              def __exit__(self, *_):
+                  next(self._cmgr)
+                  self._cmgr = None
+  '''
+  with cmgr:
+    yield cmgr
+  yield cmgr
+
+def setup_cmgr(cmgr):
+  ''' Run the set up phase of the context manager `cmgr`
+      and return a callable which runs the tear down phase.
+
+      This is a convenience wrapper for the lower level `twostep()` function
+      which produces a two iteration generator from a context manager.
+
+      The purpose of `setup_cmgr()` is to split any context manager's operation
+      across two steps when the set up and teardown phases must operate
+      in different parts of your code.
+      A common situation is the `__enter__` and `__exit__` methods
+      of another context manager class.
+
+      The call to `setup_cmgr()` performs the "enter" phase
+      and returns the tear down callable.
+      Calling that performs the tear down phase.
+
+      Example use in a class:
+
+          class SomeClass:
+              def __init__(self, foo)
+                  self.foo = foo
+                  self._teardown = None
+              def __enter__(self):
+                  self._teardown = setup_cmgr(stackattrs(o, setting=foo))
+              def __exit__(self, *_):
+                  self._teardown()
+                  self._teardown = None
+  '''
+  cmgr_twostep = twostep(cmgr)
+  next(cmgr_twostep)
+  return lambda: next(cmgr_twostep)

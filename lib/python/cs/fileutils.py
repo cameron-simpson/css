@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20201108-post'
+__version__ = '20210131-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,13 +69,16 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
+        'cs.mappings',
         'cs.obj',
         'cs.pfx',
+        'cs.progress',
         'cs.py3',
         'cs.range',
         'cs.result',
         'cs.threads',
         'cs.timeutils',
+        'cs.units',
     ],
 }
 
@@ -749,7 +752,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
     with Pfx("remove %r", lockpath):
       os.remove(lockpath)
 
-def crop_name(name, name_max=255, ext=None):
+def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
       Return the original `name` if it already short enough.
       Otherwise crop `name` before the file extension
@@ -757,9 +760,9 @@ def crop_name(name, name_max=255, ext=None):
 
       Parameters:
       * `name`: the file basename to crop
-      * `name_max`: optional maximum length, default: `255`
       * `ext`: optional file extension;
         the default is to infer the extension with `os.path.splitext`.
+      * `name_max`: optional maximum length, default: `255`
   '''
   if ext is None:
     base, ext = splitext(name)
@@ -770,7 +773,7 @@ def crop_name(name, name_max=255, ext=None):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name %r before ext %r to <=%s" % (name, ext, name_max)
+        "cannot crop name before ext %r to <=%s: name=%r" % (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
@@ -1082,13 +1085,13 @@ def iter_file(f, **kw):
 def byteses_as_fd(bss, **kw):
   ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
       Return the file descriptor.
-      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+      Any keyword arguments are passed to `CornuCopyBuffer.as_fd`.
 
       Example:
 
-         # present a passphrase for use as in input file descrptor
-         # for a subprocess
-         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+           # present a passphrase for use as in input file descrptor
+           # for a subprocess
+           rfd = byteses_as_fd([(passphrase + '\n').encode()])
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 

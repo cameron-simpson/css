@@ -90,11 +90,15 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
-assert TRACK < logging.WARNING
 
 # Special status line tracking, above INFO and below TRACK and WARNING
 STATUS = TRACK - 1
-assert logging.INFO < STATUS < logging.WARNING
+
+# Special verbose value, below INFO but above DEBUG.
+VERBOSE = logging.INFO - 1
+
+# check the hierarchy
+assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
 
 loginfo = None
 D_mode = False
@@ -303,6 +307,7 @@ def setup_logging(
   loginfo = NS(
       logger=root_logger,
       level=level,
+      verbose=verbose,
       trace_level=trace_level,
       flags=flags,
       module_names=module_names,
@@ -395,7 +400,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
       comes from the environment variable `$DEBUG`.
 
       Usually default to `logging.WARNING`, but if `sys.stderr` is a terminal,
-      default to `STATUS`.
+      default to `logging.INFO`.
 
       Parse the environment variable `$DEBUG` as a comma separated
       list of flags.
@@ -421,16 +426,12 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     if environ is None:
       environ = os.environ
     env_debug = os.environ.get('DEBUG', '')
+  level = TRACK
   if verbose is None:
-    if sys.stderr.isatty():
-      level = STATUS
-    else:
+    if not sys.stderr.isatty():
       level = logging.WARNING
   elif verbose:
-    if sys.stderr.isatty():
-      level = STATUS
-    else:
-      level = logging.INFO
+    level = logging.VERBOSE
   else:
     level = logging.WARNING
   flags = [F.upper() for F in env_debug.split(',') if len(F)]
@@ -595,18 +596,24 @@ def track(msg, *args, **kwargs):
   log(TRACK, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
-def ifverbose(verbose, msg, *args, **kwargs):
-  ''' Conditionally log a message.
-      If verbose is `None`
-      then the caller has not indicated a specific verbosity
-      and we use the `track` function.
-      If verbose is true
-      then we use the `info` function.
+def verbose(msg, *args, **kwargs):
+  ''' Emit a log at `VERBOSE` level with the current `Pfx` prefix.
   '''
-  if verbose is None:
+  log(VERBOSE, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def ifverbose(is_verbose, msg, *args, **kwargs):
+  ''' Conditionally log a message.
+
+      If `is_verbose` is `None`, log at `VERBOSE` level and rely on the logging setup.
+      Otherwise, if `is_verbose` is true, log at `INFO` level.
+  '''
+  if is_verbose is None:
+    # emit at VERBOSE level, use the logging handler levels to emit or not
+    verbose(msg, *args, **kwargs)
+  elif is_verbose:
+    # emit at INFO level
     info(msg, *args, **kwargs)
-  elif verbose:
-    track(msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
 def warning(msg, *args, **kwargs):

@@ -43,6 +43,7 @@ but used with a little discretion produces far more debuggable results.
 
 from __future__ import print_function
 from contextlib import contextmanager
+from functools import partial
 from inspect import isgeneratorfunction
 import logging
 import sys
@@ -52,7 +53,7 @@ from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20201105-post'
+__version__ = '20201227-post'
 
 DISTINFO = {
     'description':
@@ -182,6 +183,10 @@ class Pfx(object):
           true, this message forms the base of the message prefixes;
           earlier prefixes will be suppressed.
         * `loggers`: which loggers should receive log messages.
+        * `print`: if true, print the `mark` on entry to the `with` suite.
+          This may be a `bool`, implying `print()` if `True`,
+          a callable which works like `print()`,
+          or a file-like object which implies using `print(...,file=print)`.
 
         *Note*:
         the `mark` and `args` are only combined if the `Pfx` instance gets used,
@@ -202,12 +207,21 @@ class Pfx(object):
     '''
     absolute = kwargs.pop('absolute', False)
     loggers = kwargs.pop('loggers', None)
+    print_func = kwargs.pop('print', False)
+    if print_func:
+      if isinstance(print_func, bool):
+        # bool:True => print()
+        print_func = print
+      elif not callable(print_func) and hasattr(print_func, 'write'):
+        # presume a file
+        print_func = partial(print, file=print_func)
     if kwargs:
       raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
 
     self.mark = mark
     self.mark_args = args
     self.absolute = absolute
+    self.print_func = print_func
     self._umark = None
     self._loggers = None
     if loggers is not None:
@@ -217,6 +231,13 @@ class Pfx(object):
 
   def __enter__(self):
     # push this Pfx onto the per-Thread stack
+    print_func = self.print_func
+    if print_func:
+      mark = self.mark
+      mark_args = self.mark_args
+      if mark_args:
+        mark = mark % mark_args
+      print_func(mark)
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -236,7 +257,12 @@ class Pfx(object):
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
           )
-    _state.pop()
+    try:
+      _state.pop()
+    except IndexError as e:
+      print(
+          "warning: %s.__exit__: _state.pop(): %s" % (type(self).__name__, e)
+      )
     if _state.trace:
       _state.trace(_state.prefix)
     return False
@@ -539,15 +565,15 @@ def pfx_method(method, use_str=False):
 
   fname = method.__name__
 
-  def wrapper(self, *a, **kw):
+  def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
       return method(self, *a, **kw)
 
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = fname
-  return wrapper
+  pfx_method_wrapper.__doc__ = method.__doc__
+  pfx_method_wrapper.__name__ = fname
+  return pfx_method_wrapper
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`

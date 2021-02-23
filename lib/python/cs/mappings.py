@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20201102-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'description':
@@ -939,16 +939,45 @@ class AttrableMappingMixin(object):
   '''
 
   def __getattr__(self, attr):
-    ''' Unknown attributes are obtained from the `dict` entries.
+    ''' Unknown attributes are obtained from the mapping entries.
+
+        Note that this first consults `self.__dict__`.
+        For many classes that is redundants, but subclasses of
+        `dict` at least seem not to consult that with attribute
+        lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    # try self.__dict__ first - this is because it appears that
+    # getattr(dict,...) does not consult __dict__
     try:
-      value = self[attr]
+      _d = self.__dict__
+    except AttributeError:
+      # no __dict__? skip this step
+      pass
+    else:
+      try:
+        return _d[attr]
+      except KeyError:
+        pass
+    try:
+      return self[attr]
     except KeyError:
-      raise AttributeError(
-          "%s.%s (attrs=%s)" %
-          (type(self).__name__, attr, ','.join(sorted(self.keys())))
-      )
-    return value
+      try:
+        return self.ATTRABLE_MAPPING_DEFAULT
+      except AttributeError:
+        names_msgs = []
+        ks = list(self.keys())
+        if ks:
+          names_msgs.append('keys=' + ','.join(sorted(ks)))
+        dks = self.__dict__.keys()
+        if dks:
+          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        raise AttributeError(
+            "%s.%s (attrs=%s)" % (
+                type(self).__name__,
+                attr,
+                ','.join(names_msgs),
+            )
+        )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
@@ -1198,7 +1227,10 @@ class PrefixedMappingProxy:
 
   def keys(self):
     prefix = self.prefix
-    return filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    return map(
+        lambda k: cutprefix(k, prefix),
+        filter(lambda k: k.startswith(prefix), self.mapping.keys())
+    )
 
   def __contains__(self, k):
     return self.prefix + k in self.mapping

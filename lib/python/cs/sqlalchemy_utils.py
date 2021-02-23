@@ -36,16 +36,52 @@ DISTINFO = {
     ],
 }
 
-_state = State(orm=None, session=None)
+class SQLAState(State):
+  ''' Thread local state for SQLAlchemy ORM and session.
+  '''
+
+  def __init__(self, *, orm, session=None, **kw):
+    # enforce provision of an ORM, default session=None
+    super().__init__(orm=orm, session=session, **kw)
+
+  @contextmanager
+  def new_session(self, *, orm=None):
+    ''' Context manager to create a new session from `orm` or `self.orm`.
+    '''
+    if orm is None:
+      orm = self.orm
+      if orm is None:
+        raise ValueError(
+            "%s.new_session: no orm supplied and no self.orm" %
+            (type(self).__name__,)
+        )
+    with orm.session() as session:
+      with self(orm=orm, session=session):
+        yield session
+
+  @contextmanager
+  def auto_session(self, *, orm=None):
+    ''' Context manager to use the current session
+        if not `None`, otherwise to make one using `orm` or `self.orm`.
+    '''
+    session = self.session
+    if session is None:
+      with self.new_session(orm=orm) as session:
+        yield session
+    else:
+      yield session
+
+# global state, not tied to any specific ORM or session
+state = SQLAState(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
   '''
   if orm is None:
-    orm = _state.orm
+    orm = state.orm
     if orm is None:
-      raise RuntimeError("no ORM supplied and no _state.orm")
-  with _state(orm=orm):
+      raise RuntimeError("no ORM supplied and no state.orm")
+  with state(orm=orm):
     return function(*a, orm=orm, **kw)
 
 @contextmanager
@@ -56,13 +92,13 @@ def using_session(orm=None, session=None):
       Parameters:
       * `orm`: optional reference ORM,
         an object with a `.session()` method for creating a new session.
-        Default: if needed, obtained from the global `_state.orm`.
+        Default: if needed, obtained from the global `state.orm`.
       * `session`: optional existing session.
-        Default: the global `_state.session` if not `None`,
+        Default: the global `state.session` if not `None`,
         otherwise created by `orm.session()`.
 
       If a new session is created, the new session and reference ORM
-      are pushed onto the globals `_state.session` and `_state.orm`
+      are pushed onto the globals `state.session` and `state.orm`
       respectively.
 
       If an existing session is reused,
@@ -70,16 +106,16 @@ def using_session(orm=None, session=None):
   '''
   # use the shared state session if no session is supplied
   if session is None:
-    session = _state.session
+    session = state.session
   # we have a session, push to the global context
   if session is not None:
-    with _state(session=session):
+    with state(session=session):
       yield session
   else:
     # no session, we need to create one
     if orm is None:
       # use the shared state ORM if no orm is supplied
-      orm = _state.orm
+      orm = state.orm
       if orm is None:
         raise ValueError(
             "no orm supplied from which to make a session,"
@@ -87,7 +123,7 @@ def using_session(orm=None, session=None):
         )
     # create a new session and run the function within it
     with orm.session() as new_session:
-      with _state(orm=orm, session=new_session):
+      with state(orm=orm, session=new_session):
         yield new_session
 
 def with_session(function, *a, orm=None, session=None, **kw):
@@ -181,6 +217,7 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
+    self.sqla_state = SQLAState(orm=self)
 
   @contextmanager
   def session(self, *a, **kw):
@@ -239,14 +276,14 @@ class ORM(MultiOpenMixin):
       def wrapper(self, *a, **kw):
         ''' Call `method` with its ORM as the shared state `orm`.
         '''
-        with _state(orm=self):
+        with state(orm=self):
           yield from method(self, *a, **kw)
     else:
 
       def wrapper(self, *a, **kw):
         ''' Call `method` with its ORM as the shared state `orm`.
         '''
-        with _state(orm=self):
+        with state(orm=self):
           return method(self, *a, **kw)
 
     wrapper.__name__ = method.__name__
@@ -265,46 +302,45 @@ def orm_auto_session(method):
 
   if isgeneratorfunction(method):
 
-    def wrapper(self, *a, session=None, **kw):
+    def orm_auto_session_wrapper(self, *a, session=None, **kw):
       ''' Yield from the method with a session.
       '''
       with using_session(orm=self.orm, session=session) as active_session:
         yield from method(self, *a, session=active_session, **kw)
   else:
 
-    def wrapper(self, *a, session=None, **kw):
+    def orm_auto_session_wrapper(self, *a, session=None, **kw):
       ''' Call the method with a session.
       '''
       with using_session(orm=self.orm, session=session) as active_session:
         return method(self, *a, session=active_session, **kw)
 
-  wrapper.__name__ = "@orm_auto_session(%s)" % (funcname(method),)
-  wrapper.__doc__ = method.__doc__
-  wrapper.__module__ = getattr(method, '__module__', None)
-  return wrapper
+  orm_auto_session_wrapper.__name__ = "@orm_auto_session(%s)" % (
+      funcname(method),
+  )
+  orm_auto_session_wrapper.__doc__ = method.__doc__
+  orm_auto_session_wrapper.__module__ = getattr(method, '__module__', None)
+  return orm_auto_session_wrapper
 
 class BasicTableMixin:
   ''' Useful methods for most tables.
   '''
 
   @classmethod
-  @auto_session
   def lookup(cls, *, session, **criteria):
     ''' Return iterable of row entities matching `criteria`.
     '''
     return session.query(cls).filter_by(**criteria)
 
   @classmethod
-  @auto_session
   def lookup1(cls, *, session, **criteria):
     ''' Return the row entity matching `criteria`, or `None` if no match.
     '''
     return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
-  @auto_session
-  def __getitem__(cls, index, *, session):
-    row = cls.lookup1(id=index, session=session)
+  def __getitem__(cls, index):
+    row = cls.lookup1(id=index, session=state.session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
           cls,

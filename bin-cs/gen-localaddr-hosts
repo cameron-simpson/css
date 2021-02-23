@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Patch /etc/hosts (by default) with 127.0.0.n addresses with names from standard input.
+# Generate 127.0.0.n addresses from input lines in /etc/hosts format.
 # - Cameron Simpson <cs@cskk.id.au> 10apr2016
 #
 
@@ -20,4 +20,4 @@ do
   do  printf " $name$namesfx"
   done
   echo
-done | hosts-patch-known -m 'LOCAL ADDRESSES' ${1+"$@"}
+done

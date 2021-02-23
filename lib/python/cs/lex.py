@@ -24,7 +24,7 @@ from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20200914-post'
+__version__ = '20201228-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -507,7 +507,7 @@ def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
@@ -908,7 +908,7 @@ def as_lines(chunks, partials=None):
 
 def cutprefix(s, prefix):
   ''' Strip a `prefix` from the front of `s`.
-      Return the suffix if `.startswith(prefix)`, else `s`.
+      Return the suffix if `s.startswith(prefix)`, else `s`.
 
       Example:
 
@@ -926,7 +926,7 @@ def cutprefix(s, prefix):
 
 def cutsuffix(s, suffix):
   ''' Strip a `suffix` from the end of `s`.
-      Return the prefix if `.endswith(suffix)`, else `s`.
+      Return the prefix if `s.endswith(suffix)`, else `s`.
 
       Example:
 
@@ -1040,7 +1040,7 @@ def get_ini_clausename(s, offset=0):
 def get_ini_clause_entryname(s, offset=0):
   ''' Parse a `[`*clausename*`]`*entryname* string
       from `s` at `offset` (default `0`).
-      Return `(clausename,new_offset)`.
+      Return `(clausename,entryname,new_offset)`.
   '''
   clausename, offset = get_ini_clausename(s, offset=offset)
   offset = skipwhite(s, offset)
@@ -1106,15 +1106,15 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       existing `format_kwargs` method.
 
       The `format_as` method is like an inside out `str.format` or
-      `object._format__` method.
-      `str.format` is designed for formatting a string from a variety
-      of other objects supplied in the keyword arguments,
-      and `object.__format__` is for filling out a single `str.format`
+      `object.__format__` method.
+      The `str.format` method is designed for formatting a string
+      from a variety of other objects supplied in the keyword arguments,
+      and the `object.__format__` method is for filling out a single `str.format`
       replacement field from a single object.
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TaggedEntityMixin` class
+      For example, the `cs.tagset.TagSetMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
   '''
