@@ -878,10 +878,11 @@ class Box(SimpleBinary):
       try:
         path_elem = box.box_type_s
       except AttributeError as e:
-        raise RuntimeError(
+        warning(
             "%s.box_type_path: no .box_type_s on %r: %s" %
             (type(self).__name__, box, e)
         )
+        path_elem = type(box).__name__
       types.append(path_elem)
       box = box.parent
     return '.'.join(reversed(types))
