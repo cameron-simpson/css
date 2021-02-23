@@ -2627,16 +2627,23 @@ def parse(o):
 
       Keyword arguments are as for `OverBox.from_buffer`.
   '''
+  fd = None
   if isinstance(o, str):
     fd = os.open(o, os.O_RDONLY)
-    over_box = OverBox.parse(CornuCopyBuffer.from_fd(fd))
-    os.close(fd)
+    bfr = CornuCopyBuffer.from_fd(fd)
   elif isinstance(o, int):
-    over_box = OverBox.parse(CornuCopyBuffer.from_fd(o))
+    bfr = CornuCopyBuffer.from_fd(o)
   elif isinstance(o, bytes):
-    over_box = OverBox.parse(CornuCopyBuffer.from_bytes([o]))
+    bfr = CornuCopyBuffer.from_bytes([o])
   else:
-    over_box = OverBox.parse(CornuCopyBuffer.from_file(o))
+    bfr = CornuCopyBuffer.from_file(o)
+  over_box = OverBox.parse(bfr)
+  if bfr.bufs:
+    warning(
+        "unparsed data in bfr: %r", list(map(lambda bs: len(bs), bfr.bufs))
+    )
+  if fd is not None:
+    os.close(fd)
   return over_box
 
 def parse_fields(bfr, copy_offsets=None, **kw):
