@@ -49,7 +49,7 @@ def choose(basepath, preferred_indexclass=None):
         warning("ignoring unknown indexclass name %r", indexname)
         preferred_indexclass = None
   indexclasses = list(_CLASSES)
-  if preferred_indexclass is not None and preferred_indexclass.is_supported():
+  if preferred_indexclass:
     indexclasses.insert((preferred_indexclass.NAME, preferred_indexclass))
   # look for a preexisting index
   for indexname, indexclass in indexclasses:
