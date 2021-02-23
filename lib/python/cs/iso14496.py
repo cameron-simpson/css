@@ -86,9 +86,7 @@ PARSE_MODE = StackableState(copy_boxes=False, discard_data=False)
 def main(argv=None):
   ''' Command line mode.
   '''
-  if argv is None:
-    argv = sys.argv
-  return MP4Command().run(argv)
+  return MP4Command(argv).run()
 
 class MP4Command(BaseCommand):
 
@@ -96,7 +94,7 @@ class MP4Command(BaseCommand):
 
   TAG_PREFIX = 'mp4'
 
-  def cmd_autotag(self, argv, options):
+  def cmd_autotag(self, argv):
     ''' Usage: {cmd} autotag [-n] [-p prefix] [--prefix=prefix] paths...
           Tag paths based on embedded MP4 metadata.
           -n  No action.
@@ -143,7 +141,7 @@ class MP4Command(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_deref(argv, options):
+  def cmd_deref(argv):
     ''' Dereference a Box specification against ISO14496 files.
     '''
     spec = argv.pop(0)
@@ -160,7 +158,7 @@ class MP4Command(BaseCommand):
           print(path, "offset=%d" % B.offset, B)
 
   @staticmethod
-  def cmd_extract(argv, options):
+  def cmd_extract(argv):
     ''' Usage: {cmd} extract [-H] filename boxref output
           Extract the referenced Box from the specified filename into output.
           -H  Skip the Box header.
@@ -214,7 +212,7 @@ class MP4Command(BaseCommand):
       os.close(fd)
 
   @staticmethod
-  def cmd_info(argv, options):
+  def cmd_info(argv):
     ''' Usage: {cmd} info [{{-|filename}}]...]
           Print informative report about each source.
     '''
@@ -235,7 +233,7 @@ class MP4Command(BaseCommand):
               print(box.box_type_path, "%d:" % (len(tags),), tags)
 
   @staticmethod
-  def cmd_parse(argv, options):
+  def cmd_parse(argv):
     ''' Usage: {cmd} [parse [{{-|filename}}]...]
           Parse the named files (or stdin for "-").
     '''
@@ -251,7 +249,7 @@ class MP4Command(BaseCommand):
           over_box = parse(parsee)
         over_box.dump(crop_length=None)
 
-  def cmd_tags(self, argv, options):
+  def cmd_tags(self, argv):
     ''' Usage: {cmd} path
           Report the tags of `path` based on embedded MP4 metadata.
     '''
@@ -280,7 +278,7 @@ class MP4Command(BaseCommand):
     return xit
 
   @staticmethod
-  def cmd_test(argv, options):
+  def cmd_test(argv):
     ''' Usage: {cmd} [testnames...]
           Run self tests.
     '''
