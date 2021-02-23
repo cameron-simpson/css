@@ -756,6 +756,11 @@ class Box(SimpleBinary):
     '''
     return self.end_offset - self.offset
 
+  def __len__(self):
+    ''' A length which works without attempting a transcribe.
+    '''
+    return self.parse_length
+
   @property
   def unparsed_bs(self):
     ''' The unparsed data as a single `bytes` instance.
@@ -1128,11 +1133,19 @@ class MDATBoxBody(BoxBody):
     ''' Gather all data to the end of the field.
     '''
     super().parse_fields(bfr)
+    offset0 = bfr.offset
     if PARSE_MODE.discard_data:
       self.data = None
       bfr.skipto(bfr.end_offset)
     else:
       self.data = list(bfr)
+    self._data_len = bfr.offset - offset0
+
+  def __len__(self):
+    ''' Return the measured length of the data.
+        This works even if we did not store the data during the parse.
+    '''
+    return self._data_len
 
   def transcribe(self):
     assert self.data is not None
