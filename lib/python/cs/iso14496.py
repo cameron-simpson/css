@@ -276,13 +276,12 @@ class MP4Command(BaseCommand):
               print(tag)
     return xit
 
-  @staticmethod
-  def cmd_test(argv):
+  def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
           Run self tests.
     '''
     import cs.iso14496_tests
-    cs.iso14496_tests.selftest([options.cmd] + argv)
+    cs.iso14496_tests.selftest([self.options.cmd] + argv)
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -1148,6 +1147,9 @@ class MDATBoxBody(BoxBody):
     return self._data_len
 
   def transcribe(self):
+    ''' Transcribe the data.
+        Raise an `AssertionError` if we skipped the data during the parse.
+    '''
     assert self.data is not None
     return self.data
 
@@ -1169,7 +1171,6 @@ class FREEBoxBody(BoxBody):
     ''' Gather the `padding` field.
     '''
     super().parse_fields(bfr, **kw)
-    offset0 = bfr.offset
     self.free_size = bfr.end_offset - bfr.offset
     bfr.skipto(bfr.end_offset)
 
@@ -1872,7 +1873,7 @@ class ELSTBoxBody(FullBoxBody):
     self.entries = BinaryListValues.parse(
         bfr,
         count=self.entry_count,
-        pt=(V1EditEntry if self.version == 1 else V0EditEntry)
+        pt=(self.V1EditEntry if self.version == 1 else self.V0EditEntry)
     )
 
   def transcribe(self):
@@ -1984,19 +1985,21 @@ class STZ2BoxBody(FullBoxBody):
     if self.field_size == 4:
       # nybbles packed into bytes
       entry_sizes = []
-      for i in range(sample_count):
+      for i in range(self.sample_count):
         if i % 2 == 0:
           bs = bfr.take(1)
           entry_sizes.append(bs[0] >> 4)
         else:
           entry_sizes.append(bs[0] & 0x0f)
-    elif field_size == 8:
+    elif self.field_size == 8:
       # unsigned byte values - store directly!
-      entry_sizes = bfr.take(sample_count)
-    elif field_size == 16:
-      entry_sizes = BinaryListValues.parse(bfr, count=sample_count).values
+      entry_sizes = bfr.take(self.sample_count)
+    elif self.field_size == 16:
+      entry_sizes = BinaryListValues.parse(bfr, count=self.sample_count).values
     else:
-      warning("unhandled field_size=%d, not parsing entry_sizes", field_size)
+      warning(
+          "unhandled field_size=%d, not parsing entry_sizes", self.field_size
+      )
       entry_sizes = None
     self.entry_sizes = entry_sizes
 
