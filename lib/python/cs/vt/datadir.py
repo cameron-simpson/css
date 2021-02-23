@@ -334,8 +334,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self._filemap = SqliteFilemap(self, self.statefilepath)
     hashname = self.hashname
     self.index = self.indexclass(
-        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
-        self.hashclass,
+        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname))
     )
     self.index.open()
     self.runstate.start()
