@@ -322,8 +322,8 @@ class GDBMIndex(BinaryIndex):
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase):
-    super().__init__(lmdbpathbase)
+  def __init__(self, gdbmpathbase):
+    super().__init__(gdbmpathbase)
     self._gdbm = None
     self._gdbm_lock = None
     self._written = False
