@@ -627,8 +627,6 @@ class BoxBody(SimpleBinary, ABC):
         sequence of `Box`es.
     '''
     self.boxes = list(Box.scan(bfr, **kw))
-    for box in self.boxes.values:
-      box.parent = self.parent
 
   @classmethod
   def boxbody_type_from_klass(cls):
@@ -731,6 +729,11 @@ class Box(SimpleBinary):
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
       self.body.self_check()
+      # attach subBoxen to self
+      boxes = getattr(self.body, 'boxes', None)
+      if boxes:
+        for box in boxes:
+          box.parent = self
       self.body.parent = self
       self.body.offset = body_offset
       self.body.post_offset = bfr_tail.offset
