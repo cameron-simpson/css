@@ -35,7 +35,6 @@ from cs.binary import (
     BinaryUTF16NUL,
     SimpleBinary,
     BinaryListValues,
-    BinaryByteses,
     BinaryMultiStruct,
     BinaryMultiValue,
     deferred_field,
@@ -653,8 +652,8 @@ class Box(SimpleBinary):
 
   FIELD_TYPES = {
       'header': BoxHeader,
-      'body': (True, (BoxBody, BinaryByteses)),
-      'unparsed': BinaryByteses,
+      'body': BoxBody,
+      'unparsed': list,
       'offset': int,
       'unparsed_offset': int,
       'end_offset': int,
@@ -736,7 +735,7 @@ class Box(SimpleBinary):
       self.body.offset = body_offset
       self.body.post_offset = bfr_tail.offset
       self.unparsed_offset = bfr_tail.offset
-      self.unparsed = BinaryByteses.parse(bfr_tail)
+      self.unparsed = list(bfr_tail)
       if bfr_tail is not bfr:
         assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
       self.end_offset = bfr.offset
@@ -758,13 +757,7 @@ class Box(SimpleBinary):
   def unparsed_bs(self):
     ''' The unparsed data as a single `bytes` instance.
     '''
-    return b''.join(self.unparsed_bss)
-
-  @property
-  def unparsed_bss(self):
-    ''' The `bytes` instances comprising `.unparsed`.
-    '''
-    return self.unparsed.values
+    return b''.join(self.unparsed)
 
   def transcribe(self):
     ''' Transcribe the `Box`.
@@ -843,10 +836,10 @@ class Box(SimpleBinary):
         with the remaining contents of the buffer.
     '''
     unparsed = self.unparsed
-    self.unparsed = BinaryByteses()
-    bfr = CornuCopyBuffer(unparsed.values)
+    self.unparsed = []
+    bfr = CornuCopyBuffer(unparsed)
     yield bfr
-    self.unparsed = BinaryByteses.parse(bfr)
+    self.unparsed = list(bfr)
 
   @property
   def box_type(self):
@@ -1126,9 +1119,7 @@ class MDATBoxBody(BoxBody):
   ''' A Media Data Box - ISO14496 section 8.1.1.
   '''
 
-  FIELD_TYPES = dict(
-      BoxBody.FIELD_TYPES, data=(True, (type(None), BinaryByteses))
-  )
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, data=(True, (type(None), list)))
 
   def parse_fields(self, bfr):
     ''' Gather all data to the end of the field.
