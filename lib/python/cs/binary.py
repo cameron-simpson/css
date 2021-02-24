@@ -166,11 +166,10 @@ def pt_spec(pt, name=None):
   '''
   # AbstractBinary subclasses are returned directly
   try:
-    is_binary_class = issubclass(pt, AbstractBinary)
+    if issubclass(pt, AbstractBinary):
+      return pt
   except TypeError:
-    is_binary_class = False
-  if is_binary_class:
-    return pt
+    pass
   # other specifications construct a class
   try:
     f_parse_value = pt.parse_value
@@ -187,7 +186,7 @@ def pt_spec(pt, name=None):
             '_'.join(
                 (
                     name or "PTStruct", str(next(_pt_spec_seq)),
-                    pt1.replace(' ', '_')
+                    pt1.replace(' ', '__')
                 )
             ), pt0, pt1
         )
