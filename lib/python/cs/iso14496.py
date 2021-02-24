@@ -750,6 +750,11 @@ class Box(SimpleBinary):
         copy_boxes(self)
       return self
 
+  def parse_field(self, field_name, bfr, binary_cls):
+    ''' `parse_field` delegates to the `Box` body `parse_field`.
+    '''
+    return self.body.parse_field(field_name, bfr, binary_cls)
+
   @property
   def parse_length(self):
     ''' The length of the box as consumed from the buffer,
