@@ -747,6 +747,7 @@ class Box(SimpleBinary):
       self.unparsed = list(bfr_tail)
       if bfr_tail is not bfr:
         assert not bfr_tail.bufs, "bfr_tail.bufs=%r" % (bfr_tail.bufs,)
+        bfr_tail.flush()
       self.end_offset = bfr.offset
       self.self_check()
       bfr.report_offset(self.offset)
