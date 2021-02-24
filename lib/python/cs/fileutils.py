@@ -89,7 +89,7 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test whether a filelike object is seekable.
 
-      First try the `IOBase.seekable` method, otherwise try getting a file 
+      First try the `IOBase.seekable` method, otherwise try getting a file
       descriptor from `fp.fileno` and `os.stat()`ing that,
       otherwise return `False`.
   '''
@@ -142,6 +142,7 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
 def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   ''' A context manager yielding a temporary copy of `filename`
@@ -587,7 +588,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements,too-many-branches
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -773,7 +774,8 @@ def crop_name(name, ext=None, name_max=255):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name before ext %r to <=%s: name=%r" % (ext, name_max, name)
+        "cannot crop name before ext %r to <=%s: name=%r" %
+        (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
