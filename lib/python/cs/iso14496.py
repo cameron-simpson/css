@@ -560,7 +560,12 @@ class BoxBody(SimpleBinary, ABC):
       attr4 = attr[:4]
       if attr4.isupper():
         box_type = attr4.lower().encode('ascii')
-        boxes = [box for box in self if box.box_type == box_type]
+        try:
+          boxes = self.boxes
+        except AttributeError:
+          warning("no .boxes")
+          boxes = ()
+        boxes = [box for box in boxes if box.box_type == box_type]
         if attr.endswith('s'):
           return boxes
         if attr.endswith('0'):
