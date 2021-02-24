@@ -1109,13 +1109,14 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
         to align the new offset with a multiple of `readsize`.
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
+  try:
+    cur_offset = os.lseek(fd, 0, SEEK_CUR)
+    is_seekable = True
+  except OSError:
+    cur_offset = 0  # guess
+    is_seekable = False
   if offset is None:
-    try:
-      offset = os.lseek(fd, 0, SEEK_CUR)
-      is_seekable = True
-    except OSError:
-      offset = 0
-      is_seekable = False
+    offset = cur_offset
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
