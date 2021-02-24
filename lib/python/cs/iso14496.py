@@ -37,7 +37,9 @@ from cs.binary import (
     BinaryListValues,
     BinaryMultiStruct,
     BinaryMultiValue,
+    BinarySingleValue,
     deferred_field,
+    pt_spec,
 )
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
@@ -2264,53 +2266,63 @@ class METABoxBody(FullBoxBody):
 
 add_body_class(METABoxBody)
 
+# class to glom all the bytes
+_ILSTRawSchema = pt_spec(
+    (lambda bfr: bfr.take(...), lambda bs: bs), name='ILSTRawSchema'
+)
+
 def ILSTRawSchema(attribute_name):
   ''' Namedtuple type for ILST raw schema.
   '''
-  return namedtuple('ILSTRawSchema', 'attribute_name parse transcribe')(
-      attribute_name, lambda bfr: bfr.take(...), lambda bs: bs
-  )
+  return attribute_name, _ILSTRawSchema
+
+# class to decode bytes as UTF-8
+_ILSTTextSchema = pt_spec(
+    (
+        lambda bfr: bfr.take(...).decode('utf-8'),
+        lambda txt: txt.encode('utf-8'),
+    ),
+    name='ILSTTextSchema'
+)
 
 def ILSTTextSchema(attribute_name):
   ''' Namedtuple type for ILST text schema.
   '''
-  return namedtuple('ILSTTextSchema', 'attribute_name parse transcribe')(
-      attribute_name, lambda bfr: bfr.take(...).decode(),
-      lambda text: text.encode()
-  )
+  return attribute_name, _ILSTTextSchema
 
 def ILSTUInt32BESchema(attribute_name):
   ''' Namedtuple type for ILST UInt32BE schema.
   '''
-  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
-      attribute_name, UInt32BE.parse_value, UInt32BE.transcribe_value
-  )
+  return attribute_name, UInt32BE
 
 def ILSTUInt8Schema(attribute_name):
   ''' Namedtuple type for ILST UInt8BE schema.
   '''
-  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
-      attribute_name, UInt8.parse_value, UInt8.transcribe_value
-  )
+  return attribute_name, UInt8
+
+# class to decode n/total as a pair of UInt32BE values
+_ILSTAofBSchema = BinaryMultiValue(
+    'ILSTAofBSchema', dict(n=UInt32BE, total=UInt32BE)
+)
 
 def ILSTAofBSchema(attribute_name):
   ''' Namedtuple type for ILST "A of B" schema.
   '''
-  return namedtuple('ILSTUInt8Schema', 'attribute_name parse transcribe')(
-      attribute_name, lambda bfr: namedtuple('member_n_of', 'n total')
-      (UInt32BE.parse_value(bfr), UInt32BE.parse_value(bfr)),
-      lambda member_n_of: UInt32BE.transcribe_value(member_n_of.n) + UInt32BE.
-      transcribe_value(member_n_of.total)
-  )
+  return attribute_name, _ILSTAofBSchema
+
+# class to decode bytes as UTF-8 of ISO8601 datetime string
+_ILSTISOFormatSchema = pt_spec(
+    (
+        lambda bfr: datetime.fromisoformat(bfr.take(...).decode('utf-8')),
+        lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode('utf-8'),
+    ),
+    name='ILSTTextSchema'
+)
 
 def ILSTISOFormatSchema(attribute_name):
   ''' Namedtuple type for ILST ISO format schema.
   '''
-  return namedtuple('ILSTISOFormatSchema', 'attribute_name parse transcribe')(
-      attribute_name,
-      lambda bfr: datetime.fromisoformat(bfr.take(...).decode()),
-      lambda dt: dt.isoformat(sep=' ', timespec='seconds').encode()
-  )
+  return attribute_name, _ILSTISOFormatSchema
 
 itunes_media_type = namedtuple('itunes_media_type', 'type stik')
 
@@ -2516,25 +2528,25 @@ class ILSTBoxBody(ContainerBoxBody):
               if subbox_schema is None:
                 warning("%r: no schema", subbox_type)
               else:
-                with Pfx("%s", subbox_schema.parse):
+                attribute_name, binary_cls = subbox_schema
+                with Pfx("%s=%s", attribute_name, binary_cls):
                   try:
-                    data_box.parse_field(
-                        subbox_schema.attribute_name, databfr,
-                        (subbox_schema.parse, subbox_schema.transcribe)
-                    )
-                    value = subbox_schema.parse(databfr)
+                    data_box.parse_field(attribute_name, databfr, binary_cls)
                   except (ValueError, TypeError) as e:
                     warning("decode fails: %s", e)
                   else:
-                    # annotate the subbox and the ilst
-                    setattr(subbox, subbox_schema.attribute_name, value)
-                    if isinstance(value, bytes):
+                    # also annotate the subbox and the tags
+                    value = getattr(data_box, attribute_name)
+                    setattr(subbox, attribute_name, value)
+                    if isinstance(value, BinarySingleValue):
+                      tag_value = value.value
+                    if isinstance(tag_value, bytes):
                       self.tags.add(
-                          subbox_schema.attribute_name,
-                          b64encode(value).decode('ascii')
+                          attribute_name,
+                          b64encode(tag_value).decode('ascii')
                       )
                     else:
-                      self.tags.add(subbox_schema.attribute_name, value)
+                      self.tags.add(attribute_name, tag_value)
 
   def __getattr__(self, attr):
     for schema_code, schema in self.SUBBOX_SCHEMA.items():
