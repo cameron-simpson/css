@@ -1321,9 +1321,18 @@ class BinaryUTF8NUL(BinarySingleValue):
     '''
     # probe for the terminating NUL
     bs_length = 1
+    missing_nul = False
     while True:
-      bfr.extend(bs_length)
       nul_pos = bs_length - 1
+      try:
+        bfr.extend(bs_length)
+      except EOFError as e:
+        warning(
+            "BinaryUTF8NUL.parse_value: EOF found looking for NUL terminator: %s",
+            e
+        )
+        missing_nul = True
+        break
       if bfr[nul_pos] == 0:
         break
       bs_length += 1
@@ -1335,7 +1344,12 @@ class BinaryUTF8NUL(BinarySingleValue):
         # transmute memoryview to real bytes object
         utf8_bs = utf8_bs.tobytes()
       utf8 = utf8_bs.decode('utf-8')
-    bfr.take(1)
+    if not missing_nul:
+      nul = bfr.take(1)
+      if nul != b'\0':
+        raise RuntimeError(
+            "after %d bytes, expected NUL, found %r" % (nul_pos, nul)
+        )
     return utf8
 
   # pylint: disable=arguments-differ
