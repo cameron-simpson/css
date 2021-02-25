@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # ISO14496 parser. - Cameron Simpson <cs@cskk.id.au> 26mar2016
 #
@@ -12,8 +12,7 @@ ISO make the standard available here:
 * [link](http://standards.iso.org/ittf/PubliclyAvailableStandards/c068960_ISO_IEC_14496-12_2015.zip)
 '''
 
-from __future__ import print_function
-from abc import ABC, abstractmethod
+from abc import ABC
 from base64 import b64encode, b64decode
 from collections import namedtuple
 from contextlib import contextmanager
@@ -53,8 +52,6 @@ from cs.tagset import TagSet, Tag
 from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out
-
-from cs.x import X
 
 __version__ = '20200229'
 
