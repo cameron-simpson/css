@@ -2025,7 +2025,7 @@ class STZ2BoxBody(FullBoxBody):
       # unsigned byte values - store directly!
       entry_sizes = bfr.take(self.sample_count)
     elif self.field_size == 16:
-      entry_sizes = list(UInt16BE.scan(bfr, count=self.sample_count))
+      entry_sizes = list(UInt16BE.scan_values(bfr, count=self.sample_count))
     else:
       warning(
           "unhandled field_size=%d, not parsing entry_sizes", self.field_size
