@@ -1264,7 +1264,7 @@ add_body_class(PDINBoxBody)
 
 class ContainerBoxBody(BoxBody):
 
-  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=BinaryListValues)
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
 
   @pfx_method
   def parse_fields(self, bfr):
