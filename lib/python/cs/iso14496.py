@@ -1317,7 +1317,7 @@ class MVHDBoxBody(FullBoxBody):
     self.parse_field('rate_long', bfr, Int32BE)
     self.parse_field('volume_short', bfr, Int16BE)
     self.parse_field('reserved1', bfr, 10)  # 2-reserved, 2x4 reserved
-    self.parse_field('matrix', bfr, Matrix9Long),
+    self.parse_field('matrix', bfr, Matrix9Long)
     self.parse_field('predefined1', bfr, 24)  # 6x4 predefined
     self.parse_field('next_track_id', bfr, UInt32BE)
     return self
@@ -1676,7 +1676,7 @@ class _SampleEntry(BoxBody):
     ''' Gather the `data_reference_inde` field.
     '''
     super().parse_fields(bfr)
-    self.parse_field('reserved', bfr, BytesField, length=6)
+    self.add_field('reserved', bfr.take(6))
     self.parse_field('data_reference_index', bfr, UInt16BE)
 
 class BTRTBoxBody(BoxBody):
