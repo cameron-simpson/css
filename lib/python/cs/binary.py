@@ -321,21 +321,73 @@ class BinaryMixin:
     return sum(map(len, flatten(self.transcribe())))
 
   @classmethod
-  def scan_with_offsets(cls, bfr, count=None):
+  def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
         until end of input,
         yielding `(offset,instance,post_offset)` tuples
         where `offset` is the buffer offset where the instance commenced
         and `post_offset` is the buffer offset after the instance.
+
+        Parameters:
+        * `bfr`: the buffer to scan
+        * `count`: the required number of instances to scan,
+          equivalent to setting `min_count=count` and `max_count=count`
+        * `min_count`: the minimum number of instances to scan
+        * `max_count`: the maximum number of instances to scan
+        It is in error to specify both `count` and one of `min_count` or `max_count`.
+
+        Scanning stops after `max_count` instances (if specified).
+        If fewer than `min_count` instances (if specified) are scanned
+        a warning is issued.
+        This is to accomodate nonconformant streams
+        without raising exceptions.
+        Callers wanting to validate `max_count` may want to probe `bfr.at_eof()`
+        after return.
+        Callers not wanting a warning over `min_count` should not specify it,
+        and instead check the number of instances returned themselves.
     '''
-    scanned = 0
-    offset = bfr.offset
-    while (count is None or scanned < count) and not bfr.at_eof():
-      instance = cls.parse(bfr)
-      post_offset = bfr.offset
-      yield offset, instance, post_offset
-      offset = post_offset
-      scanned += 1
+    with Pfx("%s.scan", cls.__name__):
+      if count is None:
+        if min_count is None:
+          min_count = 0
+        else:
+          if min_count < 0:
+            raise ValueError(
+                "min_count must be >=0 if specified, got: %r" % (min_count,)
+            )
+        if max_count is not None:
+          if max_count < 0:
+            raise ValueError(
+                "max_count must be >=0 if specified, got: %r" % (max_count,)
+            )
+          if max_count < min_count:
+            raise ValueError(
+                "max_count must be >= min_count, got: min_count=%r, max_count=%rr"
+                % (min_count, max_count)
+            )
+      else:
+        if min_count is not None or max_count is not None:
+          raise ValueError(
+              "scan_with_offsets: may not combine count with either min_count or max_count"
+          )
+        if count < 0:
+          raise ValueError(
+              "count must be >=0 if specified, got: %r" % (count,)
+          )
+        min_count = max_count = count
+      scanned = 0
+      offset = bfr.offset
+      while (max_count is None or scanned < max_count) and not bfr.at_eof():
+        instance = cls.parse(bfr)
+        post_offset = bfr.offset
+        yield offset, instance, post_offset
+        offset = post_offset
+        scanned += 1
+      if min_count is not None and scanned < min_count:
+        warning(
+            "fewer than min_count=%s instances scanned, only %d found",
+            min_count, scanned
+        )
 
   @classmethod
   def scan(cls, bfr, **kw):
