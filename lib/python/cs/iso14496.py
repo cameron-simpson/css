@@ -2237,8 +2237,8 @@ class CPRTBoxBody(FullBoxBody):
     '''
     ch1, ch2, ch3 = language_code
     packed = bytes(
-        (ord(ch1) - 0x60) & 0x1f, ((ord(ch1) - 0x60) & 0x1f) << 5,
-        ((ord(ch1) - 0x60) & 0x1f) << 10
+        (ord(ch1) - 0x60) & 0x1f, ((ord(ch2) - 0x60) & 0x1f) << 5,
+        ((ord(ch3) - 0x60) & 0x1f) << 10
     )
     self.language_packed.value = packed
 
