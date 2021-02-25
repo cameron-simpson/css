@@ -8,8 +8,7 @@
     This module supports several backends and a mechanism for choosing one.
 '''
 
-from abc import ABC, abstractmethod
-from collections import namedtuple
+from abc import ABC
 from contextlib import contextmanager
 from os import pread
 from os.path import exists as pathexists
@@ -19,7 +18,6 @@ from cs.logutils import warning, info
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from . import Lock
-from .hash import HashCodeUtilsMixin
 
 _CLASSES = []
 _BY_NAME = {}
@@ -137,6 +135,13 @@ class BinaryIndex(MultiOpenMixin, ABC):
     ''' The path to the index file.
     '''
     return self.pathof(self.basepath)
+
+  @abstractmethod
+  @pfx_method
+  def keys(self):
+    ''' An iterator of binary keys in order.
+    '''
+    raise NotImplementedError("no keys implementation")
 
   def __iter__(self):
     return self.keys()
@@ -273,6 +278,8 @@ class LMDBIndex(BinaryIndex):
     self._lmdb.sync()
 
   def keys(self):
+    ''' Generator yielding keys from the index.
+    '''
     with self._txn() as txn:
       cursor = txn.cursor()
       yield from cursor.iternext(keys=True, values=False)
@@ -368,6 +375,8 @@ class GDBMIndex(BinaryIndex):
           self._written = False
 
   def keys(self):
+    ''' Generator yielding keys from the index.
+    '''
     with self._gdbm_lock:
       key = self._gdbm.firstkey()
     while key is not None:
@@ -440,6 +449,11 @@ class NDBMIndex(BinaryIndex):
     # no fast mode, no sync
 
   def keys(self):
+    ''' Return an iterator over a snapshot of the keys.
+
+        For large indices it is probably better to shift to an index
+        with some kind of `next_key()` method.
+    '''
     with self._ndbm_lock:
       ks = list(self._nbdm.keys())
     return iter(ks)
