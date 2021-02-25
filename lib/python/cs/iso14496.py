@@ -624,7 +624,7 @@ class BoxBody(SimpleBinary, ABC):
     ''' Transcribe the fields parsed with the `parse-field` method in the
         order parsed.
     '''
-    for field_name in self.parsed_field_names:
+    for field_name in self._parsed_field_names:
       value = getattr(self, field_name)
       if isinstance(value, bytes):
         yield value
@@ -636,6 +636,7 @@ class BoxBody(SimpleBinary, ABC):
         sequence of `Box`es.
     '''
     self.boxes = list(Box.scan(bfr, **kw))
+    self._parsed_field_names.append('boxes')
 
   @classmethod
   def boxbody_type_from_klass(cls):
