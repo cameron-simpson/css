@@ -1843,7 +1843,7 @@ class CSLGBoxBody(FullBoxBody):
     else:
       warning("unsupported version %d, treating like version 1")
       param_type = self.CSLGParamsQuad
-    self.add_field('params', param_type)
+    self.parse_field('params', bfr, param_type)
 
   def __getattr__(self, attr):
     ''' Present the `params` attributes at the top level.
