@@ -1484,7 +1484,7 @@ class TrackReferenceTypeBoxBody(BoxBody):
     ''' Gather the `track_ids` field.
     '''
     super().parse_fields(bfr)
-    self.track_ids = BinaryListValues.parse(bfr, pt=UInt32BE)
+    self.add_field('track_ids', list(UInt32BE.scan(bfr)))
 
 add_body_class(TrackReferenceTypeBoxBody)
 add_body_subclass(ContainerBoxBody, 'trgr', '8.3.4', 'Track Group')
