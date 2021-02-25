@@ -51,7 +51,7 @@ from cs.py.func import prop
 from cs.tagset import TagSet, Tag
 from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
-from cs.upd import print, out
+from cs.upd import print, out  # pylint: disable=redefined-builtin
 
 __version__ = '20200229'
 
@@ -616,12 +616,12 @@ class BoxBody(SimpleBinary, ABC):
     ''' Transcribe the binary structure.
 
         This default implementation transcribes the fields parsed with the
-        `parse-field` method in the order parsed.
+        `parse_field` method in the order parsed.
     '''
     return self.transcribe_fields()
 
   def transcribe_fields(self):
-    ''' Transcribe the fields parsed with the `parse-field` method in the
+    ''' Transcribe the fields parsed with the `parse_field` method in the
         order parsed.
     '''
     for field_name in self._parsed_field_names:
@@ -678,7 +678,6 @@ class Box(SimpleBinary):
     except AttributeError:
       s = "%s:NO_BODY" % (type_name,)
     else:
-      length = len(self)
       s = "%s[%d]:%s" % (type_name, len(self), body)
     unparsed_bs = getattr(self, 'unparsed_bs', None)
     if unparsed_bs and unparsed_bs != b'\0':
@@ -989,14 +988,13 @@ BoxBody.FIELD_TYPES['parent'] = Box
 KNOWN_BOXBODY_CLASSES = {}
 
 class FallbackBoxBody(BoxBody):
-
-  def transcribe(self):
-    pass
+  ''' A `BoxBody` subclass which parses nothing for unimplemented `Box` types,
+      used by `pick_boxbody_class()`.
+  '''
 
 def pick_boxbody_class(box_type: bytes):
-  ''' Infer a `BoxBody` subclass from the bytes `box_type`.
-
-      * `box_type`: the 4 byte box type
+  ''' Infer a `BoxBody` subclass from the 4-byte bytes `box_type`.
+      Returns `FallbackBoxBody` for unimplemented types.
   '''
   return KNOWN_BOXBODY_CLASSES.get(box_type, FallbackBoxBody)
 
@@ -1072,10 +1070,15 @@ class OverBox(BinaryListValues, HasBoxesMixin):
 
   @property
   def boxes(self):
+    ''' Alias `.value` as `.boxes`: the `Box`es encompassed by this `OverBox`.
+    '''
     return self.values
 
+  # TODO: this seems to parse a single `Box`: can we drop `OverBox`?
   @classmethod
   def parse(cls, bfr):
+    ''' Parse the `OverBox`.
+    '''
     offset = bfr.offset
     self = super().parse(bfr, pt=Box)
     self.offset = offset
@@ -1126,7 +1129,7 @@ class FullBoxBody(BoxBody):
         call `super().transcribe()` as the basis for their tranxription.
     '''
     assert (
-        type(self) is not FullBoxBody
+        type(self) is not FullBoxBody  # pylint: disable=unidiomatic-typecheck
         and type(self).transcribe is not FullBoxBody.transcribe
     ), "subclass %s did not implement .transcribe" % (type(self),)
     yield UInt8.transcribe_value(self.version)
@@ -1263,6 +1266,8 @@ class PDINBoxBody(FullBoxBody):
 add_body_class(PDINBoxBody)
 
 class ContainerBoxBody(BoxBody):
+  ''' Common subclass of several things with `.boxes`.
+  '''
 
   FIELD_TYPES = dict(BoxBody.FIELD_TYPES, boxes=list)
 
@@ -1698,6 +1703,7 @@ add_body_subclass(
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
+# pylint: disable=too-many-arguments
 def add_generic_sample_boxbody(
     box_type,
     section,
@@ -2047,7 +2053,7 @@ class STZ2BoxBody(FullBoxBody):
         b = None
         bs = []
         for i, n in entry_sizes:
-          assert n > 0 and n < 16
+          assert 0 < n < 16
           if i % 2 == 0:
             b = n << 4
           else:
@@ -2171,6 +2177,8 @@ class CO64BoxBody(FullBoxBody):
     self.chunk_offsets_bs = bfr.take(self.entry_count * UInt64BE.length)
 
   def transcribe(self):
+    ''' Transcribe a `CO64BoxBody`.
+    '''
     yield super().transcribe()
     yield UInt32BE.transcribe_value(self.entry_count)
     try:
@@ -2182,6 +2190,8 @@ class CO64BoxBody(FullBoxBody):
 
   @deferred_field
   def chunk_offsets(self, bfr):
+    ''' Computed on demand list of chunk offsets.
+    '''
     offsets = []
     for _ in range(self.entry_count):
       offsets.append(UInt64BE.from_buffer(bfr))
