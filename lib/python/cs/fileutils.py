@@ -132,7 +132,7 @@ def compare(f1, f2, mode="rb"):
   ''' Compare the contents of two file-like objects `f1` and `f2` for equality.
 
       If `f1` or `f2` is a string, open the named file using `mode`
-      (default: "rb").
+      (default: `"rb"`).
   '''
   if isinstance(f1, str):
     with open(f1, mode) as f1fp:
@@ -158,7 +158,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         otherwise it should be a `cs.progress.Progress` instance
       * `progress_label`: option progress bar label,
         only used if a progress bar is made
-      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+      Other keyword parameters are passed to `tempfile.NamedTemporaryFile`.
   '''
   if isinstance(f, str):
     # copy named file
