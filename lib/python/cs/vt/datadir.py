@@ -521,7 +521,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         continue
       hashcode, entry, post_offset = item
       with self._lock:
-        index[hashcode] = entry
+        index[hashcode] = bytes(entry)
         try:
           del unindexed[hashcode]
         except KeyError:
@@ -594,9 +594,10 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       index = self.index
       try:
         with self._lock:
-          entry = index[hashcode]
+          entry_bs = index[hashcode]
       except KeyError:
         raise KeyError("%s[%s]: hash not in index" % (self, hashcode))
+      entry = FileDataIndexEntry.from_bytes(entry_bs)
     filenum = entry.filenum
     try:
       try:
