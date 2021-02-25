@@ -2025,7 +2025,7 @@ class STZ2BoxBody(FullBoxBody):
       # unsigned byte values - store directly!
       entry_sizes = bfr.take(self.sample_count)
     elif self.field_size == 16:
-      entry_sizes = BinaryListValues.parse(bfr, count=self.sample_count).values
+      entry_sizes = list(UInt16BE.scan(bfr, count=self.sample_count))
     else:
       warning(
           "unhandled field_size=%d, not parsing entry_sizes", self.field_size
@@ -2060,7 +2060,7 @@ class STZ2BoxBody(FullBoxBody):
         assert isinstance(entry_sizes, bytes)
         yield entry_sizes
       elif field_size == 16:
-        yield from map(UInt16BE.transcribe_value, entry_sizes)
+        yield map(UInt16BE.transcribe_value, entry_sizes)
       else:
         raise ValueError(
             "unhandled field_size=%d, not transcribing entry_sizes"
