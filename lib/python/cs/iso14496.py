@@ -1886,20 +1886,32 @@ class ELSTBoxBody(FullBoxBody):
       'segment_duration media_time media_rate_integer media_rate_fraction'
   )
 
+  @property
+  def entry_class(self):
+    ''' The class representing each entry.
+    '''
+    return self.V1EditEntry if self.version == 1 else self.V0EditEntry
+
+  @property
+  def entry_count(self):
+    ''' The number of entries.
+    '''
+    return len(self.entries)
+
   def parse_fields(self, bfr):
+    ''' Parse the fields of an `ELSTBoxBody`.
+    '''
     super().parse_fields(bfr)
     assert self.version in (0, 1)
-    self.entry_count = UInt32BE.parse_value(bfr)
-    self.entries = BinaryListValues.parse(
-        bfr,
-        count=self.entry_count,
-        pt=(self.V1EditEntry if self.version == 1 else self.V0EditEntry)
-    )
+    entry_count = UInt32BE.parse_value(bfr)
+    self.entries = list(self.entry_class.scan(bfr, count=entry_count))
 
   def transcribe(self):
+    ''' Transcribe an `ELSTBoxBody`.
+    '''
     yield super().transcribe()
     yield UInt32BE.transcribe_value(self.entry_count)
-    yield self.entries
+    yield map(self.entry_class.transcribe, self.entries)
 
 add_body_subclass(ContainerBoxBody, b'dinf', '8.7.1', 'Data Information')
 
