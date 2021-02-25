@@ -2196,20 +2196,15 @@ class DREFBoxBody(FullBoxBody):
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
       entry_count=UInt32BE,
-      boxes=BinaryListValues,
+      boxes=list,
   )
 
   def parse_fields(self, bfr):
     ''' Gather the `entry_count` and `boxes` fields.
     '''
     super().parse_fields(bfr)
-    self.entry_count = UInt32BE.parse(bfr)
+    self.parse_field('entry_count', bfr, UInt32BE)
     self.parse_boxes(bfr, count=int(self.entry_count.value))
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.entry_count
-    yield self.boxes
 
 add_body_class(DREFBoxBody)
 
