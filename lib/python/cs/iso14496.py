@@ -1919,15 +1919,13 @@ class URL_BoxBody(FullBoxBody):
   ''' An 'url ' Data Entry URL BoxBody - section 8.7.2.1.
   '''
 
+  FIELD_TYPES = dict(FullBoxBody.FIELD_TYPES, location=BinaryUTF8NUL)
+
   def parse_fields(self, bfr):
     ''' Gather the `location` field.
     '''
     super().parse_fields(bfr)
     self.parse_field('location', bfr, BinaryUTF8NUL)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.location
 
 add_body_class(URL_BoxBody)
 
