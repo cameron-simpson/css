@@ -2249,7 +2249,7 @@ class METABoxBody(FullBoxBody):
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
       theHandler=Box,
-      boxes=BinaryListValues,
+      boxes=list,
   )
 
   def __iter__(self):
@@ -2259,14 +2259,10 @@ class METABoxBody(FullBoxBody):
     ''' Gather the `theHandler` Box and gather the following Boxes as `boxes`.
     '''
     super().parse_fields(bfr)
-    self.theHandler = Box.parse(bfr)
-    self.theHandler.parent = self.parent
+    self.parse_field('theHandler', bfr, Box)
+    ## we don't have a .parent yet - does this break the handler path?
+    ## self.theHandler.parent = self.parent
     self.parse_boxes(bfr)
-
-  def transcribe(self):
-    yield super().transcribe()
-    yield self.theHandler
-    yield self.boxes
 
   @pfx_method
   def __getattr__(self, attr):
