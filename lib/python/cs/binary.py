@@ -268,43 +268,47 @@ class BinaryMixin:
         and that it is written as a tuple of `(True,types)` because
         it has more than one acceptable type.
     '''
-    with Pfx(s(self)):
-      ok = True
-      try:
-        fields_spec = self.FIELD_TYPES
-      except AttributeError:
-        warning("no FIELD_TYPES")
-        ##ok = False
-      else:
-        for field_name, field_spec in fields_spec.items():
-          with Pfx(".%s=%s", field_name, field_spec):
-            if isinstance(field_spec, tuple):
-              required, basetype = field_spec
-            else:
-              required, basetype = True, field_spec
-            try:
-              field = getattr(self, field_name)
-            except AttributeError:
-              if required:
-                warning("missing: __dict__=%s", cropped_repr(self.__dict__))
-                ok = False
-            else:
-              if not isinstance(field, basetype):
-                warning(
-                    "should be an instance of %s:%s but is %s", (
-                        'tuple'
-                        if isinstance(basetype, tuple) else basetype.__name__
-                    ), basetype, s(field)
-                )
-                ok = False
-        for field_name in self.__dict__:
-          if field_name not in fields_spec:
-            warning(
-                "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
-                type(self).__name__, field_name, sorted(fields_spec.keys())
-            )
-            ok = False
-      return ok
+    ok = True
+    try:
+      fields_spec = self.FIELD_TYPES
+    except AttributeError:
+      warning("no FIELD_TYPES")
+      ##ok = False
+    else:
+      # check fields against self.FIELD_TYPES
+      for field_name, field_spec in fields_spec.items():
+        with Pfx(".%s=%s", field_name, field_spec):
+          if isinstance(field_spec, tuple):
+            required, basetype = field_spec
+          else:
+            required, basetype = True, field_spec
+          try:
+            field = getattr(self, field_name)
+          except AttributeError:
+            if required:
+              warning(
+                  "missing required field %s.%s: __dict__=%s",
+                  type(self).__name__, field_name, cropped_repr(self.__dict__)
+              )
+              ok = False
+          else:
+            if not isinstance(field, basetype):
+              warning(
+                  "should be an instance of %s:%s but is %s", (
+                      'tuple'
+                      if isinstance(basetype, tuple) else basetype.__name__
+                  ), basetype, cropped(s(field), max_length=64)
+              )
+              ok = False
+      # check that all public fields are in self.FIELD_TYPES
+      for field_name in self.__dict__:
+        if not field_name.startswith('_') and field_name not in fields_spec:
+          warning(
+              "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
+              type(self).__name__, field_name, sorted(fields_spec.keys())
+          )
+          ok = False
+    return ok
 
   def __bytes__(self):
     ''' The binary transcription as a single `bytes` object.
