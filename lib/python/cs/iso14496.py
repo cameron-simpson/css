@@ -1645,7 +1645,7 @@ class _SampleTableContainerBoxBody(FullBoxBody):
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
       entry_count=UInt32BE,
-      boxes=BinaryListValues,
+      boxes=list,
   )
 
   def __iter__(self):
