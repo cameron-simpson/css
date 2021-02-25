@@ -1246,17 +1246,19 @@ class PDINBoxBody(FullBoxBody):
 
   FIELD_TYPES = dict(
       FullBoxBody.FIELD_TYPES,
-      pdinfo=BinaryListValues,
+      pdinfo=list,
   )
 
   # field names for the tuples in a PDINBoxBody
   PDInfo = BinaryMultiStruct('PDInfo', '>LL', 'rate initial_delay')
 
   def parse_fields(self, bfr, **kw):
-    ''' Gather the (rate, initial_delay) pairs of the data section as the `pdinfo` field.
+    ''' Gather the normal version information
+        and then the `(rate,initial_delay)` pairs of the data section
+        as the `pdinfo` field.
     '''
     super().parse_fields(bfr, **kw)
-    self.pdinfo = BinaryListValues.parse(bfr, pt=PDINBoxBody.PDInfo)
+    self.add_field('pdinfo', list(PDINBoxBody.PDInfo.scan(bfr)))
 
 add_body_class(PDINBoxBody)
 
