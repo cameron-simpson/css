@@ -738,7 +738,6 @@ class Box(SimpleBinary):
       body_class = pick_boxbody_class(header.type)
       body_offset = bfr_tail.offset
       self.body = body_class.parse(bfr_tail)
-      self.body.self_check()
       # attach subBoxen to self
       boxes = getattr(self.body, 'boxes', None)
       if boxes:
@@ -747,6 +746,7 @@ class Box(SimpleBinary):
       self.body.parent = self
       self.body.offset = body_offset
       self.body.post_offset = bfr_tail.offset
+      self.body.self_check()
       self.unparsed_offset = bfr_tail.offset
       self.unparsed = list(bfr_tail)
       if bfr_tail is not bfr:
