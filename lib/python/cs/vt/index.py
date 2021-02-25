@@ -440,7 +440,9 @@ class NDBMIndex(BinaryIndex):
     # no fast mode, no sync
 
   def keys(self):
-    return iter(self._ndbm.keys())
+    with self._ndbm_lock:
+      ks = list(self._nbdm.keys())
+    return iter(ks)
 
   def __contains__(self, key):
     with self._ndbm_lock:
