@@ -2218,8 +2218,8 @@ class CPRTBoxBody(FullBoxBody):
     ''' Gather the `language` and `notice` fields.
     '''
     super().parse_fields(bfr)
-    self.parse_field('language_packed', UInt16BE)
-    self.parse_field('notice', UTF8or16Field)
+    self.parse_field('language_packed', bfr, UInt16BE)
+    self.parse_field('notice', bfr, UTF8or16Field)
 
   @property
   def language(self):
