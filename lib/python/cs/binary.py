@@ -35,7 +35,7 @@
       almost always a `bytes` instance or a `memoryview`,
       but in principle also things like `bytearray`.
 
-    There are 4 main classes on which an implementor should base their data structures:
+    There are 5 main classes on which an implementor should base their data structures:
     * `BinarySingleStruct`: a factory for classes based
       on a `struct.struct` format string with a single value;
       this builds a `namedtuple` subclass
@@ -46,9 +46,10 @@
       parsing and transcribing a single value
     * `BinaryMultiValue`: a base class for subclasses
       parsing and transcribing multiple values
-
-    The `BinaryMultiValue` base class is what should be used
-    for complex structures with varying or recursive subfields.
+      with no variation
+    * `SimpleBinary`: a base class for subclasses
+      with custom `.parse` and `.transcribe` methods,
+      for structures with variable fields
 
     All the classes derived from the above inherit all the methods
     of `BinaryMixin`.
@@ -56,7 +57,7 @@
     can be had simply from `bytes(instance)`,
     although there are more transcription methods provided
     for when greater flexibility is desired.
-    It also means that all classes have `parse`* methods
+    It also means that all classes have `parse`* and `scan`* methods
     for parsing binary data streams.
 
     You can also instantiate objects directly;
