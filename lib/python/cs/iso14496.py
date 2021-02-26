@@ -1121,31 +1121,18 @@ class FullBoxBody(BoxBody):
 
   FIELD_TYPES = dict(
       BoxBody.FIELD_TYPES,
-      version=int,
-      flags0=int,
-      flags1=int,
-      flags2=int,
+      version__Binary=UInt8,
+      flags0__Binary=UInt8,
+      flags1__Binary=UInt8,
+      flags2__Binary=UInt8,
   )
 
   def parse_fields(self, bfr):
     super().parse_fields(bfr)
-    self.version = UInt8.parse_value(bfr)
-    self.flags0 = UInt8.parse_value(bfr)
-    self.flags1 = UInt8.parse_value(bfr)
-    self.flags2 = UInt8.parse_value(bfr)
-
-  def transcribe(self):
-    ''' Transcribe the basic fields so that subclasses can safely
-        call `super().transcribe()` as the basis for their tranxription.
-    '''
-    assert (
-        type(self) is not FullBoxBody  # pylint: disable=unidiomatic-typecheck
-        and type(self).transcribe is not FullBoxBody.transcribe
-    ), "subclass %s did not implement .transcribe" % (type(self),)
-    yield UInt8.transcribe_value(self.version)
-    yield UInt8.transcribe_value(self.flags0)
-    yield UInt8.transcribe_value(self.flags1)
-    yield UInt8.transcribe_value(self.flags2)
+    self.parse_field_value('version', bfr, UInt8)
+    self.parse_field_value('flags0', bfr, UInt8)
+    self.parse_field_value('flags1', bfr, UInt8)
+    self.parse_field_value('flags2', bfr, UInt8)
 
   @property
   def flags(self):
