@@ -133,11 +133,11 @@ scan_mp3_from_chunks = chunky(scan_mp3)
 def scan_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
   '''
-  from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
+  from cs.iso14496 import Box
   with Pfx("parse_mp4"):
 
     def run_parser(bfr):
-      for _ in parse_mp4_from_buffer(bfr, discard_data=True):
+      for _ in Box.scan(bfr):
         pass
 
     return report_offsets(bfr, run_parser)
