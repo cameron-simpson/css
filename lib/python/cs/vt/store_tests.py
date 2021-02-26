@@ -25,7 +25,7 @@ from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
-from .hash import HASHCLASS_BY_NAME
+from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
     TCPStoreServer, TCPClientStore, UNIXSocketStoreServer,
     UNIXSocketClientStore
@@ -33,19 +33,28 @@ from .socket import (
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
 
+HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
+INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'
+STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
+
 ##from cs.debug import thread_dump
 
 # constraint the tests if not empty, try every permutation if empty
-HASHCLASS_NAMES = ('sha1',)
-INDEXCLASS_NAMES = ()  ## ('lmdb',)  ## ('ndbm',)
-STORE_CLASS_TESTS = (DataDirStore,)
+HASHCLASS_NAMES = tuple(
+    os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
+    or sorted(HashCode.by_name.keys())
+)
+INDEXCLASS_NAMES = tuple(
+    os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
+)
+STORECLASS_NAMES = tuple(os.environ.get(STORECLASS_NAMES_ENVVAR, '').split())
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
   '''
   # test all Store types against all the hash classes
   subtest = {}
-  for hashclass_name in HASHCLASS_NAMES or sorted(HASHCLASS_BY_NAME.keys()):
+  for hashclass_name in HASHCLASS_NAMES:
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
     with stackkeys(subtest, hashname=hashclass_name, hashclass=hashclass):
       # MappingStore
@@ -60,7 +69,7 @@ def get_test_stores(prefix):
         )
       # DataDirStore
       with stackkeys(subtest, storetype=DataDirStore):
-        for index_name in INDEXCLASS_NAMES or get_index_names():
+        for index_name in INDEXCLASS_NAMES:
           indexclass = get_index_by_name(index_name)
           with stackkeys(subtest, indexname=index_name, indexclass=indexclass):
             for rollover in 200000, :
@@ -168,7 +177,7 @@ def multitest(method):
   def testMethod(self):
     for subtest, S in get_test_stores(prefix=method.__module__ + '.' +
                                       method.__name__):
-      if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
+      if STORECLASS_NAMES and S.__name__ not in STORECLASS_NAMES:
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):
