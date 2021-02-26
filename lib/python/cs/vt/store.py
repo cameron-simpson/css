@@ -145,7 +145,11 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     ##return "STORE(%s:%s)" % (type(self), self.name)
     params = []
     for attr, val in sorted(self._str_attrs.items()):
-      params.append(attr + '=' + str(val))
+      if isinstance(val, type):
+        val_s = '<%s.%s>' % (val.__module__, val.__name__)
+      else:
+        val_s = str(val)
+      params.append(attr + '=' + val_s)
     return "%s:%s(%s)" % (
         self.__class__.__name__, self.hashclass.HASHNAME,
         ','.join([repr(self.name)] + params)
