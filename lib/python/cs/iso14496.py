@@ -624,12 +624,10 @@ class BoxBody(SimpleBinary, ABC):
     ''' Transcribe the fields parsed with the `parse_field` method in the
         order parsed.
     '''
-    for field_name in self._parsed_field_names:
-      value = getattr(self, field_name)
-      if isinstance(value, bytes):
-        yield value
-      else:
-        yield value.transcribe()
+    return map(
+        lambda field_name: getattr(self, field_name),
+        self._parsed_field_names,
+    )
 
   def parse_boxes(self, bfr, **kw):
     ''' Utility method to parse the remainder of the buffer as a
