@@ -63,8 +63,8 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       A subclass should provide thread-safe implementations of the following
       methods:
 
-        .add(block) -> hashcode
-        .get(hashcode, [default=None]) -> block (or default)
+        .add(chunk) -> hashcode
+        .get(hashcode, [default=None]) -> chunk (or default)
         .contains(hashcode) -> boolean
         .flush()
 
@@ -548,8 +548,12 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def hashcodes_from(self, **kw):
-    ''' Use the mapping's .hashcodes_from if present, otherwise use
-        HashCodeUtilsMixin.hashcodes_from.
+    ''' Use the mapping's `.hashcodes_from` if present,
+        otherwise use the superclass' `.hashcodes_from`.
+
+        This lets the mapping supply an efficient `hashcodes_from`
+        in preference to the default brute force method
+        based on the mapping keys.
     '''
     try:
       hashcodes_method = self.mapping.hashcodes_from
