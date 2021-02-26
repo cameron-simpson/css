@@ -591,6 +591,18 @@ class BoxBody(SimpleBinary, ABC):
         This base class implementation consumes nothing.
     '''
 
+  def parse_field_value(self, field_name, bfr, binary_cls):
+    ''' Parse a single value binary, store the value as `field_name`,
+        store the instance as the field `field_name+'__Binary'`
+        for transcription.
+
+        Note that this disassociaes the plain value attribute
+        from what gets transcribed.
+    '''
+    value = binary_cls.parse_value(bfr)
+    self.add_field(field_name + '__Binary', binary_cls(value))
+    setattr(self, field_name, value)
+
   def parse_field(self, field_name, bfr, binary_cls):
     ''' Parse an instance of `binary_cls` from `bfr`
         and store it as the attribute named `field_name`.
