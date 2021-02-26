@@ -82,7 +82,8 @@ class _TestPacketFields(object):
         self.assertEqual(P, P2, "%s => bytes => %s not equal" % (P, P2))
 
   def test_PacketField_round_trip(self):
-    ''' Perform round trip tests of the PacketFields for which we have test cases.
+    ''' Perform round trip tests of the `PacketField` and `AbstractBinary` subclasses
+        for which we have test cases.
     '''
     M = self.module
     for attrname, modattr in sorted(module_attributes(M)):
