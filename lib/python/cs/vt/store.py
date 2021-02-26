@@ -558,7 +558,7 @@ class MappingStore(BasicStoreSync):
     try:
       hashcodes_method = self.mapping.hashcodes_from
     except AttributeError:
-      return super().hashcodes_from(**kw)
+      hashcodes_method = super().hashcodes_from
     return hashcodes_method(**kw)
 
   def __len__(self):
