@@ -8,6 +8,7 @@ import sys
 import os
 import os.path
 import unittest
+from cs.logutils import setup_logging
 from .binary_tests import _TestPacketFields
 from .iso14496 import parse
 from . import iso14496 as iso14496_module
@@ -28,7 +29,11 @@ class Test_iso14496(unittest.TestCase):
       over_box = parse(mp4fp)
       self.assertEqual(over_box.end_offset - over_box.offset, mp4fp.tell())
     self.assertEqual(over_box.offset, 0)
-    self.assertEqual(over_box.end_offset, mp4_size)
+    self.assertEqual(
+        over_box.end_offset, mp4_size,
+        "over_box.end_offset=%d, mp4fp.tell=%d" %
+        (over_box.end_offset, mp4_size)
+    )
 
 class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
   ''' Test the `PacketField`s in `cs.iso14496`.
@@ -44,6 +49,7 @@ class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
 def selftest(argv, **kw):
   ''' Run the unit tests.
   '''
+  setup_logging(__file__)
   sys.argv = argv
   unittest.main(__name__, defaultTest=None, argv=argv, failfast=True, **kw)
 
