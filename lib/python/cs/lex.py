@@ -125,7 +125,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
-def typed_str(o, use_cls=False, use_repr=False):
+def typed_str(o, use_cls=False, use_repr=False, max_length=None):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
 
       Parameters:
@@ -140,10 +140,13 @@ def typed_str(o, use_cls=False, use_repr=False):
           ......
           X("foo = %s", s(foo))
   '''
-  return "%s:%s" % (
+  s = "%s:%s" % (
       type(o) if use_cls else type(o).__name__,
       repr(o) if use_repr else str(o),
   )
+  if max_length is not None:
+    s = cropped(s, max_length)
+  return s
 
 def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with `sep` (default `', '`).
