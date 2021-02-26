@@ -300,14 +300,6 @@ class BinaryMixin:
                   ), basetype, cropped(s(field), max_length=64)
               )
               ok = False
-      # check that all public fields are in self.FIELD_TYPES
-      for field_name in self.__dict__:
-        if not field_name.startswith('_') and field_name not in fields_spec:
-          warning(
-              "field %s.%s is present but is not defined in self.FIELD_TYPES: %r",
-              type(self).__name__, field_name, sorted(fields_spec.keys())
-          )
-          ok = False
     return ok
 
   def __bytes__(self):
