@@ -63,6 +63,7 @@ class TestAll(unittest.TestCase):
     '''
     for scanner in SCANNERS:
       with self.subTest(scanner.__name__):
+        f = None
         testfilename = scanner_testfile(scanner)
         if testfilename is None:
           input_chunks = self.random_data
@@ -82,6 +83,9 @@ class TestAll(unittest.TestCase):
               "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset)
           )
           last_qoffset = qoffset
+        if f is not None:
+          f.close()
+          f = None
 
   def test02blocked_chunks_of(self):
     ''' Blockify some input sources.
