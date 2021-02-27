@@ -8,14 +8,14 @@
     This module supports several backends and a mechanism for choosing one.
 '''
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from os import pread
 from os.path import exists as pathexists
 from zlib import decompress
 from cs.binary import BinaryMultiValue, BSUInt
 from cs.logutils import warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from . import Lock
 
@@ -138,7 +138,7 @@ class BinaryIndex(MultiOpenMixin, ABC):
 
   @abstractmethod
   @pfx_method
-  def keys(self):
+  def keys(self, start_hashcode=None):
     ''' An iterator of binary keys in order.
     '''
     raise NotImplementedError("no keys implementation")
