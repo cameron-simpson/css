@@ -13,7 +13,7 @@ from enum import IntFlag
 import sys
 from zlib import compress, decompress
 from icontract import require
-from cs.binary import BSUInt, BSData, PacketField
+from cs.binary import BSUInt, BSData, SimpleBinary
 from cs.buffer import CornuCopyBuffer
 from cs.fileutils import datafrom
 from .block import Block
@@ -28,7 +28,7 @@ class DataFlag(IntFlag):
   '''
   COMPRESSED = 0x01
 
-class DataRecord(PacketField):
+class DataRecord(SimpleBinary):
   ''' A data chunk file record for storage in a `.vtd` file.
 
       The record format is:
@@ -77,7 +77,7 @@ class DataRecord(PacketField):
     return self.data == other.data
 
   @classmethod
-  def from_buffer(cls, bfr):
+  def parse(cls, bfr):
     ''' Parse a `DataRecord` from a buffer.
     '''
     flags = BSUInt.parse_value(bfr)
