@@ -384,7 +384,6 @@ class StreamStore(BasicStoreSync):
   def hashcodes(
       self,
       start_hashcode=None,
-      reverse: bool = False,
       after: bool = False,
       length: Optional[int] = None
   ):
@@ -405,7 +404,6 @@ class StreamStore(BasicStoreSync):
         HashCodesRequest(
             start_hashcode=start_hashcode,
             hashclass=hashclass,
-            reverse=reverse,
             after=after,
             length=length
         )
@@ -431,9 +429,7 @@ class StreamStore(BasicStoreSync):
       lambda self, start_hashcode: start_hashcode is None or
       isinstance(start_hashcode, self.hashclass)
   )
-  def hash_of_hashcodes(
-      self, start_hashcode=None, reverse=False, after=False, length=None
-  ):
+  def hash_of_hashcodes(self, start_hashcode=None, after=False, length=None):
     hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r" % (length,))
@@ -447,7 +443,6 @@ class StreamStore(BasicStoreSync):
         HashOfHashCodesRequest(
             start_hashcode=start_hashcode,
             hashclass=hashclass,
-            reverse=reverse,
             after=after,
             length=length
         )
@@ -470,7 +465,7 @@ class StreamStore(BasicStoreSync):
       lambda self, start_hashcode: start_hashcode is None or
       isinstance(start_hashcode, self.hashclass)
   )
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None):
     ''' Unbounded sequence of hashcodes
         obtained by successive calls to `self.hashcodes`.
     '''
@@ -478,10 +473,7 @@ class StreamStore(BasicStoreSync):
     after = False
     while True:
       hashcodes = self.hashcodes(
-          start_hashcode=start_hashcode,
-          reverse=reverse,
-          after=after,
-          length=length
+          start_hashcode=start_hashcode, after=after, length=length
       )
       if not hashcodes:
         return
@@ -702,7 +694,6 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
   def __init__(
       self,
       *,
-      reverse: bool = False,
       after: bool = False,
       hashclass,
       start_hashcode=None,
@@ -710,7 +701,6 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
   ):
     if length is None:
       length = 0
-    self.reverse = reverse
     self.after = after
     super().__init__(
         hashclass=hashclass,
@@ -723,10 +713,9 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
   def parse(cls, bfr, *, parse_flags):
     ''' Parse a HashCodesRequest from a buffer and construct.
     '''
-    reverse = (parse_flags & 0x01) != 0
-    after = (parse_flags & 0x02) != 0
-    has_start_hashcode = (parse_flags & 0x04) != 0
-    extra_flags = parse_flags & ~0x07
+    after = (parse_flags & 0x01) != 0
+    has_start_hashcode = (parse_flags & 0x02) != 0
+    extra_flags = parse_flags & ~0x03
     if extra_flags:
       raise ValueError("extra flags: 0x%02x" % (extra_flags,))
     hashname = BSString.parse_value(bfr)
@@ -742,7 +731,6 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
       start_hashcode = None
     length = BSUInt.parse_value(bfr)
     return cls(
-        reverse=reverse,
         after=after,
         hashclass=hashclass,
         start_hashcode=start_hashcode,
@@ -754,9 +742,8 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
     ''' Compute the flags for the request packet envelope.
     '''
     return (
-        (0x01 if self.reverse else 0x00)
-        | (0x02 if self.after else 0x00)
-        | (0x04 if self.start_hashcode is not None else 0x00)
+        (0x01 if self.after else 0x00)
+        | (0x02 if self.start_hashcode is not None else 0x00)
     )
 
   def transcribe(self):
@@ -779,7 +766,6 @@ class HashCodesRequest(SimpleBinary, HasDotHashclassMixin):
     return b''.join(
         h.encode() for h in local_store.hashcodes(
             start_hashcode=self.start_hashcode,
-            reverse=self.reverse,
             after=self.after,
             length=length
         )
@@ -799,7 +785,6 @@ class HashOfHashCodesRequest(HashCodesRequest):
       raise ValueError("no local_store, request rejected")
     over_hashcode, final_hashcode = local_store.hash_of_hashcodes(
         start_hashcode=self.start_hashcode,
-        reverse=self.reverse,
         after=self.after,
         length=self.length
     )

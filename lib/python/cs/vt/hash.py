@@ -341,7 +341,7 @@ class HashCodeUtilsMixin:
       type(start_hashcode) is self.hashclass
   )  # pylint: disable=unidiomatic-typecheck
   def hash_of_hashcodes(
-      self, *, start_hashcode=None, reverse=None, after=False, length=None
+      self, *, start_hashcode=None, after=False, length=None
   ):
     ''' Return a hash of the hashcodes requested and the last
         hashcode (or `None` if no hashcodes matched);
@@ -355,10 +355,7 @@ class HashCodeUtilsMixin:
       )
     hs = list(
         self.hashcodes(
-            start_hashcode=start_hashcode,
-            reverse=reverse,
-            after=after,
-            length=length
+            start_hashcode=start_hashcode, after=after, length=length
         )
     )
     if hs:
@@ -379,7 +376,7 @@ class HashCodeUtilsMixin:
       type(start_hashcode) is self.hashclass
   )
   # pylint: disable=too-many-branches,unidiomatic-typecheck
-  def hashcodes_from(self, *, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, *, start_hashcode=None):
     ''' Default generator yielding hashcodes from this object until none remains.
 
         See the `hashcodes()` method for a wrapper with more features.
@@ -392,37 +389,19 @@ class HashCodeUtilsMixin:
         Parameters:
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
-          if None start the sequences from the smallest hashcode
-          or from the largest if `reverse` is true
-        * `reverse`: yield hashcodes in reverse order
-          (counting down instead of up).
+          if `None` start the sequences from the smallest hashcode
     '''
     ks = sorted(self.keys())
     if not ks:
       return
     if start_hashcode is None:
-      if reverse:
-        ndx = len(ks) - 1
-      else:
-        ndx = 0
+      ndx = 0
     else:
       ndx = bisect_left(ks, start_hashcode)
       if ndx == len(ks):
         # start_hashcode > max hashcode
-        if reverse:
-          # step back into array
-          ndx -= 1
-        else:
-          # nothing to return
-          return
-      else:
-        # start_hashcode <= max hashcode
-        # ==> ks[ndx] >= start_hashcode
-        if reverse and ks[ndx] > start_hashcode:
-          if ndx > 0:
-            ndx -= 1
-          else:
-            return
+        # nothing to return
+        return
     # yield keys until we're not wanted
     while True:
       try:
@@ -430,20 +409,13 @@ class HashCodeUtilsMixin:
       except IndexError:
         break
       yield hashcode
-      if reverse:
-        if ndx == 0:
-          break
-        ndx -= 1
-      else:
-        ndx += 1
+      ndx += 1
 
   @require(
       lambda self, start_hashcode: start_hashcode is None or
       type(start_hashcode) is self.hashclass
   )  # pylint: disable=unidiomatic-typecheck
-  def hashcodes(
-      self, *, start_hashcode=None, reverse=False, after=False, length=None
-  ):
+  def hashcodes(self, *, start_hashcode=None, after=False, length=None):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
 
@@ -451,9 +423,6 @@ class HashCodeUtilsMixin:
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
           if None start the sequences from the smallest hashcode
-          or from the largest if `reverse` is true
-        * `reverse`: yield hashcodes in reverse order
-            (counting down instead of up).
         * `after`: skip the first hashcode if it is equal to `start_hashcode`
         * `length`: the maximum number of hashcodes to yield
     '''
@@ -472,8 +441,7 @@ class HashCodeUtilsMixin:
       if nhashcodes == 0:
         return
     first = True
-    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
-                                        reverse=reverse):
+    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -489,15 +457,12 @@ class HashCodeUtilsMixin:
       lambda self, start_hashcode: start_hashcode is None or
       isinstance(start_hashcode, type(self))
   )
-  def hashcodes_bg(
-      self, *, start_hashcode=None, reverse=None, after=False, length=None
-  ):
+  def hashcodes_bg(self, *, start_hashcode=None, after=False, length=None):
     ''' Background a hashcodes call.
     '''
     return self._defer(
         self.hashcodes,
         start_hashcode=start_hashcode,
-        reverse=reverse,
         after=after,
         length=length
     )

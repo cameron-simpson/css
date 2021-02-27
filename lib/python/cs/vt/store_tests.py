@@ -295,29 +295,15 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     # extract hashes, check results
     #
     ks = sorted(KS1)
-    for reverse in False, True:
-      for start_hashcode in [None] + ks + [h2]:
-        with self.subTest(M1type=type(M1).__name__, reverse=reverse,
-                          start_hashcode=start_hashcode):
-          hs = list(
-              M1.hashcodes_from(
-                  start_hashcode=start_hashcode, reverse=reverse
-              )
-          )
-          self.assertIsOrdered(hs, reverse=reverse, strict=True)
-          if reverse:
-            ksrev = reversed(ks)
-            hs2 = [
-                h for h in ksrev
-                if start_hashcode is None or h <= start_hashcode
-            ]
-          else:
-            hs2 = [
-                h for h in ks if start_hashcode is None or h >= start_hashcode
-            ]
-          hs = list(sorted(hs))
-          hs2 = list(sorted(hs2))
-          self.assertEqual(hs, hs2)
+    for start_hashcode in [None] + ks + [h2]:
+      with self.subTest(M1type=type(M1).__name__,
+                        start_hashcode=start_hashcode):
+        hs = list(M1.hashcodes_from(start_hashcode=start_hashcode))
+        self.assertIsOrdered(hs, strict=True)
+        hs2 = [h for h in ks if start_hashcode is None or h >= start_hashcode]
+        hs = list(sorted(hs))
+        hs2 = list(sorted(hs2))
+        self.assertEqual(hs, hs2)
 
   @multitest
   def testhcu02hashcodes(self):
@@ -382,17 +368,14 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
             after = start_hashcode is not None
             hs = list(
                 M1.hashcodes(
-                    start_hashcode=start_hashcode,
-                    length=n,
-                    reverse=False,
-                    after=after
+                    start_hashcode=start_hashcode, length=n, after=after
                 )
             )
             # verify that no key has been seen before
             for h in hs:
               self.assertNotIn(h, seen)
             # verify ordering of returned list
-            self.assertIsOrdered(hs, reverse=False, strict=True)
+            self.assertIsOrdered(hs, strict=True)
             # verify that least key is > start_hashcode
             if start_hashcode is not None:
               self.assertLess(start_hashcode, hs[0])

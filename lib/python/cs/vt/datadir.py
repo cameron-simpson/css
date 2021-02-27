@@ -557,25 +557,22 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     return len(self.index)
 
   @pfx_method
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None):
     ''' Generator yielding the hashcodes from the database in order
         starting with optional `start_hashcode`.
 
         Parameters:
         * `start_hashcode`: the first hashcode; if missing or `None`,
           iteration starts with the first key in the index
-        * `reverse`: iterate backwards if true, otherwise forwards.
     '''
     with self._lock:
       unindexed = set(self._unindexed)
-    indexed = self.index.hashcodes_from(
-        start_hashcode=start_hashcode, reverse=reverse
+    indexed = map(
+        self.hashclass,
+        self.index.keys(start_hashcode=start_hashcode),
     )
     unseen_indexed = (h for h in indexed if h not in unindexed)
-    return imerge(
-        sorted(unindexed, reverse=reverse),
-        sorted(unseen_indexed, reverse=reverse)
-    )
+    return imerge(sorted(unindexed), sorted(unseen_indexed))
 
   def __iter__(self):
     return self.hashcodes_from()

@@ -534,26 +534,20 @@ class KyotoIndex(BinaryIndex):
   def __setitem__(self, key, binary_entry):
     self._kyoto[key] = binary_entry
 
-  def keys(self, *, start_key=None, reverse=False):
+  def keys(self, *, start_hashcode=None):
     ''' Generator yielding the keys from the index
         in order starting with optional `start_key`.
 
         Parameters:
         * `start_key`: the starting key; if missing or None,
           iteration starts with the first key in the index
-        * `reverse`: iterate backward if true, otherwise forward
     '''
     cursor = self._kyoto.cursor()
-    if reverse:
-      if cursor.jump_back(start_key):
-        yield cursor.get_key()
-        while cursor.step_back():
-          yield cursor.get_key()
-    else:
-      if cursor.jump(start_key):
-        yield cursor.get_key()
-        while cursor.step():
-          yield cursor.get_key()
+    if start_hashcode is not None:
+      cursor.jump(start_hashcode)
+    yield cursor.get_key()
+    while cursor.step():
+      yield cursor.get_key()
     cursor.disable()
 
   __iter__ = keys
