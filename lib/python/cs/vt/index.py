@@ -4,7 +4,7 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcodes => FileDataIndexEntry.
+''' An index is a mapping of hashcode => `FileDataIndexEntry`.
     This module supports several backends and a mechanism for choosing one.
 '''
 
@@ -376,6 +376,11 @@ class GDBMIndex(BinaryIndex):
 
   def keys(self):
     ''' Generator yielding keys from the index.
+
+        Note: using `start_hashcode` can be quite inefficient
+        as GDBM lacks a way to set a starting point,
+        requiring iteration from the first hashcode in the index.
+        Switch to LMDB or Kyoto for better behaviour.
     '''
     with self._gdbm_lock:
       key = self._gdbm.firstkey()
@@ -536,10 +541,10 @@ class KyotoIndex(BinaryIndex):
 
   def keys(self, *, start_hashcode=None):
     ''' Generator yielding the keys from the index
-        in order starting with optional `start_key`.
+        in order starting with optional `start_hashcode`.
 
         Parameters:
-        * `start_key`: the starting key; if missing or None,
+        * `start_hashcode`: the starting key; if missing or `None`,
           iteration starts with the first key in the index
     '''
     cursor = self._kyoto.cursor()
