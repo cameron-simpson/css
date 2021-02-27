@@ -189,12 +189,10 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def from_hashbytes(cls, hashbytes):
     ''' Factory function returning a `HashCode` object from the hash bytes.
     '''
-    if len(hashbytes) != cls.HASHLEN:
-      # pylint: disable=bad-string-format-type
-      raise ValueError(
-          "expected %d bytes, received %d: %r" %
-          (cls.HASHLEN, len(hashbytes), hashbytes)
-      )
+    assert len(hashbytes) == cls.HASHLEN, (
+        "expected %d bytes, received %d: %r" %
+        (cls.HASHLEN, len(hashbytes), hashbytes)
+    )
     return cls(hashbytes)
 
   @classmethod
