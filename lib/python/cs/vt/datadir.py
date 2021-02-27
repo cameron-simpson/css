@@ -470,7 +470,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         filenum=filenum,
         data_offset=offset + data_offset,
         data_length=data_length,
-        flags=flags
+        flags=flags,
     )
     post_offset = offset + length
     hashcode = hashclass.from_chunk(data)
@@ -884,8 +884,10 @@ class DataDir(FilesDir):
                   (
                       hashcode,
                       FileDataIndexEntry(
-                          filenum, pre_offset + DR.data_offset,
-                          DR.raw_data_length, DR.flags
+                          filenum=filenum,
+                          data_offset=pre_offset + DR.data_offset,
+                          data_length=DR.raw_data_length,
+                          flags=DR.flags,
                       ), post_offset
                   )
               )
