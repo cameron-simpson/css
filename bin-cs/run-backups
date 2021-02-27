@@ -29,7 +29,7 @@ usage="Usage: $cmd [-n] [srcs...]
   -q    Quiet.
   -x    Trace execution.
   srcs...
-        Backup source paths; if specified, only therse paths will be backed up.
+        Backup source paths; if specified, only these paths will be backed up.
 
 The configuration file: $backups
 contains lines of the form:
@@ -97,6 +97,10 @@ do
   case "$src" in
     /*) ;; *) src=$HOME/$src ;;
   esac
+  if [ -d "$src/" ]
+  then  suffix=/
+  else  suffix=
+  fi
   for dsthost in ${dsthost/,/ }
   do
     case "$dsthost" in
@@ -124,15 +128,15 @@ do
                   ;;
       image)      $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts --delete-after $etc \
-                      "$src/" "$dsthost:$dst/"
+                      "$src$suffix" "$dsthost:$dst$suffix"
                   ;;
       mv)         $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts --remove-source-files $etc \
-                      "$src/" "$dsthost:$dst/"
+                      "$src$suffix" "$dsthost:$dst$suffix"
                   ;;
       push)       $dont pfx "$src:$dsthost:$dst" $trace \
                     rsync -a $rsvopts $etc \
-                      "$src/" "$dsthost:$dst/"
+                      "$src$suffix" "$dsthost:$dst$suffix"
                   ;;
       histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
                     rhistbackup "$src:$dsthost:$dst"
