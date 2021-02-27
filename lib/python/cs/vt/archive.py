@@ -93,7 +93,7 @@ class BaseArchive(ABC):
       for entry in self:
         last_entry = entry
       if last_entry is None:
-        return ArchiveEntry(None, None)
+        return ArchiveEntry(when=None, dirent=None)
       self._last = last_entry
     return last_entry
 
@@ -117,7 +117,7 @@ class BaseArchive(ABC):
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
-        yield ArchiveEntry(when, E)
+        yield ArchiveEntry(when=when, dirent=E)
 
   @staticmethod
   def read(fp, first_lineno=1):
@@ -126,7 +126,7 @@ class BaseArchive(ABC):
     '''
     for entry in BaseArchive.parse(fp, first_lineno=first_lineno):
       return entry
-    return ArchiveEntry(None, None)
+    return ArchiveEntry(when=None, dirent=None)
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
