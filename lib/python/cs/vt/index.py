@@ -277,12 +277,16 @@ class LMDBIndex(BinaryIndex):
     # no force=True param?
     self._lmdb.sync()
 
-  def keys(self):
+  def keys(self, start_hashcode=None):
     ''' Generator yielding keys from the index.
     '''
     with self._txn() as txn:
       cursor = txn.cursor()
-      yield from cursor.iternext(keys=True, values=False)
+      if start_hashcode is not None:
+        if not cursor.set_range(start_hashcode):
+          # no keys >=start_hashcode
+          return
+      yield from cursor.iterprev(keys=True, values=False)
 
   def items(self):
     ''' Yield `(key,record)` from index.
@@ -374,7 +378,7 @@ class GDBMIndex(BinaryIndex):
           self._gdbm.sync()
           self._written = False
 
-  def keys(self):
+  def keys(self, start_hashcode=None):
     ''' Generator yielding keys from the index.
 
         Note: using `start_hashcode` can be quite inefficient
@@ -385,7 +389,8 @@ class GDBMIndex(BinaryIndex):
     with self._gdbm_lock:
       key = self._gdbm.firstkey()
     while key is not None:
-      yield key
+      if start_hashcode is not None and key >= start_hashcode:
+        yield key
       self.flush()
       with self._gdbm_lock:
         key = self._gdbm.nextkey(key)
