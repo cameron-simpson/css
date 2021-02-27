@@ -1239,14 +1239,14 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       to a class returned by the `pt_spec()` function.
 
       If the class has both `parse_value` and `transcribe_value` methods
-      then the valueitself will be directly stored.
-      Otherwise the class it presumed to be more complex some `AbstractBinary` subclass
-      and the instance is stored.
+      then the value itself will be directly stored.
+      Otherwise the class it presumed to be more complex subclass
+      of `AbstractBinary` and the instance is stored.
 
       Here is an example exhibiting various ways of defining each field:
       * `n1`: defined with the *`_value` methods of `UInt8`,
         which return or transcribe the `int` from an unsigned 8 bit value;
-        this stores a `BinarySingleValue` whole `.value` is an `int`
+        this stores a `BinarySingleValue` whose `.value` is an `int`
       * `n2`: defined from the `UInt8` class,
         which parses an unsigned 8 bit value;
         this stores an `UInt8` instance
@@ -1255,11 +1255,10 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
       * `data1`: defined with the *`_value` methods of `BSData`,
         which return or transcribe the data `bytes`
         from a run length encoded data chunk;
-        this stores a `BinarySingleValue` whole `.value` is a `bytes`
+        this stores a `BinarySingleValue` whose `.value` is a `bytes`
       * `data2`: defined from the `BSData` class
         which parses a run length encoded data chunk;
-        this stores a `BSData` instance
-        (also a `BinarySingleValue` whole `.value` is a `bytes`)
+        this is a `BinarySingleValue` so we store its `bytes` value directly.
 
           >>> class BMV(BinaryMultiValue("BMV", {
           ...         'n1': (UInt8.parse_value, UInt8.transcribe_value),
@@ -1281,14 +1280,14 @@ def BinaryMultiValue(class_name, field_map, field_order=None):
           >>> bmv.n2
           34
           >>> bmv  #doctest: +ELLIPSIS
-          BMV(n1=17, n2=34, n3=119, nd=nd_1_short_bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
+          BMV(n1=17, n2=34, n3=119, nd=nd_1_short__bs(short=33154, bs=b'zyxw'), data1=b'AB', data2=b'DEFG')
           >>> bmv.nd  #doctest: +ELLIPSIS
-          nd_1_short_bs(short=33154, bs=b'zyxw')
+          nd_1_short__bs(short=33154, bs=b'zyxw')
           >>> bmv.nd.bs
           b'zyxw'
           >>> bytes(bmv.nd)
           b'\x81\x82zyxw'
-          >>> bmv.data1  #doctest: +ELLIPSIS
+          >>> bmv.data1
           b'AB'
           >>> bmv.data2
           b'DEFG'
