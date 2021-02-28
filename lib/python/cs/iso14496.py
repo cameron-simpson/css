@@ -2298,7 +2298,7 @@ _ILSTRawSchema = pt_spec(
 )
 
 def ILSTRawSchema(attribute_name):
-  ''' Namedtuple type for ILST raw schema.
+  ''' Attribute name and type for ILST raw schema.
   '''
   return attribute_name, _ILSTRawSchema
 
@@ -2312,17 +2312,17 @@ _ILSTTextSchema = pt_spec(
 )
 
 def ILSTTextSchema(attribute_name):
-  ''' Namedtuple type for ILST text schema.
+  ''' Attribute name and type for ILST text schema.
   '''
   return attribute_name, _ILSTTextSchema
 
 def ILSTUInt32BESchema(attribute_name):
-  ''' Namedtuple type for ILST UInt32BE schema.
+  ''' Attribute name and type for ILST UInt32BE schema.
   '''
   return attribute_name, UInt32BE
 
 def ILSTUInt8Schema(attribute_name):
-  ''' Namedtuple type for ILST UInt8BE schema.
+  ''' Attribute name and type for ILST UInt8BE schema.
   '''
   return attribute_name, UInt8
 
@@ -2332,7 +2332,7 @@ _ILSTAofBSchema = BinaryMultiValue(
 )
 
 def ILSTAofBSchema(attribute_name):
-  ''' Namedtuple type for ILST "A of B" schema.
+  ''' Attribute name and type for ILST "A of B" schema.
   '''
   return attribute_name, _ILSTAofBSchema
 
@@ -2346,7 +2346,7 @@ _ILSTISOFormatSchema = pt_spec(
 )
 
 def ILSTISOFormatSchema(attribute_name):
-  ''' Namedtuple type for ILST ISO format schema.
+  ''' Attribute name and type for ILST ISO format schema.
   '''
   return attribute_name, _ILSTISOFormatSchema
 
