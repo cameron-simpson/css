@@ -21,8 +21,6 @@ from getopt import getopt, GetoptError
 import os
 import sys
 from cs.binary import (
-    BytesField,
-    ListField,
     UInt8,
     Int16BE,
     UTF16NULField,
@@ -44,7 +42,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import StackableState
 from cs.fstags import FSTags, rpaths
-from cs.lex import get_identifier, get_decimal_value
+from cs.lex import get_identifier, get_decimal_value, cropped_repr
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import prop
@@ -2391,7 +2389,7 @@ class _ILSTUTF8Text(BinarySingleValue):
     return value.encode('utf-8')
 
 class ILSTBoxBody(ContainerBoxBody):
-  ''' iTunes Information List, container for iTunes metadata fields.
+  ''' Apple iTunes Information List, container for iTunes metadata fields.
 
       The basis of the format knowledge here comes from AtomicParsley's
       documentation here:
