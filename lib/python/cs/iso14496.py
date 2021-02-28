@@ -2549,8 +2549,8 @@ class ILSTBoxBody(ContainerBoxBody):
                 data_box.parse_field_value('n2', databfr, UInt32BE)
                 data_box.parse_field_value('text', databfr, _ILSTUTF8Text)
               value = data_box.text
-              decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
-                                                  {}).get(name_box.text)
+              subsubbox_schema = self.SUBSUBBOX_SCHEMA.get(mean_box.text, {})
+              decoder = subsubbox_schema.get(name_box.text)
               if decoder is not None:
                 value = decoder(value)
               # annotate the subbox and the ilst
@@ -2568,7 +2568,11 @@ class ILSTBoxBody(ContainerBoxBody):
               data_box.parse_field_value('n2', databfr, UInt32BE)
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
-                warning("%r: no schema", subbox_type)
+                bs = databfr.take(...)
+                warning("%r: no schema, stashing bytes %r", subbox_type, bs)
+                data_box.add_field(
+                    'subbox__' + subbox_type.decode('ascii'), bs
+                )
               else:
                 attribute_name, binary_cls = subbox_schema
                 with Pfx("%s=%s", attribute_name, binary_cls):
