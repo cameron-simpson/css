@@ -73,7 +73,7 @@ from struct import Struct
 import sys
 from types import SimpleNamespace
 from cs.buffer import CornuCopyBuffer
-from cs.gimmicks import warning
+from cs.gimmicks import warning, debug
 from cs.lex import cropped, cropped_repr, typed_str as s
 from cs.pfx import Pfx, pfx_method
 from cs.seq import Seq
@@ -213,7 +213,6 @@ def pt_spec(pt, name=None):
 
   if name is not None:
     PTValue.__name__ = name
-
   PTValue.__name__ += '_' + str(next(_pt_spec_seq))
   return PTValue
 
@@ -1402,7 +1401,7 @@ class BinaryUTF8NUL(BinarySingleValue):
       try:
         bfr.extend(bs_length)
       except EOFError as e:
-        warning(
+        debug(
             "BinaryUTF8NUL.parse_value: EOF found looking for NUL terminator: %s",
             e
         )
