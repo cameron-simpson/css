@@ -763,6 +763,14 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
         def __float__(self):
           return float(self[0])
 
+        if field_names[0] != 'value':
+
+          @property
+          def value(self):
+            ''' Alias `.value` as the first (and only) struct value.
+            '''
+            return self[0]
+
         @classmethod
         def parse_value(cls, bfr):
           ''' Parse a value from `bfr`, return the value.
