@@ -596,9 +596,9 @@ class BoxBody(SimpleBinary, ABC):
         Note that this disassociaes the plain value attribute
         from what gets transcribed.
     '''
-    value = binary_cls.parse_value(bfr)
-    self.add_field(field_name + '__Binary', binary_cls(value))
-    setattr(self, field_name, value)
+    instance = binary_cls.parse(bfr)
+    self.add_field('_' + field_name + '__Binary', instance)
+    setattr(self, field_name, instance.value)
 
   def parse_field(self, field_name, bfr, binary_cls):
     ''' Parse an instance of `binary_cls` from `bfr`
