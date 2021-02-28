@@ -794,6 +794,7 @@ def BinaryMultiStruct(class_name: str, struct_format: str, field_names: str):
     struct_class.struct = struct
     struct_class.format = struct_format
     struct_class.length = struct.size
+    struct_class.field_names = field_names
     _binary_multi_struct_classes[key] = struct_class
     return struct_class
 
