@@ -2432,6 +2432,7 @@ class ILSTBoxBody(ContainerBoxBody):
       b'desc': ILSTTextSchema('description'),
       b'disk': ILSTUInt8Schema('disk_number'),
       b'egid': ILSTRawSchema('episode_guid'),
+      b'geID': ILSTUInt32BESchema('geID_unknown_geo_id_maybe'),
       b'genr': ILSTTextSchema('genre'),
       b'hdvd': ILSTUInt8Schema('is_high_definition'),
       b'keyw': ILSTTextSchema('keyword'),
