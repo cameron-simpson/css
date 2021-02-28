@@ -952,7 +952,9 @@ class Box(SimpleBinary):
     '''
     # We don't go list(self) or [].extend(self) because both of those fire
     # the transcription of the box because of list's preallocation heuristics.
-    subboxes = [subbox for subbox in self]
+    # Instead we make a bare iterator and list() that, specific
+    # incantation from Peter Otten.
+    subboxes = list(iter(self))
     yield self, subboxes
     for subbox in subboxes:
       if isinstance(subbox, Box):
