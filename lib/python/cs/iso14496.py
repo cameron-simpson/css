@@ -802,7 +802,10 @@ class Box(SimpleBinary):
     header = self.header
     body = self.body
     unparsed = self.unparsed
-    new_length = len(header) + len(body) + len(unparsed)
+    new_length = (
+        header.transcribed_length() + body.transcribed_length() +
+        sum(map(len, unparsed))
+    )
     box_size = header.box_size
     if box_size is Ellipsis or box_size != new_length:
       # change the box_size
