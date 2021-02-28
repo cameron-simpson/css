@@ -778,11 +778,6 @@ class Box(SimpleBinary):
     '''
     return self.end_offset - self.offset
 
-  def __len__(self):
-    ''' A length which works without attempting a transcribe.
-    '''
-    return self.parse_length
-
   @property
   def unparsed_bs(self):
     ''' The unparsed data as a single `bytes` instance.
@@ -1073,10 +1068,6 @@ class HasBoxesMixin:
 class OverBox(BinaryListValues, HasBoxesMixin):
   ''' A fictitious `Box` encompassing all the Boxes in an input buffer.
   '''
-
-  @pfx_method
-  def __len__(self):
-    return sum(map(len, self.values))
 
   @property
   def boxes(self):
