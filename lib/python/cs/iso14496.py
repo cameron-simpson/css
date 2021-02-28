@@ -518,12 +518,6 @@ class BoxBody(SimpleBinary, ABC):
 
   FIELD_TYPES = dict(offset=int, post_offset=int)
 
-  @staticmethod
-  def S_CHOOSE_NAME(name):
-    ''' Tweak the str/repr output a bit.
-    '''
-    return not name.startswith('_') and name != 'parent'
-
   def __getattr__(self, attr):
     ''' The following virtual attributes are defined:
         * *TYPE*`s`:
