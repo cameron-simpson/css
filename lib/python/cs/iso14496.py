@@ -1469,7 +1469,7 @@ add_body_class(TREFBoxBody)
 class TrackReferenceTypeBoxBody(BoxBody):
   ''' A TrackReferenceTypeBoxBody contains references to other tracks - ISO14496 section 8.3.3.2.
   '''
-  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, track_ids=ListField)
+  FIELD_TYPES = dict(BoxBody.FIELD_TYPES, track_ids=list)
 
   BOX_TYPES = (
       b'hint',
