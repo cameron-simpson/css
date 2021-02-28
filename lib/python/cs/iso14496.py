@@ -2582,6 +2582,10 @@ class ILSTBoxBody(ContainerBoxBody):
                     setattr(subbox, attribute_name, value)
                     if isinstance(value, BinarySingleValue):
                       tag_value = value.value
+                    elif isinstance(value, tuple) and len(value) == 1:
+                      tag_value, = value
+                    else:
+                      tag_value = value
                     if isinstance(tag_value, bytes):
                       self.tags.add(
                           attribute_name,
