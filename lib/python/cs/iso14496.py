@@ -2366,6 +2366,31 @@ itunes_store_country_code = namedtuple(
     'country_name iso_3166_1_code itunes_store_code'
 )
 
+class _ILSTUTF8Text(BinarySingleValue):
+  ''' A full-buffer piece of UTF-8 encoded text.
+  '''
+
+  @staticmethod
+  def parse_value(bfr):
+    ''' Read the entire buffer and decode it as UTF-8.
+    '''
+    bs = bfr.take(...)
+    try:
+      s = bs.decode('utf-8', errors='strict')
+    except UnicodeDecodeError as e:
+      warning(
+          "_ILSTUTF8Text.parse_value(%r): %s, retrying with errors=replace",
+          bs, e
+      )
+      s = bs.decode('utf-8', errors='replace')
+    return s
+
+  @staticmethod
+  def transcribe_value(value):
+    ''' Transcribe `value` in UTF-8.
+    '''
+    return value.encode('utf-8')
+
 class ILSTBoxBody(ContainerBoxBody):
   ''' iTunes Information List, container for iTunes metadata fields.
 
@@ -2512,26 +2537,17 @@ class ILSTBoxBody(ContainerBoxBody):
           assert mean_box.box_type == b'mean'
           assert name_box.box_type == b'name'
           with mean_box.reparse_buffer() as meanbfr:
-            mean_box.parse_field('n1', meanbfr, UInt32BE)
-            mean_box.parse_field(
-                'text', meanbfr,
-                (lambda bfr: bfr.take(...).decode(), str.encode)
-            )
+            mean_box.parse_field_value('n1', meanbfr, UInt32BE)
+            mean_box.parse_field_value('text', meanbfr, _ILSTUTF8Text)
           with Pfx("mean %r", mean_box.text):
             with name_box.reparse_buffer() as namebfr:
-              name_box.parse_field('n1', namebfr, UInt32BE)
-              name_box.parse_field(
-                  'text', namebfr,
-                  (lambda bfr: bfr.take(...).decode(), str.encode)
-              )
+              name_box.parse_field_value('n1', namebfr, UInt32BE)
+              name_box.parse_field_value('text', namebfr, _ILSTUTF8Text)
             with Pfx("name %r", name_box.text):
               with data_box.reparse_buffer() as databfr:
-                data_box.parse_field('n1', databfr, UInt32BE)
-                data_box.parse_field('n2', databfr, UInt32BE)
-                data_box.parse_field(
-                    'text', databfr,
-                    (lambda bfr: bfr.take(...).decode(), str.encode)
-                )
+                data_box.parse_field_value('n1', databfr, UInt32BE)
+                data_box.parse_field_value('n2', databfr, UInt32BE)
+                data_box.parse_field_value('text', databfr, _ILSTUTF8Text)
               value = data_box.text
               decoder = self.SUBSUBBOX_SCHEMA.get(mean_box.text,
                                                   {}).get(name_box.text)
@@ -2548,8 +2564,8 @@ class ILSTBoxBody(ContainerBoxBody):
           else:
             data_box, = inner_boxes
             with data_box.reparse_buffer() as databfr:
-              data_box.parse_field('n1', databfr, UInt32BE)
-              data_box.parse_field('n2', databfr, UInt32BE)
+              data_box.parse_field_value('n1', databfr, UInt32BE)
+              data_box.parse_field_value('n2', databfr, UInt32BE)
               subbox_schema = self.SUBBOX_SCHEMA.get(subbox_type)
               if subbox_schema is None:
                 warning("%r: no schema", subbox_type)
