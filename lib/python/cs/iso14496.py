@@ -566,6 +566,9 @@ class BoxBody(SimpleBinary, ABC):
           return box
     raise AttributeError("%s.%s" % (type(self).__name__, attr))
 
+  def __str__(self):
+    return super().__str__(getattr(self, '_parsed_field_names', ()))
+
   def __iter__(self):
     yield from ()
 
