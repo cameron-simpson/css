@@ -1117,10 +1117,10 @@ class FullBoxBody(BoxBody):
 
   FIELD_TYPES = dict(
       BoxBody.FIELD_TYPES,
-      version__Binary=UInt8,
-      flags0__Binary=UInt8,
-      flags1__Binary=UInt8,
-      flags2__Binary=UInt8,
+      _version__Binary=UInt8,
+      _flags0__Binary=UInt8,
+      _flags1__Binary=UInt8,
+      _flags2__Binary=UInt8,
   )
 
   def parse_fields(self, bfr):
