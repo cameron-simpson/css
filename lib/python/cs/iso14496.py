@@ -999,6 +999,9 @@ class FallbackBoxBody(BoxBody):
       used by `pick_boxbody_class()`.
   '''
 
+  def __str__(self):
+    return type(self).__name__
+
 def pick_boxbody_class(box_type: bytes):
   ''' Infer a `BoxBody` subclass from the 4-byte bytes `box_type`.
       Returns `FallbackBoxBody` for unimplemented types.
