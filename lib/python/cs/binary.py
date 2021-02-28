@@ -308,10 +308,13 @@ class BinaryMixin:
     '''
     return b''.join(flatten(self.transcribe()))
 
-  def __len__(self):
+  def transcribed_length(self):
     ''' Compute the length by running a transcription and measuring it.
     '''
     return sum(map(len, flatten(self.transcribe())))
+
+  # also available as len() by default
+  __len__ = transcribed_length
 
   @classmethod
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
