@@ -1152,7 +1152,12 @@ class MDATBoxBody(BoxBody):
       bfr.skipto(bfr.end_offset)
     else:
       self.data = list(bfr)
-    self._data_len = bfr.offset - offset0
+    self.data_length = bfr.offset - offset0
+
+  def transcribed_length(self):
+    ''' Return the transcription length even if we didn't keep the data.
+    '''
+    return self.data_length
 
   def __len__(self):
     ''' Return the measured length of the data.
