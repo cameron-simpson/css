@@ -610,7 +610,7 @@ class BoxBody(SimpleBinary, ABC):
     if isinstance(binary_cls, int):
       value = bfr.take(binary_cls)
     else:
-      value = binary_cls.parse(bfr)
+      value = pt_spec(binary_cls).parse(bfr)
     self.add_field(field_name, value)
 
   def add_field(self, field_name, value):
