@@ -947,7 +947,9 @@ class Box(SimpleBinary):
         As with `os.walk`, the returned `subboxes` list
         may be modified to prune the subsequent walk.
     '''
-    subboxes = list(self)
+    # We don't go list(self) or [].extend(self) because both of those fire
+    # the transcription of the box because of list's preallocation heuristics.
+    subboxes = [subbox for subbox in self]
     yield self, subboxes
     for subbox in subboxes:
       if isinstance(subbox, Box):
