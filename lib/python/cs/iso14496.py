@@ -1164,12 +1164,6 @@ class MDATBoxBody(BoxBody):
     '''
     return self.data_length
 
-  def __len__(self):
-    ''' Return the measured length of the data.
-        This works even if we did not store the data during the parse.
-    '''
-    return self._data_len
-
   def transcribe(self):
     ''' Transcribe the data.
         Raise an `AssertionError` if we skipped the data during the parse.
