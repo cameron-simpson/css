@@ -228,7 +228,12 @@ class MP4Command(BaseCommand):
         for top_box in over_box:
           for box, tags in top_box.gather_metadata():
             if tags:
-              print(box.box_type_path, "%d:" % (len(tags),), tags)
+              print(' ', box.box_type_path, str(len(tags)) + ':')
+              for tag in tags:
+                if tag.name == 'moov.udta.meta.ilst.cover':
+                  print('   ', tag.name, cropped_repr(tag.value))
+                else:
+                  print('   ', tag, repr(tag.value))
 
   @staticmethod
   def cmd_parse(argv):
