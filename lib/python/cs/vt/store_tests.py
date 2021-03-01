@@ -37,9 +37,7 @@ HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
 INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'
 STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 
-##from cs.debug import thread_dump
-
-# constraint the tests if not empty, try every permutation if empty
+# constrain the tests if not empty, try every permutation if empty
 HASHCLASS_NAMES = tuple(
     os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
     or sorted(HashCode.by_name.keys())
@@ -51,12 +49,21 @@ STORECLASS_NAMES = tuple(os.environ.get(STORECLASS_NAMES_ENVVAR, '').split())
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
+      Yield `(subtest,Store)` tuples.
+
+      `subtest` is a dict containing decriptive fields for `unittest.subtest()`.
+
+      `Store` is an empty Store to test.
   '''
   # test all Store types against all the hash classes
   subtest = {}
   for hashclass_name in HASHCLASS_NAMES:
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
-    with stackkeys(subtest, hashname=hashclass_name, hashclass=hashclass):
+    with stackkeys(
+        subtest,
+        hashname=hashclass_name,
+        hashclass=hashclass.__name__,
+    ):
       # MappingStore
       with stackkeys(subtest, storetype=MappingStore):
         yield subtest, MappingStore(
