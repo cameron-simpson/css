@@ -222,6 +222,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       rollover=None,
       flags=None,
       flags_prefix=None,
+      **_,
   ):
     resolved = cls._resolve(
         hashclass=hashclass,
