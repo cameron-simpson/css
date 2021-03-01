@@ -71,7 +71,7 @@ from cs.fileutils import (
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
@@ -882,7 +882,14 @@ class DataDir(FilesDir):
           if new_size > DFstate.scanned_to:
             offset = DFstate.scanned_to
             hashclass = self.hashclass
-            for pre_offset, DR, post_offset in DFstate.scanfrom(offset=offset):
+            for pre_offset, DR, post_offset in progressbar(
+                DFstate.scanfrom(offset=offset),
+                "%s: scan %s" % (self, relpath(datadirpath, DFstate.filename)),
+                position=offset,
+                total=new_size,
+                units_scale=BINARY_BYTES_SCALE,
+                itemlenfunc=lambda t3: t3[2] - t3[0],
+            ):
               hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(
                   (
