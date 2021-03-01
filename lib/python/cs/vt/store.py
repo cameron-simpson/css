@@ -595,27 +595,24 @@ class ProxyStore(BasicStoreSync):
   ''' A Store managing various subsidiary Stores.
 
       Three classes of Stores are managed:
-
-      Save stores. All data added to the Proxy is added to these Stores.
-
-      Read Stores. Requested data may be obtained from these Stores.
-
-      Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
+      * Save stores. All data added to the Proxy is added to these Stores.
+      * Read Stores. Requested data may be obtained from these Stores.
+      * Copy Stores. Data retrieved from a `read2` Store is copied to these Stores.
 
       A example setup utilising a working ProxyStore might look like this:
 
           ProxyStore(
             save=[local,upstream],
             save2=[spool],
-            read=[local],
+            read=[local,spool],
             read2=[upstream],
             copy2=[local],
           )
 
       In this example:
-      * `local`: is a local low latency store such as a DataDirStore.
-      * `upstream`: is a remote high latency Store such as a TCPStore.
-      * `spool`: is a local scondary Store, probably a DataDirStore.
+      * `local`: is a local low latency store such as a `DataDirStore`.
+      * `upstream`: is a remote high latency Store such as a `TCPStore`.
+      * `spool`: is a local secondary Store, probably a `DataDirStore`.
 
       This setup causes all saved data to be saved to `local` and
       `upstream`.
@@ -635,8 +632,10 @@ class ProxyStore(BasicStoreSync):
       This supports obtaining an Archive by name
       from the first Store whose glob matches the name.
 
-      TODO: replay and purge the spool? probably better as a separate
-      pushto operation ("vt -S spool_store pushto --delete upstream_store").
+      TODO: replay and purge the spool? Probably better as a separate
+      pushto operation:
+
+          vt -S spool_store pushto --delete upstream_store
   '''
 
   def __init__(
@@ -948,10 +947,10 @@ class DataDirStore(MappingStore):
     )
     MappingStore.__init__(self, name, self._datadir, hashclass=hashclass, **kw)
 
-  def startup(self, **kw):
+  def startup(self):
     ''' Startup: open the internal DataDir.
     '''
-    super().startup(**kw)
+    super().startup()
     self._datadir.open()
 
   def shutdown(self):
