@@ -3,6 +3,8 @@
 # Data stores based on local files.
 # - Cameron Simpson <cs@cskk.id.au>
 #
+# pylint: disable=too-many-lines
+#
 
 ''' Data directories: the sharable filesystem directories
     storing the backing files for the `DataDir` and `PlatonicDir`
@@ -59,7 +61,6 @@ from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
 from cs.context import nullcontext, stackattrs
-from cs.excutils import logexc
 from cs.fileutils import (
     DEFAULT_READSIZE,
     ReadMixin,
@@ -71,14 +72,13 @@ from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress
-from cs.py.func import prop as property
+from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import Upd
-from cs.x import X
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -561,7 +561,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     return len(self.index)
 
   @pfx_method
-  def hashcodes_from(self, start_hashcode=None):
+  def hashcodes_from(self, *, start_hashcode=None):
     ''' Generator yielding the hashcodes from the database in order
         starting with optional `start_hashcode`.
 
@@ -611,7 +611,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       return entry.fetch_fd(rfd)
     except Exception as e:
       exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
-      raise KeyError(str(hashcode))
+      raise KeyError(str(hashcode)) from e
 
 class SqliteFilemap:
   ''' The file mapping of `filenum` to `DataFileState`.
