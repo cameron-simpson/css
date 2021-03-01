@@ -71,7 +71,7 @@ from cs.fileutils import (
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
-from cs.progress import Progress, progressbar
+from cs.progress import progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
@@ -1256,36 +1256,32 @@ class PlatonicDir(FilesDir):
                           )
                         scan_from = DFstate.scanned_to
                         scan_start = time.time()
-                        scan_progress = Progress(
-                            name="scan " + rfilepath,
+                        for pre_offset, data, post_offset in progressbar(
+                            DFstate.scanfrom(offset=DFstate.scanned_to),
+                            "scan " + rfilepath,
                             position=DFstate.scanned_to,
                             total=new_size,
-                            units_scale=BINARY_BYTES_SCALE
-                        )
-                        with scan_progress.bar():
-                          for pre_offset, data, post_offset in DFstate.scanfrom(
-                              offset=DFstate.scanned_to):
-                            hashcode = self.hashclass.from_chunk(data)
-                            indexQ.put(
-                                (
-                                    hashcode,
-                                    FileDataIndexEntry(
-                                        filenum=DFstate.filenum,
-                                        data_offset=pre_offset,
-                                        data_length=len(data),
-                                        flags=0,
-                                    ), post_offset
-                                )
-                            )
-                            if meta_store is not None:
-                              B = Block(
-                                  data=data, hashcode=hashcode, added=True
+                            units_scale=BINARY_BYTES_SCALE,
+                            itemlenfunc=lambda t3: t3[2] - t3[0],
+                        ):
+                          hashcode = self.hashclass.from_chunk(data)
+                          indexQ.put(
+                              (
+                                  hashcode,
+                                  FileDataIndexEntry(
+                                      filenum=DFstate.filenum,
+                                      data_offset=pre_offset,
+                                      data_length=len(data),
+                                      flags=0,
+                                  ), post_offset
                               )
-                              blockQ.put((pre_offset, B))
-                            DFstate.scanned_to = post_offset
-                            scan_progress.position = post_offset
-                            if self.cancelled or self.flag_scan_disable:
-                              break
+                          )
+                          if meta_store is not None:
+                            B = Block(data=data, hashcode=hashcode, added=True)
+                            blockQ.put((pre_offset, B))
+                          DFstate.scanned_to = post_offset
+                          if self.cancelled or self.flag_scan_disable:
+                            break
                         if meta_store is not None:
                           blockQ.close()
                           try:
