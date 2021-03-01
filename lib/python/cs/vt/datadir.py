@@ -823,7 +823,7 @@ class DataDir(FilesDir):
     ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
     bfr = buffer_from_pathname(filepath, offset=offset)
-    yield from DataRecord.parse_buffer(bfr)
+    yield from DataRecord.scan_with_offsets(bfr)
 
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
