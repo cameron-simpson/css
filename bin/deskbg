@@ -67,18 +67,22 @@ fi || exit 1
   desktop "$desk" rootbg_src "$srcargs"
 ) &
 
-case "$OS" in
-  darwin)
-    set -x
-    case "$rootbg" in
-      /*) ;; *) rootbg=$(pwd)/$rootbg ;;
-    esac
-    osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$rootbg\""
-    ;;
-  *)
-    [ $desk != $thisdesk ] || fvwm-root -r --no-dither "$rootbg"
-    ;;
-esac
+# update the current display
+if [ $desk = $thisdesk ]
+then
+  case "$OS" in
+    darwin)
+      set -x
+      case "$rootbg" in
+        /*) ;; *) rootbg=$(pwd)/$rootbg ;;
+      esac
+      osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$rootbg\""
+      ;;
+    *)
+      fvwm-root -r --no-dither "$rootbg"
+      ;;
+  esac
+fi
 
 ##### apply new background, set desktop to use it
 ####cset=`expr 1024 + $desk` || exit 1
