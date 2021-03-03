@@ -6,6 +6,8 @@
 
 set -ue
 
+cd
+
 cmd=$0
 usage="Usage: $cmd org startdate enddate [repo-dirs...]"
 
