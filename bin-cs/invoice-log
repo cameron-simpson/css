@@ -31,10 +31,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-
 rcfile=$HOME/rc/invoice/$org.sh
-[ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
-. "$rcfile"
+if [ -s "$rcfile" ]
+then  . "$rcfile"
+else  echo "$cmd: missing rcfile: $rcfile" >&2
+fi
 
 set -x
 (
