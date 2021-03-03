@@ -24,8 +24,7 @@ else
   for d in $repodirs
   do
     [ -d "$d/.git" ] || [ -d "$d/.hg" ] || {
-      echo "$cmd: repodir $d: no .git or .hg subdir" >&2
-      badopts=1
+      echo "$cmd: repodir $d: no .git or .hg subdir, SKIPPING" >&2
     }
   done
 fi
