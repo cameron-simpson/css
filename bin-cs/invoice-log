@@ -44,6 +44,7 @@ set -x
   [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
   for d in $repodirs
   do
+    [ -d "$d/" ] || continue
     ( cd "$d"
       if [ -d ".git/" ]
       then  git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
