@@ -33,7 +33,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-thisdesk=`currentdesk` || exit 1
+thisdesk=`currentdesk` || thisdesk=1
 
 cmdesk=
 case "$desk" in
