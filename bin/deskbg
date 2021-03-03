@@ -1,8 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Set the root background on per-desktop basis.
 #	- Cameron Simpson <cs@cskk.id.au> 02feb2004
 #
+
+set -ue
 
 : ${DESKTOPSET:=desktop}
 
