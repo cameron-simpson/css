@@ -10,6 +10,7 @@ musicbrainzngs
 pycodestyle
 pyflakes
 pylint
+pytest
 requests
 sqlalchemy
 twine
