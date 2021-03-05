@@ -398,7 +398,7 @@ class GDBMIndex(BinaryIndex):
     with self._gdbm_lock:
       key = self._gdbm.firstkey()
     while key is not None:
-      if start_hashcode is not None and key >= start_hashcode:
+      if start_hashcode is None or key >= start_hashcode:
         yield key
       self.flush()
       with self._gdbm_lock:
