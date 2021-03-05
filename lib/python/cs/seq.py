@@ -220,14 +220,14 @@ def onetomany(func):
 
   return gather
 
-def isordered(s, reverse=False, strict=False):
+def isordered(items, reverse=False, strict=False):
   ''' Test whether an iterable is ordered.
       Note that the iterable is iterated, so this is a destructive
       test for nonsequences.
   '''
   is_first = True
   prev = None
-  for item in s:
+  for item in items:
     if not is_first:
       if reverse:
         ordered = item < prev if strict else item <= prev

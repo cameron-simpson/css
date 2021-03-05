@@ -999,7 +999,14 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
+def progressbar(
+    it,
+    label=None,
+    position=None,
+    total=None,
+    units_scale=UNSCALED_SCALE,
+    **kw
+):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
       issuing and withdrawning a progress bar during the iteration.
@@ -1007,6 +1014,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       Parameters:
       * `it`: the iterable to consume
       * `label`: optional label, doubles as the `Progress.name`
+      * `position`: optional starting position
       * `total`: optional value for `Progress.total`,
         default from `len(it)` if supported.
       * `units_scale`: optional units scale for `Progress`,
@@ -1028,7 +1036,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
     except TypeError:
       total = None
   yield from Progress(
-      name=label, total=total, units_scale=units_scale
+      name=label, position=position, total=total, units_scale=units_scale
   ).iterbar(
       it, label=label, **kw
   )

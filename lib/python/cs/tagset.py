@@ -944,7 +944,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s[offset:])):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):

@@ -13,8 +13,9 @@ from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace
-from cs.context import nullcontext, stackattrs
+from cs.context import stackattrs
 from cs.deco import cachedmethod
+from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
@@ -417,6 +418,14 @@ class BaseCommand:
       with Pfx(opt):
         self.apply_opt(opt, val)
 
+  def apply_opts(self, opts, options):
+    ''' The `apply_opts` method is required
+        if the subclass defines a nonempty `GETOPT_SPEC` attribute.
+        It should apply `opts` (the result of `getopt.getopt`)
+        to `options`.
+    '''
+    raise NotImplementedError("%s.apply_opts" % (type(self).__name__,))
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self):
     ''' Run a the command.
@@ -466,7 +475,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @staticmethod
-  def getopt_error_handler(cmd, options, e, usage):
+  def getopt_error_handler(cmd, options, e, usage):  # pylint: disable=unused-argument
     ''' The `getopt_error_handler` method
         is used to control the handling of `GetoptError`s raised
         during the command line parse
@@ -514,7 +523,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv, options):
+  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.

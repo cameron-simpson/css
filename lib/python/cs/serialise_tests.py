@@ -47,7 +47,7 @@ class TestSerialise(unittest.TestCase):
     # check that same value decoded as encoded
     self.assertEqual(n, n2)
 
-  def test00bs(self):
+  def OBSOLETEtest00bs(self):
     self.assertRaises(IndexError, get_bs, bytes(()))
     self.assertEqual(get_bs(bytes((0,))), (0, 1))
     for n in 1, 3, 7, 127, 128, 255, 256, 16383, 16384:
@@ -62,7 +62,7 @@ class TestSerialise(unittest.TestCase):
     # check that same chunk decoded as encoded
     self.assertEqual(chunk, chunk2)
 
-  def test01bsdata(self):
+  def OBSOLETEtest01bsdata(self):
     self.assertEqual(get_bsdata(bytes((0,))), (bytes(()), 1))
     self.assertEqual(get_bsdata(bytes((2, 0, 0))), (bytes((0, 0)), 3))
     for n in 1, 3, 7, 127, 128, 255, 256, 16383, 16384:
