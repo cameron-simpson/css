@@ -293,5 +293,6 @@ class _TestAdditionsMixin:
     ''' Assertion to test that an object's elements are ordered.
     '''
     self.assertTrue(
-        isordered(s, strict), "not ordered(strict=%s): %r" % (strict, s)
+        isordered(s, strict=strict),
+        "not ordered(strict=%s): %r" % (strict, s)
     )
