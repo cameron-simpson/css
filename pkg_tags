@@ -26,7 +26,7 @@ cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20210131" ok_revision="82134e048cf41a8ab2f600bb6db085cb4b4c1c42"
 cs.fstags pypi.release="20200717.1"
-cs.gimmicks ok_revision="457bbd876fb6bf7f0c45f1f588a07ff58782f7e6"
+cs.gimmicks ok_revision="457bbd876fb6bf7f0c45f1f588a07ff58782f7e6" pypi.release="20210306"
 cs.html pypi.release=20160828
 cs.id3 pypi.release=20150116.2
 cs.inttypes pypi.release=20150120
