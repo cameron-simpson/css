@@ -24,7 +24,7 @@ from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20201228-post'
+__version__ = '20210306'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
