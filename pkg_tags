@@ -16,7 +16,7 @@ cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966ed
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20210123" ok_revision="51a1ad742b3af9f59ed21974879ac06f0cd6ad70"
 cs.configutils pypi.release=20190101
-cs.context pypi.release="20200725.1" ok_revision="9dd336aee5597e8aa4e96d4c33d7b2c2b9c0282f"
+cs.context pypi.release="20210306" ok_revision="9dd336aee5597e8aa4e96d4c33d7b2c2b9c0282f"
 cs.csvutils pypi.release="20201228"
 cs.debug pypi.release=20200318
 cs.deco pypi.release="20210123" ok_revision=af258d12a144bf2526a6cd9d204d15c6bfd31c24
