@@ -143,6 +143,13 @@ class BinaryIndex(MultiOpenMixin, ABC):
     '''
     raise NotImplementedError("no keys implementation")
 
+  def sorted_keys(self, start_hashcode=None):
+    ''' The keys from `self.keys`, sorted.
+
+        Classes whose `.keys` is already sorted should short circuit this method.
+    '''
+    return iter(sorted(self.keys(start_hashcode=start_hashcode)))
+
   def __iter__(self):
     return self.keys()
 
@@ -286,7 +293,9 @@ class LMDBIndex(BinaryIndex):
         if not cursor.set_range(start_hashcode):
           # no keys >=start_hashcode
           return
-      yield from cursor.iterprev(keys=True, values=False)
+      yield from cursor.iternext(keys=True, values=False)
+
+  sorted_keys = keys
 
   def items(self):
     ''' Yield `(key,record)` from index.
@@ -395,6 +404,8 @@ class GDBMIndex(BinaryIndex):
       with self._gdbm_lock:
         key = self._gdbm.nextkey(key)
 
+  # .keys is unsorted, use the default superclass method
+
   def __contains__(self, key):
     with self._gdbm_lock:
       return key in self._gdbm
@@ -467,6 +478,8 @@ class NDBMIndex(BinaryIndex):
     with self._ndbm_lock:
       ks = list(self._nbdm.keys())
     return iter(ks)
+
+  # .keys is unsorted, use the default superclass method
 
   def __contains__(self, key):
     with self._ndbm_lock:
@@ -559,6 +572,8 @@ class KyotoIndex(BinaryIndex):
     while cursor.step():
       yield cursor.get_key()
     cursor.disable()
+
+  sorted_keys = keys
 
   __iter__ = keys
 
