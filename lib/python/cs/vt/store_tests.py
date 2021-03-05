@@ -273,15 +273,19 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     data = make_randblock(rand0(8193))
     h = M1.add(data)
     self.assertIn(h, M1)
-    hcodes = list(M1.hashcodes())
-    self.assertIn(h, M1.hashcodes())
+    self.assertEqual(M1[h], data)
     KS1.add(h)
+    self.assertIn(h, M1)
+    mks = set(M1.keys())
+    self.assertIn(h, mks)
+    mks = set(M1.hashcodes())
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
-    self.assertEqual(set(M1.hashcodes()), KS1)
+    mks2 = set(M1.hashcodes())
+    self.assertEqual(mks2, KS1)
 
   @multitest
   def testhcu01test_hashcodes_from(self):
@@ -289,28 +293,41 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     '''
     # fill map1 with 16 random data blocks
     M1 = self.S
-    KS1 = set()
+    hashcodes_added = set()
     for _ in range(16):
       data = make_randblock(rand0(8193))
       h = M1.add(data)
-      KS1.add(h)
+      hashcodes_added.add(h)
     # make a block not in the map
     data2 = make_randblock(rand0(8193))
-    h2 = self.S.hash(data2)
-    self.assertNotIn(h2, KS1, "abort test: %s in previous blocks" % (h2,))
+    hashcode_other = self.S.hash(data2)
+    self.assertNotIn(
+        hashcode_other, hashcodes_added,
+        "abort test: %s in previous blocks" % (hashcode_other,)
+    )
     #
-    # extract hashes, check results
+    # extract hashes using Store.hashcodes_from, check results
     #
-    ks = sorted(KS1)
-    for start_hashcode in [None] + ks + [h2]:
+    ks = sorted(hashcodes_added)
+    for start_hashcode in [None] + list(hashcodes_added) + [hashcode_other]:
       with self.subTest(M1type=type(M1).__name__,
                         start_hashcode=start_hashcode):
-        hs = list(M1.hashcodes_from(start_hashcode=start_hashcode))
-        self.assertIsOrdered(hs, strict=True)
-        hs2 = [h for h in ks if start_hashcode is None or h >= start_hashcode]
-        hs = list(sorted(hs))
-        hs2 = list(sorted(hs2))
-        self.assertEqual(hs, hs2)
+        hashcodes_from = list(M1.hashcodes_from(start_hashcode=start_hashcode))
+        self.assertIsOrdered(hashcodes_from, strict=True)
+        if start_hashcode is not None:
+          for h in hashcodes_from:
+            self.assertGreaterEqual(
+                h, start_hashcode,
+                "NOT start_hashocde=%s <= h=%s" % (start_hashcode, h)
+            )
+          self.assertTrue(
+              all(map(lambda h: h >= start_hashcode, hashcodes_from))
+          )
+        hashcodes_expected = sorted(
+            h for h in hashcodes_added
+            if start_hashcode is None or h >= start_hashcode
+        )
+        self.assertEqual(hashcodes_from, hashcodes_expected)
 
   @multitest
   def testhcu02hashcodes(self):
