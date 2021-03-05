@@ -524,8 +524,9 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
           old_DFstate = None
         continue
       hashcode, entry, post_offset = item
+      entry_bs = bytes(entry)
       with self._lock:
-        index[hashcode] = bytes(entry)
+        index[hashcode] = entry_bs
         try:
           del unindexed[hashcode]
         except KeyError:
