@@ -7,7 +7,6 @@
 ''' Various Store classes.
 '''
 
-from __future__ import with_statement
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from fnmatch import fnmatch
