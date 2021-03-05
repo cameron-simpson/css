@@ -444,14 +444,15 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       break
     return self._filemap.add_path(filename)
 
-  def add(self, data, hashclass):
-    ''' Add the supplied data chunk to the current save DataFile,
+  def add(self, data):
+    ''' Add the supplied data chunk to the current save `DataFile`,
         return the hashcode.
         Roll the internal state over to a new file if the current
         datafile has reached the rollover threshold.
 
         Subclasses must define the `data_save_information(data)` method.
     '''
+    # pretranscribe the in-file data record
     bs, data_offset, data_length, flags = self.data_save_information(data)
     with self._lock:
       wfd = self._wfd
@@ -477,7 +478,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         flags=flags,
     )
     post_offset = offset + length
-    hashcode = hashclass.from_chunk(data)
+    hashcode = self.hashclass.from_chunk(data)
     self._queue_index(hashcode, entry, post_offset)
     return hashcode
 
@@ -551,7 +552,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self.index.flush()
 
   def __setitem__(self, hashcode, data):
-    h = self.add(data, type(hashcode))
+    h = self.add(data)
     if hashcode != h:
       raise ValueError(
           'supplied hashcode %s does not match data, data added under %s instead'
