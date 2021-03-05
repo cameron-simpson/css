@@ -469,14 +469,18 @@ class NDBMIndex(BinaryIndex):
     '''
     # no fast mode, no sync
 
-  def keys(self):
+  def keys(self, start_hashcode=None):
     ''' Return an iterator over a snapshot of the keys.
 
         For large indices it is probably better to shift to an index
-        with some kind of `next_key()` method.
+        with some kind of `next_key()` method,
+        particularly when `start_hashcode` is not `None`.
     '''
     with self._ndbm_lock:
-      ks = list(self._nbdm.keys())
+      kit = self._ndbm.keys()
+      if start_hashcode is not None:
+        kit = (k for k in kit if k >= start_hashcode)
+      ks = list(kit)
     return iter(ks)
 
   # .keys is unsorted, use the default superclass method
