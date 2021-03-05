@@ -39,7 +39,7 @@ cs.mappings pypi.release="20210123" ok_revision="1c6729280fe13d6f16dae30f781b3a6
 cs.mixin.ucattrs pypi.release=20150118
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
-cs.obj pypi.release="20210131" ok_revision="0beb9776b0e87575cbff287909057c1b4c55a475"
+cs.obj pypi.release="20210131" ok_revision="059a4883f2d7c8265a651f4405125065501f207a"
 cs.packetstream pypi.release=20191004
 cs.pfx pypi.release="20201227" ok_revision="00b30b7f58a02044616eae6d50e1abb7c263c678"
 cs.pipeline pypi.release=20191007.1
