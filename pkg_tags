@@ -33,7 +33,7 @@ cs.inttypes pypi.release=20150120
 cs.iso14496 pypi.release=20200229
 cs.later pypi.release=20191007
 cs.lex pypi.release="20210306" ok_revision=be5b0f8bcd795fe650e2c60746559edcf7826e82
-cs.logutils pypi.release="20201021"
+cs.logutils pypi.release="20201021" ok_revision=e022e06c5eca20df716be53046512d9fe8b3070a
 cs.mailutils pypi.release=20171231.1
 cs.mappings pypi.release="20210123" ok_revision="1c6729280fe13d6f16dae30f781b3a683fe17ca1"
 cs.mixin.ucattrs pypi.release=20150118
