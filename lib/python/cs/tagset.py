@@ -2630,8 +2630,7 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
-  @staticmethod
-  def cmd_type(argv, options):
+  def cmd_type(self, argv):
     ''' Usage:
           {cmd}
             With no arguments, list the defined types.
@@ -2645,6 +2644,7 @@ class TagsOntologyCommand(BaseCommand):
           {cmd} type_name list
             Listt the metadata names for this type and their tags.
     '''
+    options = self.options
     ont = options.ontology
     if not argv:
       # list defined types
