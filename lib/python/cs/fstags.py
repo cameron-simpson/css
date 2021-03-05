@@ -174,16 +174,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     self.options.ontology_path = None
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt, val):
+    ''' Apply command line option.
     '''
     options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-o':
-          options.ontology_path = val
-        else:
-          raise RuntimeError("unhandled option")
+    if opt == '-o':
+      options.ontology_path = val
+    else:
+      raise RuntimeError("unhandled option")
 
   @contextmanager
   def run_context(self):
