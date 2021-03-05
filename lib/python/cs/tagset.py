@@ -883,7 +883,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     value = self.value
     if value is None:
       return name
-    return name + '=' + self.transcribe_value(value)
+    try:
+      value_s = self.transcribe_value(value)
+    except TypeError:
+      value_s = str(value)
+    return name + '=' + value_s
 
   @classmethod
   def transcribe_value(cls, value):
