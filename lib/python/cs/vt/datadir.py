@@ -570,14 +570,20 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         * `start_hashcode`: the first hashcode; if missing or `None`,
           iteration starts with the first key in the index
     '''
+    # important: consult this BEFORE self.index.keys otherwise items might
+    # flow from unindexed to the index unseen
     with self._lock:
-      unindexed = set(self._unindexed)
-    indexed = map(
+      unindexed = list(self._unindexed)
+    if start_hashcode is not None and unindexed:
+      unindexed = filter(lambda h: h >= start_hashcode, unindexed)
+    hs = map(
         self.hashclass,
-        self.index.keys(start_hashcode=start_hashcode),
+        self.index.sorted_keys(start_hashcode=start_hashcode),
     )
-    unseen_indexed = (h for h in indexed if h not in unindexed)
-    return imerge(sorted(unindexed), sorted(unseen_indexed))
+    unindexed = set(unindexed)
+    if unindexed:
+      hs = filter(lambda h: h not in unindexed, hs)
+    return imerge(hs, sorted(unindexed))
 
   def __iter__(self):
     return self.hashcodes_from()
