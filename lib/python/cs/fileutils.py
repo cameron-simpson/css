@@ -1756,11 +1756,13 @@ class RWFileBlockCache(object):
   def put(self, data):
     ''' Store `data`, return offset.
     '''
-    assert len(data) > 0
     fd = self.fd
     with self._lock:
       offset = os.lseek(fd, 0, 1)
-      length = os.write(fd, data)
+      if len(data) == 0:
+        length = 0
+      else:
+        length = os.write(fd, data)
     assert length == len(data)
     return offset
 
