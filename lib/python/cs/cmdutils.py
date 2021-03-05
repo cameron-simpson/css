@@ -418,14 +418,6 @@ class BaseCommand:
       with Pfx(opt):
         self.apply_opt(opt, val)
 
-  def apply_opts(self, opts, options):
-    ''' The `apply_opts` method is required
-        if the subclass defines a nonempty `GETOPT_SPEC` attribute.
-        It should apply `opts` (the result of `getopt.getopt`)
-        to `options`.
-    '''
-    raise NotImplementedError("%s.apply_opts" % (type(self).__name__,))
-
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self):
     ''' Run a the command.
