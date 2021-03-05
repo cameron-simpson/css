@@ -23,7 +23,7 @@
     and scanning the new data.
 
     A `RawDataDir` behaves like an ordinary `DataDir`
-    except that the data files contains the raw uncompressed data bytes.
+    except that the data files contain the raw uncompressed data bytes.
     This notional use case is as a local cache of efficiently accessed data.
     The intent is that one might pull all the leaf data of a "file"
     into the store contiguously in order to obtain more efficient data access.
