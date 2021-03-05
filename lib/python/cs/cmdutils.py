@@ -36,8 +36,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.py.doc', 'cs.resources'
+        'cs.context', 'cs.deco', 'cs.gimmicks', 'cs.lex', 'cs.logutils',
+        'cs.pfx', 'cs.py.doc', 'cs.resources'
     ],
 }
 
