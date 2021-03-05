@@ -11,7 +11,7 @@ cs.app.svcd pypi.release=20190729
 cs.app.ydl pypi.release="20200621"
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release=20200229
-cs.buffer pypi.release="20201102"
+cs.buffer pypi.release="20201102" ok_revision=f66679f66ff7fecbf06389f5025ada098b75603d
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20210123" ok_revision="51a1ad742b3af9f59ed21974879ac06f0cd6ad70"
