@@ -25,6 +25,8 @@ from cs.py3 import StringTypes
 from cs.seq import seq
 from cs.threads import locked_property
 
+__version__ = '20210306'
+
 DISTINFO = {
     'description': "functions and classes to work with email",
     'keywords': ["python2", "python3"],
