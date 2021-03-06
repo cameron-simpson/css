@@ -18,6 +18,7 @@ cs.cmdutils pypi.release="20210306" ok_revision="5824ff29254555ad88389e339a60365
 cs.configutils pypi.release=20190101
 cs.context pypi.release="20210306" ok_revision="9dd336aee5597e8aa4e96d4c33d7b2c2b9c0282f"
 cs.csvutils pypi.release="20201228"
+cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2
 cs.debug pypi.release=20200318
 cs.deco pypi.release="20210123" ok_revision=af258d12a144bf2526a6cd9d204d15c6bfd31c24
 cs.edit pypi.release=20191201.1 ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
