@@ -61,8 +61,11 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils',
+        'cs.excutils',
         'cs.fstags',
         'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
         'cs.result',
         'cs.tagset',
         'cs.upd',
