@@ -68,6 +68,7 @@ class Packet(SimpleBinary):
   ''' A protocol packet.
   '''
 
+  # pylint: disable=signature-differs
   def __str__(self):
     payload = self.payload
     if len(payload) > 16:
@@ -135,6 +136,7 @@ class Packet(SimpleBinary):
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
+# pylint: disable=too-many-instance-attributes
 class PacketConnection(object):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
@@ -144,6 +146,7 @@ class PacketConnection(object):
       is_request=True, channel=0, tag=0, flags=0, rq_type=0, payload=b''
   )
 
+  # pylint: disable=too-many-arguments
   def __init__(
       self,
       recv,
@@ -376,6 +379,7 @@ class PacketConnection(object):
     )
 
   @not_closed
+  # pylint: disable=too-many-arguments
   def request(
       self, rq_type, flags=0, payload=b'', decode_response=None, channel=0
   ):
@@ -428,6 +432,7 @@ class PacketConnection(object):
     return self.request(*a, **kw)()
 
   @logexc
+  # pylint: disable=too-many-arguments
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
     '''
@@ -450,13 +455,14 @@ class PacketConnection(object):
             )
           else:
             result_flags, result_payload = result
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception("exception: %s", e)
         self._reject(channel, tag, "exception during handler")
       else:
         self._respond(channel, tag, result_flags, result_payload)
       self._channel_request_tags[channel].remove(tag)
 
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def _receive_loop(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
@@ -536,7 +542,7 @@ class PacketConnection(object):
                     # decode payload
                     try:
                       result = decode_response(flags, payload)
-                    except Exception:
+                    except Exception:  # pylint: disable=broad-except
                       R.exc_info = sys.exc_info()
                     else:
                       R.result = (True, flags, result)
@@ -551,6 +557,7 @@ class PacketConnection(object):
         self._recv = None
         self.shutdown()
 
+  # pylint: disable=too-many-branches
   def _send_loop(self):
     ''' Send packets upstream.
         Write every packet directly to self._send.
