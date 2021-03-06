@@ -37,6 +37,8 @@ from cs.py.func import prop
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
+__version__ = '20210306'
+
 DISTINFO = {
     'description':
     "Tool for finding and hardlinking identical files.",
