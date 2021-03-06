@@ -16,7 +16,7 @@ from cs.fileutils import file_property
 from cs.py3 import ConfigParser, StringTypes
 from cs.threads import locked
 
-__version__ = '20210306'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description': "utility functions for .ini style configuration files",
