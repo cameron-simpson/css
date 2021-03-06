@@ -44,7 +44,7 @@ from cs.result import bg as bg_result, report
 from cs.tagset import Tag
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210306'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
