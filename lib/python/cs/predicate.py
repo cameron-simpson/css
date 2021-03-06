@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from cs.logutils import error
 from cs.pfx import Pfx
 
-__version__ = '20210306'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description': "fnctions for expressing predicates",
