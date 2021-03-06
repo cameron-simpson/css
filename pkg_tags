@@ -41,7 +41,7 @@ cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b8
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210131" ok_revision="059a4883f2d7c8265a651f4405125065501f207a"
-cs.packetstream pypi.release=20191004
+cs.packetstream pypi.release=20191004 ok_revision="5288dfe60e38aed5a428228c9f309381e13a609e"
 cs.pfx pypi.release="20201227" ok_revision="00b30b7f58a02044616eae6d50e1abb7c263c678"
 cs.pipeline pypi.release=20191007.1
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
