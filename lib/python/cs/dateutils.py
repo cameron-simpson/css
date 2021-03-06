@@ -12,6 +12,8 @@
 from datetime import date, datetime, tzinfo, timedelta
 from time import localtime, mktime, strftime
 
+__version__ = '20210306'
+
 DISTINFO = {
     'keywords': ["date", "time", "datetime", "python", "python3"],
     'classifiers': [
