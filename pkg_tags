@@ -45,7 +45,7 @@ cs.packetstream pypi.release=20191004
 cs.pfx pypi.release="20201227" ok_revision="00b30b7f58a02044616eae6d50e1abb7c263c678"
 cs.pipeline pypi.release=20191007.1
 cs.predicate pypi.release=20190221
-cs.progress pypi.release="20201102.1" ok_revision=ee5d518343b7e82ad1faaca85fc1682e63ce7d44
+cs.progress pypi.release="20210306" ok_revision=ee5d518343b7e82ad1faaca85fc1682e63ce7d44
 cs.psutils pypi.release=20190101
 cs.py.doc pypi.release="20210306" ok_revision=fc38c09619a42f8d8b9f15edb391e598401b7c5d
 cs.py.func pypi.release="20200518" ok_revision=e6c30cccb510258f853207ad2bc46e0e3b64b912
