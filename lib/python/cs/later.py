@@ -39,10 +39,9 @@ import threading
 from threading import Lock, Thread, Event
 import time
 from cs.deco import OBSOLETE
-from cs.debug import ifdebug
 from cs.excutils import logexc
 import cs.logutils
-from cs.logutils import error, warning, info, debug, exception, D
+from cs.logutils import error, warning, info, debug, ifdebug, exception, D
 from cs.pfx import pfx_method
 from cs.py.func import funcname
 from cs.queues import IterableQueue, TimerQueue
@@ -61,7 +60,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
-        'cs.debug',
         'cs.excutils',
         'cs.logutils',
         'cs.pfx',
@@ -71,7 +69,6 @@ DISTINFO = {
         'cs.result',
         'cs.seq',
         'cs.threads',
-        'cs.x',
     ],
 }
 
