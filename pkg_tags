@@ -25,7 +25,7 @@ cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20210306" ok_revision=c4fc3d471c4c4d9df6bb9e6596a4a103a05bf023
-cs.fstags pypi.release="20200717.1" ok_revision="8b555c5edcd96d9f038f9b56cef52d9d8077ef41"
+cs.fstags pypi.release="20210306" ok_revision="8b555c5edcd96d9f038f9b56cef52d9d8077ef41"
 cs.gimmicks ok_revision="457bbd876fb6bf7f0c45f1f588a07ff58782f7e6" pypi.release="20210306"
 cs.html pypi.release=20160828
 cs.id3 pypi.release=20150116.2
