@@ -102,7 +102,7 @@ default = _ThreadLocal()
 
 def defer(func, *a, **kw):
   ''' Queue a function using the current default Later.
-      Return the LateFunction.
+      Return the `LateFunction`.
   '''
   return default.current.defer(func, *a, **kw)
 
@@ -227,11 +227,11 @@ class LateFunction(Result):
   '''
 
   def __init__(self, func, name=None, retry_delay=None):
-    ''' Initialise a LateFunction.
+    ''' Initialise a `LateFunction`.
 
         Parameters:
         * `func` is the callable for later execution.
-        * `name`, if supplied, specifies an identifying name for the LateFunction.
+        * `name`, if supplied, specifies an identifying name for the `LateFunction`.
         * `retry_local`: time delay before retry of this function on RetryError.
           Default from `later.retry_delay`.
     '''
@@ -294,7 +294,7 @@ class Later(MultiOpenMixin):
 
       Methods are provided for submitting functions to run ASAP or
       after a delay or after other pending functions. These methods
-      return LateFunctions, a subclass of cs.result.Result.
+      return `LateFunction`s, a subclass of `cs.result.Result`.
 
       A Later instance' close method closes the Later for further
       submission.
@@ -373,7 +373,7 @@ class Later(MultiOpenMixin):
     bg_thread(self._finished.set)
 
   def _try_dispatch(self):
-    ''' Try to dispatch the next LateFunction.
+    ''' Try to dispatch the next `LateFunction`.
 
         Does nothing if insufficient capacity or no pending tasks.
     '''
@@ -397,7 +397,7 @@ class Later(MultiOpenMixin):
         debug("LATER: at capacity, nothing dispatched: %s", self)
 
   def _complete_LF(self, LF):
-    ''' Process a completed LateFunction: remove from .running,
+    ''' Process a completed `LateFunction`: remove from .running,
         try to dispatch another function.
     '''
     with self._lock:
@@ -543,6 +543,7 @@ class Later(MultiOpenMixin):
 
         This is really just an easy way to utilise the `Later`'s thread pool
         and get back a handy `LateFunction` for result collection.
+        Frankly, you're probably better off using `cs.result.bg` instead.
 
         It can be useful for transient control functions that themselves
         queue things through the `Later` queuing system but do not want to
@@ -585,7 +586,7 @@ class Later(MultiOpenMixin):
       self, func, priority=None, delay=None, when=None, name=None, pfx=None
   ):
     ''' Submit the callable `func` for later dispatch.
-        Return the corresponding LateFunction for result collection.
+        Return the corresponding `LateFunction` for result collection.
 
         If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
@@ -597,12 +598,12 @@ class Later(MultiOpenMixin):
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
 
-        If the parameter `name` is not None, use it to name the LateFunction.
+        If the parameter `name` is not None, use it to name the `LateFunction`.
 
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
 
-        If the parameter `LF` is not None, construct a new LateFunction to
+        If the parameter `LF` is not None, construct a new `LateFunction` to
           track function completion.
     '''
     if not self.submittable:
@@ -672,7 +673,7 @@ class Later(MultiOpenMixin):
     ''' Generator which waits for outstanding functions to complete and yields them.
 
         Parameters:
-        * `outstanding`: if not None, an iterable of LateFunctions;
+        * `outstanding`: if not None, an iterable of `LateFunction`s;
           default `self.outstanding`.
         * `until_idle`: if true,
           continue until `self.outstanding` is empty.
@@ -695,7 +696,7 @@ class Later(MultiOpenMixin):
         break
 
   def wait_outstanding(self, until_idle=False):
-    ''' Wrapper for complete(), to collect and discard completed LateFunctions.
+    ''' Wrapper for complete(), to collect and discard completed `LateFunction`s.
     '''
     for _ in self.complete(until_idle=until_idle):
       pass
@@ -703,7 +704,7 @@ class Later(MultiOpenMixin):
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
-        Return the corresponding LateFunction for result collection.
+        Return the corresponding `LateFunction` for result collection.
 
         `func` may optionally be preceeded by one or both of:
         * a string specifying the function's descriptive name,
@@ -1002,9 +1003,9 @@ class LatePool(object):
             # several calls to LatePool.defer, perhaps looped
             LP.defer(func, *args, **kwargs)
             LP.defer(func, *args, **kwargs)
-          # now we can LP.join() to block for all LateFunctions
+          # now we can LP.join() to block for all `LateFunctions`
           #
-          # or iterate over LP to collect LateFunctions as they complete
+          # or iterate over LP to collect `LateFunction`s as they complete
           for LF in LP:
             result = LF()
             print(result)
@@ -1026,7 +1027,7 @@ class LatePool(object):
         * `L`: `Later` instance, default from default.current.
         * `priority`, `delay`, `when`, `name`, `pfx`:
           default values passed to Later.submit.
-        * `block`: if true, wait for LateFunction completion
+        * `block`: if true, wait for `LateFunction` completion
           before leaving __exit__.
     '''
     if L is None:
@@ -1050,14 +1051,14 @@ class LatePool(object):
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     ''' Exit handler.
-        If .block is true, wait for LateFunction completion before return.
+        If .block is true, wait for `LateFunction` completion before return.
     '''
     if self.block:
       self.join()
     return False
 
   def add(self, LF):
-    ''' Add a LateFunction to those to be tracked by this LatePool.
+    ''' Add a `LateFunction` to those to be tracked by this LatePool.
     '''
     self.LFs.append(LF)
 
@@ -1078,13 +1079,13 @@ class LatePool(object):
     return self.submit(func)
 
   def __iter__(self):
-    ''' Report completion of the LateFunctions.
+    ''' Report completion of the `LateFunction`s.
     '''
     for LF in report(self.LFs):
       yield LF
 
   def join(self):
-    ''' Wait for completion of all the LateFunctions.
+    ''' Wait for completion of all the `LateFunction`s.
     '''
     for _ in self:
       pass
