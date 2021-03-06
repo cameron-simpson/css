@@ -51,7 +51,7 @@ from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20200229'
+__version__ = '20210306'
 
 DISTINFO = {
     'keywords': ["python3"],

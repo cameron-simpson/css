@@ -1,0 +1,159 @@
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: modernise prefixed Tag construction
+lib/python/cs/iso14496.py: cs.iso14496: fix spelling of Tag.with_prefix
+lib/python/cs/iso14496.py: cs.iso14496: metdata: use box path in tag name prefix
+lib/python/cs/iso14496.py: cs.iso14496: modernise cs.upd usage
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_autotag: avoid shadowing the options paramaeter
+lib/python/cs/iso14496.py: cs.iso14496: pull out the tags-fromfilename logic into top level parse_tags() function
+lib/python/cs/iso14496.py: cs.iso14496: new "tags" subcommand to print the tags parsed from a file
+lib/python/cs/iso14496.py: cs.iso14496.py: MP4Command: pull usage strings into subcommand methods
+lib/python/cs/iso14496_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/iso14496.py: cs.iso14496: UTF8or16Field.from_buffer: pass encoding as a keyword parameter to UTF16NULField.value_from_buffer
+lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: add undocumented "forc" box type, encountered in the wild
+lib/python/cs/iso14496.py: merge default ==> testing
+lib/python/cs/iso14496.py: cs.iso14496: replace multi_struct_field and structtuple with BinaryMultiStruct
+lib/python/cs/iso14496.py: cs.iso14496: OverBox: new .length property summing then lengths of self.boxes
+lib/python/cs/iso14496.py: cs.iso14496: update methods for various UInt* classes, now subclasses of BinarySingleValue
+lib/python/cs/iso14496.py: cs.iso14496: docstring tweak
+lib/python/cs/iso14496.py: cs.iso14496: new global StackableState PARSE_MODE to global parse behaviour modes
+lib/python/cs/iso14496_tests.py: cs.iso14496_tests: improve the length tests, strip debug, clean lint
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: move a bunch of factories to outside the class
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command: parse() will only return a single OverBox
+lib/python/cs/iso14496.py: cs.iso14496: UTF8or16Field: port from PacketField to BaseBinaryMultiValue
+lib/python/cs/iso14496.py: cs.iso14496: BoxHeader: fix the definition of MAX_BOX_SIZE_32
+lib/python/cs/iso14496.py: cs.iso14496: BoxHeader: port from Packet to BinaryMultiValue
+lib/python/cs/iso14496.py: cs.iso14496: port BoxBody from Packet to BaseBinaryMultiValue
+lib/python/cs/iso14496.py: cs.iso14496: port Box from Packet to BaseBinaryMultiValue
+lib/python/cs/iso14496.py: cs.iso14496: patch Box.FIELD_TYPES and BoxBody.FIELD_TYPES now that both classes have been defined
+lib/python/cs/iso14496.py: cs.iso14496: define FallbackBoxBody: with a do nothing transcribe() method for when there's no type specific BoxBody subclass
+lib/python/cs/iso14496.py: cs.iso14496: pull pick_boxbody_class higher up and drop its default_type parameter
+lib/python/cs/iso14496.py: cs.iso14496: add_body_subclass: clean up a little logic
+lib/python/cs/iso14496.py: cs.iso14496: drop SubBoxesField, no longer used
+lib/python/cs/iso14496.py: cs.iso14496: new HasBoxesMixin for things with a .boxes field; port OverBox from Packet to BinaryListValues (a list of Boxes)
+lib/python/cs/iso14496.py: cs.iso14496: port FullBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port MDATBoxBody; TODO: honour PARSE_MODE.discard_data
+lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody: honour PARSE_MODE.discard_data (untested)
+lib/python/cs/iso14496.py: cs.iso14496: port FREEBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port FTYPBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port PDINBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port ContainerBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port MVHDBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port TKHDBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port TREFBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: TREFBoxBody: drop parse_fields method, we no longer presuppose Box types
+lib/python/cs/iso14496.py: cs.iso14496: drop the **kw from the parse_fields() methods
+lib/python/cs/iso14496.py: cs.iso14496: port TrackReferenceTypeBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port TrackGroupTypeBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port MDHDBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port HDLRBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port HDLRBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: port ELNGBoxBody
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: new parse_boxes utility method to part the remainder of a Box as subBoxes
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: provide a working .transcribe() implementation
+lib/python/cs/iso14496.py: cs.iso14496: MP4.cmd_parse: run the main parse in discard_data=True mode
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: include some Pfx context
+lib/python/cs/iso14496.py: cs.iso14496: add_body_subclass: provide a fuller generated subclass with a decent __doc__
+lib/python/cs/iso14496.py: cs.iso14496: FullBoxBody.transcribe: sanity check to ensure the subclass implemented .transcribe itself
+lib/python/cs/iso14496.py: cs.iso14496: FullBoxBody.transcribe: bugfix the flags transcription
+lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody.FIELD_TYPES: support data=None, which happens in discard_data=True mode
+lib/python/cs/iso14496.py: cs.iso14496: drop MDATBoxBody.transcribe, now done by BoxBody superclass
+lib/python/cs/iso14496.py: cs.iso14496: ContainerBoxBody: parse: use parse_boxes method; drop transcribe method, no longer special
+lib/python/cs/iso14496.py: cs.iso14496: anything with a /transcribe() method may be yielded directly from .transcribe() - simplify accordingly
+lib/python/cs/iso14496.py: cs.iso14496: MDHDBoxBody: implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: HDLRBoxBody: implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: ELNGBoxBody: implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: _SampleTableContainerBoxBody: replace PACKET_FIELDS with FIELD_TYPES
+lib/python/cs/iso14496.py: cs.iso14496: _SampleTableContainerBoxBody: simplify parse using parse_boxes, implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: _SampleEntry: update parse implementation
+lib/python/cs/iso14496.py: cs.iso14496: BTRTBoxBody: update .parse implementation
+lib/python/cs/iso14496.py: cs.iso14496: add_generic_sample_boxbody: replace PACKET_FIELDS with FIELD_TYPES, update .parse and .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: add_generic_sample_boxbody: SpecificSampleBoxBody: make .samples into a @locked_property instead of a @deferred_field for automatic on demand access
+lib/python/cs/iso14496.py: cs.iso14496: an 'edts' Box subclasses ContainerBoxBody instead of BoxBody
+lib/python/cs/iso14496.py: cs.iso14496: ELSTBoxBody specific implementation instead of a generic sampe box body
+lib/python/cs/iso14496.py: cs.iso14496: ELSTBoxBody: spelling fix for "fraction"
+lib/python/cs/iso14496.py: cs.iso14496: URL_BoxBody: update parse, implement transcribe
+lib/python/cs/iso14496.py: cs.iso14496: URN_BoxBody: update parse, implement transcribe
+lib/python/cs/iso14496.py: cs.iso14496: STSZBoxBody: replace PACKET_FIELDS with FIELD_TYPES
+lib/python/cs/iso14496.py: cs.iso14496: STSZBoxBody: update parse, implement transcribe, turn entry_sizes from a @deferred_field into a @locked_property
+lib/python/cs/iso14496.py: cs.iso14496: STZ2BoxBody: update parse, implemnet transcribe
+lib/python/cs/iso14496.py: cs.iso14496: STSCBoxBody: replace PACKET_FIELDS with FIELD_TYPES, update parse, implement trncribe, turn entries from @deferred_field to @locked_property
+lib/python/cs/iso14496.py: cs.iso14496: STCOBoxBody: replace PACKET_FIELDS with FIELD_TYPES, update parse, implement transcribe, turn chunk_offsets from @deferred_field to @locked_property
+lib/python/cs/iso14496.py: cs.iso14496: CO64BoxBody: replace PACKET_FIELDS with FIELD_TYPES, update parse_fields, implement transcribe
+lib/python/cs/iso14496.py: cs.iso14496: DREFBoxBody: replace PACKET_FIELDS with FIELD_TYPES, update parse_fields, implement transcribe
+lib/python/cs/iso14496.py: cs.iso14496: CPRTBoxBody: update parse_fields
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody: replace PACKET_FIELDS with FIELD_TYPES, update parse_fields, implement .transcribe, __getattr__: no longer special case .boxes
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: supply FIELD_TRANSCRIBERS to skip transcription of .tags (informational attribute)
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: parse updates
+lib/python/cs/iso14496.py: cs.iso14496: VMHDBoxBody; update parse_fields, implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: SMHDBoxBody: replace PACKET_FIELDS with FIELD_TYPES, update prase_fields, implement .transcribe
+lib/python/cs/iso14496.py: cs.iso14496: parse_tags: tweak implementation
+lib/python/cs/iso14496.py: cs.iso14496: parse(): tweak implementation, drop special purpose parse_fd, parse_file, parse_chunks
+lib/python/cs/iso14496.py: cs.iso14496: rename parse_buffer to parse_fields, tweak OberBox scan
+lib/python/cs/iso14496.py: cs.iso14496: dump_box(): modernise
+lib/python/cs/iso14496.py: cs.iso14496: clean some lint
+lib/python/cs/iso14496.py: cs.iso14496: MP4Command.cmd_test: bugfix call to selftest()
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody.__getattr__: fix ILST typo, improve context
+lib/python/cs/iso14496.py: cs.iso14496: parse_deref_path: no ValueErrors to catch
+lib/python/cs/iso14496.py: cs.iso14496: swap out obsolete BaseBinaryMultiValue for SimpleBinary
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: make .parse a simple wrapper for self.parse_fields; Box: put the complexity from the old BoxBody.parse into Box.parse
+lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody: provide missing .transcribe method
+lib/python/cs/iso14496.py: cs.iso14496: tweak imports and docstrings
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_boxes: just pull a list of Box.scan
+lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: handle incompleteness
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: reimplement parse_field(bfr,AbstractBinary), provide default transcribe which transcribes fields parsed in that way
+lib/python/cs/iso14496.py: cs.iso14496: update for new cs.cmdutils.BaseCommand API
+lib/python/cs/iso14496.py: cs.iso14496: just use a list[bytes] instead of a BinaryBytes for the unparsed section, and probably generally
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_boxes: do not attach parent, complicates __init__; Box.parse: instead, if there are .boxes, attach their parent after the BoxBody parse
+lib/python/cs/iso14496.py: cs.iso14496: Box.__len__ returns the parse time length instead of measuring a transcription; MDATBoxBody.__len__: return the recorded data length, even if the data were skipped
+lib/python/cs/iso14496.py: cs.iso14496: parse: dry up the buffer setup
+lib/python/cs/iso14496.py: cs.iso14496: clean some lint
+lib/python/cs/iso14496.py: cs.iso14496: Box.box_type_path: fall back to the Box class name if there is no .box_type_s, can happen during __str__ early on for example
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse: rework the various ILST schemas to associate an attribute_name with an AbstractBinary class from pt_spec(), lets us use the newer parse_field method
+lib/python/cs/iso14496.py: cs.iso14496: using Box.parse_field applies the field to the BoxBody
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.__getattr__: XXXXs and XXXX0: pretend we have an empty box list if there is no .boxes attribute
+lib/python/cs/iso14496.py: cs.iso14496: METABoxBody.__getattr__: tidy Pfx context, make AttributeError less confusing
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: flush bfr_tail before return
+lib/python/cs/iso14496.py: cs.iso14496: update shebang, clean imports
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: rename .parsed_field_names to ._parsed_field_names, add .add_field(field_name,value) method
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.transcribe: fix spelling of _parsed_field_names; BoxBody.parse_boxes: include .boxes in the parsed fields
+lib/python/cs/iso14496.py: cs.iso14496: Box.parse: run the body self check after fully assembled
+lib/python/cs/iso14496.py: cs.iso14496: PDINBoxBody: make .pdinfo just a list of PDINBoxBody.PDInfo
+lib/python/cs/iso14496.py: cs.iso14496: ContainerBoxBody: include .boxes in the FIELD_TYPES
+lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: .track_ids is now just a list of UInt32BE
+lib/python/cs/iso14496.py: cs.iso14496: _SampleTableContainerBoxBody: update the type of .boxes, now just a list of Box
+lib/python/cs/iso14496.py: cs.iso14496: CSLGBoxBody.parse_fields: fix parse of .params
+lib/python/cs/iso14496.py: cs.iso14496: ELSTBoxBody: simplify the scan of the entries, make entry_class and entry_count properties
+lib/python/cs/iso14496.py: cs.iso14496: URL_BoxBody: include .location in the field types, drop unnecessary transcribe method (it is all just fields)
+lib/python/cs/iso14496.py: cs.iso14496: STZ2BoxBody: simplify parse and transcribe of entry_sizes
+lib/python/cs/iso14496.py: cs.iso14496: STZ2BoxBody: fix scan of 16 bit entry_sizes - should make a list of int
+lib/python/cs/iso14496.py: cs.iso14496: DREFBoxBody: update FIELD_TYPES, simplfy parse, drop transcribe as the default will now work
+lib/python/cs/iso14496.py: cs.iso14496: DREFBoxBody: update FIELD_TYPES, simplify parse, drop transcribe as the default will now work
+lib/python/cs/iso14496.py: cs.iso14496: CPRTBoxBody.language setter: bugfix computation of packed form
+lib/python/cs/iso14496.py: cs.iso14496: CPRTBoxBody.parse_fields: bugfix calls to parse_field
+lib/python/cs/iso14496.py: cs.iso14496: fix some parse_field and ad_field calls
+lib/python/cs/iso14496.py: cs.iso14496: clean some lint
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.trancribe: simplification
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: new parse_field_value to parse a binary single value, keep the value as .field_name and the instance as .field_name__Binary
+lib/python/cs/iso14496.py: cs.iso14496: FullBoxBody: use BoxBody.parse_field_value to gather vserion, flags0, flags1, flags2
+lib/python/cs/iso14496_tests.py: cs.iso14496_tests: improve assert error and logging
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: drop S_CHOOSE_NAME, unused
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody: base __str__ on ._parsed_field_names
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_field_value: give the binary instance a private name, aids __str__
+lib/python/cs/iso14496.py: cs.iso14496: BoxBody.parse_field: promote binary_cls using pt_spec
+lib/python/cs/iso14496.py: cs.iso14496: Box.__str__: use .prase_length instead of len(), which can be expensive or impossible in skip mode
+lib/python/cs/iso14496.py: cs.iso14496: Box.transcribe: compute length using transcribed_length
+lib/python/cs/iso14496.py: cs.iso14496: drop Box.__len__ and OverBox.__len__
+lib/python/cs/iso14496.py: cs.iso14496: Box.walk: construct the subboxes list without letting list's preallocation stuff get sidetracked by __len__ and friends
+lib/python/cs/iso14496.py: cs.iso14496: FallbackBoxBody.__str__: just return the class name, there are no fields of value here
+lib/python/cs/iso14496.py: cs.iso14496: FullBoxBody.FIELD_TYPES: adjust for new private _foo__Binary attributes
+lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody: make .data_length public and use it for .transcribed_length()
+lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: track_ids is now just a list
+lib/python/cs/iso14496.py: cs.iso14496: update ILST* docstrings for their new implementations
+lib/python/cs/iso14496.py: cs.iso14496: new _ILSTUTF8Text class for UTF-8 text, and use .parse_field_value for a bunch of fields
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_fields: tags: use an instance's .value for single value instances
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.prase_fields: break out the schema lookups and stash unhandled bytes
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody: stub for geID field, need to figure it out
+lib/python/cs/iso14496.py: cs.iso14496: MP4.cmd_info: easier to read multiline output
+lib/python/cs/iso14496.py: cs.iso14496: MDATBoxBody: drop __len__, not doing us anything useful
+lib/python/cs/iso14496.py: cs.iso14496: clean imports, tweak docstring
+lib/python/cs/iso14496.py: cs.iso14496: Box.walk: replace [list comprehension] with list(iter(self)), suggestion from Peter Otten. Same semantics, more readable.
+lib/python/cs/iso14496.py: cs.iso14496: update DISTINFO
