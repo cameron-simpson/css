@@ -77,10 +77,10 @@ DISTINFO = {
         'console_scripts': ['sqltags = cs.sqltags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.edit',
-        'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.sqlalchemy_utils', 'cs.tagset', 'cs.threads>=20201025',
-        'icontract', 'sqlalchemy', 'typeguard'
+        'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.fileutils',
+        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.sqlalchemy_utils',
+        'cs.tagset', 'cs.threads>=20201025', 'cs.upd', 'icontract',
+        'sqlalchemy', 'typeguard'
     ],
 }
 
