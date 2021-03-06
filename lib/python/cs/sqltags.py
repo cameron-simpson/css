@@ -254,9 +254,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing == 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing == 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value = :string_value_1'
     '''
     if other is None:
       # special test for ==None
@@ -278,9 +278,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing != 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value != :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing != 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value != :string_value_1'
     '''
     if other is None:
       # special test for ==None
@@ -302,9 +302,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing < 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value < :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing < 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value < :string_value_1'
     '''
     return self._cmp("<", other, operator.lt)
 
@@ -313,9 +313,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing <= 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value <= :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing <= 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value <= :string_value_1'
     '''
     return self._cmp("<=", other, operator.le)
 
@@ -324,9 +324,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing > 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value > :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing > 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value > :string_value_1'
     '''
     return self._cmp(">", other, operator.gt)
 
@@ -335,9 +335,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing >= 'foo'
-          >>> str(sqlp.constraint)
-          'tags_1.name = :name_1 AND tags_1.string_value >= :string_value_1'
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing >= 'foo'
+            >>> str(sqlp.constraint)
+            'tags_1.name = :name_1 AND tags_1.string_value >= :string_value_1'
     '''
     return self._cmp(">=", other, operator.ge)
 
@@ -346,9 +346,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing.startswith('foo')
-          >>> str(sqlp.constraint)
-          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing.startswith('foo')
+            >>> str(sqlp.constraint)
+            "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
     '''
     esc = '\\'
     return self._cmp(
@@ -361,9 +361,9 @@ class SQLTagProxy:
 
         Example:
 
-          >>> sqlp = SQLTags('sqlite://').tags.name.thing.likeglob('foo*')
-          >>> str(sqlp.constraint)
-          "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
+            >>> sqlp = SQLTags('sqlite://').tags.name.thing.likeglob('foo*')
+            >>> str(sqlp.constraint)
+            "tags_1.name = :name_1 AND tags_1.string_value LIKE :string_value_1 ESCAPE '\\\\'"
     '''
     esc = '\\'
     return self._cmp(
