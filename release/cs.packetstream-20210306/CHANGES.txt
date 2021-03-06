@@ -1,0 +1,15 @@
+lib/python/cs/packetstream_tests.py: cs.vt: rename randblock to make_randblock in accordance with cs.randutils module
+lib/python/cs/packetstream_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/packetstream.py: cs.packetstream: docstring tweak
+lib/python/cs/packetstream.py: cs.packetstream: initialise a debug data structure before kicking off the worker threads
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection: open the Later
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection.shutdown: reduce indentation
+lib/python/cs/packetstream.py: cs.packetstream: PacketConnection._pending_states: improve idiom
+lib/python/cs/packetstream.py: cs.packetstream: rename calls from value_from_buffer to parse_value to match recent cs.binary API changes
+lib/python/cs/packetstream.py: cs.packetstream: autoformat
+lib/python/cs/packetstream.py: cs.packetstream: Packet.from_buffer: we compute has_channel and is_request from the flags, so do that after we know what the flags are
+lib/python/cs/packetstream.py: cs.packetstream: Packet.transcribe: recorder the in-packet flags value definition for readability
+lib/python/cs/packetstream.py lib/python/cs/packetstream_tests.py: cs.packetstream,packetstream_tests: port from deprecated cs.binary.PacketField to newfangled cs.binary/BaseBinaryMultiValue
+lib/python/cs/packetstream.py: cs.packetstream: make the definition of EOF_Packet more clear
+lib/python/cs/packetstream.py: cs.packetstream: Packet: subclass SimpleBinary instead of BaseBinaryMultiValue, better fits the variable structure
+lib/python/cs/packetstream.py: cs.packetstream: clean some lint

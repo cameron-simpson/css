@@ -35,6 +35,8 @@ def tick_fd_2(bs):
   '''
   os.write(2, bs)
 
+__version__ = '20210306'
+
 DISTINFO = {
     'description':
     "general purpose bidirectional packet stream connection",
