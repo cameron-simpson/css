@@ -4,6 +4,7 @@
 ''' Stuff for Plex media libraries.
 '''
 
+from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
@@ -33,7 +34,7 @@ def main(argv=None):
   '''
   if argv is None:
     argv = sys.argv
-  return PlexCommand().run(argv)
+  return PlexCommand(argv).run()
 
 class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
@@ -41,13 +42,19 @@ class PlexCommand(BaseCommand):
 
   GETOPT_SPEC = ''
 
-  def apply_defaults(self, options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
+    self.options.fstags = FSTags()
 
-  @staticmethod
-  def cmd_linktree(argv, options):
+  @contextmanager
+  def run_context(self):
+    ''' Use the FSTags context.
+    '''
+    with self.options.fstags:
+      yield
+
+  def cmd_linktree(self, argv):
     ''' Usage: {cmd} [-u] linktree srctrees... dsttree
           Link media files from the srctrees into the dsttree
           using the Plex naming conventions.
@@ -62,6 +69,7 @@ class PlexCommand(BaseCommand):
       raise GetoptError("missing srctrees or dsttree")
     dstroot = argv.pop()
     srcroots = argv
+    options = self.options
     fstags = options.fstags
     if update_mode:
       if not isdirpath(dstroot):
