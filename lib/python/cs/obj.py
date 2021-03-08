@@ -18,7 +18,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20210131-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -430,7 +430,7 @@ class SingletonMixin:
     return instance
 
   @classmethod
-  def _singleton_also_by(cls, also_key, key):
+  def singleton_also_by(cls, also_key, key):
     ''' Obtain a singleton by a secondary key.
         Return the instance or `None`.
 

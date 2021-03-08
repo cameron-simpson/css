@@ -21,7 +21,7 @@ import sys
 from threading import Thread
 from cs.py3 import pread
 
-__version__ = '20201102-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -304,12 +304,18 @@ class CornuCopyBuffer(object):
         Other keyword arguments are passed to the buffer constructor.
     '''
     try:
-      foffset = f.tell()
-    except OSError:
+      ftell = f.tell
+    except AttributeError:
       is_seekable = False
       foffset = None
     else:
-      is_seekable = True
+      try:
+        foffset = ftell()
+      except OSError:
+        is_seekable = False
+        foffset = None
+      else:
+        is_seekable = True
     if offset is None:
       offset = foffset
     it = (
@@ -351,9 +357,10 @@ class CornuCopyBuffer(object):
       raise ValueError(
           "offset(%d)+length(%d) > len(bs):%d" % (offset, length, len(bs))
       )
+    bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
-      bs = memoryview(bs)[offset:end_offset]
-    return cls([bs], **kw)
+      bs = bs[offset:end_offset]
+    return cls([bs], offset=offset, **kw)
 
   def __str__(self):
     return "%s(offset:%d,buf:%d)" % (
@@ -824,18 +831,18 @@ class CornuCopyBuffer(object):
             >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
             >>> bfr.offset
             0
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'ab'
             >>> bfr.offset
             2
             >>> subbfr = bfr.bounded(5)
             >>> subbfr.offset
             2
             >>> for bs in subbfr:
-            ...   print(len(bs))
+            ...   print(bs)
             ...
-            1
-            2
+            b'c'
+            b'de'
             >>> subbfr.offset
             5
             >>> subbfr.take(2)
@@ -845,8 +852,8 @@ class CornuCopyBuffer(object):
             >>> subbfr.flush()
             >>> bfr.offset
             5
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'fg'
 
         *WARNING*: if the bounded buffer is not completely consumed
         then it is critical to call the new `CornuCopyBuffer`'s `.flush`

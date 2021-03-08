@@ -7,11 +7,13 @@
 '''
 
 from threading import RLock
+from types import SimpleNamespace
 from cs.logutils import info, debug, warning
 from cs.threads import locked, locked_property
 
 DISTINFO = {
-    'description': "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
+    'description':
+    "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -21,7 +23,7 @@ DISTINFO = {
     'install_requires': ['cs.logutils', 'cs.threads'],
 }
 
-class ID3(NS):
+class ID3(SimpleNamespace):
   ''' Wrapper for pyid3lib.tag.
   '''
 
@@ -56,28 +58,32 @@ class ID3(NS):
       'SYLT': ('sync_lyric_transcription',),
       'SYTC': ('sync_tempo_codes',),
       'TALB': ('album_title', 'album', 'title'),
-      'TBPM': ('bpm', 'beats_per_minute'),    # integer
+      'TBPM': ('bpm', 'beats_per_minute'),  # integer
       'TCOM': ('composer',),
-      'TCON': ('content_type',),              # integer
-      'TCOP': ('copyright',),                 # "YYYY ..."
-      'TDAT': ('date',),                      # DDMM
+      'TCON': ('content_type',),  # integer
+      'TCOP': ('copyright',),  # "YYYY ..."
+      'TDAT': ('date',),  # DDMM
       'TDEN': ('encoding_time',),
-      'TDLY': ('playlist_delay',),            # milliseconds
+      'TDLY': ('playlist_delay',),  # milliseconds
       'TDOR': ('original_release_time',),
       'TDRC': ('recording_time',),
       'TDRL': ('release_time',),
       'TDTG': ('tagging_time',),
       'TENC': ('encoded_by',),
-      'TEXT': ('lyrics',),                    # slash separated
+      'TEXT': ('lyrics',),  # slash separated
       'TFLT': ('file_type',),
-      'TIME': ('time',),                      # HHMM
+      'TIME': ('time',),  # HHMM
       'TIPL': ('involved_people',),
       'TIT1': ('content_group_description', 'genre'),
-      'TIT2': ('song_title', 'songname', 'content_description',),  # eg "adagio"
+      'TIT2': (
+          'song_title',
+          'songname',
+          'content_description',
+      ),  # eg "adagio"
       'TIT3': ('subtitle', 'description_refinement'),  # eg "Op. 16"
-      'TKEY': ('initial_key',),               # musical key
+      'TKEY': ('initial_key',),  # musical key
       'TLAN': ('languages',),
-      'TLEN': ('length',),                    # milliseconds
+      'TLEN': ('length',),  # milliseconds
       'TMCL': ('musician_credits',),
       'TMED': ('media_type',),
       'TMOO': ('mood',),
@@ -85,30 +91,30 @@ class ID3(NS):
       'TOFN': ('original_filename',),
       'TOLY': ('original_lyricist',),
       'TOPE': ('original_performer', 'original_artist', 'artist'),
-      'TORY': ('original_release_year',),     # YYYY
+      'TORY': ('original_release_year',),  # YYYY
       'TOWN': ('owner', 'file_owner', 'licensee'),
-      'TPE1': ('lead_performer', 'lead_artist',
-               'soloist', 'performing_group'),  # slash separated
+      'TPE1': ('lead_performer', 'lead_artist', 'soloist',
+               'performing_group'),  # slash separated
       'TPE2': ('band', 'orchestra', 'accompaniment'),
       'TPE3': ('conductor',),
       'TPE4': ('interpreted_by', 'remixed_by', 'modified_by'),
-      'TPOS': ('part_of_set',),               # eg 1/2
+      'TPOS': ('part_of_set',),  # eg 1/2
       'TPRO': ('produced_notice',),
       'TPUB': ('publisher',),
       'TRCK': ('track_number', 'position'),
       'TRDA': ('recording_dates',),
       'TRSN': ('radio_station_name',),
       'TRSO': ('radio_station_owner',),
-      'TSIZ': ('size',),                      # in bytes, excluding ID3 tag
+      'TSIZ': ('size',),  # in bytes, excluding ID3 tag
       'TSOA': ('album_sort_order',),
       'TSOP': ('performer_sort_order',),
       'TSOT': ('title_sort-order',),
-      'TSRC': ('isrc',),                      # International Standard
-                                              # Recording Code (ISRC) (12 characters).
-      'TSSE': ('software_settings',),         # audio encoder and its settings
+      'TSRC': ('isrc',),  # International Standard
+      # Recording Code (ISRC) (12 characters).
+      'TSSE': ('software_settings',),  # audio encoder and its settings
       'TSST': ('set_subtitle',),
       'TXXX': ('user_defined_text',),
-      'TYER': ('year',),                      # YYYY
+      'TYER': ('year',),  # YYYY
       'UFID': ('ufid', 'unique_file_identifier'),
       'USER': ('terms_of_use',),
       'USLT': ('unsync_lyric_transcription',),
@@ -129,8 +135,9 @@ class ID3(NS):
       if name in names_to_frameids:
         warning(
             "name %r already associated with frameid %r,"
-            " discarding mapping to frameid %r",
-            name, names_to_frameids[name], frameid)
+            " discarding mapping to frameid %r", name, names_to_frameids[name],
+            frameid
+        )
       else:
         names_to_frameids[name] = frameid
 
@@ -152,12 +159,10 @@ class ID3(NS):
     ''' Test lexical validity of a `frameid`.
     '''
     return (
-        len(frameid) == 4
-        and frameid[0].isupper()
-        and all(
+        len(frameid) == 4 and frameid[0].isupper() and all(
             frameid_char.isupper() or frameid_char.isdigit()
             for frameid_char in frameid[1:]
-         )
+        )
     )
 
   @staticmethod
@@ -167,8 +172,9 @@ class ID3(NS):
     '''
     if not ID3._valid_frameid(frameid):
       raise ValueError(
-          "invalid frameid, expected UPPER+3*(UPPER|DIGIT), got: %r"
-          % (frameid,))
+          "invalid frameid, expected UPPER+3*(UPPER|DIGIT), got: %r" %
+          (frameid,)
+      )
     return {'text': text, 'textenc': textenc, 'frameid': frameid}
 
   @locked
@@ -247,10 +253,7 @@ class ID3(NS):
 
   def __setattr__(self, attr, value):
     if attr in self.__dict__ or attr.startswith('_'):
-      if (
-          attr in ID3.frameids_to_names
-          or attr in ID3.names_to_frameids
-      ):
+      if (attr in ID3.frameids_to_names or attr in ID3.names_to_frameids):
         warning(".%s: local to object, shadows id3 tag", attr)
       self.__dict__[attr] = value
       return

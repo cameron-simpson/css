@@ -47,7 +47,9 @@ def ttysize(fd):
     fd = fd.fileno()
   P = Popen(['stty', '-a'], stdin=fd, stdout=PIPE, universal_newlines=True)
   stty = P.stdout.read()
+  P.stdout.close()
   xit = P.wait()
+  del P
   if xit != 0:
     return None
   m = re.compile(r' rows (\d+); columns (\d+)').search(stty)

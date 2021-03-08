@@ -13,15 +13,16 @@ from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace
-from cs.context import nullcontext, stackattrs
+from cs.context import stackattrs
 from cs.deco import cachedmethod
+from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210123-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description':
@@ -35,8 +36,8 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.py.doc', 'cs.resources'
+        'cs.context', 'cs.deco', 'cs.gimmicks', 'cs.lex', 'cs.logutils',
+        'cs.pfx', 'cs.py.doc', 'cs.resources'
     ],
 }
 
@@ -466,7 +467,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @staticmethod
-  def getopt_error_handler(cmd, options, e, usage):
+  def getopt_error_handler(cmd, options, e, usage):  # pylint: disable=unused-argument
     ''' The `getopt_error_handler` method
         is used to control the handling of `GetoptError`s raised
         during the command line parse
@@ -514,7 +515,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv, options):
+  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.

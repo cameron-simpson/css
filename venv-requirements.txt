@@ -10,9 +10,11 @@ musicbrainzngs
 pycodestyle
 pyflakes
 pylint
+pytest
 requests
 sqlalchemy
 twine
 typeguard
+watchdog
 yapf
 youtube-dl

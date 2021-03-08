@@ -85,10 +85,12 @@ do
   if [ -z "$type" ] && magic=$( file "$lintfile" )
   then
     case "$magic" in
-      *'perl script'*)          type=pl ;;
+      *'perl script'*)
+            type=pl ;;
       *[Pp]'ython script'* | *'python3 script'* )
-                                type=py ;;
-      *'POSIX shell script'*)   type=sh ;;
+            type=py ;;
+      *'POSIX shell script'* | *'Bourne-Again shell script'* )
+            type=sh ;;
     esac
   fi
   [ -n "$type" ] || {

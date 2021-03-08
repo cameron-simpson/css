@@ -15,7 +15,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20201025-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description':
@@ -36,7 +36,43 @@ DISTINFO = {
     ],
 }
 
-state = State(orm=None, session=None)
+class SQLAState(State):
+  ''' Thread local state for SQLAlchemy ORM and session.
+  '''
+
+  def __init__(self, *, orm, session=None, **kw):
+    # enforce provision of an ORM, default session=None
+    super().__init__(orm=orm, session=session, **kw)
+
+  @contextmanager
+  def new_session(self, *, orm=None):
+    ''' Context manager to create a new session from `orm` or `self.orm`.
+    '''
+    if orm is None:
+      orm = self.orm
+      if orm is None:
+        raise ValueError(
+            "%s.new_session: no orm supplied and no self.orm" %
+            (type(self).__name__,)
+        )
+    with orm.session() as session:
+      with self(orm=orm, session=session):
+        yield session
+
+  @contextmanager
+  def auto_session(self, *, orm=None):
+    ''' Context manager to use the current session
+        if not `None`, otherwise to make one using `orm` or `self.orm`.
+    '''
+    session = self.session
+    if session is None:
+      with self.new_session(orm=orm) as session:
+        yield session
+    else:
+      yield session
+
+# global state, not tied to any specific ORM or session
+state = SQLAState(orm=None, session=None)
 
 def with_orm(function, *a, orm=None, **kw):
   ''' Call `function` with the supplied `orm` in the shared state.
@@ -181,6 +217,7 @@ class ORM(MultiOpenMixin):
   def __init__(self):
     self.Base = declarative_base()
     self.Session = None
+    self.sqla_state = SQLAState(orm=self)
 
   @contextmanager
   def session(self, *a, **kw):
@@ -290,23 +327,20 @@ class BasicTableMixin:
   '''
 
   @classmethod
-  @auto_session
   def lookup(cls, *, session, **criteria):
     ''' Return iterable of row entities matching `criteria`.
     '''
     return session.query(cls).filter_by(**criteria)
 
   @classmethod
-  @auto_session
   def lookup1(cls, *, session, **criteria):
     ''' Return the row entity matching `criteria`, or `None` if no match.
     '''
     return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
-  @auto_session
-  def __getitem__(cls, index, *, session):
-    row = cls.lookup1(id=index, session=session)
+  def __getitem__(cls, index):
+    row = cls.lookup1(id=index, session=state.session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
           cls,

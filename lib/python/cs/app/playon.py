@@ -95,14 +95,15 @@ class PlayOnCommand(BaseCommand):
     options = self.options
     sqltags = PlayOnSQLTags()
     api = PlayOnAPI(options.user, options.password, sqltags)
-    with stackattrs(options, api=api, sqltags=sqltags):
-      with api:
-        # preload all the recordings from the db
-        all_recordings = list(sqltags.recordings())
-        # if there are unexpired stale entries or no unexpired entries,
-        # refresh them
-        self._refresh_sqltags_data(api, sqltags)
-        yield
+    with sqltags:
+      with stackattrs(options, api=api, sqltags=sqltags):
+        with api:
+          # preload all the recordings from the db
+          all_recordings = list(sqltags.recordings())
+          # if there are unexpired stale entries or no unexpired entries,
+          # refresh them
+          self._refresh_sqltags_data(api, sqltags)
+          yield
 
   def cmd_account(self, argv):
     ''' Usage: {cmd}
@@ -134,7 +135,7 @@ class PlayOnCommand(BaseCommand):
     @typechecked
     def _dl(dl_id: int, sem):
       try:
-        with sqltags.sql_session():
+        with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
               filename.lower().replace(' - ',
@@ -604,7 +605,7 @@ class PlayOnAPI(MultiOpenMixin):
   def _entities_from_entries(self, entries):
     ''' Return the `TagSet` instances from PlayOn data entries.
     '''
-    with self.sqltags.sql_session():
+    with self.sqltags:
       now = time.time()
       tes = set()
       for entry in entries:

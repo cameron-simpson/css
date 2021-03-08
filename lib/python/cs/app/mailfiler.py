@@ -103,6 +103,7 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.mailutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py.modules',
