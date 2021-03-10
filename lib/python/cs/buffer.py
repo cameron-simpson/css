@@ -559,10 +559,11 @@ class CornuCopyBuffer(object):
       except StopIteration:
         if min_size is Ellipsis or short_ok:
           return
+        # pylint: disable=raise-missing-from
         raise EOFError(
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
-        )
+            )
       else:
         if self.progress is not None:
           self.progress += len(next_chunk)
@@ -1128,6 +1129,7 @@ class SeekableIteratorMixin(object):
       try:
         end_offset = self.end_offset
       except AttributeError as e:
+        # pylint: disable=raise-missing-from
         raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
       new_offset += end_offset
     else:
