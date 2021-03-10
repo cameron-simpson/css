@@ -325,6 +325,30 @@ class CornuCopyBuffer(object):
     return cls(it, offset=it.offset, **kw)
 
   @classmethod
+  def from_filename(cls, filename: str, offset=None, **kw):
+    ''' Open the file named `filename` and return a new `CornuCopyBuffer`.
+
+        If `offset` is provided, skip to that position in the file.
+        A negative offset skips to a position that far from the end of the file
+        as determined by its `Stat.st_size`.
+
+        Other keyword arguments are passed to the buffer constructor.
+    '''
+    f = open(filename, 'rb')
+    bfr = cls.from_file(f, close=f.close, **kw)
+    if offset is not None:
+      if offset < 0:
+        S = os.fstat(f.fileno())
+        offset2 = S.st_size + offset
+        if offset2 < 0:
+          raise ValueError(
+              "offset %s is too far from the end of the file (st_size=%s)" %
+              (offset, S.st_size)
+          )
+      bfr.skipto(offset)
+    return bfr
+
+  @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
     ''' Return a `CornuCopyBuffer` fed from the supplied bytes `bs`
         starting at `offset` and ending after `length`.
