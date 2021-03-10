@@ -823,6 +823,14 @@ class CornuCopyBuffer(object):
     ''' Context manager wrapper for `.bounded`
         which calls the `.flush` method automatically
         on exiting the context.
+
+        Example:
+
+            # avoid buffer overrun
+            with bfr.subbuffer(bfr.offset+128) as subbfr:
+                id3v1 = ID3V1Frame.parse(subbfr)
+                # ensure the whole buffer was consumed
+                assert subbfr.at_eof()
     '''
     subbfr = self.bounded(end_offset)
     try:
@@ -834,12 +842,13 @@ class CornuCopyBuffer(object):
     ''' Return a new `CornuCopyBuffer` operating on a bounded view
         of this buffer.
 
-        `end_offset`: the ending offset of the new buffer. Note
-        that this is an absolute offset, not a length.
-
         This supports parsing of the buffer contents without risk
         of consuming past a certain point, such as the known end
         of a packet structure.
+
+        Parameters:
+        * `end_offset`: the ending offset of the new buffer.
+          Note that this is an absolute offset, not a length.
 
         The new buffer starts with the same offset as `self` and
         use of the new buffer affects `self`. After a flush both
@@ -1219,7 +1228,7 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
     self.read1 = read1
 
   def close(self):
-    ''' Detach from the file and close it.
+    ''' Detach from the file. Does *not* call `fp.close()`.
     '''
     self.fp = None
 
