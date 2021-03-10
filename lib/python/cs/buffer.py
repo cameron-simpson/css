@@ -563,7 +563,7 @@ class CornuCopyBuffer(object):
         raise EOFError(
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
-            )
+        )
       else:
         if self.progress is not None:
           self.progress += len(next_chunk)
