@@ -642,6 +642,15 @@ class CornuCopyBuffer(object):
       return bytes(taken[0])
     return b''.join(taken)
 
+  def peek(self, size, short_ok=False):
+    ''' Examine the leading bytes of the buffer without consuming them,
+        a `take` followed by a `push`.
+        Returns the bytes.
+    '''
+    bs = self.take(size, short_ok=short_ok)
+    self.push(bs)
+    return bs
+
   def read(self, size, one_fetch=False):
     ''' Compatibility method to allow using the buffer like a file.
 
