@@ -384,7 +384,8 @@ class BinaryMixin:
         All parameters are as for `scan()`.
     '''
     pre_offset = bfr.offset
-    for instance in bfr.scan(count=count,min_count=min_count,max_count=max_count):
+    for instance in cls.scan(bfr, count=count, min_count=min_count,
+                             max_count=max_count):
       post_offset = bfr.offset
       yield pre_offset, instance, post_offset
       pre_offset = post_offset
