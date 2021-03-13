@@ -316,12 +316,9 @@ class BinaryMixin:
   __len__ = transcribed_length
 
   @classmethod
-  def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
+  def scan(cls, bfr, count=None, min_count=None, max_count=None):
     ''' Function to scan the buffer `bfr` for repeated instances of `cls`
-        until end of input,
-        yielding `(offset,instance,post_offset)` tuples
-        where `offset` is the buffer offset where the instance commenced
-        and `post_offset` is the buffer offset after the instance.
+        until end of input and yield them.
 
         Parameters:
         * `bfr`: the buffer to scan
@@ -371,12 +368,8 @@ class BinaryMixin:
           )
         min_count = max_count = count
       scanned = 0
-      offset = bfr.offset
       while (max_count is None or scanned < max_count) and not bfr.at_eof():
-        instance = cls.parse(bfr)
-        post_offset = bfr.offset
-        yield offset, instance, post_offset
-        offset = post_offset
+        yield cls.parse(bfr)
         scanned += 1
       if min_count is not None and scanned < min_count:
         warning(
@@ -385,12 +378,16 @@ class BinaryMixin:
         )
 
   @classmethod
-  def scan(cls, bfr, **kw):
-    ''' Function to scan the buffer `bfr` for repeated instances of `cls`
-        until end of input,
-        yielding instances of `cls`.
+  def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
+    ''' Wrapper for `scan()` which yields (pre_offset,instance,post_offset)`
+        indicating the start and end offsets of the yielded instances.
+        All parameters are as for `scan()`.
     '''
-    return map(lambda scan3: scan3[1], cls.scan_with_offsets(bfr, **kw))
+    pre_offset = bfr.offset
+    for instance in bfr.scan(count=count,min_count=min_count,max_count=max_count):
+      post_offset = bfr.offset
+      yield pre_offset, instance, post_offset
+      pre_offset = post_offset
 
   @classmethod
   def scan_file(cls, f):
