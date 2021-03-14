@@ -12,6 +12,7 @@ from cs.binary import SimpleBinary, BinarySingleValue, UInt32BE, UInt16BE
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import info, debug, warning
 from cs.pfx import Pfx
+from cs.tagset import TagSet
 from cs.threads import locked, locked_property
 
 DISTINFO = {
@@ -226,6 +227,25 @@ class ID3V1Frame(SimpleBinary):
     if self.track > 0:
       yield bytes([0, self.track])
     yield bytes([self.genre_id])
+
+  def tagset(self):
+    ''' Return a `TagSet` with the ID3 tag information.
+    '''
+    return TagSet(
+        {
+            k: v
+            for k, v in dict(
+                title=self.title,
+                artist=self.artist,
+                album=self.album,
+                year=self.year,
+                comment=self.comment,
+                track=self.track,
+                genre_id=self.genre_id,
+            ).items()
+            if v is not None and not (isinstance(v, int) and v == 0)
+        }
+    )
 
 class EnhancedTagFrame(SimpleBinary):
   ''' An Enhanced Tag.
@@ -812,6 +832,17 @@ class ID3V2Frame(SimpleBinary):
     size = sum(map(len, tag_frames_bss))
     yield ID3V2Size(size)
     yield tag_frames_bss
+
+  def tagset(self):
+    ''' Return a `TagSet` with the ID3 tag information.
+    '''
+    tags = TagSet()
+    for tag_frame in self.tag_frames:
+      tag_id = tag_frame.tag_id.decode('ascii').lower()
+      tags.set(tag_id, tag_frame.datafrome_body.value)
+      if tag_frame.flags != 0:
+        tags.set(f"{tag_id}.flags", tag_frame.flags)
+    return tags
 
 class ID3V2Tags(SimpleNamespace):
   ''' An `ID3V2Tags` maps ID3V2 tag information as a `SimpleNamespace`.
