@@ -60,7 +60,7 @@ from uuid import uuid4
 from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
-from cs.context import nullcontext, stackattrs
+from cs.context import nullcontext
 from cs.fileutils import (
     DEFAULT_READSIZE,
     ReadMixin,
@@ -78,7 +78,7 @@ from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import Upd
+from cs.upd import Upd, upd_proxy, state as upd_state
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -509,9 +509,12 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def _queue_index_flush(self):
     self._indexQ.put(None)
 
+  @upd_proxy
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from `.indexQ` and store it.
     '''
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " index "
     index = self.index
     unindexed = self._unindexed
     filemap = self._filemap
@@ -525,16 +528,17 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
           old_DFstate = None
         continue
       hashcode, entry, post_offset = item
-      entry_bs = bytes(entry)
-      with self._lock:
-        index[hashcode] = entry_bs
-        try:
-          del unindexed[hashcode]
-        except KeyError:
-          # this can happen when the same key is indexed twice
-          # entirely plausible if a new datafile is added to the datadir
-          pass
-      DFstate = filemap[entry.filenum]
+      with proxy.extend_prefix(str(hashcode)):
+        entry_bs = bytes(entry)
+        with self._lock:
+          index[hashcode] = entry_bs
+          try:
+            del unindexed[hashcode]
+          except KeyError:
+            # this can happen when the same key is indexed twice
+            # entirely plausible if a new datafile is added to the datadir
+            pass
+        DFstate = filemap[entry.filenum]
       if DFstate is not old_DFstate:
         if old_DFstate is not None:
           filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
@@ -833,6 +837,7 @@ class DataDir(FilesDir):
     bfr = buffer_from_pathname(filepath, offset=offset)
     yield from DataRecord.scan_with_offsets(bfr)
 
+  @upd_proxy
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
@@ -841,6 +846,8 @@ class DataDir(FilesDir):
         and new data in existing files and scans them, adding the index
         information to the local state.
     '''
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " monitor "
     filemap = self._filemap
     indexQ = self._indexQ
     datadirpath = self.pathto('data')
@@ -849,21 +856,23 @@ class DataDir(FilesDir):
         time.sleep(1)
         continue
       # scan for new datafiles
-      with Pfx("listdir(%r)", datadirpath):
-        try:
-          listing = list(os.listdir(datadirpath))
-        except OSError as e:
-          if e.errno == errno.ENOENT:
-            error("listing failed: %s", e)
-            time.sleep(2)
-            continue
-          raise
+      with proxy.extend_prefix(" check datafiles"):
+        with Pfx("listdir(%r)", datadirpath):
+          try:
+            listing = list(os.listdir(datadirpath))
+          except OSError as e:
+            if e.errno == errno.ENOENT:
+              error("listing failed: %s", e)
+              time.sleep(2)
+              continue
+            raise
         for filename in listing:
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
               and filename not in filemap):
-            info("MONITOR: add new filename %r", filename)
-            filemap.add_path(filename)
+            with proxy.extend_prefix(" add " + filename):
+              info("MONITOR: add new filename %r", filename)
+              filemap.add_path(filename)
       # now scan known datafiles for new data
       for filenum in self._filemap.filenums():
         if self.cancelled or self.flag_scan_disable:
@@ -1128,132 +1137,136 @@ class PlatonicDir(FilesDir):
           DF.open()
     return DF
 
+  @upd_proxy
   def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
-    with Upd().insert(1) as U:
-      U.prefix = "%s.monitor" % (self,)
-      meta_store = self.meta_store
-      filemap = self._filemap
-      indexQ = self._indexQ
-      datadirpath = self.pathto('data')
-      if meta_store is not None:
-        topdir = self.topdir
-      else:
-        warning("%s: no meta_store!", self)
-      updated = False
-      disabled = False
-      while not self.cancelled:
-        time.sleep(self.DELAY_INTERSCAN)
-        if self.flag_scan_disable:
-          if not disabled:
-            info("scan %r DISABLED", shortpath(datadirpath))
-            disabled = True
-          continue
-        if disabled:
-          info("scan %r ENABLED", shortpath(datadirpath))
-          disabled = False
-        # scan for new datafiles
-        with Pfx("%r", datadirpath):
-          seen = set()
-          info("scan tree...")
-          with stackattrs(U, prefix=U.prefix + ": scan"):
-            for dirpath, dirnames, filenames in os.walk(datadirpath,
-                                                        followlinks=True):
-              dirnames[:] = sorted(dirnames)
-              filenames = sorted(filenames)
-              time.sleep(self.DELAY_INTRASCAN)
-              if self.cancelled or self.flag_scan_disable:
-                break
-              rdirpath = relpath(dirpath, datadirpath)
-              with Pfx(rdirpath):
-                with (stackattrs(U, prefix=U.prefix + ": " +
-                                 rdirpath) if filenames else nullcontext()):
-                  # this will be the subdirectories into which to recurse
-                  pruned_dirnames = []
-                  for dname in dirnames:
-                    if self.exclude_dir(joinpath(rdirpath, dname)):
-                      # unwanted
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " monitor "
+    meta_store = self.meta_store
+    filemap = self._filemap
+    indexQ = self._indexQ
+    datadirpath = self.pathto('data')
+    if meta_store is not None:
+      topdir = self.topdir
+    else:
+      warning("%s: no meta_store!", self)
+    updated = False
+    disabled = False
+    while not self.cancelled:
+      time.sleep(self.DELAY_INTERSCAN)
+      if self.flag_scan_disable:
+        if not disabled:
+          info("scan %r DISABLED", shortpath(datadirpath))
+          disabled = True
+        continue
+      if disabled:
+        info("scan %r ENABLED", shortpath(datadirpath))
+        disabled = False
+      # scan for new datafiles
+      with Pfx("%r", datadirpath):
+        seen = set()
+        info("scan tree...")
+        with proxy.extend_prefix(" scan"):
+          for dirpath, dirnames, filenames in os.walk(datadirpath,
+                                                      followlinks=True):
+            dirnames[:] = sorted(dirnames)
+            filenames = sorted(filenames)
+            time.sleep(self.DELAY_INTRASCAN)
+            if self.cancelled or self.flag_scan_disable:
+              break
+            rdirpath = relpath(dirpath, datadirpath)
+            with Pfx(rdirpath):
+              with (proxy.extend_prefix(" " + rdirpath)
+                    if filenames else nullcontext()):
+                # this will be the subdirectories into which to recurse
+                pruned_dirnames = []
+                for dname in dirnames:
+                  if self.exclude_dir(joinpath(rdirpath, dname)):
+                    # unwanted
+                    continue
+                  subdirpath = joinpath(dirpath, dname)
+                  try:
+                    S = os.stat(subdirpath)
+                  except OSError as e:
+                    # inaccessable
+                    warning("stat(%r): %s, skipping", subdirpath, e)
+                    continue
+                  ino = S.st_dev, S.st_ino
+                  if ino in seen:
+                    # we have seen this subdir before, probably via a symlink
+                    # TODO: preserve symlinks? attach alter ego directly as a Dir?
+                    debug(
+                        "seen %r (dev=%s,ino=%s), skipping", subdirpath,
+                        ino[0], ino[1]
+                    )
+                    continue
+                  seen.add(ino)
+                  pruned_dirnames.append(dname)
+                dirnames[:] = pruned_dirnames
+                if meta_store is None:
+                  warning("no meta_store")
+                  D = None
+                else:
+                  with meta_store:
+                    D = topdir.makedirs(rdirpath, force=True)
+                    # prune removed names
+                    names = list(D.keys())
+                    for name in names:
+                      if name not in dirnames and name not in filenames:
+                        info("del %r", name)
+                        del D[name]
+                for filename in filenames:
+                  with Pfx(filename):
+                    if self.cancelled or self.flag_scan_disable:
+                      break
+                    rfilepath = joinpath(rdirpath, filename)
+                    if self.exclude_file(rfilepath):
                       continue
-                    subdirpath = joinpath(dirpath, dname)
+                    filepath = joinpath(dirpath, filename)
+                    if not isfilepath(filepath):
+                      continue
+                    # look up this file in our file state index
+                    DFstate = filemap.get(rfilepath)
+                    if (DFstate is not None and D is not None
+                        and filename not in D):
+                      # in filemap, but not in dir: start again
+                      warning("in filemap but not in Dir, rescanning")
+                      filemap.del_path(rfilepath)
+                      DFstate = None
+                    if DFstate is None:
+                      DFstate = filemap.add_path(rfilepath)
                     try:
-                      S = os.stat(subdirpath)
+                      new_size = DFstate.stat_size(self.follow_symlinks)
                     except OSError as e:
-                      # inaccessable
-                      warning("stat(%r): %s, skipping", subdirpath, e)
+                      if e.errno == errno.ENOENT:
+                        warning("forgetting missing file")
+                        self._del_datafilestate(DFstate)
+                      else:
+                        warning("stat: %s", e)
                       continue
-                    ino = S.st_dev, S.st_ino
-                    if ino in seen:
-                      # we have seen this subdir before, probably via a symlink
-                      # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                      debug(
-                          "seen %r (dev=%s,ino=%s), skipping", subdirpath,
-                          ino[0], ino[1]
-                      )
+                    if new_size is None:
+                      # skip non files
+                      debug("SKIP non-file")
                       continue
-                    seen.add(ino)
-                    pruned_dirnames.append(dname)
-                  dirnames[:] = pruned_dirnames
-                  if meta_store is None:
-                    warning("no meta_store")
-                    D = None
-                  else:
-                    with meta_store:
-                      D = topdir.makedirs(rdirpath, force=True)
-                      # prune removed names
-                      names = list(D.keys())
-                      for name in names:
-                        if name not in dirnames and name not in filenames:
-                          info("del %r", name)
-                          del D[name]
-                  for filename in filenames:
-                    with Pfx(filename):
-                      if self.cancelled or self.flag_scan_disable:
-                        break
-                      rfilepath = joinpath(rdirpath, filename)
-                      if self.exclude_file(rfilepath):
-                        continue
-                      filepath = joinpath(dirpath, filename)
-                      if not isfilepath(filepath):
-                        continue
-                      # look up this file in our file state index
-                      DFstate = filemap.get(rfilepath)
-                      if (DFstate is not None and D is not None
-                          and filename not in D):
-                        # in filemap, but not in dir: start again
-                        warning("in filemap but not in Dir, rescanning")
-                        filemap.del_path(rfilepath)
-                        DFstate = None
-                      if DFstate is None:
-                        DFstate = filemap.add_path(rfilepath)
+                    if meta_store:
                       try:
-                        new_size = DFstate.stat_size(self.follow_symlinks)
-                      except OSError as e:
-                        if e.errno == errno.ENOENT:
-                          warning("forgetting missing file")
-                          self._del_datafilestate(DFstate)
-                        else:
-                          warning("stat: %s", e)
-                        continue
-                      if new_size is None:
-                        # skip non files
-                        debug("SKIP non-file")
-                        continue
-                      if meta_store:
-                        try:
-                          E = D[filename]
-                        except KeyError:
+                        E = D[filename]
+                      except KeyError:
+                        E = FileDirent(filename)
+                        D[filename] = E
+                      else:
+                        if not E.isfile:
+                          info(
+                              "new FileDirent replacing previous nonfile: %s",
+                              E
+                          )
                           E = FileDirent(filename)
                           D[filename] = E
-                        else:
-                          if not E.isfile:
-                            info(
-                                "new FileDirent replacing previous nonfile: %s",
-                                E
-                            )
-                            E = FileDirent(filename)
-                            D[filename] = E
-                      if new_size > DFstate.scanned_to:
+                    if new_size > DFstate.scanned_to:
+                      with proxy.extend_prefix(
+                          " scan %s[%d:%d]" %
+                          (filename, DFstate.scanned_to, new_size)):
                         if DFstate.scanned_to > 0:
                           info("scan from %d", DFstate.scanned_to)
                         if meta_store is not None:
@@ -1290,42 +1303,42 @@ class PlatonicDir(FilesDir):
                           DFstate.scanned_to = post_offset
                           if self.cancelled or self.flag_scan_disable:
                             break
-                        if meta_store is not None:
-                          blockQ.close()
-                          try:
-                            top_block = R()
-                          except MissingHashcodeError as e:
-                            error("missing data, forcing rescan: %s", e)
-                            DFstate.scanned_to = 0
-                          else:
-                            E.block = top_block
-                            D.changed = True
-                            updated = True
-                        elapsed = time.time() - scan_start
-                        scanned = DFstate.scanned_to - scan_from
-                        if elapsed > 0:
-                          scan_rate = scanned / elapsed
+                      if meta_store is not None:
+                        blockQ.close()
+                        try:
+                          top_block = R()
+                        except MissingHashcodeError as e:
+                          error("missing data, forcing rescan: %s", e)
+                          DFstate.scanned_to = 0
                         else:
-                          scan_rate = None
-                        if scan_rate is None:
-                          info(
-                              "scanned to %d: %s", DFstate.scanned_to,
-                              transcribe_bytes_geek(scanned)
-                          )
-                        else:
-                          info(
-                              "scanned to %d: %s at %s/s", DFstate.scanned_to,
-                              transcribe_bytes_geek(scanned),
-                              transcribe_bytes_geek(scan_rate)
-                          )
-                        # stall after a file scan, briefly, to limit impact
-                        if elapsed > 0:
-                          time.sleep(min(elapsed, self.DELAY_INTRASCAN))
-              # update the archive after updating from a directory
-              if updated and meta_store is not None:
-                self.sync_meta()
-                updated = False
-        self.flush()
+                          E.block = top_block
+                          D.changed = True
+                          updated = True
+                      elapsed = time.time() - scan_start
+                      scanned = DFstate.scanned_to - scan_from
+                      if elapsed > 0:
+                        scan_rate = scanned / elapsed
+                      else:
+                        scan_rate = None
+                      if scan_rate is None:
+                        info(
+                            "scanned to %d: %s", DFstate.scanned_to,
+                            transcribe_bytes_geek(scanned)
+                        )
+                      else:
+                        info(
+                            "scanned to %d: %s at %s/s", DFstate.scanned_to,
+                            transcribe_bytes_geek(scanned),
+                            transcribe_bytes_geek(scan_rate)
+                        )
+                      # stall after a file scan, briefly, to limit impact
+                      if elapsed > 0:
+                        time.sleep(min(elapsed, self.DELAY_INTRASCAN))
+            # update the archive after updating from a directory
+            if updated and meta_store is not None:
+              self.sync_meta()
+              updated = False
+      self.flush()
 
   @staticmethod
   def scanfrom(filepath, offset=0):
