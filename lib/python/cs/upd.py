@@ -1075,6 +1075,25 @@ class _UpdState(StackableState):
 
 state = _UpdState()
 
+@decorator
+def upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `prefix`: initial proxy prefix, default `func.__name__`
+      * `insert_at`: the position for the new proxy, default `1`
+  '''
+  if prefix is None:
+    prefix = func.__name__
+
+  def upd_proxy_wrapper(*a, **kw):
+    with state.upd.insert(insert_at) as proxy:
+      with stackattrs(state, proxy=proxy):
+        return func(*a, **kw)
+
+  return upd_proxy_wrapper
+
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
   '''
