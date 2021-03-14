@@ -528,17 +528,16 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
           old_DFstate = None
         continue
       hashcode, entry, post_offset = item
-      with proxy.extend_prefix(str(hashcode)):
-        entry_bs = bytes(entry)
-        with self._lock:
-          index[hashcode] = entry_bs
-          try:
-            del unindexed[hashcode]
-          except KeyError:
-            # this can happen when the same key is indexed twice
-            # entirely plausible if a new datafile is added to the datadir
-            pass
-        DFstate = filemap[entry.filenum]
+      entry_bs = bytes(entry)
+      with self._lock:
+        index[hashcode] = entry_bs
+        try:
+          del unindexed[hashcode]
+        except KeyError:
+          # this can happen when the same key is indexed twice
+          # entirely plausible if a new datafile is added to the datadir
+          pass
+      DFstate = filemap[entry.filenum]
       if DFstate is not old_DFstate:
         if old_DFstate is not None:
           filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
@@ -1284,6 +1283,7 @@ class PlatonicDir(FilesDir):
                             total=new_size,
                             units_scale=BINARY_BYTES_SCALE,
                             itemlenfunc=lambda t3: t3[2] - t3[0],
+                            update_frequency=128,
                         ):
                           hashcode = self.hashclass.from_chunk(data)
                           indexQ.put(
