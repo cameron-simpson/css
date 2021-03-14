@@ -992,6 +992,14 @@ class UpdProxy(object):
     if new_prefix != old_prefix:
       self.text = self._text
 
+  @contextmanager
+  def extend_prefix(self, more_prefix):
+    ''' Context manager to append text to the prefix.
+    '''
+    new_prefix = self.prefix + more_prefix
+    with stackattrs(self, prefix=new_prefix):
+      yield new_prefix
+
   @property
   def text(self):
     ''' The text of this proxy's slot, without the prefix.
