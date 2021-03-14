@@ -8,11 +8,21 @@
     * https://id3.org/mp3Frame
 '''
 
+import sys
 from icontract import ensure
 from cs.binary import AbstractBinary, SimpleBinary
+from cs.buffer import CornuCopyBuffer
+from cs.cmdutils import BaseCommand
 from cs.deco import OBSOLETE
 from cs.id3 import ID3V1Frame, ID3V2Frame, EnhancedTagFrame
-from cs.logutils import warning
+from cs.logutils import warning, error
+from cs.pfx import Pfx
+from cs.tagset import TagSet
+
+def main(argv=None):
+  ''' MP3 command line implementation.
+  '''
+  return MP3Command(argv).run()
 
 @OBSOLETE
 def framesof(bfr):
@@ -52,6 +62,7 @@ class MP3Frame(AbstractBinary):
     '''
     raise NotImplementedError("no transcription")
 
+# pylint: disable=too-many-instance-attributes
 class MP3AudioFrame(SimpleBinary):
   ''' An MP3 audio frame.
   '''
@@ -114,6 +125,7 @@ class MP3AudioFrame(SimpleBinary):
         break
     return bss
 
+  # pylint: disable=attribute-defined-outside-init
   @classmethod
   ##@ensure(lambda bfr: bfr.at_eof() or bfr.peek(2) == b'\xff\xfb')
   def parse(cls, bfr):
@@ -224,7 +236,60 @@ class MP3AudioFrame(SimpleBinary):
         if self.is_mpeg1 else self.SAMPLERATES_BY_MPEG2_HZ
     )[self.frequency_bits >> 2]
 
+def tags_of(bfr):
+  ''' Return a TagSet containing the tags found in an mp3 buffer.
+  '''
+  tags = TagSet()
+  for frame in MP3Frame.scan(bfr):
+    frame_type = type(frame)
+    if issubclass(frame_type, (ID3V1Frame, ID3V2Frame)):
+      tags.update(
+          frame.tagset(),
+          prefix={
+              ID3V1Frame: 'id3v1',
+              ID3V2Frame: 'id3v2'
+          }[frame_type]
+      )
+    elif issubclass(frame_type, MP3AudioFrame):
+      tags.update(dict(bitrate_kbps=frame.bitrate_kbps), prefix='audio')
+    else:
+      warning("unhandled tag type %s", frame_type.__name__)
+  return tags
+
+class MP3Command(BaseCommand):
+  ''' MP3 command line tool.
+  '''
+
+  @staticmethod
+  def cmd_tags(argv):
+    ''' Usage: {cmd} mp3filenames...
+          Print the tags from the named files.
+    '''
+    xit = 0
+    first_print = True
+    for mp3path in argv:
+      with Pfx(mp3path):
+        try:
+          bfr = CornuCopyBuffer.from_filename(mp3path)
+        except Exception as e:  # pylint: disable=broad-except
+          error(e)
+          xit = 1
+          continue
+        tags = tags_of(bfr)
+        if not first_print:
+          print()
+          first_print = False
+        print(mp3path)
+        for tag in tags:
+          print(' ', tag)
+    return xit
+
+  def cmd_test(self, argv):
+    ''' Usage: test [testsuite-args...]
+          Run unit tests.
+    '''
+    from .mp3_tests import selftest  # pylint: disable=import-outside-toplevel
+    selftest([self.options.cmd] + argv)
+
 if __name__ == '__main__':
-  import cs.mp3_tests
-  import sys
-  cs.mp3_tests.selftest(sys.argv)
+  sys.exit(main(sys.argv))
