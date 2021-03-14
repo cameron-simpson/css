@@ -72,6 +72,8 @@ from contextlib import contextmanager
 import os
 import sys
 from threading import RLock
+from cs.context import stackattrs, StackableState
+from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
@@ -93,7 +95,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
+    ['cs.context', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
 }
 
 def _cleanup():
