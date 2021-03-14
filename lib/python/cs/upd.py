@@ -1062,6 +1062,19 @@ class UpdProxy(object):
         index += self.index
       return upd.insert(index, txt)
 
+# pylint: disable=too-few-public-methods
+class _UpdState(StackableState):
+
+  def __getattr__(self, attr):
+    if attr == 'upd':
+      value = Upd()
+    else:
+      raise AttributeError("%s.%s" % (type(self).__name__, attr))
+    setattr(self, attr, value)
+    return value
+
+state = _UpdState()
+
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
   '''
