@@ -1,0 +1,2 @@
+BSUInt: rename parse_bytes to decode_bytes, the former name conflicted with BinaryMixin.parse_bytes and broken the semantics.
+Minor refactors.
