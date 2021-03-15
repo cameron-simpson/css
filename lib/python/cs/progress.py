@@ -529,8 +529,8 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
-    proxy(statusfunc(self, label, width or proxy.width))
     last_pos = start_pos = self.position
+    proxy(statusfunc(self, label, width or proxy.width))
     for item in it:
       length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
