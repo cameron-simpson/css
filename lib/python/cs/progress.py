@@ -535,15 +535,15 @@ class BaseProgress(object):
       length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
+        if not update_frequency or self.position >= last_pos + update_frequency:
+          last_pos = self.position
+          proxy(statusfunc(self, label, width or proxy.width))
       yield item
       if not incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
+        if not update_frequency or self.position >= last_pos + update_frequency:
+          last_pos = self.position
+          proxy(statusfunc(self, label, width or proxy.width))
     if delete_proxy:
       proxy.delete()
     else:
