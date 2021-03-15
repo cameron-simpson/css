@@ -72,6 +72,8 @@ from contextlib import contextmanager
 import os
 import sys
 from threading import RLock
+from cs.context import stackattrs, StackableState
+from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
@@ -93,7 +95,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
+    ['cs.context', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
 }
 
 def _cleanup():
@@ -398,13 +400,16 @@ class Upd(SingletonMixin):
     return unctrl(txt.rstrip())
 
   @classmethod
-  def _adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
+  def diff(cls, oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
         We normalise `newtxt` as using `self.normalise`.
         `oldtxt` is presumed to be already normalised.
+
+        If `raw_text` is true (default `False`) we do not normalise `newtxt`
+        before comparison.
     '''
     # normalise text
     if not raw_text:
@@ -530,7 +535,7 @@ class Upd(SingletonMixin):
     txts = self._move_to_slot_v(self._current_slot, slot)
     txts.extend(
         (
-            self._redraw_slot_v(slot) if redraw else self._adjust_text_v(
+            self._redraw_slot_v(slot) if redraw else self.diff(
                 self._slot_text[slot],
                 newtxt,
                 self.columns,
@@ -563,15 +568,14 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
+      oldtxt = slots[slot]
       if self._disabled or self._backend is None:
-        oldtxt = self._slot_text[slot]
-        self._slot_text[slot] = txt
+        slots[slot] = txt
       else:
-        oldtxt = self._slot_text[slot]
         if oldtxt != txt:
           txts = self._update_slot_v(slot, txt, raw_text=True, redraw=redraw)
           self._current_slot = slot
-          self._slot_text[slot] = txt
+          slots[slot] = txt
           backend.write(''.join(txts))
           backend.flush()
     return oldtxt
@@ -745,6 +749,7 @@ class Upd(SingletonMixin):
     txts = []
     with self._lock:
       if index < 0:
+        # convert negative index to len-index, then check range
         index0 = index
         index = len(self) + index
         if index < 0:
@@ -772,6 +777,8 @@ class Upd(SingletonMixin):
 
       # no display? just insert the slot
       if self._disabled or self._backend is None:
+        slots.insert(index, txt)
+        proxies.insert(index, proxy)
         return proxy
 
       # not disabled: manage the display
@@ -940,7 +947,7 @@ class UpdProxy(object):
           default `1` (directly above the bottom status line)
         * `upd`: the `Upd` instance with which to associate this proxy,
           default the default `Upd` instance (associated with `sys.stderr`)
-        * `text`: optional initial text fot the new status line
+        * `text`: optional initial text for the new status line
     '''
     self.upd = None
     self.index = None
@@ -991,6 +998,14 @@ class UpdProxy(object):
     old_prefix, self._prefix = self._prefix, new_prefix
     if new_prefix != old_prefix:
       self.text = self._text
+
+  @contextmanager
+  def extend_prefix(self, more_prefix):
+    ''' Context manager to append text to the prefix.
+    '''
+    new_prefix = self.prefix + more_prefix
+    with stackattrs(self, prefix=new_prefix):
+      yield new_prefix
 
   @property
   def text(self):
@@ -1053,6 +1068,38 @@ class UpdProxy(object):
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
+
+# pylint: disable=too-few-public-methods
+class _UpdState(StackableState):
+
+  def __getattr__(self, attr):
+    if attr == 'upd':
+      value = Upd()
+    else:
+      raise AttributeError("%s.%s" % (type(self).__name__, attr))
+    setattr(self, attr, value)
+    return value
+
+state = _UpdState()
+
+@decorator
+def upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `prefix`: initial proxy prefix, default `func.__name__`
+      * `insert_at`: the position for the new proxy, default `1`
+  '''
+  if prefix is None:
+    prefix = func.__name__
+
+  def upd_proxy_wrapper(*a, **kw):
+    with state.upd.insert(insert_at) as proxy:
+      with stackattrs(state, proxy=proxy):
+        return func(*a, **kw)
+
+  return upd_proxy_wrapper
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.
