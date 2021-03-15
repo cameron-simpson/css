@@ -340,9 +340,10 @@ class OSDir(DirLike):
           "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
       )
     subpath = joinpath(self.path, name)
-    with open(subpath, 'wb') as f:
-      for data in bfr:
-        f.write(data)
+    with Pfx('write %r', subpath):
+      with open(subpath, 'wb') as f:
+        for data in bfr:
+          f.write(data)
     return OSFile(subpath)
 
 class OSFile(FileLike):
