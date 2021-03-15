@@ -333,7 +333,7 @@ class OSDir(DirLike):
     return OSDir(subpath)
 
   def file_frombuffer(self, name, bfr):
-    ''' Create a new file from data from a CornuCopyBuffer.
+    ''' Create a new file from data from a `CornuCopyBuffer`.
     '''
     if not name or PATHSEP in name:
       raise ValueError(

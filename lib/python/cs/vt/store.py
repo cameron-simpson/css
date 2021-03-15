@@ -380,8 +380,9 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
       dstS.open()
       T = bg_thread(
           lambda: (
-              self.push_blocks(name, Q, srcS, dstS, sem, progress), srcS.close(
-              ), dstS.close()
+              self.push_blocks(name, Q, srcS, dstS, sem, progress),
+              srcS.close(),
+              dstS.close(),
           )
       )
       return Q, T

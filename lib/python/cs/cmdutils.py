@@ -428,7 +428,7 @@ class BaseCommand:
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self):
-    ''' Run a the command.
+    ''' Run a command.
         Returns the exit status of the command.
         May raise `GetoptError` from subcommands.
 

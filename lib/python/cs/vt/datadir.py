@@ -1059,7 +1059,7 @@ class PlatonicDir(FilesDir):
           Also, unhashed data blocks encountered during scans
           which are promoted to `HashCodeBlock`s are stored here.
         * `archive`: optional `Archive` ducktype instance with a
-          .update(Dirent[,when]) method
+          `.update(Dirent[,when])` method
 
         Other keyword arguments are passed to `FilesDir.__init__`.
 
