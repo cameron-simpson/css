@@ -13,7 +13,7 @@
 
 import sys
 
-__version__ = '20210316.2'
+__version__ = '20210316.2-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
