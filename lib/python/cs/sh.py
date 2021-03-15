@@ -15,6 +15,8 @@ As of Python 3.8 the function `shlex.join()` does what `quotecmd()` does.
 import string
 import sys
 
+__version__ = '20210316'
+
 DISTINFO = {
     'description': "Convenience functions for constructing shell commands.",
     'keywords': ["python2", "python3"],
