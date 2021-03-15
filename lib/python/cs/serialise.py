@@ -21,6 +21,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
+        "Development Status :: 7 - Inactive",
     ],
     'install_requires': [],
 }
