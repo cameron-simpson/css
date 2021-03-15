@@ -61,7 +61,7 @@ from cs.psutils import PidFileManager, write_pidfile, remove_pidfile
 from cs.py3 import DEVNULL
 from cs.sh import quotecmd
 
-__version__ = '20210316'
+__version__ = '20210316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
