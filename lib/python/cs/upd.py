@@ -400,13 +400,16 @@ class Upd(SingletonMixin):
     return unctrl(txt.rstrip())
 
   @classmethod
-  def _adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
+  def diff(cls, oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
         We normalise `newtxt` as using `self.normalise`.
         `oldtxt` is presumed to be already normalised.
+
+        If `raw_text` is true (default `False`) we do not normalise `newtxt`
+        before comparison.
     '''
     # normalise text
     if not raw_text:
@@ -532,7 +535,7 @@ class Upd(SingletonMixin):
     txts = self._move_to_slot_v(self._current_slot, slot)
     txts.extend(
         (
-            self._redraw_slot_v(slot) if redraw else self._adjust_text_v(
+            self._redraw_slot_v(slot) if redraw else self.diff(
                 self._slot_text[slot],
                 newtxt,
                 self.columns,
