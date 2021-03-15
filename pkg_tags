@@ -68,7 +68,7 @@ cs.sqltags ok_revision="703727d960d67e0864d94bc6ca96ee68ba52cd24" pypi.release="
 cs.tagset pypi.release="20210306" ok_revision=ea1ce52a3d6ea6d5350ee0f217f1eb220969e89b
 cs.threads pypi.release="20210306" ok_revision=fe403fed26cda83b04f8fc26830897164d6dabcd
 cs.timeutils pypi.release=20190220
-cs.tty pypi.release="20201102" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
+cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
 cs.units pypi.release="20201025"
 cs.upd pypi.release="20210122" ok_revision=e53c7026abb3b3a1ad774121054e77c3e23efb20
 cs.urlutils pypi.release=20191004
