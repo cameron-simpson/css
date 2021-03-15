@@ -947,7 +947,7 @@ class UpdProxy(object):
           default `1` (directly above the bottom status line)
         * `upd`: the `Upd` instance with which to associate this proxy,
           default the default `Upd` instance (associated with `sys.stderr`)
-        * `text`: optional initial text fot the new status line
+        * `text`: optional initial text for the new status line
     '''
     self.upd = None
     self.index = None
