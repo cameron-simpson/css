@@ -11,6 +11,8 @@
     * `put_bs` is now `BSUInt.transcribe_value`.
 '''
 
+import sys
+
 __version__ = '20210316-post'
 
 DISTINFO = {
@@ -23,4 +25,4 @@ DISTINFO = {
     'install_requires': [],
 }
 
-raise ImportError("please just use cs.binary")
+print("cs.serialise: OBSOLETE, please use cs.binary instead", file=sys.stderr)
