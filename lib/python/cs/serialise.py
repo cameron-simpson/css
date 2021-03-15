@@ -23,4 +23,4 @@ DISTINFO = {
     'install_requires': ['cs.binary'],
 }
 
-raise RuntimeError("please just use cs.binary")
+raise ImportError("please just use cs.binary")
