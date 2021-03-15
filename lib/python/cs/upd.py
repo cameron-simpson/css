@@ -565,15 +565,14 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
+      oldtxt = slots[slot]
       if self._disabled or self._backend is None:
-        oldtxt = self._slot_text[slot]
-        self._slot_text[slot] = txt
+        slots[slot] = txt
       else:
-        oldtxt = self._slot_text[slot]
         if oldtxt != txt:
           txts = self._update_slot_v(slot, txt, raw_text=True, redraw=redraw)
           self._current_slot = slot
-          self._slot_text[slot] = txt
+          slots[slot] = txt
           backend.write(''.join(txts))
           backend.flush()
     return oldtxt
