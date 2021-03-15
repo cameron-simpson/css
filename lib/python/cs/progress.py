@@ -87,7 +87,7 @@ class BaseProgress(object):
   __repr__ = __str__
 
   def __int__(self):
-    ''' int(Progress) returns the current position.
+    ''' `int(Progress)` returns the current position.
     '''
     return self.position
 
@@ -471,10 +471,10 @@ class BaseProgress(object):
           This reflects whether it is considered that progress is
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
-          The default is `False`,
+          The default is `False`, advancing after processing.
         * `label`: a label for the progress bar,
           default from `self.name`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
         * `window`: optional timeframe to define "recent" in seconds;
@@ -518,7 +518,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -1052,11 +1052,12 @@ def progressbar(
   ).iterbar(
       it, label=label, **kw
   )
-  pass
+  ##pass  # former workaround for some bug, IIRC
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
-  ''' Decorator for function which accept an optional `progress` parameter.
+  ''' Decorator for a function accepting an optional `progress`
+      keyword parameter.
       If `progress` is `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
@@ -1087,7 +1088,8 @@ def auto_progressbar(func, label=None, report_print=False):
 def selftest(argv):
   ''' Exercise some of the functionality.
   '''
-  lines = open(__file__).readlines()
+  with open(__file__) as f:
+    lines = f.readlines()
   lines += lines
   for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
@@ -1095,8 +1097,9 @@ def selftest(argv):
                        report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for _ in P.iterbar(open(__file__)):
-    time.sleep(0.005)
+  with open(__file__) as f:
+    for _ in P.iterbar(f):
+      time.sleep(0.005)
   from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
   runtests('cs.progress_tests')
 
