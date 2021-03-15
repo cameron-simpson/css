@@ -746,6 +746,7 @@ class Upd(SingletonMixin):
     txts = []
     with self._lock:
       if index < 0:
+        # convert negative index to len-index, then check range
         index0 = index
         index = len(self) + index
         if index < 0:
@@ -773,6 +774,8 @@ class Upd(SingletonMixin):
 
       # no display? just insert the slot
       if self._disabled or self._backend is None:
+        slots.insert(index, txt)
+        proxies.insert(index, proxy)
         return proxy
 
       # not disabled: manage the display
