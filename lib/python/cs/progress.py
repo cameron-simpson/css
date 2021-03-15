@@ -531,14 +531,14 @@ class BaseProgress(object):
       )
     proxy(statusfunc(self, label, width or proxy.width))
     last_pos = start_pos = self.position
-    for i in it:
-      length = itemlenfunc(i) if itemlenfunc else 1
+    for item in it:
+      length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
       if not update_frequency or self.position >= last_pos + update_frequency:
         proxy(statusfunc(self, label, width or proxy.width))
         last_pos = self.position
-      yield i
+      yield item
       if not incfirst:
         self += length
       if not update_frequency or self.position >= last_pos + update_frequency:
