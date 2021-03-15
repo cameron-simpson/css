@@ -94,8 +94,10 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.context', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
+    'install_requires': [
+        'cs.context', 'cs.deco', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122',
+        'cs.tty'
+    ],
 }
 
 def _cleanup():
