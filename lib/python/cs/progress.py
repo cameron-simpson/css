@@ -30,7 +30,7 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210306-post'
+__version__ = '20210316'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
