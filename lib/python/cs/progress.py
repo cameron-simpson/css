@@ -453,7 +453,8 @@ class BaseProgress(object):
       incfirst=False,
       width=None,
       window=None,
-      update_frequency=None,
+      update_frequency=1,
+      update_min_size=0,
       report_print=None,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -489,9 +490,12 @@ class BaseProgress(object):
           used only to produce the default `proxy` if that is not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
-        * `update_frequency`: optional update frequency;
+        * `update_frequency`: optional update frequency, default `1`;
+          only update the progress bar after this many iterations,
+          useful if the iteration rate is quite high
+        * `update_min_size`: optional update step size, default `0`;
           only update the progress bar after an advance of this many units,
-          useful if the iteration rate is very high
+          useful if the iteration size increment is quite small
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -529,25 +533,33 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
+    iteration = 0
+    last_update_iteration = 0
     last_update_pos = start_pos = self.position
-    proxy(statusfunc(self, label, width or proxy.width))
-    for item in it:
+
+    def update_status(force=False):
+      nonlocal self, proxy, statusfunc, label, width
+      nonlocal iteration, last_update_iteration, last_update_pos
+      if (force or iteration - last_update_iteration >= update_frequency
+          or self.position - last_update_pos >= update_min_size):
+        last_update_iteration = iteration
+        last_update_pos = self.position
+        proxy(statusfunc(self, label, width or proxy.width))
+
+    update_status(True)
+    for iteration, item in enumerate(it):
       length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
-        if not update_frequency or self.position >= last_update_pos + update_frequency:
-          last_update_pos = self.position
-          proxy(statusfunc(self, label, width or proxy.width))
+        update_status()
       yield item
       if not incfirst:
         self += length
-        if not update_frequency or self.position >= last_update_pos + update_frequency:
-          last_update_pos = self.position
-          proxy(statusfunc(self, label, width or proxy.width))
+        update_status()
     if delete_proxy:
       proxy.delete()
     else:
-      proxy(statusfunc(self, label, width or proxy.width))
+      update_status(True)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
