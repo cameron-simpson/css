@@ -59,7 +59,7 @@ cs.result pypi.release="20210123" ok_revision=d3240f904e7faa73672dc78c1920986f02
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828
 cs.seq pypi.release="20201025" ok_revision="148c51e6bebfd3cf3d57239c714369ee5924e13d"
-cs.serialise pypi.release=20190103 ok_revision="191adbcb6890f96ad36a9c1d935b2dd492a77294"
+cs.serialise pypi.release=20190103 ok_revision="3bf522faeba630b0135e21effd096b14b589142a"
 cs.sh pypi.release="20210316" ok_revision="41bb35a582f79767acefff34c2653f18dacd130c"
 cs.sharedfile pypi.release="20201228"
 cs.socketutils pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
