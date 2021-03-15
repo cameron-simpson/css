@@ -529,20 +529,20 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
-    last_pos = start_pos = self.position
+    last_update_pos = start_pos = self.position
     proxy(statusfunc(self, label, width or proxy.width))
     for item in it:
       length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
-        if not update_frequency or self.position >= last_pos + update_frequency:
-          last_pos = self.position
+        if not update_frequency or self.position >= last_update_pos + update_frequency:
+          last_update_pos = self.position
           proxy(statusfunc(self, label, width or proxy.width))
       yield item
       if not incfirst:
         self += length
-        if not update_frequency or self.position >= last_pos + update_frequency:
-          last_pos = self.position
+        if not update_frequency or self.position >= last_update_pos + update_frequency:
+          last_update_pos = self.position
           proxy(statusfunc(self, label, width or proxy.width))
     if delete_proxy:
       proxy.delete()
