@@ -95,9 +95,12 @@ class MappedFD:
     self.fd = fd
     self.mapped = mmap(fd, 0, flags=MAP_PRIVATE, prot=PROT_READ)
     self.record_count = self.mapped.size() // self.rec_size
-    assert self.mapped.size() % self.rec_size == 0, \
-        "mapped.size()=%s, rec_size=%s, modulus=%d" \
-        % (self.mapped.size(), self.rec_size, self.mapped.size() % self.rec_size)
+    assert self.mapped.size() % self.rec_size == 0, (
+        "mapped.size()=%s, rec_size=%s, modulus=%d" % (
+            self.mapped.size(), self.rec_size,
+            self.mapped.size() % self.rec_size
+        )
+    )
 
   def __del__(self):
     ''' Release resouces on object deletion.
