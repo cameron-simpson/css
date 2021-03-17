@@ -6,11 +6,13 @@
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
+from threading import Lock
 from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.attributes import flag_modified
 from icontract import require
 from cs.deco import decorator, contextdecorator
+from cs.pfx import pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -214,28 +216,62 @@ class ORM(MultiOpenMixin):
         even if these just `pass`
   '''
 
-  def __init__(self):
+  def __init__(self, serial_sessions=False):
+    ''' Initialise the ORM.
+
+        If `serial_sessions` is true (default `False`)
+        then allocate a lock to serialise session allocation.
+        This might be chosen with SQL backends which do not support
+        concurrent sessions such as SQLite.
+
+        In the case of SQLite there's a small inbuilt timeout in
+        an attempt to serialise transactions but it is possible to
+        exceed it easily and recovery is usually infeasible.
+        Instead we use the `serial_sessions` option to obtain a
+        mutex before allocating a session.
+    '''
     self.Base = declarative_base()
     self.Session = None
     self.sqla_state = SQLAState(orm=self)
+    self.serial_sessions = serial_sessions
+    if serial_sessions:
+      self._serial_sessions_lock = Lock()
 
   @contextmanager
+  @pfx_method(use_str=True)
   def session(self, *a, **kw):
     ''' Context manager to issue a new session and close it down.
 
         Note that this performs a `COMMIT` or `ROLLBACK` at the end.
     '''
     with self:
-      new_session = self.Session(*a, **kw)
-      with using_session(orm=self, session=new_session):
-        try:
-          yield new_session
-          new_session.commit()
-        except:
-          new_session.rollback()
-          raise
-        finally:
-          new_session.close()
+      if self.serial_sessions:
+        if state.orm is self and state.session is not None:
+          raise RuntimeError(
+              "this Thread already has an ORM session: %s" % (state.session,)
+          )
+        with self._serial_sessions_lock:
+          with self._raw_session(*a, **kw) as session:
+            yield session
+      else:
+        with self._raw_session(*a, **kw) as session:
+          yield session
+
+  @contextmanager
+  @pfx_method
+  def _raw_session(self, *a, **kw):
+    ''' The guts of allocating a session, called from `ORM.session`.
+      '''
+    new_session = self.Session(*a, **kw)
+    with using_session(orm=self, session=new_session):
+      try:
+        yield new_session
+        new_session.commit()
+      except:
+        new_session.rollback()
+        raise
+      finally:
+        new_session.close()
 
   @staticmethod
   def auto_session(method):
