@@ -664,15 +664,16 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   '''
 
   def __init__(self, *, db_url):
-    super().__init__()
     db_path = cutprefix(db_url, 'sqlite://')
     if db_path is db_url:
+      # no leading "sqlite://"
       if db_url.startswith(('/', './', '../')) or '://' not in db_url:
         # turn filesystenm pathnames into SQLite db URLs
         db_path = abspath(db_url)
         db_url = 'sqlite:///' + db_url
       else:
         db_path = None
+    super().__init__(serial_sessions=db_url.startswith('sqlite://'))
     self.db_url = db_url
     self.db_path = db_path
     self._lockfilepath = None
