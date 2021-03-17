@@ -168,18 +168,23 @@ def auto_session(function):
 
   if isgeneratorfunction(function):
 
-    def wrapper(*a, orm=None, session=None, **kw):
+    def auto_session_generator_wrapper(*a, orm=None, session=None, **kw):
       ''' Yield from the function with a session.
       '''
       with using_session(orm=orm, session=session) as active_session:
         yield from function(*a, session=active_session, **kw)
+
+    wrapper = auto_session_generator_wrapper
+
   else:
 
-    def wrapper(*a, orm=None, session=None, **kw):
+    def auto_session_function_wrapper(*a, orm=None, session=None, **kw):
       ''' Call the function with a session.
       '''
       with using_session(orm=orm, session=session) as active_session:
         return function(*a, session=active_session, **kw)
+
+    wrapper = auto_session_function_wrapper
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
   wrapper.__doc__ = function.__doc__
