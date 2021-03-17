@@ -9,7 +9,8 @@
     Compared to `cs.fstags` and its associated `fstags` command,
     this is oriented towards large numbers of items
     not naturally associated with filesystem objects.
-    My initial use case is an activity log.
+    My initial use case is an activity log,
+    but I'm probably going to use it for ontologies as well.
 
     Many basic tasks can be performed with the `sqltags` command line utility,
     documented under the `SQLTagsCommand` class below.
