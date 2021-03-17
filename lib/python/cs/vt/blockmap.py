@@ -20,10 +20,11 @@ import sys
 from tempfile import TemporaryFile, NamedTemporaryFile
 from cs.logutils import warning, info as log_info
 from cs.pfx import Pfx, pfx_method
-from cs.progress import Progress
+from cs.progress import progressbar
 from cs.py.func import prop
 from cs.resources import RunStateMixin
 from cs.threads import bg as bg_thread
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import upd_proxy, state as upd_state
 from cs.x import X
 from . import defaults
@@ -318,8 +319,16 @@ class BlockMap(RunStateMixin):
       submap_path = None
       nleaves = 0
       proxy.prefix = "%s(%s) leaves " % (type(self).__name__, block)
-      P = Progress(name='scan', position=offset, total=blocklen)
-      for leaf, start, length in block.slices(offset, blocklen):
+      for leaf, start, length in progressbar(
+          block.slices(offset, blocklen),
+          position=offset,
+          total=blocklen,
+          itemlenfunc=(lambda leaf_start_length: leaf_start_length[2] -
+                       leaf_start_length[1]),
+          proxy=proxy,
+          update_frequency=16,
+          units_scale=BINARY_BYTES_SCALE,
+      ):
         if runstate.cancelled:
           break
         if start > 0:
@@ -385,8 +394,6 @@ class BlockMap(RunStateMixin):
         submap_fp.write(h)
         offset += leaf.span
         nleaves += 1
-        if nleaves % 16 == 0:
-          proxy(P.status(P.name, proxy.width))
         if nleaves % 4096 == 0:
           log_info(
               "processed %d leaves in %gs (%d leaves/s)", nleaves,
