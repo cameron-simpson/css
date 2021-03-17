@@ -44,7 +44,9 @@ class SQLAState(State):
 
   def __init__(self, *, orm, session=None, **kw):
     # enforce provision of an ORM, default session=None
-    super().__init__(orm=orm, session=session, **kw)
+    super().__init__(**kw)
+    self.orm = orm
+    self.session = session
 
   @contextmanager
   def new_session(self, *, orm=None):
