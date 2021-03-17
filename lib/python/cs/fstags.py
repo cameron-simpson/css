@@ -111,7 +111,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20200717.1-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -124,8 +124,8 @@ DISTINFO = {
     },
     'install_requires': [
         'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
-        'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
-        'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
+        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
+        'cs.upd', 'icontract', 'typeguard'
     ],
 }
 
@@ -174,16 +174,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     self.options.ontology_path = None
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt, val):
+    ''' Apply command line option.
     '''
     options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-o':
-          options.ontology_path = val
-        else:
-          raise RuntimeError("unhandled option")
+    if opt == '-o':
+      options.ontology_path = val
+    else:
+      raise RuntimeError("unhandled option")
 
   @contextmanager
   def run_context(self):

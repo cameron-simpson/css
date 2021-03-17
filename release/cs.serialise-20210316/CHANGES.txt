@@ -1,0 +1,8 @@
+lib/python/cs/serialise_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/serialise_tests.py: cs.vt: rename randblock to make_randblock in accordance with cs.randutils module
+lib/python/cs/serialise_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/serialise.py: cs.serialise: bugfix the implementation of the deprecated old names put_bsdata and put_bss
+lib/python/cs/serialise_tests.py: cs.serialise_tests: drop bss tests, nonsensical, possibly python 2 dependent
+lib/python/cs/serialise.py lib/python/cs/serialise_tests.py: cs.serialise: drop all code, raise RuntimeError on import, point users to cs.binary in the docstring
+lib/python/cs/serialise.py: cs.serialise: raise an ImportError instead of a RuntimeError
+lib/python/cs/serialise.py: cs.serialise: make obviously obsolete, point users at cs.binary, drop imports

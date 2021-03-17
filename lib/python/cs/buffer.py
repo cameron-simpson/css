@@ -21,7 +21,7 @@ import sys
 from threading import Thread
 from cs.py3 import pread
 
-__version__ = '20201102-post'
+__version__ = '20210316-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -304,12 +304,18 @@ class CornuCopyBuffer(object):
         Other keyword arguments are passed to the buffer constructor.
     '''
     try:
-      foffset = f.tell()
-    except OSError:
+      ftell = f.tell
+    except AttributeError:
       is_seekable = False
       foffset = None
     else:
-      is_seekable = True
+      try:
+        foffset = ftell()
+      except OSError:
+        is_seekable = False
+        foffset = None
+      else:
+        is_seekable = True
     if offset is None:
       offset = foffset
     it = (
@@ -317,6 +323,30 @@ class CornuCopyBuffer(object):
         if is_seekable else FileIterator(f, readsize=readsize, offset=offset)
     )
     return cls(it, offset=it.offset, **kw)
+
+  @classmethod
+  def from_filename(cls, filename: str, offset=None, **kw):
+    ''' Open the file named `filename` and return a new `CornuCopyBuffer`.
+
+        If `offset` is provided, skip to that position in the file.
+        A negative offset skips to a position that far from the end of the file
+        as determined by its `Stat.st_size`.
+
+        Other keyword arguments are passed to the buffer constructor.
+    '''
+    f = open(filename, 'rb')
+    bfr = cls.from_file(f, close=f.close, **kw)
+    if offset is not None:
+      if offset < 0:
+        S = os.fstat(f.fileno())
+        offset2 = S.st_size + offset
+        if offset2 < 0:
+          raise ValueError(
+              "offset %s is too far from the end of the file (st_size=%s)" %
+              (offset, S.st_size)
+          )
+      bfr.skipto(offset)
+    return bfr
 
   @classmethod
   def from_bytes(cls, bs, offset=0, length=None, **kw):
@@ -351,9 +381,10 @@ class CornuCopyBuffer(object):
       raise ValueError(
           "offset(%d)+length(%d) > len(bs):%d" % (offset, length, len(bs))
       )
+    bs = memoryview(bs)
     if offset > 0 or end_offset < len(bs):
-      bs = memoryview(bs)[offset:end_offset]
-    return cls([bs], **kw)
+      bs = bs[offset:end_offset]
+    return cls([bs], offset=offset, **kw)
 
   def __str__(self):
     return "%s(offset:%d,buf:%d)" % (
@@ -528,6 +559,7 @@ class CornuCopyBuffer(object):
       except StopIteration:
         if min_size is Ellipsis or short_ok:
           return
+        # pylint: disable=raise-missing-from
         raise EOFError(
             "insufficient input data, wanted %d bytes but only found %d" %
             (min_size, self.buflen)
@@ -610,6 +642,15 @@ class CornuCopyBuffer(object):
     if len(taken) == 1:
       return bytes(taken[0])
     return b''.join(taken)
+
+  def peek(self, size, short_ok=False):
+    ''' Examine the leading bytes of the buffer without consuming them,
+        a `take` followed by a `push`.
+        Returns the bytes.
+    '''
+    bs = self.take(size, short_ok=short_ok)
+    self.push(bs)
+    return bs
 
   def read(self, size, one_fetch=False):
     ''' Compatibility method to allow using the buffer like a file.
@@ -783,6 +824,14 @@ class CornuCopyBuffer(object):
     ''' Context manager wrapper for `.bounded`
         which calls the `.flush` method automatically
         on exiting the context.
+
+        Example:
+
+            # avoid buffer overrun
+            with bfr.subbuffer(bfr.offset+128) as subbfr:
+                id3v1 = ID3V1Frame.parse(subbfr)
+                # ensure the whole buffer was consumed
+                assert subbfr.at_eof()
     '''
     subbfr = self.bounded(end_offset)
     try:
@@ -794,12 +843,13 @@ class CornuCopyBuffer(object):
     ''' Return a new `CornuCopyBuffer` operating on a bounded view
         of this buffer.
 
-        `end_offset`: the ending offset of the new buffer. Note
-        that this is an absolute offset, not a length.
-
         This supports parsing of the buffer contents without risk
         of consuming past a certain point, such as the known end
         of a packet structure.
+
+        Parameters:
+        * `end_offset`: the ending offset of the new buffer.
+          Note that this is an absolute offset, not a length.
 
         The new buffer starts with the same offset as `self` and
         use of the new buffer affects `self`. After a flush both
@@ -824,18 +874,18 @@ class CornuCopyBuffer(object):
             >>> bfr = CornuCopyBuffer([b'abc', b'def', b'ghi'])
             >>> bfr.offset
             0
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'ab'
             >>> bfr.offset
             2
             >>> subbfr = bfr.bounded(5)
             >>> subbfr.offset
             2
             >>> for bs in subbfr:
-            ...   print(len(bs))
+            ...   print(bs)
             ...
-            1
-            2
+            b'c'
+            b'de'
             >>> subbfr.offset
             5
             >>> subbfr.take(2)
@@ -845,8 +895,8 @@ class CornuCopyBuffer(object):
             >>> subbfr.flush()
             >>> bfr.offset
             5
-            >>> len(bfr.take(2))
-            2
+            >>> bfr.take(2)
+            b'fg'
 
         *WARNING*: if the bounded buffer is not completely consumed
         then it is critical to call the new `CornuCopyBuffer`'s `.flush`
@@ -1079,6 +1129,7 @@ class SeekableIteratorMixin(object):
       try:
         end_offset = self.end_offset
       except AttributeError as e:
+        # pylint: disable=raise-missing-from
         raise ValueError("mode=SEEK_END unsupported: %s" % (e,))
       new_offset += end_offset
     else:
@@ -1179,7 +1230,7 @@ class FileIterator(_Iterator, SeekableIteratorMixin):
     self.read1 = read1
 
   def close(self):
-    ''' Detach from the file and close it.
+    ''' Detach from the file. Does *not* call `fp.close()`.
     '''
     self.fp = None
 

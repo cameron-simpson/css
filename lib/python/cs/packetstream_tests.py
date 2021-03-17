@@ -43,7 +43,7 @@ class TestPacket(unittest.TestCase):
                     payload
                 )
                 bs = b''.join(P.transcribe_flat())
-                P2, offset = Packet.from_bytes(bs)
+                P2, offset = Packet.parse_bytes(bs)
                 self.assertEqual(offset, len(bs))
                 self.assertEqual(P, P2)
 

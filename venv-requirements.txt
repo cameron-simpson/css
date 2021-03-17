@@ -9,10 +9,13 @@ mypy
 musicbrainzngs
 pycodestyle
 pyflakes
+pyicontract-lint
 pylint
+pytest
 requests
 sqlalchemy
 twine
 typeguard
+watchdog
 yapf
 youtube-dl

@@ -6,14 +6,18 @@
 
 set -ue
 
-cmd=$0
 etc_hosts=/etc/hosts
+
+cmd=$0
+usage="Usage: $cmd [etc-hosts] < curly-input
+  etc-hosts     A file in the format of hosts(5) to use instead of $etc_hosts.
+  curly-input   Input data with {hostname} strings for replacement."
 
 badopts=
 
 [ $# = 0 ] || { etc_hosts=$1; shift; }
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" &2; badopts=1; }
-[ -f "$etc_hosts" ] || { echo "$cmd: not a file: $etc_hsosts" >&2; badopts=1; }
+[ -f "$etc_hosts" ] || { echo "$cmd: not a file: $etc_hosts" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 

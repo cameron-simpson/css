@@ -63,7 +63,7 @@ class TestDataDir(unittest.TestCase):
   def _open_default_datadir(self):
     return self.datadirclass(
         self.indexdirpath,
-        self.hashclass,
+        hashclass=self.hashclass,
         indexclass=self.indexclass,
         rollover=self.rollover
     )
@@ -107,15 +107,19 @@ class TestDataDir(unittest.TestCase):
       data_offset = random.randint(0, 7)
       data_length = random.randint(0, 65536)
       flags = random.randint(0, 1)
-      entry = FileDataIndexEntry(filenum, data_offset, data_length, flags)
+      entry = FileDataIndexEntry(
+          filenum=filenum,
+          data_offset=data_offset,
+          data_length=data_length,
+          flags=flags
+      )
       self.assertEqual(entry.filenum, filenum)
       self.assertEqual(entry.data_offset, data_offset)
       self.assertEqual(entry.data_length, data_length)
       self.assertEqual(entry.flags, flags)
       encoded = bytes(entry)
       self.assertIsInstance(encoded, bytes)
-      entry2, post_offset = FileDataIndexEntry.from_bytes(encoded)
-      self.assertEqual(post_offset, len(encoded))
+      entry2 = FileDataIndexEntry.from_bytes(encoded)
       self.assertEqual(entry, entry2)
 
   @multitest

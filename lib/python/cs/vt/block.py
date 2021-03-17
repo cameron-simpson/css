@@ -1,4 +1,6 @@
 #!/usr/bin/python
+#
+# pylint: disable=too-many-lines
 
 ''' Functions and classes relating to Blocks, which are data chunk references.
 
@@ -34,13 +36,13 @@
 '''
 
 from __future__ import print_function
-from abc import ABC
+from abc import ABC, abstractmethod
 from enum import IntEnum, unique as uniqueEnum
 from functools import lru_cache
 import sys
 from icontract import require
 from cs.binary import (
-    PacketField, BSUInt, BSData, flatten as flatten_transcription
+    BinarySingleValue, BSUInt, BSData, flatten as flatten_transcription
 )
 from cs.buffer import CornuCopyBuffer
 from cs.lex import untexthexify, get_decimal_value
@@ -68,136 +70,6 @@ class BlockType(IntEnum):
   BT_LITERAL = 2  # span raw-data
   BT_SUBBLOCK = 3  # a SubBlock of another Block
 
-class BlockRecord(PacketField):
-  ''' PacketField support for binary parsing and transcription of blockrefs.
-  '''
-
-  TEST_CASES = (
-      # zero length hashcode block
-      # note that the hashcode doesn't match that of b''
-      b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
-  )
-
-  @staticmethod
-  def value_from_buffer(bfr):
-    ''' Decode a Block reference from a buffer.
-
-        Format is:
-
-            BS(length)
-            BS(flags)
-              0x01 indirect blockref
-              0x02 typed: type follows, otherwise BT_HASHCODE
-              0x04 type flags: per type flags follow type
-            BS(span)
-            [BS(type)]
-            [BS(type_flags)]
-            union {
-              type BT_HASHCODE: hash
-              type BT_RLE: octet-value (repeat span times to get data)
-              type BT_LITERAL: raw-data (span bytes)
-              type BT_SUBBLOCK: suboffset, super block
-            }
-
-        Even though this is all decodable without the leading length
-        we use a leading length so that future encodings do not
-        prevent parsing any following data.
-    '''
-    raw_encoding = BSData.value_from_buffer(bfr)
-    blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
-    flags = BSUInt.value_from_buffer(blockref_bfr)
-    is_indirect = bool(flags & F_BLOCK_INDIRECT)
-    is_typed = bool(flags & F_BLOCK_TYPED)
-    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
-    unknown_flags = flags & ~(
-        F_BLOCK_INDIRECT | F_BLOCK_TYPED | F_BLOCK_TYPE_FLAGS
-    )
-    if unknown_flags:
-      raise ValueError(
-          "unexpected flags value (0x%02x) with unsupported flags=0x%02x" %
-          (flags, unknown_flags)
-      )
-    span = BSUInt.value_from_buffer(blockref_bfr)
-    if is_indirect:
-      # With indirect blocks, the span is of the implied data, not
-      # the referenced block's data. Therefore we build the referenced
-      # block with a span of None and store the span in the indirect
-      # block.
-      ispan = span
-      span = None
-    # block type, default BT_HASHCODE
-    if is_typed:
-      block_type = BlockType(BSUInt.value_from_buffer(blockref_bfr))
-    else:
-      block_type = BlockType.BT_HASHCODE
-    if has_type_flags:
-      type_flags = BSUInt.value_from_buffer(blockref_bfr)
-      if type_flags:
-        warning("nonzero type_flags: 0x%02x", type_flags)
-    else:
-      type_flags = 0x00
-    # instantiate type specific block ref
-    if block_type == BlockType.BT_HASHCODE:
-      hashcode = HashCode.from_buffer(blockref_bfr)
-      B = HashCodeBlock(hashcode=hashcode, span=span)
-    elif block_type == BlockType.BT_RLE:
-      octet = blockref_bfr.take(1)
-      B = RLEBlock(span, octet)
-    elif block_type == BlockType.BT_LITERAL:
-      data = blockref_bfr.take(span)
-      B = LiteralBlock(data)
-    elif block_type == BlockType.BT_SUBBLOCK:
-      suboffset = BSUInt.value_from_buffer(blockref_bfr)
-      superB = BlockRecord.value_from_buffer(blockref_bfr)
-      # wrap inner Block in subspan
-      B = SubBlock(superB, suboffset, span)
-    else:
-      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
-    if is_indirect:
-      B = IndirectBlock(B, span=ispan)
-    if not blockref_bfr.at_eof():
-      warning(
-          "unparsed data (%d bytes) follow Block %s",
-          len(raw_encoding) - blockref_bfr.offset, B
-      )
-    return B
-
-  @staticmethod
-  def transcribe_value(B):
-    ''' Transcribe this Block, the inverse of value_from_buffer.
-    '''
-    transcription = []
-    is_indirect = B.indirect
-    span = B.span
-    if is_indirect:
-      # aside from the span, everything else comes from the superblock
-      B = B.superblock
-    block_type = B.type
-    assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
-    block_typed = block_type != BlockType.BT_HASHCODE
-    flags = (
-        (F_BLOCK_INDIRECT if is_indirect else 0)
-        | (F_BLOCK_TYPED if block_typed else 0)
-        | 0  # no F_BLOCK_TYPE_FLAGS
-    )
-    transcription.append(BSUInt.transcribe_value(flags))
-    transcription.append(BSUInt.transcribe_value(span))
-    if block_typed:
-      transcription.append(BSUInt.transcribe_value(block_type))
-    # no block_type_flags
-    if block_type == BlockType.BT_HASHCODE:
-      transcription.append(B.hashcode.transcribe_b())
-    elif block_type == BlockType.BT_RLE:
-      transcription.append(B.octet)
-    elif block_type == BlockType.BT_LITERAL:
-      transcription.append(B.data)
-    elif block_type == BlockType.BT_SUBBLOCK:
-      transcription.append(BSUInt.transcribe_value(B.offset))
-      transcription.append(BlockRecord.transcribe_value(B.superblock))
-    else:
-      raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
-    return BSData(b''.join(flatten_transcription(transcription))).transcribe()
-
 def isBlock(o):
   ''' Test if an object `o` is a subinstance of `_Block`.
   '''
@@ -215,6 +87,7 @@ class _Block(Transcriber, ABC):
     self.blockmap = None
     self._lock = RLock()
 
+  # pylint: disable=too-many-branches,too-many-locals,too-many-return-statements
   def __eq__(self, oblock):
     ''' Compare this Block with another Block for data equality.
     '''
@@ -312,7 +185,7 @@ class _Block(Transcriber, ABC):
   def encode(self):
     ''' Binary transcription of this Block via BlockRecord.
     '''
-    return b''.join(BlockRecord.transcribe_value_flat(self))
+    return bytes(BlockRecord(self))
 
   def __getitem__(self, index):
     ''' Return specified direct data.
@@ -323,6 +196,12 @@ class _Block(Transcriber, ABC):
     ''' len(Block) is the length of the encompassed data.
     '''
     return self.span
+
+  @abstractmethod
+  def datafrom(self, start=0):
+    ''' Yield data chuncks from this file.
+    '''
+    raise NotImplementedError("datafrom")
 
   def get_spanned_data(self):
     ''' Collect up all the data of this Block and return a single bytes instance.
@@ -370,7 +249,7 @@ class _Block(Transcriber, ABC):
       blockmap = self.blockmap
     if blockmap is None:
       warning("making blockmap for %s", self)
-      from .blockmap import BlockMap
+      from .blockmap import BlockMap  # pylint: disable=import-outside-toplevel
       if blockmapdir is None:
         blockmapdir = defaults.S.blockmapdir
       self.blockmap = blockmap = BlockMap(self, blockmapdir=blockmapdir)
@@ -483,17 +362,17 @@ class _Block(Transcriber, ABC):
     ''' Return a new Block consisting of `self` with the span
         `start:end` replaced by the data from `new_block`.
     '''
-    from .blockify import top_block_for
+    from .blockify import top_block_for  # pylint: disable=import-outside-toplevel
     return top_block_for(self.spliced(start, end, new_block))
 
   def open(self, mode="rb"):
     ''' Open the block as a file.
     '''
+    # pylint: disable=import-outside-toplevel
+    from .file import ROBlockFile, RWBlockFile
     if mode == 'rb':
-      from .file import ROBlockFile
       return ROBlockFile(self)
     if mode == 'w+b':
-      from .file import RWBlockFile
       return RWBlockFile(backing_block=self)
     raise ValueError(
         "unsupported open mode, expected 'rb' or 'w+b', got: %r" % (mode,)
@@ -525,6 +404,151 @@ class _Block(Transcriber, ABC):
             warning("%s: push cancelled", self)
             break
           subB.pushto_queue(Q, runstate=runstate, progress=progress)
+
+class BlockRecord(BinarySingleValue):
+  ''' Support for binary parsing and transcription of blockrefs.
+  '''
+
+  TEST_CASES = (
+      # zero length hashcode block
+      # note that the hashcode doesn't match that of b''
+      b'\x17\0\0' + b'\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0',
+  )
+
+  FIELD_TYPES = dict(value=_Block)
+
+  def __init__(self, B):
+    assert isinstance(B, _Block)
+    super().__init__(B)
+
+  @property
+  def block(self):
+    ''' Alias `.value` as `.block`.
+    '''
+    return self.value
+
+  @staticmethod
+  # pylint: disable=arguments-differ,too-many-branches,too-many-locals
+  def parse_value(bfr):
+    ''' Decode a Block reference from a buffer.
+
+        Format is a `BSData` holding this encoded data:
+
+            BS(flags)
+              0x01 indirect blockref
+              0x02 typed: type follows, otherwise BT_HASHCODE
+              0x04 type flags: per type flags follow type
+            BS(span)
+            [BS(type)]
+            [BS(type_flags)]
+            union {
+              type BT_HASHCODE: hash
+              type BT_RLE: octet-value (repeat span times to get data)
+              type BT_LITERAL: raw-data (span bytes)
+              type BT_SUBBLOCK: suboffset, super block
+            }
+
+        Even though this is all decodable without the leading length
+        we use a leading length so that future encodings do not
+        prevent parsing any following data.
+    '''
+    raw_encoding = BSData.parse_value(bfr)
+    blockref_bfr = CornuCopyBuffer.from_bytes(raw_encoding)
+    flags = BSUInt.parse_value(blockref_bfr)
+    is_indirect = bool(flags & F_BLOCK_INDIRECT)
+    is_typed = bool(flags & F_BLOCK_TYPED)
+    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
+    unknown_flags = flags & ~(
+        F_BLOCK_INDIRECT | F_BLOCK_TYPED | F_BLOCK_TYPE_FLAGS
+    )
+    if unknown_flags:
+      raise ValueError(
+          "unexpected flags value (0x%02x) with unsupported flags=0x%02x" %
+          (flags, unknown_flags)
+      )
+    span = BSUInt.parse_value(blockref_bfr)
+    if is_indirect:
+      # With indirect blocks, the span is of the implied data, not
+      # the referenced block's data. Therefore we build the referenced
+      # block with a span of None and store the span in the indirect
+      # block.
+      ispan = span
+      span = None
+    # block type, default BT_HASHCODE
+    if is_typed:
+      block_type = BlockType(BSUInt.parse_value(blockref_bfr))
+    else:
+      block_type = BlockType.BT_HASHCODE
+    if has_type_flags:
+      type_flags = BSUInt.parse_value(blockref_bfr)
+      if type_flags:
+        warning("nonzero type_flags: 0x%02x", type_flags)
+    else:
+      type_flags = 0x00
+    # instantiate type specific block ref
+    if block_type == BlockType.BT_HASHCODE:
+      hashcode = HashCode.from_buffer(blockref_bfr)
+      B = HashCodeBlock(hashcode=hashcode, span=span)
+    elif block_type == BlockType.BT_RLE:
+      octet = blockref_bfr.take(1)
+      B = RLEBlock(span, octet)
+    elif block_type == BlockType.BT_LITERAL:
+      data = blockref_bfr.take(span)
+      B = LiteralBlock(data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      suboffset = BSUInt.parse_value(blockref_bfr)
+      superB = BlockRecord.parse_value(blockref_bfr)
+      # wrap inner Block in subspan
+      B = SubBlock(superB, suboffset, span)
+    else:
+      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
+    if is_indirect:
+      B = IndirectBlock(B, span=ispan)
+    if not blockref_bfr.at_eof():
+      warning(
+          "unparsed data (%d bytes) follow Block %s",
+          len(raw_encoding) - blockref_bfr.offset, B
+      )
+    assert isinstance(B, _Block)
+    return B
+
+  @staticmethod
+  # pylint: disable=arguments-differ
+  def transcribe_value(B):
+    ''' Transcribe this `Block`, the inverse of parse_value.
+    '''
+    transcription = []
+    is_indirect = B.indirect
+    span = B.span
+    if is_indirect:
+      # aside from the span, everything else comes from the superblock
+      B = B.superblock
+    block_type = B.type
+    assert block_type >= 0, "block_type(%s) => %d" % (B, B.type)
+    block_typed = block_type != BlockType.BT_HASHCODE
+    flags = (
+        (F_BLOCK_INDIRECT if is_indirect else 0)
+        | (F_BLOCK_TYPED if block_typed else 0)
+        | 0  # no F_BLOCK_TYPE_FLAGS
+    )
+    transcription.append(BSUInt.transcribe_value(flags))
+    transcription.append(BSUInt.transcribe_value(span))
+    if block_typed:
+      transcription.append(BSUInt.transcribe_value(block_type))
+    # no block_type_flags
+    if block_type == BlockType.BT_HASHCODE:
+      transcription.append(B.hashcode.transcribe_b())
+    elif block_type == BlockType.BT_RLE:
+      transcription.append(B.octet)
+    elif block_type == BlockType.BT_LITERAL:
+      transcription.append(B.data)
+    elif block_type == BlockType.BT_SUBBLOCK:
+      transcription.append(BSUInt.transcribe_value(B.offset))
+      transcription.append(BlockRecord.transcribe_value(B.superblock))
+    else:
+      raise ValueError("unsupported Block type 0x%02x: %s" % (block_type, B))
+    block_bs = b''.join(flatten_transcription(transcription))
+    return BSData(block_bs).transcribe()
 
 @lru_cache(maxsize=1024 * 1024, typed=True)
 def get_HashCodeBlock(hashcode):
@@ -601,7 +625,7 @@ class HashCodeBlock(_Block):
         # data obtained already
         continue
       try:
-        h = B.hashcode
+        _ = B.hashcode
       except AttributeError as e:
         if isinstance(B, HashCodeBlock):
           error("need_direct_data: B=%s: %s", B, e)
@@ -612,7 +636,7 @@ class HashCodeBlock(_Block):
       R.join()
 
   @prop
-  def span(self):
+  def span(self):  # pylint: disable=method-hidden
     ''' Return the data length, computing it from the data if required.
     '''
     _span = self._span
@@ -635,24 +659,16 @@ class HashCodeBlock(_Block):
             "%s: tried to change .span from %s to %s" %
             (self, self._span, newspan)
         )
-      else:
-        raise RuntimeError("SECOND UNEXPECTED")
+      raise RuntimeError("SECOND UNEXPECTED")
 
-  def datafrom(self, start=None, end=None):
+  def datafrom(self, start=0, end=None):
     ''' Generator yielding data from `start:end`.
     '''
-    if start is not None and start < 0:
-      raise ValueError("invalid start=%s" % (start,))
-    if end is not None and end < 0:
-      raise ValueError("invalid end=%s" % (end,))
-    bs = self.get_direct_data()
-    if start is None:
-      if end is None:
-        yield bs
-        return
-      raise ValueError("start is None but end=%s" % (end,))
+    if start < 0:
+      raise ValueError("invalid start:%d" % (start,))
     if end is not None and end < start:
-      raise ValueError("end(%s) < start(%s)" % (end, start))
+      raise ValueError("invalid end:%d < start:%d" % (end, start))
+    bs = self.get_direct_data()
     if start == 0:
       if end is None:
         yield bs
@@ -668,6 +684,7 @@ class HashCodeBlock(_Block):
     return T.transcribe_mapping(m, fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     m, offset = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span', None)
@@ -678,7 +695,7 @@ class HashCodeBlock(_Block):
     return B, offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this HashCodeBlock.
     '''
     ok = True
@@ -694,7 +711,7 @@ class HashCodeBlock(_Block):
           if len(self) != len(data):
             error("len(self)=%d, len(data)=%d", len(self), len(data))
             ok = False
-          h = S.hash(data, type(hashcode))
+          h = S.hash(data)
           if h != hashcode:
             error("hash(data):%s != self.hashcode:%s", h, hashcode)
             ok = False
@@ -723,6 +740,9 @@ def Block(*, hashcode=None, data=None, span=None, added=False):
   return B
 
 class IndirectBlock(_Block):
+  ''' An indirect block,
+      whose direct data consists of references to subsidiary Blocks.
+  '''
 
   transcribe_prefix = 'I'
 
@@ -743,6 +763,10 @@ class IndirectBlock(_Block):
 
   @classmethod
   def from_hashcode(cls, hashcode, span):
+    ''' Construct an `IndirectBlock` from the `hashcode`
+        for its direct data and the `span` of bytes
+        covers.
+    '''
     return cls(get_HashCodeBlock(hashcode), span=span)
 
   @classmethod
@@ -778,7 +802,10 @@ class IndirectBlock(_Block):
     blocks = self._subblocks
     if blocks is None:
       blocks = self._subblocks = tuple(
-          BlockRecord.parse_buffer_values(self.superblock.bufferfrom())
+          map(
+              lambda BR: BR.block,
+              BlockRecord.scan(self.superblock.bufferfrom())
+          )
       )
     return blocks
 
@@ -790,6 +817,7 @@ class IndirectBlock(_Block):
     T.transcribe(self.superblock, fp=fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     ''' Parse "span:Block"
     '''
@@ -875,11 +903,9 @@ class RLEBlock(_Block):
     '''
     return self.octet * self.span
 
-  def datafrom(self, start=None, end=None):
+  def datafrom(self, start=0, end=None):
     ''' Yield the data from `start` to `end`.
     '''
-    if start is None:
-      start = 0
     if end is None:
       end = self.span
     if end > self.span:
@@ -893,6 +919,7 @@ class RLEBlock(_Block):
     return T.transcribe_mapping({'span': self.span, 'octet': self.octet}, fp)
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     m = T.parse_mapping(s, offset, stopchar)
     span = m.pop('span')
@@ -902,7 +929,7 @@ class RLEBlock(_Block):
     return cls(span, octet), offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this RLEBlock.
     '''
     ok = True
@@ -938,6 +965,7 @@ class LiteralBlock(_Block):
     fp.write(hexify(self.data))
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     ''' Parse the interior of the transcription: texthexified data.
     '''
@@ -964,7 +992,7 @@ class LiteralBlock(_Block):
     yield self.data[start:end]
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this LiteralBlock.
     '''
     ok = True
@@ -1047,6 +1075,7 @@ class _SubBlock(_Block):
     )
 
   @classmethod
+  # pylint: disable=too-many-arguments
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     offset, block, suboffset, subspan = T.parse_mapping(
         s, offset, stopchar, required=('block', 'offset', 'span')
@@ -1054,7 +1083,7 @@ class _SubBlock(_Block):
     return cls(block, suboffset, subspan), offset
 
   @io_fail
-  def fsck(self, recurse=False):
+  def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this SubBlock.
     '''
     ok = True

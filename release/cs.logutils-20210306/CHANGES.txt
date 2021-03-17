@@ -1,0 +1,7 @@
+lib/python/cs/logutils.py: cs.logutils: default logging level for ttys is now INFO, not STATUS
+lib/python/cs/logutils.py: cs.logutils: define new VERBOSE level below INFO but above DEBUG, check the whole level hierarchy
+lib/python/cs/logutils.py: cs.logutils: infer_logging_level: if verbose unspecified, logging=WARNING on a tty and TRACK otherwise, else if verbose, level=VERBOSE, otherwise WARNING
+lib/python/cs/logutils.py: cs.logutils: include .verbose in the loginfo
+lib/python/cs/logutils.py: cs.logutils: new verbose() function to log at VERBOSE level
+lib/python/cs/logutils.py: cs.logutils: ifverbose(): if is
+lib/python/cs/logutils.py: cs.logutils: ifverbose() : update docstring for new semantics
