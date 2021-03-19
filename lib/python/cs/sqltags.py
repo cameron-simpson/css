@@ -683,7 +683,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
     '''
-    self.meta.create_all()
+    self.Base.metadata.create_all(bind=self.engine)
     with self.session() as session:
       self.prepare_metanode(session=session)
 
