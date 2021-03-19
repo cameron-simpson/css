@@ -69,7 +69,7 @@ class SQLAState(State):
         if not `None`, otherwise to make one using `orm` or `self.orm`.
     '''
     session = self.session
-    if session is None:
+    if session is None or (orm is not None and orm is not self.orm):
       with self.new_session(orm=orm) as session:
         yield session
     else:
