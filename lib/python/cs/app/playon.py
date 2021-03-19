@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from functools import partial
 from getopt import getopt, GetoptError
 from netrc import netrc
+import os
 from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
@@ -138,10 +139,8 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ',
-                                       '--').replace('_',
-                                                     ':').replace(' ', '-') +
-              '.'
+              filename.lower().replace(' - ', '--').replace('_', ':')
+              .replace(' ', '-').replace(os.sep, ':') + '.'
           )
           try:
             api.download(dl_id, filename=filename)
