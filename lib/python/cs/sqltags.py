@@ -1265,7 +1265,7 @@ class SQLTags(TagSets):
         entity = self.orm.entities(name=name, unixtime=unixtime)
         session.add(entity)
         for tag in tags:
-          entity.add_tag(tag.name, tag.value)
+          entity.add_tag(tag.name, tag.value, session=session)
         session.flush()
         te = self.get(entity.id)
       assert te is not None
