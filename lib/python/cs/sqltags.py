@@ -26,7 +26,7 @@ from fnmatch import fnmatchcase
 from getopt import getopt, GetoptError
 import operator
 import os
-from os.path import abspath, expanduser, exists as existspath
+from os.path import expanduser, exists as existspath
 import re
 import sys
 from threading import RLock
@@ -34,7 +34,6 @@ import time
 from typing import List
 from icontract import require
 from sqlalchemy import (
-    create_engine,
     Column,
     Integer,
     Float,
@@ -42,16 +41,15 @@ from sqlalchemy import (
     JSON,
     ForeignKey,
 )
-from sqlalchemy.orm import sessionmaker, aliased
+from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs, setup_cmgr
+from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
-from cs.fileutils import makelockfile
-from cs.lex import FormatAsError, cutprefix, get_decimal_value
+from cs.lex import FormatAsError, get_decimal_value
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -59,7 +57,6 @@ from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
     HasIdMixin,
-    SQLAState,
 )
 from cs.tagset import (
     TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
@@ -185,9 +182,11 @@ class SQLTagProxy:
           '~': self.likeglob,
       }[op_text]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise ValueError("unknown comparison operator text %r" % (op_text,))
     return cmp_func(other, alias=alias)
 
+  # pylint: disable=too-many-arguments
   def _cmp(
       self,
       op_label,
@@ -372,6 +371,7 @@ class SQLTagProxy:
         like(globptn.replace('%', esc + '%').replace('*', '%'), esc)
     )
 
+# pylint: disable=too-few-public-methods
 class SQLTagProxies:
   ''' A proxy for the tags supporting Python comparison => `SQLParameters`.
 
@@ -930,6 +930,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.tags = Tags
     self.entities = Entities
 
+  # pylint: disable=too-many-branches,too-many-locals
   @pfx_method
   def search(self, criteria, *, session, mode='tagged'):
     ''' Construct a query to match `Entity` rows
@@ -1275,6 +1276,7 @@ class SQLTags(TagSets):
         te.set(tag.name, tag.value)
     return te
 
+  # pylint: disable=arguments-differ
   def get(self, index, default=None):
     ''' Return an `SQLTagSet` matching `index`, or `None` if there is no such entity.
     '''
