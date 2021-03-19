@@ -1214,7 +1214,6 @@ class SQLTags(TagSets):
       db_url = self.infer_db_url()
     self.__tstate = ThreadState()
     self.orm = SQLTagsORM(db_url=db_url)
-    self._orm_state = SQLAState(orm=self.orm, session=None)
     if ontology is None:
       ontology = TagsOntology(self)
     self.db_url = db_url
