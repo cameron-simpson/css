@@ -1120,6 +1120,14 @@ class SQLTagSet(SingletonMixin, TagSet):
   def unixtime(self):
     return self._unixtime
 
+  @contextmanager
+  def db_session(self, *, session=None):
+    ''' Context manager to obtain a new session if required,
+        just a shim for `self.sqltags.db_session`.
+    '''
+    with self.sqltags.db_session(session=session) as session:
+      yield session
+
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
@@ -1129,22 +1137,24 @@ class SQLTagSet(SingletonMixin, TagSet):
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
       raise ValueError("may not set pseudoTag %r" % (tag_name,))
-    if tag_name in ('name', 'unixtime'):
-      setattr(self, '_' + tag_name, value)
-      if not skip_db:
-        ifverbose(verbose, "+ %s", Tag(tag_name, value))
-        setattr(self._get_db_entity(), tag_name, value)
-    else:
-      super().set(tag_name, value, verbose=verbose)
-      if not skip_db:
-        self.add_db_tag(tag_name, value)
+    with self.db_session():
+      if tag_name in ('name', 'unixtime'):
+        setattr(self, '_' + tag_name, value)
+        if not skip_db:
+          ifverbose(verbose, "+ %s", Tag(tag_name, value))
+          setattr(self._get_db_entity(), tag_name, value)
+      else:
+        super().set(tag_name, value, verbose=verbose)
+        if not skip_db:
+          self.add_db_tag(tag_name, value)
 
   @pfx_method
   def add_db_tag(self, tag_name, value=None):
     ''' Add a tag to the database.
     '''
-    e = self._get_db_entity()
-    return e.add_tag(tag_name, value, session=self.sqltags._session)
+    with self.db_session() as session:
+      e = self._get_db_entity()
+      return e.add_tag(tag_name, value, session=session)
 
   @tag_or_tag_value
   def discard(self, tag_name, value, *, skip_db=False, verbose=None):
@@ -1164,9 +1174,10 @@ class SQLTagSet(SingletonMixin, TagSet):
   def discard_db_tag(self, tag_name, value=None):
     ''' Discard a tag from the database.
     '''
-    return self._get_db_entity().discard_tag(
-        tag_name, value, session=self.sqltags._session
-    )
+    with self.db_session() as session:
+      return self._get_db_entity().discard_tag(
+          tag_name, value, session=session
+      )
 
   def parent_tagset(self, tag_name='parent'):
     ''' Return the parent `TagSet` as defined by a `Tag`,
