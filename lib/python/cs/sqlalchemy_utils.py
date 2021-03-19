@@ -59,7 +59,7 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.session() as session:
+    with orm.session(new=True) as session:
       with self(orm=orm, session=session):
         yield session
 
