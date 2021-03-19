@@ -1246,7 +1246,7 @@ class SQLTags(TagSets):
   def flush(self):
     ''' Flush the current session state to the database.
     '''
-    self._orm_state.session.flush()
+    self.default_db_session.flush()
 
   @typechecked
   def default_factory(self, name: [str, None], *, unixtime=None, tags=None):
