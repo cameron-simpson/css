@@ -665,50 +665,20 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   '''
 
   def __init__(self, *, db_url):
-    db_path = cutprefix(db_url, 'sqlite://')
-    if db_path is db_url:
-      # no leading "sqlite://"
-      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
-        # turn filesystenm pathnames into SQLite db URLs
-        db_path = abspath(db_url)
-        db_url = 'sqlite:///' + db_url
-      else:
-        db_path = None
-    super().__init__(serial_sessions=db_url.startswith('sqlite://'))
-    self.db_url = db_url
-    self.db_path = db_path
-    self._lockfilepath = None
-    engine = self.engine = create_engine(
-        db_url,
+    super().__init__(db_url)
+    self.engine_keywords.update(
         case_sensitive=True,
         echo=(
-            bool(os.environ.get('DEBUG'))
+            self.engine_keywords.get('echo', False)
             or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
-        ),  # 'debug'
+        ),
     )
-    meta = self.meta = self.Base.metadata
-    meta.bind = engine
-    self.declare_schema()
-    self.Session = sessionmaker(bind=engine)
-    if db_path is not None and not existspath(db_path):
-      track("create and init %r", db_path)
-      with Pfx("init %r", db_path):
+    db_fspath = self.db_fspath
+    if db_fspath is not None and not existspath(db_fspath):
+      track("create and init %r", db_fspath)
+      with Pfx("init %r", db_fspath):
         self.define_schema()
         info('created database')
-
-  def startup(self):
-    ''' Startup: define the tables if not present.
-    '''
-    if self.db_path:
-      self._lockfilepath = makelockfile(self.db_path, poll_interval=0.2)
-
-  def shutdown(self):
-    ''' Stub shutdown.
-    '''
-    if self._lockfilepath is not None:
-      with Pfx("remove(%r)", self._lockfilepath):
-        os.remove(self._lockfilepath)
-      self._lockfilepath = None
 
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
