@@ -1226,30 +1226,15 @@ class SQLTags(TagSets):
         type(self).__name__, getattr(self, 'db_url', None)
     )
 
-  @property
-  def _session(self):
-    ''' The current SQLAlchemy Session.
+  @contextmanager
+  def db_session(self, *, new=False, session=None):
+    ''' Context manager to obtain a db session if required,
+        just a shim for `self.orm.session()`.
     '''
-    return self._orm_state.session
+    with self.orm.session(new=new, session=session) as session2:
+      yield session2
 
-  def __enter__(self):
-    ''' Set up an ORM session if there isn't already one active
-        then run the superclass `__enter__`.
     '''
-    teardowns = self.__tstate.teardowns = getattr(
-        self.__tstate, 'teardowns', []
-    )
-    teardowns.append(setup_cmgr(self._orm_state.auto_session()))
-    super().__enter__()
-
-  def __exit__(self, *exc):
-    ''' Run the superclass `__exit__` and then tear down the new session if any.
-    '''
-    try:
-      return super().__exit__(*exc)
-    finally:
-      # run the tear down phase of auto_session
-      self.__tstate.teardowns.pop()()
 
   def flush(self):
     ''' Flush the current session state to the database.
