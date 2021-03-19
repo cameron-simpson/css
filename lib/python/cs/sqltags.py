@@ -1260,13 +1260,13 @@ class SQLTags(TagSets):
     if te is None:
       if unixtime is None:
         unixtime = time.time()
-      session = self._session
-      entity = self.orm.entities(name=name, unixtime=unixtime)
-      session.add(entity)
-      for tag in tags:
-        entity.add_tag(tag.name, tag.value, session=self._session)
-      session.flush()
-      te = self.get(entity.id)
+      with self.db_session() as session:
+        entity = self.orm.entities(name=name, unixtime=unixtime)
+        session.add(entity)
+        for tag in tags:
+          entity.add_tag(tag.name, tag.value)
+        session.flush()
+        te = self.get(entity.id)
       assert te is not None
     else:
       if unixtime is not None:
@@ -1383,7 +1383,8 @@ class SQLTags(TagSets):
   def db_entity(self, index):
     ''' Return the `Entities` instance for `index` or `None`.
     '''
-    session = self._session
+    # require a session for use with the entity
+    session = self.default_db_session
     entities = self.orm.entities
     if isinstance(index, int):
       return entities.lookup1(id=index, session=session)
@@ -1420,35 +1421,37 @@ class SQLTags(TagSets):
           criterion = criteria[i] = SQTCriterion.from_str(criterion)
         if not criterion.SQL_COMPLETE:
           post_criteria.append(criterion)
-    orm = self.orm
-    query = orm.search(
-        criteria,
-        mode='tagged',
-        session=self._session,
-    )
-    # merge entities and tag information
-    tags = self.orm.tags
-    entity_map = {}
-    for row in query:
-      entity_id = row.id
-      te = entity_map.get(entity_id)
-      if not te:
-        # not seen before
-        te = entity_map[entity_id] = self.TagSetClass(
-            _id=entity_id,
-            _ontology=self.ontology,
-            name=row.name,
-            unixtime=row.unixtime,
-            sqltags=self
-        )
-      # a None tag_name means no tags
-      if row.tag_name is not None:
-        # set the dict entry directly - we are loading db values,
-        # not applying them to the db
-        tag_value = tags.pick_value(
-            row.tag_float_value, row.tag_string_value, row.tag_structured_value
-        )
-        te.set(row.tag_name, tag_value, skip_db=True)
+    with self.db_session() as session:
+      orm = self.orm
+      query = orm.search(
+          criteria,
+          mode='tagged',
+          session=session,
+      )
+      # merge entities and tag information
+      tags = self.orm.tags
+      entity_map = {}
+      for row in query:
+        entity_id = row.id
+        te = entity_map.get(entity_id)
+        if not te:
+          # not seen before
+          te = entity_map[entity_id] = self.TagSetClass(
+              _id=entity_id,
+              _ontology=self.ontology,
+              name=row.name,
+              unixtime=row.unixtime,
+              sqltags=self
+          )
+        # a None tag_name means no tags
+        if row.tag_name is not None:
+          # set the dict entry directly - we are loading db values,
+          # not applying them to the db
+          tag_value = tags.pick_value(
+              row.tag_float_value, row.tag_string_value,
+              row.tag_structured_value
+          )
+          te.set(row.tag_name, tag_value, skip_db=True)
     if not post_criteria:
       yield from entity_map.values()
     else:
@@ -1481,25 +1484,25 @@ class SQLTags(TagSets):
         named records which already exist will update from `te`,
         otherwise the conflict will raise a `ValueError`.
     '''
-    session = self._session
-    entities = self.orm.entities
-    if te.name is None:
-      # new log entry
-      e = entities(name=None, unixtime=te.unixtime)
-      session.add(e)
-    else:
-      e = self.orm.entities.lookup1(name=te.name, session=session)
-      if e:
-        if not update_mode:
-          raise ValueError("entity named %r already exists" % (te.name,))
-      else:
-        # new named entry
-        e = entities(name=te.name, unixtime=te.unixtime)
+    with self.db_session() as session:
+      entities = self.orm.entities
+      if te.name is None:
+        # new log entry
+        e = entities(name=None, unixtime=te.unixtime)
         session.add(e)
-    # update the db entry
-    for tag in te.tags:
-      with Pfx(tag):
-        e.add_tag(tag)
+      else:
+        e = entities.lookup1(name=te.name, session=session)
+        if e:
+          if not update_mode:
+            raise ValueError("entity named %r already exists" % (te.name,))
+        else:
+          # new named entry
+          e = entities(name=te.name, unixtime=te.unixtime)
+          session.add(e)
+      # update the db entry
+      for tag in te.tags:
+        with Pfx(tag):
+          e.add_tag(tag)
 
 class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
   ''' Common features for commands oriented around an `SQLTags` database.
