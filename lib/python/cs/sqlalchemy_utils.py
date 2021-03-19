@@ -3,16 +3,24 @@
 ''' Assorted utility functions to support working with SQLAlchemy.
 '''
 
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
-from threading import Lock
-from sqlalchemy import Column, Integer
+import os
+from os.path import abspath
+from threading import current_thread, Lock
+from sqlalchemy import Column, Integer, create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.pool import NullPool
 from icontract import require
 from cs.deco import decorator, contextdecorator
-from cs.pfx import pfx_method
+from cs.fileutils import makelockfile
+from cs.lex import cutprefix
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -42,11 +50,15 @@ class SQLAState(State):
   ''' Thread local state for SQLAlchemy ORM and session.
   '''
 
-  def __init__(self, *, orm, session=None, **kw):
+  def __init__(
+      self, *, orm, engine=None, session=None, sessionmaker=None, **kw
+  ):
     # enforce provision of an ORM, default session=None
     super().__init__(**kw)
     self.orm = orm
+    self.engine = engine
     self.session = session
+    self.sessionmaker = sessionmaker
 
   @contextmanager
   def new_session(self, *, orm=None):
@@ -208,7 +220,8 @@ def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   finally:
     logger.setLevel(old_level)
 
-class ORM(MultiOpenMixin):
+# pylint: disable=too-many-instance-attributes
+class ORM(MultiOpenMixin, ABC):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
@@ -268,10 +281,8 @@ class ORM(MultiOpenMixin):
     self.sqla_state = SQLAState(
         orm=self, engine=None, sessionmaker=None, session=None
     )
-    self.serial_sessions = serial_sessions
     if serial_sessions:
       self._serial_sessions_lock = Lock()
-      self._serial_session = None
     else:
       self._engine = None
       self._sessionmaker = None
@@ -341,7 +352,7 @@ class ORM(MultiOpenMixin):
     if engine is None:
       engine = create_engine(self.db_url, **self.engine_keywords)
       self._engine = engine
-      orm_state.engine = engine
+      orm_state.engine = engine  # pylint: disable=attribute-defined-outside-init
     return engine
 
   @property
@@ -356,7 +367,7 @@ class ORM(MultiOpenMixin):
     if sessionmaker is None:
       sessionmaker = sqla_sessionmaker(bind=self.engine)
       self._sessionmaker = sessionmaker
-      orm_state.sessionmaker = sessionmaker
+      orm_state.sessionmaker = sessionmaker  # pylint: disable=attribute-defined-outside-init
     return sessionmaker
 
   @contextmanager
@@ -406,12 +417,12 @@ class ORM(MultiOpenMixin):
                 )
             )
           with self._serial_sessions_lock:
-            new_session = self.sessionmaker(*a, **kw)
+            new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
             with new_session.begin(subtransactions=True):
               with orm_state(session=new_session):
                 yield new_session
         else:
-          new_session = self.sessionmaker(*a, **kw)
+          new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
           with new_session.begin(subtransactions=True):
             with orm_state(session=new_session):
               yield new_session
@@ -453,20 +464,20 @@ class ORM(MultiOpenMixin):
   @staticmethod
   def orm_method(method):
     ''' Decorator for ORM subclass methods
-        to set the shared state `orm` to `self`.
+        to set the shared `state.orm` to `self`.
     '''
 
     if isgeneratorfunction(method):
 
       def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared state `orm`.
+        ''' Call `method` with its ORM as the shared `state.orm`.
         '''
         with state(orm=self):
           yield from method(self, *a, **kw)
     else:
 
       def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared state `orm`.
+        ''' Call `method` with its ORM as the shared `state.orm`.
         '''
         with state(orm=self):
           return method(self, *a, **kw)
