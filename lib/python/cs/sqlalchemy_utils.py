@@ -336,6 +336,11 @@ class ORM(MultiOpenMixin):
             with orm_state(session=new_session):
               yield new_session
 
+  @property
+  def default_session(self):
+    ''' The current per-`Thread` session.
+    '''
+    return self.sqla_state.session
 
   @staticmethod
   def auto_session(method):
