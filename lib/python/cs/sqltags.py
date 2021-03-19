@@ -1234,7 +1234,14 @@ class SQLTags(TagSets):
     with self.orm.session(new=new, session=session) as session2:
       yield session2
 
+  @property
+  def default_db_session(self):
+    ''' The current per-`Thread` SQLAlchemy Session.
     '''
+    session = self.orm.sqla_state.session
+    if session is None:
+      raise RuntimeError("no default db session")
+    return session
 
   def flush(self):
     ''' Flush the current session state to the database.
