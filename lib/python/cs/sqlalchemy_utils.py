@@ -238,47 +238,104 @@ class ORM(MultiOpenMixin):
         mutex before allocating a session.
     '''
     self.Base = declarative_base()
-    self.Session = None
-    self.sqla_state = SQLAState(orm=self)
+    self.sqla_state = SQLAState(
+        orm=self, engine=None, sessionmaker=None, session=None
+    )
     self.serial_sessions = serial_sessions
     if serial_sessions:
       self._serial_sessions_lock = Lock()
+      self._serial_session = None
+    else:
+      self._engine = None
+      self._sessionmaker = None
+
+  @property
+  def engine(self):
+    ''' SQLAlchemy engine, made on demand.
+    '''
+    orm_state = self.sqla_state
+    if self.serial_sessions:
+      engine = orm_state.engine
+    else:
+      engine = self._engine
+    if engine is None:
+      engine = create_engine(self.db_url, **self.engine_keywords)
+      self._engine = engine
+      orm_state.engine = engine
+    return engine
+
+  @property
+  def sessionmaker(self):
+    ''' SQLAlchemy sessionmaker for the current `Thread`.
+    '''
+    orm_state = self.sqla_state
+    if self.serial_sessions:
+      sessionmaker = orm_state.sessionmaker
+    else:
+      sessionmaker = self._sessionmaker
+    if sessionmaker is None:
+      sessionmaker = sqla_sessionmaker(bind=self.engine)
+      self._sessionmaker = sessionmaker
+      orm_state.sessionmaker = sessionmaker
+    return sessionmaker
 
   @contextmanager
   @pfx_method(use_str=True)
-  def session(self, *a, **kw):
-    ''' Context manager to issue a new session and close it down.
+  def session(self, new=False, *a, session=None, **kw):
+    ''' Context manager to issue a session if required.
+        A subtransaction is established around this call.
 
-        Note that this performs a `COMMIT` or `ROLLBACK` at the end.
+        Parameters:
+        * `new`: optional flag, default `False`;
+          if true then a new session will always be created
+        * `session`: optional session to use, default `None`;
+          if not `None` then the supplied session is used
+
+        It is an error for `new` to be true and to also supply a `session`.
+
+        It is an error for `new` to be true if there is already an
+        estalished session and `self.serial_sessions` is true.
     '''
-    with self:
-      if self.serial_sessions:
-        if state.orm is self and state.session is not None:
-          raise RuntimeError(
-              "this Thread already has an ORM session: %s" % (state.session,)
-          )
-        with self._serial_sessions_lock:
-          with self._raw_session(*a, **kw) as session:
-            yield session
-      else:
-        with self._raw_session(*a, **kw) as session:
+    orm_state = self.sqla_state
+    if session is not None:
+      if new:
+        raise ValueError("cannot set new=%r if session is not None" % (new,))
+      # provided an explicit session
+      with session.begin_nested():
+        with orm_state(session=session):
           yield session
+    # examine the current session state
+    orm_session = orm_state.session
+    if not new and orm_session is not None:
+      # reuse existing session
+      with orm_session.begin_nested():
+        yield orm_session
+    else:
+      if new:
+        raise RuntimeError("NEW")
+      # new session required
+      with self:
+        if self.serial_sessions:
+          if orm_session is not None:
+            T = current_thread()
+            tid = "Thread:%d:%s" % (T.ident, T.name)
+            raise RuntimeError(
+                "%s: this Thread already has an ORM session: %s" % (
+                    tid,
+                    orm_session,
+                )
+            )
+          with self._serial_sessions_lock:
+            new_session = self.sessionmaker(*a, **kw)
+            with new_session.begin(subtransactions=True):
+              with orm_state(session=new_session):
+                yield new_session
+        else:
+          new_session = self.sessionmaker(*a, **kw)
+          with new_session.begin(subtransactions=True):
+            with orm_state(session=new_session):
+              yield new_session
 
-  @contextmanager
-  @pfx_method
-  def _raw_session(self, *a, **kw):
-    ''' The guts of allocating a session, called from `ORM.session`.
-      '''
-    new_session = self.Session(*a, **kw)
-    with using_session(orm=self, session=new_session):
-      try:
-        yield new_session
-        new_session.commit()
-      except:
-        new_session.rollback()
-        raise
-      finally:
-        new_session.close()
 
   @staticmethod
   def auto_session(method):
