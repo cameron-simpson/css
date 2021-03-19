@@ -223,7 +223,8 @@ class ORM(MultiOpenMixin):
         even if these just `pass`
   '''
 
-  def __init__(self, serial_sessions=False):
+  @pfx_method
+  def __init__(self, db_url, serial_sessions=None):
     ''' Initialise the ORM.
 
         If `serial_sessions` is true (default `False`)
@@ -237,6 +238,32 @@ class ORM(MultiOpenMixin):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
+    db_fspath = cutprefix(db_url, 'sqlite://')
+    if db_fspath is db_url:
+      # no leading "sqlite://"
+      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
+        # turn filesystenm pathnames into SQLite db URLs
+        db_fspath = abspath(db_url)
+        db_url = 'sqlite:///' + db_url
+      else:
+        # sqlite://memory or something - no filesystem object
+        db_fspath = None
+    self.db_url = db_url
+    self.db_fspath = db_fspath
+    is_sqlite = db_url.startswith('sqlite://')
+    if serial_sessions is None:
+      # serial SQLite sessions
+      serial_sessions = is_sqlite
+    elif not serial_sessions:
+      if is_sqlite:
+        warning(
+            "serial_sessions specified as %r, but is_sqlite=%s:"
+            " this may cause trouble with multithreaded use",
+            serial_sessions,
+            is_sqlite,
+        )
+    self.serial_sessions = serial_sessions or is_sqlite
+    self._lockfilepath = None
     self.Base = declarative_base()
     self.sqla_state = SQLAState(
         orm=self, engine=None, sessionmaker=None, session=None
@@ -248,6 +275,59 @@ class ORM(MultiOpenMixin):
     else:
       self._engine = None
       self._sessionmaker = None
+    self.db_url = db_url
+    self.engine_keywords = {}
+    self.engine_keywords = dict(
+        case_sensitive=True,
+        echo=(
+            bool(os.environ.get('DEBUG'))
+            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
+        ),  # 'debug'
+    )
+    if is_sqlite:
+      # do not pool these connects and disable the Thread check
+      # because we
+      self.engine_keywords.update(
+          poolclass=NullPool, connect_args={'check_same_thread': False}
+      )
+    self.declare_schema()
+
+  @abstractmethod
+  def declare_schema(self):
+    ''' Declare the database schema / ORM mapping.
+        This just defines the relation types etc.
+        It *does not* act on the database itself.
+        It is called automatically at the end of `__init__`.
+
+        Example:
+
+            def declare_schema(self):
+              """ Define the database schema / ORM mapping.
+              """
+              orm = self
+              Base = self.Base
+              class Entities(
+              ........
+              self.entities = Entities
+
+        After this, methods can access the example `Entities` relation
+        as `self.entites`.
+    '''
+    raise NotImplementedError("declare_schema")
+
+  def startup(self):
+    ''' Startup: define the tables if not present.
+    '''
+    if self.db_fspath:
+      self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
+
+  def shutdown(self):
+    ''' Stub shutdown.
+    '''
+    if self._lockfilepath is not None:
+      with Pfx("remove(%r)", self._lockfilepath):
+        os.remove(self._lockfilepath)
+      self._lockfilepath = None
 
   @property
   def engine(self):
