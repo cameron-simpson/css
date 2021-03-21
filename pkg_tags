@@ -64,7 +64,7 @@ cs.sh pypi.release="20210316" ok_revision="41bb35a582f79767acefff34c2653f18dacd1
 cs.sharedfile pypi.release="20201228"
 cs.socketutils pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.sqlalchemy_utils pypi.release="20210321" ok_revision="6034e067bd44c2b624d080aaaa0ea0f358542640"
-cs.sqltags ok_revision="657c8717f38915e86cbd818b4391424de42a8b6b" pypi.release="20210306.1"
+cs.sqltags ok_revision="657c8717f38915e86cbd818b4391424de42a8b6b" pypi.release="20210321"
 cs.tagset pypi.release="20210306" ok_revision=ea1ce52a3d6ea6d5350ee0f217f1eb220969e89b
 cs.threads pypi.release="20210306" ok_revision=fe403fed26cda83b04f8fc26830897164d6dabcd
 cs.timeutils pypi.release=20190220
