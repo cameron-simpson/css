@@ -406,8 +406,6 @@ class ORM(MultiOpenMixin, ABC):
       with orm_session.begin_nested():
         yield orm_session
     else:
-      if new:
-        raise RuntimeError("NEW")
       # new session required
       with self:
         if self.serial_sessions:
