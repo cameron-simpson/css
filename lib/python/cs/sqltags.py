@@ -1144,7 +1144,9 @@ class SQLTagSet(SingletonMixin, TagSet):
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
-    return self.sqltags.db_entity(self.id)
+    e = self.sqltags.db_entity(self.id)
+    assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
+    return e
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
