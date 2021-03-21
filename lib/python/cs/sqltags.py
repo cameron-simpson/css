@@ -29,6 +29,7 @@ import os
 from os.path import expanduser, exists as existspath
 import re
 import sys
+from subprocess import run
 from threading import RLock
 import time
 from typing import List
@@ -1596,6 +1597,22 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       )
     else:
       return SQTEntityIdTest([index])
+
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database shell.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    orm = self.options.sqltags.orm
+    db_url = orm.db_url
+    if db_url.startswith("sqlite://"):
+      db_fspath = orm.db_fspath
+      print("sqlite3", db_fspath)
+      run(['sqlite3', db_fspath], check=True)
+    else:
+      error("I do not know how to get a db shell for %r", db_url)
+      return 1
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
