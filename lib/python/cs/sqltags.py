@@ -1088,6 +1088,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
       super().__init__(_id=_id, **kw)
+      # pylint: disable=unexpected-keyword-arg
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
       self._singleton_also_index()
     else:
@@ -1126,14 +1127,15 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Context manager to obtain a new session if required,
         just a shim for `self.sqltags.db_session`.
     '''
-    with self.sqltags.db_session(session=session) as session:
-      yield session
+    with self.sqltags.db_session(session=session) as session2:
+      yield session2
 
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
     return self.sqltags.db_entity(self.id)
 
+  # pylint: disable=arguments-differ
   @tag_or_tag_value
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
@@ -1157,6 +1159,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       e = self._get_db_entity()
       return e.add_tag(tag_name, value, session=session)
 
+  # pylint: disable=arguments-differ
   @tag_or_tag_value
   def discard(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
