@@ -1319,11 +1319,12 @@ class SQLTags(TagSets):
   def __getitem__(self, index):
     ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
-    te = self.get(index)
-    if te is None:
-      if isinstance(index, int):
-        raise IndexError(index)
-      te = self.default_factory(index)
+    with self.db_session(new=True):
+      te = self.get(index)
+      if te is None:
+        if isinstance(index, int):
+          raise IndexError(index)
+        te = self.default_factory(index)
     return te
 
   @locked
