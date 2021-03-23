@@ -1,3 +1,4 @@
+hg-gitup: use main branch, initially in addition to master, then later as a mode switch or default
 pfx_method: pass printf_func arg to Pfx
 BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
 BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
