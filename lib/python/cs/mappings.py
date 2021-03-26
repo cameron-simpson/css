@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20201228-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description':
@@ -730,9 +730,9 @@ class StackableValues(object):
   ''' A collection of named stackable values with the latest value
       available as an attribute.
 
-      I now recommand my `cs.context.stackattrs` context manager for most
-      uses; it may be applied to any object instead of requiring use of this
-      class.
+      *DEPRECATED*: I now recommend my `cs.context.stackattrs` context
+      manager for most uses; it may be applied to any object instead of
+      requiring use of this class.
 
       Note that names conflicting with methods are not available
       as attributes and must be accessed via `__getitem__`.
@@ -940,18 +940,44 @@ class AttrableMappingMixin(object):
 
   def __getattr__(self, attr):
     ''' Unknown attributes are obtained from the mapping entries.
+
+        Note that this first consults `self.__dict__`.
+        For many classes that is redundants, but subclasses of
+        `dict` at least seem not to consult that with attribute
+        lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    # try self.__dict__ first - this is because it appears that
+    # getattr(dict,...) does not consult __dict__
     try:
-      value = self[attr]
+      _d = self.__dict__
+    except AttributeError:
+      # no __dict__? skip this step
+      pass
+    else:
+      try:
+        return _d[attr]
+      except KeyError:
+        pass
+    try:
+      return self[attr]
     except KeyError:
-      raise AttributeError(
-          "%s.%s (attrs=%s)" % (
-              type(self).__name__,
-              attr,
-              ','.join(sorted(set(self.keys()) | set(self.__dict__.keys()))),
-          )
-      )
-    return value
+      try:
+        return self.ATTRABLE_MAPPING_DEFAULT
+      except AttributeError:
+        names_msgs = []
+        ks = list(self.keys())
+        if ks:
+          names_msgs.append('keys=' + ','.join(sorted(ks)))
+        dks = self.__dict__.keys()
+        if dks:
+          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        raise AttributeError(
+            "%s.%s (attrs=%s)" % (
+                type(self).__name__,
+                attr,
+                ','.join(names_msgs),
+            )
+        )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,

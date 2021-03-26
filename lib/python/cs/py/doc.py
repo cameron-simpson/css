@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20200718-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -131,7 +131,7 @@ def module_doc(
             elif isinstance(attr, property):
               obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
             else:
-              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\nSKIP DOC: {attr_doc}'
+              obj_doc += f'\n\n### `{Mname}.{attr_name}`'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)

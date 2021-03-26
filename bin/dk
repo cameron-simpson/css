@@ -10,6 +10,9 @@ set -ue
 : ${DK_ENVVARS:=''}
 : ${DK_EXEC_PREFIX:=''}
 : ${DK_PRIMARY_SERVICE=''}
+: ${DK_PSQL_SERVICE=''}
+: ${DK_PSQL_DBNAME=''}
+: ${DK_PSQL_SETUP_USERNAME=''}
 
 docker_compose_opts=
 
@@ -38,6 +41,9 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       The command is prefixed by \$DK_EXEC_PREFIX, for example if
       there is a standard environment setup script within the
       container.
+    loaddb
+      Load a postgresql dump from standard input into \$DK_PSQL_DBNAME 
+      ($DK_PSQL_DBNAME) in service \$DK_PSQL_SERVICE ($DK_PSQL_SERVICE).
     logs
       Passed to docker-compose -f \$DK_PRIMARY_SERVICE.
     rsh name command...
@@ -176,7 +182,7 @@ case "$op" in
       ;;
   exec)
       docker_exec_opts=-i
-      [ -t 0 ] && docker_exec_opts="$docker_exec_opts -t"
+      [ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
       then
@@ -189,6 +195,39 @@ case "$op" in
       fi
       set -x
       exec docker exec $docker_exec_opts "$primary_container" $DK_EXEC_PREFIX "$@"
+      ;;
+  loaddb)
+      badopts=
+      if [ $# = 0 ]
+      then
+        echo "$cmd: loaddb: extra arguments: $*" >&2
+        badopts=1
+      else
+        [ -n "$DK_PSQL_DBNAME" ] || {
+          echo "$cmd: loaddb: missing \$DK_PSQL_DBNAME" >&2
+          badopts=1
+        }
+        [ -n "$DK_PSQL_SERVICE" ] || {
+          echo "$cmd: loaddb: missing \$DK_PSQL_SERVICE" >&2
+          badopts=1
+        }
+        [ -n "$DK_PSQL_SETUP_USERNAME" ] || {
+          echo "$cmd: loaddb: missing \$DK_PSQL_SETUP_USERNAME" >&2
+          badopts=1
+        }
+      fi
+      [ -t 0 ] && {
+        echo "$cmd: loaddb: expecting a PostgreSQL dump on standard input" >&2
+        badopts=1
+      }
+      [ $badopts ] && { echo "$usage" >&2; exit 2; }
+      set -x
+      time docker exec -i "$DK_PSQL_SERVICE" su postgres \
+        -c "set -xue
+            dropdb $DK_PSQL_DBNAME
+            createdb -O $DK_PSQL_SETUP_USERNAME $DK_PSQL_DBNAME
+            psql -e -U $DK_PSQL_SETUP_USERNAME $DK_PSQL_DBNAME
+           "
       ;;
   logs)
       set -x

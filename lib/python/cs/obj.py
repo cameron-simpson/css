@@ -8,6 +8,7 @@ Convenience facilities for objects.
 '''
 
 from __future__ import print_function
+from collections import defaultdict
 from copy import copy as copy0
 import sys
 import traceback
@@ -17,7 +18,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20201227-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -389,6 +390,23 @@ class SingletonMixin:
   # does not yet have a registry.
   __global_lock = Lock()
 
+  @classmethod
+  def _singleton_get_registry(cls):
+    ''' Obtain the class singleton registry, creating it on first use.
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      with cls.__global_lock:
+        try:
+          registry = cls._singleton_registry
+        except AttributeError:
+          # create the registry and give it its own mutex and multiindex
+          registry = cls._singleton_registry = WeakValueDictionary()
+          registry._singleton_lock = Lock()
+          registry._singleton_also_keys = defaultdict(WeakValueDictionary)
+    return registry
+
   def __new__(cls, *a, **kw):
     ''' Prepare a new instance of `cls` if required.
         Return the instance.
@@ -397,23 +415,12 @@ class SingletonMixin:
         and then
     '''
     super_new = super().__new__
-    try:
-      registry = cls._singleton_registry
-    except AttributeError:
-      with cls.__global_lock:
-        try:
-          registry = cls._singleton_registry
-        except AttributeError:
-          # create the registry and give it its own mutex
-          registry = cls._singleton_registry = WeakValueDictionary()
-          registry._singleton_lock = Lock()
+    registry = cls._singleton_get_registry()
 
-    # TODO: docstring wrong - there is no _singleton_init any more
+    # pylint: disable=unused-argument
     def factory(*fargs, **fkwargs):
-      ''' Prepare a new object.
-
-          Call `object.__new__(cls)` and then `o._singleton_init(*a,**kw)`
-          on the new object.
+      ''' Prepare a new object; does not yet call `__init__`.
+          This accepts arguments to support use via the `singleton()` function.
       '''
       return super_new(cls)
 
@@ -421,6 +428,49 @@ class SingletonMixin:
     with registry._singleton_lock:
       _, instance = singleton(registry, okey, factory, (), {})
     return instance
+
+  @classmethod
+  def singleton_also_by(cls, also_key, key):
+    ''' Obtain a singleton by a secondary key.
+        Return the instance or `None`.
+
+        Parameters:
+        * `also_key`: the name of the secondary key index
+        * `key`: the key for the index
+    '''
+    registry = cls._singleton_get_registry()
+    with registry._singleton_lock:
+      return registry._singleton_also_keys[also_key].get(key)
+
+  # pylint: disable=no-self-use
+  def _singleton_also_indexmap(self):
+    ''' Return a mapping of secondary key names and their matching key values.
+    '''
+    return {}
+
+  def _singleton_also_index(self):
+    ''' Return a mapping of secondary key names and their matching key values.
+    '''
+    registry = self._singleton_get_registry()
+    with registry._singleton_lock:
+      for also_key, key in self._singleton_also_indexmap().items():
+        registry._singleton_also_keys[also_key][key] = self
+
+  @classmethod
+  def _singleton_instances(cls):
+    ''' Return a list of the current class instances.
+    '''
+    try:
+      registry = cls._singleton_registry
+    except AttributeError:
+      return []
+    else:
+      return list(
+          filter(
+              lambda obj: obj is not None,
+              map(lambda ref: ref(), registry.valuerefs())
+          )
+      )
 
 if __name__ == '__main__':
   import cs.obj_tests

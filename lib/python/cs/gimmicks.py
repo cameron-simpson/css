@@ -6,9 +6,39 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
-import sys
+try:
+  from contextlib import nullcontext  # pylint: disable=unused-import
+except ImportError:
+  from contextlib import contextmanager
 
-__version__ = '20200418.1'
+  @contextmanager
+  def nullcontext():
+    ''' A simple `nullcontext` for older Pythons
+    '''
+    yield None
+
+import sys
+try:
+  from types import SimpleNamespace  # pylint: disable=unused-import
+except ImportError:
+
+  # pylint: disable=too-few-public-methods
+  class SimpleNamespace(object):
+    ''' A tiny workalike for types.SimpleNamespace.
+    '''
+
+    def __init__(self, **kw):
+      for k, v in kw.items():
+        setattr(self, k, v)
+
+    def __str__(self):
+      return "%s(%s)" % (
+          type(self).__name__, ','.join(
+              ["%s=%s" % (k, v) for k, v in sorted(self.__dict__.items())]
+          )
+      )
+
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -28,6 +58,7 @@ def _logging_stub(func_name, *a, **kw):
   try:
     logging_function = _logging_functions[func_name]
   except KeyError:
+    # pylint: disable=import-outside-toplevel
     try:
       import cs.logutils as logging_module
     except ImportError:

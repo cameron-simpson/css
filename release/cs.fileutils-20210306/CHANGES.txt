@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: fix use-before-set of is_seekable
+lib/python/cs/fileutils.py: cs.fileutils: autoformat, clean a little lint
+lib/python/cs/fileutils.py: cs.fileutils: docstring tweaks
+lib/python/cs/fileutils.py: cs.fileutils: RWFileBlockCache.put: remove assert(len(data)>0), adjust logic

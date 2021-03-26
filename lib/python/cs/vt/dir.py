@@ -15,9 +15,8 @@ import sys
 from threading import Lock
 import time
 from uuid import UUID, uuid4
-from cs.binary import PacketField, BSUInt, BSString, BSData
+from cs.binary import BinarySingleValue, BSUInt, BSString, BSData
 from cs.buffer import CornuCopyBuffer
-from cs.excutils import logexc
 from cs.logutils import debug, error, warning, info
 from cs.pfx import Pfx
 from cs.py.func import prop
@@ -60,8 +59,8 @@ class DirentFlags(IntFlag):
   HASPREVDIRENT = 0x10  # has reference to serialised previous Dirent
   EXTENDED = 0x20  # extended BSData field
 
-class DirentRecord(PacketField):
-  ''' PacketField subclass to parsing and transcribing Dirents in binary form.
+class DirentRecord(BinarySingleValue):
+  ''' `BaseBinaryMultiValue` subclass to parsing and transcribing Dirents in binary form.
 
       The serialisation format is:
 
@@ -78,20 +77,26 @@ class DirentRecord(PacketField):
       to go in the metadata or the optional extended_data.
   '''
 
-  @classmethod
-  def value_from_buffer(cls, bfr):
+  @property
+  def dirent(self):
+    ''' The dirent comes from `.value`.
+    '''
+    return self.value
+
+  @staticmethod
+  def parse_value(bfr):
     ''' Unserialise a serialised Dirent.
     '''
-    type_ = BSUInt.value_from_buffer(bfr)
-    flags = DirentFlags(BSUInt.value_from_buffer(bfr))
+    type_ = BSUInt.parse_value(bfr)
+    flags = DirentFlags(BSUInt.parse_value(bfr))
     if flags & DirentFlags.HASNAME:
       flags ^= DirentFlags.HASNAME
-      name = BSString.value_from_buffer(bfr)
+      name = BSString.parse_value(bfr)
     else:
       name = ""
     if flags & DirentFlags.HASMETA:
       flags ^= DirentFlags.HASMETA
-      metatext = BSString.value_from_buffer(bfr)
+      metatext = BSString.parse_value(bfr)
     else:
       metatext = None
     uu = None
@@ -102,21 +107,20 @@ class DirentRecord(PacketField):
       flags ^= DirentFlags.NOBLOCK
       block = None
     else:
-      block = BlockRecord.value_from_buffer(bfr)
+      block = BlockRecord.parse_value(bfr)
     if flags & DirentFlags.HASPREVDIRENT:
       flags ^= DirentFlags.HASPREVDIRENT
-      prev_dirent_blockref = BlockRecord.value_from_buffer(bfr)
+      prev_dirent_blockref = BlockRecord.parse_value(bfr)
     else:
       prev_dirent_blockref = None
     if flags & DirentFlags.EXTENDED:
       flags ^= DirentFlags.EXTENDED
-      extended_data = BSData.value_from_buffer(bfr)
+      extended_data = BSData.parse_value(bfr)
     else:
       extended_data = None
     if flags:
       warning(
-          "%s.value_from_buffer: unexpected extra flags: 0x%02x", cls.__name__,
-          flags
+          "%s.parse_value: unexpected extra flags: 0x%02x", cls.__name__, flags
       )
     E = _Dirent.from_components(
         type_, name, meta=metatext, uuid=uu, block=block
@@ -125,10 +129,10 @@ class DirentRecord(PacketField):
     E.ingest_extended_data(extended_data)
     return E
 
-  @staticmethod
-  def transcribe_value(E):
+  def transcribe(self):
     ''' Serialise to binary format.
     '''
+    E = self.dirent
     flags = 0
     type_ = E.type
     if E.name:
@@ -270,14 +274,14 @@ class _Dirent(Transcriber):
     ''' Factory to extract a Dirent from binary data at `offset` (default 0).
         Returns the Dirent and the new offset.
     '''
-    return DirentRecord.value_from_bytes(data, offset=offset)
+    return DirentRecord.parse_value_from_bytes(data, offset=offset)
 
   @staticmethod
   def from_buffer(bfr):
     ''' Factory to extract a Dirent from the CornuCopyBuffer `bfr`.
         Returns the Dirent.
     '''
-    return DirentRecord.value_from_buffer(bfr)
+    return DirentRecord.parse_value(bfr)
 
   def exists(self):
     ''' Does this exist? For a Dir this is always true: cogito ergo sum.
@@ -992,7 +996,7 @@ class Dir(_Dirent, DirLike):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      for E in DirentRecord.parse_buffer_values(self._block.bufferfrom()):
+      for E in DirentRecord.scan_values(self._block.bufferfrom()):
         E.parent = self
         emap[E.name] = E
       self._entries = emap

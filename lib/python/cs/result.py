@@ -65,7 +65,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20201102-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -421,9 +421,16 @@ class Result(object):
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
+
+      Parameters:
+      * `_name`: optional name for the `Result`, passed to the initialiser
+      * `_extra`: optional extra data for the `Result`, passed to the initialiser
+
+      Other parameters are passed to `func`.
   '''
-  _name = kw.pop('_name', None)
-  R = Result(name=_name)
+  name = kw.pop('_name', None)
+  extra = kw.pop('_extra', None)
+  R = Result(name=name, extra=extra)
   R.bg(func, *a, **kw)
   return R
 

@@ -1,0 +1,1 @@
+lib/python/cs/obj.py: cs.obj: SingletonMixin: new _singleton_instances() method returning a list of the current instances

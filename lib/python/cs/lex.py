@@ -24,7 +24,7 @@ from cs.deco import fmtdoc
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20201228-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -124,6 +124,29 @@ def tabpadding(padlen, tabsize=8, offset=0):
     pad += "%*s" % (padlen, ' ')
 
   return pad
+
+def typed_str(o, use_cls=False, use_repr=False, max_length=None):
+  ''' Return "type(o).__name__:str(o)" for some object `o`.
+
+      Parameters:
+      * `use_cls`: default `False`;
+        if true, use `str(type(o))` instead of `type(o).__name__`
+      * `use_repr`: default `False`;
+        if true, use `repr(o)` instead of `str(o)`
+
+      I use this a lot when debugging. Example:
+
+          from cs.lex import typed_str as s
+          ......
+          X("foo = %s", s(foo))
+  '''
+  s = "%s:%s" % (
+      type(o) if use_cls else type(o).__name__,
+      repr(o) if use_repr else str(o),
+  )
+  if max_length is not None:
+    s = cropped(s, max_length)
+  return s
 
 def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with `sep` (default `', '`).
@@ -487,7 +510,7 @@ def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
@@ -950,18 +973,55 @@ def common_suffix(*strs):
     return ''
   return strs[0][-length:]
 
-def cropped_repr(s, max_length=32, offset=0):
-  ''' If the length of the sequence `s` after `offset` (default `0`)
-      exceeds `max_length` (default `32`)
-      return the `repr` of the leading `max_length-3` characters from `offset`
-      plus `'...'`.
-      Otherwise return the `repr(s[offset:])`.
-
-      This is typically used for `str` values.
+def cropped(
+    s: str, max_length: int = 32, roffset: int = 1, ellipsis: str = '...'
+):
+  ''' If the length of `s` exceeds `max_length` (default `32`),
+      replace enough of the tail with `ellipsis`
+      and the last `roffset` (default `1`) characters of `s`
+      to fit in `max_length` characters.
   '''
-  if len(s) - offset > max_length:
-    return repr(s[offset:offset + max_length - 3]) + '...'
-  return repr(s[offset:])
+  if len(s) > max_length:
+    if roffset > 0:
+      s = s[:max_length - len(ellipsis) - roffset] + ellipsis + s[-roffset:]
+    else:
+      s = s[:max_length - len(ellipsis)] + ellipsis
+  return s
+
+def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
+  ''' Compute a cropped `repr()` of `o`.
+
+      Parameters:
+      * `o`: the object to represent
+      * `max_length`: the maximum length of the representation, default `32`
+      * `inner_max_length`: the maximum length of the representations
+        of members of `o`, default `max_length//2`
+      * `roffset`: the number of trailing characters to preserve, default `1`
+  '''
+  if inner_max_length is None:
+    inner_max_length = max_length // 2
+  if isinstance(o, (tuple, list)):
+    left = '(' if isinstance(o, tuple) else '['
+    right = (',)' if len(o) == 1 else ')') if isinstance(o, tuple) else ']'
+    o_repr = left + ','.join(
+        map(
+            lambda m:
+            cropped_repr(m, max_length=inner_max_length, roffset=roffset), o
+        )
+    ) + right
+  elif isinstance(o, dict):
+    o_repr = '{' + ','.join(
+        map(
+            lambda kv: cropped_repr(
+                kv[0], max_length=inner_max_length, roffset=roffset
+            ) + ':' +
+            cropped_repr(kv[1], max_length=inner_max_length, roffset=roffset),
+            o.items()
+        )
+    ) + '}'
+  else:
+    o_repr = repr(o)
+  return cropped(o_repr, max_length=max_length, roffset=roffset)
 
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
@@ -1036,6 +1096,7 @@ def format_as(format_s, format_mapping, error_sep=None):
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
+    # pylint: disable=raise-missing-from
     raise FormatAsError(
         e.args[0], format_s, format_mapping, error_sep=error_sep
     )

@@ -34,7 +34,6 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
-from cs.sqlalchemy_utils import orm_auto_session
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
 
@@ -49,7 +48,7 @@ DEFAULT_MBDB_PATH = '~/var/cache/mbdb.sqlite'
 def main(argv=None):
   ''' Call the command line main programme.
   '''
-  return CDRipCommand().run(argv)
+  return CDRipCommand(argv).run()
 
 class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
@@ -69,19 +68,19 @@ class CDRipCommand(BaseCommand):
     CDRIP_DEV   Default CDROM device.
     CDRIP_DIR   Default output directory.'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
+    options = self.options
     options.tocdir = None
     options.force = False
     options.device = os.environ.get('CDRIP_DEV', "default")
     options.dirpath = os.environ.get('CDRIP_DIR', ".")
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply the command line options.
     '''
+    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-d':
@@ -93,23 +92,22 @@ class CDRipCommand(BaseCommand):
         else:
           raise GetoptError("unimplemented option")
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options):
+  def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     fstags = FSTags()
     mbdb = MBDB()
-    with stackattrs(options, fstags=fstags, mbdb=mbdb, verbose=True):
-      with fstags:
-        with mbdb:
+    with fstags:
+      with mbdb:
+        with stackattrs(self.options, fstags=fstags, mbdb=mbdb, verbose=True):
           yield
 
-  @staticmethod
-  def cmd_edit(argv, options):
+  def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
     '''
+    options = self.options
     mbdb = options.mbdb
     badopts = False
     tag_criteria, argv = SQLTagsCommand.parse_tagset_criteria(argv)
@@ -127,11 +125,11 @@ class CDRipCommand(BaseCommand):
       print("changed", repr(te.name or te.id))
 
   # pylint: disable=too-many-locals
-  @staticmethod
-  def cmd_rip(argv, options):
+  def cmd_rip(self, argv):
     ''' Usage: {cmd} [disc_id]
           Pull the audio into a subdirectory of the current directory.
     '''
+    options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
     disc_id = None
@@ -147,8 +145,7 @@ class CDRipCommand(BaseCommand):
         fstags=fstags
     )
 
-  @staticmethod
-  def cmd_toc(argv, options):
+  def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
           Print a table of contents for the current disc.
     '''
@@ -157,6 +154,7 @@ class CDRipCommand(BaseCommand):
       disc_id = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     MB = options.mbdb
     if disc_id is None:
       dev_info = discid.read(device=options.device)
@@ -288,10 +286,9 @@ class MBSQLTags(SQLTags):
 
   TagSetClass = MBTagSet
 
-  @orm_auto_session
   @pfx_method
-  def default_factory(self, name: str, *, session, unixtime=None):
-    te = super().default_factory(name, session=session, unixtime=unixtime)
+  def default_factory(self, name: str, *, unixtime=None):
+    te = super().default_factory(name, unixtime=unixtime)
     assert te.name == name
     mbdb = te.sqltags.mbdb
     if name.startswith('meta.'):

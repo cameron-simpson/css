@@ -3,6 +3,8 @@
 # Data stores based on local files.
 # - Cameron Simpson <cs@cskk.id.au>
 #
+# pylint: disable=too-many-lines
+#
 
 ''' Data directories: the sharable filesystem directories
     storing the backing files for the `DataDir` and `PlatonicDir`
@@ -21,7 +23,7 @@
     and scanning the new data.
 
     A `RawDataDir` behaves like an ordinary `DataDir`
-    except that the data files contains the raw uncompressed data bytes.
+    except that the data files contain the raw uncompressed data bytes.
     This notional use case is as a local cache of efficiently accessed data.
     The intent is that one might pull all the leaf data of a "file"
     into the store contiguously in order to obtain more efficient data access.
@@ -58,7 +60,7 @@ from uuid import uuid4
 from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.cache import LRU_Cache
-from cs.excutils import logexc
+from cs.context import nullcontext
 from cs.fileutils import (
     DEFAULT_READSIZE,
     ReadMixin,
@@ -69,13 +71,14 @@ from cs.fileutils import (
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
-from cs.py.func import prop as property
+from cs.progress import progressbar
+from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
-from cs.units import transcribe_bytes_geek
-from cs.x import X
+from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
+from cs.upd import Upd, upd_proxy, state as upd_state
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
@@ -159,9 +162,7 @@ class DataFileState(SimpleNamespace):
 
 class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
                RunStateMixin, FlaggedMixin, Mapping):
-  ''' Base class indexing locally stored data in files.
-      This class is hashclass specific;
-      the utilising Store maintains one of these for each supported hashclass.
+  ''' Base class indexing locally stored data in files for a specific hashclass.
 
       There are two main subclasses of this at present:
       * `DataDir`: the data are kept in a subdirectory of UUID-named files,
@@ -181,6 +182,9 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
 
   @classmethod
   def _resolve(cls, *, hashclass, indexclass, rollover, flags, flags_prefix):
+    ''' Resolve the `__init__()` arguments,
+        shared by `__init__` and `_singleton_key`.
+    '''
     if indexclass is None:
       indexclass = choose_indexclass(
           cls.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashclass.HASHNAME)
@@ -212,12 +216,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def _singleton_key(
       cls,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       indexclass=None,
       rollover=None,
       flags=None,
       flags_prefix=None,
+      **_,
   ):
     resolved = cls._resolve(
         hashclass=hashclass,
@@ -240,8 +245,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def __init__(
       self,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       indexclass=None,
       rollover=None,
       flags=None,
@@ -333,8 +338,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self._filemap = SqliteFilemap(self, self.statefilepath)
     hashname = self.hashname
     self.index = self.indexclass(
-        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname)),
-        self.hashclass,
+        self.pathto(self.INDEX_FILENAME_BASE_FORMAT.format(hashname=hashname))
     )
     self.index.open()
     self.runstate.start()
@@ -440,14 +444,15 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       break
     return self._filemap.add_path(filename)
 
-  def add(self, data, hashclass):
-    ''' Add the supplied data chunk to the current save DataFile,
+  def add(self, data):
+    ''' Add the supplied data chunk to the current save `DataFile`,
         return the hashcode.
         Roll the internal state over to a new file if the current
         datafile has reached the rollover threshold.
 
         Subclasses must define the `data_save_information(data)` method.
     '''
+    # pretranscribe the in-file data record
     bs, data_offset, data_length, flags = self.data_save_information(data)
     with self._lock:
       wfd = self._wfd
@@ -467,10 +472,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
           (filenum, length, n)
       )
     entry = FileDataIndexEntry(
-        filenum, offset + data_offset, data_length, flags
+        filenum=filenum,
+        data_offset=offset + data_offset,
+        data_length=data_length,
+        flags=flags,
     )
     post_offset = offset + length
-    hashcode = hashclass.from_chunk(data)
+    hashcode = self.hashclass.from_chunk(data)
     self._queue_index(hashcode, entry, post_offset)
     return hashcode
 
@@ -501,40 +509,42 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def _queue_index_flush(self):
     self._indexQ.put(None)
 
-  @logexc
+  @upd_proxy
   def _index_updater(self):
     ''' Thread body to collect hashcode index data from `.indexQ` and store it.
     '''
-    with Pfx("%s._index_updater", self):
-      index = self.index
-      unindexed = self._unindexed
-      filemap = self._filemap
-      old_DFstate = None
-      indexQ = self._indexQ
-      for item in indexQ:
-        # dummy item to sync state
-        if item is None:
-          if old_DFstate is not None:
-            filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-            old_DFstate = None
-          continue
-        hashcode, entry, post_offset = item
-        with self._lock:
-          index[hashcode] = entry
-          try:
-            del unindexed[hashcode]
-          except KeyError:
-            # this can happen when the same key is indexed twice
-            # entirely plausible if a new datafile is added to the datadir
-            pass
-        DFstate = filemap[entry.filenum]
-        if DFstate is not old_DFstate:
-          if old_DFstate is not None:
-            filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-          old_DFstate = DFstate
-        DFstate.indexed_to = post_offset
-      if old_DFstate is not None:
-        filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " index "
+    index = self.index
+    unindexed = self._unindexed
+    filemap = self._filemap
+    old_DFstate = None
+    indexQ = self._indexQ
+    for item in indexQ:
+      # dummy item to sync state
+      if item is None:
+        if old_DFstate is not None:
+          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+          old_DFstate = None
+        continue
+      hashcode, entry, post_offset = item
+      entry_bs = bytes(entry)
+      with self._lock:
+        index[hashcode] = entry_bs
+        try:
+          del unindexed[hashcode]
+        except KeyError:
+          # this can happen when the same key is indexed twice
+          # entirely plausible if a new datafile is added to the datadir
+          pass
+      DFstate = filemap[entry.filenum]
+      if DFstate is not old_DFstate:
+        if old_DFstate is not None:
+          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
+        old_DFstate = DFstate
+      DFstate.indexed_to = post_offset
+    if old_DFstate is not None:
+      filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
 
   @locked
   def flush(self):
@@ -545,7 +555,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self.index.flush()
 
   def __setitem__(self, hashcode, data):
-    h = self.add(data, type(hashcode))
+    h = self.add(data)
     if hashcode != h:
       raise ValueError(
           'supplied hashcode %s does not match data, data added under %s instead'
@@ -555,21 +565,29 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def __len__(self):
     return len(self.index)
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  @pfx_method
+  def hashcodes_from(self, *, start_hashcode=None):
     ''' Generator yielding the hashcodes from the database in order
         starting with optional `start_hashcode`.
 
         Parameters:
         * `start_hashcode`: the first hashcode; if missing or `None`,
           iteration starts with the first key in the index
-        * `reverse`: iterate backwards if true, otherwise forwards.
     '''
-    unindexed = set(self._unindexed)
-    indexed = self.index.hashcodes_from(
-        start_hashcode=start_hashcode, reverse=reverse
+    # important: consult this BEFORE self.index.keys otherwise items might
+    # flow from unindexed to the index unseen
+    with self._lock:
+      unindexed = list(self._unindexed)
+    if start_hashcode is not None and unindexed:
+      unindexed = filter(lambda h: h >= start_hashcode, unindexed)
+    hs = map(
+        self.hashclass,
+        self.index.sorted_keys(start_hashcode=start_hashcode),
     )
-    unseen_indexed = (h for h in indexed if h not in unindexed)
-    return imerge(sorted(unindexed, reverse=reverse), unseen_indexed)
+    unindexed = set(unindexed)
+    if unindexed:
+      hs = filter(lambda h: h not in unindexed, hs)
+    return imerge(hs, sorted(unindexed))
 
   def __iter__(self):
     return self.hashcodes_from()
@@ -588,9 +606,10 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       index = self.index
       try:
         with self._lock:
-          entry = index[hashcode]
+          entry_bs = index[hashcode]
       except KeyError:
         raise KeyError("%s[%s]: hash not in index" % (self, hashcode))
+      entry = FileDataIndexEntry.from_bytes(entry_bs)
     filenum = entry.filenum
     try:
       try:
@@ -603,7 +622,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       return entry.fetch_fd(rfd)
     except Exception as e:
       exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
-      raise KeyError(str(hashcode))
+      raise KeyError(str(hashcode)) from e
 
 class SqliteFilemap:
   ''' The file mapping of `filenum` to `DataFileState`.
@@ -815,8 +834,9 @@ class DataDir(FilesDir):
     ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
     bfr = buffer_from_pathname(filepath, offset=offset)
-    yield from DataRecord.parse_buffer(bfr)
+    yield from DataRecord.scan_with_offsets(bfr)
 
+  @upd_proxy
   def _monitor_datafiles(self):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
 
@@ -825,6 +845,8 @@ class DataDir(FilesDir):
         and new data in existing files and scans them, adding the index
         information to the local state.
     '''
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " monitor "
     filemap = self._filemap
     indexQ = self._indexQ
     datadirpath = self.pathto('data')
@@ -833,21 +855,23 @@ class DataDir(FilesDir):
         time.sleep(1)
         continue
       # scan for new datafiles
-      with Pfx("listdir(%r)", datadirpath):
-        try:
-          listing = list(os.listdir(datadirpath))
-        except OSError as e:
-          if e.errno == errno.ENOENT:
-            error("listing failed: %s", e)
-            time.sleep(2)
-            continue
-          raise
+      with proxy.extend_prefix(" check datafiles"):
+        with Pfx("listdir(%r)", datadirpath):
+          try:
+            listing = list(os.listdir(datadirpath))
+          except OSError as e:
+            if e.errno == errno.ENOENT:
+              error("listing failed: %s", e)
+              time.sleep(2)
+              continue
+            raise
         for filename in listing:
           if (not filename.startswith('.')
               and filename.endswith(DATAFILE_DOT_EXT)
               and filename not in filemap):
-            info("MONITOR: add new filename %r", filename)
-            filemap.add_path(filename)
+            with proxy.extend_prefix(" add " + filename):
+              info("MONITOR: add new filename %r", filename)
+              filemap.add_path(filename)
       # now scan known datafiles for new data
       for filenum in self._filemap.filenums():
         if self.cancelled or self.flag_scan_disable:
@@ -874,14 +898,23 @@ class DataDir(FilesDir):
           if new_size > DFstate.scanned_to:
             offset = DFstate.scanned_to
             hashclass = self.hashclass
-            for pre_offset, DR, post_offset in DFstate.scanfrom(offset=offset):
+            for pre_offset, DR, post_offset in progressbar(
+                DFstate.scanfrom(offset=offset),
+                "%s: scan %s" % (self, relpath(datadirpath, DFstate.filename)),
+                position=offset,
+                total=new_size,
+                units_scale=BINARY_BYTES_SCALE,
+                itemlenfunc=lambda t3: t3[2] - t3[0],
+            ):
               hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(
                   (
                       hashcode,
                       FileDataIndexEntry(
-                          filenum, pre_offset + DR.data_offset,
-                          DR.raw_data_length, DR.flags
+                          filenum=filenum,
+                          data_offset=pre_offset + DR.data_offset,
+                          data_length=DR.raw_data_length,
+                          flags=DR.flags,
                       ), post_offset
                   )
               )
@@ -996,8 +1029,8 @@ class PlatonicDir(FilesDir):
   def __init__(
       self,
       topdirpath,
-      hashclass,
       *,
+      hashclass,
       exclude_dir=None,
       exclude_file=None,
       follow_symlinks=False,
@@ -1020,11 +1053,13 @@ class PlatonicDir(FilesDir):
           whose basename commences with a dot.
         * `follow_symlinks`: follow symbolic links, default False.
         * `meta_store`: an optional Store used to maintain a Dir
-          representing the ideal directory; unhashed data blocks
-          encountered during scans which are promoted to `HashCodeBlock`s
-          are also stored here
+          representing the ideal directory,
+          which is maintained as changes to the source directory tree
+          are observed.
+          Also, unhashed data blocks encountered during scans
+          which are promoted to `HashCodeBlock`s are stored here.
         * `archive`: optional `Archive` ducktype instance with a
-          .update(Dirent[,when]) method
+          `.update(Dirent[,when])` method
 
         Other keyword arguments are passed to `FilesDir.__init__`.
 
@@ -1033,7 +1068,7 @@ class PlatonicDir(FilesDir):
     '''
     if meta_store is None:
       raise ValueError("meta_store may not be None")
-    super().__init__(topdirpath, hashclass, **kw)
+    super().__init__(topdirpath, hashclass=hashclass, **kw)
     if exclude_dir is None:
       exclude_dir = self._default_exclude_path
     if exclude_file is None:
@@ -1101,9 +1136,12 @@ class PlatonicDir(FilesDir):
           DF.open()
     return DF
 
+  @upd_proxy
   def _monitor_datafiles(self):
     ''' Thread body to poll the ideal tree for new or changed files.
     '''
+    proxy = upd_state.proxy
+    proxy.prefix = str(self) + " monitor "
     meta_store = self.meta_store
     filemap = self._filemap
     indexQ = self._indexQ
@@ -1128,153 +1166,174 @@ class PlatonicDir(FilesDir):
       with Pfx("%r", datadirpath):
         seen = set()
         info("scan tree...")
-        for dirpath, dirnames, filenames in os.walk(datadirpath,
-                                                    followlinks=True):
-          time.sleep(self.DELAY_INTRASCAN)
-          if self.cancelled or self.flag_scan_disable:
-            break
-          rdirpath = relpath(dirpath, datadirpath)
-          with Pfx(rdirpath):
-            # this will be the subdirectories into which to recurse
-            pruned_dirnames = []
-            for dname in dirnames:
-              if self.exclude_dir(joinpath(rdirpath, dname)):
-                # unwanted
-                continue
-              subdirpath = joinpath(dirpath, dname)
-              try:
-                S = os.stat(subdirpath)
-              except OSError as e:
-                # inaccessable
-                warning("stat(%r): %s, skipping", subdirpath, e)
-                continue
-              ino = S.st_dev, S.st_ino
-              if ino in seen:
-                # we have seen this subdir before, probably via a symlink
-                # TODO: preserve symlinks? attach alter ego directly as a Dir?
-                debug(
-                    "seen %r (dev=%s,ino=%s), skipping", subdirpath, ino[0],
-                    ino[1]
-                )
-                continue
-              seen.add(ino)
-              pruned_dirnames.append(dname)
-            dirnames[:] = pruned_dirnames
-            if meta_store is None:
-              warning("no meta_store")
-              D = None
-            else:
-              with meta_store:
-                D = topdir.makedirs(rdirpath, force=True)
-                # prune removed names
-                names = list(D.keys())
-                for name in names:
-                  if name not in dirnames and name not in filenames:
-                    info("del %r", name)
-                    del D[name]
-            for filename in filenames:
-              with Pfx(filename):
-                if self.cancelled or self.flag_scan_disable:
-                  break
-                rfilepath = joinpath(rdirpath, filename)
-                if self.exclude_file(rfilepath):
-                  continue
-                filepath = joinpath(dirpath, filename)
-                if not isfilepath(filepath):
-                  continue
-                # look up this file in our file state index
-                DFstate = filemap.get(rfilepath)
-                if (DFstate is not None and D is not None
-                    and filename not in D):
-                  # in filemap, but not in dir: start again
-                  warning("in filemap but not in Dir, rescanning")
-                  filemap.del_path(rfilepath)
-                  DFstate = None
-                if DFstate is None:
-                  DFstate = filemap.add_path(rfilepath)
-                try:
-                  new_size = DFstate.stat_size(self.follow_symlinks)
-                except OSError as e:
-                  if e.errno == errno.ENOENT:
-                    warning("forgetting missing file")
-                    self._del_datafilestate(DFstate)
-                  else:
-                    warning("stat: %s", e)
-                  continue
-                if new_size is None:
-                  # skip non files
-                  debug("SKIP non-file")
-                  continue
-                if meta_store:
+        with proxy.extend_prefix(" scan"):
+          for dirpath, dirnames, filenames in os.walk(datadirpath,
+                                                      followlinks=True):
+            dirnames[:] = sorted(dirnames)
+            filenames = sorted(filenames)
+            time.sleep(self.DELAY_INTRASCAN)
+            if self.cancelled or self.flag_scan_disable:
+              break
+            rdirpath = relpath(dirpath, datadirpath)
+            with Pfx(rdirpath):
+              with (proxy.extend_prefix(" " + rdirpath)
+                    if filenames else nullcontext()):
+                # this will be the subdirectories into which to recurse
+                pruned_dirnames = []
+                for dname in dirnames:
+                  if self.exclude_dir(joinpath(rdirpath, dname)):
+                    # unwanted
+                    continue
+                  subdirpath = joinpath(dirpath, dname)
                   try:
-                    E = D[filename]
-                  except KeyError:
-                    E = FileDirent(filename)
-                    D[filename] = E
-                  else:
-                    if not E.isfile:
-                      info("new FileDirent replacing previous nonfile: %s", E)
-                      E = FileDirent(filename)
-                      D[filename] = E
-                if new_size > DFstate.scanned_to:
-                  if DFstate.scanned_to > 0:
-                    info("scan from %d", DFstate.scanned_to)
-                  if meta_store is not None:
-                    blockQ = IterableQueue()
-                    R = meta_store._defer(
-                        lambda B, Q: top_block_for(spliced_blocks(B, Q)),
-                        E.block, blockQ
+                    S = os.stat(subdirpath)
+                  except OSError as e:
+                    # inaccessable
+                    warning("stat(%r): %s, skipping", subdirpath, e)
+                    continue
+                  ino = S.st_dev, S.st_ino
+                  if ino in seen:
+                    # we have seen this subdir before, probably via a symlink
+                    # TODO: preserve symlinks? attach alter ego directly as a Dir?
+                    debug(
+                        "seen %r (dev=%s,ino=%s), skipping", subdirpath,
+                        ino[0], ino[1]
                     )
-                  scan_from = DFstate.scanned_to
-                  scan_start = time.time()
-                  for pre_offset, data, post_offset in DFstate.scanfrom(
-                      offset=DFstate.scanned_to):
-                    hashcode = self.hashclass.from_chunk(data)
-                    indexQ.put(
-                        (
-                            hashcode,
-                            FileDataIndexEntry(
-                                DFstate.filenum, pre_offset, len(data), 0
-                            ), post_offset
-                        )
-                    )
-                    if meta_store is not None:
-                      B = Block(data=data, hashcode=hashcode, added=True)
-                      blockQ.put((pre_offset, B))
-                    DFstate.scanned_to = post_offset
+                    continue
+                  seen.add(ino)
+                  pruned_dirnames.append(dname)
+                dirnames[:] = pruned_dirnames
+                if meta_store is None:
+                  warning("no meta_store")
+                  D = None
+                else:
+                  with meta_store:
+                    D = topdir.makedirs(rdirpath, force=True)
+                    # prune removed names
+                    names = list(D.keys())
+                    for name in names:
+                      if name not in dirnames and name not in filenames:
+                        info("del %r", name)
+                        del D[name]
+                for filename in filenames:
+                  with Pfx(filename):
                     if self.cancelled or self.flag_scan_disable:
                       break
-                  if meta_store is not None:
-                    blockQ.close()
+                    rfilepath = joinpath(rdirpath, filename)
+                    if self.exclude_file(rfilepath):
+                      continue
+                    filepath = joinpath(dirpath, filename)
+                    if not isfilepath(filepath):
+                      continue
+                    # look up this file in our file state index
+                    DFstate = filemap.get(rfilepath)
+                    if (DFstate is not None and D is not None
+                        and filename not in D):
+                      # in filemap, but not in dir: start again
+                      warning("in filemap but not in Dir, rescanning")
+                      filemap.del_path(rfilepath)
+                      DFstate = None
+                    if DFstate is None:
+                      DFstate = filemap.add_path(rfilepath)
                     try:
-                      top_block = R()
-                    except MissingHashcodeError as e:
-                      error("missing data, forcing rescan: %s", e)
-                      DFstate.scanned_to = 0
-                    else:
-                      E.block = top_block
-                      D.changed = True
-                      updated = True
-                  elapsed = time.time() - scan_start
-                  scanned = DFstate.scanned_to - scan_from
-                  if elapsed > 0:
-                    scan_rate = scanned / elapsed
-                  else:
-                    scan_rate = None
-                  if scan_rate is None:
-                    info(
-                        "scanned to %d: %s", DFstate.scanned_to,
-                        transcribe_bytes_geek(scanned)
-                    )
-                  else:
-                    info(
-                        "scanned to %d: %s at %s/s", DFstate.scanned_to,
-                        transcribe_bytes_geek(scanned),
-                        transcribe_bytes_geek(scan_rate)
-                    )
-                  # stall after a file scan, briefly, to limit impact
-                  if elapsed > 0:
-                    time.sleep(min(elapsed, self.DELAY_INTRASCAN))
+                      new_size = DFstate.stat_size(self.follow_symlinks)
+                    except OSError as e:
+                      if e.errno == errno.ENOENT:
+                        warning("forgetting missing file")
+                        self._del_datafilestate(DFstate)
+                      else:
+                        warning("stat: %s", e)
+                      continue
+                    if new_size is None:
+                      # skip non files
+                      debug("SKIP non-file")
+                      continue
+                    if meta_store:
+                      try:
+                        E = D[filename]
+                      except KeyError:
+                        E = FileDirent(filename)
+                        D[filename] = E
+                      else:
+                        if not E.isfile:
+                          info(
+                              "new FileDirent replacing previous nonfile: %s",
+                              E
+                          )
+                          E = FileDirent(filename)
+                          D[filename] = E
+                    if new_size > DFstate.scanned_to:
+                      with proxy.extend_prefix(
+                          " scan %s[%d:%d]" %
+                          (filename, DFstate.scanned_to, new_size)):
+                        if DFstate.scanned_to > 0:
+                          info("scan from %d", DFstate.scanned_to)
+                        if meta_store is not None:
+                          blockQ = IterableQueue()
+                          R = meta_store._defer(
+                              lambda B, Q: top_block_for(spliced_blocks(B, Q)),
+                              E.block, blockQ
+                          )
+                        scan_from = DFstate.scanned_to
+                        scan_start = time.time()
+                        for pre_offset, data, post_offset in progressbar(
+                            DFstate.scanfrom(offset=DFstate.scanned_to),
+                            "scan " + rfilepath,
+                            position=DFstate.scanned_to,
+                            total=new_size,
+                            units_scale=BINARY_BYTES_SCALE,
+                            itemlenfunc=lambda t3: t3[2] - t3[0],
+                            update_frequency=128,
+                        ):
+                          hashcode = self.hashclass.from_chunk(data)
+                          indexQ.put(
+                              (
+                                  hashcode,
+                                  FileDataIndexEntry(
+                                      filenum=DFstate.filenum,
+                                      data_offset=pre_offset,
+                                      data_length=len(data),
+                                      flags=0,
+                                  ), post_offset
+                              )
+                          )
+                          if meta_store is not None:
+                            B = Block(data=data, hashcode=hashcode, added=True)
+                            blockQ.put((pre_offset, B))
+                          DFstate.scanned_to = post_offset
+                          if self.cancelled or self.flag_scan_disable:
+                            break
+                      if meta_store is not None:
+                        blockQ.close()
+                        try:
+                          top_block = R()
+                        except MissingHashcodeError as e:
+                          error("missing data, forcing rescan: %s", e)
+                          DFstate.scanned_to = 0
+                        else:
+                          E.block = top_block
+                          D.changed = True
+                          updated = True
+                      elapsed = time.time() - scan_start
+                      scanned = DFstate.scanned_to - scan_from
+                      if elapsed > 0:
+                        scan_rate = scanned / elapsed
+                      else:
+                        scan_rate = None
+                      if scan_rate is None:
+                        info(
+                            "scanned to %d: %s", DFstate.scanned_to,
+                            transcribe_bytes_geek(scanned)
+                        )
+                      else:
+                        info(
+                            "scanned to %d: %s at %s/s", DFstate.scanned_to,
+                            transcribe_bytes_geek(scanned),
+                            transcribe_bytes_geek(scan_rate)
+                        )
+                      # stall after a file scan, briefly, to limit impact
+                      if elapsed > 0:
+                        time.sleep(min(elapsed, self.DELAY_INTRASCAN))
             # update the archive after updating from a directory
             if updated and meta_store is not None:
               self.sync_meta()
