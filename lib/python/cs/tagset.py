@@ -1359,7 +1359,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 
   COMPARISON_FUNCS = {
       '=':
-      lambda tag_value, cmp_value: tag_value == cmp_value,
+      lambda tag_value, cmp_value: cmp_value is None or tag_value == cmp_value,
       '<=':
       lambda tag_value, cmp_value: tag_value <= cmp_value,
       '<':
