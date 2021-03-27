@@ -232,21 +232,28 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                 tagged_path.add(tag)
 
   def cmd_edit(self, argv):
-    ''' Usage: {cmd} [-d] [path]
+    ''' Usage: {cmd} [-ad] [path]
           Edit the direct tagsets of path, default: '.'
           If path is a directory, provide the tags of its entries.
           Otherwise edit just the tags for path.
-          -d          Treat directories like files: edit just its tags.
+          -a    List all names in directory edit mode; normally
+                names commencing with a dot are omitted.
+          -d    Treat directories like files: edit just its tags.
     '''
     options = self.options
     fstags = options.fstags
+    all_names = False
     directories_like_files = False
     xit = 0
-    opts, argv = getopt(argv, 'd')
+    opts, argv = getopt(argv, 'ad')
     for opt, _ in opts:
       with Pfx(opt):
-        if opt == '-d':
+        if opt == '-a':
+          all_names = True
+        elif opt == '-d':
           directories_like_files = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       path = '.'
     else:
@@ -257,7 +264,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
           fstags[path].edit(verbose=state.verbose)
-        elif not fstags.edit_dirpath(path):
+        elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
     return xit
 
@@ -1174,16 +1181,21 @@ class FSTags(MultiOpenMixin):
     return all(criterion.match_tagged_entity(te) for criterion in tag_tests)
 
   @pfx_method
-  def edit_dirpath(self, dirpath):
+  def edit_dirpath(self, dirpath, all_names=False):
     ''' Edit the filenames and tags in a directory.
+
+        If `all_names` is true, include names commencings with a dot,
+        otherwise exclude them.
     '''
     ok = True
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
     names = sorted(
         set(
-            name for name in os.listdir(dirpath)
-            if (name and name not in ('.', '..') and not name.startswith('.'))
+            name for name in os.listdir(dirpath) if (
+                name and name not in ('.', '..') and
+                (all_names or not name.startswith('.'))
+            )
         )
     )
     tes = []
