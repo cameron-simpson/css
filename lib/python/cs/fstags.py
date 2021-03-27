@@ -1157,11 +1157,12 @@ class FSTags(MultiOpenMixin):
 
         Parameters:
         * `path`: the top of the file tree to walk
-        * `tag_tests`: an iterable of `TagBasedTest`s
+        * `tag_tests`: a sequence of `TagBasedTest`s
         * `use_direct_tags`: test the direct_tags if true,
           otherwise the all_tags.
           Default: `False`
     '''
+    assert isinstance(tag_tests, (tuple, list))
     for _, filepath in rpaths(path, yield_dirs=use_direct_tags, U=U):
       if self.test(filepath, tag_tests, use_direct_tags=use_direct_tags):
         yield filepath
