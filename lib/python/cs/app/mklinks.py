@@ -278,7 +278,7 @@ class Linker(object):
   def addpath(self, path):
     ''' Add a new path to the data structures.
     '''
-    with Pfx(path):
+    with Pfx("addpath(%r)", path):
       with Pfx("lstat"):
         S = os.lstat(path)
       if not S_ISREG(S.st_mode):
@@ -288,10 +288,13 @@ class Linker(object):
       key = FileInfo.stat_key(S)
       FI = self.keymap.get(key)
       if FI:
+        assert FI.key == key
         FI.paths.add(path)
       else:
         FI = FileInfo(S.st_dev, S.st_ino, S.st_size, S.st_mtime, (path,))
+        assert FI.key == key
         self.keymap[key] = FI
+        assert key not in self.sizemap[S.st_size]
         self.sizemap[S.st_size][key] = FI
 
   @pfx_method
