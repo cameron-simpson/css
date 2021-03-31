@@ -218,12 +218,12 @@ class FileInfo(object):
               warning("already assimilated")
               continue
             if vpathprefix:
-              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
-            else:
               print(
                   "%s: %s => %s" %
                   (vpathprefix, opath[len(pathprefix):], pathsuffix)
               )
+            else:
+              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
             if no_action:
               continue
             odir = dirname(opath)
