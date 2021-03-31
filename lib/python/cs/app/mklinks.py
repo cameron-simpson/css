@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, join as joinpath, relpath
+from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
@@ -115,6 +115,7 @@ class FileInfo(object):
   ''' Information about a particular inode.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(self, dev, ino, size, mtime, paths=()):
     self.dev = dev
     self.ino = ino
@@ -160,7 +161,7 @@ class FileInfo(object):
       U = Upd()
       pathspace = U.columns - 64
       label = "scan " + (
-          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]
+          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
       )
       with Pfx("checksum %r", path):
         csum = hashfunc()
@@ -191,7 +192,7 @@ class FileInfo(object):
   def same_file(self, other):
     ''' Test whether two FileInfos refer to the same file.
     '''
-    return self.key == other.key
+    return self.key == other.key  # pylint: disable=comparison-with-callable
 
   def assimilate(self, other, no_action=False):
     ''' Link our primary path to all the paths from `other`. Return success.
@@ -201,7 +202,7 @@ class FileInfo(object):
     opaths = other.paths
     pathprefix = common_path_prefix(path, *opaths)
     vpathprefix = shortpath(pathprefix)
-    pathsuffix = path[len(pathprefix):]
+    pathsuffix = path[len(pathprefix):]  # pylint: disable=unsubscriptable-object
     with UpdProxy() as proxy:
       proxy(
           "%s%s <= %r", vpathprefix, pathsuffix,
@@ -292,7 +293,7 @@ class Linker(object):
         FI.paths.add(path)
       else:
         FI = FileInfo(S.st_dev, S.st_ino, S.st_size, S.st_mtime, (path,))
-        assert FI.key == key
+        assert FI.key == key  # pylint: disable=comparison-with-callable
         self.keymap[key] = FI
         assert key not in self.sizemap[S.st_size]
         self.sizemap[S.st_size][key] = FI
@@ -306,7 +307,7 @@ class Linker(object):
       # order FileInfos by mtime (newest first) and then path
       FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
       size = FIs[0].size
-      with UpdProxy(text="merge size %d " % (size,)) as proxy:
+      with UpdProxy(text="merge size %d " % (size,)):
         for i, FI in enumerate(FIs):
           # skip FileInfos with no paths
           # this happens when a FileInfo has been assimilated
