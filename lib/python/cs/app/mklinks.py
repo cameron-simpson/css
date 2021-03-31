@@ -302,24 +302,27 @@ class Linker(object):
     for _, FImap in sorted(self.sizemap.items(), reverse=True):
       # order FileInfos by mtime (newest first) and then path
       FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
-      for i, FI in enumerate(FIs):
-        # skip FileInfos with no paths
-        # this happens when a FileInfo has been assimilated
-        if not FI.paths:
-          continue
-        for FI2 in FIs[i + 1:]:
-          status(FI2.path)
-          assert FI.size == FI2.size
-          assert FI.mtime >= FI2.mtime
-          assert not FI.same_file(FI2)
-          if not FI.same_dev(FI2):
-            # different filesystems, cannot link
+      size = FIs[0].size
+      with UpdProxy(text="merge size %d " % (size,)) as proxy:
+        for i, FI in enumerate(FIs):
+          # skip FileInfos with no paths
+          # this happens when a FileInfo has been assimilated
+          if not FI.paths:
+            ##warning("SKIP, no paths")
             continue
-          if FI.checksum != FI2.checksum:
-            # different content, skip
-            continue
-          # FI2 is the younger, keep it
-          FI.assimilate(FI2, no_action=no_action)
+          for FI2 in FIs[i + 1:]:
+            status(FI2.path)
+            assert FI.size == FI2.size
+            assert FI.mtime >= FI2.mtime
+            assert not FI.same_file(FI2)
+            if not FI.same_dev(FI2):
+              # different filesystems, cannot link
+              continue
+            if FI.checksum != FI2.checksum:
+              # different content, skip
+              continue
+            # FI2 is the younger, keep it
+            FI.assimilate(FI2, no_action=no_action)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
