@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, relpath
+from os.path import dirname, isdir, isfile, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
@@ -269,8 +269,8 @@ class Linker(object):
               label=relpath(dirpath, path),
               update_frequency=32,
           ):
-            if isfile(path):
-              self.addpath(path)
+            filepath = joinpath(dirpath, filename)
+            self.addpath(filepath)
           dirnames[:] = sorted(dirnames)
       else:
         self.addpath(path)
