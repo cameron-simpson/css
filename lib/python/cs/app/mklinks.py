@@ -35,7 +35,7 @@ from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20210306-post'
 
@@ -202,7 +202,7 @@ class FileInfo(object):
     pathprefix = common_path_prefix(path, *opaths)
     vpathprefix = shortpath(pathprefix)
     pathsuffix = path[len(pathprefix):]
-    with Upd().insert(1) as proxy:
+    with UpdProxy() as proxy:
       proxy(
           "%s%s <= %r", vpathprefix, pathsuffix,
           list(map(lambda opath: opath[len(pathprefix):], sorted(opaths)))
@@ -259,11 +259,11 @@ class Linker(object):
   def scan(self, path):
     ''' Scan the file tree.
     '''
-    with Upd().insert(1) as proxy:
+    with UpdProxy() as proxy:
       proxy.prefix = "scan %s: " % (path)
       if isdir(path):
         for dirpath, dirnames, filenames in os.walk(path):
-          proxy(relpath(dirpath, path))
+          proxy("sweep " + relpath(dirpath, path))
           for filename in progressbar(
               sorted(filenames),
               label=relpath(dirpath, path),
