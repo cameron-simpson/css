@@ -169,7 +169,7 @@ class FileInfo(object):
           length = os.fstat(fp.fileno()).st_size
           read_len = 0
           for data in progressbar(
-              read_from(fp),
+              read_from(fp, rsize=1024*1024),
               label=label,
               total=length,
               units_scale=BINARY_BYTES_SCALE,
