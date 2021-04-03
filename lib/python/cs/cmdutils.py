@@ -93,7 +93,7 @@ class BaseCommand:
       This class provides the basic parse and dispatch mechanisms
       for command lines.
       To implement a command line
-      one instantiates a subclass of BaseCommand:
+      one instantiates a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               GETOPT_SPEC = 'ab:c'
@@ -102,7 +102,7 @@ class BaseCommand:
                 -b    But using bvalue.
                 -c    The 'c' option!
               """
-            ...
+              ...
 
       Running a command is done by:
 
@@ -122,6 +122,26 @@ class BaseCommand:
       Instances have a `self.options` attribute on which optional
       modes are set,
       avoiding conflict with the attributes of `self`.
+
+      Subclasses with no subcommands
+      generally just implement a `main(argv)` method.
+
+      Subclasses with subcommands
+      should implement a `cmd_`*subcommand*`(argv)` method
+      for each subcommand.
+      If there is a paragraph in the method docstring
+      commencing with `Usage:`
+      then that paragraph is incorporated automatically
+      into the main usage message.
+      Example:
+
+          def cmd_ls(self, argv):
+              """ Usage: {cmd} [paths...]
+                    Emit a listing for the named paths.
+
+                  Further docstring non-usage information here.
+              """
+              ... do the "ls" subcommand ...
 
       The subclass is customised by overriding the following methods:
       * `apply_defaults()`:
