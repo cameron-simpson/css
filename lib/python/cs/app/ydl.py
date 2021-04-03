@@ -41,7 +41,6 @@ from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
-from cs.tagset import Tag
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 __version__ = '20210306-post'
@@ -85,7 +84,7 @@ DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
 
 FSTAGS_PREFIX = 'youtube_dl'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
   return YDLCommand(argv).run()
