@@ -217,7 +217,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.deco',
         'cs.edit',
         'cs.lex',

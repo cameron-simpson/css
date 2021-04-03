@@ -123,7 +123,7 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
+        'cs.cmdutils>=20210404', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
         'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
         'cs.upd', 'icontract', 'typeguard'
     ],

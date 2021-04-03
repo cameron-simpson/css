@@ -93,7 +93,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.maildb',
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.configutils',
         'cs.deco',
         'cs.env',

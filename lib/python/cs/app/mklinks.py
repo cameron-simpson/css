@@ -49,7 +49,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.fileutils>=20200914',
         'cs.logutils',
         'cs.pfx',

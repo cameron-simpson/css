@@ -78,7 +78,7 @@ DISTINFO = {
         'console_scripts': ['sqltags = cs.sqltags:main'],
     },
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.context',
         'cs.dateutils',
         'cs.deco',

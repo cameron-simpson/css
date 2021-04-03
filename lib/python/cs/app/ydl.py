@@ -60,7 +60,7 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.excutils',
         'cs.fstags',
         'cs.logutils',
