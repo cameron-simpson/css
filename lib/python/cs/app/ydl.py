@@ -43,7 +43,7 @@ from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210404'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
