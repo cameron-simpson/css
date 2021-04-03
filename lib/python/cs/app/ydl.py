@@ -134,8 +134,6 @@ class YDLCommand(BaseCommand):
       for _ in over_ydl.report():
         pass
 
-YDLCommand.add_usage_to_docstring()
-
 # pylint: disable=too-many-instance-attributes
 class OverYDL:
   ''' A manager for multiple `YDL` instances.

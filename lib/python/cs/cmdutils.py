@@ -162,6 +162,17 @@ class BaseCommand:
   GETOPT_SPEC = ''
   OPTIONS_CLASS = SimpleNamespace
 
+  def __init_subclass__(cls):
+    ''' Update subclasses of `BaseCommand`.
+
+        Appends the usage message to the class docstring.
+    '''
+    usage_message = cls.usage_text()
+    cls.__doc__ += (
+        '\n\nCommand line usage:\n\n    ' +
+        usage_message.replace('\n', '\n    ')
+    )
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, **kw_options):
     ''' Initialise the command line.
@@ -305,7 +316,7 @@ class BaseCommand:
   @classmethod
   @cachedmethod
   def usage_text(cls, *, cmd=None, format_mapping=None):
-    ''' Compute the "Usage: message for this class
+    ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
         and the `'Usage:'`-containing docstrings
         from its `cmd_*` methods.
@@ -388,16 +399,6 @@ class BaseCommand:
             parts.extend(post_usage_parts)
             subusage = '\n\n'.join(parts)
     return subusage if subusage else None
-
-  @classmethod
-  def add_usage_to_docstring(cls):
-    ''' Append `cls.usage_text()` to `cls.__doc__`.
-    '''
-    usage_message = cls.usage_text()
-    cls.__doc__ += (
-        '\n\nCommand line usage:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
-    )
 
   def apply_defaults(self):
     ''' Stub `apply_defaults` method.

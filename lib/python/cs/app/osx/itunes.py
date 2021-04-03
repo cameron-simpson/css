@@ -92,8 +92,6 @@ class ITunesCommand(BaseCommand):
                       info("+ %s", new_tag)
                       tagged_path.add(new_tag)
 
-ITunesCommand.add_usage_to_docstring()
-
 class ITunesISODateTime(datetime):
   ''' A `datetime` subclass using the iTunes exported XML date format.
   '''

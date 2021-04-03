@@ -1956,7 +1956,5 @@ class SQLTagsCommand(BaseSQLTagsCommand):
           print(" ", tag)
     return xit
 
-SQLTagsCommand.add_usage_to_docstring()
-
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

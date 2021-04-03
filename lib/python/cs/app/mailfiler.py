@@ -260,8 +260,6 @@ class MailFilerCommand(BaseCommand):
         }
     )
 
-MailFilerCommand.add_usage_to_docstring()
-
 def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
   '''
