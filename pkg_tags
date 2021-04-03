@@ -4,7 +4,7 @@ cs.app.flag pypi.release="20201228" ok_revision="7edcd93a1c777caa97f8f30d60e863b
 cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release=20160310
-cs.app.mklinks pypi.release="20210401" ok_revision="50e66648493479593bc790c97f051bcc0f8861f9"
+cs.app.mklinks pypi.release="20210401" ok_revision="9f7cac4e2461bf0dc4851ae4d4714d9c4e56f55f"
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5270ebfb6
