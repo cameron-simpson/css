@@ -310,6 +310,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
       tagged_path = fstags[filepath]
+      # pylint: disable=superfluous-parens
       if (not all_paths
           and not (tagged_path if use_direct_tags else tagged_path.all_tags)):
         continue
@@ -426,7 +427,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           path = te.name
         self[path].update(te)
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-statements
   def cmd_json_import(self, argv):
     ''' Usage: json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
           Apply JSON data to path.
@@ -572,7 +573,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return self._cmd_mvcpln(argv, self.options.fstags.move)
 
   # pylint: disable=too-many-branches
-  def _cmd_mvcpln(self, argv, attach):
+  @staticmethod
+  def _cmd_mvcpln(argv, attach):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
@@ -825,7 +827,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise GetoptError("unrecognised subcommand")
 
-  def cmd_tagpaths(self, argv, options):
+  def cmd_tagpaths(self, argv):
     ''' Usage: {cmd} {{tag[=value]|-tag}} {{-|paths...}}
         Tag multiple paths.
         With the form "-tag", remove the tag from the immediate tags.
@@ -902,7 +904,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     self.options.fstags.export_xattrs(paths)
 
-  def cmd_xattr_import(self, argv, options):
+  def cmd_xattr_import(self, argv):
     ''' Usage: {cmd} {{-|paths...}}
           Update extended attributes from tags.
     '''
