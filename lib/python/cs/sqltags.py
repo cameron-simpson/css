@@ -1224,6 +1224,7 @@ class SQLTags(TagSets):
 
   TagSetClass = SQLTagSet
 
+  # pylint: disable=super-init-not-called
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
@@ -1611,9 +1612,9 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       db_fspath = orm.db_fspath
       print("sqlite3", db_fspath)
       run(['sqlite3', db_fspath], check=True)
-    else:
-      error("I do not know how to get a db shell for %r", db_url)
-      return 1
+      return 0
+    error("I do not know how to get a db shell for %r", db_url)
+    return 1
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
