@@ -8,7 +8,7 @@ cs.app.mklinks pypi.release="20210404" ok_revision="9f7cac4e2461bf0dc4851ae4d471
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5270ebfb6
-cs.app.ydl pypi.release="20210306" ok_revision=f26e2328ecf65f6c48edc838f452cc9a2148c1d0
+cs.app.ydl pypi.release="20210404" ok_revision=f26e2328ecf65f6c48edc838f452cc9a2148c1d0
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20210316" ok_revision=e0d01b9045138b3bfb6175e5abfcd96549f4a001
 cs.buffer pypi.release="20210316" ok_revision="5ed745dde92e9f0734f14e7e80969978eca80258"
