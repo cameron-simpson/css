@@ -1,0 +1,3 @@
+lib/python/cs/tagset.py: cs.tagset: bugifx TagBasedTest.COMPARISON_FUNCS["="]: if cmp_value is None, return true (the tag is present)
+lib/python/cs/tagset.py: update module DISTINFOs for recent cs.cmdutils BaseCommand change
+lib/python/cs/tagset.py: cs.tagset: update DISTINFO
