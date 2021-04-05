@@ -16,7 +16,7 @@ from types import SimpleNamespace
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, stripped_dedent
+from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
@@ -188,10 +188,12 @@ class BaseCommand:
         Appends the usage message to the class docstring.
     '''
     usage_message = cls.usage_text()
-    cls.__doc__ += (
-        '\n\nCommand line usage:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
+    usage_doc = (
+        'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
     )
+    cls_doc = cls.__doc__ or ''
+    cls_doc = cls_doc = '\n\n' + usage_doc if cls_doc else usage_doc
+    cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, **kw_options):
@@ -346,11 +348,11 @@ class BaseCommand:
         happens more than once.
     '''
     if cmd is None:
-      cmd = cls.__name__
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
     if format_mapping is None:
       format_mapping = {}
-    if cmd is not None or 'cmd' not in format_mapping:
-      format_mapping['cmd'] = cls.__name__ if cmd is None else cmd
+    if 'cmd' not in format_mapping:
+      format_mapping['cmd'] = cmd
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
