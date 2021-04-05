@@ -104,20 +104,25 @@ class BaseCommand:
               """
               ...
 
+      and provides either a `main` method if the command has no subcommands
+      or a suite of `cmd_`*subcommand* methods, one per subcommand.
+
       Running a command is done by:
 
           MyCommand(argv).run()
 
-      Modules which implement a command line mode generally look like:
+      or via the convenience method:
+
+          MyCommand.run_argv(argv)
+
+      Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
-              return MyCommand(argv).run()
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
           if __name__ == '__main__':
-              sys.exit(main(sys.argv))
+              sys.exit(MyCommand.run_argv(sys.argv))
 
       Instances have a `self.options` attribute on which optional
       modes are set,
@@ -321,6 +326,12 @@ class BaseCommand:
       raise
     else:
       self._run = main, main_cmd, argv, main_context
+
+  @classmethod
+  def run_argv(cls, argv=None):
+    ''' Create an instance for `argv` and call its `.run()` method.
+    '''
+    return cls(argv).run()
 
   @classmethod
   def subcommands(cls):
