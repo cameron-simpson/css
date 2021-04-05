@@ -450,6 +450,26 @@ def report(LFs):
   for _ in range(n):
     yield Q.get()
 
+class ResultSet(set):
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    pass
+
+  def __iter__(self):
+    ''' Iterating on a `ResultSet` yields `Result`s as they complete.
+    '''
+    for R in report(super().__iter__()):
+      yield R
+
+  def wait(self):
+    ''' Convenience function to wait for all the `Result`s.
+    '''
+    for R in self:
+      pass
+
 def after(Rs, R, func, *a, **kw):
   ''' After the completion of `Rs` call `func(*a,**kw)` and return
       its result via `R`; return the `Result` object.
