@@ -11,10 +11,11 @@ from os import geteuid
 from os.path import isdir as isdirpath
 from pwd import getpwuid
 from socket import create_connection
+import ssl
 import sys
 from threading import Lock
 from cs.cmdutils import BaseCommand
-from cs.lex import cutsuffix
+from cs.lex import cutprefix, cutsuffix
 from cs.logutils import warning
 from cs.pfx import pfx
 from cs.queues import IterableQueue
@@ -243,8 +244,19 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
   @classmethod
   def from_spec(cls, spec):
     ''' Construct an instance from a connection spec string
-        of the form [*user*`@`]*host*[`:`*port*].
+        of the form [`tcp:`|`ssl:`][*user*`@`]*host*[`:`*port*].
+
+        The optional prefixes `tcp:` and `ssl:` indicate that the connection
+        should be cleartext or SSL/TLS respectively.
+        The default is SSL/TLS.
     '''
+    spec2 = cutprefix(spec, 'tcp:')
+    if spec2 is not spec:
+      spec = spec2
+      use_ssl = False
+    else:
+      spec = cutprefix(spec, 'ssl:')
+      use_ssl = True
     try:
       user, hostpart = spec.split('@', 1)
     except ValueError:
@@ -254,10 +266,10 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
       host, port = hostpart.split(':')
     except ValueError:
       host = hostpart
-      port = 110
+      port = 995 if use_ssl else 110
     else:
       port = int(port)
-    return cls(user=user, host=host, port=port, ssl=False)
+    return cls(user=user, host=host, port=port, ssl=use_ssl)
 
   @property
   def password(self):
@@ -272,20 +284,25 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
   def connect(self):
     ''' Connect according to this `ConnectionSpec`, return the `socket`.
     '''
-    assert not self.ssl
     sock = create_connection((self.host, self.port))
+    if self.ssl:
+      context = ssl.create_default_context()
+      sock = context.wrap_socket(sock, server_hostname=self.host)
+      print("SSL:", sock.version())
     return sock
 
 class POP3Command(BaseCommand):
   ''' Command line implementation for POP3 operations.
+
+      Credentials are obtained via the `.netrc` file presently.
   '''
 
   # pylint: disable=too-many-locals
   @staticmethod
   def cmd_dl(argv):
-    ''' Collect messages from a POP3 server.
+    ''' Collect messages from a POP3 server and deliver to a Maildir.
 
-        Usage: {cmd} [user@]host[:port] maildir
+        Usage: {cmd} [{{ssl,tcp}}:][user@]host[:port] maildir
     '''
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
