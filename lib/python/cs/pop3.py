@@ -237,14 +237,14 @@ class POP3(MultiOpenMixin):
     R.extra.update(msg_n=msg_n)
     return R
 
-class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
+class ConnectionSpec(namedtuple('ConnectionSpec', 'user host sni_host port ssl')):
   ''' A specification for a POP3 connection.
   '''
 
   @classmethod
   def from_spec(cls, spec):
     ''' Construct an instance from a connection spec string
-        of the form [`tcp:`|`ssl:`][*user*`@`]*host*[`:`*port*].
+        of the form [`tcp:`|`ssl:`][*user*`@`]*[tcp_host!]server_hostname*[`:`*port*].
 
         The optional prefixes `tcp:` and `ssl:` indicate that the connection
         should be cleartext or SSL/TLS respectively.
@@ -269,7 +269,11 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
       port = 995 if use_ssl else 110
     else:
       port = int(port)
-    return cls(user=user, host=host, port=port, ssl=use_ssl)
+    try:
+      tcp_host, sni_host = host.split('!', 1)
+    except ValueError:
+      tcp_host, sni_host = host, host
+    return cls(user=user, host=tcp_host, sni_host=sni_host, port=port, ssl=use_ssl)
 
   @property
   def password(self):
@@ -287,7 +291,7 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host port ssl')):
     sock = create_connection((self.host, self.port))
     if self.ssl:
       context = ssl.create_default_context()
-      sock = context.wrap_socket(sock, server_hostname=self.host)
+      sock = context.wrap_socket(sock, server_hostname=self.sni_host)
       print("SSL:", sock.version())
     return sock
 
