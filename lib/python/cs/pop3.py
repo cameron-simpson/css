@@ -327,4 +327,4 @@ class POP3Command(BaseCommand):
             deleRs.wait()
 
 if __name__ == '__main__':
-  sys.exit(POP3Command(sys.argv).run())
+  sys.exit(POP3Command.run_argv(sys.argv))
