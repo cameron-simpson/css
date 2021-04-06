@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends: various classable classes for deferred delivery of values.
+Result and friends: various subclassable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
