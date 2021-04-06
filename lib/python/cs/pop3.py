@@ -18,7 +18,7 @@
     A separate thread collects the messages as they are delivered
     and issues `DELE`tes for the saved messages as soon as each is saved.
 
-    This results in a fetch process whihc is orders of magnitude faster.
+    This results in a fetch process which is orders of magnitude faster.
     Even on a low latency link the throughput is much faster;
     on the satellite it is gobsmackingly faster.
 '''
@@ -56,7 +56,7 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'cs.cmdutils>=20210407',
+        'cs.cmdutils>=20210407.1',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
@@ -177,7 +177,7 @@ class POP3(MultiOpenMixin):
       yield line
 
   def flush(self):
-    ''' FLush the send stream.
+    ''' Flush the send stream.
     '''
     self.sendf.flush()
 
