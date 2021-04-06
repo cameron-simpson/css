@@ -32,7 +32,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
-    --progress              Passed to rsync via hostbackup.
+    --progress              Passed to rsync via histbackup.
     --tag-name=tagname      Tag name, default: $tag_name
     -q                      Quiet.
     -x                      Trace execution."
