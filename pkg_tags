@@ -44,7 +44,7 @@ cs.obj pypi.release="20210131" ok_revision="059a4883f2d7c8265a651f4405125065501f
 cs.packetstream pypi.release="20210306" ok_revision="5288dfe60e38aed5a428228c9f309381e13a609e"
 cs.pfx pypi.release="20201227" ok_revision="00b30b7f58a02044616eae6d50e1abb7c263c678"
 cs.pipeline pypi.release=20191007.1 ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
-cs.pop3 ok_revision=e46ac7484162d72975582b8cfbecbfb45a84f095
+cs.pop3 ok_revision=e46ac7484162d72975582b8cfbecbfb45a84f095 pypi.release="20210407"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
 cs.progress pypi.release="20210316" ok_revision="353fced6b9aa18faec7ba894522beafd3b4c30ae"
 cs.psutils pypi.release=20190101 ok_revision=d48263d393ca9e6c9e3ee698307e5a6a19696efb
