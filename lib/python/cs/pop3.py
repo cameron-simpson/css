@@ -363,6 +363,56 @@ class POP3Command(BaseCommand):
   ''' Command line implementation for POP3 operations.
 
       Credentials are obtained via the `.netrc` file presently.
+
+      Connection specifications consist of an optional leading mode prefix
+      followed by a netrc(5) account name
+      or an explicit connection specification
+      from which to derive:
+      * `user`: the user name to log in as
+      * `tcp_host`: the hostname to which to establish a TCP connection
+      * `port`: the TCP port to connect on, default 995 for TLS/SSL or 110 for cleartext
+      * `sni_host`: the TLS/SSL SNI server name, which may be different from the `tcp_host`
+
+      The optional mode prefix is one of:
+      * `ssl:`: use TLS/SSL - this is the default
+      * `tcp:`: use cleartext - this is useful for ssh port forwards
+        to some not-publicly-exposed clear text POP service;
+        in particular streaming performs better this way,
+        I think because the Python SSL layer does not buffer writes
+
+      Example connection specifications:
+      * `username@mail.example.com`:
+        use TLS/SSL to connect to the POP3S service at `mail.example.com`,
+        logging in as `username`
+      * `mail.example.com`:
+        use TLS/SSL to connect to the POP3S service at `mail.example.com`,
+        logging in with the same login as the local effective user
+      * `tcp:username@localhost:1110`:
+        use cleartext to connect to `localhost:1110`,
+        typically an ssh port forward to a remote private cleartext POP service,
+        logging in as `username`
+      * `username@localhost!mail.example.com:1995`:
+        use cleartext to connect to `localhost:1995`,
+        usually an ssh port forward to a remote private TLS/SSL POP service,
+        logging in as `username` and passing `mail.exampl.com`
+        as the TLS/SSL server name indication
+        (which allows certificate verification to proceed correctly)
+
+      Note that the specification may also be a `netrc` account name.
+      If the specification matches such an account name
+      then values are derived from the `netrc` entry.
+      The entry's `machine` name becomes the TCP connection specification,
+      the entry's `login` provides a default for the username,
+      the entry's `account` host part provides the `sni_host`.
+
+      Example `netrc` entry:
+
+          machine username@localhost:1110
+            account username@mail.example.com
+            password ************
+
+      Such an entry allows you to use the specification `tcp:username@mail.example.com`
+      and obtain the remaining detail via the `netrc` entry.
   '''
 
   # pylint: disable=too-many-locals
@@ -370,7 +420,7 @@ class POP3Command(BaseCommand):
   def cmd_dl(argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
-        Usage: {cmd} [{{ssl,tcp}}:][user@]host[:port] maildir
+        Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir
     '''
     pop_target = argv.pop(0)
     maildir_path = argv.pop(0)
