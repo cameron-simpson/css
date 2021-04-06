@@ -167,7 +167,8 @@ class POP3(MultiOpenMixin):
         warning("%s: %s", R, e)
         R.exc_info = sys.exc_info
       else:
-        R.result = etc, lines
+        # save a list so that we can erase it in a handler to release memory
+        R.result = [etc, lines]
 
   def client_begin(self):
     ''' Read the opening server response.
