@@ -193,7 +193,7 @@ class POP3(MultiOpenMixin):
       n = int(n)
       yield n, msg_uid
 
-  def client_bg(self, rq_line, is_multiline=False):
+  def client_bg(self, rq_line, is_multiline=False, notify=None):
     ''' Dispatch a request `rq_line` in the background.
         Return a `Result` to collect the request result.
 
@@ -212,6 +212,8 @@ class POP3(MultiOpenMixin):
       R = Result(rq_line)
       self._result_queue.put((R, is_multiline))
     R.extra.update(rq_line=rq_line)
+    if notify:
+      R.notify(notify)
     return R
 
   def client_dele_bg(self, msg_n):
