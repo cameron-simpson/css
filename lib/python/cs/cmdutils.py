@@ -197,7 +197,7 @@ class BaseCommand:
         'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
     )
     cls_doc = cls.__doc__ or ''
-    cls_doc = cls_doc = '\n\n' + usage_doc if cls_doc else usage_doc
+    cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
