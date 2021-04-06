@@ -237,10 +237,38 @@ class POP3(MultiOpenMixin):
     R.extra.update(msg_n=msg_n)
     return R
 
-class ConnectionSpec(namedtuple('ConnectionSpec', 'user host sni_host port ssl')):
+class NetrcEntry(namedtuple('NetrcEntry', 'machine login account password')):
+  ''' A `namedtuple` representation of a `netrc` entry.
+  '''
+
+  NO_ENTRY = None, None, None
+
+  @classmethod
+  def get(cls, machine, netrc_hosts=None):
+    ''' Look up an entry by the `machine` field value.
+    '''
+    if netrc_hosts is None:
+      netrc_hosts = netrc().hosts
+    entry = netrc_hosts.get(machine, cls.NO_ENTRY)
+    return cls(machine, *entry)
+
+  @classmethod
+  def by_account(cls, account_name, netrc_hosts=None):
+    ''' Look up an entry by the `account` field value.
+    '''
+    if netrc_hosts is None:
+      netrc_hosts = netrc().hosts
+    for machine, entry_tuple in netrc_hosts.items():
+      if entry_tuple[1] == account_name:
+        return cls(machine, *entry_tuple)
+    return cls(None, *cls.NO_ENTRY)
+
+class ConnectionSpec(namedtuple('ConnectionSpec',
+                                'user host sni_host port ssl')):
   ''' A specification for a POP3 connection.
   '''
 
+  # pylint: disable=too-many-branches
   @classmethod
   def from_spec(cls, spec):
     ''' Construct an instance from a connection spec string
@@ -257,11 +285,30 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host sni_host port ssl')
     else:
       spec = cutprefix(spec, 'ssl:')
       use_ssl = True
+    # see if what's left after the mode matches a netrc account name
+    account_entry = NetrcEntry.by_account(spec)
+    if account_entry.machine is None:
+      account_entry = None
+    else:
+      # a match, use the machine name as the spec
+      spec = account_entry.machine
     try:
       user, hostpart = spec.split('@', 1)
     except ValueError:
-      user = getpwuid(geteuid()).pw_name
+      # no user specified, use a default
       hostpart = spec
+      current_user = getpwuid(geteuid()).pw_name
+      if account_entry:
+        if account_entry.login:
+          user = account_entry.login
+        else:
+          # see if the account name has a user part
+          try:
+            user, _ = account_entry.account.split('@', 1)
+          except ValueError:
+            user = current_user
+      else:
+        user = current_user
     try:
       host, port = hostpart.split(':')
     except ValueError:
@@ -272,18 +319,35 @@ class ConnectionSpec(namedtuple('ConnectionSpec', 'user host sni_host port ssl')
     try:
       tcp_host, sni_host = host.split('!', 1)
     except ValueError:
-      tcp_host, sni_host = host, host
-    return cls(user=user, host=tcp_host, sni_host=sni_host, port=port, ssl=use_ssl)
+      # get the SNI name from the account name
+      if account_entry:
+        tcp_host = host
+        try:
+          _, sni_host = account_entry.account.split('@', 1)
+        except ValueError:
+          sni_host = account_entry.account
+      else:
+        tcp_host, sni_host = host, host
+    conn_spec = cls(
+        user=user, host=tcp_host, sni_host=sni_host, port=port, ssl=use_ssl
+    )
+    ##print("conn_spec =", conn_spec)
+    return conn_spec
+
+  @property
+  def netrc_entry(self):
+    ''' The default `NetrcEntry` for this `ConnectionSpec`.
+    '''
+    machine = f'{self.user}@{self.host}:{self.port}'
+    return NetrcEntry.get(machine)
 
   @property
   def password(self):
     ''' The password for this connection, obtained from the `.netrc` file
         via the key *user*`@`*host*`:`*port*.
     '''
-    netrc_entry = netrc().hosts.get(f'{self.user}@{self.host}:{self.port}')
-    assert netrc_entry is not None
-    password = netrc_entry[2]
-    return password
+    entry = self.netrc_entry
+    return entry.password
 
   def connect(self):
     ''' Connect according to this `ConnectionSpec`, return the `socket`.
