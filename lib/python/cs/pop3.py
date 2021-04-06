@@ -65,6 +65,9 @@ DISTINFO = {
         'cs.result>=20210407',
         'cs.threads',
     ],
+    'entry_points': {
+      'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
+    },
 }
 
 class POP3(MultiOpenMixin):
