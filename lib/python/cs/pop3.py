@@ -13,7 +13,7 @@ from pwd import getpwuid
 from socket import create_connection
 import ssl
 import sys
-from threading import Lock
+from threading import RLock
 from cs.cmdutils import BaseCommand
 from cs.lex import cutprefix, cutsuffix
 from cs.logutils import warning
@@ -36,7 +36,7 @@ class POP3(MultiOpenMixin):
     self._sock = None
     self.recvf = None
     self.sendf = None
-    self._lock = Lock()
+    self._lock = RLock()
 
   @pfx
   def startup(self):
@@ -45,7 +45,6 @@ class POP3(MultiOpenMixin):
     self._sock = self.conn_spec.connect()
     self.recvf = self._sock.makefile('r', encoding='iso8859-1')
     self.sendf = self._sock.makefile('w', encoding='ascii')
-    self._lock = Lock()
     self._result_queue = IterableQueue()
     self._client_worker = bg_thread(
         self._client_response_worker, args=(self._result_queue,)
@@ -253,6 +252,30 @@ class POP3(MultiOpenMixin):
     '''
     R = self.client_bg(f'RETR {msg_n}', is_multiline=True, notify=notify)
     R.extra.update(msg_n=msg_n)
+    return R
+
+  def dl_bg(self, msg_n, maildir, deleRs):
+    ''' Download message `msg_n` to Maildir `maildir`.
+        Return the `Result` for the `RETR` request.
+
+        After a successful save,
+        queue a `DELE` for the message
+        and add its `Result` to `deleRs`.
+    '''
+
+    def dl_bg_save_result(R):
+      _, lines = R.result
+      R.result[1] = None  # release lines
+      msg_bs = b''.join(
+          map(lambda line: line.encode('iso8859-1') + b'\r\n', lines)
+      )
+      msg = BytesParser().parsebytes(msg_bs)
+      with self._lock:
+        Mkey = maildir.add(msg)
+        deleRs.add(self.client_dele_bg(msg_n))
+      print(f'msg {msg_n}: {len(msg_bs)} octets, saved as {Mkey}, deleted.')
+
+    R = self.client_retr_bg(msg_n, notify=dl_bg_save_result)
     return R
 
 class NetrcEntry(namedtuple('NetrcEntry', 'machine login account password')):
