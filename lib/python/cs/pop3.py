@@ -197,22 +197,35 @@ class POP3(MultiOpenMixin):
     ''' Dispatch a request `rq_line` in the background.
         Return a `Result` to collect the request result.
 
+        Parameters:
+        * `rq_line`: POP3 request text, without any terminating CRLF
+        * `is_multiline`: true if a multiline response is expected,
+          default `False`
+        * `notify`: a optional handler for `Result.notify`,
+          applied if not `None`
+
         *Note*: DOES NOT flush the send stream.
         Call `self.flush()` when a batch of requests has been submitted,
         before trying to collect the `Result`s.
 
-        The `Result` will receive `(etc,lines)` on success
+        The `Result` will receive `[etc,lines]` on success
         where:
         * `etc` is the trailing portion of an ok response line
         * `lines` is a list of unstuffed text lines from the response
           if `is_multiline` is true, `None` otherwise
+        The `Result` gets a list instead of a tuple
+        so that a handler may clear it in order to release memory.
+
+        Example:
+
+            R = self.client_bg(f'RETR {msg_n}', is_multiline=True, notify=notify)
     '''
     with self._lock:
       self.sendline(rq_line)
       R = Result(rq_line)
       self._result_queue.put((R, is_multiline))
     R.extra.update(rq_line=rq_line)
-    if notify:
+    if notify is not None:
       R.notify(notify)
     return R
 
