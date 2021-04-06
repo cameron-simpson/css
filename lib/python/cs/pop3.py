@@ -477,30 +477,17 @@ class POP3Command(BaseCommand):
           ('.' if len(msg_uid_map) == 0 else ':'),
           sep=''
       )
-      with ResultSet() as retrRs:
-        with ResultSet() as deleRs:
+      with ResultSet() as deleRs:
+        with ResultSet() as retrRs:
           for msg_n in msg_uid_map.keys():
-            retrRs.add(pop3.client_retr_bg(msg_n))
+            retrRs.add(pop3.dl_bg(msg_n, M, deleRs))
           pop3.flush()
-          parser = BytesParser()
-          for retrR in retrRs:
-            # release reference
-            retrRs.remove(retrR)
-            _, lines = retrR.result
-            msg_n = retrR.extra.msg_n
-            msg_bs = b''.join(
-                map(lambda line: line.encode('iso8859-1') + b'\r\n', lines)
-            )
-            msg = parser.parsebytes(msg_bs)
-            Mkey = M.add(msg)
-            deleRs.add(pop3.client_dele_bg(msg_n))
-            print(
-                f'  msg {msg_n}: {len(msg_bs)} octets, saved as {Mkey}, deleted'
-            )
-          pop3.flush()
-          if deleRs:
-            print("wait for DELEs...")
-            deleRs.wait()
+          retrRs.wait()
+        # now the deleRs are all queued
+        pop3.flush()
+        if deleRs:
+          print("wait for DELEs...")
+          deleRs.wait()
 
 if __name__ == '__main__':
   sys.exit(POP3Command.run_argv(sys.argv))
