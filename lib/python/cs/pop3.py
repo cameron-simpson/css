@@ -1,6 +1,26 @@
 #!/usr/bin/env python3
 
-''' POP3 stuff, particularly a streaming downloader.
+''' POP3 stuff, particularly a streaming downloader and a simple command line which runs it.
+
+    I spend some time on a geostationary satellite connection,
+    where round trip ping times are over 600ms when things are good.
+
+    My mail setup involves fetching messages from my inbox
+    for local storage in my laptop, usually using POP3.
+    The common standalone tools for this are `fetchmail` and `getmail`.
+    However, both are very subject to the link latency,
+    in that they request a message, collect it, issue a delete, then repeat.
+    On a satellite link that incurs a cost of over a second per message,
+    making catch up after a period offline a many minutes long exercise in tedium.
+
+    This module does something I've been meaning to do for literally years:
+    a bulk fetch. It issues `RETR`ieves for every message up front as fast as possible.
+    A separate thread collects the messages as they are delivered
+    and issues `DELE`tes for the saved messages as soon as each is saved.
+
+    This results in a fetch process whihc is orders of magnitude faster.
+    Even on a low latency link the throughput is much faster;
+    on the satellite it is gobsmackingly faster.
 '''
 
 from collections import namedtuple
@@ -22,6 +42,30 @@ from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
+
+__version__ = '20210123-post'
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Environment :: Console",
+        "Topic :: Communications :: Email :: Post-Office :: POP3",
+        "Topic :: Internet",
+        "Topic :: Utilities",
+    ],
+    'install_requires': [
+        'cs.cmdutils>=20210407',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.queues',
+        'cs.resources',
+        'cs.result>=20210407',
+        'cs.threads',
+    ],
+}
 
 class POP3(MultiOpenMixin):
   ''' Simple POP3 class with support for streaming use.
