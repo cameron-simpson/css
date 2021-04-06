@@ -245,11 +245,13 @@ class POP3(MultiOpenMixin):
     R = self.client_bg('QUIT')
     return R
 
-  def client_retr_bg(self, msg_n):
+  def client_retr_bg(self, msg_n, notify=None):
     ''' Queue a retrieve request for message `msg_n`,
         return ` Result` for collection.
+
+        If `notify` is not `None`, apply it to the `Result`.
     '''
-    R = self.client_bg(f'RETR {msg_n}', is_multiline=True)
+    R = self.client_bg(f'RETR {msg_n}', is_multiline=True, notify=notify)
     R.extra.update(msg_n=msg_n)
     return R
 
