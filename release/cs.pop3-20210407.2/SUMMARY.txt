@@ -1,0 +1,1 @@
+Provide "pop3" console_script.
