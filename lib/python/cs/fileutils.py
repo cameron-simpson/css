@@ -185,6 +185,9 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
                                   progress_label=progress_label, **kw) as T:
             yield T
     return
+  prefix = kw.pop('prefix', None)
+  if prefix is None:
+    prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
   if isinstance(f, CornuCopyBuffer):
     length = None
@@ -214,7 +217,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(**kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -1808,6 +1811,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
       # make sure the file exists
       with open(filename, 'a'):
         pass
+    self.scan_errors = []
     self._lock = RLock()
 
   def __str__(self):
