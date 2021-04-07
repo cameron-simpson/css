@@ -434,7 +434,7 @@ class CloudBackupCommand(BaseCommand):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_restore(self, argv):
-    ''' Usage: {cmd} -o outputdir [-U backup_uuid] [subpaths...]
+    ''' Usage: {cmd} -o outputdir [-U backup_uuid] backup_name [subpaths...]
           Restore files from the named backup.
           Options:
             -o outputdir    Output directory to create to hold the
@@ -467,6 +467,11 @@ class CloudBackupCommand(BaseCommand):
         if existspath(restore_dirpath):
           warning("already exists")
           badopts = True
+    if not argv:
+      warning("missing backup_name")
+      badopts = True
+    else:
+      backup_name = argv.pop(0)
     subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -482,7 +487,7 @@ class CloudBackupCommand(BaseCommand):
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
     cloud_backup = options.cloud_backup
-    backup = cloud_backup[options.backup_name]
+    backup = cloud_backup[backup_name]
     if backup_uuid is None:
       backup_record = backup.latest_backup_record()
       if backup_record is None:
