@@ -92,12 +92,12 @@ class POP3(MultiOpenMixin):
     self._sock = self.conn_spec.connect()
     self.recvf = self._sock.makefile('r', encoding='iso8859-1')
     self.sendf = self._sock.makefile('w', encoding='ascii')
+    self.client_begin()
+    self.client_auth(self.conn_spec.user, self.conn_spec.password)
     self._result_queue = IterableQueue()
     self._client_worker = bg_thread(
         self._client_response_worker, args=(self._result_queue,)
     )
-    self.client_begin()
-    self.client_auth(self.conn_spec.user, self.conn_spec.password)
     return self
 
   @pfx
@@ -151,8 +151,11 @@ class POP3(MultiOpenMixin):
         where `ok` is true if `status` is `'+OK'`, false otherwise;
         `status` is the status word
         and `etc` is the following text.
+        Return `(None,None,None)` on EOF from the receive stream.
     '''
     line = self.readline()
+    if line is None:
+      return None, None, None
     try:
       status, etc = line.split(None, 1)
     except ValueError:
