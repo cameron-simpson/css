@@ -73,11 +73,6 @@ from typeguard import typechecked
 
 DEFAULT_JOB_MAX = 16
 
-def main(argv=None):
-  ''' Create a `CloudBackupCommandCmd` instance and call its main method.
-  '''
-  return CloudBackupCommand().run(argv)
-
 class CloudBackupCommand(BaseCommand):
   ''' A main programme instance.
   '''
@@ -125,17 +120,17 @@ class CloudBackupCommand(BaseCommand):
           self.cloud_area_path, max_connections=self.job_max
       )
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
+    options = self.options
     options.cloud_area_path = os.environ.get('CLOUDBACKUP_AREA')
     options.job_max = DEFAULT_JOB_MAX
     options.key_name = os.environ.get('CLOUDBACKUP_KEYNAME')
     options.state_dirpath = joinpath(os.environ['HOME'], '.cloudbackup')
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply main command line options.
     '''
+    options = self.options
     badopts = False
     for opt, val in opts:
       with Pfx(opt):
@@ -173,8 +168,7 @@ class CloudBackupCommand(BaseCommand):
       with Pfx("mkdir(%r)", options.state_dirpath):
         os.mkdir(options.state_dirpath, 0o777)
 
-  @staticmethod
-  def cmd_backup(argv, options):
+  def cmd_backup(self, argv):
     ''' Usage: {cmd} [-R] backup_name:/path/to/backup_root [subpaths...]
           For each subpath, back up /path/to/backup_root/subpath into the
           named backup area. If no subpaths are specified, back up all of
@@ -182,6 +176,7 @@ class CloudBackupCommand(BaseCommand):
           -R  Resolve the real path of /path/to/backup_root and
               record that as the source path for the backup.
     '''
+    options = self.options
     badopts = False
     use_realpath = False
     opts, argv = getopt(argv, 'R')
@@ -265,14 +260,14 @@ class CloudBackupCommand(BaseCommand):
     for field, _, value_s in backup.report():
       print(field, ':', value_s)
 
-  @staticmethod
-  def cmd_dirstate(argv, options):
+  def cmd_dirstate(self, argv):
     ''' Usage: {cmd} {{ /dirstate/file/path.ndjson | backup_name subpath }} [subcommand ...]
           Do stuff with dirstate NDJSON files.
           Subcommands:
             rewrite Rewrite the state file with the latest lines
                     only, and with the backup listing cleaned up.
     '''
+    options = self.options
     if not argv:
       raise GetoptError("missing pathname or backup_name")
     if isabspath(argv[0]):
@@ -313,8 +308,7 @@ class CloudBackupCommand(BaseCommand):
           raise GetoptError("unrecognised subsubcommand")
 
   # pylint: disable=too-many-locals,too-many-branches
-  @staticmethod
-  def cmd_ls(argv, options):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-A] [-l] [backup_name [subpaths...]]
           Without a backup_name, list the named backups.
           With a backup_name, list the files in the backup.
@@ -324,6 +318,7 @@ class CloudBackupCommand(BaseCommand):
     '''
     # TODO: list backup_uuids?
     # TODO: -U backup_uuid
+    options = self.options
     badopts = False
     all_uuids = False
     long_mode = False
@@ -424,13 +419,13 @@ class CloudBackupCommand(BaseCommand):
             else:
               print(pathname, "???", repr(name_details))
 
-  @staticmethod
-  def cmd_new_key(argv, options):
+  def cmd_new_key(self, argv):
     ''' Usage: {cmd}
           Generate a new key pair and print its name.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     cloud_backup = options.cloud_backup
     passphrase = getpass("Passphrase for new key: ")
     cloud_backup.init()
@@ -438,8 +433,7 @@ class CloudBackupCommand(BaseCommand):
     print(key_uuid)
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-  @staticmethod
-  def cmd_restore(argv, options):
+  def cmd_restore(self, argv):
     ''' Usage: {cmd} -o outputdir [-U backup_uuid] [subpaths...]
           Restore files from the named backup.
           Options:
@@ -452,6 +446,7 @@ class CloudBackupCommand(BaseCommand):
     # TODO: restore file to stdout?
     # TODO: restore files as tarball to stdout or filename
     # TODO: rsync-like include/exclude or files-from options?
+    options = self.options
     badopts = False
     backup_uuid = None
     restore_dirpath = None
@@ -1990,4 +1985,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv))
+  sys.exit(CloubdBackupCommand.run_argv(sys.argv))
