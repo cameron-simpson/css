@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20201108-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,13 +69,16 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
+        'cs.mappings',
         'cs.obj',
         'cs.pfx',
+        'cs.progress',
         'cs.py3',
         'cs.range',
         'cs.result',
         'cs.threads',
         'cs.timeutils',
+        'cs.units',
     ],
 }
 
@@ -86,7 +89,7 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test whether a filelike object is seekable.
 
-      First try the `IOBase.seekable` method, otherwise try getting a file 
+      First try the `IOBase.seekable` method, otherwise try getting a file
       descriptor from `fp.fileno` and `os.stat()`ing that,
       otherwise return `False`.
   '''
@@ -129,7 +132,7 @@ def compare(f1, f2, mode="rb"):
   ''' Compare the contents of two file-like objects `f1` and `f2` for equality.
 
       If `f1` or `f2` is a string, open the named file using `mode`
-      (default: "rb").
+      (default: `"rb"`).
   '''
   if isinstance(f1, str):
     with open(f1, mode) as f1fp:
@@ -139,6 +142,7 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
 def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   ''' A context manager yielding a temporary copy of `filename`
@@ -587,7 +591,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements,too-many-branches
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -752,7 +756,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None, runstate=None):
     with Pfx("remove %r", lockpath):
       os.remove(lockpath)
 
-def crop_name(name, name_max=255, ext=None):
+def crop_name(name, ext=None, name_max=255):
   ''' Crop a file basename so as not to exceed `name_max` in length.
       Return the original `name` if it already short enough.
       Otherwise crop `name` before the file extension
@@ -760,9 +764,9 @@ def crop_name(name, name_max=255, ext=None):
 
       Parameters:
       * `name`: the file basename to crop
-      * `name_max`: optional maximum length, default: `255`
       * `ext`: optional file extension;
         the default is to infer the extension with `os.path.splitext`.
+      * `name_max`: optional maximum length, default: `255`
   '''
   if ext is None:
     base, ext = splitext(name)
@@ -773,7 +777,8 @@ def crop_name(name, name_max=255, ext=None):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name %r before ext %r to <=%s" % (name, ext, name_max)
+        "cannot crop name before ext %r to <=%s: name=%r" %
+        (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
@@ -1085,13 +1090,13 @@ def iter_file(f, **kw):
 def byteses_as_fd(bss, **kw):
   ''' Deliver the iterable of bytes `bss` as a readable file descriptor.
       Return the file descriptor.
-      Any keyword arguments as passed to `CornuCopyBuffer.as_fd`.
+      Any keyword arguments are passed to `CornuCopyBuffer.as_fd`.
 
       Example:
 
-         # present a passphrase for use as in input file descrptor
-         # for a subprocess
-         rfd = byteses_as_fd([(passphrase + '\n').encode()])
+           # present a passphrase for use as in input file descrptor
+           # for a subprocess
+           rfd = byteses_as_fd([(passphrase + '\n').encode()])
   '''
   return CornuCopyBuffer(bss).as_fd(**kw)
 
@@ -1109,13 +1114,14 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
         to align the new offset with a multiple of `readsize`.
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
+  try:
+    cur_offset = os.lseek(fd, 0, SEEK_CUR)
+    is_seekable = True
+  except OSError:
+    cur_offset = 0  # guess
+    is_seekable = False
   if offset is None:
-    try:
-      offset = os.lseek(fd, 0, SEEK_CUR)
-      is_seekable = True
-    except OSError:
-      offset = 0
-      is_seekable = False
+    offset = cur_offset
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
@@ -1753,11 +1759,13 @@ class RWFileBlockCache(object):
   def put(self, data):
     ''' Store `data`, return offset.
     '''
-    assert len(data) > 0
     fd = self.fd
     with self._lock:
       offset = os.lseek(fd, 0, 1)
-      length = os.write(fd, data)
+      if len(data) == 0:
+        length = 0
+      else:
+        length = os.write(fd, data)
     assert length == len(data)
     return offset
 

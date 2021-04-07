@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+#
+# Patch source files using a regexp, write patched text to standard output
+# - Cameron Simpson <cs@cskk.id.au> 15dec2020
+#
+
+from collections import defaultdict
+import re
+import sys
+from types import SimpleNamespace
+from cs.lex import unctrl
+from cs.logutils import setup_logging, warning, error
+from cs.pfx import Pfx
+
+USAGE_FORMAT = r'''Usage: {cmd} [-H hostsfile] s/regexp/replacement[/[ig]]... [sourcefiles...]
+  -H hostsfile  An /etc/hosts format file whose hostnames become
+                replacement keys. Only the first key value is kept,
+                prioritising earlier lines in the file.
+  s/regexp/replacement/ig
+                Specify a regular expression for replacement in the source 
+                text and a Python format string to use for the replacement.
+                The option mode specifiers are:
+                - "f": reapply str.format_map to the replaced text
+                - "g": replace every occurence in a source line
+                - "i": ignore case
+                The separator may be any nonalphanumeric character;
+                the third sperator is optional if there are no
+                mode specifiers.
+'''
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  usage = USAGE_FORMAT.format(cmd=cmd)
+  setup_logging(cmd)
+  settings = {}
+  replacements = []
+  badopts = False
+  # parse options
+  while argv:
+    arg = argv.pop(0)
+    with Pfx(arg):
+      if arg == '-' or not arg.startswith('-'):
+        argv.insert(0, arg)
+        break
+      if arg == '--':
+        break
+      if arg == '-H':
+        # /etc/hosts style file
+        hostsfile = argv.pop(0)
+        seen_hosts = set()
+        with Pfx("-H %s", hostsfile):
+          with open(hostsfile) as hf:
+            for lineno, line in enumerate(hf, 1):
+              with Pfx(lineno):
+                line = line.strip()
+                if not line or line.startswith('#'):
+                  continue
+                ip, *names = line.split()
+                for name in names:
+                  name_lc = name.lower()
+                  if name_lc in seen_hosts:
+                    continue
+                  settings[name_lc] = ip
+                  seen_hosts.add(name_lc)
+      else:
+        warning("unhandled option")
+        badopts = True
+  # gather replacements
+  while argv:
+    arg = argv.pop(0)
+    if not arg.startswith('s') or len(arg) < 2:
+      argv.insert(0, arg)
+      break
+    sep = arg[1]
+    if sep.isalpha() or sep.isdigit():
+      argv.insert(0, arg)
+      break
+    with Pfx(unctrl(arg)):
+      s, regexp_s, repl_s, *etc = arg.split(sep, 3)
+      modes = etc[0] if etc else ''
+      once = True
+      reformat = False
+      re_modes = 0
+      for mode in modes:
+        with Pfx("mode %r", mode):
+          if mode == 'f':
+            reformat = True
+          elif mode == 'g':
+            once = False
+          elif mode == 'i':
+            re_modes |= re.I
+          else:
+            warning("unrecognised mode letter")
+            badopts = True
+      regexp = re.compile(regexp_s, re_modes)
+      # test replacement string syntax
+      with Pfx("replacement %r", repl_s):
+        try:
+          repl_s.format_map(defaultdict(str))
+        except ValueError as e:
+          warning("bad format string: %s", e)
+          badopts = True
+      replacements.append(
+          SimpleNamespace(
+              src=arg,
+              regexp=regexp,
+              replacement=repl_s,
+              once=once,
+              reformat=reformat
+          )
+      )
+  if not replacements:
+    warning("missing s/this/that replacements")
+    badopts = True
+  source_paths = argv or ('-',)
+  if badopts:
+    print(usage.strip(), file=sys.stderr)
+    return 2
+  for source_path in source_paths:
+    with Pfx(source_path):
+      if source_path == '-':
+        replace(sys.stdin, replacements, settings)
+      else:
+        with open(source_path) as f:
+          replace(f, replacements, settings)
+
+def replace(f, replacements, base_repl_map):
+  ''' Read the file `f`, apply the `replacements`
+      and write the results to `sys.stdout`.
+  '''
+  for lineno, line in enumerate(f, 1):
+    with Pfx(lineno):
+
+      used_repls = set()
+      pos = 0
+      while pos < len(line):
+        with Pfx(pos):
+          match = None
+          for repl in replacements:
+            if id(repl) in used_repls:
+              continue
+            with Pfx(repl):
+              m = repl.regexp.search(line, pos=pos)
+              if not m:
+                continue
+              m_start = m.start()
+              if m and (match is None or match[0] > m_start):
+                match = (m, repl)
+                if m_start == pos:
+                  # cannot improve on this match
+                  break
+          if not match:
+            # no matches - we're done
+            break
+        with Pfx(m.start() + 1):
+          m, repl = match
+          repl_map = dict(settings=base_repl_map)
+          repl_map.update(base_repl_map)
+          repl_map.update(m.groupdict())
+          replaced = repl.replacement.format_map(repl_map)
+          if repl.reformat:
+            try:
+              replaced = replaced.format_map(repl_map)
+            except KeyError as e:
+              warning("substitution of %r failed, unknown: %s", m.group(0), e)
+              replaced = m.group()
+          line = line[:m.start()] + replaced + line[m.end():]
+          pos = m.start() + len(replaced)
+        if repl.once:
+          used_repls.add(id(repl))
+      print(line, end='')
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

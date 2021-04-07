@@ -1,0 +1,5 @@
+lib/python/cs/mappings.py: cs.mappings: new PrefixedMappingProxy presenting the keys of another mapping commencing with a prefix - note that adjust call key parameters, nothing more
+lib/python/cs/mappings.py: cs.mappings: PrefixedMappingProxy.keys: strip the prefix before returning the key values
+lib/python/cs/mappings.py: cs.mappings: docstring tweak
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: AttributeError: include self.__dict__, sometimes useful in debugging
+lib/python/cs/mappings.py: cs.mappings: AttrableMappingMixin.__getattr__: AttributeError: drop __dict__ recitation but merge __dict__.keys() in with the mapping keys

@@ -30,7 +30,7 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20201102.1-post'
+__version__ = '20210316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -87,7 +87,7 @@ class BaseProgress(object):
   __repr__ = __str__
 
   def __int__(self):
-    ''' int(Progress) returns the current position.
+    ''' `int(Progress)` returns the current position.
     '''
     return self.position
 
@@ -453,7 +453,8 @@ class BaseProgress(object):
       incfirst=False,
       width=None,
       window=None,
-      update_frequency=None,
+      update_frequency=1,
+      update_min_size=0,
       report_print=None,
   ):
     ''' An iterable progress bar: a generator yielding values
@@ -470,10 +471,10 @@ class BaseProgress(object):
           This reflects whether it is considered that progress is
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
-          The default is `False`,
+          The default is `False`, advancing after processing.
         * `label`: a label for the progress bar,
           default from `self.name`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
         * `window`: optional timeframe to define "recent" in seconds;
@@ -489,9 +490,12 @@ class BaseProgress(object):
           used only to produce the default `proxy` if that is not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
-        * `update_frequency`: optional update frequency;
+        * `update_frequency`: optional update frequency, default `1`;
+          only update the progress bar after this many iterations,
+          useful if the iteration rate is quite high
+        * `update_min_size`: optional update step size, default `0`;
           only update the progress bar after an advance of this many units,
-          useful if the iteration rate is very high
+          useful if the iteration size increment is quite small
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -514,7 +518,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -529,25 +533,33 @@ class BaseProgress(object):
       statusfunc = lambda P, label, width: P.status(
           label, width, window=window
       )
-    proxy(statusfunc(self, label, width or proxy.width))
-    last_pos = start_pos = self.position
-    for i in it:
-      length = itemlenfunc(i) if itemlenfunc else 1
+    iteration = 0
+    last_update_iteration = 0
+    last_update_pos = start_pos = self.position
+
+    def update_status(force=False):
+      nonlocal self, proxy, statusfunc, label, width
+      nonlocal iteration, last_update_iteration, last_update_pos
+      if (force or iteration - last_update_iteration >= update_frequency
+          or self.position - last_update_pos >= update_min_size):
+        last_update_iteration = iteration
+        last_update_pos = self.position
+        proxy(statusfunc(self, label, width or proxy.width))
+
+    update_status(True)
+    for iteration, item in enumerate(it):
+      length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
-      yield i
+        update_status()
+      yield item
       if not incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
+        update_status()
     if delete_proxy:
       proxy.delete()
     else:
-      proxy(statusfunc(self, label, width or proxy.width))
+      update_status(True)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
@@ -999,7 +1011,14 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
+def progressbar(
+    it,
+    label=None,
+    position=None,
+    total=None,
+    units_scale=UNSCALED_SCALE,
+    **kw
+):
   ''' Convenience function to construct and run a `Progress.iterbar`
       wrapping the iterable `it`,
       issuing and withdrawning a progress bar during the iteration.
@@ -1007,6 +1026,7 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
       Parameters:
       * `it`: the iterable to consume
       * `label`: optional label, doubles as the `Progress.name`
+      * `position`: optional starting position
       * `total`: optional value for `Progress.total`,
         default from `len(it)` if supported.
       * `units_scale`: optional units scale for `Progress`,
@@ -1028,15 +1048,16 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
     except TypeError:
       total = None
   yield from Progress(
-      name=label, total=total, units_scale=units_scale
+      name=label, position=position, total=total, units_scale=units_scale
   ).iterbar(
       it, label=label, **kw
   )
-  pass
+  ##pass  # former workaround for some bug, IIRC
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
-  ''' Decorator for function which accept an optional `progress` parameter.
+  ''' Decorator for a function accepting an optional `progress`
+      keyword parameter.
       If `progress` is `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
@@ -1067,7 +1088,8 @@ def auto_progressbar(func, label=None, report_print=False):
 def selftest(argv):
   ''' Exercise some of the functionality.
   '''
-  lines = open(__file__).readlines()
+  with open(__file__) as f:
+    lines = f.readlines()
   lines += lines
   for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
@@ -1075,8 +1097,9 @@ def selftest(argv):
                        report_print=True):
     time.sleep(0.005)
   P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for _ in P.iterbar(open(__file__)):
-    time.sleep(0.005)
+  with open(__file__) as f:
+    for _ in P.iterbar(f):
+      time.sleep(0.005)
   from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
   runtests('cs.progress_tests')
 

@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20201025-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -293,7 +293,9 @@ def contextdecorator(cmgrfunc):
               or the value of `func(*a,**kw)` if not (the default)
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
-          return func(*([ctxt, *a] if provide_context else a), **kw)
+          if provide_context:
+            a = a.insert(0,ctxt)
+          return func(*a, **kw)
 
     return wrapped
 

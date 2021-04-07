@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: syntax backport for older Pythons
