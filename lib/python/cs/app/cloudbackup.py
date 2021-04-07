@@ -37,6 +37,8 @@ import shutil
 import sys
 import termios
 import time
+from icontract import require
+from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
 from cs.cloud.crypt import (
@@ -68,8 +70,6 @@ from cs.threads import locked
 from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
-from icontract import require
-from typeguard import typechecked
 
 DEFAULT_JOB_MAX = 16
 
@@ -434,7 +434,7 @@ class CloudBackupCommand(BaseCommand):
 
   # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_restore(self, argv):
-    ''' Usage: {cmd} -o outputdir [-U backup_uuid] [subpaths...]
+    ''' Usage: {cmd} -o outputdir [-U backup_uuid] backup_name [subpaths...]
           Restore files from the named backup.
           Options:
             -o outputdir    Output directory to create to hold the
@@ -467,6 +467,11 @@ class CloudBackupCommand(BaseCommand):
         if existspath(restore_dirpath):
           warning("already exists")
           badopts = True
+    if not argv:
+      warning("missing backup_name")
+      badopts = True
+    else:
+      backup_name = argv.pop(0)
     subpaths = argv or ('',)
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -482,7 +487,7 @@ class CloudBackupCommand(BaseCommand):
         map(lambda subpath: '' if subpath == '.' else subpath, argv or ('',))
     )
     cloud_backup = options.cloud_backup
-    backup = cloud_backup[options.backup_name]
+    backup = cloud_backup[backup_name]
     if backup_uuid is None:
       backup_record = backup.latest_backup_record()
       if backup_record is None:
@@ -1985,4 +1990,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(CloubdBackupCommand.run_argv(sys.argv))
+  sys.exit(CloudBackupCommand.run_argv(sys.argv))
