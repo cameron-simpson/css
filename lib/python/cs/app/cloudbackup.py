@@ -37,6 +37,8 @@ import shutil
 import sys
 import termios
 import time
+from icontract import require
+from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cloud import CloudArea, validate_subpath
 from cs.cloud.crypt import (
@@ -68,8 +70,6 @@ from cs.threads import locked
 from cs.tty import modify_termios
 from cs.units import BINARY_BYTES_SCALE, transcribe
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
-from icontract import require
-from typeguard import typechecked
 
 DEFAULT_JOB_MAX = 16
 
@@ -1985,4 +1985,4 @@ class FileBackupState(UUIDedDict):
     return AttrableMapping(backups[0])
 
 if __name__ == '__main__':
-  sys.exit(CloubdBackupCommand.run_argv(sys.argv))
+  sys.exit(CloudBackupCommand.run_argv(sys.argv))
