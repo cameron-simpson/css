@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210131-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -89,7 +89,7 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test whether a filelike object is seekable.
 
-      First try the `IOBase.seekable` method, otherwise try getting a file 
+      First try the `IOBase.seekable` method, otherwise try getting a file
       descriptor from `fp.fileno` and `os.stat()`ing that,
       otherwise return `False`.
   '''
@@ -132,7 +132,7 @@ def compare(f1, f2, mode="rb"):
   ''' Compare the contents of two file-like objects `f1` and `f2` for equality.
 
       If `f1` or `f2` is a string, open the named file using `mode`
-      (default: "rb").
+      (default: `"rb"`).
   '''
   if isinstance(f1, str):
     with open(f1, mode) as f1fp:
@@ -142,6 +142,7 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
 def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   ''' A context manager yielding a temporary copy of `filename`
@@ -157,7 +158,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         otherwise it should be a `cs.progress.Progress` instance
       * `progress_label`: option progress bar label,
         only used if a progress bar is made
-      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+      Other keyword parameters are passed to `tempfile.NamedTemporaryFile`.
   '''
   if isinstance(f, str):
     # copy named file
@@ -184,6 +185,9 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
                                   progress_label=progress_label, **kw) as T:
             yield T
     return
+  prefix = kw.pop('prefix', None)
+  if prefix is None:
+    prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
   if isinstance(f, CornuCopyBuffer):
     length = None
@@ -213,7 +217,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(**kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -587,7 +591,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements,too-many-branches
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -773,7 +777,8 @@ def crop_name(name, ext=None, name_max=255):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name before ext %r to <=%s: name=%r" % (ext, name_max, name)
+        "cannot crop name before ext %r to <=%s: name=%r" %
+        (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
@@ -1109,13 +1114,14 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
         to align the new offset with a multiple of `readsize`.
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
+  try:
+    cur_offset = os.lseek(fd, 0, SEEK_CUR)
+    is_seekable = True
+  except OSError:
+    cur_offset = 0  # guess
+    is_seekable = False
   if offset is None:
-    try:
-      offset = os.lseek(fd, 0, SEEK_CUR)
-      is_seekable = True
-    except OSError:
-      offset = 0
-      is_seekable = False
+    offset = cur_offset
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
@@ -1753,11 +1759,13 @@ class RWFileBlockCache(object):
   def put(self, data):
     ''' Store `data`, return offset.
     '''
-    assert len(data) > 0
     fd = self.fd
     with self._lock:
       offset = os.lseek(fd, 0, 1)
-      length = os.write(fd, data)
+      if len(data) == 0:
+        length = 0
+      else:
+        length = os.write(fd, data)
     assert length == len(data)
     return offset
 
@@ -1803,6 +1811,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
       # make sure the file exists
       with open(filename, 'a'):
         pass
+    self.scan_errors = []
     self._lock = RLock()
 
   def __str__(self):

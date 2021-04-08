@@ -111,7 +111,7 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20200717.1-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -123,9 +123,9 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
-        'cs.logutils', 'cs.obj>=20200716', 'cs.pfx', 'cs.resources',
-        'cs.tagset', 'cs.threads', 'cs.upd', 'icontract'
+        'cs.cmdutils>=20210404', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
+        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
+        'cs.upd', 'icontract', 'typeguard'
     ],
 }
 
@@ -174,16 +174,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     '''
     self.options.ontology_path = None
 
-  def apply_opts(self, opts):
-    ''' Apply command line options.
+  def apply_opt(self, opt, val):
+    ''' Apply command line option.
     '''
     options = self.options
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-o':
-          options.ontology_path = val
-        else:
-          raise RuntimeError("unhandled option")
+    if opt == '-o':
+      options.ontology_path = val
+    else:
+      raise RuntimeError("unhandled option")
 
   @contextmanager
   def run_context(self):
@@ -234,21 +232,28 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
                 tagged_path.add(tag)
 
   def cmd_edit(self, argv):
-    ''' Usage: {cmd} [-d] [path]
+    ''' Usage: {cmd} [-ad] [path]
           Edit the direct tagsets of path, default: '.'
           If path is a directory, provide the tags of its entries.
           Otherwise edit just the tags for path.
-          -d          Treat directories like files: edit just its tags.
+          -a    List all names in directory edit mode; normally
+                names commencing with a dot are omitted.
+          -d    Treat directories like files: edit just its tags.
     '''
     options = self.options
     fstags = options.fstags
+    all_names = False
     directories_like_files = False
     xit = 0
-    opts, argv = getopt(argv, 'd')
+    opts, argv = getopt(argv, 'ad')
     for opt, _ in opts:
       with Pfx(opt):
-        if opt == '-d':
+        if opt == '-a':
+          all_names = True
+        elif opt == '-d':
           directories_like_files = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       path = '.'
     else:
@@ -259,7 +264,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       with Pfx(path):
         if directories_like_files or not isdirpath(path):
           fstags[path].edit(verbose=state.verbose)
-        elif not fstags.edit_dirpath(path):
+        elif not fstags.edit_dirpath(path, all_names=all_names):
           xit = 1
     return xit
 
@@ -305,6 +310,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     for filepath in fstags.find(realpath(path), tag_choices,
                                 use_direct_tags=use_direct_tags):
       tagged_path = fstags[filepath]
+      # pylint: disable=superfluous-parens
       if (not all_paths
           and not (tagged_path if use_direct_tags else tagged_path.all_tags)):
         continue
@@ -421,7 +427,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           path = te.name
         self[path].update(te)
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-statements
   def cmd_json_import(self, argv):
     ''' Usage: json_import --prefix=tag_prefix {{-|path}} {{-|tags.json}}
           Apply JSON data to path.
@@ -567,7 +573,8 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     return self._cmd_mvcpln(argv, self.options.fstags.move)
 
   # pylint: disable=too-many-branches
-  def _cmd_mvcpln(self, argv, attach):
+  @staticmethod
+  def _cmd_mvcpln(argv, attach):
     ''' Move/copy/link paths and their tags into a destination.
     '''
     xit = 0
@@ -820,7 +827,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           raise GetoptError("unrecognised subcommand")
 
-  def cmd_tagpaths(self, argv, options):
+  def cmd_tagpaths(self, argv):
     ''' Usage: {cmd} {{tag[=value]|-tag}} {{-|paths...}}
         Tag multiple paths.
         With the form "-tag", remove the tag from the immediate tags.
@@ -897,7 +904,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     self.options.fstags.export_xattrs(paths)
 
-  def cmd_xattr_import(self, argv, options):
+  def cmd_xattr_import(self, argv):
     ''' Usage: {cmd} {{-|paths...}}
           Update extended attributes from tags.
     '''
@@ -909,8 +916,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = argv
     with state(verbose=True):
       self.options.fstags.import_xattrs(paths)
-
-FSTagsCommand.add_usage_to_docstring()
 
 # pylint: disable=too-many-public-methods
 class FSTags(MultiOpenMixin):
@@ -1152,11 +1157,12 @@ class FSTags(MultiOpenMixin):
 
         Parameters:
         * `path`: the top of the file tree to walk
-        * `tag_tests`: an iterable of `TagBasedTest`s
+        * `tag_tests`: a sequence of `TagBasedTest`s
         * `use_direct_tags`: test the direct_tags if true,
           otherwise the all_tags.
           Default: `False`
     '''
+    assert isinstance(tag_tests, (tuple, list))
     for _, filepath in rpaths(path, yield_dirs=use_direct_tags, U=U):
       if self.test(filepath, tag_tests, use_direct_tags=use_direct_tags):
         yield filepath
@@ -1176,16 +1182,21 @@ class FSTags(MultiOpenMixin):
     return all(criterion.match_tagged_entity(te) for criterion in tag_tests)
 
   @pfx_method
-  def edit_dirpath(self, dirpath):
+  def edit_dirpath(self, dirpath, all_names=False):
     ''' Edit the filenames and tags in a directory.
+
+        If `all_names` is true, include names commencings with a dot,
+        otherwise exclude them.
     '''
     ok = True
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
     names = sorted(
         set(
-            name for name in os.listdir(dirpath)
-            if (name and name not in ('.', '..') and not name.startswith('.'))
+            name for name in os.listdir(dirpath) if (
+                name and name not in ('.', '..') and
+                (all_names or not name.startswith('.'))
+            )
         )
     )
     tes = []

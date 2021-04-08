@@ -208,7 +208,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20200716-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -217,15 +217,18 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.deco',
         'cs.edit',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.mappings',
         'cs.obj>=20200716',
         'cs.pfx',
         'cs.py3',
+        'cs.resources',
+        'cs.threads',
         'icontract',
         'typeguard',
     ],
@@ -883,7 +886,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     value = self.value
     if value is None:
       return name
-    return name + '=' + self.transcribe_value(value)
+    try:
+      value_s = self.transcribe_value(value)
+    except TypeError:
+      value_s = str(value)
+    return name + '=' + value_s
 
   @classmethod
   def transcribe_value(cls, value):
@@ -944,7 +951,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def parse(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s, offset=offset)):
+    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s[offset:])):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -1355,7 +1362,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 
   COMPARISON_FUNCS = {
       '=':
-      lambda tag_value, cmp_value: tag_value == cmp_value,
+      lambda tag_value, cmp_value: cmp_value is None or tag_value == cmp_value,
       '<=':
       lambda tag_value, cmp_value: tag_value <= cmp_value,
       '<':
@@ -2626,8 +2633,7 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
-  @staticmethod
-  def cmd_type(argv, options):
+  def cmd_type(self, argv):
     ''' Usage:
           {cmd}
             With no arguments, list the defined types.
@@ -2641,6 +2647,7 @@ class TagsOntologyCommand(BaseCommand):
           {cmd} type_name list
             Listt the metadata names for this type and their tags.
     '''
+    options = self.options
     ont = options.ontology
     if not argv:
       # list defined types

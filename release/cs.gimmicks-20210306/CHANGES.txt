@@ -1,0 +1,1 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: add simple implementations of nullcontext and SimpleNamespace

@@ -1,0 +1,2 @@
+Rename _state to state, making it public.
+Some other internal changes.

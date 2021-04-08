@@ -1119,15 +1119,20 @@ class Module(object):
       else:
         vcstag = self.latest.vcstag
     paths = self.paths()
-    latest_release_line = 'Release information for ' + self.latest.vcstag + '.'
+    latest = self.latest
+    latest_release_line = 'Release information for ' + latest.vcstag + '.' if latest else None
     return (
         ([filename
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
         if (
-            ignored or
-            ('IGNORE' not in firstline and firstline != latest_release_line)
+            ignored or (
+                'IGNORE' not in firstline and (
+                    latest_release_line is None
+                    or firstline != latest_release_line
+                )
+            )
         )
     )
 

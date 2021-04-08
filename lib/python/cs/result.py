@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends: various classable classes for deferred delivery of values.
+Result and friends: various subclassable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -65,7 +65,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20210123-post'
+__version__ = '20210407-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -449,6 +449,26 @@ def report(LFs):
     LF.notify(notify)
   for _ in range(n):
     yield Q.get()
+
+class ResultSet(set):
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    pass
+
+  def __iter__(self):
+    ''' Iterating on a `ResultSet` yields `Result`s as they complete.
+    '''
+    for R in report(super().__iter__()):
+      yield R
+
+  def wait(self):
+    ''' Convenience function to wait for all the `Result`s.
+    '''
+    for R in self:
+      pass
 
 def after(Rs, R, func, *a, **kw):
   ''' After the completion of `Rs` call `func(*a,**kw)` and return

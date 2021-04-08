@@ -18,7 +18,7 @@ import sys
 from termios import tcsetattr, tcgetattr, TCSANOW
 from cs.gimmicks import warning
 
-__version__ = '20201102-post'
+__version__ = '20210316-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -47,7 +47,9 @@ def ttysize(fd):
     fd = fd.fileno()
   P = Popen(['stty', '-a'], stdin=fd, stdout=PIPE, universal_newlines=True)
   stty = P.stdout.read()
+  P.stdout.close()
   xit = P.wait()
+  del P
   if xit != 0:
     return None
   m = re.compile(r' rows (\d+); columns (\d+)').search(stty)

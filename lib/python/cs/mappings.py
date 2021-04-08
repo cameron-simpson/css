@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20210123-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description':
@@ -730,9 +730,9 @@ class StackableValues(object):
   ''' A collection of named stackable values with the latest value
       available as an attribute.
 
-      I now recommand my `cs.context.stackattrs` context manager for most
-      uses; it may be applied to any object instead of requiring use of this
-      class.
+      *DEPRECATED*: I now recommend my `cs.context.stackattrs` context
+      manager for most uses; it may be applied to any object instead of
+      requiring use of this class.
 
       Note that names conflicting with methods are not available
       as attributes and must be accessed via `__getitem__`.

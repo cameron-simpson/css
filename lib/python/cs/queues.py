@@ -45,10 +45,7 @@ class _QueueIterator(MultiOpenMixin):
       It does not offer the .get or .get_nowait methods.
   '''
 
-  class _QueueIterator_Sentinel(object):
-    pass
-
-  sentinel = _QueueIterator_Sentinel()
+  sentinel = object()
 
   def __init__(self, q, name=None):
     if name is None:
@@ -60,7 +57,7 @@ class _QueueIterator(MultiOpenMixin):
     self._item_count = 0
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__,self.name)
+    return "%s(%r)" % (type(self).__name__, self.name)
 
   @not_closed
   def put(self, item, *args, **kw):

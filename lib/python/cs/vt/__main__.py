@@ -7,7 +7,6 @@
 ''' cs.vt command line utility.
 '''
 
-from __future__ import with_statement, print_function
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
@@ -28,6 +27,7 @@ import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 import sys
 from time import sleep
+from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -45,7 +45,7 @@ from cs.tty import ttysize
 from cs.upd import Upd, print
 import cs.x
 from cs.x import X
-from . import defaults, DEFAULT_CONFIG_PATH
+from . import common, defaults, DEFAULT_CONFIG_PATH
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
@@ -66,12 +66,16 @@ from .transcribe import parse
 def main(argv=None):
   ''' Create a VTCmd instance and call its main method.
   '''
-  return VTCmd().run(argv)
+  return VTCmd(argv).run()
 
 def mount_vtfs(argv=None):
   ''' Hook for "mount.vtfs": run the "mount" subcommand of the vt(1) command.
   '''
-  return main(argv, subcmd='mount')
+  if argv is None:
+    argv = sys.argv
+  argv = list(argv)
+  argv0 = argv.pop(0)
+  return main([argv0, "mount"] + argv)
 
 class VTCmd(BaseCommand):
   ''' A main programme instance.
@@ -99,15 +103,8 @@ class VTCmd(BaseCommand):
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
 
-  def __init__(self):
-    super().__init__()
-
-  @classmethod
-  def apply_defaults(cls, options):
-    cmd = basename(options.cmd)
-    if cmd.endswith('.py'):
-      cmd = 'vt'
-    options.cmd = cmd
+  def apply_defaults(self):
+    options = self.options
     # verbose if stderr is a tty
     try:
       options.verbose = sys.stderr.isatty()
@@ -125,12 +122,12 @@ class VTCmd(BaseCommand):
     )
     options.progress = None
     options.ticker = None
-    options.status_label = cmd
+    options.status_label = self.cmd
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
     '''
+    options = self.options
     for opt, val in opts:
       if opt == '-C':
         if val == 'NONE':
@@ -162,24 +159,21 @@ class VTCmd(BaseCommand):
             (options.hashname, sorted(HASHCLASS_BY_NAME.keys()))
         )
     if options.verbose:
-      options.loginfo.level = logging.INFO
+      self.loginfo.level = logging.INFO
     if options.dflt_log is not None:
       logTo(options.dflt_log, delay=True)
     options.config = Config(options.config_path)
 
-  @staticmethod
   @contextmanager
-  def run_context(argv, options, cmd=None):
+  def run_context(self):
     ''' Set up and tear down the surrounding context.
 
         Parameters:
         * `options`:
         * `argv`: the command line arguments after the command name
     '''
-    if cmd is None:
-      cmd = options.cmd
-    else:
-      cmd = options.cmd + ': ' + cmd
+    options = self.options
+    cmd = self.cmd
     config = options.config
     runstate = options.runstate
     progress = options.progress
@@ -283,8 +277,8 @@ class VTCmd(BaseCommand):
     if ifdebug():
       dump_debug_threads()
 
-  def cmd_profile(self, options, argv):
-    ''' Usage: {cmd} other-vt-subcommand [args...]
+  def cmd_profile(self, argv):
+    ''' Usage: {cmd} other-vt-subcommand [argv...]
           Wrapper to profile other subcommands and report.
     '''
     try:
@@ -294,7 +288,7 @@ class VTCmd(BaseCommand):
     P = profile.Profile()
     P.enable()
     try:
-      xit = self.run(argv, options=options)
+      xit = self.run(argv)
     except Exception:
       P.disable()
       raise
@@ -303,8 +297,7 @@ class VTCmd(BaseCommand):
     P.print_stats(sort='cumulative')
     return xit
 
-  @staticmethod
-  def cmd_cat(argv, options):
+  def cmd_cat(self, argv):
     ''' Usage: {cmd} filerefs...
           Concatentate the contents of the supplied filerefs to stdout.
     '''
@@ -314,22 +307,20 @@ class VTCmd(BaseCommand):
       cat(fileref)
     return 0
 
-  @staticmethod
-  def cmd_config(args, options):
+  def cmd_config(self, argv):
     ''' Usage: {cmd}
           Recite the configuration.
     '''
-    if args:
-      raise GetoptError("extra arguments: %r" % (args,))
-    print(options.config.as_text().rstrip())
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(self.options.config.as_text().rstrip())
     return 0
 
-  @staticmethod
-  def cmd_dump(args, options):
+  def cmd_dump(self, argv):
     ''' Usage: {cmd} objects...
           Dump various objects.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing objects")
     hashclass = DEFAULT_HASHCLASS
     one_line = True
@@ -338,7 +329,7 @@ class VTCmd(BaseCommand):
       columns = 80
     max_width = columns - 1
     xit = 0
-    for path in args:
+    for path in argv:
       with Pfx(path):
         if path.endswith('.vtd'):
           print(path)
@@ -365,15 +356,14 @@ class VTCmd(BaseCommand):
           warning("unsupported file type: %r", path)
     return xit
 
-  @staticmethod
-  def cmd_fsck(args, options):
+  def cmd_fsck(self, argv):
     ''' Usage: {cmd} objects...
           Data structure inspection/repair.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing fsck objects")
     xit = 0
-    for arg in args:
+    for arg in argv:
       with Pfx(arg):
         try:
           o, offset = parse(arg)
@@ -398,16 +388,14 @@ class VTCmd(BaseCommand):
           xit = 1
     return xit
 
-  @staticmethod
-  def cmd_httpd(args, options):
-    ''' Usage: {cmd} [httpd-args...]
+  def cmd_httpd(self, argv):
+    ''' Usage: {cmd} [httpd-argv...]
           Run the HTTP daemon.
     '''
     from .httpd import main as httpd_main
-    httpd_main([options.cmd + ': ' + 'httpd'] + args)
+    httpd_main([self.cmd + ': ' + 'httpd'] + argv)
 
-  @staticmethod
-  def cmd_import(args, options):
+  def cmd_import(self, argv):
     ''' Usage: {cmd} [-oW] srcpath {{-|special}}
           Import paths into the Store, print top Dirent for each.
 
@@ -417,7 +405,7 @@ class VTCmd(BaseCommand):
     delete = False
     overlay = False
     whole_read = False
-    opts, args = getopt(args, 'oW')
+    opts, argv = getopt(argv, 'oW')
     for opt, _ in opts:
       with Pfx(opt):
         if opt == '-D':
@@ -428,16 +416,16 @@ class VTCmd(BaseCommand):
           whole_read = True
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
-    if not args:
+    if not argv:
       raise GetoptError("missing path")
-    srcpath = args.pop(0)
-    if not args:
+    srcpath = argv.pop(0)
+    if not argv:
       raise GetoptError("missing archive.vt")
-    special = args.pop(0)
+    special = argv.pop(0)
     if special == '-':
       special = None
-    if args:
-      raise GetoptError("extra arguments: %s" % (' '.join(args),))
+    if argv:
+      raise GetoptError("extra arguments: %s" % (' '.join(argv),))
     if special is None:
       D = Dir('.')
     else:
@@ -485,21 +473,20 @@ class VTCmd(BaseCommand):
           warning("archive not updated")
     return xit
 
-  @staticmethod
-  def cmd_init(args, options):
+  def cmd_init(self, argv):
     ''' Usage: {cmd}
           Install a default config and initialise the configured datadir Stores.
     '''
     xit = 0
-    if args:
-      raise GetoptError("extra arguments: %r" % (args,))
-    config = options.config
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    config = self.options.config
     config_path = config.path
     if not pathexists(config_path):
       info("write %r", config_path)
       with Pfx(config_path):
         with open(config_path, 'w') as cfgf:
-          options.config.write(cfgf)
+          config.write(cfgf)
     basedir = config.basedir
     if not isdirpath(basedir):
       with Pfx("basedir"):
@@ -524,30 +511,37 @@ class VTCmd(BaseCommand):
             xit = 1
     return xit
 
-  @staticmethod
-  def cmd_ls(args, options):
+  def cmd_ls(self, argv):
     ''' Usage: {cmd} [-R] dirrefs...
           Do a directory listing of the specified dirrefs.
     '''
     recurse = False
-    if args and args[0] == "-R":
+    if argv and argv[0] == "-R":
       recurse = True
-      args.pop(0)
-    if not args:
+      argv.pop(0)
+    if not argv:
       raise GetoptError("missing dirrefs")
+    xit = 0
     first = True
-    for path in args:
+    for path in argv:
       with Pfx(path):
         if first:
           first = False
         else:
           print()
-        D = parse(path)
+        D, offset = parse(path)
+        if offset < len(path):
+          warning("unparsed text: %r, skipping", path[offset:])
+          xit = 1
+          continue
+        if not isinstance(D, Dir):
+          warning("not a Dir specification, got: %s:%r", type(D).__name__, D)
+          xit = 1
+          continue
         ls(path, D, recurse, sys.stdout)
-    return 0
+    return xit
 
-  @staticmethod
-  def cmd_mount(args, options):
+  def cmd_mount(self, argv):
     ''' Usage: {cmd} [-ar] [-o options] special [mountpoint]
           Mount the specified special on the specified mountpoint directory.
           Requires FUSE support.
@@ -564,7 +558,7 @@ class VTCmd(BaseCommand):
     all_dates = False
     append_only = False
     readonly = None
-    opts, args = getopt(args, 'ao:r')
+    opts, argv = getopt(argv, 'ao:r')
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-a':
@@ -590,7 +584,7 @@ class VTCmd(BaseCommand):
     special_basename = None
     # the special may derive directly from a config Store clause
     try:
-      special = args.pop(0)
+      special = argv.pop(0)
     except IndexError:
       special = None
       error("missing special")
@@ -599,7 +593,7 @@ class VTCmd(BaseCommand):
       with Pfx("special %r", special):
         try:
           fsname, readonly, special_store, specialD, special_basename, archive = \
-              options.config.parse_special(special, readonly)
+              self.options.config.parse_special(special, readonly)
         except ValueError as e:
           error("invalid: %s", e)
           badopts = True
@@ -615,8 +609,8 @@ class VTCmd(BaseCommand):
                 mount_store, special_store
             )
             mount_store = special_store
-    if args:
-      mountpoint = args.pop(0)
+    if argv:
+      mountpoint = argv.pop(0)
     else:
       if special_basename is None:
         if not badopts:
@@ -627,12 +621,12 @@ class VTCmd(BaseCommand):
           badopts = True
       else:
         mountpoint = special_basename
-    if args:
-      subpath = args.pop(0)
+    if argv:
+      subpath = argv.pop(0)
     else:
       subpath = None
-    if args:
-      error("extra arguments: %s", ' '.join(args))
+    if argv:
+      error("extra arguments: %s", ' '.join(argv))
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
@@ -720,17 +714,16 @@ class VTCmd(BaseCommand):
           xit = 1
     return xit
 
-  @staticmethod
-  def cmd_pack(args, options):
+  def cmd_pack(self, argv):
     ''' Usage: {cmd} ospath
           Replace the ospath with an archive file ospath.vt
           referring to the stored content of path.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing path")
-    ospath = args.pop(0)
-    if args:
-      raise GetoptError("extra arguments after path: %r" % (args,))
+    ospath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after path: %r" % (argv,))
     modes = CopyModes(trust_size_mtime=True)
     with Pfx(ospath):
       if not pathexists(ospath):
@@ -747,7 +740,7 @@ class VTCmd(BaseCommand):
       else:
         source = OSFile(ospath)
       X("target = %s, source= %s", type(target), type(source))
-      if not merge(target, source, options.runstate):
+      if not merge(target, source, self.options.runstate):
         error("merge into %r fails", arpath)
         return 1
       A.update(target)
@@ -821,43 +814,43 @@ class VTCmd(BaseCommand):
       T.join()
       return xit
 
-  def cmd_pullfrom(self, args, options):
+  def cmd_pullfrom(self, argv):
     ''' Usage: {cmd} other_store [objects...]
           Pull missing content from other Stores.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing other_store")
-    srcSspec = args.pop(0)
+    srcSspec = argv.pop(0)
     with Pfx("other_store %r", srcSspec):
-      srcS = Store(srcSspec, options.config)
-    if not args:
-      args = (srcSspec,)
+      srcS = Store(srcSspec, self.options.config)
+    if not argv:
+      argv = (srcSspec,)
     dstS = defaults.S
     pushables = []
-    for obj_spec in args:
+    for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
         except ValueError as e:
           raise GetoptError("unparsed: %s" % (e,)) from e
         pushables.append(obj)
-    return self._push(options, srcS, dstS, pushables)
+    return self._push(self.options, srcS, dstS, pushables)
 
-  def cmd_pushto(self, args, options):
+  def cmd_pushto(self, argv):
     ''' Usage: {cmd} other_store [objects...]
           Push something to a secondary Store,
           such that the secondary store has all the required Blocks.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing other_store")
     srcS = defaults.S
-    dstSspec = args.pop(0)
-    if not args:
-      args = (dstSspec,)
+    dstSspec = argv.pop(0)
+    if not argv:
+      argv = (dstSspec,)
     with Pfx("other_store %r", dstSspec):
-      dstS = Store(dstSspec, options.config)
+      dstS = Store(dstSspec, self.options.config)
     pushables = []
-    for obj_spec in args:
+    for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
@@ -866,8 +859,7 @@ class VTCmd(BaseCommand):
         pushables.append(obj)
     return self._push(srcS, dstS, pushables)
 
-  @staticmethod
-  def cmd_serve(args, options):
+  def cmd_serve(self, argv):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
           Start a service daemon listening on a TCP port
           or on a UNIX domain socket or on stdin/stdout.
@@ -875,14 +867,14 @@ class VTCmd(BaseCommand):
           otherwise the named Stores are exported with the first being
           served initially.
     '''
-    if args:
-      address = args.pop(0)
+    if argv:
+      address = argv.pop(0)
     else:
       address = 'DEFAULT'
     if address == 'DEFAULT':
       # obtain the address from the [server] config clause
       try:
-        clause = options.config.get_clause('server')
+        clause = self.options.config.get_clause('server')
       except KeyError:
         raise GetoptError(
             "no [server] clause to implement address %r" % (address,)
@@ -891,11 +883,11 @@ class VTCmd(BaseCommand):
         address = clause['address']
       except KeyError:
         raise GetoptError("[server] clause: no address field")
-    if not args:
+    if not argv:
       exports = {'': defaults.S}
     else:
       exports = {}
-      for named_store_spec in args:
+      for named_store_spec in argv:
         with Pfx("name:storespec %r", named_store_spec):
           name, offset = get_identifier(named_store_spec)
           if not name:
@@ -919,11 +911,11 @@ class VTCmd(BaseCommand):
                   "extra text after storespec: %r" %
                   (named_store_spec[offset:],)
               )
-            namedS = options.config.new_Store(parsed, type_, **params)
+            namedS = self.options.config.new_Store(parsed, type_, **params)
             exports[name] = namedS
             if '' not in exports:
               exports[''] = namedS
-    runstate = options.runstate
+    runstate = self.options.runstate
     if address == '-':
       track("dispatch StreamStore(%r,stdin,stdout,..)", address)
       from .stream import StreamStore
@@ -931,8 +923,8 @@ class VTCmd(BaseCommand):
       remoteS.join()
     elif '/' in address:
       # path/to/socket
-      track("dispatch serve_socket(%r,...)", socket_path)
       socket_path = expand_path(address)
+      track("dispatch serve_socket(%r,...)", socket_path)
       with defaults.S:
         srv = serve_socket(
             socket_path=socket_path, exports=exports, runstate=runstate
@@ -962,23 +954,22 @@ class VTCmd(BaseCommand):
         )
     return 0
 
-  @staticmethod
-  def cmd_test(args, options):
+  def cmd_test(self, argv):
     ''' Usage: {cmd} subtest [subtestargs...]
           Test various facilites.
           blockify filenames... Blockify the contents of the filenames.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing test subcommand")
-    subcmd = args.pop(0)
+    subcmd = argv.pop(0)
     with Pfx(subcmd):
       if subcmd == 'blockify':
-        if not args:
+        if not argv:
           raise GetoptError("missing filename")
-        filename = args.pop(0)
+        filename = argv.pop(0)
         with Pfx(filename):
-          if args:
-            raise GetoptError("extra arguments after filename: %r" % (args,))
+          if argv:
+            raise GetoptError("extra arguments after filename: %r" % (argv,))
           scanner = scanner_from_filename(filename)
           size_counts = defaultdict(int)
           with open(filename, 'rb') as fp:
@@ -990,18 +981,17 @@ class VTCmd(BaseCommand):
         return 0
       raise GetoptError("unrecognised subcommand")
 
-  @staticmethod
-  def cmd_unpack(args, options):
+  def cmd_unpack(self, argv):
     ''' Usage: {cmd} arpath
           Unpack the archive file _archive_`.vt` as _archive_.
     '''
-    if not args:
+    if not argv:
       raise GetoptError("missing archive name")
-    arpath = args.pop(0)
+    arpath = argv.pop(0)
     arbase, arext = splitext(arpath)
     if arext != '.vt':
       raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
-    if args:
+    if argv:
       raise GetoptError("extra arguments after archive name %r" % (arpath,))
     if pathexists(arbase):
       error("archive base already exists: %r", arbase)
@@ -1017,7 +1007,7 @@ class VTCmd(BaseCommand):
       else:
         target = OSFile(arbase)
     with Pfx(arbase):
-      if not merge(target, source, runstate=options.runstate):
+      if not merge(target, source, runstate=self.options.runstate):
         return 1
     return 0
 
@@ -1040,7 +1030,8 @@ def lsDirent(fp, E, name):
       (('d' if E.isdir else 'f'), detail, t, st_size, name)
   )
 
-def ls(path, D, recurse, fp=None):
+@typechecked
+def ls(path: str, D: Dir, recurse: bool, fp=None):
   ''' Do an ls style directory listing with optional recursion.
   '''
   if fp is None:
