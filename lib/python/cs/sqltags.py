@@ -34,6 +34,7 @@ from typing import List
 from icontract import require
 from sqlalchemy import (
     create_engine,
+    desc,
     Column,
     Integer,
     Float,
