@@ -957,10 +957,20 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     self.entities = Entities
 
   @pfx_method
-  def search(self, criteria, *, session, mode='tagged'):
+  def search(
+      self, criteria, *, session, mode='tagged', order_by=None, limit=None
+  ):
     ''' Construct a query to match `Entity` rows
         matching the supplied `criteria` iterable.
         Return an SQLAlchemy `Query`.
+
+        Parameters:
+        * `criteria`: an iterable of `SQTCriterion` instances
+          constraining the results
+        * `session`: the SQLAlchemy  `Session`
+        * `mode`: the result type, default `'tagged'`
+        * `order_by`: optional SQLAlchemy `ORDER BY` clause
+        * `limit`: option limit on the number of entities returned
 
         The `mode` parameter has the following values:
         * `'id'`: the query only yields entity ids
@@ -973,8 +983,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         fold entities with multiple tags together.
 
         *Note*:
-        due to implementation limitations
-        the SQL query itself may not apply all the criteria,
+        I'm considering dropping support for modes other than `'tagged'`.
+
+        *Note*:
+        due to SQL implementation limitations
+        the SQL query itself may not apply all the criteria fully,
         so every criterion must still be applied
         to the results
         using its `.match_entity` method.
@@ -1085,6 +1098,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         )
       else:
         raise ValueError("unrecognised mode")
+    if order_by is not None:
+      query = query.order_by(order_by)
     return query
 
 class SQLTagSet(SingletonMixin, TagSet):
