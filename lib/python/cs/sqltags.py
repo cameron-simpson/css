@@ -1438,7 +1438,8 @@ class SQLTags(TagSets):
     '''
     return self[0]
 
-  def find(self, criteria):
+  @pfx_method
+  def find(self, criteria, order_by=None, limit=None):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
@@ -1447,7 +1448,30 @@ class SQLTags(TagSets):
           which should be `SQTCriterion`s
           or a `str` suitable for `SQTCriterion.from_str`.
           A string may also be supplied, suitable for `SQTCriterion.from_str`.
+        * `order_by`: an optional string of the form [`-`]*column*
+          where *column` is an `Entities` column name,
+          indicating a `ORDER BY` clause to return entries with that column value
+          in ascending order, or descending if there is a leading `-`.
+        * `limit`: an option limit on the number of `TagSet`s returned
     '''
+    if order_by is None:
+      order_by_clause = None
+    else:
+      with Pfx("order_by=%r", order_by):
+        order_by_name = cutprefix(order_by, '-')
+        order_by_asc = order_by_name is order_by
+        if order_by_name not in ('name', 'id', 'unixtime'):
+          raise ValueError(
+              "expected an Entities column name (one of name, id, unixtime)"
+          )
+        order_by_clause = order_by_name
+        if not order_by_asc:
+          order_by_clause = desc(order_by_clause)
+    if limit is not None:
+      if limit < 1:
+        raise ValueError(
+            "limit must be >=1 if supplied, received %r" % (limit,)
+        )
     if isinstance(criteria, str):
       criteria = [criteria]
     else:
@@ -1464,6 +1488,8 @@ class SQLTags(TagSets):
         criteria,
         mode='tagged',
         session=self._session,
+        order_by=order_by_clause,
+        limit=limit,
     )
     # merge entities and tag information
     tags = self.orm.tags
