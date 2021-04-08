@@ -193,6 +193,10 @@ class BaseCommand:
         Appends the usage message to the class docstring.
     '''
     usage_message = cls.usage_text()
+    # TODO: need to indent usage_doc by the prevailing indent of
+    # the original cls.__doc__, which needs to be computed.
+    # Presently this puts "Command line usage:" hard against the left margin,
+    # which makes the original __doc__ look indented.
     usage_doc = (
         'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
     )
