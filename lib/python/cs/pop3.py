@@ -483,7 +483,7 @@ class POP3Command(BaseCommand):
         typically an ssh port forward to a remote private cleartext POP service,
         logging in as `username`
       * `username@localhost!mail.example.com:1995`:
-        use cleartext to connect to `localhost:1995`,
+        use TLS/SSL to connect to `localhost:1995`,
         usually an ssh port forward to a remote private TLS/SSL POP service,
         logging in as `username` and passing `mail.exampl.com`
         as the TLS/SSL server name indication
