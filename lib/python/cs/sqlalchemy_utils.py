@@ -25,7 +25,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20210306-post'
+__version__ = '20210322-post'
 
 DISTINFO = {
     'description':
@@ -40,6 +40,10 @@ DISTINFO = {
         'icontract',
         'sqlalchemy',
         'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
         'cs.py.func',
         'cs.resources',
         'cs.threads',
@@ -402,8 +406,6 @@ class ORM(MultiOpenMixin, ABC):
       with orm_session.begin_nested():
         yield orm_session
     else:
-      if new:
-        raise RuntimeError("NEW")
       # new session required
       with self:
         if self.serial_sessions:

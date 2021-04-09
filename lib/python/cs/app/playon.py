@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from functools import partial
 from getopt import getopt, GetoptError
 from netrc import netrc
+import os
 from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
@@ -26,6 +27,7 @@ import requests
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
@@ -36,6 +38,9 @@ from cs.sqltags import SQLTags, SQLTagSet
 from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
+
+DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
+DBURL_DEFAULT = '~/var/playon.sqlite'
 
 DEFAULT_FILENAME_FORMAT = (
     '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
@@ -59,6 +64,8 @@ class PlayOnCommand(BaseCommand):
   USAGE_KEYWORDS = {
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
       'LS_FORMAT': LS_FORMAT,
+      'DBURL_ENVVAR': DBURL_ENVVAR,
+      'DBURL_DEFAULT': DBURL_DEFAULT,
       'QUEUE_FORMAT': QUEUE_FORMAT,
   }
 
@@ -70,6 +77,8 @@ class PlayOnCommand(BaseCommand):
                                 This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
+      {DBURL_ENVVAR:17}         Location of state tags database.
+                                Default: {DBURL_DEFAULT}
 
     Recording specification:
       an int        The specific recording id.
@@ -138,10 +147,8 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ',
-                                       '--').replace('_',
-                                                     ':').replace(' ', '-') +
-              '.'
+              filename.lower().replace(' - ', '--').replace('_', ':')
+              .replace(' ', '-').replace(os.sep, ':') + '.'
           )
           try:
             api.download(dl_id, filename=filename)
@@ -382,6 +389,21 @@ class PlayOnSQLTags(SQLTags):
     if dbpath is None:
       dbpath = expanduser(self.STATEDBPATH)
     super().__init__(db_url=dbpath)
+
+  @staticmethod
+  @fmtdoc
+  def infer_db_url(envvar=None, default_path=None):
+    ''' Infer the database URL.
+
+        Parameters:
+        * `envvar`: environment variable to specify a default,
+          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+    '''
+    if envvar is None:
+      envvar = DBURL_ENVVAR
+    if default_path is None:
+      default_path = DBURL_DEFAULT
+    return super().infer_db_url(envvar=envvar, default_path=default_path)
 
   def __getitem__(self, index):
     if isinstance(index, int):

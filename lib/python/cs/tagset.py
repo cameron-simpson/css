@@ -208,7 +208,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20210306-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -217,15 +217,18 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.deco',
         'cs.edit',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.mappings',
         'cs.obj>=20200716',
         'cs.pfx',
         'cs.py3',
+        'cs.resources',
+        'cs.threads',
         'icontract',
         'typeguard',
     ],
@@ -1359,7 +1362,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 
   COMPARISON_FUNCS = {
       '=':
-      lambda tag_value, cmp_value: tag_value == cmp_value,
+      lambda tag_value, cmp_value: cmp_value is None or tag_value == cmp_value,
       '<=':
       lambda tag_value, cmp_value: tag_value <= cmp_value,
       '<':

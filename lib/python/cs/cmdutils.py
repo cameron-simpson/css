@@ -16,13 +16,13 @@ from types import SimpleNamespace
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, stripped_dedent
+from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210306-post'
+__version__ = '20210407.1-post'
 
 DISTINFO = {
     'description':
@@ -93,7 +93,7 @@ class BaseCommand:
       This class provides the basic parse and dispatch mechanisms
       for command lines.
       To implement a command line
-      one instantiates a subclass of BaseCommand:
+      one instantiates a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               GETOPT_SPEC = 'ab:c'
@@ -102,26 +102,51 @@ class BaseCommand:
                 -b    But using bvalue.
                 -c    The 'c' option!
               """
-            ...
+              ...
+
+      and provides either a `main` method if the command has no subcommands
+      or a suite of `cmd_`*subcommand* methods, one per subcommand.
 
       Running a command is done by:
 
           MyCommand(argv).run()
 
-      Modules which implement a command line mode generally look like:
+      or via the convenience method:
+
+          MyCommand.run_argv(argv)
+
+      Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
-              return MyCommand(argv).run()
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
           if __name__ == '__main__':
-              sys.exit(main(sys.argv))
+              sys.exit(MyCommand.run_argv(sys.argv))
 
       Instances have a `self.options` attribute on which optional
       modes are set,
       avoiding conflict with the attributes of `self`.
+
+      Subclasses with no subcommands
+      generally just implement a `main(argv)` method.
+
+      Subclasses with subcommands
+      should implement a `cmd_`*subcommand*`(argv)` method
+      for each subcommand.
+      If there is a paragraph in the method docstring
+      commencing with `Usage:`
+      then that paragraph is incorporated automatically
+      into the main usage message.
+      Example:
+
+          def cmd_ls(self, argv):
+              """ Usage: {cmd} [paths...]
+                    Emit a listing for the named paths.
+
+                  Further docstring non-usage information here.
+              """
+              ... do the "ls" subcommand ...
 
       The subclass is customised by overriding the following methods:
       * `apply_defaults()`:
@@ -161,6 +186,19 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   OPTIONS_CLASS = SimpleNamespace
+
+  def __init_subclass__(cls):
+    ''' Update subclasses of `BaseCommand`.
+
+        Appends the usage message to the class docstring.
+    '''
+    usage_message = cls.usage_text()
+    usage_doc = (
+        'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
+    )
+    cls_doc = obj_docstring(cls)
+    cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
+    cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, **kw_options):
@@ -290,6 +328,12 @@ class BaseCommand:
       self._run = main, main_cmd, argv, main_context
 
   @classmethod
+  def run_argv(cls, argv=None):
+    ''' Create an instance for `argv` and call its `.run()` method.
+    '''
+    return cls(argv).run()
+
+  @classmethod
   def subcommands(cls):
     ''' Return a mapping of subcommand names to class attributes
         for attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
@@ -305,7 +349,7 @@ class BaseCommand:
   @classmethod
   @cachedmethod
   def usage_text(cls, *, cmd=None, format_mapping=None):
-    ''' Compute the "Usage: message for this class
+    ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
         and the `'Usage:'`-containing docstrings
         from its `cmd_*` methods.
@@ -315,11 +359,11 @@ class BaseCommand:
         happens more than once.
     '''
     if cmd is None:
-      cmd = cls.__name__
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
     if format_mapping is None:
       format_mapping = {}
-    if cmd is not None or 'cmd' not in format_mapping:
-      format_mapping['cmd'] = cls.__name__ if cmd is None else cmd
+    if 'cmd' not in format_mapping:
+      format_mapping['cmd'] = cmd
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
@@ -388,16 +432,6 @@ class BaseCommand:
             parts.extend(post_usage_parts)
             subusage = '\n\n'.join(parts)
     return subusage if subusage else None
-
-  @classmethod
-  def add_usage_to_docstring(cls):
-    ''' Append `cls.usage_text()` to `cls.__doc__`.
-    '''
-    usage_message = cls.usage_text()
-    cls.__doc__ += (
-        '\n\nCommand line usage:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
-    )
 
   def apply_defaults(self):
     ''' Stub `apply_defaults` method.

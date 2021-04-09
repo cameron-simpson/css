@@ -29,6 +29,7 @@ import os
 from os.path import expanduser, exists as existspath
 import re
 import sys
+from subprocess import run
 from threading import RLock
 import time
 from typing import List
@@ -65,7 +66,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20210306.1-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -77,10 +78,21 @@ DISTINFO = {
         'console_scripts': ['sqltags = cs.sqltags:main'],
     },
     'install_requires': [
-        'cs.cmdutils', 'cs.context', 'cs.dateutils', 'cs.deco', 'cs.fileutils',
-        'cs.lex', 'cs.logutils', 'cs.obj', 'cs.pfx', 'cs.sqlalchemy_utils',
-        'cs.tagset', 'cs.threads>=20201025', 'cs.upd', 'icontract',
-        'sqlalchemy', 'typeguard'
+        'cs.cmdutils>=20210404',
+        'cs.context',
+        'cs.dateutils',
+        'cs.deco',
+        'cs.lex',
+        'cs.logutils',
+        'cs.obj',
+        'cs.pfx',
+        'cs.sqlalchemy_utils>=20210321',
+        'cs.tagset',
+        'cs.threads>=20201025',
+        'cs.upd',
+        'icontract',
+        'sqlalchemy',
+        'typeguard',
     ],
 }
 
@@ -1088,6 +1100,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
       super().__init__(_id=_id, **kw)
+      # pylint: disable=unexpected-keyword-arg
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
       self._singleton_also_index()
     else:
@@ -1126,14 +1139,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     ''' Context manager to obtain a new session if required,
         just a shim for `self.sqltags.db_session`.
     '''
-    with self.sqltags.db_session(session=session) as session:
-      yield session
+    with self.sqltags.db_session(session=session) as session2:
+      yield session2
 
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
     '''
-    return self.sqltags.db_entity(self.id)
+    e = self.sqltags.db_entity(self.id)
+    assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
+    return e
 
+  # pylint: disable=arguments-differ
   @tag_or_tag_value
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
@@ -1157,6 +1173,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       e = self._get_db_entity()
       return e.add_tag(tag_name, value, session=session)
 
+  # pylint: disable=arguments-differ
   @tag_or_tag_value
   def discard(self, tag_name, value, *, skip_db=False, verbose=None):
     if tag_name == 'id':
@@ -1207,6 +1224,7 @@ class SQLTags(TagSets):
 
   TagSetClass = SQLTagSet
 
+  # pylint: disable=super-init-not-called
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
@@ -1302,11 +1320,12 @@ class SQLTags(TagSets):
   def __getitem__(self, index):
     ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
-    te = self.get(index)
-    if te is None:
-      if isinstance(index, int):
-        raise IndexError(index)
-      te = self.default_factory(index)
+    with self.db_session(new=True):
+      te = self.get(index)
+      if te is None:
+        if isinstance(index, int):
+          raise IndexError(index)
+        te = self.default_factory(index)
     return te
 
   @locked
@@ -1580,6 +1599,22 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       )
     else:
       return SQTEntityIdTest([index])
+
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database shell.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    orm = self.options.sqltags.orm
+    db_url = orm.db_url
+    if db_url.startswith("sqlite://"):
+      db_fspath = orm.db_fspath
+      print("sqlite3", db_fspath)
+      run(['sqlite3', db_fspath], check=True)
+      return 0
+    error("I do not know how to get a db shell for %r", db_url)
+    return 1
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
@@ -1921,8 +1956,6 @@ class SQLTagsCommand(BaseSQLTagsCommand):
         for tag in sorted(te.tags()):
           print(" ", tag)
     return xit
-
-SQLTagsCommand.add_usage_to_docstring()
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
