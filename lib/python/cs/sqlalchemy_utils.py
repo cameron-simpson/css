@@ -290,7 +290,7 @@ class ORM(MultiOpenMixin, ABC):
       self._serial_sessions_lock = Lock()
     else:
       self._engine = None
-      self._sessionmaker = None
+      self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = {}
     self.engine_keywords = dict(
@@ -389,12 +389,11 @@ class ORM(MultiOpenMixin, ABC):
           raise RuntimeError(
               "%s: this Thread already has an ORM session: %s" % (
                   tid,
-                  orm_session,
+                  orm_state.session,
               )
           )
         with self._serial_sessions_lock:
           new_session = self._sessionmaker()
-          X("ARRANGED_SESSION: new_session=%s", new_session)
           with new_session.begin_nested():
             yield new_session
       else:
