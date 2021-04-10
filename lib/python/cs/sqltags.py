@@ -1177,12 +1177,12 @@ class SQLTagSet(SingletonMixin, TagSet):
     return self._unixtime
 
   @contextmanager
-  def db_session(self, *, session=None):
+  def db_session(self, new=False):
     ''' Context manager to obtain a new session if required,
         just a shim for `self.sqltags.db_session`.
     '''
-    with self.sqltags.db_session(session=session) as session2:
-      yield session2
+    with self.sqltags.db_session(new=new) as session:
+      yield session
 
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
@@ -1288,7 +1288,7 @@ class SQLTags(TagSets):
     )
 
   @contextmanager
-  def db_session(self, *, new=False, session=None):
+  def db_session(self, *, new=False):
     ''' Context manager to obtain a db session if required,
         just a shim for `self.orm.session()`.
     '''
