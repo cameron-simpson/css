@@ -851,12 +851,12 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if entity is None:
       # force creation of the desired row id
       entity = entities(id=0, unixtime=time.time())
+      session.add(entity)
       entity.add_tag(
           'headline',
           "%s node 0: the metanode." % (type(self).__name__,),
           session=session,
       )
-      session.add(entity)
     return entity
 
   # pylint: disable=too-many-statements
