@@ -358,17 +358,17 @@ class ORM(MultiOpenMixin, ABC):
     return engine
 
   @property
-  def sessionmaker(self):
+  def _sessionmaker(self):
     ''' SQLAlchemy sessionmaker for the current `Thread`.
     '''
     orm_state = self.sqla_state
     if self.serial_sessions:
       sessionmaker = orm_state.sessionmaker
     else:
-      sessionmaker = self._sessionmaker
+      sessionmaker = self._sessionmaker_raw
     if sessionmaker is None:
       sessionmaker = sqla_sessionmaker(bind=self.engine)
-      self._sessionmaker = sessionmaker
+      self._sessionmaker_raw = sessionmaker
       orm_state.sessionmaker = sessionmaker  # pylint: disable=attribute-defined-outside-init
     return sessionmaker
 
