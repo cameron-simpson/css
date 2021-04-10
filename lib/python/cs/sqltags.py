@@ -945,10 +945,23 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       )
       name = Column(String, comment='tag name', index=True, primary_key=True)
 
+    class TagSubValues(Base, BasicTableMixin, PolyValueMixin):
+      ''' The table of tags associated with entities.
+      '''
 
+      __tablename__ = 'tag_subvalues'
+      id = Column(Integer, primary_key=True)
+      entity_id = Column(
+          Integer,
+          ForeignKey("entities.id"),
+          nullable=False,
+          index=True,
+          comment='entity id'
       )
+      tag_name = Column(String, comment='tag name', index=True)
 
     self.tags = Tags
+    self.tag_subvalues = TagSubValues
     self.entities = Entities
 
   # pylint: disable=too-many-branches,too-many-locals
