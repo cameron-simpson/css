@@ -839,8 +839,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
     '''
-    self.Base.metadata.create_all(bind=self.engine)
-    with self.session() as session:
+    with self.sqla_state.auto_session() as session:
+      self.Base.metadata.create_all(bind=self.engine)
       self.prepare_metanode(session=session)
 
   def prepare_metanode(self, *, session):
