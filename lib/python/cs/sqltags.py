@@ -1292,7 +1292,9 @@ class SQLTags(TagSets):
     ''' Context manager to obtain a db session if required,
         just a shim for `self.orm.session()`.
     '''
-    with self.orm.session(new=new, session=session) as session2:
+    orm_state = self.orm.sqla_state
+    get_session = orm_state.new_session if new else orm_state.auto_session
+    with get_session() as session2:
       yield session2
 
   @property
