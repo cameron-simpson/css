@@ -234,8 +234,6 @@ class ORM(MultiOpenMixin, ABC):
       supporting nested open/close sequences and use as a context manager.
 
       Subclasses must define the following:
-      * `.Session`: a factory in their own `__init__`, typically
-        `self.Session=sessionmaker(bind=engine)`
       * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
         even if these just `pass`
   '''
