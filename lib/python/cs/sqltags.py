@@ -908,10 +908,15 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
                                          session=session):
           subv.delete()
         if values is not None and not isinstance(values, str):
-          for subvalue in values:
-            subv = tag_subvalues(entity_id=self.id, tag_name=tag_name)
-            subv.value = subvalue
-            session.add(subv)
+          try:
+            subvalues = iter(values)
+          except TypeError:
+            pass
+          else:
+            for subvalue in subvalues:
+              subv = tag_subvalues(entity_id=self.id, tag_name=tag_name)
+              subv.value = subvalue
+              session.add(subv)
 
       def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
