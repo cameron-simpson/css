@@ -75,9 +75,10 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.session(new=True) as session:
-      with self(orm=orm, session=session):
-        yield session
+    with orm.arranged_session() as session:
+      with session.begin_nested():
+        with self(orm=orm, session=session):
+          yield session
 
   @contextmanager
   def auto_session(self, *, orm=None):
@@ -86,10 +87,12 @@ class SQLAState(State):
     '''
     session = self.session
     if session is None or (orm is not None and orm is not self.orm):
+      # new session required
       with self.new_session(orm=orm) as session:
         yield session
     else:
-      yield session
+      with session.begin_nested():
+        yield session
 
 # global state, not tied to any specific ORM or session
 state = SQLAState(orm=None, session=None)
@@ -234,8 +237,6 @@ class ORM(MultiOpenMixin, ABC):
       supporting nested open/close sequences and use as a context manager.
 
       Subclasses must define the following:
-      * `.Session`: a factory in their own `__init__`, typically
-        `self.Session=sessionmaker(bind=engine)`
       * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
         even if these just `pass`
   '''
@@ -289,7 +290,7 @@ class ORM(MultiOpenMixin, ABC):
       self._serial_sessions_lock = Lock()
     else:
       self._engine = None
-      self._sessionmaker = None
+      self._sessionmaker_raw = None
     self.db_url = db_url
     self.engine_keywords = {}
     self.engine_keywords = dict(
@@ -360,135 +361,51 @@ class ORM(MultiOpenMixin, ABC):
     return engine
 
   @property
-  def sessionmaker(self):
+  def _sessionmaker(self):
     ''' SQLAlchemy sessionmaker for the current `Thread`.
     '''
     orm_state = self.sqla_state
     if self.serial_sessions:
       sessionmaker = orm_state.sessionmaker
     else:
-      sessionmaker = self._sessionmaker
+      sessionmaker = self._sessionmaker_raw
     if sessionmaker is None:
       sessionmaker = sqla_sessionmaker(bind=self.engine)
-      self._sessionmaker = sessionmaker
+      self._sessionmaker_raw = sessionmaker
       orm_state.sessionmaker = sessionmaker  # pylint: disable=attribute-defined-outside-init
     return sessionmaker
 
   @contextmanager
   @pfx_method(use_str=True)
-  def session(self, new=False, *a, session=None, **kw):
-    ''' Context manager to issue a session if required.
-        A subtransaction is established around this call.
-
-        Parameters:
-        * `new`: optional flag, default `False`;
-          if true then a new session will always be created
-        * `session`: optional session to use, default `None`;
-          if not `None` then the supplied session is used
-
-        It is an error for `new` to be true and to also supply a `session`.
-
-        It is an error for `new` to be true if there is already an
-        estalished session and `self.serial_sessions` is true.
+  def arranged_session(self):
+    ''' Arrange a new session for this `Thread`.
     '''
     orm_state = self.sqla_state
-    if session is not None:
-      if new:
-        raise ValueError("cannot set new=%r if session is not None" % (new,))
-      # provided an explicit session
-      with session.begin_nested():
-        with orm_state(session=session):
-          yield session
-    # examine the current session state
-    orm_session = orm_state.session
-    if not new and orm_session is not None:
-      # reuse existing session
-      with orm_session.begin_nested():
-        yield orm_session
-    else:
-      # new session required
-      with self:
-        if self.serial_sessions:
-          if orm_session is not None:
-            T = current_thread()
-            tid = "Thread:%d:%s" % (T.ident, T.name)
-            raise RuntimeError(
-                "%s: this Thread already has an ORM session: %s" % (
-                    tid,
-                    orm_session,
-                )
-            )
-          with self._serial_sessions_lock:
-            new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
-            with new_session.begin(subtransactions=True):
-              with orm_state(session=new_session):
-                yield new_session
-        else:
-          new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
-          with new_session.begin(subtransactions=True):
-            with orm_state(session=new_session):
-              yield new_session
+    with self:
+      if self.serial_sessions:
+        if orm_state.session is not None:
+          T = current_thread()
+          tid = "Thread:%d:%s" % (T.ident, T.name)
+          raise RuntimeError(
+              "%s: this Thread already has an ORM session: %s" % (
+                  tid,
+                  orm_state.session,
+              )
+          )
+        with self._serial_sessions_lock:
+          new_session = self._sessionmaker()
+          with new_session.begin_nested():
+            yield new_session
+      else:
+        new_session = self._sessionmaker()
+        with new_session.begin_nested():
+          yield new_session
 
   @property
   def default_session(self):
     ''' The current per-`Thread` session.
     '''
     return self.sqla_state.session
-
-  @staticmethod
-  def auto_session(method):
-    ''' Decorator to run a method in a session derived from this ORM
-        if a session is not presupplied.
-
-        See `with_session` for details.
-    '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          yield from method(self, *a, session=session, **kw)
-    else:
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          return method(self, *a, session=session, **kw)
-
-    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
-    wrapper.__doc__ = method.__doc__
-    wrapper.__module__ = getattr(method, '__module__', None)
-    return wrapper
-
-  @staticmethod
-  def orm_method(method):
-    ''' Decorator for ORM subclass methods
-        to set the shared `state.orm` to `self`.
-    '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared `state.orm`.
-        '''
-        with state(orm=self):
-          yield from method(self, *a, **kw)
-    else:
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared `state.orm`.
-        '''
-        with state(orm=self):
-          return method(self, *a, **kw)
-
-    wrapper.__name__ = method.__name__
-    wrapper.__doc__ = method.__doc__
-    return wrapper
-
-orm_method = ORM.orm_method
 
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`

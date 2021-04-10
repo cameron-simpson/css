@@ -671,6 +671,150 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
+class PolyValueMixin:
+  ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
+      This is used by the `Tags` and `TagMultiValues` relations inside `SQLtagsORM`.
+  '''
+
+  float_value = Column(
+      Float,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in numeric form'
+  )
+  string_value = Column(
+      String,
+      nullable=True,
+      default=None,
+      index=True,
+      comment='tag value in string form'
+  )
+  structured_value = Column(
+      JSON, nullable=True, default=None, comment='tag value in JSON form'
+  )
+
+  @staticmethod
+  @require(
+      lambda float_value: float_value is None or
+      isinstance(float_value, float)
+  )
+  @require(
+      lambda string_value: string_value is None or
+      isinstance(string_value, str)
+  )
+  @require(
+      lambda structured_value: structured_value is None or
+      not isinstance(structured_value, (float, str))
+  )
+  @require(
+      lambda float_value, string_value, structured_value: sum(
+          map(
+              lambda value: value is not None,
+              [float_value, string_value, structured_value]
+          )
+      ) < 2
+  )
+  def pick_value(float_value, string_value, structured_value):
+    ''' Chose amongst the values available.
+    '''
+    if float_value is None:
+      if string_value is None:
+        return structured_value
+      return string_value
+    i = int(float_value)
+    return i if i == float_value else float_value
+
+  @property
+  def value(self):
+    ''' Return the value for this `Tag`.
+    '''
+    return self.pick_value(
+        self.float_value, self.string_value, self.structured_value
+    )
+
+  @value.setter
+  def value(self, new_value):
+    new_values = None, None, new_value
+    if isinstance(new_value, datetime):
+      # store datetime as unixtime
+      new_values = datetime2unixtime(new_value), None, None
+    elif isinstance(new_value, float):
+      new_values = new_value, None, None
+    elif isinstance(new_value, int):
+      f = float(new_value)
+      if f == new_value:
+        new_values = f, None, None
+      else:
+        new_values = None, None, new_value
+    elif isinstance(new_value, str):
+      new_values = None, new_value, None
+    self.set_all(*new_values)
+
+  @classmethod
+  def value_test(cls, other_value):
+    ''' Return `(column,test_value)` for constructing tests against
+        `other_value` where `column` if the appropriate SQLAlchemy column
+        and `test_value` is the comparison value for testing.
+
+        For most `other_value`s the `test_value`
+        will just be `other_value`,
+        but for certain types the `test_value` will be:
+        * `NoneType`: `None`, and the column will also be `None`
+        * `datetime`: `datetime2unixtime(other_value)`
+    '''
+    if other_value is None:
+      return None, None
+    if isinstance(other_value, datetime):
+      return cls.float_value, datetime2unixtime(other_value)
+    if isinstance(other_value, float):
+      return cls.float_value, other_value
+    if isinstance(other_value, int):
+      f = float(other_value)
+      if f == other_value:
+        return cls.float_value, f
+    if isinstance(other_value, str):
+      return cls.string_value, other_value
+    return cls.structured_value, other_value
+
+  @require(
+      lambda float_value: float_value is None or
+      isinstance(float_value, float)
+  )
+  @require(
+      lambda string_value: string_value is None or
+      isinstance(string_value, str)
+  )
+  @require(
+      lambda structured_value: structured_value is None or
+      not isinstance(structured_value, (float, str))
+  )
+  @require(
+      lambda float_value, string_value, structured_value: sum(
+          map(
+              lambda value: value is not None,
+              [float_value, string_value, structured_value]
+          )
+      ) < 2
+  )
+  def set_all(self, float_value, string_value, structured_value):
+    ''' Set all the value fields.
+    '''
+    self.float_value, self.string_value, self.structured_value = (
+        float_value, string_value, structured_value
+    )
+
+  @property
+  def unixtime(self):
+    ''' The UNIX timestamp is stored as a float.
+    '''
+    return self.float_value
+
+  @unixtime.setter
+  @require(lambda timestamp: isinstance(timestamp, float))
+  def unixtime(self, timestamp):
+    self.set_all(timestamp, None, None)
+
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
@@ -695,8 +839,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
   def define_schema(self):
     ''' Instantiate the schema and define the root metanode.
     '''
-    self.Base.metadata.create_all(bind=self.engine)
-    with self.session() as session:
+    with self.sqla_state.auto_session() as session:
+      self.Base.metadata.create_all(bind=self.engine)
       self.prepare_metanode(session=session)
 
   def prepare_metanode(self, *, session):
@@ -707,12 +851,12 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
     if entity is None:
       # force creation of the desired row id
       entity = entities(id=0, unixtime=time.time())
+      session.add(entity)
       entity.add_tag(
           'headline',
           "%s node 0: the metanode." % (type(self).__name__,),
           session=session,
       )
-      session.add(entity)
     return entity
 
   # pylint: disable=too-many-statements
@@ -756,6 +900,24 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
         )
 
+      def _update_multivalues(self, tag_name, values, *, session):
+        ''' Update the tag subvalue table.
+        '''
+        tag_subvalues = orm.tag_subvalues
+        for subv in tag_subvalues.lookup(entity_id=self.id, tag_name=tag_name,
+                                         session=session):
+          subv.delete()
+        if values is not None and not isinstance(values, str):
+          try:
+            subvalues = iter(values)
+          except TypeError:
+            pass
+          else:
+            for subvalue in subvalues:
+              subv = tag_subvalues(entity_id=self.id, tag_name=tag_name)
+              subv.value = subvalue
+              session.add(subv)
+
       def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
@@ -773,6 +935,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           session.add(etag)
         else:
           etag.value = value
+        self._update_multivalues(name, value, session=session)
 
       def discard_tag(self, name, value=None, *, session):
         ''' Discard the tag matching `(name,value)`.
@@ -784,9 +947,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         if etag is not None:
           if tag.value is None or tag.value == etag.value:
             session.delete(etag)
+        self._update_multivalues(name, (), session=session)
         return etag
 
-    class Tags(Base, BasicTableMixin):
+    class Tags(Base, BasicTableMixin, PolyValueMixin):
       ''' The table of tags associated with entities.
       '''
 
@@ -800,146 +964,24 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           comment='entity id'
       )
       name = Column(String, comment='tag name', index=True, primary_key=True)
-      float_value = Column(
-          Float,
-          nullable=True,
-          default=None,
+
+    class TagSubValues(Base, BasicTableMixin, PolyValueMixin):
+      ''' The table of tags associated with entities.
+      '''
+
+      __tablename__ = 'tag_subvalues'
+      id = Column(Integer, primary_key=True)
+      entity_id = Column(
+          Integer,
+          ForeignKey("entities.id"),
+          nullable=False,
           index=True,
-          comment='tag value in numeric form'
+          comment='entity id'
       )
-      string_value = Column(
-          String,
-          nullable=True,
-          default=None,
-          index=True,
-          comment='tag value in string form'
-      )
-      structured_value = Column(
-          JSON, nullable=True, default=None, comment='tag value in JSON form'
-      )
-
-      @staticmethod
-      @require(
-          lambda float_value: float_value is None or
-          isinstance(float_value, float)
-      )
-      @require(
-          lambda string_value: string_value is None or
-          isinstance(string_value, str)
-      )
-      @require(
-          lambda structured_value: structured_value is None or
-          not isinstance(structured_value, (float, str))
-      )
-      @require(
-          lambda float_value, string_value, structured_value: sum(
-              map(
-                  lambda value: value is not None,
-                  [float_value, string_value, structured_value]
-              )
-          ) < 2
-      )
-      def pick_value(float_value, string_value, structured_value):
-        ''' Chose amongst the values available.
-        '''
-        if float_value is None:
-          if string_value is None:
-            return structured_value
-          return string_value
-        i = int(float_value)
-        return i if i == float_value else float_value
-
-      @property
-      def value(self):
-        ''' Return the value for this `Tag`.
-        '''
-        return self.pick_value(
-            self.float_value, self.string_value, self.structured_value
-        )
-
-      @value.setter
-      def value(self, new_value):
-        new_values = None, None, new_value
-        if isinstance(new_value, datetime):
-          # store datetime as unixtime
-          new_values = datetime2unixtime(new_value), None, None
-        elif isinstance(new_value, float):
-          new_values = new_value, None, None
-        elif isinstance(new_value, int):
-          f = float(new_value)
-          if f == new_value:
-            new_values = f, None, None
-          else:
-            new_values = None, None, new_value
-        elif isinstance(new_value, str):
-          new_values = None, new_value, None
-        self.set_all(*new_values)
-
-      @classmethod
-      def value_test(cls, other_value):
-        ''' Return `(column,test_value)` for constructing tests against
-            `other_value` where `column` if the appropriate SQLAlchemy column
-            and `test_value` is the comparison value for testing.
-
-            For most `other_value`s the `test_value`
-            will just be `other_value`,
-            but for certain types the `test_value` will be:
-            * `NoneType`: `None`, and the column will also be `None`
-            * `datetime`: `datetime2unixtime(other_value)`
-        '''
-        if other_value is None:
-          return None, None
-        if isinstance(other_value, datetime):
-          return cls.float_value, datetime2unixtime(other_value)
-        if isinstance(other_value, float):
-          return cls.float_value, other_value
-        if isinstance(other_value, int):
-          f = float(other_value)
-          if f == other_value:
-            return cls.float_value, f
-        if isinstance(other_value, str):
-          return cls.string_value, other_value
-        return cls.structured_value, other_value
-
-      @require(
-          lambda float_value: float_value is None or
-          isinstance(float_value, float)
-      )
-      @require(
-          lambda string_value: string_value is None or
-          isinstance(string_value, str)
-      )
-      @require(
-          lambda structured_value: structured_value is None or
-          not isinstance(structured_value, (float, str))
-      )
-      @require(
-          lambda float_value, string_value, structured_value: sum(
-              map(
-                  lambda value: value is not None,
-                  [float_value, string_value, structured_value]
-              )
-          ) < 2
-      )
-      def set_all(self, float_value, string_value, structured_value):
-        ''' Set all the value fields.
-        '''
-        self.float_value, self.string_value, self.structured_value = (
-            float_value, string_value, structured_value
-        )
-
-      @property
-      def unixtime(self):
-        ''' The UNIX timestamp is stored as a float.
-        '''
-        return self.float_value
-
-      @unixtime.setter
-      @require(lambda timestamp: isinstance(timestamp, float))
-      def unixtime(self, timestamp):
-        self.set_all(timestamp, None, None)
+      tag_name = Column(String, comment='tag name', index=True)
 
     self.tags = Tags
+    self.tag_subvalues = TagSubValues
     self.entities = Entities
 
   # pylint: disable=too-many-branches,too-many-locals
@@ -1135,12 +1177,12 @@ class SQLTagSet(SingletonMixin, TagSet):
     return self._unixtime
 
   @contextmanager
-  def db_session(self, *, session=None):
+  def db_session(self, new=False):
     ''' Context manager to obtain a new session if required,
         just a shim for `self.sqltags.db_session`.
     '''
-    with self.sqltags.db_session(session=session) as session2:
-      yield session2
+    with self.sqltags.db_session(new=new) as session:
+      yield session
 
   def _get_db_entity(self):
     ''' Return database `Entities` instance for this `SQLTagSet`.
@@ -1246,11 +1288,13 @@ class SQLTags(TagSets):
     )
 
   @contextmanager
-  def db_session(self, *, new=False, session=None):
+  def db_session(self, *, new=False):
     ''' Context manager to obtain a db session if required,
         just a shim for `self.orm.session()`.
     '''
-    with self.orm.session(new=new, session=session) as session2:
+    orm_state = self.orm.sqla_state
+    get_session = orm_state.new_session if new else orm_state.auto_session
+    with get_session() as session2:
       yield session2
 
   @property
