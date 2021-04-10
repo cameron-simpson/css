@@ -75,9 +75,10 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.session(new=True) as session:
-      with self(orm=orm, session=session):
-        yield session
+    with orm.arranged_session() as session:
+      with session.begin_nested():
+        with self(orm=orm, session=session):
+          yield session
 
   @contextmanager
   def auto_session(self, *, orm=None):
@@ -86,10 +87,12 @@ class SQLAState(State):
     '''
     session = self.session
     if session is None or (orm is not None and orm is not self.orm):
+      # new session required
       with self.new_session(orm=orm) as session:
         yield session
     else:
-      yield session
+      with session.begin_nested():
+        yield session
 
 # global state, not tied to any specific ORM or session
 state = SQLAState(orm=None, session=None)
