@@ -374,58 +374,30 @@ class ORM(MultiOpenMixin, ABC):
 
   @contextmanager
   @pfx_method(use_str=True)
-  def session(self, new=False, *a, session=None, **kw):
-    ''' Context manager to issue a session if required.
-        A subtransaction is established around this call.
-
-        Parameters:
-        * `new`: optional flag, default `False`;
-          if true then a new session will always be created
-        * `session`: optional session to use, default `None`;
-          if not `None` then the supplied session is used
-
-        It is an error for `new` to be true and to also supply a `session`.
-
-        It is an error for `new` to be true if there is already an
-        estalished session and `self.serial_sessions` is true.
+  def arranged_session(self):
+    ''' Arrange a new session for this `Thread`.
     '''
     orm_state = self.sqla_state
-    if session is not None:
-      if new:
-        raise ValueError("cannot set new=%r if session is not None" % (new,))
-      # provided an explicit session
-      with session.begin_nested():
-        with orm_state(session=session):
-          yield session
-    # examine the current session state
-    orm_session = orm_state.session
-    if not new and orm_session is not None:
-      # reuse existing session
-      with orm_session.begin_nested():
-        yield orm_session
-    else:
-      # new session required
-      with self:
-        if self.serial_sessions:
-          if orm_session is not None:
-            T = current_thread()
-            tid = "Thread:%d:%s" % (T.ident, T.name)
-            raise RuntimeError(
-                "%s: this Thread already has an ORM session: %s" % (
-                    tid,
-                    orm_session,
-                )
-            )
-          with self._serial_sessions_lock:
-            new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
-            with new_session.begin(subtransactions=True):
-              with orm_state(session=new_session):
-                yield new_session
-        else:
-          new_session = self.sessionmaker(*a, **kw)  # pylint: disable=not-callable
-          with new_session.begin(subtransactions=True):
-            with orm_state(session=new_session):
-              yield new_session
+    with self:
+      if self.serial_sessions:
+        if orm_state.session is not None:
+          T = current_thread()
+          tid = "Thread:%d:%s" % (T.ident, T.name)
+          raise RuntimeError(
+              "%s: this Thread already has an ORM session: %s" % (
+                  tid,
+                  orm_session,
+              )
+          )
+        with self._serial_sessions_lock:
+          new_session = self._sessionmaker()
+          X("ARRANGED_SESSION: new_session=%s", new_session)
+          with new_session.begin_nested():
+            yield new_session
+      else:
+        new_session = self._sessionmaker()
+        with new_session.begin_nested():
+          yield new_session
 
   @property
   def default_session(self):
