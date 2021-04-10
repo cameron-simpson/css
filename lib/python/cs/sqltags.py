@@ -900,6 +900,19 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             )
         )
 
+      def _update_multivalues(self, tag_name, values, *, session):
+        ''' Update the tag subvalue table.
+        '''
+        tag_subvalues = orm.tag_subvalues
+        for subv in tag_subvalues.lookup(entity_id=self.id, tag_name=tag_name,
+                                         session=session):
+          subv.delete()
+        if values is not None and not isinstance(values, str):
+          for subvalue in values:
+            subv = tag_subvalues(entity_id=self.id, tag_name=tag_name)
+            subv.value = subvalue
+            session.add(subv)
+
       def add_tag(self, name: str, value=None, *, session):
         ''' Add a tag for `(name,value)`,
             replacing any existing tag named `name`.
@@ -917,6 +930,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           session.add(etag)
         else:
           etag.value = value
+        self._update_multivalues(name, value, session=session)
 
       def discard_tag(self, name, value=None, *, session):
         ''' Discard the tag matching `(name,value)`.
@@ -928,6 +942,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         if etag is not None:
           if tag.value is None or tag.value == etag.value:
             session.delete(etag)
+        self._update_multivalues(name, (), session=session)
         return etag
 
     class Tags(Base, BasicTableMixin, PolyValueMixin):
