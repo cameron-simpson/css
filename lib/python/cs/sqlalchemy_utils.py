@@ -405,61 +405,6 @@ class ORM(MultiOpenMixin, ABC):
     '''
     return self.sqla_state.session
 
-  @staticmethod
-  def auto_session(method):
-    ''' Decorator to run a method in a session derived from this ORM
-        if a session is not presupplied.
-
-        See `with_session` for details.
-    '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          yield from method(self, *a, session=session, **kw)
-    else:
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          return method(self, *a, session=session, **kw)
-
-    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
-    wrapper.__doc__ = method.__doc__
-    wrapper.__module__ = getattr(method, '__module__', None)
-    return wrapper
-
-  @staticmethod
-  def orm_method(method):
-    ''' Decorator for ORM subclass methods
-        to set the shared `state.orm` to `self`.
-    '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared `state.orm`.
-        '''
-        with state(orm=self):
-          yield from method(self, *a, **kw)
-    else:
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared `state.orm`.
-        '''
-        with state(orm=self):
-          return method(self, *a, **kw)
-
-    wrapper.__name__ = method.__name__
-    wrapper.__doc__ = method.__doc__
-    return wrapper
-
-orm_method = ORM.orm_method
-
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`
       if a session is not presupplied.
