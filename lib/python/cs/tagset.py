@@ -1814,6 +1814,7 @@ class TagSetNamespace(ExtendedNamespace):
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
       getns = self.__dict__.get
+      tag = getns('_tag')
       tagset = getns('_tagset')
       if attr == 'cover':
         raise RuntimeError("BANG")
@@ -1822,7 +1823,6 @@ class TagSetNamespace(ExtendedNamespace):
       if attr == '_meta':
         return self._tag.meta.ns()
       if attr == '_keys':
-        tag = getns('_tag')
         if tag is not None:
           value = tag.value
           try:
@@ -1832,11 +1832,9 @@ class TagSetNamespace(ExtendedNamespace):
           else:
             return list(keys())
       if attr == '_value':
-        tag = getns('_tag')
         if tag is not None:
           return tag.value
       if attr == '_values':
-        tag = getns('_tag')
         if tag is not None:
           value = tag.value
           try:
@@ -1848,6 +1846,11 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
+      if tag is not None:
+        try:
+          return getattr(tag, attr)
+        except AttributeError:
+          pass
       if tagset is not None:
         try:
           return getattr(tagset, attr)
