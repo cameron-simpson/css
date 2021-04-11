@@ -105,7 +105,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{datetime} {headline}'
 
 def main(argv=None):
   ''' Command line mode.
