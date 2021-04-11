@@ -192,6 +192,7 @@ from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
+from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
@@ -329,7 +330,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
-class TagSet(dict, FormatableMixin, AttrableMappingMixin):
+class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
