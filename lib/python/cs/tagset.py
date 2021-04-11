@@ -1655,7 +1655,6 @@ class TagSetNamespace(ExtendedNamespace):
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
         `'..a.b'` will all map to the namespace entry `a.b`.
-
         `Tag`s are processed in reverse lexical order by name, which
         dictates which of the conflicting multidot names takes
         effect in the namespace - the first found is used.
@@ -1816,8 +1815,6 @@ class TagSetNamespace(ExtendedNamespace):
       getns = self.__dict__.get
       tag = getns('_tag')
       tagset = getns('_tagset')
-      if attr == 'cover':
-        raise RuntimeError("BANG")
       if attr == '_type':
         return self._tag.typedata.ns()
       if attr == '_meta':
