@@ -1813,9 +1813,10 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
+      getns = self.__dict__.get
+      tagset = getns('_tagset')
       if attr == 'cover':
         raise RuntimeError("BANG")
-      getns = self.__dict__.get
       if attr == '_type':
         return self._tag.typedata.ns()
       if attr == '_meta':
@@ -1847,6 +1848,11 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
+      if tagset is not None:
+        try:
+          return getattr(tagset, attr)
+        except AttributeError:
+          pass
       for conv_suffix, conv in {
           'i': int,
           's': str,
