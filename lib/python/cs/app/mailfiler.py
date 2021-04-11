@@ -93,7 +93,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.maildb',
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.configutils',
         'cs.deco',
         'cs.env',
@@ -259,8 +259,6 @@ class MailFilerCommand(BaseCommand):
                      'rules_pattern') and v is not None
         }
     )
-
-MailFilerCommand.add_usage_to_docstring()
 
 def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
