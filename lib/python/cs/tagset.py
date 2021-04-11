@@ -219,6 +219,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
+        'cs.dateutils',
         'cs.deco',
         'cs.edit',
         'cs.fileutils',
