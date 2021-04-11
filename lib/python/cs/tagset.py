@@ -1664,7 +1664,8 @@ class TagSetNamespace(ExtendedNamespace):
       pathnames = []
     ns0 = cls(
         _path='.'.join(pathnames) if pathnames else '.',
-        _pathnames=tuple(pathnames)
+        _pathnames=tuple(pathnames),
+        _tagset=tags,
     )
     if tags:
       ns0._ontology = tags.ontology
