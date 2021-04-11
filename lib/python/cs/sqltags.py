@@ -105,7 +105,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{entity.isodatetime} {headline}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{datetime} {headline}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -1644,6 +1644,23 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       return SQTEntityIdTest([index])
 
+  @staticmethod
+  def parse_categories(categories):
+    ''' Extract "category" words from the `str` `categories`,
+        return a list of category names.
+
+        Splits on commas, strips leading and trailing whitespace, downcases.
+    '''
+    return list(
+        filter(
+            None,
+            map(
+                lambda category: category.strip().lower(),
+                categories.split(',')
+            )
+        )
+    )
+
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database shell.
@@ -1819,7 +1836,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     for opt, val in opts:
       with Pfx(opt if val is None else f"{opt} {val!r}"):
         if opt == '-c':
-          categories = map(str.lower, filter(None, val.split(',')))
+          categories = self.parse_categories(val)
         elif opt == '-d':
           try:
             dt = datetime.fromisoformat(val)
@@ -1908,13 +1925,10 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
           # infer categories from leading "FOO,BAH:" text
           m = CATEGORIES_PREFIX_re.match(headline)
           if m:
-            tag_categories = map(
-                str.lower, filter(None,
-                                  m.group('categories').split(','))
-            )
+            tag_categories = self.parse_categories(m.group('categories'))
             headline = headline[len(m.group()):]
           else:
-            tag_categories = ()
+            tag_categories = None
         else:
           tag_categories = categories
         log_tags.append(Tag('headline', headline))

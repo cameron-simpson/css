@@ -192,6 +192,7 @@ from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
+from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
@@ -218,6 +219,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.cmdutils>=20210404',
+        'cs.dateutils',
         'cs.deco',
         'cs.edit',
         'cs.fileutils',
@@ -329,7 +331,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
-class TagSet(dict, FormatableMixin, AttrableMappingMixin):
+class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
       This actually subclasses `dict`, so a `TagSet` is a direct
@@ -1654,7 +1656,6 @@ class TagSetNamespace(ExtendedNamespace):
         Note that multiple dots in `Tag` names are collapsed;
         for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
         `'..a.b'` will all map to the namespace entry `a.b`.
-
         `Tag`s are processed in reverse lexical order by name, which
         dictates which of the conflicting multidot names takes
         effect in the namespace - the first found is used.
@@ -1663,7 +1664,8 @@ class TagSetNamespace(ExtendedNamespace):
       pathnames = []
     ns0 = cls(
         _path='.'.join(pathnames) if pathnames else '.',
-        _pathnames=tuple(pathnames)
+        _pathnames=tuple(pathnames),
+        _tagset=tags,
     )
     if tags:
       ns0._ontology = tags.ontology
@@ -1811,15 +1813,14 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     path = self.__dict__.get('_path')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
-      if attr == 'cover':
-        raise RuntimeError("BANG")
       getns = self.__dict__.get
+      tag = getns('_tag')
+      tagset = getns('_tagset')
       if attr == '_type':
         return self._tag.typedata.ns()
       if attr == '_meta':
         return self._tag.meta.ns()
       if attr == '_keys':
-        tag = getns('_tag')
         if tag is not None:
           value = tag.value
           try:
@@ -1829,11 +1830,9 @@ class TagSetNamespace(ExtendedNamespace):
           else:
             return list(keys())
       if attr == '_value':
-        tag = getns('_tag')
         if tag is not None:
           return tag.value
       if attr == '_values':
-        tag = getns('_tag')
         if tag is not None:
           value = tag.value
           try:
@@ -1845,6 +1844,16 @@ class TagSetNamespace(ExtendedNamespace):
       # end of private/special attributes
       if attr.startswith('_'):
         raise AttributeError(attr)
+      if tag is not None:
+        try:
+          return getattr(tag, attr)
+        except AttributeError:
+          pass
+      if tagset is not None:
+        try:
+          return getattr(tagset, attr)
+        except AttributeError:
+          pass
       for conv_suffix, conv in {
           'i': int,
           's': str,
