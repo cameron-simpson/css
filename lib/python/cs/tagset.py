@@ -1725,6 +1725,21 @@ class TagSetNamespace(ExtendedNamespace):
       return format(tag.value, spec)
     return super().__format__(spec)
 
+  def _subns(self, attr):
+    ''' Create a subnamespace for `attr` as for `ExtendedNamespace`
+        and adorn it with `._tag` and `._tagset`.
+    '''
+    subns = super()._subns(attr)
+    overtag = self.__dict__.get('_tag')
+    format_placeholder = '{' + self._path + '.' + attr + '}'
+    subns._tag = Tag(
+        attr,
+        format_placeholder,
+        ontology=overtag.ontology if overtag else self._tagset.ontology
+    )
+    subns._tagset = self._tagset.subtags(attr)
+    return subns
+
   @pfx_method
   def __getitem__(self, key):
     ''' If this node has a `._tag` then dereference its `.value`,
