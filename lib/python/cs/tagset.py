@@ -1710,9 +1710,9 @@ class TagSetNamespace(ExtendedNamespace):
     return super().__repr__()
 
   def __bool__(self):
-    ''' Truthiness: `True` unless the `._bool` attribute overrides that.
+    ''' Truthiness: true if the `._tagset` is not empty.
     '''
-    return getattr(self, '_bool', True)
+    return bool(self._tagset)
 
   @pfx_method
   def __format__(self, spec):
