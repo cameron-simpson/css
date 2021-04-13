@@ -1745,27 +1745,18 @@ class TagSetNamespace(ExtendedNamespace):
     ''' If this node has a `._tag` then dereference its `.value`,
         otherwise fall through to the superclass `__getitem__`.
     '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      # This node in the hierarchy is associated with a Tag.
-      # Dereference the Tag's value.
-      value = tag.value
+    if isinstance(key, str):
       try:
-        element = value[key]
-      except TypeError as e:
-        warning("[%r]: %s", key, e)
-      except KeyError:
-        # Leave a visible indication of the unfulfilled dereference.
-        return self._path + '[' + repr(key) + ']'
+        item = getattr(self, key)
+      except (AttributeError, TypeError) as e:
+        warning(
+            "[%s:%r]: %s, fall back to super().__getitem__",
+            type(key).__name_, key, e
+        )
       else:
-        # Look up this element in the ontology (if any).
-        member_metadata = tag.member_metadata(key)
-        if member_metadata is None:
-          # No metadata? Return the element.
-          return element
-        # Return the metadata for the element as a namespace.
-        return member_metadata.ns()
-    return super().__getitem__(key)
+        return item
+    super_item = super().__getitem__(key)
+    return super_item
 
   def _tag_value(self):
     ''' Fetch the value if this node's `Tag`, or `None`.
