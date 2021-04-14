@@ -20,4 +20,6 @@ fi
   exit 2
 }
 
-exec fstags ls -d -o '{cs.dlog}' -- "$path"
+format={cs.dlog}
+category=$( fstags ls -d -o "$format" -- "$path" )
+[ -n "$category" ] && [ "x$category" != "x$format" ] && echo "$category"

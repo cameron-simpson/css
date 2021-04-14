@@ -1710,9 +1710,9 @@ class TagSetNamespace(ExtendedNamespace):
     return super().__repr__()
 
   def __bool__(self):
-    ''' Truthiness: `True` unless the `._bool` attribute overrides that.
+    ''' Truthiness: true if the `._tagset` is not empty.
     '''
-    return getattr(self, '_bool', True)
+    return bool(self._tagset)
 
   @pfx_method
   def __format__(self, spec):
@@ -1725,32 +1725,38 @@ class TagSetNamespace(ExtendedNamespace):
       return format(tag.value, spec)
     return super().__format__(spec)
 
+  def _subns(self, attr):
+    ''' Create a subnamespace for `attr` as for `ExtendedNamespace`
+        and adorn it with `._tag` and `._tagset`.
+    '''
+    subns = super()._subns(attr)
+    overtag = self.__dict__.get('_tag')
+    format_placeholder = '{' + self._path + '.' + attr + '}'
+    subns._tag = Tag(
+        attr,
+        format_placeholder,
+        ontology=overtag.ontology if overtag else self._tagset.ontology
+    )
+    subns._tagset = self._tagset.subtags(attr)
+    return subns
+
   @pfx_method
   def __getitem__(self, key):
     ''' If this node has a `._tag` then dereference its `.value`,
         otherwise fall through to the superclass `__getitem__`.
     '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      # This node in the hierarchy is associated with a Tag.
-      # Dereference the Tag's value.
-      value = tag.value
+    if isinstance(key, str):
       try:
-        element = value[key]
-      except TypeError as e:
-        warning("[%r]: %s", key, e)
-      except KeyError:
-        # Leave a visible indication of the unfulfilled dereference.
-        return self._path + '[' + repr(key) + ']'
+        item = getattr(self, key)
+      except (AttributeError, TypeError) as e:
+        warning(
+            "[%s:%r]: %s, fall back to super().__getitem__",
+            type(key).__name_, key, e
+        )
       else:
-        # Look up this element in the ontology (if any).
-        member_metadata = tag.member_metadata(key)
-        if member_metadata is None:
-          # No metadata? Return the element.
-          return element
-        # Return the metadata for the element as a namespace.
-        return member_metadata.ns()
-    return super().__getitem__(key)
+        return item
+    super_item = super().__getitem__(key)
+    return super_item
 
   def _tag_value(self):
     ''' Fetch the value if this node's `Tag`, or `None`.
@@ -1811,95 +1817,105 @@ class TagSetNamespace(ExtendedNamespace):
           so the `{a.b.c.d}` in a format string
           can be replaced with itself to present the undefined name in full.
     '''
-    path = self.__dict__.get('_path')
+    getns = self.__dict__.get
+    path = getns('_path')
+    tagset = getns('_tagset')
+    tag = getns('_tag')
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
-      getns = self.__dict__.get
-      tag = getns('_tag')
-      tagset = getns('_tagset')
-      if attr == '_type':
-        return self._tag.typedata.ns()
-      if attr == '_meta':
-        return self._tag.meta.ns()
-      if attr == '_keys':
-        if tag is not None:
-          value = tag.value
-          try:
-            keys = value.keys
-          except AttributeError:
-            pass
-          else:
-            return list(keys())
-      if attr == '_value':
-        if tag is not None:
-          return tag.value
-      if attr == '_values':
-        if tag is not None:
-          value = tag.value
-          try:
-            values = value.values
-          except AttributeError:
-            pass
-          else:
-            return list(values())
-      # end of private/special attributes
-      if attr.startswith('_'):
-        raise AttributeError(attr)
       if tag is not None:
+        # local Tag? probe it
+        # first, special _* attributes
+        if attr == '_type':
+          return self._tag.typedata.ns()
+        if attr == '_meta':
+          return self._tag.meta.ns()
+        if attr == '_keys':
+          if tag is not None:
+            value = tag.value
+            try:
+              keys = value.keys
+            except AttributeError:
+              # not found, fall through
+              pass
+            else:
+              return list(keys())
+        if attr == '_value':
+          if tag is not None:
+            return tag.value
+        if attr == '_values':
+          if tag is not None:
+            value = tag.value
+            try:
+              values = value.values
+            except AttributeError:
+              # not found, fall through
+              pass
+            else:
+              return list(values())
+        # otherwise probe the Tag directly
         try:
           return getattr(tag, attr)
         except AttributeError:
+          # not found, fall through
           pass
-      if tagset is not None:
-        try:
-          return getattr(tagset, attr)
-        except AttributeError:
-          pass
+      # probe local TagSet
+      try:
+        tagset_value = getattr(tagset, attr)
+      except AttributeError:
+        pass
+      else:
+        # TagSet attribute access returns None for missing attributes (Tags)
+        if tagset_value is not None:
+          return tagset_value
+      # end of Tag, Tagset and private/special attributes
+      if attr.startswith('_'):
+        raise AttributeError(
+            "%s: unsupported special attribute .%r" % (type(self), attr)
+        )
+      # try builtin conversions
+      # these are all reductive, so there should be no unbound regress
       for conv_suffix, conv in {
-          'i': int,
-          's': str,
-          'f': float,
-          'lc': lc_,
+          '_i': int,
+          '_s': str,
+          '_f': float,
+          '_lc': lc_,
+          's': lambda value: [value],
+          'es': lambda value: [value],
       }.items():
         ur_attr = cutsuffix(attr, '_' + conv_suffix)
         if ur_attr is not attr:
-          ur_value = self._attr_tag_value(ur_attr)
-          if ur_value is not None:
+          try:
+            ur_value = getattr(self, ur_attr)
+          except AttributeError:
+            pass
+          else:
             with Pfx("%s(.%s=%r)", conv, ur_attr, ur_value):
               ur_value = conv(ur_value)
-          return ur_value
-      attr_lc_value = getns(attr + '_lc')
+            return ur_value
+      # see if there's a real "attr_lc" attribute to titleify
+      attr_lc = attr + '_lc'
+      attr_lc_value = getns(attr_lc)
       if attr_lc_value is not None:
-        return titleify_lc(value)
-      # plural from singular
-      for pl_suffix in 's', 'es':
-        single_attr = cutsuffix(attr, pl_suffix)
-        if single_attr is not attr:
-          single_value = self._attr_tag_value(single_attr)
-          if single_value is not None:
-            return [single_value]
+        return titleify_lc(attr_lc_value)
       # singular from plural
       for pl_suffix in 's', 'es':
         plural_attr = attr + pl_suffix
         plural_value = self._attr_tag_value(plural_attr)
-        if plural_value is None:
-          continue
-        value0 = plural_value[0]
-        return value0
-      if attr and attr[0].isalpha():
-        # no such attribute, create a placeholder `Tag`
-        # for [:alpha:]* names
-        format_placeholder = '{' + self._path + '.' + attr + '}'
-        subns = self._subns(attr)
-        overtag = self.__dict__.get('_tag')
-        subns._tag = Tag(
-            attr,
-            format_placeholder,
-            ontology=overtag.ontology if overtag else None
-        )
-        subns._bool = False
-        self.__dict__[attr] = subns
-        return subns
-      return super().__getattr__(attr)
+        if plural_value is not None:
+          value0 = plural_value[0]
+          return value0
+      try:
+        # see if the superclass knows this attribute
+        return super().__getattr__(attr)
+      except AttributeError as e:
+        if attr and attr[0].isalpha():
+          # "public" attribute name
+          # no such attribute, create a placeholder `Tag`
+          # for [:alpha:]* names
+          # and return a namespace containing it
+          subns = self._subns(attr)
+          return subns
+        raise
 
   @property
   def ontology(self):
