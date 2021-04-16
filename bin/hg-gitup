@@ -9,6 +9,7 @@ set -ue
 trace=command
 [ -t 2 ] && trace=set-x
 git_push_opts=
+git_default_branch=main     # vs historic "master"
 all_heads=
 
 cmd=$( basename "$0" )
@@ -103,7 +104,7 @@ xit=0
 for hg_branch
 do
   case "$hg_branch" in
-    default)git_branch=master ;;
+    default)git_branch=$git_default_branch ;;
     *:*)    git_branch=${hg_branch#*:}
             hg_branch=${hg_branch%%:*}
             ;;
