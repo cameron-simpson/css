@@ -7,7 +7,7 @@ cs.mp3: should it yield various Binary packets or is that overkill?
 cs.mp3: parse tags? pull names etc from cs.id3
 progress/upd: fixed with trailing units, eg %2d
 run-backups: single file: src type desthost[:dstpath?] [options...]
-cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue
+(no, we can't) cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue
 cs.logutils,pilfer: drop D_mode and the D function
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
