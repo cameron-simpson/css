@@ -39,10 +39,14 @@ class TestPacket(unittest.TestCase):
               with self.subTest(is_request=is_request, channel=channel,
                                 tag=tag, flags=flags, payload=payload):
                 P = Packet(
-                    is_request, channel, tag, flags, 0 if is_request else None,
-                    payload
+                    is_request=is_request,
+                    channel=channel,
+                    tag=tag,
+                    flags=flags,
+                    rq_type=0 if is_request else None,
+                    payload=payload,
                 )
-                bs = b''.join(P.transcribe_flat())
+                bs = bytes(P)
                 P2, offset = Packet.parse_bytes(bs)
                 self.assertEqual(offset, len(bs))
                 self.assertEqual(P, P2)
