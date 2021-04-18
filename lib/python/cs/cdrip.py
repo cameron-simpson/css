@@ -259,19 +259,6 @@ class MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
-  def __getattr__(self, attr):
-    if attr in ('sqltags', 'tags'):
-      raise AttributeError("MBTagSet.__getattr__: no .%s" % (attr,))
-    try:
-      value = self.tags[attr]
-    except KeyError:
-      # pylint: disable=raise-missing-from
-      raise AttributeError(
-          '%s:%r.tags[%r] (have %r)' %
-          (type(self).__name__, self.name, attr, sorted(self.tags.keys()))
-      )
-    return value
-
   def artists(self):
     ''' Return a list of the artists' metadata.
     '''
