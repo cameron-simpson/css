@@ -3,7 +3,8 @@
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
 
-''' Convenience functions for working with the Cmd module
+''' Convenience functions for working with the Cmd module,
+    the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
 '''
 
@@ -36,8 +37,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context', 'cs.deco', 'cs.gimmicks', 'cs.lex', 'cs.logutils',
-        'cs.pfx', 'cs.py.doc', 'cs.resources'
+        'cs.context',
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.doc',
+        'cs.resources',
     ],
 }
 
@@ -60,13 +67,13 @@ def docmd(dofunc):
           from cs.cmdutils import docmd
           ...
           class MyCmd(Cmd):
-            @docmd
-            def do_something(...):
-              ... do something ...
+              @docmd
+              def do_something(...):
+                  ... do something ...
   '''
   funcname = dofunc.__name__
 
-  def wrapped(self, *a, **kw):
+  def docmd_wrapper(self, *a, **kw):
     ''' Run a `Cmd` "do" method with some context and handling.
     '''
     if not funcname.startswith('do_'):
@@ -83,9 +90,9 @@ def docmd(dofunc):
         exception("%s", e)
         return None
 
-  wrapped.__name__ = '@docmd(%s)' % (funcname,)
-  wrapped.__doc__ = dofunc.__doc__
-  return wrapped
+  docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
+  docmd_wrapper.__doc__ = dofunc.__doc__
+  return docmd_wrapper
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
