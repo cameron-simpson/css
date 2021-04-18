@@ -538,7 +538,7 @@ class BaseCommand:
         and return `True` to contain the exception
         or `False` to cause the exception to be reraised.
     '''
-    print("%s: %s" % (cmd, e), file=sys.stderr)
+    warning("%s", e)
     if usage:
       print(usage.rstrip(), file=sys.stderr)
     return True
