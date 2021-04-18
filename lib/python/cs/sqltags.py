@@ -1364,7 +1364,7 @@ class SQLTags(TagSets):
   def __getitem__(self, index):
     ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
-    with self.db_session(new=True):
+    with self.db_session():
       te = self.get(index)
       if te is None:
         if isinstance(index, int):
