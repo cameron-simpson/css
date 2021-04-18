@@ -262,12 +262,12 @@ class MBTagSet(SQLTagSet):
   def artists(self):
     ''' Return a list of the artists' metadata.
     '''
-    return self.tag('artists').metadata(convert=str)
+    return self.tag_metadata('artists', convert=str)
 
   def recordings(self):
     ''' Return a list of the recordings.
     '''
-    return self.tag('recordings').metadata(convert=str)
+    return self.tag_metadata('recordings', convert=str)
 
   def artist_names(self):
     ''' Return a list of artist names.
