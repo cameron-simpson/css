@@ -106,7 +106,7 @@ class CDRipCommand(BaseCommand):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
     fstags = FSTags()
-    mbdb = MBDB()
+    mbdb = MBDB(mbdb_path=self.options.mbdb_path)
     with fstags:
       with mbdb:
         with stackattrs(self.options, fstags=fstags, mbdb=mbdb, verbose=True):
