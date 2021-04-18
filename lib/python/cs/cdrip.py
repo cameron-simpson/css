@@ -32,7 +32,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
-from cs.logutils import warning
+from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
@@ -204,7 +204,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
     if existspath(mp3_filename):
-      warning("MP3 file already exists, skipping track: %r",mp3_filename)
+      warning("MP3 file already exists, skipping track: %r", mp3_filename)
     else:
       with NamedTemporaryFile(dir=subdir,
                               prefix=f"cdparanoia--track{tracknum}--",
@@ -243,6 +243,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     fstags[mp3_filename].update(track_tags)
   os.system("eject")
 
+# pylint: disable=too-many-ancestors
 class MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
