@@ -33,7 +33,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.logutils import warning, info
+from cs.logutils import error, warning, info
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
@@ -146,13 +146,17 @@ class CDRipCommand(BaseCommand):
       disc_id = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    rip(
-        options.device,
-        options.mbdb,
-        output_dirpath=dirpath,
-        disc_id=disc_id,
-        fstags=fstags
-    )
+    try:
+      rip(
+          options.device,
+          options.mbdb,
+          output_dirpath=dirpath,
+          disc_id=disc_id,
+          fstags=fstags
+      )
+    except discid.disc.DiscError as e:
+      error("disc error: %s", e)
+      return 1
 
   def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
@@ -166,7 +170,11 @@ class CDRipCommand(BaseCommand):
     options = self.options
     MB = options.mbdb
     if disc_id is None:
-      dev_info = discid.read(device=options.device)
+      try:
+        dev_info = discid.read(device=options.device)
+      except discid.disc.DiscError as e:
+        error("disc error: %s", e)
+        return 1
       disc_id = dev_info.id
     with Pfx("discid %s", disc_id):
       disc = MB.discs[disc_id]
