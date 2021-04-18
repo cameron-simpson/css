@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
+    exists as existspath,
     expanduser,
     expandvars,
     isdir as isdirpath,
@@ -202,37 +203,43 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
-    with NamedTemporaryFile(dir=subdir,
-                            prefix=f"cdparanoia--track{tracknum}--",
-                            suffix='.wav') as T:
-      argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
+    if existspath(mp3_filename):
+      warning("MP3 file already exists, skipping track: %r",mp3_filename)
+    else:
+      with NamedTemporaryFile(dir=subdir,
+                              prefix=f"cdparanoia--track{tracknum}--",
+                              suffix='.wav') as T:
+        if existspath(wav_filename):
+          info("using existing WAV file: %r", wav_filename)
+        else:
+          argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
+          with Pfx("+ %r", argv, print=True):
+            subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+          with Pfx("%r => %r", T.name, wav_filename, print=True):
+            os.link(T.name, wav_filename)
+      fstags[wav_filename].update(track_tags)
+      argv = [
+          'lame',
+          '-q',
+          '7',
+          '-V',
+          '0',
+          '--tt',
+          recording.title or "UNTITLED",
+          '--ta',
+          track_artists or "NO ARTISTS",
+          '--tl',
+          level2,
+          ## '--ty',recording year
+          '--tn',
+          str(tracknum),
+          ## '--tg', recording genre
+          ## '--ti', album cover filename
+          wav_filename,
+          mp3_filename
+      ]
       with Pfx("+ %r", argv, print=True):
         subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-      with Pfx("%r => %r", T.name, wav_filename, print=True):
-        os.link(T.name, wav_filename)
-    fstags[wav_filename].update(track_tags)
-    argv = [
-        'lame',
-        '-q',
-        '7',
-        '-V',
-        '0',
-        '--tt',
-        recording.title,
-        '--ta',
-        track_artists,
-        '--tl',
-        level2,
-        ## '--ty',recording year
-        '--tn',
-        str(tracknum),
-        ## '--tg', recording genre
-        ## '--ti', album cover filename
-        wav_filename,
-        mp3_filename
-    ]
-    with Pfx("+ %r", argv, print=True):
-      subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
     fstags[mp3_filename].update(track_tags)
   os.system("eject")
 
