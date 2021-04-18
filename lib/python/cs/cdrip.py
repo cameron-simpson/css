@@ -57,9 +57,10 @@ class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
   '''
 
-  GETOPT_SPEC = 'D:fM:'
+  GETOPT_SPEC = 'd:D:fM:'
 
   USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
+    -d output_dir Specify the output directory path.
     -D device     Device to access. This may be omitted or "default" or
                   "" for the default device as determined by the discid module.
                   The environment variable $CDRIP_DEV may override the default.
@@ -68,7 +69,7 @@ class CDRipCommand(BaseCommand):
 
   Environment:
     CDRIP_DEV            Default CDROM device.
-    CDRIP_DIR            Default output directory.
+    CDRIP_DIR            Default output directory path.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
 
@@ -92,14 +93,20 @@ class CDRipCommand(BaseCommand):
     options = self.options
     for opt, val in opts:
       with Pfx(opt):
-        if opt == '-D':
+        if opt == '-d':
+          options.dirpath = val
+        elif opt == '-D':
           options.device = val
         elif opt == '-f':
           options.force = True
-        if opt == '-M':
+        elif opt == '-M':
           options.mbdb_path = val
         else:
           raise GetoptError("unimplemented option")
+    if not isdirpath(options.dirpath):
+      raise GetoptError(
+          "output directory: not a directory: %r" % (options.dirpath,)
+      )
 
   @contextmanager
   def run_context(self):
