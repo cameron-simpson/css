@@ -524,6 +524,13 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         ontology=ontology or self.ontology,
     )
 
+  def tag_metadata(self, tag_name, prefix=None, ontology=None, convert=None):
+    ''' Return a list of the metadata for the `Tag` named `tag_name`,
+        or an empty list if the `Tag` is missing.
+    '''
+    tag = self.tag(tag_name, prefix=prefix, ontology=ontology)
+    return tag.metadata(ontology=ontology, convert=convert) if tag is not None else []
+
   def as_tags(self, prefix=None, ontology=None):
     ''' Yield the tag data as `Tag`s.
     '''
