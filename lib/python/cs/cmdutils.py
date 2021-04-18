@@ -525,8 +525,8 @@ class BaseCommand:
         It returns a false value if the exception is considered unhandled,
         in which case the main `run` method reraises the `GetoptError`.
 
-        This default handler prints an error message to standard error,
-        prints the usage message (if specified) to standard error,
+        This default handler issues a warning containing the exception text,
+        prints the usage message to standard error,
         and returns `True` to indicate that the error has been handled.
 
         To let the exceptions out unhandled
