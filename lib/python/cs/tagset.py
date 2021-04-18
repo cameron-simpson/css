@@ -607,7 +607,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       if name not in other:
         self.discard(name, verbose=verbose)
 
-  def update(self, other, *, prefix=None, verbose=None):
+  def update(self, other=None, *, prefix=None, verbose=None, **kw):
     ''' Update this `TagSet` from `other`,
         a dict of `{name:value}`
         or an iterable of `Tag`like or `(name,value)` things.
@@ -619,11 +619,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       items = other
     else:
       items = items_attr()
-    for item in items:
-      try:
-        name, value = item
-      except ValueError:
-        name, value = item.name, item.value
+    if items is not None:
+      for item in items:
+        try:
+          name, value = item
+        except ValueError:
+          name, value = item.name, item.value
+        if prefix:
+          name = prefix + '.' + name
+        self.set(name, value, verbose=verbose)
+    for name, value in kw.items():
       if prefix:
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
