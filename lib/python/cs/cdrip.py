@@ -31,6 +31,7 @@ import musicbrainzngs
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_method
@@ -44,7 +45,8 @@ musicbrainzngs.set_useragent(__name__, __version__, os.environ['EMAIL'])
 
 DEFAULT_CDRIP_DIR = '~/var/cdrip'
 
-DEFAULT_MBDB_PATH = '~/var/cache/mbdb.sqlite'
+MBDB_PATH_ENVVAR = 'MUSICBRAINZ_SQLTAGS'
+MBDB_PATH_DEFAULT = '~/var/cache/mbdb.sqlite'
 
 def main(argv=None):
   ''' Call the command line main programme.
@@ -55,28 +57,34 @@ class CDRipCommand(BaseCommand):
   ''' 'cdrip' command line.
   '''
 
-  GETOPT_SPEC = 'd:D:f'
-  USAGE_FORMAT = r'''Usage: {cmd} [-d tocdir] [-dev_info device] subcommand...
-    -d tocdir Use tocdir as a directory of contents cached by discid
-              In this mode the cache TOC file pathname is recited to standard
-              output instead of the contents.
-    -D device Device to access. This may be omitted or "default" or
-              "" for the default device as determined by the discid module.
-              The environment variable $CDRIP_DEV may override the default.
-    -f        Force. Read disc and consult Musicbrainz even if a toc file exists.
+  GETOPT_SPEC = 'D:fM:'
+
+  USAGE_FORMAT = r'''Usage: {cmd} [options...] subcommand...
+    -D device     Device to access. This may be omitted or "default" or
+                  "" for the default device as determined by the discid module.
+                  The environment variable $CDRIP_DEV may override the default.
+    -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
+    -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
 
   Environment:
-    CDRIP_DEV   Default CDROM device.
-    CDRIP_DIR   Default output directory.'''
+    CDRIP_DEV            Default CDROM device.
+    CDRIP_DIR            Default output directory.
+    {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
+                         default {MBDB_PATH_DEFAULT}.'''
+
+  USAGE_KEYWORDS = {
+      'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
+      'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
+  }
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
     options = self.options
-    options.tocdir = None
     options.force = False
     options.device = os.environ.get('CDRIP_DEV', "default")
     options.dirpath = os.environ.get('CDRIP_DIR', ".")
+    options.mbdb_path = None
 
   def apply_opts(self, opts):
     ''' Apply the command line options.
@@ -84,12 +92,12 @@ class CDRipCommand(BaseCommand):
     options = self.options
     for opt, val in opts:
       with Pfx(opt):
-        if opt == '-d':
-          options.tocdir = val
-        elif opt == '-D':
+        if opt == '-D':
           options.device = val
         elif opt == '-f':
           options.force = True
+        if opt == '-M':
+          options.mbdb_path = val
         else:
           raise GetoptError("unimplemented option")
 
@@ -281,6 +289,23 @@ class MBSQLTags(SQLTags):
 
   TagSetClass = MBTagSet
 
+  @fmtdoc
+  def __init__(self, mbdb_path=None):
+    ''' Initialise the MBSQLTags instance,
+        computing the default `mbdb_path` if required.
+
+        `mbdb_path` is provided as `db_url` to the SQLTags superclass
+        initialiser.
+        If not specified it is obtained from the environment variable
+        {MBDB_PATH_ENVVAR}, falling back to `{MBDB_PATH_DEFAULT!r}`.
+    '''
+    if mbdb_path is None:
+      mbdb_path = os.environ.get(MBDB_PATH_ENVVAR)
+      if mbdb_path is None:
+        mbdb_path = expanduser(MBDB_PATH_DEFAULT)
+    super().__init__(db_url=mbdb_path)
+    self.mbdb_path = mbdb_path
+
   @pfx_method
   def default_factory(self, name: str, *, unixtime=None):
     te = super().default_factory(name, unixtime=unixtime)
@@ -305,10 +330,8 @@ class MBDB(MultiOpenMixin):
 
   VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
 
-  def __init__(self):
-    sqltags = self.sqltags = MBSQLTags(
-        expanduser(expandvars(DEFAULT_MBDB_PATH))
-    )
+  def __init__(self, mbdb_path=None):
+    sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
       sqltags.init()
