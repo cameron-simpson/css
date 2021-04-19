@@ -495,19 +495,15 @@ class PlayOnAPI(MultiOpenMixin):
     self.sqltags = sqltags
     self._fstags = FSTags()
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start up: open and init the `SQLTags`, open the `FSTags`.
     '''
     sqltags = self.sqltags
-    sqltags.open()
-    sqltags.init()
-    self._fstags.open()
-
-  def shutdown(self):
-    ''' Shutdown: close the `SQLTags`, close the `FSTags`.
-    '''
-    self._fstags.close()
-    self.sqltags.close()
+    with sqltags:
+      sqltags.init()
+      with self._fstags:
+        yield
 
   @property
   @pfx_method
