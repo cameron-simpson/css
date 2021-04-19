@@ -169,18 +169,18 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         for dl_id in recording_ids:
-          te = sqltags[dl_id]
-          with Pfx(te.name):
-            if te.is_expired():
+          recording = sqltags[dl_id]
+          with Pfx(recording.name):
+            if recording.is_expired():
               warning("expired, skipping")
               continue
-            if not te.is_available():
+            if not recording.is_available():
               warning("not yet available, skipping")
               continue
-            if te.is_downloaded():
-              warning("already downloaded to %r", te.download_path)
+            if recording.is_downloaded():
+              warning("already downloaded to %r", recording.download_path)
             if no_download:
-              te.ls()
+              recording.ls()
             else:
               sem.acquire()
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
@@ -188,9 +188,9 @@ class PlayOnCommand(BaseCommand):
     if Rs:
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
-        te = sqltags[dl_id]
+        recording = sqltags[dl_id]
         if R():
-          print("OK ", dl_id, te.download_path)
+          print("OK ", dl_id, recording.download_path)
         else:
           print("BAD", dl_id)
           xit = 1
