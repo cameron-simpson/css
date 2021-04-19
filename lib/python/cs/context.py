@@ -280,8 +280,29 @@ def twostep(cmgr):
       See also the `setup_cmgr(cmgr)` function
       which is a convenience wrapper for this low level generator.
 
+      *Note*:
+      this function expects `cmgr` to be an existing context manager.
+      In particular, if you define some function like this:
+
+          @contextmanager
+          def my_cmgr_func(...):
+              ...
+              yield
+              ...
+
+      then the correct use of `twostep()` is:
+
+          cmgr_iter = twostep(my_cmgr_func(...))
+          next(cmgr_iter)   # set up
+          next(cmgr_iter)   # tear down
+
+      and _not_:
+
+          cmgr_iter = twostep(my_cmgr_func)
+          ...
+
       The purpose of `twostep()` is to split any context manager's operation
-      across two steps when the set up and teardown phases must operate
+      across two steps when the set up and tear down phases must operate
       in different parts of your code.
       A common situation is the `__enter__` and `__exit__` methods
       of another context manager class.
@@ -294,11 +315,13 @@ def twostep(cmgr):
           class SomeClass:
               def __init__(self, foo)
                   self.foo = foo
-                  self._cmgr = None
+                  self._cmgr_ = None
               def __enter__(self):
-                  self._cmgr = next(stackattrs(o, setting=foo))
+                  self._cmgr_stepped = twostep(stackattrs(o, setting=foo))
+                  self._cmgr = next(self._cmgr_stepped)
+                  return self._cmgr
               def __exit__(self, *_):
-                  next(self._cmgr)
+                  next(self._cmgr_stepped)
                   self._cmgr = None
   '''
   with cmgr:
@@ -311,6 +334,25 @@ def setup_cmgr(cmgr):
 
       This is a convenience wrapper for the lower level `twostep()` function
       which produces a two iteration generator from a context manager.
+
+      *Note*:
+      this function expects `cmgr` to be an existing context manager.
+      In particular, if you define some context manager function like this:
+
+          @contextmanager
+          def my_cmgr_func(...):
+              ...
+              yield
+              ...
+
+      then the correct use of `setup_cmgr()` is:
+
+          teardown = setup_cmgr(my_cmgr_func(...))
+
+      and _not_:
+
+          cmgr_iter = setup_cmgr(my_cmgr_func)
+          ...
 
       The purpose of `setup_cmgr()` is to split any context manager's operation
       across two steps when the set up and teardown phases must operate
@@ -331,8 +373,8 @@ def setup_cmgr(cmgr):
               def __enter__(self):
                   self._teardown = setup_cmgr(stackattrs(o, setting=foo))
               def __exit__(self, *_):
-                  self._teardown()
-                  self._teardown = None
+                  teardown, self._teardown = self._teardown, None
+                  teardown()
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
