@@ -702,6 +702,7 @@ def makelockfile(
           raise
         if timeout is not None and timeout <= 0:
           # immediate failure
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
@@ -722,6 +723,7 @@ def makelockfile(
           sleep_for = min(poll_interval, start + timeout - now)
         # test for timeout
         if sleep_for <= 0:
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         time.sleep(sleep_for)
         continue
@@ -1785,6 +1787,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
 
   loadable_mapping_key = 'uuid'
 
+  # pylint: disable=unused-argument
   @staticmethod
   def _singleton_key(filename, dictclass=UUIDedDict, create=False):
     ''' Key off the absolute path of `filename`.
