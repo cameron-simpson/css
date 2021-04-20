@@ -297,6 +297,28 @@ class PlayOnCommand(BaseCommand):
       T.join()
     return xit
 
+  def cmd_service(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [service_id]
+          List services.
+    '''
+    if argv:
+      service_id = argv.pop(0)
+    else:
+      service_id = None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
+      playon = service.subtags('playon')
+      if service_id is not None and playon.ID != service_id:
+        print("skip", playon.ID)
+        continue
+      print(playon.ID, playon.Name, playon.LoginMetadata["URL"])
+      if service_id is None:
+        continue
+      for tag in playon:
+        print(" ", tag)
+
 # pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
   ''' The API has a distinct login call, avoid basic auth from netrc etc.
