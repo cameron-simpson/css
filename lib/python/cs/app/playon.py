@@ -726,6 +726,52 @@ class PlayOnAPI(MultiOpenMixin):
     entries = data['entries']
     return self._recordings_from_entries(entries)
 
+  @pfx_method
+  def _services_from_entries(self, entries):
+    ''' Return the service `TagSet` instances from PlayOn data entries.
+    '''
+    with self.sqltags:
+      now = time.time()
+      services = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          for field, conv in sorted(dict(
+              ##Created=self.from_playon_date,
+              ##Expires=self.from_playon_date,
+              ##Updated=self.from_playon_date,
+          ).items()):
+            try:
+              value = entry[field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", field, value):
+                if value is None:
+                  del entry[field]
+                else:
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
+                  else:
+                    entry[field] = value2
+          service = self.service(entry_id)
+          service.update(entry, prefix='playon')
+          service.update(dict(last_updated=now))
+          services.add(service)
+      return services
+
+  @pfx_method
+  def services(self):
+    entries = self.cdsurl_data('content')
+    return self._services_from_entries(entries)
+
+  def service(self, service_id):
+    ''' Return the service `SQLTags` instance for `service_id`.
+    '''
+    return self.sqltags[f'service.{service_id}']
+
   # pylint: disable=too-many-locals
   @pfx_method
   @typechecked
