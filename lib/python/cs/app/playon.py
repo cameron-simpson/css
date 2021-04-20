@@ -618,14 +618,14 @@ class PlayOnAPI(MultiOpenMixin):
 
   @staticmethod
   def from_playon_date(date_s):
-    ''' The PlayOnAPI seems to use UTC date strings.
+    ''' The PlayOn API seems to use UTC date strings.
     '''
     return datetime.strptime(date_s,
                              "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
   @typechecked
   def __getitem__(self, download_id: int):
-    ''' Return the `TagSet` associated with the recording `download_id`.
+    ''' Return the recording `TagSet` associated with the recording `download_id`.
     '''
     return self.sqltags[download_id]
 
