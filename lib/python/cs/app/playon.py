@@ -646,8 +646,9 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.suburl_data('account')
 
-  def _entities_from_entries(self, entries):
-    ''' Return the `TagSet` instances from PlayOn data entries.
+  @pfx_method
+  def _recordings_from_entries(self, entries):
+    ''' Return the recording `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
       now = time.time()
@@ -690,7 +691,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     data = self.suburl_data('queue')
     entries = data['entries']
-    return self._entities_from_entries(entries)
+    return self._recordings_from_entries(entries)
 
   @pfx_method
   def recordings(self):
@@ -698,7 +699,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     data = self.suburl_data('library/all')
     entries = data['entries']
-    return self._entities_from_entries(entries)
+    return self._recordings_from_entries(entries)
 
   # pylint: disable=too-many-locals
   @pfx_method
