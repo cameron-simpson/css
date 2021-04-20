@@ -500,6 +500,9 @@ class PlayOnAPI(MultiOpenMixin):
   API_BASE = f'https://{API_HOSTNAME}/v3/'
   API_AUTH_GRACETIME = 30
 
+  CDS_HOSTNAME = 'cds.playonrecorder.com'
+  CDS_BASE = f'https://{CDS_HOSTNAME}/api/v6/'
+
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
       sqltags = PlayOnSQLTags()
@@ -604,11 +607,11 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, method, suburl):
+  def suburl_request(self, base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
-    url = self.API_BASE + suburl
+    url = base_url + suburl
     rqm = partial(
         {
             'GET': requests.get,
@@ -620,7 +623,15 @@ class PlayOnAPI(MultiOpenMixin):
     )
     return rqm
 
-  def suburl_data(self, suburl, _method='GET', headers=None, **kw):
+  def suburl_data(
+      self,
+      suburl,
+      _base_url=None,
+      _method='GET',
+      headers=None,
+      raw=False,
+      **kw
+  ):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
@@ -631,10 +642,14 @@ class PlayOnAPI(MultiOpenMixin):
         Other keyword arguments are passed to the `requests` method
         used to perform the HTTP call.
     '''
+    if _base_url is None:
+      _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    rqm = self.suburl_request(_method, suburl)
+    rqm = self.suburl_request(_base_url, _method, suburl)
     result = rqm(headers=headers, **kw).json()
+    if raw:
+      return result
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
@@ -645,6 +660,16 @@ class PlayOnAPI(MultiOpenMixin):
     ''' Return account information.
     '''
     return self.suburl_data('account')
+
+  def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
+    return self.suburl_data(
+        suburl,
+        _base_url=self.CDS_BASE,
+        _method=_method,
+        headers=headers,
+        raw=True,
+        **kw
+    )
 
   @pfx_method
   def _recordings_from_entries(self, entries):
