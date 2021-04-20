@@ -86,7 +86,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
-        'cs.sqlalchemy_utils>=20210321',
+        'cs.sqlalchemy_utils>=20210420',
         'cs.tagset',
         'cs.threads>=20201025',
         'cs.upd',
