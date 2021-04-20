@@ -904,9 +904,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         ''' Update the tag subvalue table.
         '''
         tag_subvalues = orm.tag_subvalues
-        for subv in tag_subvalues.lookup(entity_id=self.id, tag_name=tag_name,
-                                         session=session):
-          subv.delete()
+        session.query(tag_subvalues).filter_by(
+            entity_id=self.id, tag_name=tag_name
+        ).delete()
         if values is not None and not isinstance(values, str):
           try:
             subvalues = iter(values)
