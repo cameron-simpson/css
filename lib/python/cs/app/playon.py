@@ -84,6 +84,7 @@ class PlayOnCommand(BaseCommand):
       an int        The specific recording id.
       all           All known recordings.
       downloaded    Recordings already downloaded.
+      expired       Recording which are no longer available.
       pending       Recordings not already downloaded.
       /regexp       Recordings whose Series or Name match the regexp,
                     case insensitive.
@@ -448,6 +449,10 @@ class PlayOnSQLTags(SQLTags):
       elif arg == 'downloaded':
         recordings.extend(
             recording for recording in self if recording.is_downloaded()
+        )
+      elif arg == 'expired':
+        recordings.extend(
+            recording for recording in self if recording.is_expired()
         )
       elif arg == 'pending':
         recordings.extend(
