@@ -27,7 +27,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py.stack'],
+    'install_requires': [
+        'cs.context',
+        'cs.logutils',
+        'cs.obj',
+        'cs.py.func',
+        'cs.py.stack',
+    ],
 }
 
 class ClosedError(Exception):
