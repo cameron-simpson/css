@@ -75,8 +75,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
-        'cs.threads', 'icontract'
+        'cs.logutils',
+        'cs.mappings',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
     ],
 }
 
