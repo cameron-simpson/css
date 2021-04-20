@@ -171,14 +171,18 @@ class PlayOnCommand(BaseCommand):
         for dl_id in recording_ids:
           recording = sqltags[dl_id]
           with Pfx(recording.name):
+            citation = recording.nice_name()
             if recording.is_expired():
-              warning("expired, skipping")
+              warning("expired, skipping %r", citation)
               continue
             if not recording.is_available():
-              warning("not yet available, skipping")
+              warning("not yet available, skipping %r", citation)
               continue
             if recording.is_downloaded():
-              warning("already downloaded to %r", recording.download_path)
+              warning(
+                  "already downloaded %r to %r", citation,
+                  recording.download_path
+              )
             if no_download:
               recording.ls()
             else:
@@ -311,6 +315,16 @@ class PlayOnSQLTagSet(SQLTagSet):
     ''' The recording id or `None`.
     '''
     return self.get('playon.ID')
+
+  def nice_name(self):
+    ''' A nice name for the recording: the PlayOn series and name,
+        omitting the series if None.
+    '''
+    playon_tags = self.subtags('playon')
+    citation = playon_tags.Name
+    if playon_tags.Series:
+      citation = playon_tags.Series + " - " + citation
+    return citation
 
   @property
   def status(self):
