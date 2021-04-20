@@ -529,7 +529,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         or an empty list if the `Tag` is missing.
     '''
     tag = self.tag(tag_name, prefix=prefix, ontology=ontology)
-    return tag.metadata(ontology=ontology, convert=convert) if tag is not None else []
+    return tag.metadata(
+        ontology=ontology, convert=convert
+    ) if tag is not None else []
 
   def as_tags(self, prefix=None, ontology=None):
     ''' Yield the tag data as `Tag`s.
@@ -1672,6 +1674,7 @@ class TagSetNamespace(ExtendedNamespace):
         dictates which of the conflicting multidot names takes
         effect in the namespace - the first found is used.
     '''
+    assert tags is not None
     if pathnames is None:
       pathnames = []
     ns0 = cls(
@@ -1698,7 +1701,7 @@ class TagSetNamespace(ExtendedNamespace):
               subns = ns.__dict__.get(subname)
               if subns is None:
                 subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(
-                    None, subpath
+                    tags.subtags(dotted_subpath), subpath
                 )
               ns = subns
           ns._tag = tag
