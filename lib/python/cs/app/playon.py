@@ -84,6 +84,7 @@ class PlayOnCommand(BaseCommand):
       an int        The specific recording id.
       all           All known recordings.
       downloaded    Recordings already downloaded.
+      expired       Recording which are no longer available.
       pending       Recordings not already downloaded.
       /regexp       Recordings whose Series or Name match the regexp,
                     case insensitive.
@@ -169,18 +170,22 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         for dl_id in recording_ids:
-          te = sqltags[dl_id]
-          with Pfx(te.name):
-            if te.is_expired():
-              warning("expired, skipping")
+          recording = sqltags[dl_id]
+          with Pfx(recording.name):
+            citation = recording.nice_name()
+            if recording.is_expired():
+              warning("expired, skipping %r", citation)
               continue
-            if not te.is_available():
-              warning("not yet available, skipping")
+            if not recording.is_available():
+              warning("not yet available, skipping %r", citation)
               continue
-            if te.is_downloaded():
-              warning("already downloaded to %r", te.download_path)
+            if recording.is_downloaded():
+              warning(
+                  "already downloaded %r to %r", citation,
+                  recording.download_path
+              )
             if no_download:
-              te.ls()
+              recording.ls()
             else:
               sem.acquire()
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
@@ -188,9 +193,9 @@ class PlayOnCommand(BaseCommand):
     if Rs:
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
-        te = sqltags[dl_id]
+        recording = sqltags[dl_id]
         if R():
-          print("OK ", dl_id, te.download_path)
+          print("OK ", dl_id, recording.download_path)
         else:
           print("BAD", dl_id)
           xit = 1
@@ -202,10 +207,10 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    tes = set(sqltags.recordings())
-    if (any(map(
-        lambda te: not te.is_expired() and te.is_stale(max_age=max_age), tes))
-        or all(map(lambda te: te.is_expired(), tes))):
+    recordings = set(sqltags.recordings())
+    if (any(map(lambda recording: not recording.is_expired() and recording.
+                is_stale(max_age=max_age), recordings))
+        or all(map(lambda recording: recording.is_expired(), recordings))):
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -242,9 +247,9 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         for dl_id in recording_ids:
-          te = sqltags[dl_id]
-          with Pfx(te.name):
-            te.ls(ls_format=listing_format, long_mode=long_mode)
+          recording = sqltags[dl_id]
+          with Pfx(recording.name):
+            recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
   def cmd_ls(self, argv):
@@ -311,6 +316,16 @@ class PlayOnSQLTagSet(SQLTagSet):
     ''' The recording id or `None`.
     '''
     return self.get('playon.ID')
+
+  def nice_name(self):
+    ''' A nice name for the recording: the PlayOn series and name,
+        omitting the series if None.
+    '''
+    playon_tags = self.subtags('playon')
+    citation = playon_tags.Name
+    if playon_tags.Series:
+      citation = playon_tags.Series + " - " + citation
+    return citation
 
   @property
   def status(self):
@@ -424,19 +439,30 @@ class PlayOnSQLTags(SQLTags):
     ''' Convert a string to a list of recording ids.
     '''
     with Pfx(arg):
-      tes = []
+      recordings = []
       if arg == 'all':
-        tes.extend(iter(self))
+        recordings.extend(iter(self))
       elif arg == 'available':
-        tes.extend(te for te in self if te.is_available())
+        recordings.extend(
+            recording for recording in self if recording.is_available()
+        )
       elif arg == 'downloaded':
-        tes.extend(te for te in self if te.is_downloaded())
+        recordings.extend(
+            recording for recording in self if recording.is_downloaded()
+        )
+      elif arg == 'expired':
+        recordings.extend(
+            recording for recording in self if recording.is_expired()
+        )
       elif arg == 'pending':
-        tes.extend(
-            te for te in self if not te.is_downloaded() and te.is_available()
+        recordings.extend(
+            recording for recording in self
+            if not recording.is_downloaded() and recording.is_available()
         )
       elif arg == 'queued':
-        tes.extend(te for te in self if te.is_queued())
+        recordings.extend(
+            recording for recording in self if recording.is_queued()
+        )
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
         r_text = arg[1:]
@@ -444,11 +470,11 @@ class PlayOnSQLTags(SQLTags):
           r_text = r_text[:-1]
         with Pfx("re.compile(%r, re.I)", r_text):
           r = re.compile(r_text, re.I)
-        for te in self:
-          pl_tags = te.subtags('playon')
+        for recording in self:
+          pl_tags = recording.subtags('playon')
           if (pl_tags.Series and r.search(pl_tags.Series)
               or pl_tags.Name and r.search(pl_tags.Name)):
-            tes.append(te)
+            recordings.append(recording)
       else:
         # integer recording id
         try:
@@ -456,11 +482,11 @@ class PlayOnSQLTags(SQLTags):
         except ValueError:
           warning("unsupported word")
         else:
-          tes.append(self[dl_id])
+          recordings.append(self[dl_id])
       return list(
           filter(
               lambda dl_id: dl_id is not None,
-              map(lambda te: te.get('playon.ID'), tes)
+              map(lambda recording: recording.get('playon.ID'), recordings)
           )
       )
 
@@ -488,19 +514,15 @@ class PlayOnAPI(MultiOpenMixin):
     self.sqltags = sqltags
     self._fstags = FSTags()
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start up: open and init the `SQLTags`, open the `FSTags`.
     '''
     sqltags = self.sqltags
-    sqltags.open()
-    sqltags.init()
-    self._fstags.open()
-
-  def shutdown(self):
-    ''' Shutdown: close the `SQLTags`, close the `FSTags`.
-    '''
-    self._fstags.close()
-    self.sqltags.close()
+    with sqltags:
+      sqltags.init()
+      with self._fstags:
+        yield
 
   @property
   @pfx_method
@@ -629,7 +651,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     with self.sqltags:
       now = time.time()
-      tes = set()
+      recordings = set()
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
@@ -656,11 +678,11 @@ class PlayOnAPI(MultiOpenMixin):
                     warning("%r: %s", value, e)
                   else:
                     entry[field] = value2
-          te = self[entry_id]
-          te.update(entry, prefix='playon')
-          te.update(dict(last_updated=now))
-          tes.add(te)
-      return tes
+          recording = self[entry_id]
+          recording.update(entry, prefix='playon')
+          recording.update(dict(last_updated=now))
+          recordings.add(recording)
+      return recordings
 
   @pfx_method
   def queue(self):
@@ -738,12 +760,12 @@ class PlayOnAPI(MultiOpenMixin):
                   offset += written
                   length -= written
     fullpath = realpath(filename)
-    te = self[download_id]
+    recording = self[download_id]
     if dl_rsp is not None:
-      te.set('download_path', fullpath)
+      recording.set('download_path', fullpath)
     # apply the SQLTagSet to the FSTags TagSet
-    self._fstags[fullpath].update(te.subtags('playon'), prefix='playon')
-    return te
+    self._fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
+    return recording
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

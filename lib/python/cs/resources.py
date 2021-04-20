@@ -12,6 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
+from cs.context import setup_cmgr
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.py.func import prop
@@ -65,8 +66,9 @@ class _mom_state(object):
 
 ## debug: TrackedClassMixin
 class MultiOpenMixin(object):
-  ''' A mixin to count open and close calls, and to call `.startup`
-      on the first `.open` and to call `.shutdown` on the last `.close`.
+  ''' A multithread safe mixin to count open and close calls,
+      and to call `.startup` on the first `.open`
+      and to call `.shutdown` on the last `.close`.
 
       If used as a context manager this mixin calls `open()`/`close()` from
       `__enter__()` and `__exit__()`.
@@ -75,9 +77,39 @@ class MultiOpenMixin(object):
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
-      Multithread safe.
+      Classes using this mixin need to _either_:
+      * _either_ define a context manager method `.startup_shutdown`
+        which does the startup actions before yeilding
+        and then does the shutdown actions
+      * _or_ define separate `.startup` and `.shutdown` methods.
 
-      Classes using this mixin need to define `.startup` and `.shutdown`.
+      Example:
+
+          class DatabaseThing(MultiOpenMixin):
+              @contextmanager
+              def startup_shutdown(self):
+                  self._db = open_the_database()
+                  yield
+                  self._db.close()
+          ...
+          with DatabaseThing(...) as db_thing:
+              ... use db_thing ...
+
+      Why not a plain context manager? Because in multithreaded
+      code one wants to keep the instance "open" while any thread
+      is still using it.
+      This mixin lets threads use an instance in overlapping fashion:
+
+          db_thing = DatabaseThing(...)
+          with db_thing:
+              ... kick off threads with access to the db ...
+          ...
+          thread 1:
+          with db_thing:
+             ... use db_thing ...
+          thread 2:
+          with db_thing:
+             ... use db_thing ...
 
       TODO:
       * `subopens`: if true (default false) then `.open` will return
@@ -120,6 +152,14 @@ class MultiOpenMixin(object):
     self.close(caller_frame=caller())
     return False
 
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Default context manager form of startup/shutdown - just calls them.
+    '''
+    self.startup()
+    yield
+    self.shutdown()
+
   def open(self, caller_frame=None):
     ''' Increment the open count.
         On the first `.open` call `self.startup()`.
@@ -137,7 +177,7 @@ class MultiOpenMixin(object):
       state._opens = opens
       if opens == 1:
         state._finalise = Condition(state._lock)
-        self.startup()
+        state._teardown = setup_cmgr(self.startup_shutdown())
     return self
 
   def close(
@@ -187,7 +227,8 @@ class MultiOpenMixin(object):
         if caller_frame is None:
           caller_frame = caller()
         state._final_close_from = caller_frame
-        retval = self.shutdown()
+        teardown, state._teardown = state._teardown, None
+        retval = teardown()
         if not state._finalise_later:
           self.finalise()
     if enforce_final_close and opens != 0:
