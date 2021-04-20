@@ -451,6 +451,9 @@ def report(LFs):
     yield Q.get()
 
 class ResultSet(set):
+  ''' A `set` if `Result`s,
+      on which one may iterate as `Result`s complete.
+  '''
 
   def __enter__(self):
     return self
@@ -467,7 +470,7 @@ class ResultSet(set):
   def wait(self):
     ''' Convenience function to wait for all the `Result`s.
     '''
-    for R in self:
+    for _ in self:
       pass
 
 def after(Rs, R, func, *a, **kw):
