@@ -137,7 +137,7 @@ class CSReleaseCommand(BaseCommand):
   def run_context(self):
     ''' Arrange to autosave the package tagsets.
     '''
-    with self.pkg_tagsets:
+    with self.options.pkg_tagsets:
       yield
 
   ##  export      Export release to temporary directory, report directory.
