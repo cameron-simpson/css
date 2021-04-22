@@ -587,7 +587,7 @@ class Modules(defaultdict):
     return M
 
 # pylint: disable=too-many-public-methods
-class Module(object):
+class Module:
   ''' Metadata about a Python module.
   '''
 
