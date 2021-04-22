@@ -267,14 +267,16 @@ class CSReleaseCommand(BaseCommand):
       print(' '.join(files) + ':', firstline)
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [package_name...]
           List package names and their latst PyPI releases.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+      pkg_names = argv
+    else:
+      pkg_names = sorted(tagsets.keys())
     options = self.options
     tagsets = options.pkg_tagsets
-    for pkg_name in sorted(tagsets.keys()):
+    for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
