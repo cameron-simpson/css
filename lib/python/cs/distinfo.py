@@ -31,7 +31,6 @@ import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
-from cs.app.lastvalue import LastValues
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
