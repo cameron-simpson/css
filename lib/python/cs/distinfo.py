@@ -300,7 +300,8 @@ class CSReleaseCommand(BaseCommand):
 
   def cmd_ok(self, argv):
     ''' Usage: {cmd} pkg_name [changset-hash]
-          Print the commit log since the latest release.
+          Mark a particulaqr changeset as ok for purposes of "check".
+          This lets one accept cosmetic outstanding commits as irrelevant.
     '''
     if not argv:
       raise GetoptError("missing package name")
