@@ -282,10 +282,15 @@ class CSReleaseCommand(BaseCommand):
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
           problems = pkg.problems()
-          print(
-              pkg_name, pypi_release,
-              "%d problems" % (len(problems),) if problems else "ok"
-          )
+          list_argv = [
+              pkg_name,
+              pypi_release,
+              "%d problems" % (len(problems),) if problems else "ok",
+          ]
+          features = pkg.features(pypi_release)
+          if features:
+            list_argv.append('[' + ' '.join(sorted(features)) + ']')
+          print(*list_argv)
     return 0
 
   def cmd_next(self, argv):
