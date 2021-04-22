@@ -722,6 +722,58 @@ class Module:
     '''
     return self.options.pkg_tagsets[self.name]
 
+  @pfx_method(use_str=True)
+  def release_features(self):
+    ''' Yield `(release_version,feature_names)`
+        for all releases mentioned in the `features` tag.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    yield from feature_map.items()
+
+  @pfx_method(use_str=True)
+  def release_featuresets(self):
+    ''' Yield `(release_version,feature_sets)`
+        for all releases mentioned in the `features` tag
+        in release order.
+
+        This is an accumulation of features up to and including `release_version`.
+        Use of this method implies an assumption that features are
+        only added and never removed.
+    '''
+    feature_set = set()
+    for release_version, release_features in sorted(self.release_features()):
+      feature_set.update(release_features)
+      yield release_version, set(feature_set)
+
+  @pfx_method(use_str=True)
+  def features(self, release_version=None):
+    ''' Return a set of the feature names for `release_version`,
+        default from the `pypi.release`.
+
+        This is an accumulation of the features from prior releases.
+    '''
+    tags = self.pkg_tags
+    if release_version is None:
+      release_version = tags.get('pypi.release')
+      if release_version is None:
+        raise ValueError("no pypi.release")
+    release_set = set()
+    for version, featureset in sorted(self.release_featuresets()):
+      if version > release_version:
+        break
+      release_set = featureset
+    return release_set
+
+  @pfx_method(use_str=True)
+  def release_with_features(self, features):
+    ''' Return the earliest release version containing all the named features.
+        Return `None` if no release has all the features.
+    '''
+    for version, featureset in sorted(self.release_featuresets()):
+      if all(map(lambda feature: feature in featureset, features)):
+        return version
+    return None
+
   def save_pkg_tags(self):
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
