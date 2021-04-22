@@ -96,8 +96,8 @@ vecho=:
 symlink=LATEST
 src=
 dest=
-linkonly=
 filteroutput=
+reflink=
 rrsync=rsync
 usehbinclude=1
 usehbfiles=1
@@ -119,8 +119,8 @@ usage="Usage:
   $cmd [options...] --no-rsync backupdir
   $cmd [options...] [-- [rsyncopts...]]
 
-  -A, --acls    Preserve ACLs. Passed to rsync.
   -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
+  -f            Force: presently just implies --no-symlink-if-unchanged.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
@@ -149,6 +149,7 @@ usage="Usage:
   --link-fail-repair (Obsolete; this is always done.)
                 Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
+  --reflink     Use \"cp --reflink\" and \"rsync --inplace\".
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
@@ -172,14 +173,6 @@ datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
 while [ $# -gt 0 ]
 do
   case $1 in
-
-    # =item -A, --acls
-    #
-    # Preserve ACLs. Passed to rsync.
-    #
-    -A|--acls)
-      rsopts="$rsopts $1"
-      ;;
 
     # =item --copy-times
     #
@@ -226,6 +219,14 @@ do
       sshcmd=$2; shift
       ;;
 
+    # =item -f
+    #
+    # Force. Presently shorthand for B<--no-symlink-if-unchanged>.
+    #
+    -f)
+      symlink_unchanged=
+      ;;
+
     # =item -i, --itemize-changes
     #
     # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
@@ -269,14 +270,6 @@ do
       usehbinclude=
       ;;
 
-    # =item --no-rsync
-    #
-    # Skip the rsync step; just create the new link tree.
-    #
-    --no-rsync)
-      linkonly=1
-      ;;
-
     # =item --no-symlink-if-unchanged
     #
     # Do not symlink the top level date if there are no changes to the tree,
@@ -286,6 +279,19 @@ do
         symlink_unchanged=
         ;;
 
+    # =item --reflink
+    #
+    # Use "cp --reflink" and "rsync --inplace".
+    # This makes distinct file metadata in the new tree
+    # instead of hard linking from the old tree, and the
+    # lower hard link count also eases filesystem repair.
+    # This requires matching filesystem support for copy-on-write
+    # clones.
+    #
+    --reflink)
+        reflink=1
+        rsopts="$rsopts --inplace"
+        ;;
     # =item --rsync-path rrsync
     #
     # Passed to rsync.
@@ -353,9 +359,6 @@ done
 #
 # =head1 Post Option Arguments
 #
-# If the B<--no-rsync> option has been used, only the destination
-# directory appears after the options. It will be initialised for use.
-#
 # If neither the source not destination appear
 # it is expected that the destination is the current directory
 # and that the source is specified by the B<.hbsource> file in the current directory.
@@ -368,69 +371,51 @@ done
 # these will be passed to rsync.
 #
 
-if [ $linkonly ]
-then
-    if [ $# -lt 1 ]
+case "$*" in
+  '' | -* )
+    # neither source nor backupdir: use .hbsource and "."
+    src=
+    dest=.
+    if [ ! -f .hbsource ]
     then
-        echo "$cmd: missing parent" >&2
+      echo "$cmd: missing .hbsource" >&2
+      badopts=1
+    else
+      src=$(cat .hbsource)
+      [ -n "$src" ] || { echo "$cmd: empty source from .hbsource" >&2; badopts=1; }
+    fi
+    ;;
+  *)
+    # expect source _and_ backupdir
+    if [ $# -lt 2 ]
+    then
+        echo "$cmd: missing source or backupdir" >&2
         badopts=1
     else
-        dest=$1
-        shift
+        src=$1 dest=$2
+        shift; shift
+        # gather other backup dirs, turn into --link-dest= options
+        obackup_count=0
+        while [ $# -gt 0 ]
+        do
+          case "x$1" in
+            x/*)
+              obackup=$1; shift
+              if [ "$obackup_count" -lt 20 ]
+              then
+                obackup_options="$obackup_options --link-dest=$obackup"
+                obackup_count=$( expr $obackup_count + 1 )
+              else
+                $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
+              fi
+              ;;
+            *)break
+              ;;
+          esac
+        done
     fi
-else
-    case "$*" in
-      '' | -* )
-        # neither source nor backupdir: use .hbsource and "."
-        src=
-        dest=.
-        if [ ! -f .hbsource ]
-        then
-          echo "$cmd: missing .hbsource" >&2
-          badopts=1
-        else
-          src=$(cat .hbsource)
-          [ -n "$src" ] || { echo "$cmd: empty source from .hbsource" >&2; badopts=1; }
-        fi
-        ;;
-      *)
-        # expect source _and_ backupdir
-        if [ $# -lt 2 ]
-        then
-            echo "$cmd: missing source or backupdir" >&2
-            badopts=1
-        else
-            src=$1 dest=$2
-            shift; shift
-            # gather other backup dirs, turn into --link-dest= options
-            obackup_count=0
-            while [ $# -gt 0 ]
-            do
-              case "x$1" in
-                x/*)
-                  obackup=$1; shift
-                  if [ "$obackup_count" -lt 20 ]
-                  then
-                    obackup_options="$obackup_options --link-dest=$obackup"
-                    obackup_count=$( expr $obackup_count + 1 )
-                  else
-                    $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
-                  fi
-                  ;;
-                *)break
-                  ;;
-              esac
-            done
-        fi
-        ;;
-    esac
-fi
-
-if [ $linkonly ] && [ $# -gt 0 ]
-then
-    echo "$cmd: --no-rsync: extra arguments after parent: $*" >&2
-    badopts=1
-fi
+    ;;
+esac
 
 # needed from here on
 wd=$( pwd )
@@ -447,7 +432,8 @@ fi
 
 # sanity check $src
 case "$src" in
-    '')         [ $linkonly ] || { echo "$cmd: empty src, rejected" >&2; badopts=1; }
+    '')         echo "$cmd: empty src, rejected" >&2
+                badopts=1
                 ;;
     *:*)        # remote - don't check
                 ;;
@@ -465,33 +451,40 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# have "cp -ral"? otherwise rely on my linktree script
-if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+if [ $reflink ]
 then
   mklinktree(){
-    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
-    _mkl_src=$1
-    _mkl_dst=$2
-    case "$_mkl_dst" in
-      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
-    esac
-    # make link tree, might fail if hard link limit reached for files
-    $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
-      # failed to make target? fail outright
-      [ -d "$_mkl_dst/." ] || return 1
-      # if we made the target, update from source
-      dorsync "$_mkl_src/" "$_mkl_dst/"
-    }
+      [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+      _mkl_src=$1
+      _mkl_dst=$2
+      case "$_mkl_dst" in
+        /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+      esac
+      # make link tree, might fail if hard link limit reached for files
+      $trace cp -ra --reflink "$_mkl_src" "$_mkl_dst"
   }
 else
-  mklinktree(){ $trace linktree "$1" "$2"; }
-fi
-
-if [ $linkonly ]
-then
-  # protect against accidental misused of $src
-  unset src
-  exec 3>&1 1>&2
+  # have "cp -ral"? otherwise rely on my linktree script
+  if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+  then
+    mklinktree(){
+      [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+      _mkl_src=$1
+      _mkl_dst=$2
+      case "$_mkl_dst" in
+        /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+      esac
+      # make link tree, might fail if hard link limit reached for files
+      $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
+        # failed to make target? fail outright
+        [ -d "$_mkl_dst/." ] || return 1
+        # if we made the target, update from source
+        dorsync "$_mkl_src/" "$_mkl_dst/"
+      }
+    }
+  else
+    mklinktree(){ $trace linktree "$1" "$2"; }
+  fi
 fi
 
 if [ $imode ]
@@ -567,7 +560,7 @@ fi
 lastbackup=$(
         cd "$dest" || exit 1
         (
-          if [ $symlink_unchanged ] || [ $linkonly ]
+          if [ $symlink_unchanged ]
           then
             # actual directory trees only
             ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
@@ -593,7 +586,7 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- $trace rsync -e "$sshcmd" $rsopts -a $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync -e "$sshcmd" $rsopts -aJ $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   if [ -n "$filteroutput" ] && which filter_fd >/dev/null 2>&1
   then
     set -- filter_fd 1 "$filteroutput" "$@"
@@ -607,16 +600,14 @@ ok=
 # Probe for changes since last backup.
 # If none, make symlink to last real backup and exit.
 if [ $symlink_unchanged ] \
-&& [ -z "$linkonly" ] \
 && [ -n "$lastbackup" ] \
 && [ -d "$dest/$lastbackup/." ]
 then
   $vecho "checking for changes to $src from $lastbackup ..."
-  changes=$( dorsync "$src" "$dest/$lastbackup" ${1+"$@"} -niO \
-           | sed -n '/^..         /!{ p; q; }'
-           )
-  if [ -z "$changes" ]
+  if dorsync "$src" "$dest/$lastbackup" -niO ${1+"$@"} | read -r change1
   then
+    $vecho "changes, proceeding with regular backup ..."
+  else
     $vecho "no changes, symlinking last tree"
     ( set -ue
       cd "$dest" || exit 1
@@ -625,42 +616,25 @@ then
       || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
     )
     exit
-  else
-    $vecho "changes, proceeding with regular backup ..."
   fi
 fi
 
 ok=1
 
 # New backup tree required.
-if [ $linkonly ]
-then
-  # just make the hard link tree
-  [ -n "$lastbackup" ] || {
-    echo "$cmd: no previous backup, cannot make link tree" >&2
-    exit 1
-  }
-  ( cd "$dest" || exit 1
-    mklinktree "./$lastbackup" "$thisbackup" \
-    || dorsync "./$lastbackup" "$thisbackup" --link-dest="$absdest/$lastbackup/"
-  )
-else
-  # do a proper hardlinked backup
-  ( cd "$dest" || exit 1
-    if [ -n "$lastbackup" ]
-    then
-      mklinktree "./$lastbackup" "$thisbackup"
-      dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
-      || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
-    else
-      dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options
-    fi
-  )
-fi \
-|| {
-  echo "$cmd: rsync failed, review errors and check the content of $absdest/$thisbackup" >&2
-  ok=
-}
+( cd "$dest" || exit 1
+  if [ -n "$lastbackup" ]
+  then
+    mklinktree "./$lastbackup" "$thisbackup" || exit 1
+    dorsync "$src" "$thisbackup" -H ${1+"$@"} $obackup_options \
+    || dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
+    || :
+  else
+    $trace mkdir "$thisbackup" || exit 1
+    dorsync "$src" "$thisbackup" ${1+"$@"} $obackup_options \
+    || :
+  fi
+) || ok=
 
 if [ $copytimes ]
 then

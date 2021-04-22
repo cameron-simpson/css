@@ -1,0 +1,3 @@
+lib/python/cs/tty.py: Release information for cs.tty-20200521.
+lib/python/cs/tty.py: cs.tty: new modify_termios and stack_termios to apply (and restore) termios modes
+lib/python/cs/tty.py: cs.tty: clean lint, autoformat

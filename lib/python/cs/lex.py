@@ -12,6 +12,8 @@ Generally the get_* functions accept a source string and an offset
 raising `ValueError` on failed tokenisation.
 '''
 
+# pylint: disable=too-many-lines
+
 import binascii
 from functools import partial
 import os
@@ -19,9 +21,10 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import sys
 from textwrap import dedent
 from cs.deco import fmtdoc
-from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes
+from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
+from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20200718-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -30,7 +33,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3'],
+    'install_requires': ['cs.deco', 'cs.py3', 'cs.seq>=20200914'],
 }
 
 unhexify = binascii.unhexlify
@@ -45,16 +48,22 @@ else:
 
 ord_space = ord(' ')
 
+# pylint: disable=too-many-branches
 def unctrl(s, tabsize=8):
-  ''' Return the string `s` with TABs expanded and control characters
+  ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
   '''
+  if tabsize < 1:
+    raise ValueError("tabsize(%r) < 1" % (tabsize,))
   s2 = ''
   sofar = 0
   for i, ch in enumerate(s):
     ch2 = None
     if ch == '\t':
-      pass
+      if sofar < i:
+        s2 += s[sofar:i]
+        sofar = i
+      ch2 = ' ' * (tabsize - (len(s2) % tabsize))
     elif ch == '\f':
       ch2 = '\\f'
     elif ch == '\n':
@@ -116,8 +125,31 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
+def typed_str(o, use_cls=False, use_repr=False, max_length=None):
+  ''' Return "type(o).__name__:str(o)" for some object `o`.
+
+      Parameters:
+      * `use_cls`: default `False`;
+        if true, use `str(type(o))` instead of `type(o).__name__`
+      * `use_repr`: default `False`;
+        if true, use `repr(o)` instead of `str(o)`
+
+      I use this a lot when debugging. Example:
+
+          from cs.lex import typed_str as s
+          ......
+          X("foo = %s", s(foo))
+  '''
+  s = "%s:%s" % (
+      type(o) if use_cls else type(o).__name__,
+      repr(o) if use_repr else str(o),
+  )
+  if max_length is not None:
+    s = cropped(s, max_length)
+  return s
+
 def strlist(ary, sep=", "):
-  ''' Convert an iterable to strings and join with ", ".
+  ''' Convert an iterable to strings and join with `sep` (default `', '`).
   '''
   return sep.join([str(a) for a in ary])
 
@@ -359,19 +391,19 @@ def stripped_dedent(s):
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
-      starting at `offset` (default 0).
+      starting at `offset` (default `0`).
       Return `(match,new_offset)`.
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 def get_decimal(s, offset=0):
-  ''' Scan the string `s` for decimal characters starting at `offset`.
+  ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
 def get_decimal_value(s, offset=0):
-  ''' Scan the string `s` for a decimal value starting at `offset`.
+  ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   value_s, offset = get_decimal(s, offset)
@@ -380,13 +412,13 @@ def get_decimal_value(s, offset=0):
   return int(value_s), offset
 
 def get_hexadecimal(s, offset=0):
-  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+  ''' Scan the string `s` for hexadecimal characters starting at `offset` (default `0`).
       Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_hexadecimal_value(s, offset=0):
-  ''' Scan the string `s` for a hexadecimal value starting at `offset`.
+  ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   value_s, offset = get_hexadecimal(s, offset)
@@ -396,7 +428,7 @@ def get_hexadecimal_value(s, offset=0):
 
 def get_decimal_or_float_value(s, offset=0):
   ''' Fetch a decimal or basic float (nnn.nnn) value
-      from the str `s` at `offset`.
+      from the str `s` at `offset` (default `0`).
       Return `(value,new_offset)`.
   '''
   int_part, offset = get_decimal(s, offset)
@@ -437,7 +469,8 @@ def get_identifier(
   return ch + idtail, offset
 
 def is_identifier(s, offset=0, **kw):
-  ''' Test if the string `s` is an identifier from position `offset` onward.
+  ''' Test if the string `s` is an identifier
+      from position `offset` (default `0`) onward.
   '''
   s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
@@ -459,6 +492,9 @@ def get_dotted_identifier(s, offset=0, **kw):
 
       Note: the empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
+
+      Keyword arguments are passed to `get_identifier`
+      (used for each component of the dotted identifier).
   '''
   offset0 = offset
   _, offset = get_identifier(s, offset=offset, **kw)
@@ -474,7 +510,7 @@ def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
-  return s2 and offset2 == len(s)
+  return len(s2) > 0 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
@@ -504,6 +540,8 @@ def slosh_mapper(c, charmap=None):
     charmap = SLOSH_CHARMAP
   return charmap.get(c)
 
+# pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+# pylint: disable=too-many-statements,too-many-arguments
 def get_sloshed_text(
     s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None
 ):
@@ -663,8 +701,8 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
       * `s`: the string with the variable reference
       * `offset`: the starting point for the reference
       * `default`: default value for missing environment variables;
-         if None (the default) a ValueError is raised
-      * `environ`: the environment mapping, default os.environ
+         if `None` (the default) a `ValueError` is raised
+      * `environ`: the environment mapping, default `os.environ`
       * `specials`: the mapping of special single character variables
   '''
   if environ is None:
@@ -691,6 +729,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
+# pylint: disable=too-many-arguments
 def get_qstr(
     s, offset=0, q='"', environ=None, default=None, env_specials=None
 ):
@@ -698,10 +737,10 @@ def get_qstr(
 
       Parameters:
       * `s`: the string containg the quoted text.
-      * `offset`: the starting point, default 0.
-      * `q`: the quote character, default `'"'`. If `q` is set to `None`,
+      * `offset`: the starting point, default `0`.
+      * `q`: the quote character, default `'"'`. If `q` is `None`,
         do not expect the string to be delimited by quote marks.
-      * `environ`: if not `None`, also parse and expand $envvar references.
+      * `environ`: if not `None`, also parse and expand `$`*envvar* references.
       * `default`: passed to `get_envvar`
   '''
   if environ is None and default is not None:
@@ -748,24 +787,25 @@ def get_delimited(s, offset, delim):
 
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied
-      tokenise functions `getters`; return the list of tokens matched
-      and the final offset.
+      tokeniser functions `getters`.
+      Return the list of tokens matched and the final offset.
 
       Parameters:
       * `s`: the string to parse.
       * `offset`: the starting position for the parse.
       * `getters`: an iterable of tokeniser specifications.
 
-      Each tokeniser specification is either:
-      * a callable expecting (s, offset) and returning (token, new_offset)
+      Each tokeniser specification `getter` is either:
+      * a callable expecting `(s,offset)` and returning `(token,new_offset)`
       * a literal string, to be matched exactly
-      * a tuple or list with values (func, args, kwargs);
-        call func(s, offset, *args, **kwargs)
-      * an object with a .match method such as a regex;
-        call getter.match(s, offset) and return a match object with
-        a .end() method returning the offset of the end of the match
+      * a `tuple` or `list` with values `(func,args,kwargs)`;
+        call `func(s,offset,*args,**kwargs)`
+      * an object with a `.match` method such as a regex;
+        call `getter.match(s,offset)` and return a match object with
+        a `.end()` method returning the offset of the end of the match
   '''
   tokens = []
+  # pylint: disable=cell-var-from-loop
   for getter in getters:
     args = ()
     kwargs = {}
@@ -799,8 +839,8 @@ def get_tokens(s, offset, getters):
   return tokens, offset
 
 def match_tokens(s, offset, getters):
-  ''' Wrapper for get_tokens which catches ValueError exceptions
-      and returns (None, offset).
+  ''' Wrapper for `get_tokens` which catches `ValueError` exceptions
+      and returns `(None,offset)`.
   '''
   try:
     tokens, offset2 = get_tokens(s, offset, getters)
@@ -810,7 +850,7 @@ def match_tokens(s, offset, getters):
     return tokens, offset2
 
 def isUC_(s):
-  ''' Check that a string matches `^[A-Z][A-Z_0-9]*$`.
+  ''' Check that a string matches the regular expression `^[A-Z][A-Z_0-9]*$`.
   '''
   if s.isalpha() and s.isupper():
     return True
@@ -824,11 +864,12 @@ def isUC_(s):
   return True
 
 def parseUC_sAttr(attr):
-  ''' Take an attribute name and return `(key, is_plural)`.
+  ''' Take an attribute name `attr` and return `(key,is_plural)`.
 
-      `'FOO'` returns `(`FOO`, False)`.
-      `'FOOs'` or `'FOOes'` returns `('FOO', True)`.
-      Otherwise return `(None, False)`.
+      Examples:
+      * `'FOO'` returns `('FOO',False)`.
+      * `'FOOs'` or `'FOOes'` returns `('FOO',True)`.
+      Otherwise return `(None,False)`.
   '''
   if len(attr) > 1:
     if attr[-1] == 's':
@@ -846,10 +887,10 @@ def parseUC_sAttr(attr):
 
 def as_lines(chunks, partials=None):
   ''' Generator yielding complete lines from arbitrary pieces of text from
-      the iterable `chunks`.
+      the iterable of `str` `chunks`.
 
       After completion, any remaining newline-free chunks remain
-      in the partials list; this will be unavailable to the caller
+      in the partials list; they will be unavailable to the caller
       unless the list is presupplied.
   '''
   if partials is None:
@@ -870,7 +911,7 @@ def as_lines(chunks, partials=None):
 
 def cutprefix(s, prefix):
   ''' Strip a `prefix` from the front of `s`.
-      Return the suffix if `.startswith(prefix)`, else `s`.
+      Return the suffix if `s.startswith(prefix)`, else `s`.
 
       Example:
 
@@ -888,7 +929,7 @@ def cutprefix(s, prefix):
 
 def cutsuffix(s, suffix):
   ''' Strip a `suffix` from the end of `s`.
-      Return the prefix if `.endswith(suffix)`, else `s`.
+      Return the prefix if `s.endswith(suffix)`, else `s`.
 
       Example:
 
@@ -904,18 +945,83 @@ def cutsuffix(s, suffix):
     return s[:-len(suffix)]
   return s
 
-def cropped_repr(s, max_length=32, offset=0):
-  ''' If the length of the sequence `s` after `offset (default `0`)
-      exceeds `max_length` (default 32)
-      return the `repr` of the leading `max_length-3` characters from `offset`
-      plus `'...'`.
-      Otherwise return the `repr` of `s[offset:]`.
+def common_prefix(*strs):
+  ''' Return the common prefix of the strings `strs`.
 
-      This is typically used for `str` values.
+      Examples:
+
+          >>> common_prefix('abc', 'def')
+          ''
+          >>> common_prefix('abc', 'abd')
+          'ab'
+          >>> common_prefix('abc', 'abcdef')
+          'abc'
+          >>> common_prefix('abc', 'abcdef', 'abz')
+          'ab'
+          >>> # contrast with cs.fileutils.common_path_prefix
+          >>> common_prefix('abc/def', 'abc/def1', 'abc/def2')
+          'abc/def'
   '''
-  if len(s) - offset > max_length:
-    return repr(s[offset:offset + max_length - 3]) + '...'
-  return repr(s[offset:])
+  return strs[0][:common_prefix_length(*strs)]
+
+def common_suffix(*strs):
+  ''' Return the common suffix of the strings `strs`.
+  '''
+  length = common_suffix_length(*strs)
+  if not length:
+    # catch 0 length suffix specially, because -0 == 0
+    return ''
+  return strs[0][-length:]
+
+def cropped(
+    s: str, max_length: int = 32, roffset: int = 1, ellipsis: str = '...'
+):
+  ''' If the length of `s` exceeds `max_length` (default `32`),
+      replace enough of the tail with `ellipsis`
+      and the last `roffset` (default `1`) characters of `s`
+      to fit in `max_length` characters.
+  '''
+  if len(s) > max_length:
+    if roffset > 0:
+      s = s[:max_length - len(ellipsis) - roffset] + ellipsis + s[-roffset:]
+    else:
+      s = s[:max_length - len(ellipsis)] + ellipsis
+  return s
+
+def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
+  ''' Compute a cropped `repr()` of `o`.
+
+      Parameters:
+      * `o`: the object to represent
+      * `max_length`: the maximum length of the representation, default `32`
+      * `inner_max_length`: the maximum length of the representations
+        of members of `o`, default `max_length//2`
+      * `roffset`: the number of trailing characters to preserve, default `1`
+  '''
+  if inner_max_length is None:
+    inner_max_length = max_length // 2
+  if isinstance(o, (tuple, list)):
+    left = '(' if isinstance(o, tuple) else '['
+    right = (',)' if len(o) == 1 else ')') if isinstance(o, tuple) else ']'
+    o_repr = left + ','.join(
+        map(
+            lambda m:
+            cropped_repr(m, max_length=inner_max_length, roffset=roffset), o
+        )
+    ) + right
+  elif isinstance(o, dict):
+    o_repr = '{' + ','.join(
+        map(
+            lambda kv: cropped_repr(
+                kv[0], max_length=inner_max_length, roffset=roffset
+            ) + ':' +
+            cropped_repr(kv[1], max_length=inner_max_length, roffset=roffset),
+            o.items()
+        )
+    ) + '}'
+  else:
+    o_repr = repr(o)
+  return cropped(o_repr, max_length=max_length, roffset=roffset)
 
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
@@ -937,7 +1043,7 @@ def get_ini_clausename(s, offset=0):
 def get_ini_clause_entryname(s, offset=0):
   ''' Parse a `[`*clausename*`]`*entryname* string
       from `s` at `offset` (default `0`).
-      Return `(clausename,new_offset)`.
+      Return `(clausename,entryname,new_offset)`.
   '''
   clausename, offset = get_ini_clausename(s, offset=offset)
   offset = skipwhite(s, offset)
@@ -947,7 +1053,7 @@ def get_ini_clause_entryname(s, offset=0):
   return clausename, entryname, offset
 
 def format_escape(s):
-  ''' Escape {} characters in a string to protect them from `str.format`.
+  ''' Escape `{}` characters in a string to protect them from `str.format`.
   '''
   return s.replace('{', '{{').replace('}', '}}')
 
@@ -975,7 +1081,7 @@ class FormatAsError(LookupError):
 
 @fmtdoc
 def format_as(format_s, format_mapping, error_sep=None):
-  ''' Format the string `format_s` using `format_mapping`,
+  ''' Format the string `format_s` using `str.format_mapping`,
       return the formatted result.
       This is a wrapper for `str.format_map`
       which raises a more informative `FormatAsError` exception on failure.
@@ -984,12 +1090,13 @@ def format_as(format_s, format_mapping, error_sep=None):
       * `format_s`: the format string to use as the template
       * `format_mapping`: the mapping of available replacement fields
       * `error_sep`: optional separator for the multipart error message,
-        default from FormatAsError.DEFAULT_SEPARATOR:
+        default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
   '''
   try:
     formatted = format_s.format_map(format_mapping)
   except KeyError as e:
+    # pylint: disable=raise-missing-from
     raise FormatAsError(
         e.args[0], format_s, format_mapping, error_sep=error_sep
     )
@@ -997,20 +1104,20 @@ def format_as(format_s, format_mapping, error_sep=None):
 
 _format_as = format_as
 
-class FormatableMixin(object):
+class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes with an
       existing `format_kwargs` method.
 
       The `format_as` method is like an inside out `str.format` or
-      `object._format__` method.
-      `str.format` is designed for formatting a string from a variety
-      of other obejcts supplied in the keyword arguments,
-      and `object.__format__` is for filling out a single `str.format`
+      `object.__format__` method.
+      The `str.format` method is designed for formatting a string
+      from a variety of other objects supplied in the keyword arguments,
+      and the `object.__format__` method is for filling out a single `str.format`
       replacement field from a single object.
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
-      For example, the `cs.tagset.TagSet` class
+      For example, the `cs.tagset.TagSetMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
   '''

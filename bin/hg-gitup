@@ -9,6 +9,7 @@ set -ue
 trace=command
 [ -t 2 ] && trace=set-x
 git_push_opts=
+git_default_branch=main     # vs historic "master"
 all_heads=
 
 cmd=$( basename "$0" )
@@ -21,7 +22,8 @@ usage="Usage: $cmd [-f] [--] hg-path [hg-branch...]
     hg-path The mercurial remote path.
     hg-branch[:git-branch]
             Mercurial branches to push, with optional corresponding git branch.
-            The default is the current branch and tip."
+            The default is the current branch, and if the current branch is
+            \"default\", also \"tip\"."
 
 badopts=
 
@@ -50,7 +52,10 @@ else
   shift
 fi
 
-[ $# -gt 0 ] || set -- $( hg branch ) tip
+[ $# -gt 0 ] || {
+  set -- $( hg branch )
+  [ "x$1" = xdefault ] && set -- "$@" tip
+}
 
 # not a loop, here to allow using break to skip further tests
 while [ -z "$badopts" ]
@@ -79,9 +84,8 @@ do
   hg_root=$( hg root )
   git_dir=$hg_root/.hg/git
   [ -d "$git_dir" ] || {
-    echo "$cmd: no git tree at $git_dir" >&2
-    badopts=1
-    break
+    echo "$cmd: no git tree at $git_dir, runing gexport" >&2
+    $trace hg gexport || exit $?
   }
 
   break
@@ -100,7 +104,7 @@ xit=0
 for hg_branch
 do
   case "$hg_branch" in
-    default)git_branch=master ;;
+    default)git_branch=$git_default_branch ;;
     *:*)    git_branch=${hg_branch#*:}
             hg_branch=${hg_branch%%:*}
             ;;

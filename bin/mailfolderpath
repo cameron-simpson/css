@@ -2,8 +2,10 @@
 #
 # Take a folder name and return the file path to it.
 # Yanked from "+" for use there and in filemailitem.
-#	- Cameron Simpson <cs@cskk.id.au> 08jul2004
+# - Cameron Simpson <cs@cskk.id.au> 08jul2004
 #
+
+set -ue
 
 cmd=$0
 usage="Usage: $cmd foldername"
@@ -13,22 +15,22 @@ folder=$1; shift
 
 case "$folder" in
   /*|.|./*|..|../*)
-  	fpath=$folder
-	if [ -d "$fpath/." ]
-	then
-	  fpath=`cd "$fpath" && /bin/pwd` || exit 1
-	else
-	  fdir=`dirname "$fpath"`	|| exit 1
-	  fbase=`basename "$fpath"`	|| exit 1
-	  fdir=`cd "$fdir" && /bin/pwd` || exit 1
-	  fpath=$fdir/$fbase
-	fi
-	;;
-  [+=]*)fpath=$MAILDIR/`expr "x$folder" : '..\(.*\)'` ;;
-  imap:*) fpath= ;;
-  *?.?*)fpath= ;;
-  ?*)	fpath=$MAILDIR/$folder ;;
-  *)	fpath= ;;
+            fpath=$folder
+            if [ -d "$fpath/." ]
+            then
+              fpath=`cd "$fpath" && /bin/pwd` || exit 1
+            else
+              fdir=`dirname "$fpath"` || exit 1
+              fbase=`basename "$fpath"` || exit 1
+              fdir=`cd "$fdir" && /bin/pwd` || exit 1
+              fpath=$fdir/$fbase
+            fi
+            ;;
+  [+=]*)    fpath=$MAILDIR/`expr "x$folder" : '..\(.*\)'` ;;
+  imap:*)   fpath= ;;
+  *?.?*)    fpath= ;;
+  ?*)       fpath=$MAILDIR/$folder ;;
+  *)        fpath= ;;
 esac
 
 printf "%s\n" "$fpath"

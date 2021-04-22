@@ -11,9 +11,23 @@ set -ue
 : ${TMUX:=''}
 : ${DEBUG:=''}
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
-: ${TMPDIR:=/tmp}
-: ${TMUX_TMPDIR:=$TMPDIR/tmux-`id -u`}
-export TMUX_TMPDIR
+: ${TMPDIR:=''}
+: ${TMUX_TMPDIR:=''}
+
+setup_env='
+    [ -n "$TMPDIR" -a -d "$TMPDIR" ] || \
+    if [ -d "$HOME/tmp" ]
+    then  TMPDIR=$HOME/tmp
+    else  TMPDIR=/tmp
+    fi
+    [ -n "$TMUX_TMPDIR" -a -d "$TMUX_TMPDIR" ] || \
+    if [ -d "$HOME/var/tmux" ]
+    then  TMUX_TMPDIR=$HOME/var/tmux
+    else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
+    fi
+    export TMPDIR TMUX_TMPDIR'
+
+eval "$setup_env"
 
 trace=
 setx=:
@@ -302,19 +316,11 @@ rcmd(){
     *)      _rcmd_ssh=ssh ;;
   esac
   $trace $_rcmd_ssh -t "$_rcmd_rhost" "
-    $setx"'
-    PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH
-    : ${TMPDIR:=/tmp}
-    export PATH TMPDIR
-    if [ -z "$TMUX_TMPDIR" ]
-    then
-      if [ -d "$HOME/var/tmux/." ]
-      then  TMUX_TMPDIR=$HOME/var/tmux
-      else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
-      fi
-    fi
-    export TMUX_TMPDIR
-    '"$*"
+    $setx
+    $setup_env
+    PATH=\$HOME/bin-local:\$HOME/bin:\$PATH:/usr/local/bin:/opt/local/bin
+    export PATH
+    $*"
 }
 
 # print "LABEL shcmd" to standard output

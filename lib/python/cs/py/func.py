@@ -72,13 +72,14 @@ def prop(func):
       into RuntimeErrors.
   '''
 
-  def wrapper(*a, **kw):
+  def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)
     except AttributeError as e:
       raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
 
-  return property(wrapper)
+  prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
+  return property(prop_wrapper)
 
 def derived_property(
     func,
@@ -95,7 +96,6 @@ def derived_property(
     property_name = '_' + func.__name__
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
-  from cs.x import X
 
   def property_value(self):
     ''' Attempt lockless fetch of property first.
@@ -113,28 +113,9 @@ def derived_property(
           p_revision = getattr(self, property_revision_name, 0)
           o_revision = getattr(self, original_revision_name)
           if p is unset_object or p_revision < o_revision:
-            X(
-                "COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name,
-                p_revision, o_revision
-            )
             p = func(self)
             setattr(self, property_name, p)
-            X(
-                "COMPUTE .%s: set .%s to %s", property_name,
-                property_revision_name, o_revision
-            )
             setattr(self, property_revision_name, o_revision)
-          else:
-            ##debug("inside lock, already computed up to date %s", property_name)
-            pass
-        X(
-            "property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
-            property_name, getattr(self, property_revision_name),
-            getattr(self, original_revision_name)
-        )
-      else:
-        ##debug("outside lock, already computed up to date %s", property_name)
-        pass
     except AttributeError as e:
       raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
     return p

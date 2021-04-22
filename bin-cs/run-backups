@@ -11,42 +11,40 @@
 
 set -ue
 
-rsopts=
+quiet=
+rsvopts=
 trace=
 doit=1
 dont=
 isatty=
-[ -t 2 ] && isatty=1 rsopts=-P trace=set-x
+[ -t 2 ] && isatty=1 rsvopts=-P trace=set-x
 
 rcdir=$HOME/.run-backups
+backups=$rcdir/backups
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-n] [backup-filelists...]
+usage="Usage: $cmd [-n] [srcs...]
   -n    No action. Passed -n to rsync for the rsync backups,
         and suppresses the histbackup runs.
-  backup-filelists...
-        Backup definition files. Each file's basename has the form:
-          mode.target
-	where the target is used by ssh for the remote backup target
-	and the mode specifies the file format and backup semantics.
+  -q    Quiet.
+  -x    Trace execution.
+  srcs...
+        Backup source paths; if specified, only these paths will be backed up.
+
+The configuration file: $backups
+contains lines of the form:
+    src mode dsthost [options...]
 
 Modes:
-  hg
-    The file contains lines of the form:
-      path [more-hg-options...]
-    Use \"hg push -f\" to push commits to ssh://target/BACKUP/\$HOST/hg/path
+  hg    Use \"hg push -f\" to push commits to
+        ssh://target/BACKUP/\$HOST/hg/path
   histbackup
-    The file contains lines of the form:
-      src [dst]
-    dst defaults to the basename of src.
-    Use rhistbackup to backup from ~/src to target:BACKUP/\$HOST/histbackup/dst
+        Use rhistbackup to backup from ~/src to target:BACKUP/\$HOST/histbackup/dst
   mv, push, image
-    The file contains lines of the form:
-      path [more-rsync-options...]
-    Uses rsync to backup from ~/path to target:BACKUP/\$HOST/rsync/path
-    mv: passes --remove-source-files to rsync.
-    push: does not use --delete, accumulating at the far end
-    image: passed --delete-after to rsync, making an image copy."
+        Uses rsync to backup from ~/path to target:BACKUP/\$HOST/rsync/path
+        mv: passes --remove-source-files to rsync.
+        push: does not use --delete, accumulating at the far end
+        image: passed --delete-after to rsync, making an image copy."
 
 badopts=
 
@@ -58,6 +56,8 @@ do
         exit 0
         ;;
     -n) doit= dont=echo ;;
+    -q) quiet=1 rsvopts= trace= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -66,14 +66,6 @@ do
   esac
   shift
 done
-
-[ $# -gt 0 ] || \
-  set -- \
-        "$rcdir"/hg.* \
-        "$rcdir"/mv.* \
-        "$rcdir"/push.* \
-        "$rcdir"/image.* \
-        "$rcdir"/histbackup.*
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -84,111 +76,76 @@ prefix(){
   fi
 }
 
-# Usage: set_mode_target backup-filename
-set_mode_target(){
-  mode=$( basename "$1" )
-  target=${mode#*.}
-}
-
-# Usage: do_rsync_push backup-filename
-do_rsync_push(){
-  do_rsync "$1"
-}
-
-# Usage: do_rsync_mv backup-filename
-do_rsync_mv(){
-  do_rsync "$1" --remove-source-files
-}
-
-# Usage: do_rsync_rsync backup-filename
-do_rsync_image(){
-  do_rsync "$1" --delete-after
-}
-
-# Usage: do_rsync backup-filename rsync-opts
-do_rsync(){
-  ( set -ue
-    set_mode_target "$1"
-    exec <"$1"
-    shift
-    cd
-    xit=0
-    while read -r path more_rsopts
-    do
-      [ -d "$path/" ] && path=$path/
-      $dont prefix "$target:$path" $trace \
-        rsync -ia $rsopts ${1+"$@"} $more_rsopts "$path" "$target:BACKUP/$HOST/rsync/$path" \
-        </dev/null \
-      || xit=1
-    done
-    exit $xit
-  )
-}
-
-# Usage: do_hg backup-filename
-do_hg(){
-  ( set -ue
-    set_mode_target "$1"
-    exec <"$1"
-    shift
-    cd
-    xit=0
-    while read -r path more_hgopts
-    do
-      [ -d "$path/" ] || {
-        echo "$cmd: do_hg $1: path $path: not a directory" >&2
-        exit 1
-      }
-      ( set -ue
-        cd "$path"
-        $dont prefix "$target:$path" $trace \
-          hg push -f $more_hgopts "ssh://$target/BACKUP/$HOST/hg/$path"
-      ) || xit=1
-    done
-    exit $xit
-  )
-}
-
-# Usage: do_histbackup histbackup.*-filename
-do_histbackup(){
-  ( set -ue
-    set_mode_target "$1"
-    exec <"$1"
-    cd
-    while read -r src dst
-    do
-      : "${dst:=$(basename "$src")}"
-      [ -d "$src" ] || {
-        echo "$cmd: do_histbackup $1: src $src: not a directory" >&2
-        exit 1
-      }
-      $dont prefix "$target:$src" $trace \
-        rhistbackup "$src:$target:BACKUP/$HOST/histbackup/$dst" \
-        </dev/null || xit=1
-    done
-  )
-}
-
-
 xit=0
 
-for rsyncf
+exec 3<"$backups"
+
+lineno=0
+while read -r src mode dsthost etc <&3
 do
-  [ -s "$rsyncf" ] || continue
-  echo "$rsyncf"
-  mode=$( basename "$rsyncf" )
-  target=${mode#*.}
-  frsopts=
-  case "$mode" in
-    hg.*)         do_hg "$rsyncf" ;;
-    image.*)      do_rsync_image "$rsyncf" ;;
-    mv.*)         do_rsync_mv "$rsyncf" ;;
-    push.*)       do_rsync_push "$rsyncf" ;;
-    histbackup.*) do_histbackup "$rsyncf" ;;
-    *)            echo "$0: unsupported rsync file: $rsyncf" >&2
+  lineno=$(( lineno + 1 ))
+  case "$src" in
+    '' | \#* ) continue ;;
+  esac
+  [ $# = 0 ] || \
+  case " $* " in
+    *" $src "*) ;;
+    *)  [ $quiet ] || echo "$cmd: skip $src" >&2
+        continue
+        ;;
+  esac
+  case "$src" in
+    /*) ;; *) src=$HOME/$src ;;
+  esac
+  if [ -d "$src/" ]
+  then  suffix=/
+  else  suffix=
+  fi
+  for dsthost in ${dsthost/,/ }
+  do
+    case "$dsthost" in
+      *:*)    dst=$(     expr "x$dsthost" : 'x[^:]*:\(.*\)' )
+              dsthost=$( expr "x$dsthost" : 'x\([^:]*\):.*' )
+              ;;
+      *)      dst=$( basename "$src" )
+              ;;
+    esac
+    case "$dst" in
+      /*)     ;;
+      *)      case "$mode" in
+                hg) ;;
+                image|mv|push)  dst=BACKUP/$HOST/rsync/$dst ;;
+                histbackup)     dst=BACKUP/$HOST/histbackup/$dst ;;
+                *)              echo "$cmd: $backups:$lineno: unknown mode: $mode" >&2
+                                exit 1
+                                ;;
+              esac
+              ;;
+    esac
+    case "$mode" in
+      hg)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
+                  ;;
+      image)      $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --delete-after $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      mv)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --remove-source-files $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      push)       $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
+                    rhistbackup "$src:$dsthost:$dst"
+                  ;;
+      *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
                   exit 1
                   ;;
-  esac || xit=1
+    esac || xit=1
+  done
 done
 
 exit $xit

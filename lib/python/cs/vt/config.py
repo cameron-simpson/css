@@ -28,8 +28,9 @@ from cs.logutils import debug, warning, error
 from cs.obj import SingletonMixin, singleton
 from cs.pfx import Pfx, XP, pfx_method
 from cs.result import OnDemandResult
-from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG
+from . import Lock, DEFAULT_BASEDIR, DEFAULT_CONFIG_MAP
 from .archive import Archive, FilePathArchive
+from .backingfile import VTDStore
 from .cache import FileCacheStore, MemoryCacheStore
 from .compose import (
     parse_store_specs,
@@ -65,24 +66,30 @@ class Config(SingletonMixin):
   '''
 
   @staticmethod
-  @require(lambda config_map: isinstance(config_map, (str, dict)))
+  @require(
+      lambda config_map: config_map is None or
+      isinstance(config_map, (str, dict))
+  )
   @require(
       lambda default_config:
       (default_config is None or isinstance(default_config, dict))
   )
-  def _singleton_key(config_map, environ=None, default_config=None):
+  def _singleton_key(config_map=None, environ=None, default_config=None):
+    if config_map is None:
+      config_map = DEFAULT_CONFIG_MAP
     return (
         config_map if isinstance(config_map, str) else id(config_map),
-        id(DEFAULT_CONFIG) if default_config is None else id(default_config)
+        id(DEFAULT_CONFIG_MAP)
+        if default_config is None else id(default_config)
     )
 
-  def __init__(self, config_map, environ=None, default_config=None):
-    if hasattr(self, 'map'):
-      return
+  def __init__(self, config_map=None, environ=None, default_config=None):
+    if config_map is None:
+      config_map = DEFAULT_CONFIG_MAP
     if environ is None:
       environ = os.environ
     if default_config is None:
-      default_config = DEFAULT_CONFIG
+      default_config = DEFAULT_CONFIG_MAP
     self.environ = environ
     config = ConfigParser()
     if isinstance(config_map, str):
@@ -102,6 +109,7 @@ class Config(SingletonMixin):
         warning("falling back to default configuration")
         config.read_dict(default_config)
     else:
+      self.path = None
       config.read_dict(config_map)
     self.map = config
     self._clause_stores = {}  # clause_name => Result->Store
@@ -176,6 +184,15 @@ class Config(SingletonMixin):
     ''' The default location for local archives and stores.
     '''
     return longpath(self.get_default('basedir', DEFAULT_BASEDIR))
+
+  @property
+  def blockmapdir(self):
+    ''' The global blockmapdir.
+        Falls back to `{self.basedir}/blockmaps`.
+    '''
+    return longpath(
+        self.get_default('blockmapdir', joinpath(self.basedir, 'blockmaps'))
+    )
 
   @property
   def mountdir(self):
@@ -376,6 +393,32 @@ class Config(SingletonMixin):
     if isinstance(raw, str):
       raw = truthy_word(raw)
     return DataDirStore(store_name, path, hashclass=hashclass, raw=raw)
+
+  def datafile_Store(
+      self,
+      store_name,
+      clause_name,
+      *,
+      path=None,
+      basedir=None,
+      hashclass=None,
+  ):
+    ''' Construct a VTDStore from a "datafile" clause.
+    '''
+    if basedir is None:
+      basedir = self.get_default('basedir')
+    if path is None:
+      path = clause_name
+    path = longpath(path)
+    if not isabspath(path):
+      if path.startswith('./'):
+        path = abspath(path)
+      else:
+        if basedir is None:
+          raise ValueError('relative path %r but no basedir' % (path,))
+        basedir = longpath(basedir)
+        path = joinpath(basedir, path)
+    return VTDStore(store_name, path, hashclass=hashclass)
 
   def filecache_Store(
       self,

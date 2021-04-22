@@ -1,3 +1,6 @@
+fstags to return TaggedEntities, TaggedPath to subclass TagSetMixin and rename to FSTagSet
+bring the jsonable hook from cs.app.beyonwiz in house for subclassing
+fstags: support sqlite SQLTags for ontology
 "fstags tagvalue [--direct] tagname" to mean "fstags ls -d -o {tagname} [--direct] ."
 TagFile: TagFile.modified flag tracking new or deleted TagSets to compliment the per-tagset modified flags
 module docstring: nice dotted tag name example, particularly in format strings

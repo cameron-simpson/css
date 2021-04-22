@@ -10,11 +10,11 @@ from hashlib import sha1, sha256
 from os.path import splitext
 import sys
 from icontract import require
-from cs.binary import PacketField, BSUInt
+from typeguard import typechecked
+from cs.binary import BSUInt, BinarySingleValue
 from cs.excutils import exc_fold
 from cs.lex import get_identifier, hexify
 from cs.resources import MultiOpenMixin
-from cs.serialise import put_bs
 from .pushpull import missing_hashcodes
 from .transcribe import Transcriber, transcribe_s, register as register_transcriber
 
@@ -35,19 +35,43 @@ def io_fail(func):
   '''
   return exc_fold(exc_types=(MissingHashcodeError,))(func)
 
-# enums for hash types, used in encode/decode
-HASH_SHA1_T = 0
-HASH_SHA256_T = 1
-
-class HashCodeField(PacketField):
-  ''' A PacketField for parsing and transcibing hashcodes.
+class HasDotHashclassMixin:
+  ''' Mixin providing `.hashenum` and `.hashname` properties.
   '''
 
+  @property
+  def hashenum(self):
+    ''' The hashclass enum value.
+    '''
+    return self.hashclass.HASHENUM
+
+  @property
+  def hashname(self):
+    ''' The name token for this hashclass.
+    '''
+    return self.hashclass.HASHNAME
+
+class HashCodeField(BinarySingleValue, HasDotHashclassMixin):
+  ''' Binary transcription of hashcodes.
+  '''
+
+  @property
+  def hashcode(self):
+    ''' The value named `.hashcode`.
+    '''
+    return self.value
+
+  @property
+  def hashclass(self):
+    ''' The hash class comes from the hash code.
+    '''
+    return self.value.hashclass
+
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_value(bfr):
     ''' Decode a serialised hash from the CornuCopyBuffer `bfr`.
     '''
-    hashenum = BSUInt.value_from_buffer(bfr)
+    hashenum = BSUInt.parse_value(bfr)
     hashcls = HASHCLASS_BY_ENUM[hashenum]
     return hashcls.from_hashbytes(bfr.take(hashcls.HASHLEN))
 
@@ -58,25 +82,57 @@ class HashCodeField(PacketField):
     yield BSUInt.transcribe_value(hashcode.HASHENUM)
     yield hashcode
 
-decode_buffer = HashCodeField.value_from_buffer
-decode = HashCodeField.value_from_bytes
+decode_buffer = HashCodeField.parse_value
+decode = HashCodeField.parse_value_from_bytes
 
-def hash_of_byteses(bss, hashclass):
-  ''' Compute a `HashCode` from an iterable of bytes.
-
-      This underlies the mechanism for comparing remote Stores,
-      which is based on the `hash_of_hashcodes` method.
-  '''
-  H = hashclass.HASHFUNC()
-  for bs in bss:
-    H.update(bs)
-  return hashclass.from_chunk(H.digest())
-
-class HashCode(bytes, Transcriber):
+class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   ''' All hashes are bytes subclasses.
   '''
 
   __slots__ = ()
+
+  by_name = {}
+  by_enum = {}
+
+  @classmethod
+  @typechecked
+  @require(lambda cls, hashname: hashname not in cls.by_name)
+  @require(lambda cls, hashenum: hashenum not in cls.by_enum)
+  def new_class(
+      cls, hashname: str, hashenum: int, *, hashfunc: callable, hashlen: int
+  ):
+    ''' Factory t create, register and return a new `HashCode` subclass.
+    '''
+
+    class hashclass(HashCode):
+      ''' `HashCode` subclass.
+      '''
+      __slotes__ = ()
+      HASHNAME = hashname
+      HASHFUNC = hashfunc
+      HASHLEN = hashlen
+      HASHENUM = hashenum
+      HASHENUM_BS = bytes(BSUInt(hashenum))
+      HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+
+    hashclass.__name__ = 'Hash_' + hashname.upper()
+    hashclass.__doc__ = f"HashCode(bytes) subclass for the {hashname} hash function."
+    cls.by_name[hashname] = hashclass
+    cls.by_enum[hashenum] = hashclass
+    return hashclass
+
+  @classmethod
+  def by_index(cls, index):
+    ''' Obtain a hash class from its name or enum.
+    '''
+    if isinstance(index, str):
+      return cls.by_name[index]
+    if isinstance(index, int):
+      return cls.by_enum[index]
+    raise TypeError(
+        "%s.by_index: expected str or int, got %s:%r" %
+        (cls.__name__, type(index).__name__, index)
+    )
 
   transcribe_prefix = 'H'
 
@@ -85,6 +141,12 @@ class HashCode(bytes, Transcriber):
 
   def __repr__(self):
     return ':'.join((self.HASHNAME, hexify(self)))
+
+  @property
+  def hashclass(self):
+    ''' The hash class is our own type.
+    '''
+    return type(self)
 
   @property
   def bare_etag(self):
@@ -108,14 +170,14 @@ class HashCode(bytes, Transcriber):
   def from_buffer(bfr):
     ''' Decode a hash from a buffer.
     '''
-    return HashCodeField.value_from_buffer(bfr)
+    return HashCodeField.parse_value(bfr)
 
   def transcribe_b(self):
-    ''' Binary transcription of this hash via `cs.binary.PacketField.transcribe_value`.
+    ''' Binary transcription of this hash.
     '''
     return HashCodeField.transcribe_value(self)
 
-  def encode(self):
+  def encode(self):  # pylint: disable=arguments-differ
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
 
         If we ever have a variable length hash function,
@@ -125,13 +187,12 @@ class HashCode(bytes, Transcriber):
 
   @classmethod
   def from_hashbytes(cls, hashbytes):
-    ''' Factory function returning a HashCode object from the hash bytes.
+    ''' Factory function returning a `HashCode` object from the hash bytes.
     '''
-    if len(hashbytes) != cls.HASHLEN:
-      raise ValueError(
-          "expected %d bytes, received %d: %r" %
-          (cls.HASHLEN, len(hashbytes), hashbytes)
-      )
+    assert len(hashbytes) == cls.HASHLEN, (
+        "expected %d bytes, received %d: %r" %
+        (cls.HASHLEN, len(hashbytes), hashbytes)
+    )
     return cls(hashbytes)
 
   @classmethod
@@ -150,14 +211,16 @@ class HashCode(bytes, Transcriber):
     try:
       hashclass = HASHCLASS_BY_NAME[hashname.lower()]
     except KeyError:
-      raise ValueError("unknown hashclass name %r", hashname)
+      raise ValueError(
+          "unknown hashclass name %r" % (hashname,)
+      )  # pylint: raise-missing-from
     return hashclass.from_hashbytes_hex(hashtext)
 
   @classmethod
   def from_chunk(cls, chunk):
     ''' Factory function returning a HashCode object from a data block.
     '''
-    hashbytes = cls.HASHFUNC(chunk).digest()
+    hashbytes = cls.HASHFUNC(chunk).digest()  # pylint: disable=not-callable
     return cls.from_hashbytes(hashbytes)
 
   @property
@@ -188,7 +251,7 @@ class HashCode(bytes, Transcriber):
         hashname = cls.HASHNAME
       except AttributeError as e:
         raise ValueError("no .hashname extension") from e
-    hashclass = HASHCLASS_BY_NAME[hashname]
+    hashclass = cls.by_index(hashname)
     hashbytes = bytes.fromhex(hexpart)
     return hashclass.from_hashbytes(hashbytes)
 
@@ -221,56 +284,23 @@ class HashCode(bytes, Transcriber):
 
 register_transcriber(HashCode)
 
-class Hash_SHA1(HashCode):
-  ''' A hash class for SHA1.
-  '''
-  __slots__ = ()
-  HASHFUNC = sha1
-  HASHNAME = 'sha1'
-  HASHLEN = 20
-  HASHENUM = HASH_SHA1_T
-  HASHENUM_BS = put_bs(HASHENUM)
-  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+# legacy names, to be removed (TODO)
+HASHCLASS_BY_NAME = HashCode.by_name
+HASHCLASS_BY_ENUM = HashCode.by_enum
 
-class Hash_SHA256(HashCode):
-  ''' A hash class for SHA256.
-  '''
-  __slots__ = ()
-  HASHFUNC = sha256
-  HASHNAME = 'sha256'
-  HASHLEN = 32
-  HASHENUM = HASH_SHA256_T
-  HASHENUM_BS = put_bs(HASHENUM)
-  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
+# enums for hash types; TODO: remove and use names throughout
+HASH_SHA1_T = 0
+HASH_SHA256_T = 1
 
-HASHCLASS_BY_NAME = {}
-HASHCLASS_BY_ENUM = {}
-
-def register_hashclass(klass):
-  ''' Register a hash class for lookup elsewhere.
-  '''
-  hashname = klass.HASHNAME
-  if hashname in HASHCLASS_BY_NAME:
-    raise ValueError(
-        'cannot register hash class %s: hashname %r already registered to %s' %
-        (klass, hashname, HASHCLASS_BY_NAME[hashname])
-    )
-  hashenum = klass.HASHENUM
-  if hashenum in HASHCLASS_BY_ENUM:
-    raise ValueError(
-        'cannot register hash class %s: hashenum %r already registered to %s' %
-        (klass, hashenum, HASHCLASS_BY_NAME[hashenum])
-    )
-  HASHCLASS_BY_NAME[hashname] = klass
-  HASHCLASS_BY_ENUM[hashenum] = klass
-
-register_hashclass(Hash_SHA1)
-register_hashclass(Hash_SHA256)
+Hash_SHA1 = HashCode.new_class('sha1', HASH_SHA1_T, hashfunc=sha1, hashlen=20)
+Hash_SHA256 = HashCode.new_class(
+    'sha256', HASH_SHA256_T, hashfunc=sha256, hashlen=32
+)
 
 DEFAULT_HASHCLASS = Hash_SHA1
 
-class HashCodeUtilsMixin(object):
-  ''' Utility methods for classes which use hashcodes as keys.
+class HashCodeUtilsMixin:
+  ''' Utility methods for classes which use `HashCode`s as keys.
 
       Subclasses will generally override `.hashcodes_from`,
       which returns an iterator that yields hashcodes until none remains.
@@ -292,28 +322,29 @@ class HashCodeUtilsMixin(object):
       * `.hashcodes_missing`: likewise
   '''
 
+  def hash_of_byteses(self, bss):
+    ''' Compute a `HashCode` from an iterable of `bytes`.
+
+        This underlies the mechanism for comparing remote Stores,
+        which is based on the `hash_of_hashcodes` method.
+    '''
+    hashclass = self.hashclass
+    hashstate = hashclass.HASHFUNC()
+    for bs in bss:
+      hashstate.update(bs)
+    return hashclass.from_chunk(hashstate.digest())
+
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
-  )
+      lambda self, start_hashcode: start_hashcode is None or
+      type(start_hashcode) is self.hashclass
+  )  # pylint: disable=unidiomatic-typecheck
   def hash_of_hashcodes(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=None,
-      after=False,
-      length=None
+      self, *, start_hashcode=None, after=False, length=None
   ):
     ''' Return a hash of the hashcodes requested and the last
-        hashcode (or None if no hashcodes matched); used for comparing
-        remote Stores.
+        hashcode (or `None` if no hashcodes matched);
+        used for comparing remote Stores.
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
@@ -322,36 +353,31 @@ class HashCodeUtilsMixin(object):
       )
     hs = list(
         self.hashcodes(
-            start_hashcode=start_hashcode,
-            hashclass=hashclass,
-            reverse=reverse,
-            after=after,
-            length=length
+            start_hashcode=start_hashcode, after=after, length=length
         )
     )
     if hs:
       h_final = hs[-1]
     else:
       h_final = None
-    return hash_of_byteses(hs, hashclass=hashclass), h_final
+    return self.hash_of_byteses(hs), h_final
 
-  def hashcodes_missing(self, other, *, window_size=None, hashclass=None):
+  def hashcodes_missing(self, other, *, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
         Note that a StreamStore overrides this with a call to
         missing_hashcodes_by_checksum to reduce bandwidth.
     '''
-    return missing_hashcodes(
-        self, other, window_size=window_size, hashclass=hashclass
-    )
+    return missing_hashcodes(self, other, window_size=window_size)
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      type(start_hashcode) is self.hashclass
   )
-  def hashcodes_from(
-      self, *, start_hashcode=None, reverse=False, hashclass=None
-  ):
+  # pylint: disable=too-many-branches,unidiomatic-typecheck
+  def hashcodes_from(self, *, start_hashcode=None):
     ''' Default generator yielding hashcodes from this object until none remains.
+
+        See the `hashcodes()` method for a wrapper with more features.
 
         This implementation starts by fetching and sorting all the
         keys, so for large mappings this implementation is memory
@@ -361,42 +387,19 @@ class HashCodeUtilsMixin(object):
         Parameters:
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
-          if None start the sequences from the smallest hashcode
-          or from the largest if `reverse` is true
-        * `reverse`: yield hashcodes in reverse order
-          (counting down instead of up).
+          if `None` start the sequences from the smallest hashcode
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
-    ks = sorted(hashcode for hashcode in self.keys(hashclass))
+    ks = sorted(self.keys())
     if not ks:
       return
     if start_hashcode is None:
-      if reverse:
-        ndx = len(ks) - 1
-      else:
-        ndx = 0
+      ndx = 0
     else:
       ndx = bisect_left(ks, start_hashcode)
       if ndx == len(ks):
         # start_hashcode > max hashcode
-        if reverse:
-          # step back into array
-          ndx -= 1
-        else:
-          # nothing to return
-          return
-      else:
-        # start_hashcode <= max hashcode
-        # ==> ks[ndx] >= start_hashcode
-        if reverse and ks[ndx] > start_hashcode:
-          if ndx > 0:
-            ndx -= 1
-          else:
-            return
+        # nothing to return
+        return
     # yield keys until we're not wanted
     while True:
       try:
@@ -404,26 +407,13 @@ class HashCodeUtilsMixin(object):
       except IndexError:
         break
       yield hashcode
-      if reverse:
-        if ndx == 0:
-          break
-        ndx -= 1
-      else:
-        ndx += 1
+      ndx += 1
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
-  )
-  def hashcodes(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=False,
-      after=False,
-      length=None
-  ):
+      lambda self, start_hashcode: start_hashcode is None or
+      type(start_hashcode) is self.hashclass
+  )  # pylint: disable=unidiomatic-typecheck
+  def hashcodes(self, *, start_hashcode=None, after=False, length=None):
     ''' Generator yielding up to `length` hashcodes `>=start_hashcode`.
         This relies on `.hashcodes_from` as the source of hashcodes.
 
@@ -431,17 +421,9 @@ class HashCodeUtilsMixin(object):
         * `start_hashcode`: starting hashcode;
           the returned hashcodes are `>=start_hashcode`;
           if None start the sequences from the smallest hashcode
-          or from the largest if `reverse` is true
-        * `reverse`: yield hashcodes in reverse order
-            (counting down instead of up).
         * `after`: skip the first hashcode if it is equal to `start_hashcode`
         * `length`: the maximum number of hashcodes to yield
     '''
-    if hashclass is None:
-      if start_hashcode is None:
-        hashclass = self.hashclass
-      else:
-        hashclass = type(start_hashcode)
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if after and start_hashcode is None:
@@ -457,8 +439,7 @@ class HashCodeUtilsMixin(object):
       if nhashcodes == 0:
         return
     first = True
-    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
-                                        hashclass=hashclass, reverse=reverse):
+    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode):
       if first:
         first = False
         if after and hashcode == start_hashcode:
@@ -471,25 +452,15 @@ class HashCodeUtilsMixin(object):
           break
 
   @require(
-      lambda start_hashcode, hashclass: start_hashcode is None or hashclass is
-      None or isinstance(start_hashcode, hashclass)
+      lambda self, start_hashcode: start_hashcode is None or
+      isinstance(start_hashcode, type(self))
   )
-  def hashcodes_bg(
-      self,
-      *,
-      start_hashcode=None,
-      hashclass=None,
-      reverse=None,
-      after=False,
-      length=None
-  ):
+  def hashcodes_bg(self, *, start_hashcode=None, after=False, length=None):
     ''' Background a hashcodes call.
     '''
     return self._defer(
         self.hashcodes,
         start_hashcode=start_hashcode,
-        hashclass=hashclass,
-        reverse=reverse,
         after=after,
         length=length
     )
@@ -498,10 +469,11 @@ class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
 
-  def __init__(self):
+  def __init__(self, hashclass=None):
     dict.__init__(self)
-    MultiOpenMixin.__init__(self)
-    self.hashclass = DEFAULT_HASHCLASS
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    self.hashclass = hashclass
 
   def __str__(self):
     return '<%s:%d-entries>' % (self.__class__.__name__, len(self))

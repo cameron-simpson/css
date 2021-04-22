@@ -6,7 +6,8 @@
 import abc
 import importlib
 from inspect import (
-    getcomments, getmodule, isclass, isfunction, ismethod, signature
+    getcomments, getmodule, isclass, isdatadescriptor, isfunction, ismethod,
+    signature
 )
 from itertools import chain
 from cs.lex import cutprefix, stripped_dedent
@@ -14,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20200718-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -122,13 +123,15 @@ def module_doc(
             if ismethod(attr) or isfunction(attr):
               method_sig = signature(attr)
               obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
+            elif isdatadescriptor(attr):
+              obj_doc += f'\n\n### Property `{Mname}.{attr_name}`\n\n{attr_doc}'
             elif not callable(attr):
               ##obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
               pass
             elif isinstance(attr, property):
               obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
             else:
-              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\nSKIP DOC: {attr_doc}'
+              obj_doc += f'\n\n### `{Mname}.{attr_name}`'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)

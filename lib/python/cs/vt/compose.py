@@ -7,7 +7,7 @@
 ''' Syntactic parsing.
 '''
 
-from os.path import isdir
+from os.path import isdir as isdirpath, isfile as isfilepath
 from cs.lex import (
     get_identifier,
     get_other_chars,
@@ -98,7 +98,7 @@ def get_store_spec(s, offset=0):
         Supported paths:
         - `.../foo.sock`: A UNIX socket based StreamStore.
         - `.../dir`: A DataDirStore directory.
-        - `.../foo.vtd `: (STILL TODO): A DataFileStore.
+        - `.../foo.vtd `: (STILL TODO): A VTDStore.
       * `|command`: A subprocess implementing the streaming protocol.
       * `store_type(param=value,...)`:
         A general Store specification.
@@ -137,8 +137,11 @@ def get_store_spec(s, offset=0):
     if path.endswith('.sock'):
       store_type = 'socket'
       params = {'socket_path': path}
-    elif isdir(path):
+    elif isdirpath(path):
       store_type = 'datadir'
+      params = {'path': path}
+    elif isfilepath(path):
+      store_type = 'datafile'
       params = {'path': path}
     else:
       raise ValueError("%r: not a directory or a socket" % (path,))

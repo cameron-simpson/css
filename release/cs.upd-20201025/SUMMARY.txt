@@ -1,0 +1,11 @@
+Upd: new .disabled property to allow inspection of disabledness.
+Upd.insert: accept negative insert indices to position from the top of the list.
+Upd.nl: use clear-to-end-of-line at the end of the message if available.
+UpdProxy: turn .prefix into a property which causes a redraw when changed.
+Upd.proxy(index): return None if the index is out of range, accomodates racy or incorrect behaviour by a user.
+UpdProxy: cropped overflowing text gets a leading '<' to make it apparent.
+UpdProxy: new .insert() method to support insterting new proxies with respect to an existing proxy.
+UpdProxy: new reset() method, clears prefix and text.
+UpdProxy.__init__: BREAKING: make all arguments optional to aid use.
+Upd: do not make any slots unless required.
+Make the compute-redraw-strings methods private.

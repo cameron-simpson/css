@@ -1,0 +1,1 @@
+module_attributes: skip values from other modules _if we know the module_ (computed values like tuples have no module and still need to be returned).

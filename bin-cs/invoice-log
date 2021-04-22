@@ -6,26 +6,58 @@
 
 set -ue
 
-cmd=$0
-usage="Usage: $cmd org startdate enddate"
+cd
 
-[ $# = 3 ] || { echo "$usage" >&2; exit 2; }
-org=$1 start=$2 end=$3
+cmd=$0
+usage="Usage: $cmd org startdate enddate [repo-dirs...]"
+
+badopts=
+
+if [ $# -lt 3 ]
+then
+  echo "$cmd: missing org startdate enddate" >&2
+  badopts=1
+else
+  org=$1 start=$2 end=$3
+  shift; shift; shift
+  repodirs=$*
+  for d in $repodirs
+  do
+    [ -d "$d/.git" ] || [ -d "$d/.hg" ] || {
+      echo "$cmd: repodir $d: no .git or .hg subdir, SKIPPING" >&2
+    }
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 rcfile=$HOME/rc/invoice/$org.sh
-[ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
-. "$rcfile"
+if [ -s "$rcfile" ]
+then  . "$rcfile"
+else  echo "$cmd: missing rcfile: $rcfile" >&2
+fi
 
 set -x
 (
+  set -ue
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
-  for d in $gitdirs
+  [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
+  for d in $repodirs
   do
+    [ -d "$d/" ] || continue
     ( cd "$d"
-      git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
-    ) | awk -v "email=$EMAIL" '$4 == email {print}'
-  done
+      if [ -d ".git/" ]
+      then  git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
+      elif [ -d ".hg/" ]
+      then  hg log --template '{date|isodate} {user|email} {desc|firstline} [{bookmarks} {branch}]\n' -d "$start to $end"
+      else
+        echo "$d: NO VCS" >&2
+      fi
+    )
+  done \
+  | awk -v "email=$EMAIL" '$4 == email { $3=""; $4=""; print}'
 ) \
+| sed 's/   */ /g' \
 | awk -v "email=$EMAIL" -v "start=$start" -v "end=$end" '$1 >= start && $1 <= end {print}' \
 | sort -u \
 | awk '$1 != last_date {print("")}

@@ -1,7 +1,7 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-hg_repos        = sr.ht
-git_repos       = bitbucket github
+hg_repos        = sr.ht-css
+git_repos       = bitbucket-css github-css
 www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 www_github      = https://github.com/cameron-simpson/css
@@ -64,7 +64,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
+rsync = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -112,9 +112,9 @@ _testhost:
           do \
             target=$$testhost:$$basedir \
             pfx "$$target/bin" set-x \\
-              rsync -iOtrl "bin/" "$$target/bin/" & \
+              $(rsync) -a "bin/" "$$target/bin/" & \
             pfx "$$target/lib/python/cs" set-x \\
-              rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
+              $(rsync) -a '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
           done \
         done \
@@ -155,7 +155,7 @@ deploy_dir(targetdir, base, includes) = \
             set -x; mkdir -p $(targetdir)/$(base) \
           ) \
           pfx $(targetdir)/$(base) \\
-              $(rsync) -aO --delete $(base)/. $(targetdir)/$(base)/. \
+              $(rsync) -a --delete $(base)/. $(targetdir)/$(base)/. \
         )
 
 deploy(targetdir) = \
