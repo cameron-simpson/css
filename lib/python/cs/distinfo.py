@@ -118,7 +118,6 @@ class CSReleaseCommand(BaseCommand):
     options.force = False
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
-    options.last_values = LastValues()
     options.modules = Modules(options=options)
 
   def apply_opts(self, opts):
