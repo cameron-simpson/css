@@ -50,6 +50,10 @@ class ITunesCommand(BaseCommand):
     options.fstags = FSTags()
     options.library = ITunes()
 
+  def run_context(self):
+    with stackattrs(self.options, fstags=FSTags()):
+      yield
+
   @staticmethod
   def cmd_autotag(argv, options):
     ''' Tag paths based on data from the iTunes library.
@@ -63,34 +67,32 @@ class ITunesCommand(BaseCommand):
         ['series', 'season', 'episode_order'], tv_show=True
     )
     ##print(pformat(tracks_by_series_season_episode))
-    with fstags:
-      for top_path in argv:
-        for path in rpaths(top_path):
-          with Pfx(path):
-            tagged_path = TaggedPath(path, fstags)
-            all_tags = tagged_path.all_tags
-            key = (
-                all_tags.title, all_tags.get('season'),
-                all_tags.get('episode')
-            )
-            tracks = tracks_by_series_season_episode.get(key, ())
-            if tracks:
-              if len(tracks) > 1:
-                warning("multiple tracks: %r", tracks)
-              else:
-                track, = tracks
-                for tag_name, track_attr in (
-                    ('title', 'name'),
-                    ('genre', 'genre'),
-                    ('release_date', 'release_date'),
-                ):
-                  tag_value = all_tags.get(tag_name)
-                  if not tag_value:
-                    tr_value = getattr(track, track_attr, None)
-                    if tr_value is not None:
-                      new_tag = Tag(tag_name, tr_value)
-                      info("+ %s", new_tag)
-                      tagged_path.add(new_tag)
+    for top_path in argv:
+      for path in rpaths(top_path):
+        with Pfx(path):
+          tagged_path = TaggedPath(path, fstags)
+          all_tags = tagged_path.all_tags
+          key = (
+              all_tags.title, all_tags.get('season'), all_tags.get('episode')
+          )
+          tracks = tracks_by_series_season_episode.get(key, ())
+          if tracks:
+            if len(tracks) > 1:
+              warning("multiple tracks: %r", tracks)
+            else:
+              track, = tracks
+              for tag_name, track_attr in (
+                  ('title', 'name'),
+                  ('genre', 'genre'),
+                  ('release_date', 'release_date'),
+              ):
+                tag_value = all_tags.get(tag_name)
+                if not tag_value:
+                  tr_value = getattr(track, track_attr, None)
+                  if tr_value is not None:
+                    new_tag = Tag(tag_name, tr_value)
+                    info("+ %s", new_tag)
+                    tagged_path.add(new_tag)
 
 class ITunesISODateTime(datetime):
   ''' A `datetime` subclass using the iTunes exported XML date format.
