@@ -1,19 +1,24 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
-# Basic XML conveniences.
-#   - Cameron Simpson <cs@cskk.id.au> 12feb2017
-#
+
+''' Trite XML conveniences.
+'''
 
 from __future__ import print_function
 import sys
 try:
-  from lxml import etree
+  import lxml.etree as etree
 except ImportError:
-  import xml.etree.ElementTree as etree
+  try:
+    import xml.etree.cElementTree as etree
+  except ImportError:
+    import xml.etree.ElementTree as etree
 
 def pprint(xml, fp=None):
-  ''' Directly derived from the suggestion at:
-       http://stackoverflow.com/questions/749796/pretty-printing-xml-in-python
+  ''' Pretty print an XML object.
+
+      Directly derived from the suggestion at:
+      http://stackoverflow.com/questions/749796/pretty-printing-xml-in-python
   '''
   if fp is None:
     fp = sys.stdout
