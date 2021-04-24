@@ -1,0 +1,2 @@
+Portfwds: accept any iterable for target_list.
+Portability fix.

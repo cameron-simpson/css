@@ -30,6 +30,10 @@ class SQLATestAll(NodeTestAll):
         echo=len(os.environ.get('DEBUG', '')) > 0
     )
 
+  @unittest.skip("sqla backend broken for persistence, fix will come with planned nodedb backend-as-mapping lazy load changes")
+  def test22persist(self):
+    pass
+
 def selftest(argv):
   unittest.main(__name__, None, argv)
 

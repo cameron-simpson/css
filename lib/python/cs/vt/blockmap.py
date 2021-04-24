@@ -200,7 +200,7 @@ class BlockMap(RunStateMixin):
   ''' A fast mapping of offsets to leaf block hashcodes.
   '''
 
-  def __init__(self, block, mapsize=None, blockmapdir=None):
+  def __init__(self, block, mapsize=None, blockmapdir=None, runstate=None):
     ''' Initialise the `BlockMap`, dispatch the index generator.
 
         Parameters:
@@ -208,6 +208,7 @@ class BlockMap(RunStateMixin):
         * `mapsize`: the size of each index map, default `OFFSET_SCALE`
         * `blockmapdir`: the pathname for persistent storage of `BlockMaps`
     '''
+    super().__init__(runstate=runstate)
     if mapsize is None:
       mapsize = OFFSET_SCALE
     elif mapsize <= 0 or mapsize > OFFSET_SCALE:
@@ -217,11 +218,7 @@ class BlockMap(RunStateMixin):
       )
     # DEBUGGING
     if blockmapdir is None:
-      blockmapdir = '/Users/cameron/hg/css-venti/test_blockmaps'
-      X("BlockMap: set blockmapdir to %r (was None)", blockmapdir)
-    else:
-      X("BlockMap: supplied blockmapdir=%r", blockmapdir)
-    RunStateMixin.__init__(self, "BlockMap")
+      blockmapdir = defaults.S.blockmapdir
     if not isinstance(block, IndirectBlock):
       raise TypeError(
           "block needs to be an IndirectBlock, got a %s instead" %
@@ -239,7 +236,6 @@ class BlockMap(RunStateMixin):
       )
       if not isdir(mappath):
         with Pfx("makedirs(%r)", mappath):
-          X("MKDIR %r", mappath)
           os.makedirs(mappath)
     self.block = block
     self.S = defaults.S
@@ -261,10 +257,6 @@ class BlockMap(RunStateMixin):
         mapped_to += mapsize
     self.mapped_to = mapped_to
     if mapped_to < len(block):
-      X(
-          "BlockMap.__init__: dispatch worker to scan from offset %d ...",
-          mapped_to
-      )
       self.runstate.start()
       self._worker = bg_thread(
           self._load_maps,
@@ -293,7 +285,6 @@ class BlockMap(RunStateMixin):
   def close(self):
     ''' Release the resources associated with the `BlockMap`.
     '''
-    X("BlockMap.close...")
     self.cancel()
     self.join()
     maps = self.maps

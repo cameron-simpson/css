@@ -10,16 +10,12 @@
 import sys
 from random import randint
 import unittest
-import cs.x
-from cs.x import X
 from cs.randutils import randomish_chunks
 from .block import IndirectBlock, HashCodeBlock
 from .blockmap import BlockMap
 from .store import MappingStore
 
-cs.x.X_via_tty = True
-
-class TestAll(unittest.TestCase):
+class TestBlockMap(unittest.TestCase):
   ''' Tests for BlockMaps.
   '''
 
@@ -59,23 +55,18 @@ class TestAll(unittest.TestCase):
     with self.S:
       for depth in 0, 1, 2, 3:
         for width in 1, 2, 7:  # , 17:
-          X("gen depth=%d, width=%d ...", depth, width)
           top_block, flat_data = self._gen_data(depth, width)
           if not isinstance(top_block, IndirectBlock):
             top_block = IndirectBlock.from_subblocks([top_block], force=True)
           for mapsize in 999999, 10000007, 13131313, None:
             with self.subTest(mapsize=mapsize, depth=depth, width=width):
-              X("test mapsize=%s", mapsize)
               bmap = BlockMap(top_block, mapsize=mapsize)
               bmap.join()
-              X("full data cmp...")
               bmap.self_check()
               self.assertEqual(flat_data, bmap.data(0, len(flat_data)))
-              X("full data cmp DONE")
               for _ in range(16):
                 start = randint(0, len(flat_data) - 1)
                 end = randint(start, len(flat_data))
-                X("compare [%d:%d]...", start, end)
                 self.assertEqual(
                     flat_data[start:end], bmap.data(start, end - start),
                     'flat_data[%d:%s] != bmap.data(%d, %d)' %

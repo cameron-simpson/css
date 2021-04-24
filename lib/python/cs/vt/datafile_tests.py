@@ -74,7 +74,7 @@ class TestDataFile(unittest.TestCase):
         with self.subTest(shuffled_offsets_n=n, offset=offset):
           f.seek(offset)
           bfr = CornuCopyBuffer.from_file(f)
-          dr = DataRecord.from_buffer(bfr)
+          dr = DataRecord.parse(bfr)
           data = dr.data
           self.assertTrue(data == blocks[offset])
 

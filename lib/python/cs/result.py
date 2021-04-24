@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends: various classable classes for deferred delivery of values.
+Result and friends: various subclassable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -58,13 +58,14 @@ import sys
 from threading import Lock, RLock
 from icontract import require
 from cs.logutils import exception, error, warning, debug
-from cs.pfx import Pfx
+from cs.mappings import AttrableMapping
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20200521-post'
+__version__ = '20210420-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -74,8 +75,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
-        'cs.threads', 'icontract'
+        'cs.logutils',
+        'cs.mappings',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
     ],
 }
 
@@ -101,25 +108,33 @@ class CancellationError(Exception):
       msg = "%s: cancelled" % (msg,)
     Exception.__init__(self, msg)
 
+# pylint: disable=too-many-instance-attributes
 class Result(object):
   ''' Basic class for asynchronous collection of a result.
-      This is also used to make OnDemandFunctions, LateFunctions and other
+      This is also used to make `OnDemandFunction`s, `LateFunction`s and other
       objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None, lock=None, result=None):
+  def __init__(self, name=None, lock=None, result=None, extra=None):
     ''' Base initialiser for `Result` objects and subclasses.
 
         Parameter:
         * `name`: optional parameter naming this object.
         * `lock`: optional locking object, defaults to a new `threading.Lock`.
         * `result`: if not `None`, prefill the `.result` property.
+        * `extra`: a mapping of extra information to associate with the `Result`,
+          useful to provide context when collecting the result;
+          the `Result` has a public attribute `.extra`
+          which is an `AttrableMapping` to hold this information.
     '''
     if lock is None:
       lock = RLock()
     if name is None:
       name = "%s-%d" % (type(self).__name__, seq())
     self.name = name
+    self.extra = AttrableMapping()
+    if extra:
+      self.extra.update(extra)
     self.state = ResultState.pending
     self.notifiers = []
     self.collected = False
@@ -249,7 +264,7 @@ class Result(object):
     else:
       try:
         raise exc
-      except:
+      except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
   @require(lambda self: self.state == ResultState.pending)
@@ -263,7 +278,7 @@ class Result(object):
       r = func(*a, **kw)
     except BaseException:
       self.exc_info = sys.exc_info()
-    except:
+    except:  # pylint: disable=bare-except
       exception("%s: unexpected exception: %r", func, sys.exc_info())
       self.exc_info = sys.exc_info()
     else:
@@ -323,13 +338,14 @@ class Result(object):
       debug("%s._complete: notify via %r", self, notifier)
       try:
         notifier(self)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         exception(
             "%s._complete: calling notifier %s: exc=%s", self, notifier, e
         )
       else:
         self.collected = True
 
+  @pfx_method
   def join(self):
     ''' Calling the .join() method waits for the function to run to
         completion and returns a tuple as for the WorkerThreadPool's
@@ -411,9 +427,16 @@ class Result(object):
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
+
+      Parameters:
+      * `_name`: optional name for the `Result`, passed to the initialiser
+      * `_extra`: optional extra data for the `Result`, passed to the initialiser
+
+      Other parameters are passed to `func`.
   '''
-  _name = kw.pop('_name', None)
-  R = Result(name=_name)
+  name = kw.pop('_name', None)
+  extra = kw.pop('_extra', None)
+  R = Result(name=name, extra=extra)
   R.bg(func, *a, **kw)
   return R
 
@@ -432,6 +455,29 @@ def report(LFs):
     LF.notify(notify)
   for _ in range(n):
     yield Q.get()
+
+class ResultSet(set):
+  ''' A `set` if `Result`s,
+      on which one may iterate as `Result`s complete.
+  '''
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    pass
+
+  def __iter__(self):
+    ''' Iterating on a `ResultSet` yields `Result`s as they complete.
+    '''
+    for R in report(super().__iter__()):
+      yield R
+
+  def wait(self):
+    ''' Convenience function to wait for all the `Result`s.
+    '''
+    for _ in self:
+      pass
 
 def after(Rs, R, func, *a, **kw):
   ''' After the completion of `Rs` call `func(*a,**kw)` and return

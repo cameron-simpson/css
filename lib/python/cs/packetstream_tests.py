@@ -1,19 +1,15 @@
-#!/usr/bin/python
-#
-# Self tests for cs.stream.
-#       - Cameron Simpson <cs@cskk.id.au>
+#!/usr/bin/env python3
 #
 
-from __future__ import absolute_import
-from functools import partial
-import sys
+''' Unit tests for cs.packetstream.
+'''
+
 import os
 import random
 import socket
 from threading import Thread
 import unittest
 from cs.binary_tests import _TestPacketFields
-from cs.py3 import bytes
 from cs.randutils import rand0, make_randblock
 from cs.socketutils import bind_next_port, OpenSocket
 from . import packetstream
@@ -31,6 +27,8 @@ class TestPacket(unittest.TestCase):
   '''
 
   def test00round_trip(self):
+    ''' Test construction/serialise/deserialise for various basic packets.
+    '''
     for is_request in False, True:
       for channel in 0, 1, 13, 17, 257:
         for tag in 0, 1, 13, 17, 257:
@@ -39,25 +37,34 @@ class TestPacket(unittest.TestCase):
               with self.subTest(is_request=is_request, channel=channel,
                                 tag=tag, flags=flags, payload=payload):
                 P = Packet(
-                    is_request, channel, tag, flags, 0 if is_request else None,
-                    payload
+                    is_request=is_request,
+                    channel=channel,
+                    tag=tag,
+                    flags=flags,
+                    rq_type=0 if is_request else None,
+                    payload=payload,
                 )
-                bs = b''.join(P.transcribe_flat())
-                P2, offset = Packet.from_bytes(bs)
+                bs = bytes(P)
+                P2, offset = Packet.parse_bytes(bs)
                 self.assertEqual(offset, len(bs))
                 self.assertEqual(P, P2)
 
-class _TestStream(object):
+class _TestStream(unittest.TestCase):
   ''' Base class for stream tests.
   '''
 
   def setUp(self):
+    ''' Set up: open the streams.
+    '''
     self._open_Streams()
 
+  # pylint: disable=no-self-use
   def _open_Streams(self):
     raise unittest.SkipTest("base test")
 
   def tearDown(self):
+    ''' Tear down: shutdown and close the streams.
+    '''
     self.local_conn.shutdown()
     self.remote_conn.shutdown()
     self._close_Streams()
@@ -74,10 +81,12 @@ class _TestStream(object):
     return 0x11, bytes(reversed(payload))
 
   def test00immediate_close(self):
-    pass
+    ''' Trite test: do nothing with the streams.
+    '''
 
   def test01half_duplex(self):
-    # throw the same packet up and back repeatedly
+    ''' Half duplex test to throw the same packet up and back repeatedly.
+    '''
     for _ in range(16):
       R = self.local_conn.request(
           1, 0x55, bytes((2, 3)), self._decode_response, 0
@@ -88,7 +97,8 @@ class _TestStream(object):
       self.assertEqual(payload, bytes((3, 2)))
 
   def test02full_duplex_random_payloads(self):
-    # throw 16 packets up, collect responses after requests queued
+    ''' Throw 16 packets up, collect responses after requests queued.
+    '''
     rqs = []
     for _ in range(16):
       size = rand0(16385)
@@ -104,11 +114,13 @@ class _TestStream(object):
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
-class TestStreamPipes(_TestStream, unittest.TestCase):
+class TestStreamPipes(_TestStream):
   ''' Test streaming over pipes.
   '''
 
   def _open_Streams(self):
+    ''' Set up streams using UNIX pipes.
+    '''
     self.upstream_rd, self.upstream_wr = os.pipe()
     self.downstream_rd, self.downstream_wr = os.pipe()
     self.local_conn = PacketConnection(
@@ -127,11 +139,13 @@ class TestStreamPipes(_TestStream, unittest.TestCase):
     os.close(self.downstream_rd)
     os.close(self.downstream_wr)
 
-class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
+class TestStreamUNIXSockets(_TestStream):
   ''' Test streaming over sockets.
   '''
 
   def _open_Streams(self):
+    ''' Set up streams using UNIX sockets.
+    '''
     self.upstream_rd, self.upstream_wr = socket.socketpair()
     self.downstream_rd, self.downstream_wr = socket.socketpair()
     self.local_conn = PacketConnection(
@@ -152,11 +166,14 @@ class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
     self.downstream_rd.close()
     self.downstream_wr.close()
 
+# pylint: disable=too-many-instance-attributes
 class TestStreamTCP(_TestStream, unittest.TestCase):
   ''' Test streaming over TCP.
   '''
 
   def _open_Streams(self):
+    ''' Set up strreams using TCP connections.
+    '''
     self.listen_sock = socket.socket()
     self.listen_port = bind_next_port(self.listen_sock, '127.0.0.1', 9999)
     self.listen_sock.listen(1)
@@ -182,7 +199,7 @@ class TestStreamTCP(_TestStream, unittest.TestCase):
     )
 
   def _accept(self):
-    self.downstream_sock, raddr = self.listen_sock.accept()
+    self.downstream_sock, _ = self.listen_sock.accept()
     self.listen_sock.close()
 
   def _close_Streams(self):

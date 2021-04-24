@@ -14,6 +14,7 @@ set -ue
 export ZAP_LOGFILE
 
 dflt_listen=localhost:3128
+etc_hosts=$HOME/rc-local/hosts-ALL
 
 cmd=`basename "$0"`
 oargs=$*
@@ -141,7 +142,7 @@ retry_on_error on
 
 X
 
-  proxy-peerage squid <"$peerage"
+  re-subst -H "$etc_hosts" 's/{(?P<hostname>[^}]+)}/{{{hostname}}}/f' "$peerage" | proxy-peerage squid
 ) \
 | patch-config -I -i "$dfltrc" \
 | grep '^[^#]' \

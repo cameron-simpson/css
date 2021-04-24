@@ -1,30 +1,29 @@
 #!/usr/bin/python
 #
-# Index classes.
+# Binary index classes.
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' An index is a mapping of hashcodes => FileDataIndexEntry.
+''' An index is a mapping of hashcode => `FileDataIndexEntry`.
     This module supports several backends and a mechanism for choosing one.
 '''
 
-from collections import namedtuple
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from os import pread
 from os.path import exists as pathexists
 from zlib import decompress
+from cs.binary import BinaryMultiValue, BSUInt
 from cs.logutils import warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
-from cs.serialise import get_bs, put_bs
 from . import Lock
-from .hash import HashCodeUtilsMixin
 
 _CLASSES = []
 _BY_NAME = {}
 
 def class_names():
-  ''' Return the index class names.
+  ''' Return an iterable of the index class names.
   '''
   return _BY_NAME.keys()
 
@@ -35,9 +34,10 @@ def class_by_name(indexname):
 
 def choose(basepath, preferred_indexclass=None):
   ''' Choose an indexclass from a `basepath` with optional preferred indexclass.
+      This prefers an existing index if present.
   '''
-  global _CLASSES
-  global _BY_NAME
+  global _CLASSES  # pylint: disable=global-statement
+  global _BY_NAME  # pylint: disable=global-statement
   if preferred_indexclass is not None:
     if isinstance(preferred_indexclass, str):
       indexname = preferred_indexclass
@@ -47,14 +47,16 @@ def choose(basepath, preferred_indexclass=None):
         warning("ignoring unknown indexclass name %r", indexname)
         preferred_indexclass = None
   indexclasses = list(_CLASSES)
-  if preferred_indexclass is not None and preferred_indexclass.is_supported():
+  if preferred_indexclass:
     indexclasses.insert((preferred_indexclass.NAME, preferred_indexclass))
+  # look for a preexisting index
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
     indexpath = indexclass.pathof(basepath)
     if pathexists(indexpath):
       return indexclass
+  # otherwise choose the first supported index
   for indexname, indexclass in indexclasses:
     if not indexclass.is_supported():
       continue
@@ -63,8 +65,12 @@ def choose(basepath, preferred_indexclass=None):
       "no supported index classes available: tried %r" % (indexclasses,)
   )
 
-class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
-                                    'filenum data_offset data_length flags')):
+class FileDataIndexEntry(BinaryMultiValue('FileDataIndexEntry', {
+    'filenum': BSUInt,
+    'data_offset': BSUInt,
+    'data_length': BSUInt,
+    'flags': BSUInt,
+})):
   ''' An index entry describing a data chunk in a `DataDir`.
 
       This has the following attributes:
@@ -88,26 +94,6 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
     '''
     return self.flags & self.FLAG_COMPRESSED
 
-  @classmethod
-  def from_bytes(cls, bs: bytes, offset: int = 0):
-    ''' Parse a binary index entry, return `(FileDataIndexEntry,offset)`.
-    '''
-    filenum, offset = get_bs(bs, offset)
-    data_offset, offset = get_bs(bs, offset)
-    data_length, offset = get_bs(bs, offset)
-    flags, offset = get_bs(bs, offset)
-    return cls(filenum, data_offset, data_length, flags), offset
-
-  def __bytes__(self) -> bytes:
-    ''' Encode to binary form for use as an index entry.
-    '''
-    return b''.join(
-        (
-            put_bs(self.filenum), put_bs(self.data_offset),
-            put_bs(self.data_length), put_bs(self.flags)
-        )
-    )
-
   def fetch_fd(self, rfd):
     ''' Fetch the decompressed data from an open binary file.
     '''
@@ -121,21 +107,22 @@ class FileDataIndexEntry(namedtuple('FileDataIndexEntry',
       bs = decompress(bs)
     return bs
 
-class _Index(HashCodeUtilsMixin, MultiOpenMixin):
-  ''' The base class for indexes mapping hashcodes to `FileDataIndexEntry`.
+class BinaryIndex(MultiOpenMixin, ABC):
+  ''' The base class for indices mapping `bytes`->`bytes`.
   '''
 
-  def __init__(self, basepath, hashclass):
-    ''' Initialise an _Index instance.
+  # make a TypeError if used, subclasses provide their own
+  SUFFIX = None
+
+  def __init__(self, basepath):
+    ''' Initialise an `BinaryIndex` instance.
 
         Parameters:
         * `basepath`: the base path to the index; the index itself
           is at `basepath`.SUFFIX
-        * `hashclass`: the hashclass indexed by this index
     '''
     MultiOpenMixin.__init__(self)
     self.basepath = basepath
-    self.hashclass = hashclass
 
   @classmethod
   def pathof(cls, basepath):
@@ -149,29 +136,33 @@ class _Index(HashCodeUtilsMixin, MultiOpenMixin):
     '''
     return self.pathof(self.basepath)
 
-  @staticmethod
-  def decode_binary_record(binary_record):
-    ''' Decode the binary record obtained from the index.
-        Return the `FileDataIndexEntry`.
+  @abstractmethod
+  @pfx_method
+  def keys(self, start_hashcode=None):
+    ''' An iterator of binary keys in order.
     '''
-    record, post_offset = FileDataIndexEntry.from_bytes(binary_record)
-    if post_offset < len(binary_record):
-      warning(
-          "short decode of binary FileDataIndexEntry: record=%s, post_offset=%d, remaining binary_record=%r",
-          record, post_offset, binary_record[post_offset:]
-      )
-    return record
+    raise NotImplementedError("no keys implementation")
 
-  def get(self, hashcode, default=None):
-    ''' Get the `FileDataIndexEntry` for `hashcode`.
-        Return `default` for a missing `hashcode` (default `None`).
+  def sorted_keys(self, start_hashcode=None):
+    ''' The keys from `self.keys`, sorted.
+
+        Classes whose `.keys` is already sorted should short circuit this method.
+    '''
+    return iter(sorted(self.keys(start_hashcode=start_hashcode)))
+
+  def __iter__(self):
+    return self.keys()
+
+  def get(self, key, default=None):
+    ''' Get the `FileDataIndexEntry` for `key`.
+        Return `default` for a missing `key` (default `None`).
     '''
     try:
-      return self[hashcode]
+      return self[key]
     except KeyError:
-      return False
+      return default
 
-class LMDBIndex(_Index):
+class LMDBIndex(BinaryIndex):
   ''' LMDB index for a DataDir.
   '''
 
@@ -179,8 +170,8 @@ class LMDBIndex(_Index):
   SUFFIX = 'lmdb'
   MAP_SIZE = 1024 * 1024 * 1024
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, lmdbpathbase):
+    super().__init__(lmdbpathbase)
     self._lmdb = None
     self._resize_needed = False
     # Locking around transaction control logic.
@@ -191,21 +182,22 @@ class LMDBIndex(_Index):
     self._txn_idle = Lock()  # available if no transactions are in progress
     self._txn_blocked = Lock()  # available if new transactions may commence
     self._txn_count = 0
+    self.map_size = None
 
   def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__, self.basepath, self.hashclass.HASHNAME
-    )
+    return "%s(%r)" % (type(self).__name__, self.basepath)
 
   def __len__(self):
-    db = self._lmdb
-    return None if db is None else db.stat()['entries']
+    with self._txn_lock:
+      db = self._lmdb
+      return None if db is None else db.stat()['entries']
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import lmdb
     except ImportError:
       return False
@@ -226,8 +218,9 @@ class LMDBIndex(_Index):
       self._lmdb = None
 
   def _open_lmdb(self):
+    # pylint: disable=import-error,import-outside-toplevel
     import lmdb
-    self._lmdb = lmdb.Environment(
+    db = self._lmdb = lmdb.Environment(
         self.path,
         subdir=True,
         readonly=False,
@@ -237,6 +230,13 @@ class LMDBIndex(_Index):
         map_async=True,
         map_size=self.map_size,
     )
+    return db
+
+  def _reopen_lmdb(self):
+    with self._txn_lock:
+      self._lmdb.sync()
+      self._lmdb.close()
+      return self._open_lmdb()
 
   def _embiggen_lmdb(self, new_map_size=None):
     if new_map_size is None:
@@ -244,9 +244,7 @@ class LMDBIndex(_Index):
     self.map_size = new_map_size
     info("change LMDB map_size to %d", self.map_size)
     # reopen the database
-    self._lmdb.sync()
-    self._lmdb.close()
-    self._open_lmdb()
+    return self._reopen_lmdb()
 
   @contextmanager
   def _txn(self, write=False):
@@ -286,52 +284,50 @@ class LMDBIndex(_Index):
     # no force=True param?
     self._lmdb.sync()
 
-  def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
+  def keys(self, start_hashcode=None):
+    ''' Generator yielding keys from the index.
+    '''
     with self._txn() as txn:
       cursor = txn.cursor()
-      for hashcode in cursor.iternext(keys=True, values=False):
-        yield mkhash(hashcode)
+      if start_hashcode is not None:
+        if not cursor.set_range(start_hashcode):
+          # no keys >=start_hashcode
+          return
+      yield from cursor.iternext(keys=True, values=False)
 
-  def keys(self):
-    ''' Return an iterator yielding hashcodes.
-    '''
-    return iter(self)
+  sorted_keys = keys
 
   def items(self):
-    ''' Yield `(hashcode,record)` from index.
+    ''' Yield `(key,record)` from index.
     '''
-    mkhash = self.hashclass.from_hashbytes
-    mkentry = self.decode_binary_record
     with self._txn() as txn:
       cursor = txn.cursor()
-      for binary_hashcode, binary_record in cursor.iternext(keys=True,
-                                                            values=True):
-        yield mkhash(binary_hashcode), mkentry(binary_record)
+      for binary_key, binary_entry in cursor.iternext(keys=True, values=True):
+        yield binary_key, binary_entry
 
-  def _get(self, hashcode):
+  def _get(self, key):
     with self._txn() as txn:
-      return txn.get(hashcode)
+      return txn.get(key)
 
-  def __contains__(self, hashcode):
-    return self._get(hashcode) is not None
+  def __contains__(self, key):
+    return self._get(key) is not None
 
-  def __getitem__(self, hashcode):
-    ''' Get the `FileDataIndexEntry` for `hashcode`.
-        Raise `KeyError` for a missing hashcode.
+  def __getitem__(self, key):
+    ''' Get the `FileDataIndexEntry` for `key`.
+        Raise `KeyError` for a missing key.
     '''
-    binary_record = self._get(hashcode)
-    if binary_record is None:
-      raise KeyError(hashcode)
-    return self.decode_binary_record(binary_record)
+    binary_entry = self._get(key)
+    if binary_entry is None:
+      raise KeyError(key)
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
+  def __setitem__(self, key: bytes, binary_entry: bytes):
+    # pylint: disable=import-error,import-outside-toplevel
     import lmdb
-    binary_record = bytes(entry)
     while True:
       try:
         with self._txn(write=True) as txn:
-          txn.put(hashcode, binary_record, overwrite=True)
+          txn.put(key, binary_entry, overwrite=True)
           txn.commit()
       except lmdb.MapFullError as e:
         info("%s", e)
@@ -339,23 +335,25 @@ class LMDBIndex(_Index):
       else:
         return
 
-class GDBMIndex(_Index):
+class GDBMIndex(BinaryIndex):
   ''' GDBM index for a DataDir.
   '''
 
   NAME = 'gdbm'
   SUFFIX = 'gdbm'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, gdbmpathbase):
+    super().__init__(gdbmpathbase)
     self._gdbm = None
     self._gdbm_lock = None
+    self._written = False
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import dbm.gnu
     except ImportError:
       return False
@@ -364,6 +362,7 @@ class GDBMIndex(_Index):
   def startup(self):
     ''' Start the index: open dbm, allocate lock.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     import dbm.gnu
     with Pfx(self.path):
       self._gdbm = dbm.gnu.open(self.path, 'cf')
@@ -388,48 +387,59 @@ class GDBMIndex(_Index):
           self._gdbm.sync()
           self._written = False
 
-  def __iter__(self):
-    mkhash = self.hashclass.from_hashbytes
+  def keys(self, start_hashcode=None):
+    ''' Generator yielding keys from the index.
+
+        Note: using `start_hashcode` can be quite inefficient
+        as GDBM lacks a way to set a starting point,
+        requiring iteration from the first hashcode in the index.
+        Switch to LMDB or Kyoto for better behaviour.
+    '''
     with self._gdbm_lock:
-      hashcode = self._gdbm.firstkey()
-    while hashcode is not None:
-      yield mkhash(hashcode)
+      key = self._gdbm.firstkey()
+    while key is not None:
+      if start_hashcode is None or key >= start_hashcode:
+        yield key
       self.flush()
       with self._gdbm_lock:
-        hashcode = self._gdbm.nextkey(hashcode)
+        key = self._gdbm.nextkey(key)
 
-  def __contains__(self, hashcode):
+  # .keys is unsorted, use the default superclass method
+
+  def __contains__(self, key):
     with self._gdbm_lock:
-      return hashcode in self._gdbm
+      return key in self._gdbm
 
-  def __getitem__(self, hashcode):
+  def __getitem__(self, key):
     with self._gdbm_lock:
-      binary_record = self._gdbm[hashcode]
-    return self.decode_binary_record(binary_record)
+      binary_entry = self._gdbm[key]
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
+  def __setitem__(self, key, entry):
     binary_entry = bytes(entry)
     with self._gdbm_lock:
-      self._gdbm[hashcode] = binary_entry
+      self._gdbm[key] = binary_entry
       self._written = True
 
-class NDBMIndex(_Index):
+class NDBMIndex(BinaryIndex):
   ''' NDBM index for a DataDir.
   '''
 
   NAME = 'ndbm'
   SUFFIX = 'ndbm'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase):
+    super().__init__(nmdbpathbase)
     self._ndbm = None
     self._ndbm_lock = None
+    self._written = False
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
     try:
+      # pylint: disable=import-error,unused-import,import-outside-toplevel
       import dbm.ndbm
     except ImportError:
       return False
@@ -438,6 +448,7 @@ class NDBMIndex(_Index):
   def startup(self):
     ''' Start the index: open dbm, allocate lock.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     import dbm.ndbm
     with Pfx(self.path):
       self._ndbm = dbm.ndbm.open(self.path, 'c')
@@ -456,25 +467,39 @@ class NDBMIndex(_Index):
   def flush(self):
     ''' Flush the index: sync the ndbm.
     '''
-    # no fast mode, no sycn
-    pass
+    # no fast mode, no sync
 
-  def __contains__(self, hashcode):
+  def keys(self, start_hashcode=None):
+    ''' Return an iterator over a snapshot of the keys.
+
+        For large indices it is probably better to shift to an index
+        with some kind of `next_key()` method,
+        particularly when `start_hashcode` is not `None`.
+    '''
     with self._ndbm_lock:
-      return hashcode in self._ndbm
+      kit = self._ndbm.keys()
+      if start_hashcode is not None:
+        kit = (k for k in kit if k >= start_hashcode)
+      ks = list(kit)
+    return iter(ks)
 
-  def __getitem__(self, hashcode):
+  # .keys is unsorted, use the default superclass method
+
+  def __contains__(self, key):
     with self._ndbm_lock:
-      binary_record = self._ndbm[hashcode]
-    return self.decode_binary_record(binary_record)
+      return key in self._ndbm
 
-  def __setitem__(self, hashcode, entry):
+  def __getitem__(self, key):
+    with self._ndbm_lock:
+      return self._ndbm[key]
+
+  def __setitem__(self, key, entry):
     binary_entry = bytes(entry)
     with self._ndbm_lock:
-      self._ndbm[hashcode] = binary_entry
+      self._ndbm[key] = binary_entry
       self._written = True
 
-class KyotoIndex(_Index):
+class KyotoIndex(BinaryIndex):
   ''' Kyoto Cabinet index.
       Notably this uses a B+ tree for the index and thus one can
       traverse from one key forwards and backwards, which supports
@@ -484,14 +509,15 @@ class KyotoIndex(_Index):
   NAME = 'kyoto'
   SUFFIX = 'kct'
 
-  def __init__(self, lmdbpathbase, hashclass):
-    super().__init__(lmdbpathbase, hashclass)
+  def __init__(self, nmdbpathbase):
+    super().__init__(nmdbpathbase)
     self._kyoto = None
 
   @classmethod
   def is_supported(cls):
     ''' Test whether this index class is supported by the Python environment.
     '''
+    # pylint: disable=import-error,unused-import,import-outside-toplevel
     try:
       import kyotocabinet
     except ImportError:
@@ -501,6 +527,7 @@ class KyotoIndex(_Index):
   def startup(self):
     ''' Open the index.
     '''
+    # pylint: disable=import-error,import-outside-toplevel
     from kyotocabinet import DB
     self._kyoto = DB()
     self._kyoto.open(self.path, DB.OWRITER | DB.OCREATE)
@@ -522,41 +549,37 @@ class KyotoIndex(_Index):
   def __len__(self):
     return self._kyoto.count()
 
-  def __contains__(self, hashcode):
-    return self._kyoto.check(hashcode) >= 0
+  def __contains__(self, key):
+    return self._kyoto.check(key) >= 0
 
-  def __getitem__(self, hashcode):
-    binary_record = self._kyoto.get(hashcode)
-    if binary_record is None:
-      raise KeyError(hashcode)
-    return self.decode_binary_record(binary_record)
+  def __getitem__(self, key):
+    binary_entry = self._kyoto.get(key)
+    if binary_entry is None:
+      raise KeyError(key)
+    return binary_entry
 
-  def __setitem__(self, hashcode, entry):
-    binary_entry = bytes(entry)
-    self._kyoto[hashcode] = binary_entry
+  def __setitem__(self, key, binary_entry):
+    self._kyoto[key] = binary_entry
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  def keys(self, *, start_hashcode=None):
     ''' Generator yielding the keys from the index
         in order starting with optional `start_hashcode`.
 
         Parameters:
-        * `start_hashcode`: the starting hashcode; if missing or None,
+        * `start_hashcode`: the starting key; if missing or `None`,
           iteration starts with the first key in the index
-        * `reverse`: iterate backward if true, otherwise forward
     '''
-    hashclass = self.hashclass
     cursor = self._kyoto.cursor()
-    if reverse:
-      if cursor.jump_back(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
-        while cursor.step_back():
-          yield hashclass.from_hashbytes(cursor.get_key())
-    else:
-      if cursor.jump(start_hashcode):
-        yield hashclass.from_hashbytes(cursor.get_key())
-        while cursor.step():
-          yield hashclass.from_hashbytes(cursor.get_key())
+    if start_hashcode is not None:
+      cursor.jump(start_hashcode)
+    yield cursor.get_key()
+    while cursor.step():
+      yield cursor.get_key()
     cursor.disable()
+
+  sorted_keys = keys
+
+  __iter__ = keys
 
 def register(indexclass, indexname=None, priority=False):
   ''' Register a new `indexclass`, making it known.
@@ -585,6 +608,6 @@ for klass in LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex:
 
 if not _CLASSES:
   raise RuntimeError(
-      __name__ +
-      ": no index classes available: none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
+      __name__ + ": no index classes available:"
+      " none of LMDBIndex, KyotoIndex, GDBMIndex, NDBMIndex is available"
   )

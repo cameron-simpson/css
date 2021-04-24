@@ -1,0 +1,2 @@
+lib/python/cs/buffer.py: Release information for cs.buffer-20201021.
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new optional `progress` parameter for report data consumed from `input_data`

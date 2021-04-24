@@ -15,17 +15,20 @@ in the course of its function.
 import heapq
 import itertools
 from threading import Lock, Condition
-from cs.logutils import warning
+from cs.gimmicks import warning
+
+__version__ = '20201025-post'
 
 DISTINFO = {
-    'description': "Stuff to do with counters, sequences and iterables.",
+    'description':
+    "Stuff to do with counters, sequences and iterables.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils'],
+    'install_requires': ['cs.gimmicks'],
 }
 
 class Seq(object):
@@ -54,7 +57,7 @@ __seq = Seq()
 def seq():
   ''' Return a new sequential value.
   '''
-  global __seq
+  global __seq  # pylint: disable=global-statement
   return next(__seq)
 
 def the(iterable, context=None):
@@ -71,8 +74,7 @@ def the(iterable, context=None):
       is_first = False
     else:
       raise IndexError(
-          "%s: got more than one element (%s, %s, ...)"
-          % (icontext, it, elem)
+          "%s: got more than one element (%s, %s, ...)" % (icontext, it, elem)
       )
   if is_first:
     raise IndexError("%s: got no elements" % (icontext,))
@@ -94,7 +96,7 @@ def last(iterable):
     nothing = False
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
-  return item
+  return item  # pylint: disable=undefined-loop-variable
 
 def get0(iterable, default=None):
   ''' Return first element of an iterable, or the default.
@@ -143,32 +145,35 @@ def imerge(*iters, **kw):
   if reverse:
     # tuples that compare in reverse order
     class _MergeHeapItem(tuple):
+
       def __lt__(self, other):
         return self[0] > other[0]
   else:
     # tuples that compare in forward order
     class _MergeHeapItem(tuple):
+
       def __lt__(self, other):
         return self[0] < other[0]
+
   # prime the list of head elements with (value, iter)
   heap = []
-  for I in iters:
-    I = iter(I)
+  for it in iters:
+    it = iter(it)
     try:
-      head = next(I)
+      head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem( (head, I)))
+      heapq.heappush(heap, _MergeHeapItem((head, it)))
   while heap:
-    head, I = heapq.heappop(heap)
+    head, it = heapq.heappop(heap)
     yield head
     try:
-      head = next(I)
+      head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem( (head, I)))
+      heapq.heappush(heap, _MergeHeapItem((head, it)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
@@ -184,11 +189,13 @@ def onetoone(func):
             strs = X(['Abc', 'Def'])
             lower_strs = X.lower()
   '''
+
   def gather(self, *a, **kw):
     ''' Yield the results of calling the function on each item.
     '''
     for item in self:
       yield func(item, *a, **kw)
+
   return gather
 
 def onetomany(func):
@@ -205,20 +212,22 @@ def onetomany(func):
             strs = X(['Abc', 'Def'])
             all_chars = X.chars()
   '''
+
   def gather(self, *a, **kw):
     ''' Chain the function results together.
     '''
-    return itertools.chain(*[ func(item, *a, **kw) for item in self ])
+    return itertools.chain(*[func(item, *a, **kw) for item in self])
+
   return gather
 
-def isordered(s, reverse=False, strict=False):
+def isordered(items, reverse=False, strict=False):
   ''' Test whether an iterable is ordered.
       Note that the iterable is iterated, so this is a destructive
       test for nonsequences.
   '''
   is_first = True
   prev = None
-  for item in s:
+  for item in items:
     if not is_first:
       if reverse:
         ordered = item < prev if strict else item <= prev
@@ -229,6 +238,26 @@ def isordered(s, reverse=False, strict=False):
     prev = item
     is_first = False
   return True
+
+def common_prefix_length(*seqs):
+  ''' Return the length of the common prefix of sequences `seqs`.
+  '''
+  if not seqs:
+    return 0
+  if len(seqs) == 1:
+    return len(seqs[0])
+  for i, items in enumerate(zip(*seqs)):
+    item0 = items[0]
+    # pylint: disable=cell-var-from-loop
+    if not all(map(lambda item: item == item0, items)):
+      return i
+  # return the length of the shorted sequence
+  return len(min(*seqs, key=len))
+
+def common_suffix_length(*seqs):
+  ''' Return the length of the common suffix of sequences `seqs`.
+  '''
+  return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
@@ -357,6 +386,38 @@ class StatefulIterator(object):
     item, new_state = next(self.it)
     self.state = new_state
     return item
+
+def splitoff(sq, *sizes):
+  ''' Split a sequence into (usually short) prefixes and a tail,
+      for example to construct subdirectory trees based on a UUID.
+
+      Example:
+
+          >>> from uuid import UUID
+          >>> uuid = 'd6d9c510-785c-468c-9aa4-b7bda343fb79'
+          >>> uu = UUID(uuid).hex
+          >>> uu
+          'd6d9c510785c468c9aa4b7bda343fb79'
+          >>> splitoff(uu, 2, 2)
+          ['d6', 'd9', 'c510785c468c9aa4b7bda343fb79']
+  '''
+  if len(sizes) < 1:
+    raise ValueError("no sizes")
+  offset = 0
+  parts = []
+  for size in sizes:
+    if size < 1:
+      raise ValueError("size:%s < 1" % (size,))
+    end_offset = offset + size
+    if end_offset >= len(sq):
+      raise ValueError(
+          "size:%s consumes up to or beyond"
+          " the end of the sequence (length %d)" % (size, len(sq))
+      )
+    parts.append(sq[offset:end_offset])
+    offset = end_offset
+  parts.append(sq[offset:])
+  return parts
 
 if __name__ == '__main__':
   import sys

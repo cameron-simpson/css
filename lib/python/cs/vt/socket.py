@@ -85,6 +85,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     if self.socket_server:
       self.socket_server.shutdown()
     self.socket_server_thread.join()
+    if self.socket_server and self.socket_server.socket is not None:
+      self.socket_server.socket.close()
     self.socket_server = None
 
   def shutdown_now(self):
@@ -92,6 +94,8 @@ class _SocketStoreServer(MultiOpenMixin, RunStateMixin):
     '''
     if self.socket_server:
       self.socket_server.shutdown()
+      if self.socket_server.socket is not None:
+        self.socket_server.socket.close()
       self.socket_server = None
 
   def flush(self):
@@ -173,7 +177,7 @@ class TCPClientStore(StreamStore):
 
   def shutdown(self):
     StreamStore.shutdown(self)
-    if self.sock:
+    if self.sock is not None:
       self.sock.close()
       self.sock = None
 

@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: Release information for cs.upd-20201026.
+lib/python/cs/upd.py: cs.upd: Upd.nl: simple output if there are no status lines to accomodate

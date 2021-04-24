@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Tail the active TimeMachine backup log.
+# - Cameron Simpson <cs@cskk.id.au> 17feb2021
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+exec </dev/null
+
+ps ax \
+| awk '/\/backupd$/{print$1}' \
+| while read pid
+  do  lsof -p "$pid"
+  done \
+| sed -n 's|.* \(/Volumes/.*backupdb/.*\.log\)$|\1|p' \
+| (
+  while read -r logpath
+  do  $trace tail -f "$logpath" &
+  done
+) \
+| dateify
