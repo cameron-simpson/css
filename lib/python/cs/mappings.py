@@ -938,6 +938,21 @@ class AttrableMappingMixin(object):
   ''' Provides a `__getattr__` which accesses the mapping value.
   '''
 
+  def AttrableMappingMixin_attr_keys(self, attr):
+    ''' Return an iteratable of mapping keys to consult for a given
+        attribute name `attr`.
+
+        This default implemnetation just yields `attr` itself.
+
+        However, classes like `cs.app.osx.itunes.ITunesXMLPList`
+        know a domain specific key convention
+        and can generate the expected keys of the underlying mapping.
+        As such, the first key yielded from this method should be
+        the "canonical" name, as it may be used in a `__setattr__`
+        implementation in some subclass.
+    '''
+    yield attr
+
   def __getattr__(self, attr):
     ''' Unknown attributes are obtained from the mapping entries.
 
