@@ -19,6 +19,7 @@ from os.path import basename, join as joinpath
 from pprint import pformat
 import sys
 from threading import RLock
+from .plist import PListDict
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, TaggedPath, Tag, rpaths
 from cs.logutils import warning, info
@@ -110,6 +111,18 @@ class ITunesISODateTime(datetime):
     ''' Prepare `ITunesISODateTime` from its text transcription.
     '''
     return cls.strptime(date_text, cls.ISOFORMAT)
+
+class ITunesXMLPListDict(PListDict):
+  ''' A `PList` subclass with iTunes specific methods.
+  '''
+
+  def AttrableMappingMixin_attr_keys(self, attr):
+    ''' Map an attribute name `attr` to the canonical iTunes XML file name.
+    '''
+    words = list(map(str.title, attr.lower().split('_')))
+    if words[-1] == 'Id':
+      words[-1] = 'ID'
+    yield ' '.join(words)
 
 class ITunes:
   ''' Access to an iTunes library.
