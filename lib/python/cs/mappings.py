@@ -944,7 +944,7 @@ class AttrableMappingMixin(object):
 
         This default implemnetation just yields `attr` itself.
 
-        However, classes like `cs.app.osx.itunes.ITunesXMLPList`
+        However, classes like `cs.app.osx.itunes.ITunesXMLPListDict`
         know a domain specific key convention
         and can generate the expected keys of the underlying mapping.
         As such, the first key yielded from this method should be
@@ -953,46 +953,57 @@ class AttrableMappingMixin(object):
     '''
     yield attr
 
+  # pylint: disable=too-many-branches
   def __getattr__(self, attr):
     ''' Unknown attributes are obtained from the mapping entries.
 
         Note that this first consults `self.__dict__`.
-        For many classes that is redundants, but subclasses of
-        `dict` at least seem not to consult that with attribute
+        For many classes that is redundant, but subclasses of
+        `dict` at least seem not to consult `__dict__` during attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
-    # try self.__dict__ first - this is because it appears that
-    # getattr(dict,...) does not consult __dict__
-    try:
-      _d = self.__dict__
-    except AttributeError:
-      # no __dict__? skip this step
-      pass
-    else:
+    for key in self.AttrableMappingMixin_attr_keys(attr):
+      # try self.__dict__ first - this is because it appears that
+      # getattr(dict,...) does not consult __dict__
       try:
-        return _d[attr]
-      except KeyError:
-        pass
-    try:
-      return self[attr]
-    except KeyError:
-      try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        _d = self.__dict__
       except AttributeError:
-        names_msgs = []
-        ks = list(self.keys())
-        if ks:
-          names_msgs.append('keys=' + ','.join(sorted(ks)))
-        dks = self.__dict__.keys()
-        if dks:
-          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
-        raise AttributeError(
-            "%s.%s (attrs=%s)" % (
-                type(self).__name__,
-                attr,
-                ','.join(names_msgs),
-            )
-        )
+        # no __dict__? skip this step
+        pass
+      else:
+        try:
+          return _d[key]
+        except KeyError:
+          pass
+      # try the mapping
+      try:
+        return self[key]
+      except KeyError:
+        try:
+          return type(self).ATTRABLE_MAPPING_DEFAULT
+        except AttributeError:
+          pass
+    # no matches? raise an informative exception
+    names_msgs = []
+    ks = list(self.keys())
+    if ks:
+      names_msgs.append('keys=' + ','.join(sorted(ks)))
+    try:
+      dk = self.__dict__
+    except AttributeError:
+      try:
+        sl = type(self).__slots__
+      except AttributeError:
+        pass
+      else:
+        if sl:
+          names_msgs.append('__slots__=' + ','.join(sorted(sl)))
+    else:
+      if dk:
+        names_msgs.append('__dict__=' + ','.join(sorted(dk.keys())))
+    raise AttributeError(
+        "%s.%s (%s)" % (type(self).__name__, attr, ','.join(names_msgs))
+    )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
