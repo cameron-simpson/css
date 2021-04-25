@@ -1,3 +1,4 @@
+cs.upd: setupterm calls and fails if stdout is not a tty but stderr is a tty - stack stderr as stdout during setupterm
 pfx_method: pass printf_func arg to Pfx
 BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
 BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
