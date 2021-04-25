@@ -17,6 +17,7 @@ from icontract import require
 import cs.iso8601
 from cs.lex import cutsuffix
 from cs.logutils import setup_logging, warning
+from cs.mappings import AttrableMappingMixin
 from cs.pfx import Pfx, pfx_method, XP
 import cs.sh
 from cs.x import X
@@ -60,7 +61,7 @@ def pythonic_xml_element(e):
   X("NOT TRANSFORMING plist elem %r: %r %r", e, e.attrib, e.text)
   return e
 
-class PListDict(dict):
+class PListDict(dict, AttrableMappingMixin):
   ''' A `dict` subclass representing a plist `<dict>` element.
   '''
 
@@ -135,29 +136,6 @@ class PListDict(dict):
     ''' Return an XML element tree for this dict.
     '''
     raise NotImplementedError("no as_xml implementation yet")
-
-  @pfx_method
-  def __getattr__(self, attr):
-    if attr[0].isalpha():
-      # foo_bar => foo bar
-      key = self[attr.replace('_', ' ')]
-      try:
-        return self[key]
-      except KeyError:
-        # foo bar => Foo Bar
-        uc_key = key.title()
-        try:
-          return self[key]
-        except KeyError:
-          # Foo Id => Foo ID
-          keypfx = cutsuffix(key, ' Id')
-          if keypfx is not key:
-            key = keypfx + ' ID'
-            try:
-              return self[key]
-            except KeyError:
-              pass
-    raise AttributeError(attr)
 
 class PListArray(list):
   ''' A `list` subclass representing a plist `<array>` element.
