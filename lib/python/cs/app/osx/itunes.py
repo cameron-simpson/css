@@ -9,6 +9,7 @@
 
 from base64 import b64decode
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime
 try:
   from lxml import etree
@@ -21,6 +22,7 @@ import sys
 from threading import RLock
 from .plist import PListDict
 from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
 from cs.fstags import FSTags, TaggedPath, Tag, rpaths
 from cs.logutils import warning, info
 from cs.mappings import named_column_tuples, dicts_to_namedtuples
@@ -33,7 +35,7 @@ ITUNES_LIBRARY_PATH_ENVVAR = 'ITUNES_LIBRARY_PATH'
 def main(argv=None):
   ''' Command line mode.
   '''
-  return ITunesCommand().run(argv)
+  return ITunesCommand.run_argv(argv)
 
 class ITunesCommand(BaseCommand):
   ''' `itunes` main command line class.
@@ -45,12 +47,13 @@ class ITunesCommand(BaseCommand):
         Tag paths based on data from the iTunes library.
   '''
 
-  def apply_defaults(self, options):
+  @pfx_method
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
     options.library = ITunes()
 
+  @contextmanager
   def run_context(self):
     with stackattrs(self.options, fstags=FSTags()):
       yield
