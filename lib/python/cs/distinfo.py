@@ -687,6 +687,18 @@ class Modules(defaultdict):
     self[mod_name] = M
     return M
 
+  @pfx_method
+  def resolve_requirement(self, requirement_spec):
+    ''' Resolve the `install_requires` specification `requirement_spec`
+        into a requirement string.
+    '''
+    with Pfx(requirement_spec):
+      mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
+      requirement = mrq.resolve()
+      if requirement != requirement_spec:
+        warning("RESOLVE %r => %r", requirement_spec, requirement)
+      return requirement
+
 # pylint: disable=too-many-public-methods
 class Module:
   ''' Metadata about a Python module.
