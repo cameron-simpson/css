@@ -1029,6 +1029,12 @@ class Module:
     )
     dinfo.update(self.module.DISTINFO)
 
+    # resolve install_requires
+    dinfo.update(
+        install_requires=self
+        .resolve_requirements(dinfo.pop('install_requires', ()))
+    )
+
     # fill in default fields
     for field in ('author', 'author_email', 'long_description_content_type',
                   'package_dir'):
