@@ -1244,6 +1244,10 @@ class Module:
             else:
               out("  %s = %r," % (kw, distinfo[kw]))
             written.add(kw)
+        out(
+            "  %s = %r," %
+            ('install_requires', distinfo.pop('install_requires', ()))
+        )
         for kw, kv in sorted(distinfo.items()):
           if kw not in written:
             out("  %s = %r," % (kw, kv))
