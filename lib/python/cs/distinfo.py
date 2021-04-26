@@ -514,6 +514,98 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
     version = today.version + '.' + str(next_seq)
     return type(self)(self.name, version)
 
+class ModuleRequirement(namedtuple('ModuleRequirement',
+                                   'module_name op requirements modules')):
+  ''' A parsed version of a module requirement string
+      such as `'cs.upd>=multiline'` or `'cs.obj>=20200716'`.
+
+      Attributes:
+      * `module_name`: the name of the module or package
+      * `op`: the relationship to the requirements,
+        supporting `'='` and `'>='`;
+        `None` if only the name is present
+      * `requirements`: a list of the requirement terms,
+        broken out on commas in the requirements part
+      * `modules`: a references to the `Modules` instance used to track module information
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_requirement(cls, requirement_spec, modules):
+    ''' Parse a requirement string, return a `ModuleRequirement`.
+    '''
+    with Pfx(requirement_spec):
+      module_name, offset = get_dotted_identifier(requirement_spec)
+      if not module_name:
+        raise ValueError('module_name is not a dotted identifier')
+      if offset == len(requirement_spec):
+        op = None
+      else:
+        for op in '>=', '=', None:
+          if op is None:
+            raise ValueError(
+                "no valid op after module_name at %r" %
+                (requirement_spec[offset:],)
+            )
+          if requirement_spec.startswith(op, offset):
+            offset += len(op)
+            break
+      if op is not None and offset == len(requirement_spec):
+        raise ValueError("no requirements after op %r" % (op,))
+      requirements = [
+          req for req in map(str.strip, requirement_spec[offset:].split(','))
+          if req
+      ]
+      return cls(
+          module_name=module_name,
+          op=op,
+          requirements=requirements,
+          modules=modules
+      )
+
+  @pfx_method
+  def resolve(self):
+    ''' Return a requirement string,
+        either `self.module_name` if `self.op` is `None`
+        or *module_name*{`=`,`>=`}*version*
+        satisfying the versions and features in `self.requirements`.
+    '''
+    if self.op is None:
+      return self.module_name
+    release_versions = set()
+    feature_set = set()
+    for requirement in self.requirements:
+      with Pfx("%r", requirement):
+        feature_name, _ = get_identifier(requirement)
+        if feature_name == requirement:
+          feature_set.add(feature_name)
+        else:
+          # not a bare identifier, presume release version
+          release_versions.add(requirement)
+    if feature_set:
+      pkg = self.modules[self.module_name]
+      release_version = pkg.release_with_features(feature_set)
+      if release_version is None:
+        raise ValueError(
+            "no release version satifying feature set %r" % (feature_set,)
+        )
+      release_versions.add(release_version)
+    if not release_versions:
+      raise ValueError("no satisfactory release versions")
+    if self.op == '=':
+      if len(release_versions) > 1:
+        raise ValueError(
+            "conflicting release versions for %r: %r" %
+            (self.op, release_versions)
+        )
+      release_version = release_versions.pop()
+    elif self.op == '>=':
+      # the release versions are minima: pick their maximum
+      release_version = max(release_versions)
+    else:
+      raise RuntimeError("onimplemenented op %r" % (self.op,))
+    return ''.join((self.module_name, self.op, release_version))
+
 def runcmd(argv, **kw):
   ''' Run command.
   '''
