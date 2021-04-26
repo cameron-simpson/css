@@ -1245,6 +1245,12 @@ class Module:
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
+  def resolve_requirements(self, requirement_specs):
+    ''' Resolve the requirement specifications from `requirement_specs`
+        into valid `install_requires` specification.
+    '''
+    return list(map(self.modules.resolve_requirement, requirement_specs))
+
   @staticmethod
   def reldistfiles(pkg_dir):
     ''' Return the relative paths existing within `pkg_dir`.
