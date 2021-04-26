@@ -34,7 +34,12 @@ from icontract import ensure
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.lex import cutsuffix, get_dotted_identifier
+from cs.lex import (
+    cutsuffix,
+    get_identifier,
+    get_dotted_identifier,
+    is_dotted_identifier,
+)
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -272,12 +277,11 @@ class CSReleaseCommand(BaseCommand):
     ''' Usage: {cmd} [package_name...]
           List package names and their latst PyPI releases.
     '''
+    options = self.options
     if argv:
       pkg_names = argv
     else:
-      pkg_names = sorted(tagsets.keys())
-    options = self.options
-    tagsets = options.pkg_tagsets
+      pkg_names = sorted(options.tagsets.keys())
     for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
@@ -501,7 +505,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
 
   @classmethod
   def today(cls, name):
-    ''' Basic release tag for today, without any `.`n suffix.
+    ''' Basic release tag for today, without any `.`*n* suffix.
     '''
     return cls(name, isodate(dashed=False))
 
@@ -700,7 +704,12 @@ class Modules(defaultdict):
     self.options = options
 
   def __missing__(self, mod_name):
-    assert isinstance(mod_name, str), "mod_name=%r" % (mod_name,)
+    assert isinstance(mod_name, str), "mod_name=%s:%r" % (
+        type(mod_name),
+        mod_name,
+    )
+    assert is_dotted_identifier(mod_name
+                                ), "not a dotted identifier: %r" % (mod_name,)
     M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
@@ -1034,6 +1043,8 @@ class Module:
   ):
     ''' Compute the distutils info mapping for this package.
     '''
+    if '>' in self.name or '=' in self.name:
+      raise RuntimeError("bad module name %r" % (self.name))
     if pypi_package_name is None:
       pypi_package_name = self.name
     if pypi_package_version is None:
