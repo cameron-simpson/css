@@ -231,6 +231,8 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
+    if not is_dotted_identifier(pkg_name):
+      raise GetoptError("invalid package name: %r" % (pkg_name,))
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     pkg = self.options.modules[pkg_name]
