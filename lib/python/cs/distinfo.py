@@ -469,6 +469,24 @@ class CSReleaseCommand(BaseCommand):
     )
     return 0
 
+  def cmd_resolve(self, argv):
+    ''' Usage: {cmd} requirements_spec...
+          Resolve and print each requirements_spec into a valid install_requires value.
+    '''
+    if not argv:
+      raise GetoptError("missing requirements_specs")
+    xit = 0
+    modules = self.options.modules
+    for requirement_spec in argv:
+      with Pfx(requirement_spec):
+        try:
+          requirement = modules.resolve_requirement(requirement_spec)
+        except ValueError as e:
+          error("invalid requirement_spec: %s", e)
+        else:
+          print(requirement_spec, requirement)
+    return xit
+
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
       which have the form *package_name*`-`*version*.
