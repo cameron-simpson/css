@@ -837,7 +837,7 @@ class Module:
     yield from feature_map.items()
 
   @pfx_method(use_str=True)
-  def release_featuresets(self):
+  def release_feature_set(self):
     ''' Yield `(release_version,feature_sets)`
         for all releases mentioned in the `features` tag
         in release order.
@@ -864,10 +864,10 @@ class Module:
       if release_version is None:
         raise ValueError("no pypi.release")
     release_set = set()
-    for version, featureset in sorted(self.release_featuresets()):
+    for version, feature_set in sorted(self.release_feature_set()):
       if version > release_version:
         break
-      release_set = featureset
+      release_set = feature_set
     return release_set
 
   @pfx_method(use_str=True)
@@ -875,8 +875,8 @@ class Module:
     ''' Return the earliest release version containing all the named features.
         Return `None` if no release has all the features.
     '''
-    for version, featureset in sorted(self.release_featuresets()):
-      if all(map(lambda feature: feature in featureset, features)):
+    for version, feature_set in sorted(self.release_feature_set()):
+      if all(map(lambda feature: feature in feature_set, features)):
         return version
     return None
 
