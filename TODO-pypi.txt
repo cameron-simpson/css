@@ -1,3 +1,4 @@
+cs-release: release: add "features/fixes" prompt, update pkg_tags accordingly lib/python/cs/distinfo.py
 cs.distinfo: release log: include href to full commit log for the primary file or dir
 ds.distinfo: add cmd_diff to present diff from latest release
 compute_doc: mode to document all methods for use in upcoming module-README-autodoc.md

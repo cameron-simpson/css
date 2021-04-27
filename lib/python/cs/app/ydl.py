@@ -67,7 +67,7 @@ DISTINFO = {
         'cs.progress',
         'cs.result',
         'cs.tagset',
-        'cs.upd',
+        'cs.upd>=multiline',
         'youtube_dl',
     ],
     'entry_points': {
