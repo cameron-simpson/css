@@ -31,6 +31,7 @@ import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
+from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
@@ -39,6 +40,7 @@ from cs.lex import (
     get_identifier,
     get_dotted_identifier,
     is_dotted_identifier,
+    is_identifier,
 )
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
@@ -433,6 +435,29 @@ class CSReleaseCommand(BaseCommand):
     if not release_message:
       error("empty release message, not making new release")
       return 1
+    print("Feature and bug names should be space separated identifiers.")
+    existing_features = pkg.named_features()
+    if existing_features:
+      print("Existing features:", ' '.join(sorted(existing_features)))
+    features = list(
+        filter(None,
+               prompt('Any named features with this release? ').split())
+    )
+    if any(map(lambda feature_name: not is_identifier(feature_name) or
+               feature_name.startswith('fix_'), features)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(
+        filter(
+            None,
+            prompt('Any named bugs fixed with this release? ').split()
+        )
+    )
+    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
+               startswith('fix_'), bugfixes)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
     latest = pkg.latest
     next_release = pkg.latest.next() if latest else ReleaseTag.today(pkg.name)
     next_vcstag = next_release.vcstag
@@ -471,6 +496,8 @@ class CSReleaseCommand(BaseCommand):
     pkg.set_tag(
         'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
+    for feature_name in features + bugfixes:
+      pkg.set_feature(feature_name, next_release)
     return 0
 
   def cmd_resolve(self, argv):
@@ -670,8 +697,9 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def ask(message, fin=None, fout=None):
-  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+def prompt(message, fin=None, fout=None):
+  ''' Prompt for a one line answer.
+      Return the answer with trailing newlines or carriage returns stripped.
   '''
   if fin is None:
     fin = sys.stdin
@@ -679,7 +707,13 @@ def ask(message, fin=None, fout=None):
     fout = sys.stderr
   print(message, end='? ', file=fout)
   fout.flush()
-  response = fin.readline().rstrip().lower()
+  return fin.readline().rstrip('\r\n')
+
+def ask(message, fin=None, fout=None):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  response = prompt(message, fin=fin, fout=fout)
+  response = response.rstrip().lower()
   return response in ('y', 'yes')
 
 @contextmanager
@@ -854,6 +888,30 @@ class Module:
     ''' The `TagSet` for this package.
     '''
     return self.options.pkg_tagsets[self.name]
+
+  @pfx_method
+  def named_features(self):
+    ''' Return a set containing all the feature names in use by this `Module`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    all_feature_names = set()
+    for feature_names in feature_map.values():
+      for feature_name in feature_names:
+        if not is_identifier(feature_name):
+          warning("ignoring non-dentifier feature name: %r", feature_name)
+        else:
+          all_feature_names.add(feature_name)
+    return all_feature_names
+
+  @typechecked
+  def set_feature(self, feature_name: str, release_version: str):
+    ''' Include `feature_name` in the features for release `release_version`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    release_features = set(feature_map.get(release_version, []))
+    release_features.add(feature_name)
+    feature_map = list(release_features)
+    self.pkg_tags.set('features', feature_map)
 
   @pfx_method(use_str=True)
   def release_features(self):
