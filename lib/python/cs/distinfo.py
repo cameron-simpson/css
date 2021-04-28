@@ -441,17 +441,15 @@ class CSReleaseCommand(BaseCommand):
       print("Existing features:", ' '.join(sorted(existing_features)))
     features = list(
         filter(None,
-               prompt('Any named features with this release? ').split())
+               prompt('Any named features with this release').split())
     )
     if any(map(lambda feature_name: not is_identifier(feature_name) or
                feature_name.startswith('fix_'), features)):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
-        filter(
-            None,
-            prompt('Any named bugs fixed with this release? ').split()
-        )
+        filter(None,
+               prompt('Any named bugs fixed with this release').split())
     )
     if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
                startswith('fix_'), bugfixes)):
