@@ -495,7 +495,7 @@ class CSReleaseCommand(BaseCommand):
         'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
     for feature_name in features + bugfixes:
-      pkg.set_feature(feature_name, next_release)
+      pkg.set_feature(feature_name, next_release.version)
     return 0
 
   def cmd_resolve(self, argv):
@@ -908,8 +908,12 @@ class Module:
     feature_map = self.pkg_tags.features or {}
     release_features = set(feature_map.get(release_version, []))
     release_features.add(feature_name)
-    feature_map = list(release_features)
-    self.pkg_tags.set('features', feature_map)
+    feature_map[release_version] = sorted(release_features)
+    self.set_tag(
+        'features',
+        feature_map,
+        msg="features[%s]+%s" % (release_version, feature_name)
+    )
 
   @pfx_method(use_str=True)
   def release_features(self):
