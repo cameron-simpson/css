@@ -1,0 +1,1 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet.set: always mark the TagSet as modified, avoids missing out when a complex value is internally modified
