@@ -556,12 +556,10 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Set `self[tag_name]=value`.
         If `verbose`, emit an info message if this changes the previous value.
     '''
-    old_value = self.get(tag_name)
-    if tag_name not in self or old_value is not value:
-      # setting to the same object is not a change,
-      # but setting to an equivalent value is a change
-      self.modified = True
-      if old_value != value and (verbose is None or verbose):
+    self.modified = True
+    if verbose is None or verbose:
+      old_value = self.get(tag_name)
+      if old_value is not value and old_value != value:
         # report different values
         tag = Tag(tag_name, value, ontology=self.ontology)
         msg = (
@@ -569,7 +567,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             (tag, old_value)
         )
         ifverbose(verbose, msg)
-      super().__setitem__(tag_name, value)
+    super().__setitem__(tag_name, value)
 
   # "set" mode
   add = set
