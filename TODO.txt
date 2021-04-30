@@ -1,3 +1,4 @@
+cs.units: maybe we can embed "%2.1f" in the UnitStep instead of max_width? may be faster
 pfx_method: pass printf_func arg to Pfx
 BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
 BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
