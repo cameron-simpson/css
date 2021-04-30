@@ -206,7 +206,7 @@ class BaseProgress(object):
   def eta(self):
     ''' The projected time of completion: now + `remaining_time`.
 
-        If `reamining_time` is `None`, this is also `None`.
+        If `remaining_time` is `None`, this is also `None`.
     '''
     remaining = self.remaining_time
     if remaining is None:
@@ -1092,6 +1092,8 @@ def selftest(argv):
     lines = f.readlines()
   lines += lines
   for _ in progressbar(lines, "lines"):
+    time.sleep(0.005)
+  for _ in progressbar(lines, "blines",units_scale=BINARY_BYTES_SCALE, itemlenfunc=len):
     time.sleep(0.005)
   for _ in progressbar(lines, "lines step 100", update_frequency=100,
                        report_print=True):
