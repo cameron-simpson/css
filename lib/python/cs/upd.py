@@ -909,7 +909,7 @@ class Upd(SingletonMixin):
           txts.append('\r')
           txts.append(slots[index])
         else:
-          # the effectiove index has now moved down
+          # the effective index has now moved down
           index -= 1
           if delete_line:
             # delete line and advance to the end of the new current line
