@@ -1105,8 +1105,14 @@ def format_as(format_s, format_mapping, error_sep=None):
 _format_as = format_as
 
 class FormatableMixin(object):  # pylint: disable=too-few-public-methods
-  ''' A mixin to supply a `format_as` method for classes with an
-      existing `format_kwargs` method.
+  ''' A mixin to supply a `format_as` method for classes,
+      which formats a format string using `str.format_map`
+      with a suitable mapping derived from the instance.
+
+      An instance with no `format_kwargs` method
+      is presumed to be a suitable mapping itself.
+      Otherwise the `format_kwargs` method is expected to return a mapping
+      for use with str.format_map`.
 
       The `format_as` method is like an inside out `str.format` or
       `object.__format__` method.
@@ -1126,11 +1132,20 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
 
-        The class using this mixin must provide
-        a `format_kwargs(**control_kw)` method
-        to compute the mapping provided to `str.format_map`.
+        If a class using the mixin has no `format_kwargs(**control_kw)` method
+        to provide a mapping for `str.format_map`
+        then the instance itself is used as the mapping.
     '''
-    format_mapping = self.format_kwargs(**control_kw)
+    try:
+      get_format_mapping = self.format_kwargs
+    except AttributeError:
+      if control_kw:
+        raise ValueError(
+            "no .format_kwargs() method, but control_kw=%r" % (control_kw,)
+        )
+      format_mapping = self
+    else:
+      format_mapping = get_format_mapping(**control_kw)
     return _format_as(format_s, format_mapping, error_sep=error_sep)
 
 if __name__ == '__main__':
