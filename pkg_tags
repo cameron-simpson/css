@@ -73,7 +73,7 @@ cs.threads pypi.release="20210306" ok_revision=fe403fed26cda83b04f8fc26830897164
 cs.timeutils pypi.release=20190220
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
 cs.units pypi.release="20201025"
-cs.upd pypi.release="20210428.4" ok_revision=fd2d7acd69e29d8fb43408583387e596659204bc features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"]}
+cs.upd pypi.release="20210428.4" ok_revision=eb05f119f76261a6920c06b88855f8cc920ea7bb features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"]}
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
