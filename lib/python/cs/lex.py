@@ -1080,7 +1080,7 @@ class FormatAsError(LookupError):
     )
 
 @fmtdoc
-def format_as(format_s, format_mapping, error_sep=None):
+def format_as(format_s, format_mapping, format_class=None, error_sep=None):
   ''' Format the string `format_s` using `str.format_mapping`,
       return the formatted result.
       This is a wrapper for `str.format_map`
@@ -1089,12 +1089,20 @@ def format_as(format_s, format_mapping, error_sep=None):
       Parameters:
       * `format_s`: the format string to use as the template
       * `format_mapping`: the mapping of available replacement fields
+      * `format_class`: an optional formatter class
+        with a `.vformat(format_string,args,kwargs)` method,
+        usually a subclass of `string.Formatter`;
+        if not specified then `str.formap_map` is used directly
       * `error_sep`: optional separator for the multipart error message,
         default from `FormatAsError.DEFAULT_SEPARATOR`:
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
   '''
+  formatter = None if format_class is None else format_class()
   try:
-    formatted = format_s.format_map(format_mapping)
+    formatted = (
+        format_s.format_map(format_mapping) if formatter is None else
+        formatter.vformat(format_s, (), format_mapping)
+    )
   except KeyError as e:
     # pylint: disable=raise-missing-from
     raise FormatAsError(
@@ -1140,13 +1148,20 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       get_format_mapping = self.format_kwargs
     except AttributeError:
       if control_kw:
+        # pylint: disable=raise-missing-from
         raise ValueError(
             "no .format_kwargs() method, but control_kw=%r" % (control_kw,)
         )
       format_mapping = self
     else:
       format_mapping = get_format_mapping(**control_kw)
-    return _format_as(format_s, format_mapping, error_sep=error_sep)
+    format_class = getattr(self, 'format_class', None)
+    return _format_as(
+        format_s,
+        format_mapping,
+        format_class=format_class,
+        error_sep=error_sep
+    )
 
 if __name__ == '__main__':
   import cs.lex_tests
