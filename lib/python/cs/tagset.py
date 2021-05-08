@@ -1629,6 +1629,137 @@ class ExtendedNamespace(SimpleNamespace):
         raise KeyError(attr)  # pylint: disable=raise-missing-from
       return value
 
+class TagSetPrefixView:
+  ''' A view of a `TagSet` via a `prefix`.
+
+      Access to a key `k` accesses the `TagSet`
+      with the key `prefix+'.'+k`.
+  '''
+
+  @typechecked
+  @require(lambda prefix: len(prefix) > 0)
+  def __init__(self, tags, prefix: str):
+    self._tags = tags
+    self._prefix = prefix
+    self._prefix_ = prefix + '.'
+
+  def __str__(self):
+    tag = self.tag
+    if tag is None:
+      return repr(
+          dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
+      )
+    else:
+      return str(tag.value)
+
+  def __repr__(self):
+    return "%s:%r" % (type(self).__name__, dict(self.items()))
+
+  @property
+  def onotology(self):
+    return self._tags.ontology
+
+  @pfx_method
+  def __format__(self, format_spec):
+    ''' Format a `TagSetPrefixView` according to `format_spec`,
+        The optional text after a colon in a format string.
+
+        In addition to the default formats,
+        the following special formats are recognised:
+        * `meta`: formats commencing with the identifier `meta`
+          obtain the view's `Tag` and dereference its metadata.
+        * `type`: formats commencing with the identifier `type`
+          obtain the view's `Tag` and dereference its type data.
+    '''
+    with Pfx("format_spec=%r", format_spec):
+      spec0, offset = get_identifier(format_spec)
+      if spec0 in ('meta', 'type'):
+        with Pfx(spec0):
+          # look up the Tag metadata
+          tag = self.tag
+          if tag is None:
+            X("TagSetPrefixView.__format__: no Tag for the TagSet view")
+            X("  %r", self)
+          elif spec0 == 'meta':
+            spec_tags = tag.metadata()
+          elif spec0 == 'type':
+            spec_tags = tag.typedata()
+          else:
+            raise RuntimeError("unhandled spec %r" % (spec0,))
+          spec_fmt = TagSetFormatter()
+          if format_spec.startswith('.', offset):
+            # eg :meta.tag_name[etc...]
+            spec_format_field = format_spec[offset + 1:]
+            if not spec_format_field:
+              raise ValueError("nothing after trailing dot")
+            spec_value, field_text = spec_fmt.get_field(
+                spec_format_field, (), spec_tags
+            )
+          else:
+            spec_value = spec_fmt.get_subfield(spec_tags, format_spec[offset:])
+          return str(spec_value)
+      return super().__format__(format_spec)
+
+  def keys(self):
+    prefix_ = self._prefix_
+    return map(
+        lambda k: cutprefix(k, prefix_),
+        filter(lambda k: k.startswith(prefix_), self._tags.keys())
+    )
+
+  def __contains__(self, k):
+    return self._prefix_ + k in self._tags
+
+  def __getitem__(self, k):
+    if not isinstance(k, str):
+      raise ValueError(
+          "%s.__getitem__: str required, received %s:%r" %
+          (type(self).__name__, type(k), k)
+      )
+    tag = self.tag
+    if tag is not None:
+      return tag.value[k]
+    return self._tags[self._prefix_ + k]
+
+  def __setitem__(self, k, v):
+    self._tags[self._prefix_ + k] = v
+
+  def __deltitem__(self, k):
+    del self._tags[self._prefix_ + k]
+
+  def items(self):
+    return map(lambda k: (k, self[k]), self.keys())
+
+  def values(self):
+    return map(lambda k: self[k], self.keys())
+
+  def __getattr__(self, attr):
+    ''' Proxy other attributes through to the `TagSet`.
+    '''
+    X("%s.__getattr__(%r)...", type(self), attr)
+    try:
+      return self[attr]
+    except KeyError:
+      value = getattr(self._tags, attr)
+      return value
+
+  def subtags(self, subprefix):
+    ''' Return a deeper view of the `TagSet`.
+    '''
+    return type(self)(self._tags, self._prefix_ + subprefix)
+
+  @property
+  def tag(self):
+    ''' Return a `Tag` for the prefix, or `None` if there is no such `Tag`.
+    '''
+    return self._tags.tag(self._prefix)
+
+  @property
+  def value(self):
+    ''' Return the `Tag` value for the prefix, or `None` if there is no such `Tag`.
+    '''
+    return self._tags.get(self._prefix)
+
 class TagSetNamespace(ExtendedNamespace):
   ''' A formattable nested namespace for a `TagSet`,
       subclassing `ExtendedNamespace`,
