@@ -707,24 +707,30 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
 
-  def subtags(self, prefix):
-    ''' Return a new `TagSet` containing tags commencing with `prefix+'.'`
+  def subtags(self, prefix, as_tagset=False):
+    ''' Return `TagSetPrefixView` of the tags commencing with `prefix+'.'`
         with the key prefixes stripped off.
+
+        If `as_tagset` is true (default `False`)
+        return a new standalone `TagSet` containing the prefixed keys.
 
         Example:
 
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
-            TagSet:{'b': 1, 'd': 2}
+            TagSetPrefixView:{'b': 1, 'd': 2}
     '''
-    prefix_ = prefix + '.'
-    return TagSet(
-        {
-            cutprefix(k, prefix_): v
-            for k, v in self.items()
-            if k.startswith(prefix_)
-        }
-    )
+    if as_tagset:
+      # prepare a standalone TagSet
+      prefix_ = prefix + '.'
+      subdict = {
+          k.cutprefix(prefix_): self[k]
+          for k in self.keys()
+          if k.startswith(prefix_)
+      }
+      return TagSet(subdict, _ontology=self.ontology)
+    # prepare a view of this TagSet
+    return TagSetPrefixView(self, prefix)
 
   @property
   def name(self):
