@@ -17,10 +17,18 @@ raising `ValueError` on failed tokenisation.
 import binascii
 from functools import partial
 import os
-from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
+from string import (
+    ascii_letters,
+    ascii_uppercase,
+    digits,
+    printable,
+    whitespace,
+    Formatter,
+)
 import sys
 from textwrap import dedent
 from cs.deco import fmtdoc
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
@@ -1162,6 +1170,105 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
         format_class=format_class,
         error_sep=error_sep
     )
+
+  @staticmethod
+  def format_get_arg_name(field_name):
+    ''' Default initial arg_name is an identifier.
+
+        Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
+    '''
+    return get_identifier(field_name)
+
+  def format_get_value(self, arg_name):
+    ''' Default dereference of `arg_name`: returns `self[arg_name]`.
+
+        Raise `KeyError` if `arg_name` does not resolve.
+    '''
+    return self[arg_name]
+
+  @staticmethod
+  def format_convert_field(value, conversion):
+    ''' Default converter for fields calls `Formatter.convert_field`.
+    '''
+    return Formatter().convert_field(value, conversion)
+
+  @staticmethod
+  def format_format_field(value, format_spec):
+    ''' Default formatter for values calls `Formatter.format_field`.
+    '''
+    return Formatter().format_field(value, format_spec)
+
+  @staticmethod
+  def format_get_subfield(value, subfield_text: str):
+    ''' Format a subfield of `value` using `FormattableFormatter.get_subfield`.
+    '''
+    return FormattableFormatter.get_subfield(value, subfield_text)
+
+class FormattableFormatter(Formatter):
+  ''' A `string.Formatter` subclass interacting with objects
+      which inherit from `FormattableMixin`.
+  '''
+
+  def __init__(self, obj):
+    self.obj = obj
+
+  @pfx_method
+  def get_field(self, field_name, a, kw):
+    ''' Get the object referenced by the field text `field_name`.
+    '''
+    assert not a
+    with Pfx("field_name=%r: kw=%r", field_name, kw):
+      arg_name, offset = self.obj.format_get_arg_name(field_name)
+      try:
+        arg_value, _ = self.get_value(arg_name, a, kw)
+      except KeyError as e:
+        raise ValueError("no value for arg_name=%r: %s" % (arg_name, e)) from e
+      # resolve the rest of the field
+      return self.get_subfield(arg_value, field_name[offset:]), field_name
+
+  @staticmethod
+  def get_subfield(value, subfield_text: str):
+    ''' Resolve `value` against `subfield_text`,
+        the remaining field text after the term which resolved to `value`.
+
+        For example, a format `{name.blah[0]}`
+        has the field text `name.blah[0]`.
+        A `get_field` implementation might initially
+        resolve `name` to some value,
+        leaving `.blah[0]` as the `subfield_text`.
+        This method supports taking that value
+        and resolving it against the remaining text `.blah[0]`.
+
+        For generality, if `subfield_text` is the empty string
+        `value` is returned unchanged.
+    '''
+    if subfield_text == '':
+      return value
+    subfield_fmt = f'{{value{subfield_text}}}'
+    subfield_map = {'value': value}
+    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
+      return subfield_fmt.format_map(subfield_map)
+
+  @pfx_method
+  def get_value(self, arg_name, a, _):
+    ''' Get the object with index `key`.
+    '''
+    assert not a
+    with Pfx("arg_name=%r", arg_name):
+      arg_value = self.obj.format_get_value(arg_name)
+      return arg_value, arg_name
+
+  @pfx_method
+  def convert_field(self, value, conversion):
+    ''' Convert a value using `self._obj.format_convert_field`.
+    '''
+    return self.obj.format_convert_field(value, conversion)
+
+  @pfx_method
+  def format_field(self, value, format_spec):
+    ''' Format a value using `self._obj.format_format_field`.
+    '''
+    return self.obj.format_format_field(value, format_spec)
 
 if __name__ == '__main__':
   import cs.lex_tests
