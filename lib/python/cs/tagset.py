@@ -2361,6 +2361,12 @@ class TagsOntology(SingletonMixin, TagSets):
         ),
     )
 
+  def __str__(self):
+    return str(self.as_dict())
+
+  def as_dict(self):
+    return dict(self.te_mapping)
+
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
         since ontologies are broadly optional.
