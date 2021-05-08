@@ -668,7 +668,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       # prepare a standalone TagSet
       prefix_ = prefix + '.'
       subdict = {
-          k.cutprefix(prefix_): self[k]
+          cutprefix(k, prefix_): self[k]
           for k in self.keys()
           if k.startswith(prefix_)
       }
