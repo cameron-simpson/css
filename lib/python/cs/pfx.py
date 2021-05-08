@@ -7,9 +7,10 @@
 r'''
 Dynamic message prefixes providing execution context.
 
-The primary facility here is Pfx,
+The primary facility here is `Pfx`,
 a context manager which maintains a per thread stack of context prefixes.
 There are also decorators for functions.
+This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
