@@ -434,7 +434,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
       Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
       you can also access tag values as attributes
-      provided that they do conflict with instance attributes
+      provided that they do not conflict with instance attributes
       or class methods or properties.
       The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
       as `None` which causes attribute access to return `None`
@@ -505,7 +505,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags
             TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
             >>> tags.c
-            TagSet:{'z': 9, 'x': 8}
+            TagSetPrefixView:{'z': 9, 'x': 8}
             >>> tags.c.z
             9
 
@@ -1775,7 +1775,8 @@ class TagSetNamespace(ExtendedNamespace):
       derived from that `TagSet`.
 
       This class exists particularly to help with format strings
-      because tools like fstags and sqltags use these for their output formats.
+      because tools like `fstags` and `sqltags` often use these
+      to specify their output formats.
       As such, I wanted to be able to put some expressive stuff
       in the format strings.
 
