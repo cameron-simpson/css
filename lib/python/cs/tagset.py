@@ -331,6 +331,73 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+class TagSetFormatter(Formatter):
+  ''' A `string.Formatter` subclass for format strings based on a `TagSet`.
+  '''
+
+  @pfx_method
+  def get_field(self, field_name, a, tags):
+    ''' Get the object referenced by the field text `field_name`.
+    '''
+    assert not a
+    with Pfx("field_name=%r: tags=%s", field_name, tags):
+      tag_name, offset = get_dotted_identifier(field_name)
+      if not tag_name:
+        # not a tag_name, pass to the superclass
+        return super().get_field(field_name, a, tags)
+      # obtain a view of the tags at tag_name
+      subtags = TagSetPrefixView(tags, tag_name)
+      if offset == len(field_name):
+        # no further dereferencing - return the subtags
+        return subtags, field_name
+      with Pfx("tag_name %r", tag_name):
+        # need to dereference the named Tag's value
+        tag_value = tags[tag_name]
+        return self.get_subfield(tag_value, field_name[offset:])
+
+  @pfx_method(with_args=[0])
+  def get_subfield(self, value, subfield_text: str):
+    ''' Resolve `value` against `subfield_text`,
+        the remaining field text after the term which resolved to `value`.
+
+        For example, a format `{name.blah[0]}`
+        has the field text `name.blah[0]`.
+        A `get_field` implementation might initially
+        resolve `name` to some value,
+        leaving `.blah[0]` as the `subfield_text`.
+        This method supports taking that value
+        and resolving it against the remaining text `.blah[0]`.
+
+        For generality, if `subfield_text` is the empty string
+        `value` is returned unchanged.
+    '''
+    if subfield_text == '':
+      return value
+    subfield_fmt = f'{{value{subfield_text}}}'
+    subfield_map = {'value': value}
+    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
+      return subfield_fmt.format_map(subfield_map)
+
+  @pfx_method
+  def get_value(self, key, args, kwargs):
+    ''' Get the object with index `key`.
+    '''
+    with Pfx("key=%r", key):
+      assert not args
+      return super().get_value(key, args, kwargs)
+
+  @pfx_method
+  def convert_field(self, value, conversion):
+    ''' Convert a value.
+    '''
+    with Pfx("conversion=%r", conversion):
+      return super().convert_field(value, conversion)
+
+  @pfx_method
+  def format_field(self, value, format_spec):
+    with Pfx("format_spec=%r", format_spec):
+      return super().format_field(value, format_spec)
+
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
