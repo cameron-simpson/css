@@ -1579,7 +1579,7 @@ class ExtendedNamespace(SimpleNamespace):
         raise KeyError(attr)  # pylint: disable=raise-missing-from
       return value
 
-class TagSetPrefixView:
+class TagSetPrefixView(FormatableMixin):
   ''' A view of a `TagSet` via a `prefix`.
 
       Access to a key `k` accesses the `TagSet`
@@ -1623,31 +1623,27 @@ class TagSetPrefixView:
     '''
     with Pfx("format_spec=%r", format_spec):
       spec0, offset = get_identifier(format_spec)
-      if spec0 in ('meta', 'type'):
-        with Pfx(spec0):
+      with Pfx(':' + spec0):
+        # we either return a value or break to fall through
+        while True:
           # look up the Tag metadata
           tag = self.tag
-          if tag is None:
-            X("TagSetPrefixView.__format__: no Tag for the TagSet view")
-            X("  %r", self)
-          elif spec0 == 'meta':
-            spec_tags = tag.metadata()
-          elif spec0 == 'type':
-            spec_tags = tag.typedata()
+          if tag is not None:
+            # things we can do with the Tag
+            if spec0 == 'meta':
+              value = tag.metadata()
+            elif spec0 == 'type':
+              value = tag.typedata()
+            else:
+              # not a supported special format mode
+              break
           else:
-            raise RuntimeError("unhandled spec %r" % (spec0,))
-          spec_fmt = TagSetFormatter()
-          if format_spec.startswith('.', offset):
-            # eg :meta.tag_name[etc...]
-            spec_format_field = format_spec[offset + 1:]
-            if not spec_format_field:
-              raise ValueError("nothing after trailing dot")
-            spec_value, field_text = spec_fmt.get_field(
-                spec_format_field, (), spec_tags
-            )
-          else:
-            spec_value = spec_fmt.get_subfield(spec_tags, format_spec[offset:])
-          return str(spec_value)
+            # no tag, no special format modes
+            break
+          subspec = format_spec[offset:]
+          value = self.format_get_subfield(value, subspec)
+          return str(value)
+    with Pfx("super().__format__(%r)", format_spec):
       return super().__format__(format_spec)
 
   def keys(self):
