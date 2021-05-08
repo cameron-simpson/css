@@ -1904,7 +1904,7 @@ class TagSetNamespace(ExtendedNamespace):
               subns = ns.__dict__.get(subname)
               if subns is None:
                 subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(
-                    tags.subtags(dotted_subpath), subpath
+                    tags.subtags(dotted_subpath, as_tagset=True), subpath
                 )
               ns = subns
           ns._tag = tag
