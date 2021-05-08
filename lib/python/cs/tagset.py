@@ -1903,6 +1903,10 @@ class TagSetNamespace(ExtendedNamespace):
     ''' If this node has a `._tag` then dereference its `.value`,
         otherwise fall through to the superclass `__getitem__`.
     '''
+    tag = self.__dict__.get('_tag')
+    if tag is not None:
+      with Pfx(".value:%r[%r]", tag.value, key):
+        return tag.value[key]
     if isinstance(key, str):
       try:
         item = getattr(self, key)
