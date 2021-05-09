@@ -197,9 +197,9 @@ from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.lex import (
-    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
-    is_dotted_identifier, is_identifier, skipwhite, lc_, titleify_lc,
-    FormatableMixin
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_identifier,
+    get_nonwhite, is_dotted_identifier, is_identifier, skipwhite, lc_,
+    titleify_lc, FormatableMixin, format_recover
 )
 from cs.logutils import warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
@@ -1532,6 +1532,7 @@ class ExtendedNamespace(SimpleNamespace):
     '''
     return len(self._public_keys())
 
+  @format_recover
   @pfx_method
   def __format__(self, spec):
     ''' The default formatted form of this node.
@@ -1609,6 +1610,7 @@ class TagSetPrefixView(FormatableMixin):
   def onotology(self):
     return self._tags.ontology
 
+  @format_recover
   @pfx_method
   def __format__(self, format_spec):
     ''' Format a `TagSetPrefixView` according to `format_spec`,
@@ -1872,6 +1874,7 @@ class TagSetNamespace(ExtendedNamespace):
     '''
     return bool(self._tagset)
 
+  @format_recover
   @pfx_method
   def __format__(self, spec):
     ''' Format this node.
