@@ -27,8 +27,9 @@ from string import (
 )
 import sys
 from textwrap import dedent
-from cs.deco import fmtdoc
+from cs.deco import fmtdoc, decorator
 from cs.pfx import Pfx, pfx_method
+from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
@@ -1086,6 +1087,24 @@ class FormatAsError(LookupError):
             "available keys: %s" % (' '.join(sorted(format_mapping.keys()))),
         )
     )
+
+@decorator
+def format_recover(method):
+  ''' Decorator for `__format__` methods which replaces failed formats
+      with `{self:format_spec}`.
+  '''
+
+  def format_recovered(self, format_spec):
+    try:
+      return method(self, format_spec)
+    except ValueError as e:
+      warning(
+          "%s.%s(%r): %s",
+          type(self).__name__, funcname(method), format_spec, e
+      )
+      return f'{{{self}:{format_spec}}}'
+
+  return format_recovered
 
 @fmtdoc
 def format_as(format_s, format_mapping, formatter=None, error_sep=None):
