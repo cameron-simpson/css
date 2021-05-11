@@ -1161,6 +1161,32 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       whose replacement fields are derived from the tags in the tag set.
   '''
 
+  @format_recover
+  def __format__(self, format_spec):
+    ''' Supply a default `__format__` method
+        which falls back to object methods as implementations of `format_spec`.
+    '''
+    try:
+      return super().__format__(format_spec)
+    except ValueError as e:
+      method_name, offset = get_identifier(format_spec)
+      if not method_name or not method_name[0].isalpha():
+        raise
+      try:
+        method = getattr(self, method_name)
+      except AttributeError as e2:
+        warning("%s.%s: %s", type(self).__name__, method_name, e2)
+        raise e
+      if not callable(method):
+        raise
+      try:
+        value = method()
+      except TypeError as e2:
+        warning("%s.%s: %s", type(self).__name__, method_name, e2)
+        raise e
+      value = self.format_get_subfield(value, format_spec[offset:])
+      return str(value)
+
   def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
