@@ -1209,7 +1209,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     return _format_as(
         format_s,
         format_mapping,
-        formatter=FormattableFormatter(self),
+        formatter=FormatableFormatter(self),
         error_sep=error_sep
     )
 
@@ -1242,13 +1242,13 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
 
   @staticmethod
   def format_get_subfield(value, subfield_text: str):
-    ''' Format a subfield of `value` using `FormattableFormatter.get_subfield`.
+    ''' Format a subfield of `value` using `FormatableFormatter.get_subfield`.
     '''
-    return FormattableFormatter.get_subfield(value, subfield_text)
+    return FormatableFormatter.get_subfield(value, subfield_text)
 
-class FormattableFormatter(Formatter):
+class FormatableFormatter(Formatter):
   ''' A `string.Formatter` subclass interacting with objects
-      which inherit from `FormattableMixin`.
+      which inherit from `FormatableMixin`.
   '''
 
   def __init__(self, obj):
