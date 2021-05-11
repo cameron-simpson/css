@@ -1607,7 +1607,9 @@ class TagSetPrefixView(FormatableMixin):
     return "%s:%r" % (type(self).__name__, dict(self.items()))
 
   @property
-  def onotology(self):
+  def ontology(self):
+    ''' The ontology of the references `TagSet`.
+    '''
     return self._tags.ontology
 
   @format_recover
