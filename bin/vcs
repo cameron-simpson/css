@@ -181,7 +181,7 @@ case "$op" in
                     ;;
       # graph log
       glog,git)     git log \
-                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" \
+                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" --date-order \
                       ${1+"$@"}
                     ;;
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
