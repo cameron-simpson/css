@@ -1206,24 +1206,12 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     '''
     try:
       return super().__format__(format_spec)
-    except ValueError as e:
-      method_name, offset = get_identifier(format_spec)
-      if not method_name or not method_name[0].isalpha():
-        raise
-      try:
-        method = getattr(self, method_name)
-      except AttributeError as e2:
-        warning("%s.%s: %s", type(self).__name__, method_name, e2)
-        raise e
-      if not callable(method):
-        raise
-      try:
-        value = method()
-      except TypeError as e2:
-        warning("%s.%s: %s", type(self).__name__, method_name, e2)
-        raise e
-      value = self.format_get_subfield(value, format_spec[offset:])
-      return str(value)
+    except ValueError:
+      converted, offset = self.convert_via_method(self, format_spec)
+      fully_converted = self.format_get_subfield(
+          converted, format_spec[offset:]
+      )
+      return str(fully_converted)
 
   def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
