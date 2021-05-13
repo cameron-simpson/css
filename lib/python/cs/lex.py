@@ -1270,6 +1270,8 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   def format_convert_field(value, conversion):
     ''' Default converter for fields calls `Formatter.convert_field`.
     '''
+    if conversion == '':
+      conversion = None
     return Formatter().convert_field(value, conversion)
 
   @staticmethod
