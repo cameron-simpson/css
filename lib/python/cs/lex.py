@@ -1173,6 +1173,32 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       whose replacement fields are derived from the tags in the tag set.
   '''
 
+  @staticmethod
+  def convert_via_method(value, format_spec):
+    ''' Apply a method name based conversion to `value`
+        where `format_spec` starts with a method name
+        applicable to `value`.
+        Return `(converted,offset)`
+        being the converted value and the offset after the method name.
+    '''
+    method_name, offset = get_identifier(format_spec)
+    if not method_name or not method_name[0].isalpha():
+      raise ValueError("not an identifier")
+    try:
+      method = getattr(value, method_name)
+    except AttributeError:
+      # pylint: disable=raise-missing-from
+      raise ValueError("unknown attribute name %r" % (method_name,))
+    if not callable(method):
+      # pylint: disable=raise-missing-from
+      raise ValueError("not callable attribute name %r" % (method_name,))
+    try:
+      converted = method()
+    except TypeError as e:
+      # pylint: disable=raise-missing-from
+      raise ValueError("TypeError calling %s(): %s" % (method_name, e))
+    return converted, offset
+
   @format_recover
   def __format__(self, format_spec):
     ''' Supply a default `__format__` method
