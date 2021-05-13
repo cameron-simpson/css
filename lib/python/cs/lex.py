@@ -1281,7 +1281,17 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
         Promote `str` to `FStr`, then try `value.__format__`.
         If that raises `ValueError`, try `Formatter.format_field`.
     '''
-    return Formatter().format_field(value, format_spec)
+    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+      value = FStr(value)
+    try:
+      formatted = value.__format__(format_spec)
+    except ValueError as e:
+      warning(
+          "%s.__format__(%r): %s, falling back to Formatter.format_field",
+          type(value), format_spec, e
+      )
+      formatted = Formatter().format_field(value, format_spec)
+    return formatted
 
   @staticmethod
   @typechecked
