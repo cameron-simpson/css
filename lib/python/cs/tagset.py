@@ -1578,6 +1578,8 @@ class ExtendedNamespace(SimpleNamespace):
         value = getattr(self, attr)
       except AttributeError:
         raise KeyError(attr)  # pylint: disable=raise-missing-from
+      if type(value) is str:
+        value = FStr(value)
       return value
 
 class TagSetPrefixView(FormatableMixin):
@@ -1601,7 +1603,7 @@ class TagSetPrefixView(FormatableMixin):
           dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
       )
     else:
-      return str(tag.value)
+      return FStr(tag.value)
 
   def __repr__(self):
     return "%s:%r" % (type(self).__name__, dict(self.items()))
