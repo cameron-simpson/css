@@ -1329,6 +1329,13 @@ class FormatableFormatter(Formatter):
     '''
     return self.obj.format_format_field(value, format_spec)
 
+# TODO: add a bunch of string conveniences here: plural, lc etc etc.
+class FStr(FormatableMixin, str):
+  ''' A `str` subclass with the `FormatableMixin` methods,
+      particularly its `__format__`
+      which use `str` method names as valid conversions.
+  '''
+
 if __name__ == '__main__':
   import cs.lex_tests
   cs.lex_tests.selftest(sys.argv)
