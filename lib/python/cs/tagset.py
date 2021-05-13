@@ -199,12 +199,12 @@ from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_identifier,
     get_nonwhite, is_dotted_identifier, is_identifier, skipwhite, lc_,
-    titleify_lc, FormatableMixin, format_recover
+    titleify_lc, FormatableMixin, FStr, format_recover
 )
 from cs.logutils import warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
@@ -1211,7 +1211,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
   def metadata(self, ontology=None, convert=None):
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
-        The default `ontology` is `self.onotology`.
+        The default `ontology` is `self.ontology`.
 
         For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
         for `self.value`.
@@ -1686,12 +1686,10 @@ class TagSetPrefixView(FormatableMixin):
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
     '''
-    X("%s.__getattr__(%r)...", type(self), attr)
     try:
       return self[attr]
     except KeyError:
-      value = getattr(self._tags, attr)
-      return value
+      return getattr(self._tags, attr)
 
   def subtags(self, subprefix):
     ''' Return a deeper view of the `TagSet`.
@@ -1991,7 +1989,7 @@ class TagSetNamespace(ExtendedNamespace):
     with Pfx("%s:%s.%s", type(self).__name__, path, attr):
       if tag is not None:
         # local Tag? probe it
-        # first, special _* attributes
+        # first, the special _* attributes
         if attr == '_type':
           return self._tag.typedata.ns()
         if attr == '_meta':
