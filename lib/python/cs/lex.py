@@ -1384,7 +1384,10 @@ class FormatableFormatter(Formatter):
     subfield_fmt = f'{{value{subfield_text}}}'
     subfield_map = {'value': value}
     with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
-      return subfield_fmt.format_map(subfield_map)
+      value = subfield_fmt.format_map(subfield_map)
+    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+      value = FStr(value)
+    return value
 
   @pfx_method
   def get_value(self, arg_name, a, _):
