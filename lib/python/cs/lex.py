@@ -17,6 +17,7 @@ raising `ValueError` on failed tokenisation.
 import binascii
 from functools import partial
 import os
+import re
 from string import (
     ascii_letters,
     ascii_uppercase,
@@ -27,8 +28,12 @@ from string import (
 )
 import sys
 from textwrap import dedent
+
+from typeguard import typechecked
+
 from cs.deco import fmtdoc, decorator
-from cs.pfx import Pfx, pfx_method
+from cs.gimmicks import warning
+from cs.pfx import Pfx, pfx_method, XP
 from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
@@ -42,7 +47,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.py3', 'cs.seq>=20200914'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq>=20200914',
+    ],
 }
 
 unhexify = binascii.unhexlify
@@ -1106,8 +1117,9 @@ def format_recover(method):
 
   return format_recovered
 
+@typechecked
 @fmtdoc
-def format_as(format_s, format_mapping, formatter=None, error_sep=None):
+def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
   ''' Format the string `format_s` using `str.format_mapping`,
       return the formatted result.
       This is a wrapper for `str.format_map`
@@ -1236,11 +1248,15 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
 
   @staticmethod
   def format_format_field(value, format_spec):
-    ''' Default formatter for values calls `Formatter.format_field`.
+    ''' Default `FormatableFormatter.format_field` implementation.
+
+        Promote `str` to `FStr`, then try `value.__format__`.
+        If that raises `ValueError`, try `Formatter.format_field`.
     '''
     return Formatter().format_field(value, format_spec)
 
   @staticmethod
+  @typechecked
   def format_get_subfield(value, subfield_text: str):
     ''' Format a subfield of `value` using `FormatableFormatter.get_subfield`.
     '''
@@ -1252,6 +1268,7 @@ class FormatableFormatter(Formatter):
   '''
 
   def __init__(self, obj):
+    assert isinstance(obj, FormatableMixin)
     self.obj = obj
 
   @pfx_method
@@ -1293,7 +1310,7 @@ class FormatableFormatter(Formatter):
 
   @pfx_method
   def get_value(self, arg_name, a, _):
-    ''' Get the object with index `key`.
+    ''' Get the object with index `arg_name`.
     '''
     assert not a
     with Pfx("arg_name=%r", arg_name):
