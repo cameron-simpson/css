@@ -1110,8 +1110,9 @@ def format_recover(method):
       return method(self, format_spec)
     except ValueError as e:
       warning(
-          "%s.%s(%r): %s",
-          type(self).__name__, funcname(method), format_spec, e
+          "@format_recover: %s.%s(%r): %s, falling back via %r",
+          type(self).__name__, funcname(method), format_spec, e,
+          "f'{{{self}:{format_spec}}}'"
       )
       return f'{{{self}:{format_spec}}}'
 
