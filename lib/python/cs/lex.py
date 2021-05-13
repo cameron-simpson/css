@@ -1299,6 +1299,56 @@ class FormatableFormatter(Formatter):
     assert isinstance(obj, FormatableMixin)
     self.obj = obj
 
+  RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
+  RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
+  RE_ARG_NAME_s = rf'({RE_IDENTIFIER_s}|\d+)'
+  RE_ATTRIBUTE_NAME_s = rf'\.{RE_IDENTIFIER_s}'
+  RE_ELEMENT_INDEX_s = r'[^]]*'
+  RE_FIELD_EXPR_s = rf'{RE_ARG_NAME_s}({RE_ATTRIBUTE_NAME_s}|\[{RE_ELEMENT_INDEX_s}\])*'
+  RE_FIELD_EXPR = re.compile(RE_FIELD_EXPR_s, re.I)
+  RE_FIELD = re.compile(
+      (
+          r'{' + rf'(?P<arg_name>{RE_FIELD_EXPR_s})?' +
+          r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
+      ), re.I
+  )
+
+  if False:  # pylint: disable=using-constant-test
+
+    @classmethod
+    @typechecked
+    def parse(cls, format_string: str):
+      ''' Parse a format string after the fashion of `Formatter.parse`,
+          yielding `(literal,arg_name,format_spec,conversion)` tuples.
+
+          Unlike `Formatter.parse`,
+          this does not validate the `conversion` part preemptively,
+          supporting extended values for use with the `convert_field` method.
+      '''
+      offset = 0
+      while offset < len(format_string):
+        m_literal = cls.RE_LITERAL_TEXT.match(format_string, offset)
+        literal = m_literal.group()
+        offset = m_literal.end()
+        if offset == len(format_string):
+          # nothing after the literal text
+          if literal:
+            yield literal, None, None, None
+          return
+        m_field = cls.RE_FIELD.match(format_string, offset)
+        if not m_field:
+          raise ValueError(
+              "expected a field at offset %d: found %r" %
+              (offset, format_string[offset:])
+          )
+        yield (
+            literal,
+            m_field.group('arg_name'),
+            m_field.group('format_spec') or '',
+            m_field.group('conversion'),
+        )
+        offset = m_field.end()
+
   @pfx_method
   def get_field(self, field_name, a, kw):
     ''' Get the object referenced by the field text `field_name`.
