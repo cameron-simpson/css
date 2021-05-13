@@ -1883,10 +1883,19 @@ class TagSetNamespace(ExtendedNamespace):
         If there's a `Tag` on the node, format its value.
         Otherwise use the superclass format.
     '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      return format(tag.value, spec)
-    return super().__format__(spec)
+    try:
+      tag = self.__dict__.get('_tag')
+      if tag is not None:
+        value = tag.value
+        if type(value) is str:
+          value = FStr(value)
+        with Pfx("format(%r,%r)", value, spec):
+          return format(value, spec)
+      with Pfx("super().__format__(%r)", spec):
+        return super().__format__(spec)
+    except ValueError as e:
+      warning("__format__ error: %s", e)
+      return f'{{{self}:{spec}}}'
 
   def _subns(self, attr):
     ''' Create a subnamespace for `attr` as for `ExtendedNamespace`
