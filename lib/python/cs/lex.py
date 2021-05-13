@@ -1286,7 +1286,9 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   def format_get_subfield(value, subfield_text: str):
     ''' Format a subfield of `value` using `FormatableFormatter.get_subfield`.
     '''
-    return FormatableFormatter.get_subfield(value, subfield_text)
+    if not subfield_text:
+      return value
+    return FormatableFormatter(value).get_subfield(value, subfield_text)
 
 class FormatableFormatter(Formatter):
   ''' A `string.Formatter` subclass interacting with objects
