@@ -1405,10 +1405,49 @@ class FormatableFormatter(Formatter):
     return self.obj.format_convert_field(value, conversion)
 
   @pfx_method
-  def format_field(self, value, format_spec):
-    ''' Format a value using `self._obj.format_format_field`.
+  @typechecked
+  def format_field(self, value, format_spec: str):
+    ''' Format a value using `value.format_format_field`.
+
+        We actually recognise colon separated chains of conversions
+        and apply each conversion to the previously converted value.
+        As such, we look for a `.format_format_field` method
+        on the value to be converted,
+        falling back to `FStr.format_format_field` if the value is a `str`
+        otherwise to `FormattableMixin.convert_via_method`.
     '''
-    return self.obj.format_format_field(value, format_spec)
+    format_subspecs = []
+    offset = 0
+    while offset < len(format_spec):
+      if format_spec.startswith(':', offset):
+        format_subspec = ''
+        offset += 1
+      else:
+        m_format_subspec = self.RE_FIELD_EXPR.match(format_spec, offset)
+        if m_format_subspec:
+          format_subspec = m_format_subspec.group()
+        else:
+          warning(
+              "unrecognised subspec at %d: %r, falling back to split", offset,
+              format_spec[offset:]
+          )
+          format_subspec, *_ = format_spec[offset:].split(':', 1)
+        offset += len(format_subspec)
+      format_subspecs.append(format_subspec)
+    # chain the various subspecifications
+    for format_subspec in format_subspecs or ('',):
+      with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+        try:
+          format_format_field = getattr(value, 'format_format_field')
+        except AttributeError:
+          if isinstance(value, str):
+            format_format_field = FStr(value).format_format_field
+          else:
+            format_format_field = lambda format_subspec: (
+                FormatableMixin.convert_via_method(value, format_subspec)
+            )
+        value = format_format_field(value, format_subspec)
+    return value
 
 # TODO: add a bunch of string conveniences here: plural, lc etc etc.
 class FStr(FormatableMixin, str):
