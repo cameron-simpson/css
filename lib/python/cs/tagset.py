@@ -426,11 +426,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return get_dotted_identifier(field_name)
 
-  def format_get_value(self, arg_name):
-    ''' The initial `arg_name` produces a `TagSetPrefixView`.
-    '''
-    return self.subtags(arg_name)
-
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes
         if `attr` is not found via the superclass `__getattr__`.
