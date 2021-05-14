@@ -1448,7 +1448,7 @@ class FormatableFormatter(Formatter):
                 FormatableMixin.
                 convert_via_method_or_attr(value, format_subspec)
             )
-        value = format_format_field(value, format_subspec)
+        value = self.obj.format_format_field(value, format_subspec)
     return value
 
 # TODO: add a bunch of string conveniences here: plural, lc etc etc.
