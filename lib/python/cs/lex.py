@@ -1257,24 +1257,14 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       conversion = None
     return Formatter().convert_field(value, conversion)
 
-  @staticmethod
-  def format_format_field(value, format_spec):
+  def format_format_field(self, value, format_spec):
     ''' Default `FormatableFormatter.format_field` implementation.
 
-        Promote `str` to `FStr`, then try `value.__format__`.
-        If that raises `ValueError`, try `Formatter.format_field`.
+        Promote `str` to `FStr`, then use `value.__format__`.
     '''
     if type(value) is str:  # pylint: disable=unidiomatic-typecheck
       value = FStr(value)
-    try:
-      formatted = value.__format__(format_spec)
-    except ValueError as e:
-      warning(
-          "%s.__format__(%r): %s, falling back to Formatter.format_field",
-          type(value), format_spec, e
-      )
-      formatted = Formatter().format_field(value, format_spec)
-    return formatted
+    return value.__format__(format_spec)
 
   @staticmethod
   @typechecked
