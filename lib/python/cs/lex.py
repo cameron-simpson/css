@@ -1175,7 +1175,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   '''
 
   @staticmethod
-  def convert_via_method(value, format_spec):
+  def convert_via_method_or_attr(value, format_spec):
     ''' Apply a method name based conversion to `value`
         where `format_spec` starts with a method name
         applicable to `value`.
@@ -1190,14 +1190,14 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     except AttributeError:
       # pylint: disable=raise-missing-from
       raise ValueError("unknown attribute name %r" % (method_name,))
-    if not callable(method):
-      # pylint: disable=raise-missing-from
-      raise ValueError("not callable attribute name %r" % (method_name,))
-    try:
-      converted = method()
-    except TypeError as e:
-      # pylint: disable=raise-missing-from
-      raise ValueError("TypeError calling %s(): %s" % (method_name, e))
+    if callable(method):
+      try:
+        converted = method()
+      except TypeError as e:
+        # pylint: disable=raise-missing-from
+        raise ValueError("TypeError calling %s(): %s" % (method_name, e))
+    else:
+      converted = method
     return converted, offset
 
   @format_recover
@@ -1208,7 +1208,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     try:
       return super().__format__(format_spec)
     except ValueError:
-      converted, offset = self.convert_via_method(self, format_spec)
+      converted, offset = self.convert_via_method_or_attr(self, format_spec)
       fully_converted = self.format_get_subfield(
           converted, format_spec[offset:]
       )
@@ -1415,7 +1415,7 @@ class FormatableFormatter(Formatter):
         As such, we look for a `.format_format_field` method
         on the value to be converted,
         falling back to `FStr.format_format_field` if the value is a `str`
-        otherwise to `FormattableMixin.convert_via_method`.
+        otherwise to `FormattableMixin.convert_via_method_or_attr`.
     '''
     format_subspecs = []
     offset = 0
@@ -1445,7 +1445,8 @@ class FormatableFormatter(Formatter):
             format_format_field = FStr(value).format_format_field
           else:
             format_format_field = lambda format_subspec: (
-                FormatableMixin.convert_via_method(value, format_subspec)
+                FormatableMixin.
+                convert_via_method_or_attr(value, format_subspec)
             )
         value = format_format_field(value, format_subspec)
     return value
