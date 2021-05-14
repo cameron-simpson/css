@@ -1248,13 +1248,6 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     '''
     return get_identifier(field_name)
 
-  def format_get_value(self, arg_name):
-    ''' Default dereference of `arg_name`: returns `self[arg_name]`.
-
-        Raise `KeyError` if `arg_name` does not resolve.
-    '''
-    return self[arg_name]
-
   @staticmethod
   def format_convert_field(value, conversion):
     ''' Default converter for fields calls `Formatter.convert_field`.
