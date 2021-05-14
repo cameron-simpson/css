@@ -33,7 +33,7 @@ from typeguard import typechecked
 
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
@@ -1257,6 +1257,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       conversion = None
     return Formatter().convert_field(value, conversion)
 
+  # pylint: disable=no-self-use
   def format_format_field(self, value, format_spec):
     ''' Default `FormatableFormatter.format_field` implementation.
 
@@ -1337,6 +1338,7 @@ class FormatableFormatter(Formatter):
         )
         offset = m_field.end()
 
+  # pylint: disable=arguments-differ
   @pfx_method
   def get_field(self, field_name, a, kw):
     ''' Get the object referenced by the field text `field_name`.
@@ -1382,6 +1384,7 @@ class FormatableFormatter(Formatter):
       value = FStr(value)
     return value
 
+  # pylint: disable=arguments-differ
   @pfx_method
   def get_value(self, arg_name, a, kw):
     ''' Get the object with index `arg_name`.
@@ -1449,7 +1452,7 @@ class FormatableFormatter(Formatter):
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__`
-      which use `str` method names as valid conversions.
+      which use `str` method names as valid formats.
   '''
 
 if __name__ == '__main__':
