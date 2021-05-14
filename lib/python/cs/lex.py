@@ -1183,8 +1183,9 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
         being the converted value and the offset after the method name.
     '''
     method_name, offset = get_identifier(format_spec)
-    if not method_name or not method_name[0].isalpha():
-      raise ValueError("not an identifier")
+    if not method_name:
+      # no leading method/attribute name, return unchanged
+      return value, 0
     try:
       method = getattr(value, method_name)
     except AttributeError:
