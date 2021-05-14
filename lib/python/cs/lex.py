@@ -1138,7 +1138,7 @@ def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
         `'{FormatAsError.DEFAULT_SEPARATOR}'`
   '''
   if formatter is None:
-    formatter = Formatter()
+    formatter = FormatableFormatter(format_mapping)
   try:
     formatted = formatter.vformat(format_s, (), format_mapping)
   except KeyError as e:
