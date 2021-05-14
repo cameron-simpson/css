@@ -1394,12 +1394,12 @@ class FormatableFormatter(Formatter):
     return value
 
   @pfx_method
-  def get_value(self, arg_name, a, _):
+  def get_value(self, arg_name, a, kw):
     ''' Get the object with index `arg_name`.
     '''
     assert not a
     with Pfx("arg_name=%r", arg_name):
-      arg_value = self.obj.format_get_value(arg_name)
+      arg_value = kw[arg_name]
       return arg_value, arg_name
 
   @pfx_method
