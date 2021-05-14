@@ -1300,6 +1300,9 @@ class FormatableFormatter(Formatter):
     assert isinstance(obj, FormatableMixin)
     self.obj = obj
 
+  def __repr__(self):
+    return "%s:%r" % (type(self).__name__, self.obj)
+
   RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
   RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
   RE_ARG_NAME_s = rf'({RE_IDENTIFIER_s}|\d+)'
