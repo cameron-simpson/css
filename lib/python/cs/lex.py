@@ -1351,7 +1351,8 @@ class FormatableFormatter(Formatter):
     ''' Get the object referenced by the field text `field_name`.
     '''
     assert not a
-    with Pfx("field_name=%r: kw=%r", field_name, kw):
+    with Pfx("self.obj=%s: field_name=%r: kw=%r", type(self.obj).__name__,
+             field_name, kw, print=True):
       arg_name, offset = self.obj.format_get_arg_name(field_name)
       try:
         arg_value, _ = self.get_value(arg_name, a, kw)
