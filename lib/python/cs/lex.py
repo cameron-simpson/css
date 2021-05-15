@@ -1409,10 +1409,13 @@ class FormatableFormatter(Formatter):
 
         We actually recognise colon separated chains of formats
         and apply each format to the previously converted value.
-        As such, we look for a `.format_format_field` method
-        on the value to be converted,
-        falling back to `FStr.format_format_field` if the value is a `str`
-        otherwise to `FormattableMixin.convert_via_method_or_attr`.
+        `str` values are promoted to `FStr` at each step.
+
+        At each step, for the current value
+        we look for `value.format_format_field`
+        or `FormattableMixin.convert_via_method_or_attr(value)`
+        or `FormattableMixin.convert_via_method_or_attr(FStr(value)`
+        in turn.
     '''
     format_subspecs = []
     offset = 0
@@ -1432,6 +1435,9 @@ class FormatableFormatter(Formatter):
           format_subspec, *_ = format_spec[offset:].split(':', 1)
         offset += len(format_subspec)
       format_subspecs.append(format_subspec)
+    # promote str to FStr before formatting
+    if type(value) is str:
+      value = FStr(value)
     # chain the various subspecifications
     for format_subspec in format_subspecs or ('',):
       with Pfx("value=%r, format_subspec=%r", value, format_subspec):
@@ -1439,14 +1445,25 @@ class FormatableFormatter(Formatter):
           format_format_field = getattr(value, 'format_format_field')
         except AttributeError:
           # fall back to convert_via_method_or_attr
-          value, offset = FormatableMixin.convert_via_method_or_attr(
-              value, format_subspec
-          )
+          try:
+            value, offset = FormatableMixin.convert_via_method_or_attr(
+                value, format_subspec
+            )
+          except ValueError:
+            # see if it converts to an Fstr and resolves
+            value2 = FStr(value)
+            value2, offset = FormatableMixin.convert_via_method_or_attr(
+                value2, format_subspec
+            )
+            value = value2
           if offset < len(format_subspec):
             value = cls.get_subfield(value, format_subspec[offset:])
         else:
           # use value.format_format_field(format_subspec)
-          format_format_field(format_subspec)
+          X("format_format_field=%r", format_format_field)
+          value = format_format_field(format_subspec)
+        if type(value) is str:
+          value = FStr(value)
     return FStr(value)
 
 # TODO: add a bunch of string conveniences here: plural, lc etc etc.
