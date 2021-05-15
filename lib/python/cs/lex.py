@@ -1262,15 +1262,11 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       conversion = None
     return Formatter().convert_field(value, conversion)
 
-  # pylint: disable=no-self-use
-  def format_format_field(self, value, format_spec):
-    ''' Default `FormatableFormatter.format_field` implementation.
-
-        Promote `str` to `FStr`, then use `value.__format__`.
+  def format_format_field(self, format_spec):
+    ''' Default `FormatableFormatter.format_field` implementation
+        just calls `self.__format__`.
     '''
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
-    return value.__format__(format_spec)
+    return self.__format__(format_spec)
 
   @staticmethod
   @typechecked
