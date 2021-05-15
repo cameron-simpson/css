@@ -16,6 +16,7 @@ raising `ValueError` on failed tokenisation.
 
 import binascii
 from functools import partial
+from json import JSONEncoder
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
@@ -1175,6 +1176,8 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       whose replacement fields are derived from the tags in the tag set.
   '''
 
+  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+
   @staticmethod
   def convert_via_method_or_attr(value, format_spec):
     ''' Apply a method name based conversion to `value`
@@ -1216,7 +1219,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       return super().__format__(format_spec)
     except ValueError:
       converted, offset = self.convert_via_method_or_attr(self, format_spec)
-      fully_converted = self.format_get_subfield(
+      fully_converted = FormatableFormatter.get_subfield(
           converted, format_spec[offset:]
       )
       return str(fully_converted)
@@ -1269,14 +1272,11 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     '''
     return self.__format__(format_spec)
 
-  @staticmethod
-  @typechecked
-  def format_get_subfield(value, subfield_text: str):
-    ''' Format a subfield of `value` using `FormatableFormatter.get_subfield`.
+  # Utility methods for formats.
+  def json(self):
+    ''' The value transcribed as compact JSON.
     '''
-    if not subfield_text:
-      return value
-    return FormatableFormatter(value).get_subfield(value, subfield_text)
+    return self.JSON_ENCODER.encode(self)
 
 class FormatableFormatter(Formatter):
   ''' A `string.Formatter` subclass interacting with objects
