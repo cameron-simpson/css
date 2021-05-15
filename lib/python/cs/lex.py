@@ -1453,7 +1453,50 @@ class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__`
       which use `str` method names as valid formats.
+
+      It also has a bunch of utility methods which are available
+      as `:`*method* in format strings.
   '''
+
+  def basename(self):
+    ''' Treat as a filesystem path and return the basename.
+    '''
+    return Path(self).name
+
+  def dirname(self):
+    ''' Treat as a filesystem path and return the dirname.
+    '''
+    return Path(self).parent
+
+  def f(self):
+    ''' Parse `self` as a `float`.
+    '''
+    return float(self)
+
+  def i(self, base=10):
+    ''' Parse `self` as an `int`.
+    '''
+    return int(self, base=base)
+
+  def lc(self):
+    ''' Lowercase using `lc_()`.
+    '''
+    return lc_(self)
+
+  def path(self):
+    ''' Convert to a native filesystem `pathlib.Path`.
+    '''
+    return Path(self)
+
+  def unix_path(self):
+    ''' Convert to a UNIX filesystem `pathlib.Path`.
+    '''
+    return PureUNIXPath(self)
+
+  def windows_path(self):
+    ''' Convert to a Windows filesystem `pathlib.Path`.
+    '''
+    return PureWindowsPath(self)
 
 if __name__ == '__main__':
   import cs.lex_tests
