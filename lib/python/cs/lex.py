@@ -1461,7 +1461,6 @@ class FormatableFormatter(Formatter):
             value = cls.get_subfield(value, format_subspec[offset:])
         else:
           # use value.format_format_field(format_subspec)
-          X("format_format_field=%r", format_format_field)
           value = format_format_field(format_subspec)
         if type(value) is str:
           value = FStr(value)
