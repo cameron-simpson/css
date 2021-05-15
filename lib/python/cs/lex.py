@@ -1190,7 +1190,12 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       method = getattr(value, method_name)
     except AttributeError:
       # pylint: disable=raise-missing-from
-      raise ValueError("unknown attribute name %r" % (method_name,))
+      raise ValueError(
+          "unknown attribute name %s.%r" % (
+              typed_str(value),
+              method_name,
+          )
+      )
     if callable(method):
       try:
         converted = method()
