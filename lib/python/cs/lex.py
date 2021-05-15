@@ -17,6 +17,7 @@ raising `ValueError` on failed tokenisation.
 import binascii
 from functools import partial
 import os
+from pathlib import Path, PureUNIXPath, PureWindowsPath
 import re
 from string import (
     ascii_letters,
@@ -1466,7 +1467,6 @@ class FormatableFormatter(Formatter):
           value = FStr(value)
     return FStr(value)
 
-# TODO: add a bunch of string conveniences here: plural, lc etc etc.
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__`
