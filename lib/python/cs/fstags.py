@@ -81,7 +81,7 @@ import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
     isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile, splitext
+    samefile
 )
 from pathlib import PurePath
 import shutil
@@ -123,9 +123,19 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils>=20210404', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'cs.upd', 'icontract', 'typeguard'
+        'cs.cmdutils>=20210404',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.resources',
+        'cs.tagset',
+        'cs.threads',
+        'cs.upd',
+        'icontract',
+        'typeguard',
     ],
 }
 
