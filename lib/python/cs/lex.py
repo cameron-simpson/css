@@ -17,7 +17,7 @@ raising `ValueError` on failed tokenisation.
 import binascii
 from functools import partial
 import os
-from pathlib import Path, PureUNIXPath, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 from string import (
     ascii_letters,
@@ -1437,7 +1437,7 @@ class FormatableFormatter(Formatter):
         offset += len(format_subspec)
       format_subspecs.append(format_subspec)
     # promote str to FStr before formatting
-    if type(value) is str:
+    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
       value = FStr(value)
     # chain the various subspecifications
     for format_subspec in format_subspecs or ('',):
@@ -1462,7 +1462,7 @@ class FormatableFormatter(Formatter):
         else:
           # use value.format_format_field(format_subspec)
           value = format_format_field(format_subspec)
-        if type(value) is str:
+        if type(value) is str:  # pylint: disable=unidiomatic-typecheck
           value = FStr(value)
     return FStr(value)
 
@@ -1505,10 +1505,10 @@ class FStr(FormatableMixin, str):
     '''
     return Path(self)
 
-  def unix_path(self):
-    ''' Convert to a UNIX filesystem `pathlib.Path`.
+  def posix_path(self):
+    ''' Convert to a Posix filesystem `pathlib.Path`.
     '''
-    return PureUNIXPath(self)
+    return PurePosixPath(self)
 
   def windows_path(self):
     ''' Convert to a Windows filesystem `pathlib.Path`.
