@@ -1199,7 +1199,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       whose replacement fields are derived from the tags in the tag set.
   '''
 
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+  FORMAT_JSON_ENCODER = JSONEncoder(separators=(',', ':'))
 
   @classmethod
   def format_methods(cls):
@@ -1321,7 +1321,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   def json(self):
     ''' The value transcribed as compact JSON.
     '''
-    return self.JSON_ENCODER.encode(self)
+    return self.FORMAT_JSON_ENCODER.encode(self)
 
 class FormatableFormatter(Formatter):
   ''' A `string.Formatter` subclass interacting with objects
