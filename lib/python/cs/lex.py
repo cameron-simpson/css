@@ -1152,6 +1152,28 @@ def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
 
 _format_as = format_as  # for reuse in the format_as method below
 
+def format_method(method):
+  ''' Mark a method as available as a format method.
+      Requires the enclosing class to be decorated with `@has_format_methods`.
+  '''
+  method.is_format_method = True
+  return method
+
+def has_format_methods(cls):
+  ''' Class decorator to walk this class for direct methods
+      marked as for use in format strings
+      and to include them in `cls.format_methods()`.
+  '''
+  for method_name in dir(cls):
+    try:
+      method = getattr(cls, method_name)
+    except AttributeError:
+      pass
+    else:
+      if getattr(method, 'is_format_method', False):
+        cls.format_methods()[method_name] = method
+  return cls
+
 class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
       which formats a format string using `str.format_map`
