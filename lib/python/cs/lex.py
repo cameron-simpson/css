@@ -1174,6 +1174,7 @@ def has_format_methods(cls):
         cls.format_methods()[method_name] = method
   return cls
 
+@has_format_methods
 class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
       which formats a format string using `str.format_map`
@@ -1488,6 +1489,7 @@ class FormatableFormatter(Formatter):
           value = FStr(value)
     return FStr(value)
 
+@has_format_methods
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__`
@@ -1497,36 +1499,50 @@ class FStr(FormatableMixin, str):
       as `:`*method* in format strings.
   '''
 
+  # str is immutable: prefill with all public class attributes
+  _format_methods = {
+      method_name: getattr(str, method_name)
+      for method_name in dir(str)
+      if method_name[0].isalpha()
+  }
+
+  @format_method
   def basename(self):
     ''' Treat as a filesystem path and return the basename.
     '''
     return Path(self).name
 
+  @format_method
   def dirname(self):
     ''' Treat as a filesystem path and return the dirname.
     '''
     return Path(self).parent
 
+  @format_method
   def f(self):
     ''' Parse `self` as a `float`.
     '''
     return float(self)
 
+  @format_method
   def i(self, base=10):
     ''' Parse `self` as an `int`.
     '''
     return int(self, base=base)
 
+  @format_method
   def lc(self):
     ''' Lowercase using `lc_()`.
     '''
     return lc_(self)
 
+  @format_method
   def path(self):
     ''' Convert to a native filesystem `pathlib.Path`.
     '''
     return Path(self)
 
+  @format_method
   def posix_path(self):
     ''' Convert to a Posix filesystem `pathlib.Path`.
     '''
