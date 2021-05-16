@@ -1542,7 +1542,7 @@ class TagSetPrefixView(FormatableMixin):
             # no tag, no special format modes
             break
           subspec = format_spec[offset:]
-          value = self.format_get_subfield(value, subspec)
+          value = FormatableFormatter.get_subfield(value, subspec)
           return str(value)
     with Pfx("super().__format__(%r)", format_spec):
       return super().__format__(format_spec)
