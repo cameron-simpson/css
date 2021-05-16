@@ -1317,6 +1317,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     return self.__format__(format_spec)
 
   # Utility methods for formats.
+  @format_method
   def json(self):
     ''' The value transcribed as compact JSON.
     '''
@@ -1569,6 +1570,7 @@ class FStr(FormatableMixin, str):
     '''
     return PurePosixPath(self)
 
+  @format_method
   def windows_path(self):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
