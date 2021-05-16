@@ -1150,7 +1150,7 @@ def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
     )
   return formatted
 
-_format_as = format_as
+_format_as = format_as  # for reuse in the format_as method below
 
 class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
