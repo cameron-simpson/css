@@ -2496,12 +2496,15 @@ class RegexpTagRule:
           tags.append(tag)
     return tags
 
-def main(_):
+def main(argv):
   ''' Test code.
   '''
   # pylint: disable=import-outside-toplevel
+  from pprint import pprint
   from cs.logutils import setup_logging
-  setup_logging()
+  setup_logging(argv.pop(0))
+  if not argv:
+    argv = '{colour} {aa} {aa.bb} label0={labels[0]}',
   ont = TagsOntology(
       {
           'type.colour':
@@ -2513,6 +2516,7 @@ def main(_):
           ),
       }
   )
+  print(ont)
   tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
   print("tags.colour =", tags.colour)
   colour = tags.tag('colour')
