@@ -1238,6 +1238,7 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     try:
       method = methods[method_name]
     except KeyError:
+      # pylint: disable=raise-missing-from
       raise ValueError(
           "class %r: method/attr %r is forbidden - not in %s.format_methods()"
           % (cls.__name__, method_name, cls.__name__)
