@@ -1201,9 +1201,6 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
 
   JSON_ENCODER = JSONEncoder(separators=(',', ':'))
 
-  @staticmethod
-  def convert_via_method_or_attr(value, format_spec):
-    ''' Apply a method name based conversion to `value`
   @classmethod
   def format_methods(cls):
     ''' Return a mapping of permitted methods to functions of an instance.
@@ -1216,31 +1213,43 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
       methods = cls._format_methods = {}
     return methods
 
+  @classmethod
+  def convert_via_method_or_attr(cls, value, format_spec):
+    ''' Apply a method or attribute name based conversion to `value`
         where `format_spec` starts with a method name
         applicable to `value`.
         Return `(converted,offset)`
         being the converted value and the offset after the method name.
+
+        The methods/attributes are looked up in the mapping
+        returned by `.format_methods()` which represents allowed methods
+        (broadly, one should avoid allowing methods which modify any state).
+
+        If this returns a callable, it is called to obtain the converted value
+        otherwise it is used as is.
     '''
     method_name, offset = get_identifier(format_spec)
     if not method_name:
       # no leading method/attribute name, return unchanged
       return value, 0
+    methods = cls.format_methods()
+    if method_name not in methods:
+      raise ValueError("%s.%s not allowed" % (cls.__name__, method_name))
     try:
-      method = getattr(value, method_name)
-    except AttributeError:
-      # pylint: disable=raise-missing-from
+      method = methods[method_name]
+    except KeyError:
       raise ValueError(
-          "unknown attribute name %s.%r" % (
-              typed_str(value),
-              method_name,
-          )
+          "class %r: method/attr %r is forbidden - not in %s.format_methods()"
+          % (cls.__name__, method_name, cls.__name__)
       )
     if callable(method):
       try:
-        converted = method()
+        converted = method(value)
       except TypeError as e:
         # pylint: disable=raise-missing-from
-        raise ValueError("TypeError calling %s(): %s" % (method_name, e))
+        raise ValueError(
+            "TypeError calling %s.%s(): %s" % (cls.__name__, method_name, e)
+        )
     else:
       converted = method
     return converted, offset
