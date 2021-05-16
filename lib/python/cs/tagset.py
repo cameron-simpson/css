@@ -2518,20 +2518,13 @@ def main(argv):
   )
   print(ont)
   tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-  print("tags.colour =", tags.colour)
-  colour = tags.tag('colour')
-  print("colour =", colour)
-  print("type =", colour.typedata)
-  print("meta =", colour.metadata)
-  print("meta.url =", colour.meta.url)
-  print("meta.ns =", colour.meta.ns())
-  print("meta.url =", colour.meta.ns().url_s)
-  ns = tags.ns()
-  print("colour =", ns.colour._tag)
-  print("colour.metadata =", ns.colour._meta)
-  print("colour.metadata.url =", ns.colour._meta.url)
-  ##print("colour.metadata.ns() =", ns.colour._tag.metadata.ns())
-  ##print(repr(list(ns.colour._tag.metadata.ns().__dict__.items())))
+  pprint(tags.as_dict())
+  tags['aa.bb'] = 'aabb'
+  tags['aa'] = 'aa'
+  for format_str in argv:
+    print(format_str)
+    print("=>", repr(tags.format_as(format_str)))
+  sys.exit(1)
 
 if __name__ == '__main__':
   import sys  # pylint: disable=import-outside-toplevel
