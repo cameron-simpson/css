@@ -1487,26 +1487,15 @@ class FormatableFormatter(Formatter):
     # chain the various subspecifications
     for format_subspec in format_subspecs or ('',):
       with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+        # fall back to convert_via_method_or_attr
         try:
-          format_format_field = getattr(value, 'format_format_field')
+          convert = value.convert_via_method_or_attr
         except AttributeError:
-          # fall back to convert_via_method_or_attr
-          try:
-            value, offset = FormatableMixin.convert_via_method_or_attr(
-                value, format_subspec
-            )
-          except ValueError:
-            # see if it converts to an Fstr and resolves
-            value2 = FStr(value)
-            value2, offset = FormatableMixin.convert_via_method_or_attr(
-                value2, format_subspec
-            )
-            value = value2
-          if offset < len(format_subspec):
-            value = cls.get_subfield(value, format_subspec[offset:])
-        else:
-          # use value.format_format_field(format_subspec)
-          value = format_format_field(format_subspec)
+          value = FStr(value)
+          convert = value.convert_via_method_or_attr
+        value, offset = convert(value, format_subspec)
+        if offset < len(format_subspec):
+          value = cls.get_subfield(value, format_subspec[offset:])
         if type(value) is str:  # pylint: disable=unidiomatic-typecheck
           value = FStr(value)
     return FStr(value)
