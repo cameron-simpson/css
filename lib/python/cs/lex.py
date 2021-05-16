@@ -1204,6 +1204,18 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   @staticmethod
   def convert_via_method_or_attr(value, format_spec):
     ''' Apply a method name based conversion to `value`
+  @classmethod
+  def format_methods(cls):
+    ''' Return a mapping of permitted methods to functions of an instance.
+        This is used to whitelist allowed `:`*name* method formats
+        to prevent scenarios like little Bobby Tables calling `delete()`.
+    '''
+    try:
+      methods = getattr(cls, '_format_methods')
+    except AttributeError:
+      methods = cls._format_methods = {}
+    return methods
+
         where `format_spec` starts with a method name
         applicable to `value`.
         Return `(converted,offset)`
