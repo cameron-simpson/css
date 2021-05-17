@@ -865,6 +865,12 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       )
     return tag
 
+  def __init__(self, *a, **kw):
+    ''' Dummy `__init__` to avoid `FormatableMixin.__init__`
+        because we subclass `namedtuple` which has no `__init__`.
+    '''
+    pass
+
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
   JSON_ENCODER = JSONEncoder(separators=(',', ':'))
