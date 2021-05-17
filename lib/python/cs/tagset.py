@@ -1629,6 +1629,11 @@ class TagSetPrefixView(FormatableMixin):
     assert not a
     if kw is self:
       return self.subtags(arg_name)
+    warning(
+        "%s.get_value(%r): kw is not self: kw=%s",
+        type(self).__name__, arg_name, r(kw)
+    )
+    return kw[arg_name]
 
 class TagSets(MultiOpenMixin, ABC):
   ''' Base class for collections of `TagSet` instances
