@@ -170,6 +170,11 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
     s = cropped(s, max_length)
   return s
 
+def typed_repr(o, use_cls=False, max_length=None):
+  ''' Like `typed_str` but using `repr` instead of `str`.
+  '''
+  return typed_str(o, use_cls=use_cls, max_length=max_length, use_repr=True)
+
 def strlist(ary, sep=", "):
   ''' Convert an iterable to strings and join with `sep` (default `', '`).
   '''
