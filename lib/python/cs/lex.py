@@ -1179,6 +1179,182 @@ def has_format_methods(cls):
         cls.format_methods()[method_name] = method
   return cls
 
+class FormatableFormatter(Formatter):
+  ''' A `string.Formatter` subclass interacting with objects
+      which inherit from `FormatableMixin`.
+  '''
+
+  FORMAT_RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
+  FORMAT_RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
+  FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+)'
+  FORMAT_RE_ATTRIBUTE_NAME_s = rf'\.{FORMAT_RE_IDENTIFIER_s}'
+  FORMAT_RE_ELEMENT_INDEX_s = r'[^]]*'
+  FORMAT_RE_FIELD_EXPR_s = rf'{FORMAT_RE_ARG_NAME_s}({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\])*'
+  FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.I)
+  FORMAT_RE_FIELD = re.compile(
+      (
+          r'{' + rf'(?P<arg_name>{FORMAT_RE_FIELD_EXPR_s})?' +
+          r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
+      ), re.I
+  )
+
+  if False:  # pylint: disable=using-constant-test
+
+    @classmethod
+    @typechecked
+    def parse(cls, format_string: str):
+      ''' Parse a format string after the fashion of `Formatter.parse`,
+          yielding `(literal,arg_name,format_spec,conversion)` tuples.
+
+          Unlike `Formatter.parse`,
+          this does not validate the `conversion` part preemptively,
+          supporting extended values for use with the `convert_field` method.
+      '''
+      offset = 0
+      while offset < len(format_string):
+        m_literal = cls.FORMAT_RE_LITERAL_TEXT.match(format_string, offset)
+        literal = m_literal.group()
+        offset = m_literal.end()
+        if offset == len(format_string):
+          # nothing after the literal text
+          if literal:
+            yield literal, None, None, None
+          return
+        m_field = cls.FORMAT_RE_FIELD.match(format_string, offset)
+        if not m_field:
+          raise ValueError(
+              "expected a field at offset %d: found %r" %
+              (offset, format_string[offset:])
+          )
+        yield (
+            literal,
+            m_field.group('arg_name'),
+            m_field.group('format_spec') or '',
+            m_field.group('conversion'),
+        )
+        offset = m_field.end()
+
+  # pylint: disable=arguments-differ
+  @pfx_method
+  def get_field(self, field_name, a, kw):
+    ''' Get the object referenced by the field text `field_name`.
+    '''
+    assert not a
+    with Pfx("field_name=%r: kw=%r", field_name, kw):
+      arg_name, offset = self.get_arg_name(field_name)
+      try:
+        arg_value, _ = self.get_value(arg_name, a, kw)
+      except KeyError as e:
+        raise ValueError("no value for arg_name=%r: %s" % (arg_name, e)) from e
+      # resolve the rest of the field
+      return self.get_subfield(arg_value, field_name[offset:]), field_name
+
+  @staticmethod
+  def get_subfield(value, subfield_text: str):
+    ''' Resolve `value` against `subfield_text`,
+        the remaining field text after the term which resolved to `value`.
+
+        For example, a format `{name.blah[0]}`
+        has the field text `name.blah[0]`.
+        A `get_field` implementation might initially
+        resolve `name` to some value,
+        leaving `.blah[0]` as the `subfield_text`.
+        This method supports taking that value
+        and resolving it against the remaining text `.blah[0]`.
+
+        For generality, if `subfield_text` is the empty string
+        `value` is returned unchanged.
+    '''
+    if subfield_text == '':
+      return value
+    subfield_fmt = f'{{value{subfield_text}}}'
+    subfield_map = {'value': value}
+    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
+      value = subfield_fmt.format_map(subfield_map)
+    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+      value = FStr(value)
+    return value
+
+  # pylint: disable=arguments-differ
+  @pfx_method
+  def get_value(self, arg_name, a, kw):
+    ''' Get the object with index `arg_name`.
+
+        This default implementation 
+    '''
+    assert not a
+    with Pfx("arg_name=%r", arg_name):
+      gv = getattr(kw, arg_name, kw.__getitem__)
+      arg_value = gv(arg_name)
+      ##arg_value = kw[arg_name]
+      return arg_value, arg_name
+
+  @classmethod
+  @pfx_method
+  @typechecked
+  def format_field(cls, value, format_spec: str):
+    ''' Format a value using `value.format_format_field`.
+
+        We actually recognise colon separated chains of formats
+        and apply each format to the previously converted value.
+        `str` values are promoted to `FStr` at each step.
+
+        At each step, for the current value
+        we look try `value.__format__` first
+        then `FormattableMixin.convert_via_method_or_attr(value)`
+        then `FormattableMixin.convert_via_method_or_attr(FStr(value))`
+        in turn.
+    '''
+    format_subspecs = []
+    offset = 0
+    while offset < len(format_spec):
+      if format_spec.startswith(':', offset):
+        format_subspec = ''
+        offset += 1
+      else:
+        m_format_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
+        if m_format_subspec:
+          format_subspec = m_format_subspec.group()
+        else:
+          warning(
+              "unrecognised subspec at %d: %r, falling back to split", offset,
+              format_spec[offset:]
+          )
+          format_subspec, *_ = format_spec[offset:].split(':', 1)
+        offset += len(format_subspec)
+      format_subspecs.append(format_subspec)
+    # promote str to FStr before formatting
+    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+      value = FStr(value)
+    # chain the various subspecifications
+    for format_subspec in format_subspecs or ('',):
+      with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+        X(
+            "%s.format_field: value=%s:%r", cls.__name__,
+            type(value).__name__, value
+        )
+        # try the value's native __format__ first
+        # then try the fallback method based version
+        try:
+          value = format(value, format_subspec)
+        except (ValueError, TypeError) as e:
+          warning(
+              "%s.format_field: format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
+              cls.__name__, format_subspec, typed_repr(value), e
+          )
+          # fall back to convert_via_method_or_attr
+          try:
+            convert = value.convert_via_method_or_attr
+          except AttributeError:
+            value = FStr(value)
+            convert = value.convert_via_method_or_attr
+          value, offset = convert(value, format_subspec)
+          if offset < len(format_subspec):
+            value = cls.get_subfield(value, format_subspec[offset:])
+          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+            value = FStr(value)
+    return FStr(value)
+
 @has_format_methods
 class FormatableMixin(object):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
@@ -1328,183 +1504,6 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     ''' The value transcribed as compact JSON.
     '''
     return self.FORMAT_JSON_ENCODER.encode(self)
-
-class FormatableFormatter(Formatter):
-  ''' A `string.Formatter` subclass interacting with objects
-      which inherit from `FormatableMixin`.
-  '''
-
-  def __init__(self, obj):
-    assert isinstance(obj, FormatableMixin)
-    self.obj = obj
-
-  def __repr__(self):
-    return "%s:%r" % (type(self).__name__, self.obj)
-
-  RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
-  RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
-  RE_ARG_NAME_s = rf'({RE_IDENTIFIER_s}|\d+)'
-  RE_ATTRIBUTE_NAME_s = rf'\.{RE_IDENTIFIER_s}'
-  RE_ELEMENT_INDEX_s = r'[^]]*'
-  RE_FIELD_EXPR_s = rf'{RE_ARG_NAME_s}({RE_ATTRIBUTE_NAME_s}|\[{RE_ELEMENT_INDEX_s}\])*'
-  RE_FIELD_EXPR = re.compile(RE_FIELD_EXPR_s, re.I)
-  RE_FIELD = re.compile(
-      (
-          r'{' + rf'(?P<arg_name>{RE_FIELD_EXPR_s})?' +
-          r'(!(?P<conversion>[^:}]*))?' + r'(:(?P<format_spec>[^}]*))?' + r'}'
-      ), re.I
-  )
-
-  if False:  # pylint: disable=using-constant-test
-
-    @classmethod
-    @typechecked
-    def parse(cls, format_string: str):
-      ''' Parse a format string after the fashion of `Formatter.parse`,
-          yielding `(literal,arg_name,format_spec,conversion)` tuples.
-
-          Unlike `Formatter.parse`,
-          this does not validate the `conversion` part preemptively,
-          supporting extended values for use with the `convert_field` method.
-      '''
-      offset = 0
-      while offset < len(format_string):
-        m_literal = cls.RE_LITERAL_TEXT.match(format_string, offset)
-        literal = m_literal.group()
-        offset = m_literal.end()
-        if offset == len(format_string):
-          # nothing after the literal text
-          if literal:
-            yield literal, None, None, None
-          return
-        m_field = cls.RE_FIELD.match(format_string, offset)
-        if not m_field:
-          raise ValueError(
-              "expected a field at offset %d: found %r" %
-              (offset, format_string[offset:])
-          )
-        yield (
-            literal,
-            m_field.group('arg_name'),
-            m_field.group('format_spec') or '',
-            m_field.group('conversion'),
-        )
-        offset = m_field.end()
-
-  # pylint: disable=arguments-differ
-  @pfx_method
-  def get_field(self, field_name, a, kw):
-    ''' Get the object referenced by the field text `field_name`.
-    '''
-    assert not a
-    with Pfx(
-        "self.obj=%s: field_name=%r: kw=%r",
-        type(self.obj).__name__,
-        field_name,
-        kw,
-    ):
-      arg_name, offset = self.obj.format_get_arg_name(field_name)
-      try:
-        arg_value, _ = self.get_value(arg_name, a, kw)
-      except KeyError as e:
-        raise ValueError("no value for arg_name=%r: %s" % (arg_name, e)) from e
-      # resolve the rest of the field
-      return self.get_subfield(arg_value, field_name[offset:]), field_name
-
-  @staticmethod
-  def get_subfield(value, subfield_text: str):
-    ''' Resolve `value` against `subfield_text`,
-        the remaining field text after the term which resolved to `value`.
-
-        For example, a format `{name.blah[0]}`
-        has the field text `name.blah[0]`.
-        A `get_field` implementation might initially
-        resolve `name` to some value,
-        leaving `.blah[0]` as the `subfield_text`.
-        This method supports taking that value
-        and resolving it against the remaining text `.blah[0]`.
-
-        For generality, if `subfield_text` is the empty string
-        `value` is returned unchanged.
-    '''
-    if subfield_text == '':
-      return value
-    subfield_fmt = f'{{value{subfield_text}}}'
-    subfield_map = {'value': value}
-    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
-      value = subfield_fmt.format_map(subfield_map)
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
-    return value
-
-  # pylint: disable=arguments-differ
-  @pfx_method
-  def get_value(self, arg_name, a, kw):
-    ''' Get the object with index `arg_name`.
-    '''
-    assert not a
-    with Pfx("arg_name=%r", arg_name):
-      arg_value = kw[arg_name]
-      return arg_value, arg_name
-
-  @pfx_method
-  def convert_field(self, value, conversion):
-    ''' Convert a value using `self._obj.format_convert_field`.
-    '''
-    return self.obj.format_convert_field(value, conversion)
-
-  @classmethod
-  @pfx_method
-  @typechecked
-  def format_field(cls, value, format_spec: str):
-    ''' Format a value using `value.format_format_field`.
-
-        We actually recognise colon separated chains of formats
-        and apply each format to the previously converted value.
-        `str` values are promoted to `FStr` at each step.
-
-        At each step, for the current value
-        we look for `value.format_format_field`
-        or `FormattableMixin.convert_via_method_or_attr(value)`
-        or `FormattableMixin.convert_via_method_or_attr(FStr(value)`
-        in turn.
-    '''
-    format_subspecs = []
-    offset = 0
-    while offset < len(format_spec):
-      if format_spec.startswith(':', offset):
-        format_subspec = ''
-        offset += 1
-      else:
-        m_format_subspec = cls.RE_FIELD_EXPR.match(format_spec, offset)
-        if m_format_subspec:
-          format_subspec = m_format_subspec.group()
-        else:
-          warning(
-              "unrecognised subspec at %d: %r, falling back to split", offset,
-              format_spec[offset:]
-          )
-          format_subspec, *_ = format_spec[offset:].split(':', 1)
-        offset += len(format_subspec)
-      format_subspecs.append(format_subspec)
-    # promote str to FStr before formatting
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
-    # chain the various subspecifications
-    for format_subspec in format_subspecs or ('',):
-      with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-        # fall back to convert_via_method_or_attr
-        try:
-          convert = value.convert_via_method_or_attr
-        except AttributeError:
-          value = FStr(value)
-          convert = value.convert_via_method_or_attr
-        value, offset = convert(value, format_subspec)
-        if offset < len(format_subspec):
-          value = cls.get_subfield(value, format_subspec[offset:])
-        if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-          value = FStr(value)
-    return FStr(value)
 
 @has_format_methods
 class FStr(FormatableMixin, str):
