@@ -319,6 +319,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+@has_format_methods
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
@@ -414,10 +415,22 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return self
 
   # methods supporting FormattableMixin/ExtendedFormatter
-  def format_get_arg_name(self, field_name):
+  def get_arg_name(self, field_name):
     ''' Leading dotted identifiers represent tags or tag prefixes.
     '''
     return get_dotted_identifier(field_name)
+
+  def get_value(self, arg_name, a, kw):
+    assert not a
+    if kw is self:
+      value = self.subtags(arg_name)
+    else:
+      warning(
+          "%s.get_value(%r): kw is not self: kw=%s",
+          type(self).__name__, arg_name, r(kw)
+      )
+      value = kw[arg_name]
+    return value, arg_name
 
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes
