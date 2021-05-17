@@ -1562,7 +1562,7 @@ class TagSetPrefixView(FormatableMixin):
             # no tag, no special format modes
             break
           subspec = format_spec[offset:]
-          value = FormatableFormatter.get_subfield(value, subspec)
+          value = self.get_subfield(value, subspec)
           return str(value)
     with Pfx("super().__format__(%r)", format_spec):
       return super().__format__(format_spec)
@@ -1624,6 +1624,11 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return the `Tag` value for the prefix, or `None` if there is no such `Tag`.
     '''
     return self._tags.get(self._prefix)
+
+  def get_value(self, arg_name, a, kw):
+    assert not a
+    if kw is self:
+      return self.subtags(arg_name)
 
 class TagSets(MultiOpenMixin, ABC):
   ''' Base class for collections of `TagSet` instances
