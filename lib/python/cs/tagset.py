@@ -799,8 +799,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
 
-class Tag(namedtuple('Tag', 'name value ontology')):
-  ''' A Tag has a `.name` (`str`) and a `.value`
+@has_format_methods
+class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
+  ''' A `Tag` has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
 
       The `name` must be a dotted identifier.
