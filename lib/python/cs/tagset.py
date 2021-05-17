@@ -510,7 +510,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     tags = cls(_ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.parse(line, offset, ontology=ontology)
+      tag, offset = Tag.from_str2(line, offset, ontology=ontology)
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
@@ -948,7 +948,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
     with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
+      tag, post_offset = cls.from_str2(s, offset=offset, ontology=ontology)
       if post_offset < len(s):
         raise ValueError(
             "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
@@ -977,10 +977,10 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0, *, ontology):
+  def from_str2(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s[offset:])):
+    with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
