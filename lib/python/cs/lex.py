@@ -1356,7 +1356,7 @@ class FormatableFormatter(Formatter):
     return FStr(value)
 
 @has_format_methods
-class FormatableMixin(object):  # pylint: disable=too-few-public-methods
+class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
       which formats a format string using `str.format_map`
       with a suitable mapping derived from the instance.
@@ -1393,6 +1393,18 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     except AttributeError:
       methods = cls._format_methods = {}
     return methods
+
+  ##@staticmethod
+  def convert_field(self, value, conversion):
+    ''' Default converter for fields calls `Formatter.convert_field`.
+    '''
+    if conversion == '':
+      warning(
+          "%s.convert_field(%s, conversion=%r): turned conversion into None",
+          type(self).__name__, typed_str(value, use_repr=True), conversion
+      )
+      conversion = None
+    return super().convert_field(value, conversion)
 
   @classmethod
   def convert_via_method_or_attr(cls, value, format_spec):
@@ -1470,33 +1482,16 @@ class FormatableMixin(object):  # pylint: disable=too-few-public-methods
     else:
       format_mapping = get_format_mapping(**control_kw)
     return _format_as(
-        format_s,
-        format_mapping,
-        formatter=FormatableFormatter(self),
-        error_sep=error_sep
+        format_s, format_mapping, formatter=self, error_sep=error_sep
     )
 
   @staticmethod
-  def format_get_arg_name(field_name):
+  def get_arg_name(field_name):
     ''' Default initial arg_name is an identifier.
 
         Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
     '''
     return get_identifier(field_name)
-
-  @staticmethod
-  def format_convert_field(value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
-    '''
-    if conversion == '':
-      conversion = None
-    return Formatter().convert_field(value, conversion)
-
-  def format_format_field(self, format_spec):
-    ''' Default `FormatableFormatter.format_field` implementation
-        just calls `self.__format__`.
-    '''
-    return self.__format__(format_spec)
 
   # Utility methods for formats.
   @format_method
