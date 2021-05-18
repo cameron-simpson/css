@@ -426,10 +426,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     if kw is self:
       value = self.subtags(arg_name)
     else:
-      warning(
-          "%s.get_value(%r): kw is not self: kw=%s",
-          type(self).__name__, arg_name, r(kw)
-      )
       value = kw[arg_name]
     return value, arg_name
 
