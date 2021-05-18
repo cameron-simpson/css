@@ -154,10 +154,37 @@ which is computed as:
 
 == Format Strings ==
 
-While you can just use `str.format_map` as shown above
-for the directvalues in a `TagSet`
-(and some command line tools like `fstags` use this in output format specifications
-you can also use `TagSet`s in format strings.
+You can just use `str.format_map` as shown above
+for the direct values in a `TagSet`,
+since it subclasses `dict`.
+
+However, `TagSet`s subclass `cs.lex.FormatableMixin`
+as therefore have a richer `format_as` method which has an extended syntax
+for the format component.
+Command line tools like `fstags` use this for output format specifications.
+
+An example:
+
+    >>> # an ontology specifying the type for a colour
+    >>> # and some information about the colour "blue"
+    >>> ont = TagsOntology(
+    ...   {
+    ...       'type.colour':
+    ...       TagSet(description="a colour, a hue", type="str"),
+    ...       'meta.colour.blue':
+    ...       TagSet(
+    ...           url='https://en.wikipedia.org/wiki/Blue',
+    ...           wavelengths='450nm-495nm'
+    ...       ),
+    ...   }
+    ... )
+    >>> # tag set with a "blue" tag, using the ontology above
+    >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+    >>> tags.format_as('The colour is {colour}.')
+    'The colour is blue.'
+    >>> tags.format_as('Information about the colour may be found here: {colour:meta.url}')
+    'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
+
 
 '''
 
