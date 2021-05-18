@@ -1329,19 +1329,15 @@ class FormatableFormatter(Formatter):
     # chain the various subspecifications
     for format_subspec in format_subspecs or ('',):
       with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-        X(
-            "%s.format_field: value=%s:%r", cls.__name__,
-            type(value).__name__, value
-        )
         # try the value's native __format__ first
         # then try the fallback method based version
         try:
           value = format(value, format_subspec)
         except (ValueError, TypeError) as e:
-          warning(
-              "%s.format_field: format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
-              cls.__name__, format_subspec, typed_repr(value), e
-          )
+          ##warning(
+          ##    "format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
+          ##    cls.__name__, format_subspec, typed_repr(value), e
+          ##)
           # fall back to convert_via_method_or_attr
           try:
             convert = value.convert_via_method_or_attr
