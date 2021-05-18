@@ -187,7 +187,8 @@ from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_identifier,
     get_nonwhite, is_dotted_identifier, is_identifier, skipwhite, lc_,
-    titleify_lc, FormatableMixin, FStr, format_recover
+    titleify_lc, FormatableMixin, has_format_methods, format_method, FStr,
+    format_recover, typed_repr as r
 )
 from cs.logutils import warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
@@ -843,7 +844,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     # name should be taglike
     if value is not None:
       raise ValueError(
-          "name(%s) is not a str, value must be None" % (type(name).__name__,)
+          "name(%s) is not a str, value must be None" % (r(name),)
       )
     tag = name
     if not hasattr(tag, 'name'):
