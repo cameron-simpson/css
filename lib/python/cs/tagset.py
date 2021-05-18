@@ -827,36 +827,69 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         using its `.value`
         and overriding its `.ontology`
         if the `ontology` parameter is not `None`
+
+      Examples:
+
+          >>> ont = TagsOntology({'meta.colour.blue': TagSet(wavelengths='450nm-495nm')})
+          >>> tag0 = Tag('colour', 'blue')
+          >>> tag0
+          Tag(name='colour',value='blue',ontology=None)
+          >>> tag = Tag(tag0)
+          >>> tag
+          Tag(name='colour',value='blue',ontology=None)
+          >>> tag is tag0
+          True
+          >>> tag = Tag(tag0, ontology=ont)
+          >>> tag # doctest: +ELLIPSIS
+          Tag(name='colour',value='blue',ontology=<...>)
+          >>> tag is tag0
+          False
+          >>> tag = Tag(tag0, prefix='surface')
+          >>> tag
+          Tag(name='surface.colour',value='blue',ontology=None)
+          >>> tag is tag0
+          False
   '''
 
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
-  def __new__(cls, name, value=None, *, ontology=None):
+  def __new__(cls, name, value=None, *, ontology=None, prefix=None):
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
-      # (name[,value[,ontology]]) => Tag
+      # (name[,value[,ontology][,prefix]]) => Tag
+      if prefix:
+        name = prefix + '.' + name
       return super().__new__(cls, name, value, ontology)
-    # name should be taglike
+    # name should be taglike, value should not be present (None)
+    tag = name
+    try:
+      name = tag.name
+    except AttributeError:
+      raise ValueError("tag has no .name attribute")
+    else:
+      name0 = name  # keep the preprefix name
+      if prefix:
+        name = prefix + '.' + name
     if value is not None:
       raise ValueError(
           "name(%s) is not a str, value must be None" % (r(name),)
       )
-    tag = name
-    if not hasattr(tag, 'name'):
-      raise ValueError("tag has no .name attribute")
-    if not hasattr(tag, 'value'):
+    try:
+      value = tag.value
+    except AttributeError:
       raise ValueError("tag has no .value attribute")
     if isinstance(tag, Tag):
-      # already a Tag subtype, see if the ontology needs updating
-      if ontology is not None and tag.ontology is not ontology:
+      # already a Tag subtype, see if the ontology needs updating or the name was changed
+      if name != name0 or (ontology is not None
+                           and tag.ontology is not ontology):
         # new Tag with supplied ontology
-        tag = super().__new__(cls, tag.name, tag.value, ontology)
+        tag = super().__new__(cls, name, value, ontology)
     else:
       # not a Tag subtype, construct a new instance,
       # overriding .ontology if the supplied ontology is not None
       tag = super().__new__(
-          cls, tag.name, tag.value, (
+          cls, name, value, (
               ontology
               if ontology is not None else getattr(tag, 'ontology', None)
           )
@@ -881,14 +914,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       (date, date_fromisoformat, date.isoformat),
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
-
-  @classmethod
-  def with_prefix(cls, name, value, *, ontology=None, prefix):
-    ''' Make a new `Tag` whose `name` is prefixed with `prefix+'.'`.
-    '''
-    if prefix:
-      name = prefix + '.' + name
-    return cls(name, value, ontology=ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
