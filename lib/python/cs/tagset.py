@@ -1203,6 +1203,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return None
     return ont.basetype(self.type)
 
+  @format_method
   def metadata(self, ontology=None, convert=None):
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
