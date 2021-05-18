@@ -1233,11 +1233,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       }
     return ont.value_metadata(self.name, self.value)
 
-  @property
-  def meta(self):
-    ''' The `Tag` metadata derived from the `Tag`'s ontology.
-    '''
-    return self.metadata()
+  meta = metadata
 
   @property
   def key_type(self):
