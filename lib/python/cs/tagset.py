@@ -843,13 +843,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         it should be a `Tag`like object to promote;
         it is an error if the `value` parameter is not `None`
         in this case
+      * an optional `prefix` may be supplied
+        which is prepended to `name` with a dot (`'.'`) if not empty
 
       The promotion process is as follows:
       * if `name` is a `Tag` subinstance
         then if the supplied `ontology` is not `None`
         and is not the ontology associated with `name`
         then a new `Tag` is made,
-        otherwise `name` is returned unchanged
+        otherwise the original `Tag` is returned unchanged
       * otherwise a new `Tag` is made from `name`
         using its `.value`
         and overriding its `.ontology`
