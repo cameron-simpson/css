@@ -67,9 +67,7 @@ def trace(func, call=True, retval=False, exception=False, pfx=False):
     if call:
       xlog("CALL %s (a=%r,kw=%r)...", citation, a, kw)
     try:
-      X("T1")
       retval = func(*a, **kw)
-      X("T2")
     except Exception as e:
       if exception:
         xlog("CALL %s RAISE %r", citation, e)
