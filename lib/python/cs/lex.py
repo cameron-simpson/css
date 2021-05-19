@@ -1290,6 +1290,62 @@ class FormatableFormatter(Formatter):
       return arg_value, arg_name
 
   @classmethod
+  def get_format_subspecs(cls, format_spec):
+    ''' Parse a `format_spec` as a sequence of colon separated components,
+        return the components.
+    '''
+    subspecs = []
+    offset = 0
+    while offset < len(format_spec):
+      if format_spec.startswith(':', offset):
+        subspec = ''
+        offset += 1
+      else:
+        m_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
+        if m_subspec:
+          subspec = m_subspec.group()
+        else:
+          warning(
+              "unrecognised subspec at %d: %r, falling back to split", offset,
+              format_spec[offset:]
+          )
+          subspec, *_ = format_spec[offset:].split(':', 1)
+        offset += len(subspec)
+      subspecs.append(subspec)
+    return subspecs
+
+  @classmethod
+  def format_field1(cls, value, format_subspec):
+    ''' Format a subspec of a larger colon separated `format_spec`
+        as from `format_field(value,format_spec)`.
+        Return the new value, which need not be a `str`;
+        the outer `format_field` call does a final conversion to an `FStr`.
+    '''
+    with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+      # promote bare str to FStr
+      if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+        value = FStr(value)
+      # try the value's native __format__ first
+      # then try the fallback method based version
+      try:
+        value = format(value, format_subspec)
+      except (ValueError, TypeError) as e:
+        ##warning(
+        ##    "format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
+        ##    cls.__name__, format_subspec, typed_repr(value), e
+        ##)
+        # fall back to convert_via_method_or_attr
+        try:
+          convert = value.convert_via_method_or_attr
+        except AttributeError:
+          value = FStr(value)
+          convert = value.convert_via_method_or_attr
+        value, offset = convert(value, format_subspec)
+        if offset < len(format_subspec):
+          value = cls.get_subfield(value, format_subspec[offset:])
+    return value
+
+  @classmethod
   @pfx_method
   @typechecked
   def format_field(cls, value, format_spec: str):
@@ -1300,55 +1356,17 @@ class FormatableFormatter(Formatter):
         `str` values are promoted to `FStr` at each step.
 
         At each step, for the current value
-        we look try `value.__format__` first
+        we try `format(value)` first
         then `FormattableMixin.convert_via_method_or_attr(value)`
         then `FormattableMixin.convert_via_method_or_attr(FStr(value))`
         in turn.
     '''
-    format_subspecs = []
-    offset = 0
-    while offset < len(format_spec):
-      if format_spec.startswith(':', offset):
-        format_subspec = ''
-        offset += 1
-      else:
-        m_format_subspec = cls.FORMAT_RE_FIELD_EXPR.match(format_spec, offset)
-        if m_format_subspec:
-          format_subspec = m_format_subspec.group()
-        else:
-          warning(
-              "unrecognised subspec at %d: %r, falling back to split", offset,
-              format_spec[offset:]
-          )
-          format_subspec, *_ = format_spec[offset:].split(':', 1)
-        offset += len(format_subspec)
-      format_subspecs.append(format_subspec)
+    # parse the format_spec into multiple subspecs
+    format_subspecs = cls.get_format_subspecs(format_spec)
     # promote str to FStr before formatting
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
     # chain the various subspecifications
     for format_subspec in format_subspecs or ('',):
-      with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-        # try the value's native __format__ first
-        # then try the fallback method based version
-        try:
-          value = format(value, format_subspec)
-        except (ValueError, TypeError) as e:
-          ##warning(
-          ##    "format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
-          ##    cls.__name__, format_subspec, typed_repr(value), e
-          ##)
-          # fall back to convert_via_method_or_attr
-          try:
-            convert = value.convert_via_method_or_attr
-          except AttributeError:
-            value = FStr(value)
-            convert = value.convert_via_method_or_attr
-          value, offset = convert(value, format_subspec)
-          if offset < len(format_subspec):
-            value = cls.get_subfield(value, format_subspec[offset:])
-          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-            value = FStr(value)
+      value = cls.format_field1(value, format_subspec)
     return FStr(value)
 
 @has_format_methods
