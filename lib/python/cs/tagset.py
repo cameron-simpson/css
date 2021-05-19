@@ -217,7 +217,7 @@ from cs.lex import (
     titleify_lc, FormatableMixin, has_format_methods, format_method, FStr,
     format_recover, typed_repr as r
 )
-from cs.logutils import warning, error, ifverbose
+from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
@@ -2575,15 +2575,9 @@ class RegexpTagRule:
           tags.append(tag)
     return tags
 
-def main(argv):
-  ''' Test code.
-  '''
-  # pylint: disable=import-outside-toplevel
+def selftest(argv):
   from pprint import pprint
-  from cs.logutils import setup_logging
   setup_logging(argv.pop(0))
-  if not argv:
-    argv = '{colour} {aa} {aa.bb} label0={labels[0]}',
   ont = TagsOntology(
       {
           'type.colour':
@@ -2602,9 +2596,8 @@ def main(argv):
   tags['aa'] = 'aa'
   for format_str in argv:
     print(format_str)
-    print("=>", repr(tags.format_as(format_str)))
-  sys.exit(1)
+    print("=>", tags.format_as(format_str))
 
 if __name__ == '__main__':
-  import sys  # pylint: disable=import-outside-toplevel
-  sys.exit(main(sys.argv))
+  import sys
+  sys.exit(selftest(sys.argv))
