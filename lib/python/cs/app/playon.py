@@ -72,7 +72,7 @@ class PlayOnCommand(BaseCommand):
   USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
 
     Environment:
-      PLAYON_USER               PlayOn login name.
+      PLAYON_USER               PlayOn login name, default from $EMAIL.
       PLAYON_PASSWORD           PlayOn password.
                                 This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
@@ -92,7 +92,7 @@ class PlayOnCommand(BaseCommand):
 
   def apply_defaults(self):
     options = self.options
-    options.user = environ.get('PLAYON_USER')
+    options.user = environ.get('PLAYON_USER', environ.get('EMAIL'))
     options.password = environ.get('PLAYON_PASSWORD')
     options.filename_format = environ.get(
         'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
