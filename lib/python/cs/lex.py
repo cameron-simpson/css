@@ -1464,8 +1464,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       # no leading method/attribute name, return unchanged
       return value, 0
     methods = cls.format_methods()
-    if method_name not in methods:
-      raise ValueError("%s.%s not allowed" % (cls.__name__, method_name))
     try:
       method = methods[method_name]
     except KeyError:
