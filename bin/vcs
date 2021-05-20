@@ -211,8 +211,8 @@ case "$op" in
                     hg clone "$vcs_top" "$clonedir"
                     upstream=$( hg path default )
                     bsed \
-                      '/^ *\[ *paths *\]/,/^\ *[/s/^default *=.*/default = $upstream/' \
-                      "$clonedir/.hgrc"
+                      "/^ *\\[ *paths *\\]/,/^ *\\[/s^default *=.*default = $upstream" \
+                      "$clonedir/.hg/hgrc"
                     ;;
       sibling,git)  clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
