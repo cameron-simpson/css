@@ -36,6 +36,9 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     modified    Report the names of modified files.
     remote      Report remote paths.
     report      (Default.) Report brief summary.
+    sibling clonedir
+                Clone the current repo to clonedir but keep the
+                upstream the same as ours.
     status      Report tree status.
     tags        Report tag names.
     top         Report top of tree.
@@ -202,6 +205,20 @@ case "$op" in
                     ;;
       report,hg)    hg summary
                     hg status -C ${1+"$@"} | grep '^[^?]'
+                    ;;
+      sibling,hg)   clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    hg clone "$vcs_top" "$clonedir"
+                    upstream=$( hg path default )
+                    bsed \
+                      '/^ *\[ *paths *\]/,/^\ *[/s/^default *=.*/default = $upstream/' \
+                      "$clonedir/.hgrc"
+                    ;;
+      sibling,git)  clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    git clone "$vcs_top" "$clonedir"
+                    upstream=$( git remote get-url origin )
+                    incd "$clonedir" git remote set-url origin "$upstream"
                     ;;
       status,hg | st,hg)
                     hg status -C ${1+"$@"}
