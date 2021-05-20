@@ -22,8 +22,7 @@ from types import SimpleNamespace as NS
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
-from cs.pfx import Pfx, XP
-from cs.py.func import funccite
+from cs.pfx import Pfx
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
@@ -42,7 +41,6 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
         'cs.result',
@@ -559,6 +557,7 @@ def debug_object_shell(o, prompt=None):
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
+  # pylint: disable=import-outside-toplevel
   if argv is None:
     argv = sys.argv
   import importlib
