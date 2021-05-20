@@ -578,14 +578,20 @@ class PlayOnAPI(MultiOpenMixin):
     password = self._password
     if not login or not password:
       N = netrc()
+      netrc_hosts = []
       if login:
-        entry = N.hosts.get(f"{login}:{self.API_HOSTNAME}")
+        netrc_host = f"{login}:{self.API_HOSTNAME}"
+        netrc_hosts.append(netrc_host)
+        with Pfx(".netrc host %r", netrc_host):
+          entry = N.hosts.get(netrc_host)
       else:
         entry = None
       if not entry:
-        entry = N.hosts.get(self.API_HOSTNAME)
+        netrc_hosts.append(self.API_HOSTNAME)
+        with Pfx(".netrc host %r", self.API_HOSTNAME):
+          entry = N.hosts.get(self.API_HOSTNAME)
       if not entry:
-        raise ValueError("no netrc entry")
+        raise ValueError("no netrc entry for %r" % (netrc_hosts,))
       n_login, _, n_password = entry
       if login is None:
         login = n_login
