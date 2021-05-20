@@ -1551,6 +1551,11 @@ class TagSetPrefixView(FormatableMixin):
 
       Access to a key `k` accesses the `TagSet`
       with the key `prefix+'.'+k`.
+
+      This is a kind of funny hybrid of a `Tag` and a `TagSet`
+      in that some things such as `__format__`
+      will format the `Tag` named `prefix` if it exists
+      in preference to the subtags.
   '''
 
   @typechecked
@@ -1570,7 +1575,7 @@ class TagSetPrefixView(FormatableMixin):
       return FStr(tag.value)
 
   def __repr__(self):
-    return "%s:%r" % (type(self).__name__, dict(self.items()))
+    return "%s:%s%r" % (type(self).__name__, self._prefix_, dict(self.items()))
 
   @property
   def ontology(self):
@@ -1578,43 +1583,22 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return self._tags.ontology
 
-  @format_recover
   @pfx_method
   def __format__(self, format_spec):
     ''' Format a `TagSetPrefixView` according to `format_spec`,
         The optional text after a colon in a format string.
 
-        In addition to the default formats,
-        the following special formats are recognised:
-        * `meta`: formats commencing with the identifier `meta`
-          obtain the view's `Tag` and dereference its metadata.
-        * `type`: formats commencing with the identifier `type`
-          obtain the view's `Tag` and dereference its type data.
+        If we have a `Tag` then format that
+        otherwise format a `TagSet`
+        made from our branch of the reference `TagSet`.
     '''
     with Pfx("format_spec=%r", format_spec):
-      spec0, offset = get_identifier(format_spec)
-      with Pfx(':' + spec0):
-        # we either return a value or break to fall through
-        while True:
-          # look up the Tag metadata
-          tag = self.tag
-          if tag is not None:
-            # things we can do with the Tag
-            if spec0 == 'meta':
-              value = tag.metadata()
-            elif spec0 == 'type':
-              value = tag.typedata()
-            else:
-              # not a supported special format mode
-              break
-          else:
-            # no tag, no special format modes
-            break
-          subspec = format_spec[offset:]
-          value = self.get_subfield(value, subspec)
-          return str(value)
-    with Pfx("super().__format__(%r)", format_spec):
-      return super().__format__(format_spec)
+      # format the Tag if there is one
+      tag = self.tag
+      if tag is not None:
+        return format(tag, format_spec)
+      tags = self._tags.subtags(self._prefix, as_tagset=True)
+      return format(tags, format_spec)
 
   def keys(self):
     prefix_ = self._prefix_
@@ -1664,7 +1648,7 @@ class TagSetPrefixView(FormatableMixin):
 
   @property
   def tag(self):
-    ''' Return a `Tag` for the prefix, or `None` if there is no such `Tag`.
+    ''' The `Tag` for the prefix, or `None` if there is no such `Tag`.
     '''
     return self._tags.tag(self._prefix)
 
@@ -1673,16 +1657,6 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return the `Tag` value for the prefix, or `None` if there is no such `Tag`.
     '''
     return self._tags.get(self._prefix)
-
-  def get_value(self, arg_name, a, kw):
-    assert not a
-    if kw is self:
-      return self.subtags(arg_name)
-    warning(
-        "%s.get_value(%r): kw is not self: kw=%s",
-        type(self).__name__, arg_name, r(kw)
-    )
-    return kw[arg_name]
 
 class TagSets(MultiOpenMixin, ABC):
   ''' Base class for collections of `TagSet` instances
