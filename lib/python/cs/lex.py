@@ -1169,6 +1169,7 @@ def has_format_methods(cls):
       marked as for use in format strings
       and to include them in `cls.format_methods()`.
   '''
+  methods = cls.format_methods()
   for method_name in dir(cls):
     try:
       method = getattr(cls, method_name)
@@ -1176,7 +1177,7 @@ def has_format_methods(cls):
       pass
     else:
       if getattr(method, 'is_format_method', False):
-        cls.format_methods()[method_name] = method
+        methods[method_name] = method
   return cls
 
 class FormatableFormatter(Formatter):
@@ -1402,10 +1403,11 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         This is used to whitelist allowed `:`*name* method formats
         to prevent scenarios like little Bobby Tables calling `delete()`.
     '''
+    # this shuffle is because cls.__dict__ is a proxy, not a dict
     try:
-      methods = getattr(cls, '_format_methods')
-    except AttributeError:
-      methods = cls._format_methods = {}
+      methods = cls.__dict__['_format_methods']
+    except KeyError:
+      cls._format_methods = methods = {}
     return methods
 
   ##@staticmethod
