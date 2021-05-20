@@ -202,7 +202,6 @@ from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
 import time
-from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
@@ -212,10 +211,9 @@ from cs.deco import decorator
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.lex import (
-    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_identifier,
-    get_nonwhite, is_dotted_identifier, is_identifier, skipwhite, lc_,
-    titleify_lc, FormatableMixin, has_format_methods, format_method, FStr,
-    format_recover, typed_repr as r
+    cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
+    is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
+    has_format_methods, format_method, FStr, typed_repr as r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
@@ -304,8 +302,7 @@ def tag_or_tag_value(func, no_self=False):
       return func(name, value, *a, **kw)
   else:
 
-    # pylint: disable=keyword-arg-before-vararg
-    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
+    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):  # pylint: disable=keyword-arg-before-vararg
       ''' Method flavour of `tag_or_tag_value`,
           accepting `(self,name,value=None,...)`.
       '''
@@ -506,7 +503,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       try:
         super_getattr = super().__getattr__
       except AttributeError:
-        raise AttributeError(type(self).__name__ + '.' + attr)
+        raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
       return super_getattr(attr)
 
   def __setattr__(self, attr, value):
@@ -896,7 +893,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       name = tag.name
     except AttributeError:
-      raise ValueError("tag has no .name attribute")
+      raise ValueError("tag has no .name attribute")  # pylint: disable=raise-missing-from
     else:
       name0 = name  # keep the preprefix name
       if prefix:
@@ -908,7 +905,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     try:
       value = tag.value
     except AttributeError:
-      raise ValueError("tag has no .value attribute")
+      raise ValueError("tag has no .value attribute")  # pylint: disable=raise-missing-from
     if isinstance(tag, Tag):
       # already a Tag subtype, see if the ontology needs updating or the name was changed
       if name != name0 or (ontology is not None
@@ -930,7 +927,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Dummy `__init__` to avoid `FormatableMixin.__init__`
         because we subclass `namedtuple` which has no `__init__`.
     '''
-    pass
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -1892,6 +1888,8 @@ class TagsOntology(SingletonMixin, TagSets):
     return str(self.as_dict())
 
   def as_dict(self):
+    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
+    '''
     return dict(self.te_mapping)
 
   def __bool__(self):
