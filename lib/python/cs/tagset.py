@@ -1245,7 +1245,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return type_name
 
   @property
-  @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
         Returns `None` if there is no ontology.
@@ -1259,7 +1258,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return ont.basetype(self.type)
 
   @format_method
-  def metadata(self, ontology=None, convert=None):
+  def metadata(self, *, ontology=None, convert=None):
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
         The default `ontology` is `self.ontology`.
