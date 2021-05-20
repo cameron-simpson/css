@@ -1493,7 +1493,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     '''
     try:
       return super().__format__(format_spec)
-    except ValueError:
+    except (TypeError, ValueError) as e:
       converted, offset = self.convert_via_method_or_attr(self, format_spec)
       fully_converted = FormatableFormatter.get_subfield(
           converted, format_spec[offset:]
