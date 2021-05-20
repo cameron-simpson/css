@@ -1281,14 +1281,10 @@ class FormatableFormatter(Formatter):
   def get_value(self, arg_name, a, kw):
     ''' Get the object with index `arg_name`.
 
-        This default implementation 
+        This default implementation returns `(kw[arg_name],arg_name)`.
     '''
     assert not a
-    with Pfx("arg_name=%r", arg_name):
-      gv = getattr(kw, arg_name, kw.__getitem__)
-      arg_value = gv(arg_name)
-      ##arg_value = kw[arg_name]
-      return arg_value, arg_name
+    return kw[arg_name], arg_name
 
   @classmethod
   def get_format_subspecs(cls, format_spec):
