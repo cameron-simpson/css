@@ -1393,6 +1393,32 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   FORMAT_JSON_ENCODER = JSONEncoder(separators=(',', ':'))
 
+  @trace
+  def __format__(self, format_spec):
+    ''' Format `self` according to `format_spec`.
+
+        This implementation calls `FormatableFormatter.format_field`
+        if `format_spec` contains a colon,
+        otherwise `self.__format1__`.
+
+        The default implementation of `__format1__` just calls `super().__format__`.
+        Implementations providing specialised formats
+        should implement them in `__format1__`
+        with fallback to `super().__format1__`.
+    '''
+    if ':' in format_spec:
+      return self.format_field(self, format_spec)
+    return self.format_field1(self, format_spec)
+
+  @trace
+  @require(lambda format_spec: ':' not in format_spec)
+  def __format1__(self, format_subspec):
+    ''' Format a single component of a colon separated format specification.
+
+        This default implementation calls `super().__format__`.
+    '''
+    return super().__format__(format_spec)
+
   @classmethod
   def format_methods(cls):
     ''' Return a mapping of permitted methods to functions of an instance.
