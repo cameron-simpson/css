@@ -81,7 +81,7 @@ import os
 from os.path import (
     abspath, basename, dirname, exists as existspath, expanduser, isdir as
     isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile, splitext
+    samefile
 )
 from pathlib import PurePath
 import shutil
@@ -123,9 +123,19 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils>=20210404', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'cs.upd', 'icontract', 'typeguard'
+        'cs.cmdutils>=20210404',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.resources',
+        'cs.tagset',
+        'cs.threads',
+        'cs.upd',
+        'icontract',
+        'typeguard',
     ],
 }
 
@@ -137,8 +147,8 @@ XATTR_B = (
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{filepath.pathname}'
-LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{filepath}'
+LS_OUTPUT_FORMAT_DEFAULT = '{filepath:json} {tags}'
 
 # pylint: disable=too-many-locals
 
@@ -1448,15 +1458,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
       if tag.name not in kwtags:
         kwtags.add(tag)
     # tags based on the filepath
-    filepath = self.filepath
-    for pathtag in (
-        Tag('filepath.basename', basename(filepath), ontology=ont),
-        Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
-        Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
-    ):
-      if pathtag.name not in kwtags:
-        kwtags.add(pathtag)
+    kwtags['filepath'] = PurePath(self.filepath)
     return kwtags
 
   def format_kwargs(self, *, direct=False):
@@ -1474,10 +1476,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     kwtags = self.format_tagset(direct=direct)
     kwtags['tags'] = str(kwtags)
-    # convert the TagSet to an ExtendedNamespace
-    kwargs = kwtags.format_kwargs()
-    ##XP("format_kwargs=%s", kwargs)
-    return kwargs
+    return kwtags
 
   @property
   def basename(self):

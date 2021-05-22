@@ -412,7 +412,9 @@ class SingletonMixin:
         Return the instance.
 
         This creates the class registry if missing,
-        and then
+        prepares a key from `cls._singleton_key`,
+        then returns the entry from the registry is present,
+        or creates a new entry if not.
     '''
     super_new = super().__new__
     registry = cls._singleton_get_registry()

@@ -154,23 +154,38 @@ which is computed as:
 
 == Format Strings ==
 
-While you can just use `str.format_map` as shown above
-for the directvalues in a `TagSet`
-(and some command line tools like `fstags` use this in output format specifications
-you can also use `TagSet`s in format strings.
+You can just use `str.format_map` as shown above
+for the direct values in a `TagSet`,
+since it subclasses `dict`.
 
-There is a `TagSet.ns()` method which constructs
-an enhanced type of `SimpleNamespace`
-from the tags in the set
-which allows convenient dot notation use in format strings,
-for example:
+However, `TagSet`s subclass `cs.lex.FormatableMixin`
+as therefore have a richer `format_as` method which has an extended syntax
+for the format component.
+Command line tools like `fstags` use this for output format specifications.
 
-      tags = TagSet(colour='blue', labels=['a','b','c'], size=9, _ontology=ont)
-      ns = tags.ns()
-      print(f'colour={ns.colour}, info URL={ns.colour._meta.url}')
-      colour=blue, info URL=https://en.wikipedia.org/wiki/Blue
+An example:
 
-There is a detailed run down of this in the `TagSetNamespace` docstring below.
+    >>> # an ontology specifying the type for a colour
+    >>> # and some information about the colour "blue"
+    >>> ont = TagsOntology(
+    ...   {
+    ...       'type.colour':
+    ...       TagSet(description="a colour, a hue", type="str"),
+    ...       'meta.colour.blue':
+    ...       TagSet(
+    ...           url='https://en.wikipedia.org/wiki/Blue',
+    ...           wavelengths='450nm-495nm'
+    ...       ),
+    ...   }
+    ... )
+    >>> # tag set with a "blue" tag, using the ontology above
+    >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+    >>> tags.format_as('The colour is {colour}.')
+    'The colour is blue.'
+    >>> tags.format_as('Information about the colour may be found here: {colour:meta.url}')
+    'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
+
+
 '''
 
 from abc import ABC, abstractmethod
@@ -187,7 +202,6 @@ from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
 import time
-from types import SimpleNamespace
 from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
@@ -198,13 +212,13 @@ from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
-    is_dotted_identifier, is_identifier, skipwhite, lc_, titleify_lc,
-    FormatableMixin
+    is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
+    has_format_attributes, format_attribute, FStr, typed_repr as r
 )
-from cs.logutils import warning, error, ifverbose
+from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method, XP
+from cs.pfx import Pfx, pfx, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
@@ -288,8 +302,7 @@ def tag_or_tag_value(func, no_self=False):
       return func(name, value, *a, **kw)
   else:
 
-    # pylint: disable=keyword-arg-before-vararg
-    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):
+    def accept_tag_or_tag_value(self, name, value=None, *a, **kw):  # pylint: disable=keyword-arg-before-vararg
       ''' Method flavour of `tag_or_tag_value`,
           accepting `(self,name,value=None,...)`.
       '''
@@ -331,6 +344,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+@has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
@@ -367,7 +381,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
       Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
       you can also access tag values as attributes
-      provided that they do conflict with instance attributes
+      provided that they do not conflict with instance attributes
       or class methods or properties.
       The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
       as `None` which causes attribute access to return `None`
@@ -420,6 +434,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  # methods supporting FormattableMixin/ExtendedFormatter
+  def get_arg_name(self, field_name):
+    ''' Leading dotted identifiers represent tags or tag prefixes.
+    '''
+    return get_dotted_identifier(field_name)
+
+  def get_value(self, arg_name, a, kw):
+    assert not a
+    if isinstance(kw, TagSet):
+      # for TagSets we get the matching TagSetPrefixView
+      value = self.subtags(arg_name)
+    else:
+      value = kw[arg_name]
+    return value, arg_name
+
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes
         if `attr` is not found via the superclass `__getattr__`.
@@ -438,7 +467,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags
             TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
             >>> tags.c
-            TagSet:{'z': 9, 'x': 8}
+            TagSetPrefixView:{'z': 9, 'x': 8}
             >>> tags.c.z
             9
 
@@ -469,7 +498,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       try:
         super_getattr = super().__getattr__
       except AttributeError:
-        raise AttributeError(type(self).__name__ + '.' + attr)
+        raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
       return super_getattr(attr)
 
   def __setattr__(self, attr, value):
@@ -498,7 +527,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     tags = cls(_ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.parse(line, offset, ontology=ontology)
+      tag, offset = Tag.from_str2(line, offset, ontology=ontology)
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
@@ -640,24 +669,30 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         name = prefix + '.' + name
       self.set(name, value, verbose=verbose)
 
-  def subtags(self, prefix):
-    ''' Return a new `TagSet` containing tags commencing with `prefix+'.'`
+  def subtags(self, prefix, as_tagset=False):
+    ''' Return `TagSetPrefixView` of the tags commencing with `prefix+'.'`
         with the key prefixes stripped off.
+
+        If `as_tagset` is true (default `False`)
+        return a new standalone `TagSet` containing the prefixed keys.
 
         Example:
 
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
-            TagSet:{'b': 1, 'd': 2}
+            TagSetPrefixView:{'b': 1, 'd': 2}
     '''
-    prefix_ = prefix + '.'
-    return TagSet(
-        {
-            cutprefix(k, prefix_): v
-            for k, v in self.items()
-            if k.startswith(prefix_)
-        }
-    )
+    if as_tagset:
+      # prepare a standalone TagSet
+      prefix_ = prefix + '.'
+      subdict = {
+          cutprefix(k, prefix_): self[k]
+          for k in self.keys()
+          if k.startswith(prefix_)
+      }
+      return TagSet(subdict, _ontology=self.ontology)
+    # prepare a view of this TagSet
+    return TagSetPrefixView(self, prefix)
 
   @property
   def name(self):
@@ -680,16 +715,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Set the `unixtime`.
     '''
     self['unixtime'] = new_unixtime
-
-  @pfx_method
-  def ns(self):
-    ''' Return a `TagSetNamespace` for this `TagSet`.
-
-        This has many convenience facilities for use in format strings.
-    '''
-    return TagSetNamespace.from_tagset(self)
-
-  format_kwargs = ns
 
   def edit(self, editor=None, verbose=None):
     ''' Edit this `TagSet`.
@@ -791,8 +816,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
 
-class Tag(namedtuple('Tag', 'name value ontology')):
-  ''' A Tag has a `.name` (`str`) and a `.value`
+@has_format_attributes
+class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
+  ''' A `Tag` has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
 
       The `name` must be a dotted identifier.
@@ -810,52 +836,92 @@ class Tag(namedtuple('Tag', 'name value ontology')):
         it should be a `Tag`like object to promote;
         it is an error if the `value` parameter is not `None`
         in this case
+      * an optional `prefix` may be supplied
+        which is prepended to `name` with a dot (`'.'`) if not empty
 
       The promotion process is as follows:
       * if `name` is a `Tag` subinstance
         then if the supplied `ontology` is not `None`
         and is not the ontology associated with `name`
         then a new `Tag` is made,
-        otherwise `name` is returned unchanged
+        otherwise the original `Tag` is returned unchanged
       * otherwise a new `Tag` is made from `name`
         using its `.value`
         and overriding its `.ontology`
         if the `ontology` parameter is not `None`
+
+      Examples:
+
+          >>> ont = TagsOntology({'meta.colour.blue': TagSet(wavelengths='450nm-495nm')})
+          >>> tag0 = Tag('colour', 'blue')
+          >>> tag0
+          Tag(name='colour',value='blue',ontology=None)
+          >>> tag = Tag(tag0)
+          >>> tag
+          Tag(name='colour',value='blue',ontology=None)
+          >>> tag is tag0
+          True
+          >>> tag = Tag(tag0, ontology=ont)
+          >>> tag # doctest: +ELLIPSIS
+          Tag(name='colour',value='blue',ontology=<...>)
+          >>> tag is tag0
+          False
+          >>> tag = Tag(tag0, prefix='surface')
+          >>> tag
+          Tag(name='surface.colour',value='blue',ontology=None)
+          >>> tag is tag0
+          False
   '''
 
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
-  def __new__(cls, name, value=None, *, ontology=None):
+  def __new__(cls, name, value=None, *, ontology=None, prefix=None):
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
-      # (name[,value[,ontology]]) => Tag
+      # (name[,value[,ontology][,prefix]]) => Tag
+      if prefix:
+        name = prefix + '.' + name
       return super().__new__(cls, name, value, ontology)
-    # name should be taglike
+    # name should be taglike, value should not be present (None)
+    tag = name
+    try:
+      name = tag.name
+    except AttributeError:
+      raise ValueError("tag has no .name attribute")  # pylint: disable=raise-missing-from
+    else:
+      name0 = name  # keep the preprefix name
+      if prefix:
+        name = prefix + '.' + name
     if value is not None:
       raise ValueError(
-          "name(%s) is not a str, value must be None" % (type(name).__name__,)
+          "name(%s) is not a str, value must be None" % (r(name),)
       )
-    tag = name
-    if not hasattr(tag, 'name'):
-      raise ValueError("tag has no .name attribute")
-    if not hasattr(tag, 'value'):
-      raise ValueError("tag has no .value attribute")
+    try:
+      value = tag.value
+    except AttributeError:
+      raise ValueError("tag has no .value attribute")  # pylint: disable=raise-missing-from
     if isinstance(tag, Tag):
-      # already a Tag subtype, see if the ontology needs updating
-      if ontology is not None and tag.ontology is not ontology:
+      # already a Tag subtype, see if the ontology needs updating or the name was changed
+      if name != name0 or (ontology is not None
+                           and tag.ontology is not ontology):
         # new Tag with supplied ontology
-        tag = super().__new__(cls, tag.name, tag.value, ontology)
+        tag = super().__new__(cls, name, value, ontology)
     else:
       # not a Tag subtype, construct a new instance,
       # overriding .ontology if the supplied ontology is not None
       tag = super().__new__(
-          cls, tag.name, tag.value, (
+          cls, name, value, (
               ontology
               if ontology is not None else getattr(tag, 'ontology', None)
           )
       )
     return tag
+
+  def __init__(self, *a, **kw):
+    ''' Dummy `__init__` to avoid `FormatableMixin.__init__`
+        because we subclass `namedtuple` which has no `__init__`.
+    '''
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
@@ -869,14 +935,6 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       (date, date_fromisoformat, date.isoformat),
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
-
-  @classmethod
-  def with_prefix(cls, name, value, *, ontology=None, prefix):
-    ''' Make a new `Tag` whose `name` is prefixed with `prefix+'.'`.
-    '''
-    if prefix:
-      name = prefix + '.' + name
-    return cls(name, value, ontology=ontology)
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -933,7 +991,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
     with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.parse(s, offset=offset, ontology=ontology)
+      tag, post_offset = cls.from_str2(s, offset=offset, ontology=ontology)
       if post_offset < len(s):
         raise ValueError(
             "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
@@ -962,10 +1020,10 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def parse(cls, s, offset=0, *, ontology):
+  def from_str2(cls, s, offset=0, *, ontology):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
-    with Pfx("%s.parse(%s)", cls.__name__, cropped_repr(s[offset:])):
+    with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
       name, offset = cls.parse_name(s, offset)
       with Pfx(name):
         if offset < len(s):
@@ -1178,7 +1236,6 @@ class Tag(namedtuple('Tag', 'name value ontology')):
     return type_name
 
   @property
-  @pfx_method(use_str=True)
   def basetype(self):
     ''' The base type name for this tag.
         Returns `None` if there is no ontology.
@@ -1191,10 +1248,11 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       return None
     return ont.basetype(self.type)
 
-  def metadata(self, ontology=None, convert=None):
+  @format_attribute
+  def metadata(self, *, ontology=None, convert=None):
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
-        The default `ontology` is `self.onotology`.
+        The default `ontology` is `self.ontology`.
 
         For a scalar type (`int`, `float`, `str`) this is the ontology `TagSet`
         for `self.value`.
@@ -1221,11 +1279,7 @@ class Tag(namedtuple('Tag', 'name value ontology')):
       }
     return ont.value_metadata(self.name, self.value)
 
-  @property
-  def meta(self):
-    ''' The `Tag` metadata derived from the `Tag`'s ontology.
-    '''
-    return self.metadata()
+  meta = metadata
 
   @property
   def key_type(self):
@@ -1482,504 +1536,119 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
 TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
-class ExtendedNamespace(SimpleNamespace):
-  ''' Subclass `SimpleNamespace` with inferred attributes
-      intended primarily for use in format strings.
-      As such it also presents attributes as `[]` elements via `__getitem__`.
+class TagSetPrefixView(FormatableMixin):
+  ''' A view of a `TagSet` via a `prefix`.
 
-      Because [:alpha:]* attribute names
-      are reserved for "public" keys/attributes,
-      most methods commence with an underscore (`_`).
+      Access to a key `k` accesses the `TagSet`
+      with the key `prefix+'.'+k`.
+
+      This is a kind of funny hybrid of a `Tag` and a `TagSet`
+      in that some things such as `__format__`
+      will format the `Tag` named `prefix` if it exists
+      in preference to the subtags.
   '''
 
-  def _public_keys(self):
-    return (k for k in self.__dict__ if k and k[0].isalpha())
-
-  def _public_keys_str(self):
-    return ','.join(sorted(self._public_keys()))
-
-  def _public_items(self):
-    return ((k, v) for k, v in self.__dict__.items() if k and k[0].isalpha())
+  @typechecked
+  @require(lambda prefix: len(prefix) > 0)
+  def __init__(self, tags, prefix: str):
+    self._tags = tags
+    self._prefix = prefix
+    self._prefix_ = prefix + '.'
 
   def __str__(self):
-    ''' Return a visible placeholder, supporting exposing this object
-        in a format string so that the user knows there wasn't a value
-        at this point in the dotted path.
-    '''
-    return '{' + type(self).__name__ + ':' + ','.join(
-        str(k) + '=' + repr(v) for k, v in sorted(self._public_items())
-    ) + '}'
-
-  def __len__(self):
-    ''' The number of public keys.
-    '''
-    return len(self._public_keys())
-
-  @pfx_method
-  def __format__(self, spec):
-    ''' The default formatted form of this node.
-        The value to format is `'{`*type*':'*path*'['*public_keys*']'`.
-    '''
-    return (
-        "{%s:%s%s}" %
-        (type(self).__name__, self._path, sorted(self._public_keys()))
-    ).__format__(spec)
-
-  @property
-  def _path(self):
-    ''' The path to this node as a dotted string.
-    '''
-    pathnames = getattr(self, '_pathnames', ())
-    return '.'.join(pathnames)
-
-  def _subns(self, subname):
-    ''' Create and attache a new subnamespace named `subname`
-        of the same type as `self`.
-        Return the new subnamespace.
-
-        It is an error if `subname` is already present in `self.__dict__`.
-    '''
-    if subname in self.__dict__:
-      raise ValueError(
-          "%s: attribute %r already exists" % (self._path, subname)
+    tag = self.tag
+    if tag is None:
+      return repr(
+          dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
       )
-    subns = type(self)(_pathnames=self._pathnames + (subname,))
-    setattr(self, subname, subns)
-    return subns
-
-  def __getattr__(self, attr):
-    ''' Just a stub so that (a) subclasses can call `super().__getattr__`
-        and (b) a pathbased `AttributeError` gets raised for better context.
-    '''
-    raise AttributeError("%s:%s.%s" % (self._path, type(self).__name__, attr))
-
-  @pfx_method
-  def __getitem__(self, attr):
-    with Pfx("%s[%r]", self._path, attr):
-      try:
-        value = getattr(self, attr)
-      except AttributeError:
-        raise KeyError(attr)  # pylint: disable=raise-missing-from
-      return value
-
-class TagSetNamespace(ExtendedNamespace):
-  ''' A formattable nested namespace for a `TagSet`,
-      subclassing `ExtendedNamespace`,
-      providing attribute based access to tag data.
-
-      `TagSet`s have a `.ns()` method which returns a `TagSetNamespace`
-      derived from that `TagSet`.
-
-      This class exists particularly to help with format strings
-      because tools like fstags and sqltags use these for their output formats.
-      As such, I wanted to be able to put some expressive stuff
-      in the format strings.
-
-      However, this also gets you attribute style access to various
-      related values without mucking with format strings.
-      For example for some `TagSet` `tags` with a `colour=blue` `Tag`,
-      if I set `ns=tags.ns()`:
-      * `ns.colour` is itself a namespace based on the `colour `Tag`
-      * `ns.colour_s` is the string `'blue'`
-      * `ns.colour._tag` is the `colour` `Tag` itself
-      If the `TagSet` had an ontology:
-      * `ns.colour._meta` is a namespace based on the metadata
-        for the `colour` `Tag`
-
-      This provides an assortment of special names derived from the `TagSet`.
-      See the docstring for `__getattr__` for the special attributes provided
-      beyond those already provided by `ExtendedNamespace.__getattr__`.
-
-      Example with a simple `TagSet`:
-
-          >>> tags = TagSet(colour='blue', labels=['a','b','c'], size=9)
-          >>> 'The colour is {colour}.'.format_map(tags)
-          'The colour is blue.'
-          >>> # the natural way to obtain a TagSetNamespace from a TagSet
-          >>> ns = tags.ns()  # returns TagSetNamespace.from_tagset(tags)
-          >>> # the ns object has additional computed attributes
-          >>> 'The colour tag is {colour._tag}.'.format_map(ns)
-          'The colour tag is colour=blue.'
-          >>> # also, the direct name for any Tag can be used
-          >>> # which returns its value
-          >>> 'The colour is {colour}.'.format_map(ns)
-          'The colour is blue.'
-          >>> 'The colours are {colours}. The labels are {labels}.'.format_map(ns)
-          "The colours are ['blue']. The labels are ['a', 'b', 'c']."
-          >>> 'The first label is {label}.'.format_map(ns)
-          'The first label is a.'
-
-      The same `TagSet` with an ontology:
-
-          >>> ont = TagsOntology({
-          ...   'type.colour': TagSet(description="a colour, a hue", type="str"),
-          ...   'meta.colour.blue': TagSet(
-          ...     url='https://en.wikipedia.org/wiki/Blue',
-          ...     wavelengths='450nm-495nm'),
-          ... })
-          >>> tags = TagSet(colour='blue', labels=['a','b','c'], size=9, _ontology=ont)
-          >>> # the colour Tag
-          >>> tags.tag('colour')  # doctest: +ELLIPSIS
-          Tag(name='colour',value='blue',ontology=TagsOntology<...>)
-          >>> # type information about a colour
-          >>> tags.tag('colour').type
-          'str'
-          >>> tags.tag('colour').typedata
-          TagSet:{'description': 'a colour, a hue', 'type': 'str'}
-          >>> # metadata about this particular colour value
-          >>> tags.tag('colour').meta
-          TagSet:{'url': 'https://en.wikipedia.org/wiki/Blue', 'wavelengths': '450nm-495nm'}
-
-      Using a namespace view of the Tag, useful for format strings:
-
-          >>> # the TagSet as a namespace for use in format strings
-          >>> ns = tags.ns()
-          >>> # The namespace .colour node, which has the Tag attached.
-          >>> # When there is a Tag attached, the repr is that of the Tag value.
-          >>> ns.colour         # doctest: +ELLIPSIS
-          'blue'
-          >>> # The underlying colour Tag itself.
-          >>> ns.colour._tag    # doctest: +ELLIPSIS
-          Tag(name='colour',value='blue',ontology=TagsOntology<...>)
-          >>> # The str() of a namespace with a ._tag is the Tag value
-          >>> # making for easy use in a format string.
-          >>> f'{ns.colour}'
-          'blue'
-          >>> # the type information about the colour Tag
-          >>> ns.colour._tag.typedata
-          TagSet:{'description': 'a colour, a hue', 'type': 'str'}
-          >>> # The metadata: a TagSetNamespace for the metadata TagSet
-          >>> ns.colour._meta   # doctest: +ELLIPSIS
-          TagSetNamespace(_path='.', _pathnames=(), _ontology=None, wavelengths='450nm-495nm', url='https://en.wikipedia.org/wiki/Blue')
-          >>> # the _meta.url is itself a namespace with a ._tag for the URL
-          >>> ns.colour._meta.url   # doctest: +ELLIPSIS
-          'https://en.wikipedia.org/wiki/Blue'
-          >>> # but it formats nicely because it has a ._tag
-          >>> f'colour={ns.colour}, info URL={ns.colour._meta.url}'
-          'colour=blue, info URL=https://en.wikipedia.org/wiki/Blue'
-  '''
-
-  @classmethod
-  @pfx_method
-  def from_tagset(cls, tags, pathnames=None):
-    ''' Compute and return a presentation of this `TagSet` as a
-        nested `TagSetNamespace`.
-
-        Note that multiple dots in `Tag` names are collapsed;
-        for example `Tag`s named '`a.b'`, `'a..b'`, `'a.b.'` and
-        `'..a.b'` will all map to the namespace entry `a.b`.
-        `Tag`s are processed in reverse lexical order by name, which
-        dictates which of the conflicting multidot names takes
-        effect in the namespace - the first found is used.
-    '''
-    assert tags is not None
-    if pathnames is None:
-      pathnames = []
-    ns0 = cls(
-        _path='.'.join(pathnames) if pathnames else '.',
-        _pathnames=tuple(pathnames),
-        _tagset=tags,
-    )
-    if tags:
-      ns0._ontology = tags.ontology
-      for tag in sorted(tags, reverse=True):
-        with Pfx(tag):
-          tag_name = tag.name
-          subnames = [subname for subname in tag_name.split('.') if subname]
-          if not subnames:
-            warning("skipping weirdly named tag")
-            continue
-          ns = ns0
-          subpath = []
-          while subnames:
-            subname = subnames.pop(0)
-            subpath.append(subname)
-            dotted_subpath = '.'.join(subpath)
-            with Pfx(dotted_subpath):
-              subns = ns.__dict__.get(subname)
-              if subns is None:
-                subns = ns.__dict__[subname] = TagSetNamespace.from_tagset(
-                    tags.subtags(dotted_subpath), subpath
-                )
-              ns = subns
-          ns._tag = tag
-    return ns0
-
-  def __str__(self):
-    ''' A `TagSetNamespace` with a `._tag` renders `str(_tag.value)`,
-        otherwise `ExtendedNamespace.__str__` is used.
-    '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      return str(tag.value)
-    return super().__str__()
+    else:
+      return FStr(tag.value)
 
   def __repr__(self):
-    ''' Return `repr(self._tag.value)` if defined, otherwise use the superclass `__repr__`.
-    '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      return repr(tag.value)
-    return super().__repr__()
-
-  def __bool__(self):
-    ''' Truthiness: true if the `._tagset` is not empty.
-    '''
-    return bool(self._tagset)
-
-  @pfx_method
-  def __format__(self, spec):
-    ''' Format this node.
-        If there's a `Tag` on the node, format its value.
-        Otherwise use the superclass format.
-    '''
-    tag = self.__dict__.get('_tag')
-    if tag is not None:
-      return format(tag.value, spec)
-    return super().__format__(spec)
-
-  def _subns(self, attr):
-    ''' Create a subnamespace for `attr` as for `ExtendedNamespace`
-        and adorn it with `._tag` and `._tagset`.
-    '''
-    subns = super()._subns(attr)
-    overtag = self.__dict__.get('_tag')
-    format_placeholder = '{' + self._path + '.' + attr + '}'
-    subns._tag = Tag(
-        attr,
-        format_placeholder,
-        ontology=overtag.ontology if overtag else self._tagset.ontology
-    )
-    subns._tagset = self._tagset.subtags(attr)
-    return subns
-
-  @pfx_method
-  def __getitem__(self, key):
-    ''' If this node has a `._tag` then dereference its `.value`,
-        otherwise fall through to the superclass `__getitem__`.
-    '''
-    if isinstance(key, str):
-      try:
-        item = getattr(self, key)
-      except (AttributeError, TypeError) as e:
-        warning(
-            "[%s:%r]: %s, fall back to super().__getitem__",
-            type(key).__name_, key, e
-        )
-      else:
-        return item
-    super_item = super().__getitem__(key)
-    return super_item
-
-  def _tag_value(self):
-    ''' Fetch the value if this node's `Tag`, or `None`.
-    '''
-    tag = self.__dict__.get('_tag')
-    if tag is None:
-      warning("%s: no ._tag", self)
-      return None
-    return tag.value
-
-  def _attr_tag_value(self, attr):
-    ''' Fetch the value of the `Tag` at `attr` (a namespace with a `._tag`).
-        Returns `None` if required attributes are not present.
-    '''
-    attr_value = self.__dict__.get(attr)
-    if attr_value is None:
-      ##warning("%s: no .%r", self, attr)
-      return None
-    return attr_value._tag_value()
-
-  # pylint: disable=too-many-locals
-  # pylint: disable=too-many-return-statements
-  # pylint: disable=too-many-branches
-  # pylint: disable=too-many-statements
-  @pfx_method
-  def __getattr__(self, attr):
-    ''' Look up an indirect node attribute,
-        whose value is inferred from another.
-
-        The following attribute names and forms are supported:
-        * `_keys`: the keys of the value
-          for the `Tag` associated with this node;
-          meaningful if `self._tag.value` has a `keys` method
-        * `_meta`: a namespace containing the meta information
-          for the `Tag` associated with this node:
-          `self._tag.meta.ns()`
-        * `_type`: a namespace containing the type definition
-          for the `Tag` associated with this node:
-          `self._tag.typedata.ns()`
-        * `_values`: the values within the `Tag.value`
-          for the `Tag` associated with this node
-        * *baseattr*`_lc`: lowercase and titled forms.
-          If *baseattr* exists,
-          return its value lowercased via `cs.lex.lc_()`.
-          Conversely, if *baseattr* is required
-          and does not directly exist
-          but its *baseattr*`_lc` form *does*,
-          return the value of *baseattr*`_lc`
-          titlelified using `cs.lex.titleify_lc()`.
-        * *baseattr*`s`, *baseattr*`es`: singular/plural.
-          If *baseattr* exists
-          return `[self.`*baseattr*`]`.
-          Conversely,
-          if *baseattr* does not exist but one of its plural attributes does,
-          return the first element from the plural attribute.
-        * `[:alpha:]*`:
-          an identifierish name binds to a stub subnamespace
-          so the `{a.b.c.d}` in a format string
-          can be replaced with itself to present the undefined name in full.
-    '''
-    getns = self.__dict__.get
-    path = getns('_path')
-    tagset = getns('_tagset')
-    tag = getns('_tag')
-    with Pfx("%s:%s.%s", type(self).__name__, path, attr):
-      if tag is not None:
-        # local Tag? probe it
-        # first, special _* attributes
-        if attr == '_type':
-          return self._tag.typedata.ns()
-        if attr == '_meta':
-          return self._tag.meta.ns()
-        if attr == '_keys':
-          if tag is not None:
-            value = tag.value
-            try:
-              keys = value.keys
-            except AttributeError:
-              # not found, fall through
-              pass
-            else:
-              return list(keys())
-        if attr == '_value':
-          if tag is not None:
-            return tag.value
-        if attr == '_values':
-          if tag is not None:
-            value = tag.value
-            try:
-              values = value.values
-            except AttributeError:
-              # not found, fall through
-              pass
-            else:
-              return list(values())
-        # otherwise probe the Tag directly
-        try:
-          return getattr(tag, attr)
-        except AttributeError:
-          # not found, fall through
-          pass
-      # probe local TagSet
-      try:
-        tagset_value = getattr(tagset, attr)
-      except AttributeError:
-        pass
-      else:
-        # TagSet attribute access returns None for missing attributes (Tags)
-        if tagset_value is not None:
-          return tagset_value
-      # end of Tag, Tagset and private/special attributes
-      if attr.startswith('_'):
-        raise AttributeError(
-            "%s: unsupported special attribute .%r" % (type(self), attr)
-        )
-      # try builtin conversions
-      # these are all reductive, so there should be no unbound regress
-      for conv_suffix, conv in {
-          '_i': int,
-          '_s': str,
-          '_f': float,
-          '_lc': lc_,
-          's': lambda value: [value],
-          'es': lambda value: [value],
-      }.items():
-        ur_attr = cutsuffix(attr, '_' + conv_suffix)
-        if ur_attr is not attr:
-          try:
-            ur_value = getattr(self, ur_attr)
-          except AttributeError:
-            pass
-          else:
-            with Pfx("%s(.%s=%r)", conv, ur_attr, ur_value):
-              ur_value = conv(ur_value)
-            return ur_value
-      # see if there's a real "attr_lc" attribute to titleify
-      attr_lc = attr + '_lc'
-      attr_lc_value = getns(attr_lc)
-      if attr_lc_value is not None:
-        return titleify_lc(attr_lc_value)
-      # singular from plural
-      for pl_suffix in 's', 'es':
-        plural_attr = attr + pl_suffix
-        plural_value = self._attr_tag_value(plural_attr)
-        if plural_value is not None:
-          value0 = plural_value[0]
-          return value0
-      try:
-        # see if the superclass knows this attribute
-        return super().__getattr__(attr)
-      except AttributeError as e:
-        if attr and attr[0].isalpha():
-          # "public" attribute name
-          # no such attribute, create a placeholder `Tag`
-          # for [:alpha:]* names
-          # and return a namespace containing it
-          subns = self._subns(attr)
-          return subns
-        raise
+    return "%s:%s%r" % (type(self).__name__, self._prefix_, dict(self.items()))
 
   @property
   def ontology(self):
-    ''' The reference ontology.
-      '''
-    return self.key_metadata.ontology
+    ''' The ontology of the references `TagSet`.
+    '''
+    return self._tags.ontology
 
   @property
-  def key(self):
-    ''' The key.
-      '''
-    return self.key_metadata.value
+  def __proxied(self):
+    ''' Return the object for which this view is a proxy.
+        If there's a `Tag` at this node, return the `Tag`.
+        Otherwise return a sub`TagSet` based on the prefix.
+    '''
+    tag = self.tag
+    if tag is not None:
+      return tag
+    return self._tags.subtags(self._prefix, as_tagset=True)
+
+  def get_format_attribute(self, attr):
+    ''' Fetch a formatting attribute from the proxied object.
+    '''
+    return self.__proxied.get_format_attribute(attr)
+
+  def keys(self):
+    ''' The keys of the subtags.
+    '''
+    prefix_ = self._prefix_
+    return map(
+        lambda k: cutprefix(k, prefix_),
+        filter(lambda k: k.startswith(prefix_), self._tags.keys())
+    )
+
+  def __contains__(self, k):
+    return self._prefix_ + k in self._tags
+
+  def __getitem__(self, k):
+    if not isinstance(k, str):
+      raise ValueError(
+          "%s.__getitem__: str required, received %s:%r" %
+          (type(self).__name__, type(k), k)
+      )
+    tag = self.tag
+    if tag is not None:
+      return tag.value[k]
+    return self._tags[self._prefix_ + k]
+
+  def __setitem__(self, k, v):
+    self._tags[self._prefix_ + k] = v
+
+  def __deltitem__(self, k):
+    del self._tags[self._prefix_ + k]
+
+  def items(self):
+    return map(lambda k: (k, self[k]), self.keys())
+
+  def values(self):
+    return map(lambda k: self[k], self.keys())
+
+  def __getattr__(self, attr):
+    ''' Proxy other attributes through to the `TagSet`.
+    '''
+    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
+      try:
+        return self[attr]
+      except (KeyError, TypeError):
+        return getattr(self.__proxied, attr)
+
+  def subtags(self, subprefix):
+    ''' Return a deeper view of the `TagSet`.
+    '''
+    return type(self)(self._tags, self._prefix_ + subprefix)
+
+  @property
+  def tag(self):
+    ''' The `Tag` for the prefix, or `None` if there is no such `Tag`.
+    '''
+    return self._tags.tag(self._prefix)
 
   @property
   def value(self):
-    ''' The value.
-      '''
-    return self.value_metadata.value
-
-class ValueMetadataNamespace(TagSetNamespace):
-  ''' A subclass of `TagSetNamespace` for a `Tag`'s metadata.
-
-      The reference `TagSet` is the defining `TagSet`
-      for the metadata of a particular `Tag` value
-      as defined by a `ValueMetadata`
-      (the return value of `Tag.metadata`).
-  '''
-
-  @classmethod
-  @pfx_method
-  def from_metadata(cls, meta, pathnames=None):
-    ''' Construct a new `ValueMetadataNamespace` from `meta` (a `ValueMetadata`).
+    ''' Return the `Tag` value for the prefix, or `None` if there is no such `Tag`.
     '''
-    ont = meta.ontology
-    ontkey = meta.ontkey
-    tags = ont[ontkey]
-    ns0 = cls.from_tagset(tags, pathnames=pathnames)
-    ns0._ontology = ont
-    ns0._ontkey = ontkey
-    ns0._value = meta.value
-    return ns0
-
-  @pfx_method
-  def __format__(self, spec):
-    ''' Format this node.
-        If there's a `Tag` on the node, format its value.
-        Otherwise use the superclass format.
-    '''
-    return (
-        "{%s:%r[%s]}" % (self._ontkey, self._value, self._public_keys_str())
-    ).__format__(spec)
+    return self._tags.get(self._prefix)
 
 class TagSets(MultiOpenMixin, ABC):
   ''' Base class for collections of `TagSet` instances
@@ -2211,6 +1880,14 @@ class TagsOntology(SingletonMixin, TagSets):
             te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
         ),
     )
+
+  def __str__(self):
+    return str(self.as_dict())
+
+  def as_dict(self):
+    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
+    '''
+    return dict(self.te_mapping)
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
@@ -2866,12 +2543,9 @@ class RegexpTagRule:
           tags.append(tag)
     return tags
 
-def main(_):
-  ''' Test code.
-  '''
-  # pylint: disable=import-outside-toplevel
-  from cs.logutils import setup_logging
-  setup_logging()
+def selftest(argv):
+  from pprint import pprint  # pylint: disable=import-outside-toplevel
+  setup_logging(argv.pop(0))
   ont = TagsOntology(
       {
           'type.colour':
@@ -2883,22 +2557,16 @@ def main(_):
           ),
       }
   )
+  print(ont)
   tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-  print("tags.colour =", tags.colour)
-  colour = tags.tag('colour')
-  print("colour =", colour)
-  print("type =", colour.typedata)
-  print("meta =", colour.metadata)
-  print("meta.url =", colour.meta.url)
-  print("meta.ns =", colour.meta.ns())
-  print("meta.url =", colour.meta.ns().url_s)
-  ns = tags.ns()
-  print("colour =", ns.colour._tag)
-  print("colour.metadata =", ns.colour._meta)
-  print("colour.metadata.url =", ns.colour._meta.url)
-  ##print("colour.metadata.ns() =", ns.colour._tag.metadata.ns())
-  ##print(repr(list(ns.colour._tag.metadata.ns().__dict__.items())))
+  pprint(tags.as_dict())
+  tags['aa.bb'] = 'aabb'
+  tags['aa'] = 'aa'
+  for format_str in argv:
+    print(format_str)
+    formatted = tags.format_as(format_str)
+    print("tag.format_as() => ", formatted)
 
 if __name__ == '__main__':
-  import sys  # pylint: disable=import-outside-toplevel
-  sys.exit(main(sys.argv))
+  import sys
+  sys.exit(selftest(sys.argv))
