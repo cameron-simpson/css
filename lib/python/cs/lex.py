@@ -1502,9 +1502,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         to provide a mapping for `str.format_map`
         then the instance itself is used as the mapping.
     '''
-    try:
-      get_format_mapping = self.format_kwargs
-    except AttributeError:
+    get_format_mapping = getattr(self, 'format_kwargs', None)
+    if get_format_mapping is None:
       if control_kw:
         # pylint: disable=raise-missing-from
         raise ValueError(
