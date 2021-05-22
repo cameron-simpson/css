@@ -590,7 +590,7 @@ class PlayOnAPI(MultiOpenMixin):
       N = netrc()
       netrc_hosts = []
       if login:
-        assert login is not None and login is not 'None', "login=%r" % login
+        assert login is not None and login != 'None', "login=%r" % login
         netrc_host = f"{login}:{self.API_HOSTNAME}"
         netrc_hosts.append(netrc_host)
         with Pfx(".netrc host %r", netrc_host):
