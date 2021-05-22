@@ -1396,7 +1396,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   FORMAT_JSON_ENCODER = JSONEncoder(separators=(',', ':'))
 
-  @trace
+  # pylint: disable=invalid-format-returned
   def __format__(self, format_spec):
     ''' Format `self` according to `format_spec`.
 
@@ -1473,7 +1473,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     if not attr:
       # no leading method/attribute name, return unchanged
       return value, 0
-    cls = type(value)
     try:
       attribute = value.get_format_attribute(attr)
     except AttributeError as e:
@@ -1511,7 +1510,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         )
       format_mapping = self
     else:
-      format_mapping = get_format_mapping(**control_kw)
+      format_mapping = self.get_format_mapping(**control_kw)
     return _format_as(
         format_s, format_mapping, formatter=self, error_sep=error_sep
     )

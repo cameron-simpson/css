@@ -2544,7 +2544,7 @@ class RegexpTagRule:
     return tags
 
 def selftest(argv):
-  from pprint import pprint
+  from pprint import pprint  # pylint: disable=import-outside-toplevel
   setup_logging(argv.pop(0))
   ont = TagsOntology(
       {
