@@ -1416,18 +1416,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         should implement them in `__format1__`
         with fallback to `super().__format1__`.
     '''
-    if ':' in format_spec:
-      return self.format_field(self, format_spec)
-    return self.format_field1(self, format_spec)
-
-  @trace
-  @require(lambda format_spec: ':' not in format_spec)
-  def __format1__(self, format_subspec):
-    ''' Format a single component of a colon separated format specification.
-
-        This default implementation calls `super().__format__`.
-    '''
-    return super().__format__(format_spec)
+    return self.format_field(self, format_spec)
 
   @classmethod
   def get_format_attributes(cls):
