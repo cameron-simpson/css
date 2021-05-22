@@ -1128,7 +1128,7 @@ def format_recover(method):
 @typechecked
 @fmtdoc
 def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
-  ''' Format the string `format_s` using `str.format_mapping`,
+  ''' Format the string `format_s` using `Formatter.vformat`,
       return the formatted result.
       This is a wrapper for `str.format_map`
       which raises a more informative `FormatAsError` exception on failure.
@@ -1335,7 +1335,9 @@ class FormatableFormatter(Formatter):
   @pfx_method
   @typechecked
   def format_field(cls, value, format_spec: str):
-    ''' Format a value using `value.format_format_field`.
+    ''' Format a value using `value.format_format_field`,
+        returning an `FStr`
+        (a `str` subclass with additional `format_spec` features).
 
         We actually recognise colon separated chains of formats
         and apply each format to the previously converted value.
@@ -1357,27 +1359,39 @@ class FormatableFormatter(Formatter):
 
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
-  ''' A mixin to supply a `format_as` method for classes,
-      which formats a format string using `str.format_map`
-      with a suitable mapping derived from the instance.
-
-      An instance with no `format_kwargs` method
-      is presumed to be a suitable mapping itself.
-      Otherwise the `format_kwargs` method is expected to return a mapping
-      for use with str.format_map`.
+  ''' A subclass of `FormatableFormatter` which  provides 2 features:
+      - a `__format__ method which parses the `format_spec` string
+        into multiple colon separated terms whose results chain
+      - a `format_as` method which formats a format string using `str.format_map`
+        with a suitable mapping derived from the instance
+        via its `format_kwargs` method
+        (whose default is to return the instance itself)
 
       The `format_as` method is like an inside out `str.format` or
       `object.__format__` method.
+
       The `str.format` method is designed for formatting a string
-      from a variety of other objects supplied in the keyword arguments,
-      and the `object.__format__` method is for filling out a single `str.format`
+      from a variety of other objects supplied in the keyword arguments.
+
+      The `object.__format__` method is for filling out a single `str.format`
       replacement field from a single object.
+
       By contrast, `format_as` is designed to fill out an entire format
       string from the current object.
 
       For example, the `cs.tagset.TagSetMixin` class
       uses `FormatableMixin` to provide a `format_as` method
       whose replacement fields are derived from the tags in the tag set.
+
+      Subclasses wanting to provide additional `format_spec` terms
+      should:
+      - override `FormatableFormatter.format_field1` to implement
+        terms with no colons, letting `format_field` do the split into terms
+      - override `FormatableFormatter.get_format_subspecs` to implement
+        the parse of `format_spec` into a sequence of terms.
+        This might recognise a special additional syntax
+        and quietly fall back to `super().get_format_subspecs`
+        if that is not present.
   '''
 
   FORMAT_JSON_ENCODER = JSONEncoder(separators=(',', ':'))
@@ -1386,9 +1400,16 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
   def __format__(self, format_spec):
     ''' Format `self` according to `format_spec`.
 
-        This implementation calls `FormatableFormatter.format_field`
-        if `format_spec` contains a colon,
-        otherwise `self.__format1__`.
+        This implementation calls `self.format_field`.
+        As such, a `format_spec` is considered
+        a sequence of colon separated terms.
+
+        Classes wanting to implement addition format string syntaxes
+        should either:
+        - override `FormatableFormatter.format_field1` to implement
+          terms with no colons, letting `format_field1` do the split into terms
+        - override `FormatableFormatter.get_format_subspecs` to implement
+          the term parse.
 
         The default implementation of `__format1__` just calls `super().__format__`.
         Implementations providing specialised formats
