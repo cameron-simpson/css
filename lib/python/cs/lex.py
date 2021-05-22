@@ -1510,7 +1510,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         )
       format_mapping = self
     else:
-      format_mapping = self.get_format_mapping(**control_kw)
+      format_mapping = get_format_mapping(**control_kw)
     return _format_as(
         format_s, format_mapping, formatter=self, error_sep=error_sep
     )
