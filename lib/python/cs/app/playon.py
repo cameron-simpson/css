@@ -29,6 +29,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.lex import has_format_attributes, format_attribute
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
@@ -56,7 +57,7 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
@@ -327,6 +328,7 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
+@has_format_attributes
 class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
@@ -334,11 +336,13 @@ class PlayOnSQLTagSet(SQLTagSet):
   # recording data stale after 10 minutes
   STALE_AGE = 600
 
+  @format_attribute
   def recording_id(self):
     ''' The recording id or `None`.
     '''
     return self.get('playon.ID')
 
+  @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
         omitting the series if None.
@@ -349,36 +353,41 @@ class PlayOnSQLTagSet(SQLTagSet):
       citation = playon_tags.Series + " - " + citation
     return citation
 
-  @property
+  @format_attribute
   def status(self):
-    ''' A short status string.
+    ''' Return a short status string.
     '''
     for status_label in 'queued', 'expired', 'downloaded', 'pending':
       if getattr(self, f'is_{status_label}')():
         return status_label
     raise RuntimeError("cannot infer a status string: %s" % (self,))
 
+  @format_attribute
   def is_available(self):
     ''' Is a recording available for download?
     '''
     return not self.is_expired() and not self.is_queued()
 
+  @format_attribute
   def is_queued(self):
     ''' Is a recording still in the queue?
     '''
     return 'playon.Created' not in self
 
+  @format_attribute
   def is_downloaded(self):
     ''' Test whether this recording has been downloaded
         based on the presence of a `download_path` `Tag`.
     '''
     return self.download_path is not None
 
+  @format_attribute
   def is_pending(self):
     ''' A pending download: available and not already downloaded.
     '''
     return self.is_available() and not self.is_downloaded()
 
+  @format_attribute
   def is_expired(self):
     ''' Test whether this recording is expired,
         should imply no longer available for download.
@@ -388,6 +397,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
+  @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this entry is stale
         i.e. the time since `self.last_updated` exceeds `max_age` seconds,
@@ -409,7 +419,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(self.format_as(ls_format), f'{self.status.upper()}')
+    print_func(self.format_as(ls_format))
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
@@ -580,7 +590,7 @@ class PlayOnAPI(MultiOpenMixin):
       N = netrc()
       netrc_hosts = []
       if login:
-        assert login is not None and login is not 'None', "login=%r" % login
+        assert login is not None and login != 'None', "login=%r" % login
         netrc_host = f"{login}:{self.API_HOSTNAME}"
         netrc_hosts.append(netrc_host)
         with Pfx(".netrc host %r", netrc_host):
