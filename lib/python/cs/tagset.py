@@ -434,11 +434,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
-  def format_kwargs(self):
-    ''' Return ourself as the mapping for `.format_as`.
-    '''
-    return self
-
   # methods supporting FormattableMixin/ExtendedFormatter
   def get_arg_name(self, field_name):
     ''' Leading dotted identifiers represent tags or tag prefixes.
