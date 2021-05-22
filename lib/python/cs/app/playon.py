@@ -409,7 +409,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(ls_format.format_map(self.ns()), f'{self.status.upper()}')
+    print_func(self.format_as(ls_format), f'{self.status.upper()}')
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
