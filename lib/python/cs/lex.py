@@ -1494,20 +1494,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       converted = attribute
     return converted, offset
 
-  @format_recover
-  def __format__(self, format_spec):
-    ''' Supply a default `__format__` method
-        which falls back to object methods as implementations of `format_spec`.
-    '''
-    try:
-      return super().__format__(format_spec)
-    except (TypeError, ValueError) as e:
-      converted, offset = self.convert_via_method_or_attr(self, format_spec)
-      fully_converted = FormatableFormatter.get_subfield(
-          converted, format_spec[offset:]
-      )
-      return str(fully_converted)
-
   def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
         returned by `self.format_kwargs(**control_kw)`.
