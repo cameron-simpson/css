@@ -85,7 +85,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20210428.4-post'
+__version__ = '20210507-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -95,8 +95,12 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context', 'cs.deco', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122',
-        'cs.tty'
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.obj>=20210122',
+        'cs.tty',
     ],
 }
 
@@ -909,7 +913,7 @@ class Upd(SingletonMixin):
           txts.append('\r')
           txts.append(slots[index])
         else:
-          # the effectiove index has now moved down
+          # the effective index has now moved down
           index -= 1
           if delete_line:
             # delete line and advance to the end of the new current line

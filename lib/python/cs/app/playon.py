@@ -72,7 +72,7 @@ class PlayOnCommand(BaseCommand):
   USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
 
     Environment:
-      PLAYON_USER               PlayOn login name.
+      PLAYON_USER               PlayOn login name, default from $EMAIL.
       PLAYON_PASSWORD           PlayOn password.
                                 This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
@@ -92,7 +92,7 @@ class PlayOnCommand(BaseCommand):
 
   def apply_defaults(self):
     options = self.options
-    options.user = environ.get('PLAYON_USER')
+    options.user = environ.get('PLAYON_USER', environ.get('EMAIL'))
     options.password = environ.get('PLAYON_PASSWORD')
     options.filename_format = environ.get(
         'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
@@ -578,14 +578,21 @@ class PlayOnAPI(MultiOpenMixin):
     password = self._password
     if not login or not password:
       N = netrc()
+      netrc_hosts = []
       if login:
-        entry = N.hosts.get(f"{login}:{self.API_HOSTNAME}")
+        assert login is not None and login is not 'None', "login=%r" % login
+        netrc_host = f"{login}:{self.API_HOSTNAME}"
+        netrc_hosts.append(netrc_host)
+        with Pfx(".netrc host %r", netrc_host):
+          entry = N.hosts.get(netrc_host)
       else:
         entry = None
       if not entry:
-        entry = N.hosts.get(self.API_HOSTNAME)
+        netrc_hosts.append(self.API_HOSTNAME)
+        with Pfx(".netrc host %r", self.API_HOSTNAME):
+          entry = N.hosts.get(self.API_HOSTNAME)
       if not entry:
-        raise ValueError("no netrc entry")
+        raise ValueError("no netrc entry for %r" % (netrc_hosts,))
       n_login, _, n_password = entry
       if login is None:
         login = n_login
