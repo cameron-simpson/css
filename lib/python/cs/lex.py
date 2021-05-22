@@ -1157,27 +1157,27 @@ def format_as(format_s: str, format_mapping, formatter=None, error_sep=None):
 
 _format_as = format_as  # for reuse in the format_as method below
 
-def format_method(method):
+def format_attribute(method):
   ''' Mark a method as available as a format method.
-      Requires the enclosing class to be decorated with `@has_format_methods`.
+      Requires the enclosing class to be decorated with `@has_format_attributes`.
   '''
-  method.is_format_method = True
+  method.is_format_attribute = True
   return method
 
-def has_format_methods(cls):
+def has_format_attributes(cls):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
-      and to include them in `cls.format_methods()`.
+      and to include them in `cls.format_attributes()`.
   '''
-  methods = cls.format_methods()
-  for method_name in dir(cls):
+  attributes = cls.get_format_attributes()
+  for attr in dir(cls):
     try:
-      method = getattr(cls, method_name)
+      attribute = getattr(cls, attr)
     except AttributeError:
       pass
     else:
-      if getattr(method, 'is_format_method', False):
-        methods[method_name] = method
+      if getattr(attribute, 'is_format_attribute', False):
+        attributes[attr] = attribute
   return cls
 
 class FormatableFormatter(Formatter):
@@ -1322,24 +1322,13 @@ class FormatableFormatter(Formatter):
       # promote bare str to FStr
       if type(value) is str:  # pylint: disable=unidiomatic-typecheck
         value = FStr(value)
-      # try the value's native __format__ first
-      # then try the fallback method based version
       try:
-        value = format(value, format_subspec)
-      except (ValueError, TypeError) as e:
-        ##warning(
-        ##    "format_subspec=%r: format(%s) gave %s, falling back to convert_via_method_or_attr",
-        ##    cls.__name__, format_subspec, typed_repr(value), e
-        ##)
-        # fall back to convert_via_method_or_attr
-        try:
-          convert = value.convert_via_method_or_attr
-        except AttributeError:
-          value = FStr(value)
-          convert = value.convert_via_method_or_attr
-        value, offset = convert(value, format_subspec)
-        if offset < len(format_subspec):
-          value = cls.get_subfield(value, format_subspec[offset:])
+        value.convert_via_method_or_attr
+      except AttributeError:
+        value = FStr(value)
+      value, offset = value.convert_via_method_or_attr(value, format_subspec)
+      if offset < len(format_subspec):
+        value = cls.get_subfield(value, format_subspec[offset:])
     return value
 
   @classmethod
@@ -1366,7 +1355,7 @@ class FormatableFormatter(Formatter):
       value = cls.format_field1(value, format_subspec)
     return FStr(value)
 
-@has_format_methods
+@has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A mixin to supply a `format_as` method for classes,
       which formats a format string using `str.format_map`
@@ -1420,17 +1409,29 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     return super().__format__(format_spec)
 
   @classmethod
-  def format_methods(cls):
+  def get_format_attributes(cls):
+    ''' Return the mapping of format attributes.
+    '''
+    try:
+      attributes = cls.__dict__['_format_attributes']
+    except KeyError:
+      cls._format_attributes = attributes = {}
+    return attributes
+
+  def get_format_attribute(self, attr):
     ''' Return a mapping of permitted methods to functions of an instance.
         This is used to whitelist allowed `:`*name* method formats
         to prevent scenarios like little Bobby Tables calling `delete()`.
     '''
     # this shuffle is because cls.__dict__ is a proxy, not a dict
-    try:
-      methods = cls.__dict__['_format_methods']
-    except KeyError:
-      cls._format_methods = methods = {}
-    return methods
+    cls = type(self)
+    attributes = cls.get_format_attributes()
+    if attr in attributes:
+      return getattr(self, attr)
+    raise AttributeError(
+        "disallowed attribute %r: not in %s._format_attributes" %
+        (attr, cls.__name__)
+    )
 
   ##@staticmethod
   def convert_field(self, value, conversion):
@@ -1444,8 +1445,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       conversion = None
     return super().convert_field(value, conversion)
 
-  @classmethod
-  def convert_via_method_or_attr(cls, value, format_spec):
+  def convert_via_method_or_attr(self, value, format_spec):
     ''' Apply a method or attribute name based conversion to `value`
         where `format_spec` starts with a method name
         applicable to `value`.
@@ -1453,35 +1453,35 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         being the converted value and the offset after the method name.
 
         The methods/attributes are looked up in the mapping
-        returned by `.format_methods()` which represents allowed methods
+        returned by `.format_attributes()` which represents allowed methods
         (broadly, one should avoid allowing methods which modify any state).
 
         If this returns a callable, it is called to obtain the converted value
         otherwise it is used as is.
     '''
-    method_name, offset = get_identifier(format_spec)
-    if not method_name:
+    attr, offset = get_identifier(format_spec)
+    if not attr:
       # no leading method/attribute name, return unchanged
       return value, 0
-    methods = cls.format_methods()
+    cls = type(value)
     try:
-      method = methods[method_name]
-    except KeyError:
-      # pylint: disable=raise-missing-from
+      attribute = value.get_format_attribute(attr)
+    except AttributeError as e:
       raise ValueError(
-          "class %r: method/attr %r is forbidden - not in %s.format_methods()"
-          % (cls.__name__, method_name, cls.__name__)
-      )
-    if callable(method):
+          "convert_via_method_or_attr(%s,%r): %s" %
+          (typed_repr(value), format_spec, e)
+      ) from e
+    if callable(attribute):
       try:
-        converted = method(value)
+        converted = attribute()
       except TypeError as e:
         # pylint: disable=raise-missing-from
         raise ValueError(
-            "TypeError calling %s.%s(): %s" % (cls.__name__, method_name, e)
+            "TypeError calling %s.%s():%s: %s" %
+            (type(self).__name__, attr, attribute, e)
         )
     else:
-      converted = method
+      converted = attribute
     return converted, offset
 
   @format_recover
@@ -1530,13 +1530,13 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     return get_identifier(field_name)
 
   # Utility methods for formats.
-  @format_method
+  @format_attribute
   def json(self):
     ''' The value transcribed as compact JSON.
     '''
     return self.FORMAT_JSON_ENCODER.encode(self)
 
-@has_format_methods
+@has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
       particularly its `__format__`
@@ -1547,55 +1547,55 @@ class FStr(FormatableMixin, str):
   '''
 
   # str is immutable: prefill with all public class attributes
-  _format_methods = {
-      method_name: getattr(str, method_name)
-      for method_name in dir(str)
-      if method_name[0].isalpha()
+  _format_attributes = {
+      attr: getattr(str, attr)
+      for attr in dir(str)
+      if attr[0].isalpha()
   }
 
-  @format_method
+  @format_attribute
   def basename(self):
     ''' Treat as a filesystem path and return the basename.
     '''
     return Path(self).name
 
-  @format_method
+  @format_attribute
   def dirname(self):
     ''' Treat as a filesystem path and return the dirname.
     '''
     return Path(self).parent
 
-  @format_method
+  @format_attribute
   def f(self):
     ''' Parse `self` as a `float`.
     '''
     return float(self)
 
-  @format_method
+  @format_attribute
   def i(self, base=10):
     ''' Parse `self` as an `int`.
     '''
     return int(self, base=base)
 
-  @format_method
+  @format_attribute
   def lc(self):
     ''' Lowercase using `lc_()`.
     '''
     return lc_(self)
 
-  @format_method
+  @format_attribute
   def path(self):
     ''' Convert to a native filesystem `pathlib.Path`.
     '''
     return Path(self)
 
-  @format_method
+  @format_attribute
   def posix_path(self):
     ''' Convert to a Posix filesystem `pathlib.Path`.
     '''
     return PurePosixPath(self)
 
-  @format_method
+  @format_attribute
   def windows_path(self):
     ''' Convert to a Windows filesystem `pathlib.Path`.
     '''
