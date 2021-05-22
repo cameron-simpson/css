@@ -57,7 +57,7 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
@@ -419,7 +419,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(ls_format.format_map(self.ns()), f'{self.status.upper()}')
+    print_func(self.format_as(ls_format))
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
