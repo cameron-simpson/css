@@ -442,11 +442,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def get_value(self, arg_name, a, kw):
     assert not a
-    if isinstance(kw, TagSet):
-      # for TagSets we get the matching TagSetPrefixView
-      value = self.subtags(arg_name)
+    try:
+      attribute = self.get_format_attribute(arg_name)
+    except AttributeError:
+      if isinstance(kw, TagSet):
+        # for TagSets we get the matching TagSetPrefixView
+        value = self.subtags(arg_name)
+      else:
+        value = kw[arg_name]
     else:
-      value = kw[arg_name]
+      value = attribute() if callable(attribute) else attribute
     return value, arg_name
 
   def __getattr__(self, attr):
