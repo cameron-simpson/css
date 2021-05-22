@@ -213,7 +213,7 @@ from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_methods, format_method, FStr, typed_repr as r
+    has_format_attributes, format_attribute, FStr, typed_repr as r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
@@ -344,7 +344,7 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
-@has_format_methods
+@has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
 
@@ -821,7 +821,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
 
-@has_format_methods
+@has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
   ''' A `Tag` has a `.name` (`str`) and a `.value`
       and an optional `.ontology`.
@@ -1253,7 +1253,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return None
     return ont.basetype(self.type)
 
-  @format_method
+  @format_attribute
   def metadata(self, *, ontology=None, convert=None):
     ''' Fetch the metadata information about this specific tag value,
         derived through the `ontology` from the tag name and value.
@@ -1578,22 +1578,21 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return self._tags.ontology
 
-  @pfx_method
-  def __format__(self, format_spec):
-    ''' Format a `TagSetPrefixView` according to `format_spec`,
-        The optional text after a colon in a format string.
-
-        If we have a `Tag` then format that
-        otherwise format a `TagSet`
-        made from our branch of the reference `TagSet`.
+  @property
+  def __proxied(self):
+    ''' Return the object for which this view is a proxy.
+        If there's a `Tag` at this node, return the `Tag`.
+        Otherwise return a sub`TagSet` based on the prefix.
     '''
-    with Pfx("format_spec=%r", format_spec):
-      # format the Tag if there is one
-      tag = self.tag
-      if tag is not None:
-        return format(tag, format_spec)
-      tags = self._tags.subtags(self._prefix, as_tagset=True)
-      return format(tags, format_spec)
+    tag = self.tag
+    if tag is not None:
+      return tag
+    return self._tags.subtags(self._prefix, as_tagset=True)
+
+  def get_format_attribute(self, attr):
+    ''' Fetch a formatting attribute from the proxied object.
+    '''
+    return self.__proxied.get_format_attribute(attr)
 
   def keys(self):
     prefix_ = self._prefix_
