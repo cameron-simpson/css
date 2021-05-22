@@ -1590,6 +1590,8 @@ class TagSetPrefixView(FormatableMixin):
     return self.__proxied.get_format_attribute(attr)
 
   def keys(self):
+    ''' The keys of the subtags.
+    '''
     prefix_ = self._prefix_
     return map(
         lambda k: cutprefix(k, prefix_),
@@ -1625,10 +1627,11 @@ class TagSetPrefixView(FormatableMixin):
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
     '''
-    try:
-      return self[attr]
-    except KeyError:
-      return getattr(self._tags, attr)
+    with Pfx("%s.__getattr__(%r)", type(self).__name__, attr):
+      try:
+        return self[attr]
+      except (KeyError, TypeError):
+        return getattr(self.__proxied, attr)
 
   def subtags(self, subprefix):
     ''' Return a deeper view of the `TagSet`.
@@ -2561,7 +2564,8 @@ def selftest(argv):
   tags['aa'] = 'aa'
   for format_str in argv:
     print(format_str)
-    print("=>", tags.format_as(format_str))
+    formatted = tags.format_as(format_str)
+    print("tag.format_as() => ", formatted)
 
 if __name__ == '__main__':
   import sys
