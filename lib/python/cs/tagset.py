@@ -1739,23 +1739,8 @@ class TagSets(MultiOpenMixin, MutableMapping):
     self[name] = te
     return te
 
-  def add(self, name: str, **kw):
-    ''' Return a new `TagSet` associated with `name`,
-        which should not already be in use.
-    '''
-    te = self.get(name, default=self._missing)
-    if te is not self._missing:
-      raise ValueError("%r: name already present" % (name,))
-    return self.default_factory(name, **kw)
-
-  @abstractmethod
-  def get(self, name: str, default=None):
-    ''' Return the `TagSet` associated with `name`,
-        or `default` if there is no such entity.
-    '''
-    raise NotImplementedError(
-        "%s: no .get(name,default=None) method" % (type(self).__name__,)
-    )
+  #################################################################
+  # MutableMapping methods
 
   def __getitem__(self, name: str):
     ''' Obtain the `TagSet` associated with `name`.
@@ -1787,6 +1772,24 @@ class TagSets(MultiOpenMixin, MutableMapping):
     '''
     raise NotImplementedError(
         "%s: no .__len__() method" % (type(self).__name__,)
+    )
+
+  def add(self, name: str, **kw):
+    ''' Return a new `TagSet` associated with `name`,
+        which should not already be in use.
+    '''
+    te = self.get(name, default=self._missing)
+    if te is not self._missing:
+      raise ValueError("%r: name already present" % (name,))
+    return self.default_factory(name, **kw)
+
+  @abstractmethod
+  def get(self, name: str, default=None):
+    ''' Return the `TagSet` associated with `name`,
+        or `default` if there is no such entity.
+    '''
+    raise NotImplementedError(
+        "%s: no .get(name,default=None) method" % (type(self).__name__,)
     )
 
   def subdomain(self, subname):
