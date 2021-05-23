@@ -66,6 +66,10 @@ parse_mount_path(){
                 host=$( expr "x$mount_path" : 'x[^:/]*://\([^/]*\)/.*' )
                 path=$( expr "x$mount_path" : 'x[^:/]*://[^/]*/\(.*\)' )
                 ;;
+      ?*:?*)    type=ssh
+                host=$( expr "x$mount_path" : 'x\([^:/][^:/]*\):.*' )
+                path=$( expr "x$mount_path" : 'x[^:/][^:/]*:\(.*\)' )
+                ;;
       *)        echo "$cmd: unsupported mount_path:: $mount_path" >&2
                 exit 2
                 ;;
@@ -119,7 +123,7 @@ mount_path2mount_point(){
     type=$1 host=$2 path=$3
     # shellcheck disable=SC2030
     pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g; s/\./_/g' )
-    print '%s\n' "$MNT_BASE/$host/$pathbase"
+    printf '%s\n' "$MNT_BASE/$host/$pathbase"
   )
 }
 
