@@ -2202,7 +2202,7 @@ class TagFile(SingletonMixin, TagSets):
     '''
     self.tagsets[name] = te
 
-  # Mapping mathods, proxying through to .tagsets.
+  # Mapping methods, proxying through to .tagsets.
   def keys(self, prefix=None):
     ''' `tagsets.keys`
 
