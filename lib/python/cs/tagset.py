@@ -1668,7 +1668,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called as
+      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called
         from `__missing__` for missing names,
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
@@ -1760,6 +1760,32 @@ class TagSets(MultiOpenMixin, MutableMapping):
     raise NotImplementedError(
         "%s: no .__setitem__(name,tagset) method" % (type(self).__name__,)
     )
+
+  @abstractmethod
+  def keys(self, *, prefix=None):
+    ''' Return the keys starting with `prefix+'.'`
+        or all keys if `prefix` is `None`.
+    '''
+    raise NotImplementedError("%s: no .keys() method" % (type(self).__name__,))
+
+  def __iter__(self):
+    ''' Iteration returns the keys.
+    '''
+    return self.keys()
+
+  def values(self, *, prefix=None):
+    ''' Generator yielding the mapping values (`TagSet`s),
+        optionally constrained to keys starting with `prefix+'.'`.
+    '''
+    for k in self.keys(prefix=prefix):
+      yield self.get(k)
+
+  def items(self, *, prefix=None):
+    ''' Generator yielding `(key,value)` pairs,
+        optionally constrained to keys starting with `prefix+'.'`.
+    '''
+    for k in self.keys(prefix=prefix):
+      yield k, self.get(k)
 
   def __contains__(self, name: str):
     ''' Test whether `name` is present in `self.te_mapping`.
