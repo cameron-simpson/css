@@ -1915,6 +1915,17 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     self.tagsets[name] = te
 
+  ##################################################################
+  # Mapping methods.
+  def keys(self, *, prefix=None):
+    return self.tagsets.keys(prefix=None)
+
+  def __iter__(self):
+    return self.keys()
+
+  def __delitem__(self, index):
+    del self.tagsets[index]
+
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
