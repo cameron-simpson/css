@@ -1905,6 +1905,8 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     return True
 
+  ##################################################################
+  # TagSets required methods
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.tagsets`.
     '''
@@ -1941,7 +1943,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for key, tags in self.tagsets.items():
+    for key, tags in self.items():
       type_name = cutprefix(key, 'type.')
       if type_name is not key:
         yield type_name, tags
@@ -1949,7 +1951,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def type_names(self):
     ''' Generator yielding defined type names.
     '''
-    for key in self.tagsets.keys():
+    for key in self.keys():
       type_name = cutprefix(key, 'type.')
       if type_name is not key:
         yield type_name
@@ -2183,6 +2185,9 @@ class TagFile(SingletonMixin, TagSets):
     if prefix:
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
+
+  def __iter__(self):
+    return self.keys()
 
   def values(self, prefix=None):
     ''' `tagsets.values`
