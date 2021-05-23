@@ -189,7 +189,7 @@ An example:
 '''
 
 from abc import ABC, abstractmethod
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, MutableMapping
 from datetime import date, datetime
 import errno
 import fnmatch
@@ -1660,7 +1660,7 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return self._tags.get(self._prefix)
 
-class TagSets(MultiOpenMixin, ABC):
+class TagSets(MultiOpenMixin, MutableMapping):
   ''' Base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
