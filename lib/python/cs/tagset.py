@@ -1878,16 +1878,16 @@ class TagsOntology(SingletonMixin, TagSets):
   }
 
   @classmethod
-  def _singleton_key(cls, te_mapping):
-    return id(te_mapping)
+  def _singleton_key(cls, tagsets):
+    return id(tagsets)
 
-  def __init__(self, te_mapping):
-    if hasattr(self, 'te_mapping'):
+  def __init__(self, tagsets):
+    if hasattr(self, 'tagsets'):
       return
     self.__dict__.update(
-        te_mapping=te_mapping,
+        tagsets=tagsets,
         default_factory=getattr(
-            te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
+            tagsets, 'default_factory', lambda name: TagSet(_ontology=self)
         ),
     )
 
@@ -1897,7 +1897,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
-    return dict(self.te_mapping)
+    return dict(self.tagsets)
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
@@ -1906,14 +1906,14 @@ class TagsOntology(SingletonMixin, TagSets):
     return True
 
   def get(self, name, default=None):
-    ''' Proxy `.get` through to `self.te_mapping`.
+    ''' Proxy `.get` through to `self.tagsets`.
     '''
-    return self.te_mapping.get(name, default)
+    return self.tagsets.get(name, default)
 
   def __setitem__(self, name, te):
     ''' Save `te` against the key `name`.
     '''
-    self.te_mapping[name] = te
+    self.tagsets[name] = te
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
