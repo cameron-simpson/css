@@ -608,7 +608,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def add(self, tag, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    return self.set(tag, *kw)
+    return self.set(tag, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
