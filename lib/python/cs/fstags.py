@@ -79,9 +79,9 @@ from getopt import getopt, GetoptError
 import json
 import os
 from os.path import (
-    abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile
+    abspath, basename, dirname, exists as existspath, expanduser, isabs as
+    isabspath, isdir as isdirpath, isfile as isfilepath, join as joinpath,
+    realpath, relpath, samefile
 )
 from pathlib import PurePath
 import shutil
@@ -687,10 +687,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       )
     if not argv:
       print(ont)
-      return
+      return 0
+    print("argv =", repr(argv))
     with stackattrs(options, ontology=ont):
-      TagsOntologyCommand().run([options.cmd] + argv, options=options)
-    return
+      return TagsOntologyCommand(argv, **options.__dict__).run()
 
   def cmd_rename(self, argv):
     ''' Usage: {cmd} -n newbasename_format paths...
@@ -1038,9 +1038,9 @@ class FSTags(MultiOpenMixin):
     return self.open_ontology(ontpath)
 
   def open_ontology(self, ontpath):
-    X("%s.ontology => %r", self, ontpath)
+    ''' Open the contology file at `ontpath`.
+    '''
     ont_tagfile = self._tagfile(ontpath, no_ontology=True)
-    X("ont_tagfile=%r", ont_tagfile)
     ont = TagsOntology(ont_tagfile)
     ont_tagfile.ontology = ont
     return ont
@@ -1053,8 +1053,6 @@ class FSTags(MultiOpenMixin):
     '''
     if ontbase is None:
       ontbase = self.ontology_filepath
-    X("ont for %r, ontbase=%r", dirpath, ontbase)
-    X("findup from %r", realpath(dirpath))
     ontdirpath = next(
         findup(
             realpath(dirpath),
@@ -1075,7 +1073,7 @@ class FSTags(MultiOpenMixin):
     ontpath = self.find_ontpath(dirpath, ontbase=ontbase)
     if ontpath is None:
       return None
-    return self.open_ontlogy(ontpath)
+    return self.open_ontology(ontpath)
 
   @locked
   def ontology_for(self, path, ontbase=None):
@@ -1092,7 +1090,7 @@ class FSTags(MultiOpenMixin):
     dirpath = path if isdirpath(path) else dirname(path)
     ont = cache.get(dirpath)
     if ont is None:
-      ont = self.find_ontology(dirpath)
+      ont = self.find_ontology(dirpath, ontbase=ontbase)
     if ont is not None:
       cache[dirpath] = ont
     return ont
@@ -1414,6 +1412,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
+# pylint: disable=too-many-ancestors
 class TaggedPath(TagSet, HasFSTagsMixin):
   ''' Class to manipulate the tags for a specific path.
   '''
