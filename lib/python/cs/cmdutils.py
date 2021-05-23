@@ -461,10 +461,14 @@ class BaseCommand:
     return cls(argv).run(**kw)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def run(self):
+  def run(self, **kw_options):
     ''' Run a command.
         Returns the exit status of the command.
         May raise `GetoptError` from subcommands.
+
+        Any keyword arguments are used to override `self.options` attributes
+        for the duration of the run,
+        for example to presupply a shared `RunState` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -497,9 +501,10 @@ class BaseCommand:
               runstate=runstate,
               upd=self.loginfo.upd,
           ):
-            with self.run_context():
-              with main_context:
-                return main(main_argv)
+            with stackattrs(options, **kw_options):
+              with self.run_context():
+                with main_context:
+                  return main()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(main_cmd, options, e,
