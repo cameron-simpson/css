@@ -182,7 +182,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    self.options.ontology_path = None
+    self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
@@ -198,7 +198,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Push the `FSTags`.
     '''
     options = self.options
-    fstags = FSTags(ontologyfile=options.ontology_path)
+    fstags = FSTags(ontology_filepath=options.ontology_path)
     with fstags:
       with stackattrs(options, fstags=fstags):
         yield
@@ -932,15 +932,15 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile_basename=None, ontologyfile=None):
+  def __init__(self, tagsfile_basename=None, ontology_filepath=None):
     MultiOpenMixin.__init__(self)
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
-    if ontologyfile is None:
-      ontologyfile = tagsfile_basename + '-ontology'
+    if ontology_filepath is None:
+      ontology_filepath = tagsfile_basename + '-ontology'
     self.config = FSTagsConfig()
     self.config.tagsfile_basename = tagsfile_basename
-    self.config.ontologyfile = ontologyfile
+    self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
@@ -985,10 +985,10 @@ class FSTags(MultiOpenMixin):
     return self.config.tagsfile_basename
 
   @property
-  def ontologyfile(self):
+  def ontology_filepath(self):
     ''' The ontology file basename.
     '''
-    return self.config.ontologyfile
+    return self.config.ontology_filepath
 
   def __str__(self):
     return "%s(tagsfile_basename=%r)" % (
@@ -1026,43 +1026,75 @@ class FSTags(MultiOpenMixin):
 
   @property
   def ontology(self):
-    ''' The primary `TagsOntology`, or `None` if `self.ontologyfile` was `None`.
+    ''' The primary `TagsOntology`, or `None` if `self.ontology_filepath` was `None`.
     '''
-    if not self.ontologyfile:
+    ontpath = self.ontology_filepath
+    if not ontpath:
       return None
-    ont_tagfile = self._tagfile(self.ontologyfile, no_ontology=True)
+    if not isabspath(ontpath):
+      ontpath = self.find_ontpath('.', ontbase=ontpath)
+      if ontpath is None:
+        return None
+    return self.open_ontology(ontpath)
+
+  def open_ontology(self, ontpath):
+    X("%s.ontology => %r", self, ontpath)
+    ont_tagfile = self._tagfile(ontpath, no_ontology=True)
+    X("ont_tagfile=%r", ont_tagfile)
     ont = TagsOntology(ont_tagfile)
     ont_tagfile.ontology = ont
     return ont
 
+  def find_ontpath(self, dirpath, ontbase=None):
+    ''' Locate an ontology file for the directory `dirpath`.
+        The optional `ontbase` may override the relative path to the file,
+        default is `self.ontology_filepath`.
+        Return the found ontology file or `None` if not found.
+    '''
+    if ontbase is None:
+      ontbase = self.ontology_filepath
+    X("ont for %r, ontbase=%r", dirpath, ontbase)
+    X("findup from %r", realpath(dirpath))
+    ontdirpath = next(
+        findup(
+            realpath(dirpath),
+            lambda p: isfilepath(joinpath(p, ontbase)),
+            first=True
+        )
+    )
+    if ontdirpath is None:
+      return None
+    return joinpath(ontdirpath, ontbase)
+
+  def find_ontology(self, dirpath, ontbase=None):
+    ''' Locate an ontology for the directory `dirpath`.
+        The optional `ontbase` may override the relative path to the file,
+        default is `self.ontology_filepath`.
+        Return a `TagOntology` or `None` if not found.
+    '''
+    ontpath = self.find_ontpath(dirpath, ontbase=ontbase)
+    if ontpath is None:
+      return None
+    return self.open_ontlogy(ontpath)
+
   @locked
-  def ontology_for(self, path):
+  def ontology_for(self, path, ontbase=None):
     ''' Return the `TagsOntology` associated with `path`.
         Returns `None` if an ontology cannot be found.
     '''
     ont = self.ontology
     if ont:
+      # global ontology, use it
       return ont
+    # find an ontology file in the filesystem above path
     cache = self._dirpath_ontologies
     path = abspath(path)
     dirpath = path if isdirpath(path) else dirname(path)
     ont = cache.get(dirpath)
     if ont is None:
-      # locate the ancestor directory containing the first ontology file
-      ontbase = self.ontologyfile
-      ontdirpath = next(
-          findup(
-              realpath(dirpath),
-              lambda p: isfilepath(joinpath(p, ontbase)),
-              first=True
-          )
-      )
-      if ontdirpath is not None:
-        ontpath = joinpath(ontdirpath, ontbase)
-        ont_tagfile = self._tagfile(ontpath, no_ontology=True)
-        ont = TagsOntology(ont_tagfile)
-        ont_tagfile.ontology = ont
-        cache[dirpath] = ont
+      ont = self.find_ontology(dirpath)
+    if ont is not None:
+      cache[dirpath] = ont
     return ont
 
   def path_tagfiles(self, filepath):
