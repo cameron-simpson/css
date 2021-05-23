@@ -68,7 +68,7 @@ case "$mount_path" in
             ;;
 esac
 
-pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g' )
+pathbase=$( printf '%s\n' "$path" | sed 's|//$||; s|//*|__|g; s/\./_/g' )
 mnt_point=$MNT_BASE/$host/$pathbase
 
 if [ $umount ]
@@ -83,7 +83,8 @@ else
     set -ue
     case "$type" in
       ssh | sshfs )
-        sshfs -o reconnect -- "$host:$path" "$mnt_point"
+        set -x
+        tm "MNT_${host}_${pathbase}" set-x sshfs -f -o reconnect -- "$host:$path" "$mnt_point"
         ;;
       *)echo "$cmd: $mount_point: unsupported type: $type" >&2
         exit 1
