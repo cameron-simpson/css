@@ -449,7 +449,6 @@ class BaseCommand:
   def apply_opts(self, opts):
     ''' Apply command line options.
     '''
-    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
@@ -490,16 +489,16 @@ class BaseCommand:
         main_cmd = self.cmd  # used in "except" below
         raise GetoptError("bad invocation")
       main, main_cmd, main_argv, main_context = self._run
-      upd_context = self.loginfo.upd
-      if upd_context is None:
-        upd_context = nullcontext()
-      with RunState(main_cmd) as runstate:
+      runstate = getattr(options, 'runstate', RunState(main_cmd))
+      upd = getattr(options, 'upd', self.loginfo.upd)
+      upd_context = nullcontext() if upd is None else upd
+      with runstate:
         with upd_context:
           with stackattrs(
               options,
               cmd=main_cmd,
               runstate=runstate,
-              upd=self.loginfo.upd,
+              upd=upd,
           ):
             with stackattrs(options, **kw_options):
               with self.run_context():
