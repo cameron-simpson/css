@@ -22,7 +22,7 @@ usage="Usage:
     mount-path
         ALL
           Scan the file
-        ssh://host/path
+        ssh://host/path or host:path
           Note that the remote path commences _after_ the slash
           separating the host from the path, so an absolute path will
           have 2 slashes after the host.
