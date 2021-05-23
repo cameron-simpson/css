@@ -1,3 +1,4 @@
+let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
 cs.pop3: buffering for the SSL mode
 an atomic-sh make scratch dir then rename to target name decorator
 cs.units: maybe we can embed "%2.1f" in the UnitStep instead of max_width? may be faster
