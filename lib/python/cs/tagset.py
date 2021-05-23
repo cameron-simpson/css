@@ -189,7 +189,8 @@ An example:
 '''
 
 from abc import ABC, abstractmethod
-from collections import defaultdict, namedtuple, MutableMapping
+from collections import defaultdict, namedtuple
+from collections.abc import MutableMapping
 from datetime import date, datetime
 import errno
 import fnmatch
@@ -1545,6 +1546,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
 TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
+# pylint: disable=too-many-ancestors
 class TagSetPrefixView(FormatableMixin):
   ''' A view of a `TagSet` via a `prefix`.
 
@@ -1570,8 +1572,7 @@ class TagSetPrefixView(FormatableMixin):
       return repr(
           dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
       )
-    else:
-      return FStr(tag.value)
+    return FStr(tag.value)
 
   def __repr__(self):
     return "%s:%s%r" % (type(self).__name__, self._prefix_, dict(self.items()))
@@ -1628,9 +1629,13 @@ class TagSetPrefixView(FormatableMixin):
     del self._tags[self._prefix_ + k]
 
   def items(self):
+    ''' Return an iterable of the items (`Tag` name, `Tag`).
+    '''
     return map(lambda k: (k, self[k]), self.keys())
 
   def values(self):
+    ''' Return an iterable of the values (`Tag`s).
+    '''
     return map(lambda k: self[k], self.keys())
 
   def __getattr__(self, attr):
@@ -1762,6 +1767,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
     )
 
   @abstractmethod
+  # pylint: disable=arguments-differ
   def keys(self, *, prefix=None):
     ''' Return the keys starting with `prefix+'.'`
         or all keys if `prefix` is `None`.
@@ -1773,6 +1779,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
     '''
     return self.keys()
 
+  # pylint: disable=arguments-differ
   def values(self, *, prefix=None):
     ''' Generator yielding the mapping values (`TagSet`s),
         optionally constrained to keys starting with `prefix+'.'`.
@@ -1780,6 +1787,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
     for k in self.keys(prefix=prefix):
       yield self.get(k)
 
+  # pylint: disable=arguments-differ
   def items(self, *, prefix=None):
     ''' Generator yielding `(key,value)` pairs,
         optionally constrained to keys starting with `prefix+'.'`.
@@ -2373,6 +2381,7 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
+  # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
     ''' Usage:
           {cmd}
@@ -2589,6 +2598,8 @@ class RegexpTagRule:
     return tags
 
 def selftest(argv):
+  ''' Run some ad hoc self tests.
+  '''
   from pprint import pprint  # pylint: disable=import-outside-toplevel
   setup_logging(argv.pop(0))
   ont = TagsOntology(
