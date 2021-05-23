@@ -1400,6 +1400,14 @@ class SQLTags(TagSets):
         yield name
     conn.close()
 
+  def __iter__(self):
+    return self.keys()
+
+  def __delitem__(self, index):
+    raise NotImplementedError(
+        "no %s.__delitem__(%s)" % (type(self).__name__, r(index))
+    )
+
   def items(self, *, prefix=None):
     ''' Return an iterable of `(tagset_name,TagSet)`.
         Excludes unnamed `TagSet`s.
@@ -1990,7 +1998,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.
   '''
 
-  def cmd_ns(self, argv):
+  def cmd_list(self, argv):
     ''' Usage: {cmd} entity-names...
           List entities and their tags.
     '''
@@ -2014,6 +2022,8 @@ class SQLTagsCommand(BaseSQLTagsCommand):
         for tag in sorted(te.tags()):
           print(" ", tag)
     return xit
+
+  cmd_ls = cmd_list
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -15,6 +15,7 @@ import time
 from cs.context import setup_cmgr
 from cs.logutils import error, warning
 from cs.obj import Proxy
+from cs.pfx import pfx_method
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
@@ -479,7 +480,7 @@ class RunState(object):
     )
 
   def __enter__(self):
-    self.start()
+    self.start(running_ok=True)
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -512,17 +513,17 @@ class RunState(object):
       label = "stopped"
     return label
 
-  def start(self):
+  @pfx_method
+  def start(self, running_ok=False):
     ''' Start: adjust state, set `start_time` to now.
         Sets `.cancelled` to `False` and sets `.running` to `True`.
     '''
-    if self.running:
-      warning("runstate.start() when already running")
+    if not running_ok and self.running:
+      warning("already running")
       print("runstate.start(): originally started from:", file=sys.stderr)
       stack_dump(Fs=self._started_from)
     else:
       self._started_from = stack_frames()
-    assert not self.running
     self.cancelled = False
     self.running = True
 
@@ -530,7 +531,6 @@ class RunState(object):
     ''' Stop: adjust state, set `stop_time` to now.
         Sets sets `.running` to `False`.
     '''
-    assert self.running
     self.running = False
 
   # compatibility

@@ -256,7 +256,7 @@ class BaseCommand:
     '''
     self._run = None  # becomes the run state later if no GetoptError
     self._printed_usage = False
-    self.options = self.OPTIONS_CLASS()
+    options = self.options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -266,7 +266,7 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    log_level = getattr(self.options, 'log_level', None)
+    log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.cmd = cmd
@@ -275,7 +275,7 @@ class BaseCommand:
     self.apply_defaults()
     # override the default options
     for option, value in kw_options.items():
-      setattr(self.options, option, value)
+      setattr(options, option, value)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
@@ -299,7 +299,7 @@ class BaseCommand:
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
+          main_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError(
@@ -309,22 +309,23 @@ class BaseCommand:
               )
           )
         try:
-          main_is_class = issubclass(main, BaseCommand)
+          main_is_class = issubclass(main_method, BaseCommand)
         except TypeError:
           main_is_class = False
         if main_is_class:
-          subcmd_cls = main
-          main = subcmd_cls(argv, cmd=subcmd).run
+          subcmd_cls = main_method
+          main = lambda: subcmd_cls(argv, cmd=subcmd).run
+        else:
+          main = lambda: main_method(argv)
         main_cmd = subcmd
         main_context = Pfx(subcmd)
       else:
         try:
-          main = self.main
+          main = lambda: self.main(argv, **kw)
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
         main_cmd = cmd
         main_context = nullcontext()
-      # stash for use by .run()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, self.options, e, self.usage):
@@ -333,12 +334,6 @@ class BaseCommand:
       raise
     else:
       self._run = main, main_cmd, argv, main_context
-
-  @classmethod
-  def run_argv(cls, argv=None):
-    ''' Create an instance for `argv` and call its `.run()` method.
-    '''
-    return cls(argv).run()
 
   @classmethod
   def subcommands(cls):
@@ -454,16 +449,25 @@ class BaseCommand:
   def apply_opts(self, opts):
     ''' Apply command line options.
     '''
-    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
 
+  @classmethod
+  def run_argv(cls, argv, **kw):
+    ''' Create an instance for `argv` and call its `.run()` method.
+    '''
+    return cls(argv).run(**kw)
+
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def run(self):
+  def run(self, **kw_options):
     ''' Run a command.
         Returns the exit status of the command.
         May raise `GetoptError` from subcommands.
+
+        Any keyword arguments are used to override `self.options` attributes
+        for the duration of the run,
+        for example to presupply a shared `RunState` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -485,20 +489,21 @@ class BaseCommand:
         main_cmd = self.cmd  # used in "except" below
         raise GetoptError("bad invocation")
       main, main_cmd, main_argv, main_context = self._run
-      upd_context = self.loginfo.upd
-      if upd_context is None:
-        upd_context = nullcontext()
-      with RunState(main_cmd) as runstate:
+      runstate = getattr(options, 'runstate', RunState(main_cmd))
+      upd = getattr(options, 'upd', self.loginfo.upd)
+      upd_context = nullcontext() if upd is None else upd
+      with runstate:
         with upd_context:
           with stackattrs(
               options,
               cmd=main_cmd,
               runstate=runstate,
-              upd=self.loginfo.upd,
+              upd=upd,
           ):
-            with self.run_context():
-              with main_context:
-                return main(main_argv)
+            with stackattrs(options, **kw_options):
+              with self.run_context():
+                with main_context:
+                  return main()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(main_cmd, options, e,

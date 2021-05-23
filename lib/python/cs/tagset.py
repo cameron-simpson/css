@@ -190,6 +190,7 @@ An example:
 
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
+from collections.abc import MutableMapping
 from datetime import date, datetime
 import errno
 import fnmatch
@@ -604,7 +605,11 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     super().__setitem__(tag_name, value)
 
   # "set" mode
-  add = set
+  # note: cannot just be add=set because it won't follow subclass overrides
+  def add(self, tag, **kw):
+    ''' Adding a `Tag` calls the class `set()` method.
+    '''
+    return self.set(tag, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
@@ -1541,6 +1546,7 @@ class TagBasedTest(namedtuple('TagBasedTest', 'spec choice tag comparison'),
 TagSetCriterion.CRITERION_PARSE_CLASSES.append(TagBasedTest)
 TagSetCriterion.TAG_BASED_TEST_CLASS = TagBasedTest
 
+# pylint: disable=too-many-ancestors
 class TagSetPrefixView(FormatableMixin):
   ''' A view of a `TagSet` via a `prefix`.
 
@@ -1566,8 +1572,7 @@ class TagSetPrefixView(FormatableMixin):
       return repr(
           dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
       )
-    else:
-      return FStr(tag.value)
+    return FStr(tag.value)
 
   def __repr__(self):
     return "%s:%s%r" % (type(self).__name__, self._prefix_, dict(self.items()))
@@ -1624,9 +1629,13 @@ class TagSetPrefixView(FormatableMixin):
     del self._tags[self._prefix_ + k]
 
   def items(self):
+    ''' Return an iterable of the items (`Tag` name, `Tag`).
+    '''
     return map(lambda k: (k, self[k]), self.keys())
 
   def values(self):
+    ''' Return an iterable of the values (`Tag`s).
+    '''
     return map(lambda k: self[k], self.keys())
 
   def __getattr__(self, attr):
@@ -1655,7 +1664,7 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return self._tags.get(self._prefix)
 
-class TagSets(MultiOpenMixin, ABC):
+class TagSets(MultiOpenMixin, MutableMapping):
   ''' Base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
@@ -1664,7 +1673,7 @@ class TagSets(MultiOpenMixin, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called as
+      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called
         from `__missing__` for missing names,
         and also from `add`.
         If set to `None` then `__getitem__` will raise `KeyError`
@@ -1735,23 +1744,8 @@ class TagSets(MultiOpenMixin, ABC):
     self[name] = te
     return te
 
-  def add(self, name: str, **kw):
-    ''' Return a new `TagSet` associated with `name`,
-        which should not already be in use.
-    '''
-    te = self.get(name, default=self._missing)
-    if te is not self._missing:
-      raise ValueError("%r: name already present" % (name,))
-    return self.default_factory(name, **kw)
-
-  @abstractmethod
-  def get(self, name: str, default=None):
-    ''' Return the `TagSet` associated with `name`,
-        or `default` if there is no such entity.
-    '''
-    raise NotImplementedError(
-        "%s: no .get(name,default=None) method" % (type(self).__name__,)
-    )
+  #################################################################
+  # MutableMapping methods
 
   def __getitem__(self, name: str):
     ''' Obtain the `TagSet` associated with `name`.
@@ -1772,17 +1766,64 @@ class TagSets(MultiOpenMixin, ABC):
         "%s: no .__setitem__(name,tagset) method" % (type(self).__name__,)
     )
 
+  @abstractmethod
+  # pylint: disable=arguments-differ
+  def keys(self, *, prefix=None):
+    ''' Return the keys starting with `prefix+'.'`
+        or all keys if `prefix` is `None`.
+    '''
+    raise NotImplementedError("%s: no .keys() method" % (type(self).__name__,))
+
+  def __iter__(self):
+    ''' Iteration returns the keys.
+    '''
+    return self.keys()
+
+  # pylint: disable=arguments-differ
+  def values(self, *, prefix=None):
+    ''' Generator yielding the mapping values (`TagSet`s),
+        optionally constrained to keys starting with `prefix+'.'`.
+    '''
+    for k in self.keys(prefix=prefix):
+      yield self.get(k)
+
+  # pylint: disable=arguments-differ
+  def items(self, *, prefix=None):
+    ''' Generator yielding `(key,value)` pairs,
+        optionally constrained to keys starting with `prefix+'.'`.
+    '''
+    for k in self.keys(prefix=prefix):
+      yield k, self.get(k)
+
   def __contains__(self, name: str):
     ''' Test whether `name` is present in `self.te_mapping`.
     '''
     missing = object()
-    return self.get(name) is not missing
+    return self.get(name, missing) is not missing
 
   def __len__(self):
     ''' Return the length of `self.te_mapping`.
     '''
     raise NotImplementedError(
         "%s: no .__len__() method" % (type(self).__name__,)
+    )
+
+  def add(self, name: str, **kw):
+    ''' Return a new `TagSet` associated with `name`,
+        which should not already be in use.
+    '''
+    te = self.get(name, default=self._missing)
+    if te is not self._missing:
+      raise ValueError("%r: name already present" % (name,))
+    return self.default_factory(name, **kw)
+
+  @abstractmethod
+  def get(self, name: str, default=None):
+    ''' Return the `TagSet` associated with `name`,
+        or `default` if there is no such entity.
+    '''
+    raise NotImplementedError(
+        "%s: no .get(name,default=None) method" % (type(self).__name__,)
     )
 
   def subdomain(self, subname):
@@ -1873,16 +1914,16 @@ class TagsOntology(SingletonMixin, TagSets):
   }
 
   @classmethod
-  def _singleton_key(cls, te_mapping):
-    return id(te_mapping)
+  def _singleton_key(cls, tagsets):
+    return id(tagsets)
 
-  def __init__(self, te_mapping):
-    if hasattr(self, 'te_mapping'):
+  def __init__(self, tagsets):
+    if hasattr(self, 'tagsets'):
       return
     self.__dict__.update(
-        te_mapping=te_mapping,
+        tagsets=tagsets,
         default_factory=getattr(
-            te_mapping, 'default_factory', lambda name: TagSet(_ontology=self)
+            tagsets, 'default_factory', lambda name: TagSet(_ontology=self)
         ),
     )
 
@@ -1892,7 +1933,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
-    return dict(self.te_mapping)
+    return dict(self.tagsets)
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
@@ -1900,15 +1941,28 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     return True
 
+  ##################################################################
+  # TagSets required methods
   def get(self, name, default=None):
-    ''' Proxy `.get` through to `self.te_mapping`.
+    ''' Proxy `.get` through to `self.tagsets`.
     '''
-    return self.te_mapping.get(name, default)
+    return self.tagsets.get(name, default)
 
   def __setitem__(self, name, te):
     ''' Save `te` against the key `name`.
     '''
-    self.te_mapping[name] = te
+    self.tagsets[name] = te
+
+  ##################################################################
+  # Mapping methods.
+  def keys(self, *, prefix=None):
+    return self.tagsets.keys(prefix=None)
+
+  def __iter__(self):
+    return self.keys()
+
+  def __delitem__(self, index):
+    del self.tagsets[index]
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -1925,7 +1979,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for key, tags in self.tagsets.items():
+    for key, tags in self.items():
       type_name = cutprefix(key, 'type.')
       if type_name is not key:
         yield type_name, tags
@@ -1933,7 +1987,7 @@ class TagsOntology(SingletonMixin, TagSets):
   def type_names(self):
     ''' Generator yielding defined type names.
     '''
-    for key in self.tagsets.keys():
+    for key in self.keys():
       type_name = cutprefix(key, 'type.')
       if type_name is not key:
         yield type_name
@@ -2119,7 +2173,7 @@ class TagFile(SingletonMixin, TagSets):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, **kw):
+  def _singleton_key(cls, filepath, **_):
     return filepath
 
   @typechecked
@@ -2156,8 +2210,8 @@ class TagFile(SingletonMixin, TagSets):
     '''
     self.tagsets[name] = te
 
-  # Mapping mathods, proxying through to .tagsets.
-  def keys(self, prefix=None):
+  # Mapping methods, proxying through to .tagsets.
+  def keys(self, *, prefix=None):
     ''' `tagsets.keys`
 
         If the options `prefix` is supplied,
@@ -2167,28 +2221,6 @@ class TagFile(SingletonMixin, TagSets):
     if prefix:
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
-
-  def values(self, prefix=None):
-    ''' `tagsets.values`
-
-        If the optional `prefix` is supplied,
-        yield only those values whose keys start with `prefix`.
-    '''
-    if not prefix:
-      # use native values, faster
-      return self.tagsets.values()
-    return map(lambda kv: kv[1], self.items(prefix=prefix))
-
-  def items(self, prefix=None):
-    ''' `tagsets.items`
-
-        If the optional `prefix` is supplied,
-        yield only those items whose keys start with `prefix`.
-    '''
-    if not prefix:
-      # use native items, faster
-      return self.tagsets.items()
-    return filter(lambda kv: kv[0].startswith(prefix), self.tagsets.items())
 
   def __delitem__(self, name):
     del self.tagsets[name]
@@ -2349,6 +2381,7 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
+  # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
     ''' Usage:
           {cmd}
@@ -2361,12 +2394,15 @@ class TagsOntologyCommand(BaseCommand):
             Edit the tags for the metadata names matching the
             meta_names_patterns.
           {cmd} type_name list
-            Listt the metadata names for this type and their tags.
+            List the metadata names for this type and their tags.
+          {cmd} type_name + entity_name [tags...]
+            Create meta.entity_name and apply the tags.
     '''
     options = self.options
     ont = options.ontology
     if not argv:
       # list defined types
+      print("Types:")
       for type_name, tags in ont.types():
         print(type_name, tags)
       return 0
@@ -2374,6 +2410,7 @@ class TagsOntologyCommand(BaseCommand):
     with Pfx(type_name):
       tags = ont.type(type_name)
       if not argv:
+        print("Tags for type", type_name, "=", tags)
         for tag in sorted(tags):
           print(tag)
         return 0
@@ -2402,6 +2439,18 @@ class TagsOntologyCommand(BaseCommand):
             raise GetoptError("extra arguments: %r" % (argv,))
           for meta_name in sorted(ont.meta_names(type_name=type_name)):
             print(meta_name, ont.meta(type_name, meta_name))
+          return 0
+        if subcmd == '+':
+          if not argv:
+            raise GetoptError("missing entity_name")
+          entity_name = argv.pop(0)
+          print("entity_name =", entity_name)
+          etags = ont.meta(type_name, entity_name)
+          print("entity tags =", etags)
+          for arg in argv:
+            with Pfx("%s", arg):
+              tag = Tag.from_str(arg)
+              etags.add(tag)
           return 0
         raise GetoptError("unrecognised subcommand")
 
@@ -2549,6 +2598,8 @@ class RegexpTagRule:
     return tags
 
 def selftest(argv):
+  ''' Run some ad hoc self tests.
+  '''
   from pprint import pprint  # pylint: disable=import-outside-toplevel
   setup_logging(argv.pop(0))
   ont = TagsOntology(
