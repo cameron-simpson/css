@@ -2369,6 +2369,7 @@ class TagsOntologyCommand(BaseCommand):
     ont = options.ontology
     if not argv:
       # list defined types
+      print("Types:")
       for type_name, tags in ont.types():
         print(type_name, tags)
       return 0
@@ -2376,6 +2377,7 @@ class TagsOntologyCommand(BaseCommand):
     with Pfx(type_name):
       tags = ont.type(type_name)
       if not argv:
+        print("Tags for type", type_name, "=", tags)
         for tag in sorted(tags):
           print(tag)
         return 0
