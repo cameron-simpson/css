@@ -2214,9 +2214,6 @@ class TagFile(SingletonMixin, TagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-  def __iter__(self):
-    return self.keys()
-
   def values(self, prefix=None):
     ''' `tagsets.values`
 
