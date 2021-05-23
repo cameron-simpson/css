@@ -335,12 +335,6 @@ class BaseCommand:
       self._run = main, main_cmd, argv, main_context
 
   @classmethod
-  def run_argv(cls, argv=None):
-    ''' Create an instance for `argv` and call its `.run()` method.
-    '''
-    return cls(argv).run()
-
-  @classmethod
   def subcommands(cls):
     ''' Return a mapping of subcommand names to class attributes
         for attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
@@ -458,6 +452,12 @@ class BaseCommand:
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
+
+  @classmethod
+  def run_argv(cls, argv, **kw):
+    ''' Create an instance for `argv` and call its `.run()` method.
+    '''
+    return cls(argv).run(**kw)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def run(self):
