@@ -299,7 +299,7 @@ class BaseCommand:
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
+          main_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError(
@@ -309,22 +309,23 @@ class BaseCommand:
               )
           )
         try:
-          main_is_class = issubclass(main, BaseCommand)
+          main_is_class = issubclass(main_method, BaseCommand)
         except TypeError:
           main_is_class = False
         if main_is_class:
-          subcmd_cls = main
-          main = subcmd_cls(argv, cmd=subcmd).run
+          subcmd_cls = main_method
+          main = lambda: subcmd_cls(argv, cmd=subcmd).run
+        else:
+          main = lambda: main_method(argv)
         main_cmd = subcmd
         main_context = Pfx(subcmd)
       else:
         try:
-          main = self.main
+          main = lambda: self.main(argv, **kw)
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
         main_cmd = cmd
         main_context = nullcontext()
-      # stash for use by .run()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, self.options, e, self.usage):
