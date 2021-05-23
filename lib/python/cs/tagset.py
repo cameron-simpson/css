@@ -608,7 +608,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def add(self, tag, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    X("plumb to self.set")
     return self.set(tag, *kw)
 
   def __delitem__(self, tag_name):
@@ -2436,9 +2435,9 @@ class TagsOntologyCommand(BaseCommand):
           etags = ont.meta(type_name, entity_name)
           print("entity tags =", etags)
           for arg in argv:
-            tag = Tag.from_str(arg)
-            print("add tag", tag)
-            etags.add(tag)
+            with Pfx("%s", arg):
+              tag = Tag.from_str(arg)
+              etags.add(tag)
           return 0
         raise GetoptError("unrecognised subcommand")
 
