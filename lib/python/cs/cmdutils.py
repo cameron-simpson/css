@@ -256,7 +256,7 @@ class BaseCommand:
     '''
     self._run = None  # becomes the run state later if no GetoptError
     self._printed_usage = False
-    self.options = self.OPTIONS_CLASS()
+    options = self.options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -266,7 +266,7 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    log_level = getattr(self.options, 'log_level', None)
+    log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.cmd = cmd
@@ -275,7 +275,7 @@ class BaseCommand:
     self.apply_defaults()
     # override the default options
     for option, value in kw_options.items():
-      setattr(self.options, option, value)
+      setattr(options, option, value)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
