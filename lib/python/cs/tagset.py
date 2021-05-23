@@ -1791,7 +1791,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
     ''' Test whether `name` is present in `self.te_mapping`.
     '''
     missing = object()
-    return self.get(name) is not missing
+    return self.get(name, missing) is not missing
 
   def __len__(self):
     ''' Return the length of `self.te_mapping`.
