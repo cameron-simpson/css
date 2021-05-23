@@ -1998,7 +1998,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
   ''' `sqltags` main command line utility.
   '''
 
-  def cmd_ns(self, argv):
+  def cmd_list(self, argv):
     ''' Usage: {cmd} entity-names...
           List entities and their tags.
     '''
@@ -2022,6 +2022,8 @@ class SQLTagsCommand(BaseSQLTagsCommand):
         for tag in sorted(te.tags()):
           print(" ", tag)
     return xit
+
+  cmd_ls = cmd_list
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
