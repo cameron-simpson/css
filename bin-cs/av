@@ -1,0 +1,113 @@
+#!/bin/sh
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd convs... srcfile [dstfile]"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+acodec=
+vcodec=
+ext=
+dst=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    h264 | avc | avc1 )
+      if [ -n "$vcodec" ]
+      then  echo "$cmd: video codec already set to $vcodec" >&2
+            badopts=1
+      else  vcodec=h264
+      fi
+      ;;
+    h265 | hevc )
+      if [ -n "$vcodec" ]
+      then  echo "$cmd: video codec already set to $vcodec" >&2
+            badopts=1
+      else  vcodec=h265
+      fi
+      ;;
+    mp4 | mkv )
+      if [ -n "$ext" ]
+      then  echo "$cmd: extension already set to $ext" >&2
+            badopts=1
+      else  ext=$1
+      fi
+      ;;
+    *)break ;;
+  esac
+  shift
+done
+
+[ -n "$acodec" ] || [ -n "$vcodec" ] || {
+  echo "$cmd: an audio or video codec must be specified" >&2
+  badopts=1
+}
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing src" >&2
+  badopts=1
+else
+  src=$1
+  shift
+  if src_=$( expr "x$src" : 'x\(.*\)\.[^.][^.]*' )
+  then
+    echo "$cmd: no extension on src: $src" >&2
+    badopts=1
+  else
+    srcext=$( expr "x$src" : 'x.*\.\([^.][^.]*\)' )
+  fi
+
+  [ $# = 0 ] || {
+    dst=$1
+    shift
+    [ -z "$ext" ] || {
+      echo "$cmd: may not specify both ext ($ext) and dstfile ($dst)" >&2
+      badopts=1
+    }
+  }
+
+  [ $# = 0 ] || {
+    echo "$cmd: extra arguments: $*" >&2
+    badopts=1
+  }
+
+  if [ -z "$vcodec" ]
+  then  vcodec=copy
+  else  src_=$src_--$vcodec
+  fi
+
+  if [ -z "$acodec" ]
+  then  acodec=copy
+  else  src_=$src_--$acodec
+  fi
+
+  [ -n "$dst" ] || {
+    dst=$src_.${ext:-${srcext:-mp4}}
+  }
+
+  [ "x$src" = "x$dst" ] || {
+    echo "$cmd: src and dst may not be the same: $src" >&2
+    badopts=1
+  }
+
+  [ -s "$src" ] || {
+    echo "$cmd: $src: not a regular file" >&2
+    badopts=1
+  }
+
+  [ ! -e "$dst" ] || {
+    echo "$cmd: $dst: already exists" >&2
+    badopts=1
+  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace ffmpeg -i "$src" -c:v "$vcodec" -c:a "$acodec" "$dst"
