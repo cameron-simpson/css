@@ -1447,7 +1447,10 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     assert tag_name != 'name'
     super().discard(tag_name, value, verbose=verbose)
 
+  @tag_or_tag_value
   def set(self, tag_name, value, **kw):
+    ''' Forbid the special tag name `'name'`, reserved for the filename.
+    '''
     assert tag_name != 'name'
     super().set(tag_name, value, **kw)
 
