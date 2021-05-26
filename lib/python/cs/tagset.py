@@ -442,7 +442,6 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return get_dotted_identifier(field_name)
 
   @staticmethod
-  @trace
   def get_value(arg_name, a, kw):
     assert not a
     try:
