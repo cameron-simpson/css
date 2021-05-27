@@ -175,7 +175,7 @@ case "$op" in
                       esac
                       for srcpath in $paths
                       do
-                        context="$cmd $op: \$pathvar: $srcpath"
+                        context="$cmd $op: \$$pathvar: $srcpath"
                         case "$srcpath" in
                           /*) echo "$context: ignore absolute path" >&2
                               continue
