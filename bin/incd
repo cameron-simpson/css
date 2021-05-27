@@ -89,8 +89,7 @@ then
   qdir=$( shqstr "$dir" )
   exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
 else
-  [ -z "$do_trace" ] || set -x
   cd "$dir" || exit 1
   [ -z "$pwd_opt" ] || { PWD=$( pwd "$pwd_opt" ); export PWD; }
-  exec "$@"
+  exec $trace "$@"
 fi
