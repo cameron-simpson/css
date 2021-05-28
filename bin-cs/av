@@ -29,7 +29,7 @@ do
       if [ -n "$vcodec" ]
       then  echo "$cmd: video codec already set to $vcodec" >&2
             badopts=1
-      else  vcodec=h265
+      else  vcodec=hevc
       fi
       ;;
     mp4 | mkv )
@@ -58,10 +58,10 @@ else
   shift
   if src_=$( expr "x$src" : 'x\(.*\)\.[^.][^.]*' )
   then
+    srcext=$( expr "x$src" : 'x.*\.\([^.][^.]*\)' )
+  else
     echo "$cmd: no extension on src: $src" >&2
     badopts=1
-  else
-    srcext=$( expr "x$src" : 'x.*\.\([^.][^.]*\)' )
   fi
 
   [ $# = 0 ] || {
@@ -92,7 +92,7 @@ else
     dst=$src_.${ext:-${srcext:-mp4}}
   }
 
-  [ "x$src" = "x$dst" ] || {
+  [ "x$src" = "x$dst" ] && {
     echo "$cmd: src and dst may not be the same: $src" >&2
     badopts=1
   }
