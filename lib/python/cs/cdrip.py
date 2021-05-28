@@ -43,7 +43,11 @@ __version__ = '20201004-dev'
 
 musicbrainzngs.set_useragent(__name__, __version__, os.environ['EMAIL'])
 
-DEFAULT_CDRIP_DIR = '~/var/cdrip'
+CDRIP_DEV_ENVVAR = 'CDRIP_DEV'
+CDRIP_DEV_DEFAULT = 'default'
+
+CDRIP_DIR_ENVVAR = 'CDRIP_DIR'
+CDRIP_DIR_DEFAULT = '~/var/cdrip'
 
 MBDB_PATH_ENVVAR = 'MUSICBRAINZ_SQLTAGS'
 MBDB_PATH_DEFAULT = '~/var/cache/mbdb.sqlite'
@@ -63,17 +67,22 @@ class CDRipCommand(BaseCommand):
     -d output_dir Specify the output directory path.
     -D device     Device to access. This may be omitted or "default" or
                   "" for the default device as determined by the discid module.
-                  The environment variable $CDRIP_DEV may override the default.
     -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
     -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
 
   Environment:
-    CDRIP_DEV            Default CDROM device.
-    CDRIP_DIR            Default output directory path.
+    {CDRIP_DEV_ENVVAR}            Default CDROM device.
+                         default {CDRIP_DEV_DEFAULT}.
+    {CDRIP_DIR_ENVVAR}            Default output directory path.,
+                         default {CDRIP_DIR_DEFAULT}.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
 
   USAGE_KEYWORDS = {
+      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
+      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
+      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
+      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
       'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
       'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
   }
@@ -83,8 +92,8 @@ class CDRipCommand(BaseCommand):
     '''
     options = self.options
     options.force = False
-    options.device = os.environ.get('CDRIP_DEV', "default")
-    options.dirpath = os.environ.get('CDRIP_DIR', ".")
+    options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
+    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or CDRIP_DIR_DEFAULT
     options.mbdb_path = None
 
   def apply_opts(self, opts):
