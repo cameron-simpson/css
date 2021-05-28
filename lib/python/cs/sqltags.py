@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -51,7 +50,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
-from cs.lex import FormatAsError, get_decimal_value
+from cs.lex import FormatAsError, get_decimal_value, typed_repr as r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -1727,7 +1726,6 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       with Pfx(option):
         if option == '-F':
           export_format = value.lower()
-          X("export_format => %r", export_format)
           with Pfx(export_format):
             if export_format not in ('csv', 'fstags'):
               warning("unrecognised export format, expected CSV or FSTAGS")
@@ -1741,7 +1739,6 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tagsets = sqltags.find(tag_criteria)
-    X("use export format %r", export_format)
     if export_format == 'csv':
       csvw = csv.writer(sys.stdout)
       for tags in tagsets:
