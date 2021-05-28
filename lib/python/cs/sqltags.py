@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -60,8 +61,8 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.tagset import (
-    TagSet, Tag, TagSetCriterion, TagBasedTest, TagsCommandMixin, TagsOntology,
-    TagSets, tag_or_tag_value, as_unixtime
+    TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
+    TagsOntology, TagSets, tag_or_tag_value, as_unixtime
 )
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -1707,27 +1708,54 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
       print("changed", repr(te.name or te.id))
 
   def cmd_export(self, argv):
-    ''' Usage: {cmd} {{tag[=value]|-tag}}...
+    ''' Usage: {cmd} [-F format] [{{tag[=value]|-tag}}...]
           Export entities matching all the constraints.
-          The output format is CSV data with the following columns:
-          * `unixtime`: the entity unixtime, a float
-          * `id`: the entity database row id, an integer
-          * `name`: the entity name
-          * `tags`: a column per `Tag`
+          -F format Specify the export format, either CSV or FSTAGS.
+
+          The CSV export format is CSV data with the following columns:
+          * unixtime: the entity unixtime, a float
+          * id: the entity database row id, an integer
+          * name: the entity name
+          * tags: a column per Tag
     '''
     options = self.options
     sqltags = options.sqltags
+    export_format = 'csv'
     badopts = False
+    opts, argv = getopt(argv, 'F:')
+    for option, value in opts:
+      with Pfx(option):
+        if option == '-F':
+          export_format = value.lower()
+          X("export_format => %r", export_format)
+          with Pfx(export_format):
+            if export_format not in ('csv', 'fstags'):
+              warning("unrecognised export format, expected CSV or FSTAGS")
+              badopts = True
+        else:
+          raise RuntimeError("unimplmented option")
     tag_criteria, argv = self.parse_tagset_criteria(argv)
-    if not tag_criteria:
-      warning("missing tag criteria")
+    if argv:
+      warning("extra arguments after criteria: %r", argv)
       badopts = True
     if badopts:
       raise GetoptError("bad arguments")
-    csvw = csv.writer(sys.stdout)
-    for te in sqltags.find(tag_criteria):
-      with Pfx(te):
-        csvw.writerow(te.csvrow)
+    tagsets = sqltags.find(tag_criteria)
+    X("use export format %r", export_format)
+    if export_format == 'csv':
+      csvw = csv.writer(sys.stdout)
+      for tags in tagsets:
+        with Pfx(tags):
+          csvw.writerow(tags.csvrow)
+    elif export_format == 'fstags':
+      for tags in tagsets:
+        print(
+            TagFile.tags_line(
+                tags.name, [Tag('unixtime', tags.unixtime)] + list(tags)
+            )
+        )
+    else:
+      raise RuntimeError("unimplemented export format %r" % (export_format,))
 
   # pylint: disable=too-many-locals
   def cmd_find(self, argv):
@@ -1750,7 +1778,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
           ## output_format = sqltags.resolve_format_string(value)
           output_format = value
         else:
-          raise RuntimeError("unsupported option")
+          raise RuntimeError("unimplmented option")
     tag_criteria, argv = self.parse_tagset_criteria(argv)
     if not tag_criteria:
       warning("missing tag criteria")
