@@ -43,7 +43,7 @@
         >>> # add a "bare" Tag named 'blue' with no value
         >>> tags.add('blue')
         >>> # add a "topic=tagging" Tag
-        >>> tags.add('topic','tagging')
+        >>> tags.set('topic', 'tagging')
         >>> # make a "subtopic" Tag and add it
         >>> subtopic = Tag('subtopic', 'ontologies')
         >>> tags.add(subtopic)
@@ -474,7 +474,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags
             TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
             >>> tags.c
-            TagSetPrefixView:{'z': 9, 'x': 8}
+            TagSetPrefixView:c.{'z': 9, 'x': 8}
             >>> tags.c.z
             9
 
@@ -691,7 +691,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
-            TagSetPrefixView:{'b': 1, 'd': 2}
+            TagSetPrefixView:a.{'b': 1, 'd': 2}
     '''
     if as_tagset:
       # prepare a standalone TagSet
