@@ -966,7 +966,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         self._update_multivalues(name, (), session=session)
         return etag
 
-    class Tags(Base, BasicTableMixin, PolyValueMixin):
+    class Tags(Base, BasicTableMixin, PolyValueColumnMixin):
       ''' The table of tags associated with entities.
       '''
 
@@ -981,8 +981,9 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       )
       name = Column(String, comment='tag name', index=True, primary_key=True)
 
-    class TagSubValues(Base, BasicTableMixin, PolyValueMixin):
-      ''' The table of tags associated with entities.
+    class TagSubValues(Base, BasicTableMixin, PolyValueColumnMixin):
+      ''' The table of tag value members,
+          allowing lookup of basic list member values.
       '''
 
       __tablename__ = 'tag_subvalues'
@@ -1207,6 +1208,35 @@ class SQLTagSet(SingletonMixin, TagSet):
     assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
     return e
 
+  def normalise_sql_value(self, tag_name, value):
+    ''' Convert an SQL value to a tag value.
+
+        This can be overridden by subclasses along with `normalise_tag_value`.
+        The `tag_name` is provided for context
+        in case it should influence the normalisation.
+    '''
+    if isinstance(value, str):
+      for conv in datetime.fromisoformat, date.fromisoformat:
+        try:
+          return conv(value)
+        except ValueError:
+          pass
+    return value
+
+  def normalise_tag_value(self, tag_name, value):
+    ''' Normalise `Tag` values for storage via SQL.
+        Preserve things directly expressable in JSON.
+        Convert other values via `str()`.
+
+        This can be overridden by subclasses along with `normalise_sql_value`.
+        The `tag_name` is provided for context
+        in case it should influence the normalisation.
+    '''
+    if value is None or isinstance(value,
+                                   (int, float, str, dict, list, tuple)):
+      return value
+    return str(value)
+
   # pylint: disable=arguments-differ
   @tag_or_tag_value
   def set(self, tag_name, value, *, skip_db=False, verbose=None):
@@ -1221,7 +1251,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       else:
         super().set(tag_name, value, verbose=verbose)
         if not skip_db:
-          self.add_db_tag(tag_name, value)
+          self.add_db_tag(tag_name, self.normalise_tag_value(tag_name, value))
 
   @pfx_method
   def add_db_tag(self, tag_name, value=None):
@@ -1245,7 +1275,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     else:
       super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
-        self.discard_db_tag(tag_name, value)
+        self.discard_db_tag(
+            tag_name, self.normalise_tag_value(tag_name, value)
+        )
 
   def discard_db_tag(self, tag_name, value=None):
     ''' Discard a tag from the database.
@@ -1497,7 +1529,6 @@ class SQLTags(TagSets):
         * `criteria`: an iterable of search criteria
           which should be `SQTCriterion`s
           or a `str` suitable for `SQTCriterion.from_str`.
-          A string may also be supplied, suitable for `SQTCriterion.from_str`.
     '''
     if isinstance(criteria, str):
       criteria = [criteria]
@@ -1536,9 +1567,12 @@ class SQLTags(TagSets):
         if row.tag_name is not None:
           # set the dict entry directly - we are loading db values,
           # not applying them to the db
-          tag_value = tags.pick_value(
-              row.tag_float_value, row.tag_string_value,
-              row.tag_structured_value
+          tag_value = te.normalise_sql_value(
+              row.tag_name,
+              tags.pick_value(
+                  row.tag_float_value, row.tag_string_value,
+                  row.tag_structured_value
+              )
           )
           te.set(row.tag_name, tag_value, skip_db=True)
     if not post_criteria:
