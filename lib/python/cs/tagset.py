@@ -1558,14 +1558,30 @@ class TagSetPrefixView(FormatableMixin):
       in that some things such as `__format__`
       will format the `Tag` named `prefix` if it exists
       in preference to the subtags.
+
+      Example:
+
+          >>> tags = TagSet(a=1, b=2)
+          >>> tags
+          TagSet:{'a': 1, 'b': 2}
+          >>> tags['sub.x'] = 3
+          >>> tags['sub.y'] = 4
+          >>> tags
+          TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4}
+          >>> sub = tags.sub
+          >>> sub
+          TagSetPrefixView:sub.{'x': 3, 'y': 4}
+          >>> sub.z = 5
+          >>> sub
+          TagSetPrefixView:sub.{'x': 3, 'y': 4, 'z': 5}
+          >>> tags
+          TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
   @typechecked
   @require(lambda prefix: len(prefix) > 0)
   def __init__(self, tags, prefix: str):
-    self._tags = tags
-    self._prefix = prefix
-    self._prefix_ = prefix + '.'
+    self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
   def __str__(self):
     tag = self.tag
@@ -1647,6 +1663,25 @@ class TagSetPrefixView(FormatableMixin):
         return self[attr]
       except (KeyError, TypeError):
         return getattr(self.__proxied, attr)
+
+  def __setattr__(self, attr, value):
+    ''' Attribute based `Tag` access.
+
+        If `attr` is in `self.__dict__` then that is updated,
+        supporting "normal" attributes set on the instance.
+        Otherwise the `Tag` named `attr` is set to `value`.
+
+        The `__init__` methods of subclasses should do something like this
+        (from `TagSet.__init__`)
+        to set up the ordinary instance attributes
+        which are not to be treated as `Tag`s:
+
+            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+    '''
+    if attr in self.__dict__:
+      self.__dict__[attr] = value
+    else:
+      self[attr] = value
 
   def subtags(self, subprefix):
     ''' Return a deeper view of the `TagSet`.
