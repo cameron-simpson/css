@@ -749,8 +749,6 @@ class PolyValueColumnMixin:
       return PolyValue(None, None, value)
     if isinstance(value, str):
       return PolyValue(None, value, None)
-    if isinstance(value, (date, datetime)):
-      raise RuntimeError("got date or datetime: %r" % (value,))
     return PolyValue(None, None, value)
 
   @property
