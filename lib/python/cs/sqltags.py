@@ -671,9 +671,14 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-class PolyValueMixin:
+# a namedtuple for the polyvalues used in an SQLTagsORM.
+PolyValue = namedtuple(
+    'PolyValue', 'float_value string_value structured_value'
+)
+
+class PolyValueColumnMixin:
   ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
-      This is used by the `Tags` and `TagMultiValues` relations inside `SQLtagsORM`.
+      This is used by the `Tags` and `TagMultiValues` relations inside `SQLTagsORM`.
   '''
 
   float_value = Column(
@@ -725,6 +730,29 @@ class PolyValueMixin:
     i = int(float_value)
     return i if i == float_value else float_value
 
+  def polyvalue(self, value):
+    ''' Return Set the `float_value`, `string_value` and `structured_value`
+        slots from `value`.
+    '''
+    if value is None:
+      return PolyValue(None, None, None)
+    # stash unhandled values in the structured_value slot
+    if isinstance(value, datetime):
+      # store datetime as unixtime
+      return PolyValue(datetime2unixtime(value), None, None)
+    if isinstance(value, float):
+      return PolyValue(value, None, None)
+    if isinstance(value, int):
+      f = float(value)
+      if f == value:
+        return PolyValue(f, None, None)
+      return PolyValue(None, None, value)
+    if isinstance(value, str):
+      return PolyValue(None, value, None)
+    if isinstance(value, (date, datetime)):
+      raise RuntimeError("got date or datetime: %r" % (value,))
+    return PolyValue(None, None, value)
+
   @property
   def value(self):
     ''' Return the value for this `Tag`.
@@ -735,21 +763,11 @@ class PolyValueMixin:
 
   @value.setter
   def value(self, new_value):
-    new_values = None, None, new_value
-    if isinstance(new_value, datetime):
-      # store datetime as unixtime
-      new_values = datetime2unixtime(new_value), None, None
-    elif isinstance(new_value, float):
-      new_values = new_value, None, None
-    elif isinstance(new_value, int):
-      f = float(new_value)
-      if f == new_value:
-        new_values = f, None, None
-      else:
-        new_values = None, None, new_value
-    elif isinstance(new_value, str):
-      new_values = None, new_value, None
-    self.set_all(*new_values)
+    ''' Set the `float_value`, `string_value` and `structured_value`
+        slots from `new_value`.
+    '''
+    pv = self.polyvalue(new_value)
+    self.set_all(*pv)
 
   @classmethod
   def value_test(cls, other_value):
