@@ -910,9 +910,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       def __str__(self):
         return (
-            "%s:%s(when=%s,name=%r)" % (
-                type(self).__name__, self.id, self.datetime.isoformat(),
-                self.name
+            "%s:%s(name=%r,when=%s)" % (
+                type(self).__name__,
+                self.id,
+                self.name,
+                self.datetime.isoformat(),
             )
         )
 
@@ -1267,6 +1269,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     if tag_name == 'id':
       raise ValueError("may not discard pseudoTag %r" % (tag_name,))
     if tag_name in ('name', 'unixtime'):
+      # direct columns
       if value is None or getattr(self, tag_name) == value:
         setattr(self, '_' + tag_name, None)
         if not skip_db:
