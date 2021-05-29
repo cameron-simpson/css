@@ -2417,6 +2417,24 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
+  def cmd_edit(self, argv):
+    ''' Usage: {cmd} entity
+          Edit the named entity.
+          If the entity name for not start with type. or meta. then
+          meta. is prepended to the name.
+    '''
+    options = self.options
+    ont = options.ontology
+    if not argv:
+      raise GetoptError("missing entity")
+    entity_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after entity: %r" % (argv,))
+    if not entity_name.startswith(('type.','meta.')):
+      entity_name = 'meta.'+entity_name
+    tags = ont[entity_name]
+    tags.edit()
+
   # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
     ''' Usage:
