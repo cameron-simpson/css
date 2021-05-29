@@ -436,7 +436,7 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def _fill_in_artist(self, mb_tags: MBTagSet, force=False):
+  def _fill_in_artist(self, mb_tags: MBTagSet, force: bool = False):
     assert mb_tags.name.startswith('meta.artist.')
     artist_id = mb_tags.name.split('.', 2)[-1]
     mb_tags['musicbrainz.artist_id'] = artist_id
