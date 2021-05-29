@@ -132,10 +132,10 @@ class RecordingMetaData(NS):
   def as_tags(self, prefix=None):
     ''' Generator yielding the metadata as `Tag`s.
     '''
-    yield from (Tag.with_prefix(tag, None, prefix=prefix) for tag in self.tags)
+    yield from (Tag(tag, prefix=prefix) for tag in self.tags)
     yield from self.episodeinfo.as_tags(prefix=prefix)
     for rawkey, rawvalue in self.raw.items():
-      yield Tag.with_prefix(rawkey, jsonable(rawvalue), prefix=prefix)
+      yield Tag(rawkey, jsonable(rawvalue), prefix=prefix)
 
   @property
   def start_dt(self):
