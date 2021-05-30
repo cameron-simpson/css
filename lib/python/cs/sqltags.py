@@ -733,43 +733,23 @@ class PolyValueColumnMixin:
       JSON, nullable=True, default=None, comment='tag value in JSON form'
   )
 
+  def as_polyvalue(self):
+    ''' Return this row's value as a `PolyValue`.
     '''
-  def polyvalue(self, value):
-    ''' Return Set the `float_value`, `string_value` and `structured_value`
-        slots from `value`.
-    '''
-    if value is None:
-      return PolyValue(None, None, None)
-    # stash unhandled values in the structured_value slot
-    if isinstance(value, datetime):
-      # store datetime as unixtime
-      return PolyValue(datetime2unixtime(value), None, None)
-    if isinstance(value, float):
-      return PolyValue(value, None, None)
-    if isinstance(value, int):
-      f = float(value)
-      if f == value:
-        return PolyValue(f, None, None)
-      return PolyValue(None, None, value)
-    if isinstance(value, str):
-      return PolyValue(None, value, None)
-    return PolyValue(None, None, value)
-
-  @property
-  def value(self):
-    ''' Return the value for this `Tag`.
-    '''
-    return self.pick_value(
-        self.float_value, self.string_value, self.structured_value
+    return PolyValue(
+        float_value=self.float_value,
+        string_value=self.string_value,
+        structured_value=self.structured_value,
     )
 
-  @value.setter
-  def value(self, new_value):
-    ''' Set the `float_value`, `string_value` and `structured_value`
-        slots from `new_value`.
+  @require(lambda pv: pv.is_valid())
+  @typechecked
+  def set_polyvalue(self, pv: PolyValue):
+    ''' Set all the value fields.
     '''
-    pv = self.polyvalue(new_value)
-    self.set_all(*pv)
+    self.float_value = pv.float_value
+    self.string_value = pv.string_value
+    self.structured_value = pv.structured_value
 
   @classmethod
   def value_test(cls, other_value):
@@ -797,43 +777,6 @@ class PolyValueColumnMixin:
       return cls.string_value, other_value
     return cls.structured_value, other_value
 
-  @require(
-      lambda float_value: float_value is None or
-      isinstance(float_value, float)
-  )
-  @require(
-      lambda string_value: string_value is None or
-      isinstance(string_value, str)
-  )
-  @require(
-      lambda structured_value: structured_value is None or
-      not isinstance(structured_value, (float, str))
-  )
-  @require(
-      lambda float_value, string_value, structured_value: sum(
-          map(
-              lambda value: value is not None,
-              [float_value, string_value, structured_value]
-          )
-      ) < 2
-  )
-  def set_all(self, float_value, string_value, structured_value):
-    ''' Set all the value fields.
-    '''
-    self.float_value, self.string_value, self.structured_value = (
-        float_value, string_value, structured_value
-    )
-
-  @property
-  def unixtime(self):
-    ''' The UNIX timestamp is stored as a float.
-    '''
-    return self.float_value
-
-  @unixtime.setter
-  @require(lambda timestamp: isinstance(timestamp, float))
-  def unixtime(self, timestamp):
-    self.set_all(timestamp, None, None)
 
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
