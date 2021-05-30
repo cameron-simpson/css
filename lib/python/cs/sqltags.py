@@ -1166,6 +1166,22 @@ class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
   '''
 
+  # Conversion mappings for various nonJSONable types.
+  # Subclasses wanting to augument this should prepare their own
+  # with code such as:
+  #
+  #  TYPE_JS_MAPPING=dict(SQLTagSet.TYPE_JS_MAPPING)
+  #  TYPE_JS_MAPPING.update(
+  #    typelabel=(type, to_str, from_str),
+  #    ....
+  #  )
+  #
+  TYPE_JS_MAPPING = {
+      'bigint': (int, str, int),  # for ints which do not round trip with float
+      'date': (date, date.isoformat, date.fromisoformat),
+      'datetime': (datetime, datetime.isoformat, datetime.fromisoformat),
+  }
+
   @staticmethod
   # pylint: disable=redefined-builtin
   def _singleton_key(*, sqltags, _id, **_):
@@ -1237,34 +1253,85 @@ class SQLTagSet(SingletonMixin, TagSet):
     assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
     return e
 
-  def normalise_sql_value(self, tag_name, value):
-    ''' Convert an SQL value to a tag value.
+  @typechecked
+  def as_js_str(self, tag_name: str, tag_value) -> str:
+    ''' Convert `tag_value` to a `str` suitable for storage in `structure_value`.
+        This can be reversed by `from_js_str`.
 
-        This can be overridden by subclasses along with `normalise_tag_value`.
+        Subclasses wanting extra type support
+        should either:
+        (usual approach) provide their own `TYPE_JS_MAPPING` class attribute
+        as described at the top of this class
+        or (for unusual requirements) override this method and also `from_js_str`.
+    '''
+    with Pfx("as_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
+             tag_value):
+      for typelabel, (type_, to_str, from_str) in self.TYPE_JS_MAPPING.items():
+        assert ':' not in typelabel, "bad typelabel %r: colons forbidden" % (
+            typelabel,
+        )
+        if isinstance(tag_value, type_):
+          with Pfx("typelabel=%r", typelabel):
+            return typelabel + ':' + to_str(tag_value)
+      raise TypeError("unsupported type")
+
+  @typechecked
+  def from_js_str(self, tag_name: str, js: str):
+    ''' Convert the `str` `js` to a `Tag` value.
+        This is the reverse of `as_js_str`.
+
+        Subclasses wanting extra type support
+        should either:
+        (usual approach) provide their own `TYPE_JS_MAPPING` class attribute
+        as described at the top of this class
+        or (for unusual requirements) override this method and also `as_js_str`.
+    '''
+    typelabel, js_s = js.split(':', 1)
+    type_, to_str, from_str = self.TYPE_JS_MAPPING[typelabel]
+    return from_str(js_s)
+
+  @typechecked
+  @require(lambda pv: pv.is_single_value())
+  def from_polyvalue(self, tag_name: str, pv: PolyValue):
+    ''' Convert an SQL `PolyValue` to a tag value.
+
+        This can be overridden by subclasses along with `to_polyvalue`.
         The `tag_name` is provided for context
         in case it should influence the normalisation.
     '''
-    if isinstance(value, str):
-      for conv in datetime.fromisoformat, date.fromisoformat:
-        try:
-          return conv(value)
-        except ValueError:
-          pass
-    return value
+    if pv.float_value is not None:
+      return pv.float_value
+    if pv.string_value is not None:
+      return pv.string_value
+    js = pv.structured_value
+    if js is None:
+      return None
+    if isinstance(js, str):
+      return self.from_js_str(tag_name, js)
+    return js
 
-  def normalise_tag_value(self, tag_name, value):
+  @typechecked
+  @ensure(lambda result: result.is_single_value())
+  def to_polyvalue(self, tag_name: str, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
-        Convert other values via `str()`.
-
-        This can be overridden by subclasses along with `normalise_sql_value`.
-        The `tag_name` is provided for context
-        in case it should influence the normalisation.
+        Convert other values via `to_js_str`.
+        Return `PolyValue` for use with the SQL rows.
     '''
-    if value is None or isinstance(value,
-                                   (int, float, str, dict, list, tuple)):
-      return value
-    return str(value)
+    if tag_value is None:
+      return PolyValue(None, None, None)
+    if isinstance(tag_value, float):
+      return PolyValue(tag_value, None, None)
+    if isinstance(tag_value, int):
+      f = float(tag_value)
+      if f == tag_value:
+        return PolyValue(f, None, None)
+    if isinstance(tag_value, str):
+      return PolyValue(None, tag_value, None)
+    if isinstance(tag_value, (list, tuple, dict)):
+      return PolyValue(None, None, tag_value)
+    # convert to a special string
+    return PolyValue(None, None, self.to_js_str(tag_name, tag_value))
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
@@ -1280,7 +1347,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       else:
         super().set(tag_name, value, verbose=verbose)
         if not skip_db:
-          self.add_db_tag(tag_name, self.normalise_tag_value(tag_name, value))
+          self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
   @pfx_method
   def add_db_tag(self, tag_name, value=None):
@@ -1305,17 +1372,14 @@ class SQLTagSet(SingletonMixin, TagSet):
     else:
       super().discard(tag_name, value, verbose=verbose)
       if not skip_db:
-        self.discard_db_tag(
-            tag_name, self.normalise_tag_value(tag_name, value)
-        )
+        self.discard_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
-  def discard_db_tag(self, tag_name, value=None):
+  @typechecked
+  def discard_db_tag(self, tag_name: str, pv: Optional[PolyValue] = None):
     ''' Discard a tag from the database.
     '''
     with self.db_session() as session:
-      return self._get_db_entity().discard_tag(
-          tag_name, value, session=session
-      )
+      return self._get_db_entity().discard_tag(tag_name, pv, session=session)
 
   def parent_tagset(self, tag_name='parent'):
     ''' Return the parent `TagSet` as defined by a `Tag`,
