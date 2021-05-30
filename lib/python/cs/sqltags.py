@@ -1179,7 +1179,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return e
 
   @typechecked
-  def as_js_str(self, tag_name: str, tag_value) -> str:
+  def to_js_str(self, tag_name: str, tag_value) -> str:
     ''' Convert `tag_value` to a `str` suitable for storage in `structure_value`.
         This can be reversed by `from_js_str`.
 
@@ -1209,14 +1209,14 @@ class SQLTagSet(SingletonMixin, TagSet):
         should either:
         (usual approach) provide their own `TYPE_JS_MAPPING` class attribute
         as described at the top of this class
-        or (for unusual requirements) override this method and also `as_js_str`.
+        or (for unusual requirements) override this method and also `to_js_str`.
     '''
     typelabel, js_s = js.split(':', 1)
     type_, to_str, from_str = self.TYPE_JS_MAPPING[typelabel]
     return from_str(js_s)
 
   @typechecked
-  @require(lambda pv: pv.is_single_value())
+  @require(lambda pv: pv.is_valid())
   def from_polyvalue(self, tag_name: str, pv: PolyValue):
     ''' Convert an SQL `PolyValue` to a tag value.
 
@@ -1236,7 +1236,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return js
 
   @typechecked
-  @ensure(lambda result: result.is_single_value())
+  @ensure(lambda result: result.is_valid())
   def to_polyvalue(self, tag_name: str, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
