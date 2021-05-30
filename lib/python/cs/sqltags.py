@@ -671,10 +671,37 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
 SQTCriterion.CRITERION_PARSE_CLASSES.append(SQLTagBasedTest)
 SQTCriterion.TAG_BASED_TEST_CLASS = SQLTagBasedTest
 
-# a namedtuple for the polyvalues used in an SQLTagsORM.
-PolyValue = namedtuple(
-    'PolyValue', 'float_value string_value structured_value'
-)
+class PolyValue(namedtuple('PolyValue',
+                           'float_value string_value structured_value')):
+  ''' A `namedtuple` for the polyvalues used in an `SQLTagsORM`.
+
+      We express various types in SQL as one of 3 columns:
+      * `float_value`: for `float`s and `int`s which round trip with `float`
+      * `string_value`: for `str`
+      * `structured_value`: a JSON transcription of any other type
+
+      This allows SQL indexing of basic types.
+
+      Note that because `str` gets stored in `string_value`
+      this leaves us free to use "bare string" JSON to serialise
+      various nonJSONable types.
+
+      The `SQLTagSets` class has a `to_polyvalue` factory
+      which produces a `PolyValue` suitable for the SQL rows.
+      NonJSONable types such as `datetime`
+      are converted to a `str` but stored in the `structured_value` column.
+      This should be overridden by subclasses as necessary.
+
+      On retrieval from the database
+      the tag rows are converted to Python values
+      by the `SQLTagSets.from_polyvalue` method,
+      reversing the process above.
+  '''
+
+  def is_single_value(self):
+    ''' Test that at most one attribute is non-`None`.
+    '''
+    return sum(map(lambda v: int(v is None), self)) >= len(self) - 1
 
 class PolyValueColumnMixin:
   ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
