@@ -9,11 +9,19 @@
     Compared to `cs.fstags` and its associated `fstags` command,
     this is oriented towards large numbers of items
     not naturally associated with filesystem objects.
-    My initial use case is an activity log,
-    but I'm probably going to use it for ontologies as well.
+
+    My initial use case is an activity log
+    (unnamed timestamped tag sets)
+    but I'm also using it for ontologies
+    (named tag sets containing metadata).
 
     Many basic tasks can be performed with the `sqltags` command line utility,
     documented under the `SQLTagsCommand` class below.
+
+    See the `SQLTagsORM` documentation for details about how data
+    are stored in the database.
+    See the `SQLTagSet` documentation for details of how various
+    tag value types are supported.
 '''
 
 from abc import abstractmethod
@@ -777,10 +785,56 @@ class PolyValueColumnMixin:
       return cls.string_value, other_value
     return cls.structured_value, other_value
 
-
 # pylint: disable=too-many-instance-attributes
 class SQLTagsORM(ORM, UNIXTimeMixin):
   ''' The ORM for an `SQLTags`.
+
+      The current implementation uses 3 tables:
+      * `entities`: this has a NULLable `name`
+        and `unixtime` UNIX timestamp;
+        this is unique per `name` if the name is not NULL
+      * `tags`: this has an `entity_id`, `name` and a value stored
+        in one of three columns: `float_value`, `string_value` and
+        `structured_value` which is a JSON blob;
+        this is unique per `(entity_id,name)`
+      * `tag_subvalues`: this is a broken out version of `tags`
+        when `structured_value` is a sequence or mapping,
+        breaking out the values one per row;
+        this exists to support "tag contains value" lookups
+
+      Tag values are stored as follows:
+      * `None`: all 3 columns are set to `NULL`
+      * `float`: stored in `float_value`
+      * `int`: if the `int` round trips to `float`
+        then it is stored in `float_value`,
+        otherwise it is stored in `structured_value`
+        with the type label `"bigint"`
+      * `str`: stored in `string_value`
+      * `list`, `tuple`, `dict`: stored in `structured_value`;
+        if these containers contain unJSONable content there will be trouble
+      * other types, such as `datetime`:
+        these are converted to strings with identifying type label prefixes
+        and stored in `structured_value`
+
+      The `float_value` and `string_value` columns
+      allow us to provide indices for these kinds of tag values.
+
+      The type label scheme takes advantage of the fact that actual `str`s
+      are stored in the `string_value` column.
+      Because of this, there will be no actual strings in `structured_value`.
+      Therefore, we can convert nonJSONable types to `str` and store them here.
+
+      The scheme used is to provide conversion functions to convert types
+      to `str` and back, and an associated "type label" prefix.
+      For example, we store a `datetime` as the ISO format of the `datetime`
+      with `"datetime:"` prefixed to it.
+
+      The actual conversions are kept with the `SQLTagSet` class
+      (or any subclass).
+      This ORM received the 3-tuples of SQL ready values
+      from that class as the `PolyValue` `namedtuple`
+      and does not perform any conversion itself.
+      The conversion process itself is described in `SQLTagSet`.
   '''
 
   def __init__(self, *, db_url):
@@ -1089,6 +1143,48 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
+
+      As with the `TagSet` superclass,
+      tag values can be any Python type.
+      Howeverm because we are storing these values in an SQL database
+      it is necessary to provide a conversion facility
+      to prepare those values for storage.
+
+      The database schema is described in the `SQLTagsORM` class;
+      in short we directly support `None`, `float` and `str`,
+      `int`s which round trip with `float`,
+      and `list`, `tuple` and `dict` whose contents transcribe to JSON.
+
+      `int`s which are too large to round trip with `float`
+      are treated as an extended `"bigint"` type
+      using the scheme described below.
+
+      Because the ORM has distinct `float` and `str` columns to support indexing,
+      there will be no strings in the remaining JSON blob column.
+      Therefore we support other types by providing functions
+      to convert each type to a `str` and back,
+      and an associate "type label" which will be prefixed to the string;
+      the resulting string is stored in the JSON blob.
+
+      The default mechanism is based on the following class attributes and methods:
+      * `TYPE_JS_MAPPING`: a mapping of a type label string
+        to a 3 tuple of `(type,to_str,from_str)`
+        being the extended type,
+        a function to convert an instance to `str`
+        and a function to convert a `str` to an instance of this type
+      * `to_js_str`: a method accepting `(tag_name,tag_value)`
+        and returning `tag_value` as a `str`;
+        the default implementation looks up the type of `tag_value`
+        in `TYPE_JS_MAPPING` to locate the corresponding `to_str` function
+      * `from_js_str`: a method accepting `(tag_name,js)`
+        which uses the leading type label prefix from the `js`
+        to look up the corresponding `from_str` function
+        from `TYPE_JS_MAPPING` and use it on the tail of `js`
+
+      The default `TYPE_JS_MAPPING` has mappings for:
+      * `"bigint"`: conversions for `int`
+      * `"date"`: conversions for `datetime.date`
+      * `"datetime"`: conversions for `datetime.datetime`
   '''
 
   # Conversion mappings for various nonJSONable types.
