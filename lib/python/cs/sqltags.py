@@ -750,8 +750,8 @@ class PolyValueColumnMixin:
         structured_value=self.structured_value,
     )
 
-  @require(lambda pv: pv.is_valid())
   @typechecked
+  @require(lambda pv: pv.is_valid())
   def set_polyvalue(self, pv: PolyValue):
     ''' Set all the value fields.
     '''
@@ -938,7 +938,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
               session.add(subv)
 
       @typechecked
-      def add_tag(self, name: str, pv, *, session):
+      def add_tag(self, name: str, pv: PolyValue, *, session):
         ''' Add a tag for `(name,pv)`,
             replacing any existing tag named `name`.
         '''
@@ -1274,8 +1274,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     assert e is not None, "no sqltags.db_entity(id=%r)" % self.id
     return e
 
+  @classmethod
   @typechecked
-  def to_js_str(self, tag_name: str, tag_value) -> str:
+  def to_js_str(cls, tag_name: str, tag_value) -> str:
     ''' Convert `tag_value` to a `str` suitable for storage in `structure_value`.
         This can be reversed by `from_js_str`.
 
@@ -1287,7 +1288,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     '''
     with Pfx("as_js_str(%r, %s:%r)", tag_name, type(tag_value).__name__,
              tag_value):
-      for typelabel, (type_, to_str, from_str) in self.TYPE_JS_MAPPING.items():
+      for typelabel, (type_, to_str, from_str) in cls.TYPE_JS_MAPPING.items():
         assert ':' not in typelabel, "bad typelabel %r: colons forbidden" % (
             typelabel,
         )
@@ -1296,8 +1297,9 @@ class SQLTagSet(SingletonMixin, TagSet):
             return typelabel + ':' + to_str(tag_value)
       raise TypeError("unsupported type")
 
+  @classmethod
   @typechecked
-  def from_js_str(self, tag_name: str, js: str):
+  def from_js_str(cls, tag_name: str, js: str):
     ''' Convert the `str` `js` to a `Tag` value.
         This is the reverse of `as_js_str`.
 
@@ -1308,12 +1310,13 @@ class SQLTagSet(SingletonMixin, TagSet):
         or (for unusual requirements) override this method and also `to_js_str`.
     '''
     typelabel, js_s = js.split(':', 1)
-    type_, to_str, from_str = self.TYPE_JS_MAPPING[typelabel]
+    type_, to_str, from_str = cls.TYPE_JS_MAPPING[typelabel]
     return from_str(js_s)
 
+  @classmethod
   @typechecked
   @require(lambda pv: pv.is_valid())
-  def from_polyvalue(self, tag_name: str, pv: PolyValue):
+  def from_polyvalue(cls, tag_name: str, pv: PolyValue):
     ''' Convert an SQL `PolyValue` to a tag value.
 
         This can be overridden by subclasses along with `to_polyvalue`.
@@ -1328,12 +1331,13 @@ class SQLTagSet(SingletonMixin, TagSet):
     if js is None:
       return None
     if isinstance(js, str):
-      return self.from_js_str(tag_name, js)
+      return cls.from_js_str(tag_name, js)
     return js
 
+  @classmethod
   @typechecked
   @ensure(lambda result: result.is_valid())
-  def to_polyvalue(self, tag_name: str, tag_value) -> PolyValue:
+  def to_polyvalue(cls, tag_name: str, tag_value) -> PolyValue:
     ''' Normalise `Tag` values for storage via SQL.
         Preserve things directly expressable in JSON.
         Convert other values via `to_js_str`.
@@ -1352,7 +1356,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     if isinstance(tag_value, (list, tuple, dict)):
       return PolyValue(None, None, tag_value)
     # convert to a special string
-    return PolyValue(None, None, self.to_js_str(tag_name, tag_value))
+    return PolyValue(None, None, cls.to_js_str(tag_name, tag_value))
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
@@ -1491,7 +1495,11 @@ class SQLTags(TagSets):
         entity = self.orm.entities(name=name, unixtime=unixtime)
         session.add(entity)
         for tag in tags:
-          entity.add_tag(tag.name, tag.value, session=session)
+          entity.add_tag(
+              tag.name,
+              self.TagSetClass.to_polyvalue(tag.name, tag.value),
+              session=session
+          )
         session.flush()
         te = self.get(entity.id)
       assert te is not None
