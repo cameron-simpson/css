@@ -868,8 +868,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       def _update_multivalues(self, tag_name, values, *, session):
         ''' Update the tag subvalue table.
         '''
-        tag_subvalues = orm.tag_subvalues
-        session.query(tag_subvalues).filter_by(
+        tag_subvalues_table = orm.tag_subvalues
+        session.query(tag_subvalues_table).filter_by(
             entity_id=self.id, tag_name=tag_name
         ).delete()
         if values is not None and not isinstance(values, str):
@@ -879,36 +879,41 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             pass
           else:
             for subvalue in subvalues:
-              subv = tag_subvalues(entity_id=self.id, tag_name=tag_name)
+              subv = tag_subvalues_table(entity_id=self.id, tag_name=tag_name)
               subv.value = subvalue
               session.add(subv)
 
-      def add_tag(self, name: str, value=None, *, session):
-        ''' Add a tag for `(name,value)`,
+      @typechecked
+      def add_tag(self, name: str, pv, *, session):
+        ''' Add a tag for `(name,pv)`,
             replacing any existing tag named `name`.
         '''
-        tags = orm.tags
+        tags_table = orm.tags
         if self.id is None:
           # obtain the id value from the database
           session.add(self)
           session.flush()
         # TODO: upsert!
-        etag = tags.lookup1(session=session, entity_id=self.id, name=name)
+        etag = tags_table.lookup1(
+            session=session, entity_id=self.id, name=name
+        )
         if etag is None:
-          etag = tags(entity_id=self.id, name=name)
-          etag.value = value
+          etag = tags_table(entity_id=self.id, name=name)
+          etag.set_polyvalue(pv)
           session.add(etag)
         else:
-          etag.value = value
-        self._update_multivalues(name, value, session=session)
+          etag.set_polyvalue(pv)
+        self._update_multivalues(name, pv.structured_value, session=session)
 
       def discard_tag(self, name, value=None, *, session):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
         '''
         tag = Tag(name, value)
-        tags = orm.tags
-        etag = tags.lookup1(session=session, entity_id=self.id, name=name)
+        tags_table = orm.tags
+        etag = tags_table.lookup1(
+            session=session, entity_id=self.id, name=name
+        )
         if etag is not None:
           if tag.value is None or tag.value == etag.value:
             session.delete(etag)
