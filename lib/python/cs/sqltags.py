@@ -698,10 +698,17 @@ class PolyValue(namedtuple('PolyValue',
       reversing the process above.
   '''
 
-  def is_single_value(self):
+  def is_valid(self):
     ''' Test that at most one attribute is non-`None`.
     '''
-    return sum(map(lambda v: int(v is None), self)) >= len(self) - 1
+    # at least 2 values of 3 must be None
+    assert sum(map(lambda v: int(v is None), self)) >= len(self) - 1
+    assert self.float_value is None or isinstance(self.float_value, float)
+    assert self.string_value is None or isinstance(self.string_value, str)
+    assert self.structured_value is None or not isinstance(
+        self.structured_value, float
+    )
+    return True
 
 class PolyValueColumnMixin:
   ''' A mixin for classes with `(float_value,string_value,structured_value)` columns.
@@ -726,37 +733,7 @@ class PolyValueColumnMixin:
       JSON, nullable=True, default=None, comment='tag value in JSON form'
   )
 
-  @staticmethod
-  @require(
-      lambda float_value: float_value is None or
-      isinstance(float_value, float)
-  )
-  @require(
-      lambda string_value: string_value is None or
-      isinstance(string_value, str)
-  )
-  @require(
-      lambda structured_value: structured_value is None or
-      not isinstance(structured_value, (float, str))
-  )
-  @require(
-      lambda float_value, string_value, structured_value: sum(
-          map(
-              lambda value: value is not None,
-              [float_value, string_value, structured_value]
-          )
-      ) < 2
-  )
-  def pick_value(float_value, string_value, structured_value):
-    ''' Chose amongst the values available.
     '''
-    if float_value is None:
-      if string_value is None:
-        return structured_value
-      return string_value
-    i = int(float_value)
-    return i if i == float_value else float_value
-
   def polyvalue(self, value):
     ''' Return Set the `float_value`, `string_value` and `structured_value`
         slots from `value`.
