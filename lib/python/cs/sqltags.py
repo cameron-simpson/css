@@ -1275,12 +1275,13 @@ class SQLTagSet(SingletonMixin, TagSet):
           self.add_db_tag(tag_name, self.to_polyvalue(tag_name, value))
 
   @pfx_method
-  def add_db_tag(self, tag_name, value=None):
+  @typechecked
+  def add_db_tag(self, tag_name, pv: PolyValue):
     ''' Add a tag to the database.
     '''
     with self.db_session() as session:
       e = self._get_db_entity()
-      return e.add_tag(tag_name, value, session=session)
+      return e.add_tag(tag_name, pv, session=session)
 
   # pylint: disable=arguments-differ
   @tag_or_tag_value
@@ -1568,7 +1569,6 @@ class SQLTags(TagSets):
           session=session,
       )
       # merge entities and tag information
-      tags = self.orm.tags
       entity_map = {}
       for row in query:
         entity_id = row.id
@@ -1586,9 +1586,9 @@ class SQLTags(TagSets):
         if row.tag_name is not None:
           # set the dict entry directly - we are loading db values,
           # not applying them to the db
-          tag_value = te.normalise_sql_value(
+          tag_value = te.from_polyvalue(
               row.tag_name,
-              tags.pick_value(
+              PolyValue(
                   row.tag_float_value, row.tag_string_value,
                   row.tag_structured_value
               )
