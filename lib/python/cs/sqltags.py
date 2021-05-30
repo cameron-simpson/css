@@ -831,10 +831,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
 
       The actual conversions are kept with the `SQLTagSet` class
       (or any subclass).
-      This ORM received the 3-tuples of SQL ready values
+      This ORM receives the 3-tuples of SQL ready values
       from that class as the `PolyValue` `namedtuple`
       and does not perform any conversion itself.
-      The conversion process itself is described in `SQLTagSet`.
+      The conversion process is described in `SQLTagSet`.
   '''
 
   def __init__(self, *, db_url):
