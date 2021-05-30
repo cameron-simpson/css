@@ -1290,7 +1290,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       }
     return ont.value_metadata(self.name, self.value)
 
-  meta = metadata
+  @property
+  def meta(self):
+    ''' Shortcut property for the metadata `TagSet`.
+    '''
+    return self.metadata()
 
   @property
   def key_type(self):
