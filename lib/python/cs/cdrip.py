@@ -93,7 +93,7 @@ class CDRipCommand(BaseCommand):
     options = self.options
     options.force = False
     options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
-    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or CDRIP_DIR_DEFAULT
+    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or expanduser(CDRIP_DIR_DEFAULT)
     options.mbdb_path = None
 
   def apply_opts(self, opts):
