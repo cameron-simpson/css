@@ -32,8 +32,8 @@ import sys
 from subprocess import run
 from threading import RLock
 import time
-from typing import List
-from icontract import require
+from typing import List, Optional
+from icontract import ensure, require
 from sqlalchemy import (
     Column,
     Integer,
