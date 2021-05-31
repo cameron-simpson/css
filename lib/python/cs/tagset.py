@@ -2498,14 +2498,14 @@ class TagsOntologyCommand(BaseCommand):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
           for meta_name in sorted(ont.meta_names(type_name=type_name)):
-            print(meta_name, ont.meta(type_name, meta_name))
+            print(meta_name, ont.metadata(type_name, meta_name))
           return 0
         if subcmd == '+':
           if not argv:
             raise GetoptError("missing entity_name")
           entity_name = argv.pop(0)
           print("entity_name =", entity_name)
-          etags = ont.meta(type_name, entity_name)
+          etags = ont.metadata(type_name, entity_name)
           print("entity tags =", etags)
           for arg in argv:
             with Pfx("%s", arg):
