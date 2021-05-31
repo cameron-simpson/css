@@ -1032,7 +1032,8 @@ class FSTags(MultiOpenMixin):
     if not ontpath:
       return None
     if not isabspath(ontpath):
-      ontpath = self.find_ontpath('.', ontbase=ontpath)
+      ontbase = ontpath
+      ontpath = self.find_ontpath('.', ontbase=ontbase)
       if ontpath is None:
         return None
     return self.open_ontology(ontpath)
