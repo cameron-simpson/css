@@ -2453,6 +2453,7 @@ class TagsOntologyCommand(BaseCommand):
             Edit the tags for the metadata names matching the
             meta_names_patterns.
           {cmd} type_name list
+          {cmd} type_name ls
             List the metadata names for this type and their tags.
           {cmd} type_name + entity_name [tags...]
             Create meta.entity_name and apply the tags.
@@ -2493,7 +2494,7 @@ class TagsOntologyCommand(BaseCommand):
             ]
             ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
           return 0
-        if subcmd == 'list':
+        if subcmd in ('list', 'ls'):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
           for meta_name in sorted(ont.meta_names(type_name=type_name)):
