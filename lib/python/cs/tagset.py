@@ -1996,7 +1996,7 @@ class TagsOntology(SingletonMixin, TagSets):
   ##################################################################
   # Mapping methods.
   def keys(self, *, prefix=None):
-    return self.tagsets.keys(prefix=None)
+    return self.tagsets.keys(prefix=prefix)
 
   def __iter__(self):
     return self.keys()
