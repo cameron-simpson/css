@@ -315,10 +315,10 @@ class MBSQLTags(SQLTags):
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
-    ''' Initialise the MBSQLTags instance,
+    ''' Initialise the `MBSQLTags` instance,
         computing the default `mbdb_path` if required.
 
-        `mbdb_path` is provided as `db_url` to the SQLTags superclass
+        `mbdb_path` is provided as `db_url` to the `SQLTags` superclass
         initialiser.
         If not specified it is obtained from the environment variable
         {MBDB_PATH_ENVVAR}, falling back to `{MBDB_PATH_DEFAULT!r}`.
