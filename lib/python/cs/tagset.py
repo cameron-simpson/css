@@ -1279,16 +1279,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if basetype == 'list':
       member_type = self.member_type
       return [
-          ont.value_metadata(member_type, value, convert=convert)
+          ont.metadata(member_type, value, convert=convert)
           for value in self.value
       ]
     if basetype == 'dict':
       member_type = self.member_type
       return {
-          key: ont.value_metadata(member_type, value)
+          key: ont.metadata(member_type, value)
           for key, value in self.value.items()
       }
-    return ont.value_metadata(self.name, self.value)
+    return ont.metadata(self.name, self.value)
 
   @property
   def meta(self):
@@ -2032,15 +2032,11 @@ class TagsOntology(SingletonMixin, TagSets):
       assert key.startswith('type.')
       yield cutprefix(key, 'type.')
 
-  def meta(self, type_name, value):
-    ''' Return the metadata `TagSet` for `(type_name,value)`.
-    '''
-    return self[self.meta_index(type_name, value)]
   ################################################################
   # Metadata.
 
   @classmethod
-  def meta_index(cls, type_name=None, value=None):
+  def meta_index(cls, type_name=None, value=None, convert=None):
     ''' Return the entry index for the metadata for `(type_name,value)`.
     '''
     index = 'meta'
@@ -2048,8 +2044,12 @@ class TagsOntology(SingletonMixin, TagSets):
       assert value is None
     else:
       index += '.' + type_name
-      if value:
-        index += '.' + cls.value_to_tag_name(value)
+      if value is not None:
+        if convert is None:
+          convert = cls.value_to_tag_name
+        value_tag_name = convert(value)
+        assert isinstance(value_tag_name, str) and value_tag_name
+        index += '.' + value_tag_name
     return index
 
   def meta_names(self, type_name=None):
@@ -2075,9 +2075,10 @@ class TagsOntology(SingletonMixin, TagSets):
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
-        Returns `None` for unconvertable values.
+        Raises `ValueError` for unconvertable values.
 
-        Nonnegative `int`s are converted to `str`.
+        `int`s are converted to `str`
+        and their leading dash, if any, converted to an underscroe.
 
         Strings are converted as follows:
         * a trailing `(.*)` is turned into a prefix with a dot,
@@ -2088,22 +2089,27 @@ class TagsOntology(SingletonMixin, TagSets):
           for example `"Marvel.Captain America"`
           becomes `"marvel.captain_america"`.
     '''
-    if isinstance(value, int) and value >= 0:
-      return str(value)
+    if isinstance(value, int):
+      return str(value).replace('-', '_')
     if isinstance(value, str):
       value = value.strip()
       m = re.match(r'(.*)\(([^()]*)\)\s*$', value)
       if m:
         value = m.group(2).strip() + '.' + m.group(1).strip()
       value = '_'.join(value.lower().split())
+      value = value.replace('-', '_')
       return value
     raise ValueError(value)
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_metadata(self, type_name, value, convert=None):
-    ''' Return a `ValueMetadata` for `type_name` and `value`.
-        This provides the mapping between a type's value and its semantics.
+  def metadata(self, type_name, value, convert=None):
+    ''' Return the metadata `TagSet` for `type_name` and `value`.
+        This implements the mapping between a type's value and its semantics.
+
+        The optional parameter `convert`
+        may specify a function to use to convert `value` to a tag name component
+        to be used in place of `self.value_to_tag_name` (the default).
 
         For example,
         if a `TagSet` had a list of characters such as:
@@ -2116,14 +2122,7 @@ class TagsOntology(SingletonMixin, TagSets):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    if convert:
-      value_tag_name = convert(value)
-      assert isinstance(value_tag_name, str) and value_tag_name
-    else:
-      value_tag_name = self.value_to_tag_name(str(value))
-    ontkey = 'meta.' + type_name + '.' + '_'.join(
-        value_tag_name.lower().split()
-    )
+    ontkey = self.meta_index(type_name, value, convert=convert)
     return self[ontkey]
 
   def basetype(self, typename):
