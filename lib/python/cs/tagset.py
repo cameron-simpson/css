@@ -1271,7 +1271,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         For a sequence (`list`) this is a list of the metadata
         for each member.
 
-        For a mapping (`dict`) this is mapping of `key->value_metadata`.
+        For a mapping (`dict`) this is mapping of `key->metadata`.
     '''
     ont = ontology or self.ontology
     assert ont, "ont is false: %r" % (ont,)
@@ -2435,8 +2435,8 @@ class TagsOntologyCommand(BaseCommand):
     entity_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments after entity: %r" % (argv,))
-    if not entity_name.startswith(('type.','meta.')):
-      entity_name = 'meta.'+entity_name
+    if not entity_name.startswith(('type.', 'meta.')):
+      entity_name = 'meta.' + entity_name
     tags = ont[entity_name]
     tags.edit()
 
