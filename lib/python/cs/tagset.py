@@ -2004,6 +2004,9 @@ class TagsOntology(SingletonMixin, TagSets):
   def __delitem__(self, index):
     del self.tagsets[index]
 
+  ##################################################################
+  # Types.
+
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
@@ -2019,23 +2022,22 @@ class TagsOntology(SingletonMixin, TagSets):
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for key, tags in self.items():
-      type_name = cutprefix(key, 'type.')
-      if type_name is not key:
-        yield type_name, tags
+    for type_name in self.type_names():
+      yield type_name, self.type(type_name)
 
   def type_names(self):
     ''' Generator yielding defined type names.
     '''
-    for key in self.keys():
-      type_name = cutprefix(key, 'type.')
-      if type_name is not key:
-        yield type_name
+    for key in self.keys(prefix='type.'):
+      assert key.startswith('type.')
+      yield cutprefix(key, 'type.')
 
   def meta(self, type_name, value):
     ''' Return the metadata `TagSet` for `(type_name,value)`.
     '''
     return self[self.meta_index(type_name, value)]
+  ################################################################
+  # Metadata.
 
   @classmethod
   def meta_index(cls, type_name=None, value=None):
@@ -2062,10 +2064,10 @@ class TagsOntology(SingletonMixin, TagSets):
         i.e. only the suffix part for `character` metadata.
     '''
     prefix = self.meta_index(type_name=type_name) + '.'
-    for key in self.tagsets.keys(prefix=prefix):
-      suffix = cutprefix(key, prefix)
-      assert suffix is not key
-      yield suffix
+    for key in self.keys(prefix=prefix):
+      X("meta_names: key=%r",key)
+      assert key.startswith(prefix)
+      yield cutprefix(key, prefix)
 
   @staticmethod
   @pfx
