@@ -1,3 +1,4 @@
+TagSet.subtags: subclass PrefixedMappingProxy also
 let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
 cs.pop3: buffering for the SSL mode
 an atomic-sh make scratch dir then rename to target name decorator
