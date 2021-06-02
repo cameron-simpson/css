@@ -1324,7 +1324,12 @@ class SQLTagSet(SingletonMixin, TagSet):
         in case it should influence the normalisation.
     '''
     if pv.float_value is not None:
-      return pv.float_value
+      # return as an int if the float round trips
+      f = pv.float_value
+      i = int(f)
+      if float(i) == f:
+        return i
+      return f
     if pv.string_value is not None:
       return pv.string_value
     js = pv.structured_value
