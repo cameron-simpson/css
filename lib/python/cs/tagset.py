@@ -2062,6 +2062,10 @@ class TagsOntology(SingletonMixin, TagSets):
         on an ontology with a `meta.character.marvel.black_widow`
         would yield `'marvel.black_widow'`
         i.e. only the suffix part for `character` metadata.
+
+        By contrast, `meta_names()`
+        on an ontology with a `meta.character.marvel.black_widow`
+        would yield `'character.marvel.black_widow'`.
     '''
     prefix = self.meta_index(type_name=type_name) + '.'
     for key in self.keys(prefix=prefix):
