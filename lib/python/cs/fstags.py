@@ -507,13 +507,13 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
-        List files from paths and their tags.
-        -d          Treat directories like files, do not recurse.
-        --direct    List direct tags instead of all tags.
-        -o output_format
-                    Use output_format as a Python format string to lay out
-                    the listing.
-                    Default: {LS_OUTPUT_FORMAT_DEFAULT}
+          List files from paths and their tags.
+          -d          Treat directories like files, do not recurse.
+          --direct    List direct tags instead of all tags.
+          -o output_format
+                      Use output_format as a Python format string to lay out
+                      the listing.
+                      Default: {LS_OUTPUT_FORMAT_DEFAULT}
     '''
     options = self.options
     fstags = options.fstags
@@ -1032,7 +1032,8 @@ class FSTags(MultiOpenMixin):
     if not ontpath:
       return None
     if not isabspath(ontpath):
-      ontpath = self.find_ontpath('.', ontbase=ontpath)
+      ontbase = ontpath
+      ontpath = self.find_ontpath('.', ontbase=ontbase)
       if ontpath is None:
         return None
     return self.open_ontology(ontpath)
@@ -1447,7 +1448,10 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     assert tag_name != 'name'
     super().discard(tag_name, value, verbose=verbose)
 
+  @tag_or_tag_value
   def set(self, tag_name, value, **kw):
+    ''' Forbid the special tag name `'name'`, reserved for the filename.
+    '''
     assert tag_name != 'name'
     super().set(tag_name, value, **kw)
 

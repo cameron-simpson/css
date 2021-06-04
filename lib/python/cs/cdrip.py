@@ -43,7 +43,11 @@ __version__ = '20201004-dev'
 
 musicbrainzngs.set_useragent(__name__, __version__, os.environ['EMAIL'])
 
-DEFAULT_CDRIP_DIR = '~/var/cdrip'
+CDRIP_DEV_ENVVAR = 'CDRIP_DEV'
+CDRIP_DEV_DEFAULT = 'default'
+
+CDRIP_DIR_ENVVAR = 'CDRIP_DIR'
+CDRIP_DIR_DEFAULT = '~/var/cdrip'
 
 MBDB_PATH_ENVVAR = 'MUSICBRAINZ_SQLTAGS'
 MBDB_PATH_DEFAULT = '~/var/cache/mbdb.sqlite'
@@ -63,17 +67,22 @@ class CDRipCommand(BaseCommand):
     -d output_dir Specify the output directory path.
     -D device     Device to access. This may be omitted or "default" or
                   "" for the default device as determined by the discid module.
-                  The environment variable $CDRIP_DEV may override the default.
     -f            Force. Read disc and consult Musicbrainz even if a toc file exists.
     -M mbdb_path  Specify the location of the MusicBrainz SQLTags cache.
 
   Environment:
-    CDRIP_DEV            Default CDROM device.
-    CDRIP_DIR            Default output directory path.
+    {CDRIP_DEV_ENVVAR}            Default CDROM device.
+                         default {CDRIP_DEV_DEFAULT}.
+    {CDRIP_DIR_ENVVAR}            Default output directory path.,
+                         default {CDRIP_DIR_DEFAULT}.
     {MBDB_PATH_ENVVAR}  Default location of MusicBrainz SQLTags cache,
                          default {MBDB_PATH_DEFAULT}.'''
 
   USAGE_KEYWORDS = {
+      'CDRIP_DEV_ENVVAR': CDRIP_DEV_ENVVAR,
+      'CDRIP_DEV_DEFAULT': CDRIP_DEV_DEFAULT,
+      'CDRIP_DIR_ENVVAR': CDRIP_DIR_ENVVAR,
+      'CDRIP_DIR_DEFAULT': CDRIP_DIR_DEFAULT,
       'MBDB_PATH_ENVVAR': MBDB_PATH_ENVVAR,
       'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
   }
@@ -83,8 +92,8 @@ class CDRipCommand(BaseCommand):
     '''
     options = self.options
     options.force = False
-    options.device = os.environ.get('CDRIP_DEV', "default")
-    options.dirpath = os.environ.get('CDRIP_DIR', ".")
+    options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
+    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or expanduser(CDRIP_DIR_DEFAULT)
     options.mbdb_path = None
 
   def apply_opts(self, opts):
@@ -306,10 +315,10 @@ class MBSQLTags(SQLTags):
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
-    ''' Initialise the MBSQLTags instance,
+    ''' Initialise the `MBSQLTags` instance,
         computing the default `mbdb_path` if required.
 
-        `mbdb_path` is provided as `db_url` to the SQLTags superclass
+        `mbdb_path` is provided as `db_url` to the `SQLTags` superclass
         initialiser.
         If not specified it is obtained from the environment variable
         {MBDB_PATH_ENVVAR}, falling back to `{MBDB_PATH_DEFAULT!r}`.
@@ -340,7 +349,7 @@ class MBSQLTags(SQLTags):
     return te
 
 class MBDB(MultiOpenMixin):
-  ''' An interface to MusicBrainz with a local `SQLTags` cache.
+  ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
 
   VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
@@ -427,7 +436,7 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def _fill_in_artist(self, mb_tags: MBTagSet, force=False):
+  def _fill_in_artist(self, mb_tags: MBTagSet, force: bool = False):
     assert mb_tags.name.startswith('meta.artist.')
     artist_id = mb_tags.name.split('.', 2)[-1]
     mb_tags['musicbrainz.artist_id'] = artist_id

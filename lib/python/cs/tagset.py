@@ -43,7 +43,7 @@
         >>> # add a "bare" Tag named 'blue' with no value
         >>> tags.add('blue')
         >>> # add a "topic=tagging" Tag
-        >>> tags.add('topic','tagging')
+        >>> tags.set('topic', 'tagging')
         >>> # make a "subtopic" Tag and add it
         >>> subtopic = Tag('subtopic', 'ontologies')
         >>> tags.add(subtopic)
@@ -441,14 +441,15 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return get_dotted_identifier(field_name)
 
-  def get_value(self, arg_name, a, kw):
+  @staticmethod
+  def get_value(arg_name, a, kw):
     assert not a
     try:
-      attribute = self.get_format_attribute(arg_name)
+      attribute = kw.get_format_attribute(arg_name)
     except AttributeError:
       if isinstance(kw, TagSet):
         # for TagSets we get the matching TagSetPrefixView
-        value = self.subtags(arg_name)
+        value = kw.subtags(arg_name)
       else:
         value = kw[arg_name]
     else:
@@ -473,7 +474,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags
             TagSet:{'a': 1, 'b': 2, 'c.z': 9, 'c.x': 8}
             >>> tags.c
-            TagSetPrefixView:{'z': 9, 'x': 8}
+            TagSetPrefixView:c.{'z': 9, 'x': 8}
             >>> tags.c.z
             9
 
@@ -690,7 +691,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
-            TagSetPrefixView:{'b': 1, 'd': 2}
+            TagSetPrefixView:a.{'b': 1, 'd': 2}
     '''
     if as_tagset:
       # prepare a standalone TagSet
@@ -1270,7 +1271,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         For a sequence (`list`) this is a list of the metadata
         for each member.
 
-        For a mapping (`dict`) this is mapping of `key->value_metadata`.
+        For a mapping (`dict`) this is mapping of `key->metadata`.
     '''
     ont = ontology or self.ontology
     assert ont, "ont is false: %r" % (ont,)
@@ -1278,18 +1279,22 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if basetype == 'list':
       member_type = self.member_type
       return [
-          ont.value_metadata(member_type, value, convert=convert)
+          ont.metadata(member_type, value, convert=convert)
           for value in self.value
       ]
     if basetype == 'dict':
       member_type = self.member_type
       return {
-          key: ont.value_metadata(member_type, value)
+          key: ont.metadata(member_type, value)
           for key, value in self.value.items()
       }
-    return ont.value_metadata(self.name, self.value)
+    return ont.metadata(self.name, self.value)
 
-  meta = metadata
+  @property
+  def meta(self):
+    ''' Shortcut property for the metadata `TagSet`.
+    '''
+    return self.metadata()
 
   @property
   def key_type(self):
@@ -1557,14 +1562,30 @@ class TagSetPrefixView(FormatableMixin):
       in that some things such as `__format__`
       will format the `Tag` named `prefix` if it exists
       in preference to the subtags.
+
+      Example:
+
+          >>> tags = TagSet(a=1, b=2)
+          >>> tags
+          TagSet:{'a': 1, 'b': 2}
+          >>> tags['sub.x'] = 3
+          >>> tags['sub.y'] = 4
+          >>> tags
+          TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4}
+          >>> sub = tags.sub
+          >>> sub
+          TagSetPrefixView:sub.{'x': 3, 'y': 4}
+          >>> sub.z = 5
+          >>> sub
+          TagSetPrefixView:sub.{'x': 3, 'y': 4, 'z': 5}
+          >>> tags
+          TagSet:{'a': 1, 'b': 2, 'sub.x': 3, 'sub.y': 4, 'sub.z': 5}
   '''
 
   @typechecked
   @require(lambda prefix: len(prefix) > 0)
   def __init__(self, tags, prefix: str):
-    self._tags = tags
-    self._prefix = prefix
-    self._prefix_ = prefix + '.'
+    self.__dict__.update(_tags=tags, _prefix=prefix, _prefix_=prefix + '.')
 
   def __str__(self):
     tag = self.tag
@@ -1646,6 +1667,25 @@ class TagSetPrefixView(FormatableMixin):
         return self[attr]
       except (KeyError, TypeError):
         return getattr(self.__proxied, attr)
+
+  def __setattr__(self, attr, value):
+    ''' Attribute based `Tag` access.
+
+        If `attr` is in `self.__dict__` then that is updated,
+        supporting "normal" attributes set on the instance.
+        Otherwise the `Tag` named `attr` is set to `value`.
+
+        The `__init__` methods of subclasses should do something like this
+        (from `TagSet.__init__`)
+        to set up the ordinary instance attributes
+        which are not to be treated as `Tag`s:
+
+            self.__dict__.update(id=_id, ontology=_ontology, modified=False)
+    '''
+    if attr in self.__dict__:
+      self.__dict__[attr] = value
+    else:
+      self[attr] = value
 
   def subtags(self, subprefix):
     ''' Return a deeper view of the `TagSet`.
@@ -1956,13 +1996,16 @@ class TagsOntology(SingletonMixin, TagSets):
   ##################################################################
   # Mapping methods.
   def keys(self, *, prefix=None):
-    return self.tagsets.keys(prefix=None)
+    return self.tagsets.keys(prefix=prefix)
 
   def __iter__(self):
     return self.keys()
 
   def __delitem__(self, index):
     del self.tagsets[index]
+
+  ##################################################################
+  # Types.
 
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
@@ -1979,26 +2022,21 @@ class TagsOntology(SingletonMixin, TagSets):
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for key, tags in self.items():
-      type_name = cutprefix(key, 'type.')
-      if type_name is not key:
-        yield type_name, tags
+    for type_name in self.type_names():
+      yield type_name, self.type(type_name)
 
   def type_names(self):
     ''' Generator yielding defined type names.
     '''
-    for key in self.keys():
-      type_name = cutprefix(key, 'type.')
-      if type_name is not key:
-        yield type_name
+    for key in self.keys(prefix='type.'):
+      assert key.startswith('type.')
+      yield cutprefix(key, 'type.')
 
-  def meta(self, type_name, value):
-    ''' Return the metadata `TagSet` for `(type_name,value)`.
-    '''
-    return self[self.meta_index(type_name, value)]
+  ################################################################
+  # Metadata.
 
   @classmethod
-  def meta_index(cls, type_name=None, value=None):
+  def meta_index(cls, type_name=None, value=None, convert=None):
     ''' Return the entry index for the metadata for `(type_name,value)`.
     '''
     index = 'meta'
@@ -2006,8 +2044,12 @@ class TagsOntology(SingletonMixin, TagSets):
       assert value is None
     else:
       index += '.' + type_name
-      if value:
-        index += '.' + cls.value_to_tag_name(value)
+      if value is not None:
+        if convert is None:
+          convert = cls.value_to_tag_name
+        value_tag_name = convert(value)
+        assert isinstance(value_tag_name, str) and value_tag_name
+        index += '.' + value_tag_name
     return index
 
   def meta_names(self, type_name=None):
@@ -2020,12 +2062,16 @@ class TagsOntology(SingletonMixin, TagSets):
         on an ontology with a `meta.character.marvel.black_widow`
         would yield `'marvel.black_widow'`
         i.e. only the suffix part for `character` metadata.
+
+        By contrast, `meta_names()`
+        on an ontology with a `meta.character.marvel.black_widow`
+        would yield `'character.marvel.black_widow'`.
     '''
     prefix = self.meta_index(type_name=type_name) + '.'
-    for key in self.tagsets.keys(prefix=prefix):
-      suffix = cutprefix(key, prefix)
-      assert suffix is not key
-      yield suffix
+    for key in self.keys(prefix=prefix):
+      X("meta_names: key=%r",key)
+      assert key.startswith(prefix)
+      yield cutprefix(key, prefix)
 
   @staticmethod
   @pfx
@@ -2033,9 +2079,10 @@ class TagsOntology(SingletonMixin, TagSets):
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
-        Returns `None` for unconvertable values.
+        Raises `ValueError` for unconvertable values.
 
-        Nonnegative `int`s are converted to `str`.
+        `int`s are converted to `str`
+        and their leading dash, if any, converted to an underscroe.
 
         Strings are converted as follows:
         * a trailing `(.*)` is turned into a prefix with a dot,
@@ -2046,22 +2093,27 @@ class TagsOntology(SingletonMixin, TagSets):
           for example `"Marvel.Captain America"`
           becomes `"marvel.captain_america"`.
     '''
-    if isinstance(value, int) and value >= 0:
-      return str(value)
+    if isinstance(value, int):
+      return str(value).replace('-', '_')
     if isinstance(value, str):
       value = value.strip()
       m = re.match(r'(.*)\(([^()]*)\)\s*$', value)
       if m:
         value = m.group(2).strip() + '.' + m.group(1).strip()
       value = '_'.join(value.lower().split())
+      value = value.replace('-', '_')
       return value
     raise ValueError(value)
 
   @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
-  def value_metadata(self, type_name, value, convert=None):
-    ''' Return a `ValueMetadata` for `type_name` and `value`.
-        This provides the mapping between a type's value and its semantics.
+  def metadata(self, type_name, value, convert=None):
+    ''' Return the metadata `TagSet` for `type_name` and `value`.
+        This implements the mapping between a type's value and its semantics.
+
+        The optional parameter `convert`
+        may specify a function to use to convert `value` to a tag name component
+        to be used in place of `self.value_to_tag_name` (the default).
 
         For example,
         if a `TagSet` had a list of characters such as:
@@ -2074,14 +2126,7 @@ class TagsOntology(SingletonMixin, TagSets):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    if convert:
-      value_tag_name = convert(value)
-      assert isinstance(value_tag_name, str) and value_tag_name
-    else:
-      value_tag_name = self.value_to_tag_name(str(value))
-    ontkey = 'meta.' + type_name + '.' + '_'.join(
-        value_tag_name.lower().split()
-    )
+    ontkey = self.meta_index(type_name, value, convert=convert)
     return self[ontkey]
 
   def basetype(self, typename):
@@ -2381,6 +2426,24 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
+  def cmd_edit(self, argv):
+    ''' Usage: {cmd} entity
+          Edit the named entity.
+          If the entity name for not start with type. or meta. then
+          meta. is prepended to the name.
+    '''
+    options = self.options
+    ont = options.ontology
+    if not argv:
+      raise GetoptError("missing entity")
+    entity_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after entity: %r" % (argv,))
+    if not entity_name.startswith(('type.', 'meta.')):
+      entity_name = 'meta.' + entity_name
+    tags = ont[entity_name]
+    tags.edit()
+
   # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
     ''' Usage:
@@ -2394,6 +2457,7 @@ class TagsOntologyCommand(BaseCommand):
             Edit the tags for the metadata names matching the
             meta_names_patterns.
           {cmd} type_name list
+          {cmd} type_name ls
             List the metadata names for this type and their tags.
           {cmd} type_name + entity_name [tags...]
             Create meta.entity_name and apply the tags.
@@ -2434,18 +2498,18 @@ class TagsOntologyCommand(BaseCommand):
             ]
             ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
           return 0
-        if subcmd == 'list':
+        if subcmd in ('list', 'ls'):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
           for meta_name in sorted(ont.meta_names(type_name=type_name)):
-            print(meta_name, ont.meta(type_name, meta_name))
+            print(meta_name, ont.metadata(type_name, meta_name))
           return 0
         if subcmd == '+':
           if not argv:
             raise GetoptError("missing entity_name")
           entity_name = argv.pop(0)
           print("entity_name =", entity_name)
-          etags = ont.meta(type_name, entity_name)
+          etags = ont.metadata(type_name, entity_name)
           print("entity tags =", etags)
           for arg in argv:
             with Pfx("%s", arg):

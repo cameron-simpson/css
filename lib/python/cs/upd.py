@@ -168,6 +168,17 @@ class Upd(SingletonMixin):
 
   # pylint: disable=too-many-branches
   def __init__(self, backend=None, columns=None, disabled=None):
+    ''' Initialise the `Upd`.
+
+        Parameters:
+        * `backend`: the output file, default `sys.stderr`
+        * `columns`: the width of the output,
+          default from the width of the `backend` tty if it is a tty,
+          `80` otherwise
+        * `disabled`: if true, disable the output - just keep state;
+          default true if the output is not a tty;
+          this automatically silences the `Upd` if stderr is not a tty
+    '''
     if hasattr(self, '_backend'):
       return
     if backend is None:

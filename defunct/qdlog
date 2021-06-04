@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Query my dlog.
-#       - Cameron Simpson <cs@cskk.id.au> 14dec2005
+# - Cameron Simpson <cs@cskk.id.au> 14dec2005
 #
 
 import os
@@ -10,17 +10,14 @@ import sys
 import re
 import string
 from getopt import getopt, GetoptError
-import cs.lex
+from cs.env import LOGDIR
+from cs.lex import skipwhite
 from cs.logutils import setup_logging, error, warning
 
 cmd = os.path.basename(sys.argv[0])
 setup_logging(cmd)
 
-if 'LOGDIR' in os.environ:
-  logdir=os.environ['LOGDIR']
-else:
-  logdir=os.path.join(os.environ['HOME'],'var','log')
-
+logdir=LOGDIR()
 log=os.path.join(logdir,'dlog')
 relist=[]
 lastremode=False
@@ -32,15 +29,15 @@ usage="""Usage: """+cmd+""" [-i incre]... [-e excre]... prefix
 
 badopts=False
 
-print "argv =", `sys.argv`
+print("argv =", repr(sys.argv))
 try:
   (opts,argv)=getopt(sys.argv[1:],'i:e:')
-except GetoptError, e:
+except GetoptError as e:
   error("unrecognised option: %s: %s", e.opt, e.msg)
   badopts=True
 
 for (opt,val) in opts:
-  print 'opt =', opt, 'val =', `val`
+  print('opt =', opt, 'val =', repr(val))
   if opt == '-i':
     relist.append((True, re.compile(val), val))
     lastremode=True
@@ -61,9 +58,8 @@ if badopts:
   warning(usage)
   sys.exit(2)
 
-dfltrelist=file(os.path.join(os.environ['HOME'],'rc','dlog','q-'+prefix))
-if dfltrelist:
-  for regexp in dfltrelist:
+with open(expandvars('$HOME/rc/dlog/q-')+prefix) as f:
+  for regexp in f:
     regexp=chomp(regexp)
     relist.append((False, re.compile(regexp), regexp))
 
@@ -77,7 +73,7 @@ def showdate():
   global showndate
   global curdate
   if curdate != showndate:
-    print curdate
+    print(curdate)
     showndate=curdate
 
 def newdate(when):
@@ -89,7 +85,7 @@ def newdate(when):
 
 def flushline(hhmm,line):
   showdate()
-  print ' ', hhmm, line
+  print(' ', hhmm, line)
 
 def cmpmsgs(a,b):
   return cmp(a['HHMM'],b['HHMM'])
@@ -98,11 +94,11 @@ def flushemail():
   global email
   if email:
     showdate()
-    print "  EMAIL:"
+    print("  EMAIL:")
     subjlist=email.keys()
     subjlist.sort()
     for subj in subjlist:
-      print '  ', subj+':'
+      print('  ', subj+':')
       pfx='   '
       topic=email[subj]
       msgs=[topic[msgid] for msgid in topic]
@@ -111,7 +107,7 @@ def flushemail():
         rpt=msg['HHMM']+": "
         if 'FROM' in msg: rpt=rpt+string.join(cs.misc.uniq(msg['FROM']),', ')
         if 'TO' in msg:   rpt=rpt+'->'+string.join(cs.misc.uniq(msg['TO']),', ')
-        print pfx, rpt  ##  msg['MSGID']
+        print(pfx, rpt)  ##  msg['MSGID']
         pfx='   '
     email={}
 
@@ -165,20 +161,20 @@ for line in file(log):
   if line[0] not in string.whitespace:
     newdate(line)
     continue
-  line=line[cs.lex.skipwhite(line):]
+  line=line[skipwhite(line):]
 
   m=hhmm_re.match(line)
   if not hhmm_re.match(line):
-    print "BAD LINE:", line
+    print("BAD LINE:", line)
     continue
   hhmm=m.group(1)
-  line=line[cs.lex.skipwhite(line,len(hhmm)):]
+  line=line[skipwhite(line,len(hhmm)):]
 
   m=q_re.match(line)
   if m is None:
     continue
 
-  line=line[cs.lex.skipwhite(line,len(m.group(0))):]
+  line=line[skipwhite(line,len(m.group(0))):]
   if not testre(line):
     # rejected by regexps
     continue
