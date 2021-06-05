@@ -1235,6 +1235,14 @@ class FormatableFormatter(Formatter):
         )
         offset = m_field.end()
 
+  @staticmethod
+  def get_arg_name(field_name):
+    ''' Default initial arg_name is an identifier.
+
+        Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
+    '''
+    return get_identifier(field_name)
+
   # pylint: disable=arguments-differ
   @pfx_method
   def get_field(self, field_name, a, kw):
@@ -1531,14 +1539,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
     return _format_as(
         format_s, format_mapping, formatter=self, error_sep=error_sep
     )
-
-  @staticmethod
-  def get_arg_name(field_name):
-    ''' Default initial arg_name is an identifier.
-
-        Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
-    '''
-    return get_identifier(field_name)
 
   # Utility methods for formats.
   @format_attribute
