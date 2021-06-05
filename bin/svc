@@ -179,18 +179,19 @@ cd "$SVC_RUNDIR"
 case "$op" in
   start)
     set -x
+    cd
     if [ -n "$stop_shcmd" ]
     then
       [ -d "$SVC_LOGDIR" ] || set-x mkdir "$SVC_LOGDIR"
       date | tee -a "$SVC_LOGDIR/$name.log" "$SVC_LOGDIR/$name.err"
-      exec sh -xc "$start_shcmd" >>"$SVC_LOGDIR/$name.log" 2>>"$SVC_LOGDIR/$name.err"
+      exec sh -uexc "$start_shcmd" >>"$SVC_LOGDIR/$name.log" 2>>"$SVC_LOGDIR/$name.err"
     else
       SVC_OP=$op
       SVC_NAME=$name
       SVC_TMUX_SESSION=SVC_$( printf '%s\n' "$name" | tr '[a-z]-' '[A-Z]_' )
       export SVC_OP SVC_NAME SVC_TMUX_SESSION
       set -x
-      exec tm "$SVC_TMUX_SESSION" set-x svcd -n "$SVC_NAME" sh -xc "pwd; $start_shcmd"
+      exec tm "$SVC_TMUX_SESSION" set-x svcd -n "$SVC_NAME" sh -uexc "$start_shcmd"
     fi
     ;;
   exec)
