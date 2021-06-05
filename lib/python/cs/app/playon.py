@@ -859,6 +859,7 @@ class PlayOnAPI(MultiOpenMixin):
               total=dl_length,
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
+              report_print=True,
           ):
             offset = 0
             length = len(chunk)
