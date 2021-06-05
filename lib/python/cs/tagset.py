@@ -2109,7 +2109,6 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     prefix = self.meta_index(type_name=type_name) + '.'
     for key in self.keys(prefix=prefix):
-      X("meta_names: key=%r",key)
       assert key.startswith(prefix)
       yield cutprefix(key, prefix)
 
