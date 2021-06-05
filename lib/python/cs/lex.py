@@ -58,15 +58,16 @@ DISTINFO = {
     ],
 }
 
-unhexify = binascii.unhexlify
+unhexify = binascii.unhexlify  # pylint: disable=c-extension-no-member
+hexify = binascii.hexlify  # pylint: disable=c-extension-no-member
 if sys.hexversion >= 0x030000:
+  _hexify = hexify
 
+  # pylint: disable=function-redefined
   def hexify(bs):
     ''' A flavour of `binascii.hexlify` returning a `str`.
     '''
-    return binascii.hexlify(bs).decode()
-else:
-  hexify = binascii.hexlify
+    return _hexify(bs).decode()
 
 ord_space = ord(' ')
 
@@ -1190,7 +1191,11 @@ class FormatableFormatter(Formatter):
   FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+)'
   FORMAT_RE_ATTRIBUTE_NAME_s = rf'\.{FORMAT_RE_IDENTIFIER_s}'
   FORMAT_RE_ELEMENT_INDEX_s = r'[^]]*'
-  FORMAT_RE_FIELD_EXPR_s = rf'{FORMAT_RE_ARG_NAME_s}({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\])*'
+  FORMAT_RE_FIELD_EXPR_s = (
+      rf'{FORMAT_RE_ARG_NAME_s}'
+      rf'({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\]'
+      rf')*'
+  )
   FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.I)
   FORMAT_RE_FIELD = re.compile(
       (
@@ -1535,7 +1540,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         )
       format_mapping = self
     else:
-      format_mapping = get_format_mapping(**control_kw)
+      format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
     return _format_as(
         format_s, format_mapping, formatter=self, error_sep=error_sep
     )
