@@ -884,6 +884,19 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           False
   '''
 
+  # A JSON encoder used for tag values which lack a special encoding.
+  # The default here is "compact": no whitespace in delimiters.
+  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+
+  # A JSON decoder.
+  JSON_DECODER = JSONDecoder()
+
+  EXTRA_TYPES = [
+      (UUID, UUID, str),
+      (date, date_fromisoformat, date.isoformat),
+      (datetime, datetime_fromisoformat, datetime.isoformat),
+  ]
+
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
@@ -933,19 +946,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Dummy `__init__` to avoid `FormatableMixin.__init__`
         because we subclass `namedtuple` which has no `__init__`.
     '''
-
-  # A JSON encoder used for tag values which lack a special encoding.
-  # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
-
-  # A JSON decoder.
-  JSON_DECODER = JSONDecoder()
-
-  EXTRA_TYPES = [
-      (UUID, UUID, str),
-      (date, date_fromisoformat, date.isoformat),
-      (datetime, datetime_fromisoformat, datetime.isoformat),
-  ]
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
