@@ -1325,6 +1325,7 @@ class FormatableFormatter(Formatter):
       try:
         value.convert_via_method_or_attr
       except AttributeError:
+        # promote to something with convert_via_method_or_attr
         value = FStr(value)
       value, offset = value.convert_via_method_or_attr(value, format_subspec)
       if offset < len(format_subspec):
@@ -1455,6 +1456,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       conversion = None
     return super().convert_field(value, conversion)
 
+  @pfx_method
   def convert_via_method_or_attr(self, value, format_spec):
     ''' Apply a method or attribute name based conversion to `value`
         where `format_spec` starts with a method name
@@ -1464,7 +1466,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
         The methods/attributes are looked up in the mapping
         returned by `.format_attributes()` which represents allowed methods
-        (broadly, one should avoid allowing methods which modify any state).
+        (broadly, one should not allow methods which modify any state).
 
         If this returns a callable, it is called to obtain the converted value
         otherwise it is used as is.
@@ -1484,6 +1486,9 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       try:
         converted = attribute()
       except TypeError as e:
+        if not isinstance(value, FStr):
+          with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
+            return self.convert_via_method_or_attr(FStr(value), format_spec)
         # pylint: disable=raise-missing-from
         raise ValueError(
             "TypeError calling %s.%s():%s: %s" %
