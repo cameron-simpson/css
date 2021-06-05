@@ -1470,33 +1470,45 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
         If this returns a callable, it is called to obtain the converted value
         otherwise it is used as is.
+
+        As a final tweak,
+        if `value.get_format_attribute()` raises an `AttributeError`
+        (the attribute is not an allowed attribute)
+        or calling the attribute raises a `TypeError`
+        (the `value` isn't suitable)
+        and the `value` is not an instance of `FStr`,
+        convert it to an `FStr` and try again.
+        This provides the command utility methods on other types.
+
+        The motivating example was a `PurePosixPath`,
+        which does not JSON transcribe;
+        this tweak supports both
+        `posixpath:basename` via the pathlib stuff
+        and `posixpath:json` via `FStr`
+        even though a `PurePosixPath` does not subclass `FStr`.
     '''
-    attr, offset = get_identifier(format_spec)
-    if not attr:
-      # no leading method/attribute name, return unchanged
-      return value, 0
     try:
-      attribute = value.get_format_attribute(attr)
-    except AttributeError as e:
-      raise ValueError(
-          "convert_via_method_or_attr(%s,%r): %s" %
-          (typed_repr(value), format_spec, e)
-      ) from e
-    if callable(attribute):
+      attr, offset = get_identifier(format_spec)
+      if not attr:
+        # no leading method/attribute name, return unchanged
+        return value, 0
       try:
+        attribute = value.get_format_attribute(attr)
+      except AttributeError as e:
+        raise TypeError(
+            "convert_via_method_or_attr(%s,%r): %s" %
+            (typed_repr(value), format_spec, e)
+        ) from e
+      if callable(attribute):
         converted = attribute()
-      except TypeError as e:
-        if not isinstance(value, FStr):
-          with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
-            return self.convert_via_method_or_attr(FStr(value), format_spec)
-        # pylint: disable=raise-missing-from
-        raise ValueError(
-            "TypeError calling %s.%s():%s: %s" %
-            (type(self).__name__, attr, attribute, e)
-        )
-    else:
-      converted = attribute
-    return converted, offset
+      else:
+        converted = attribute
+      return converted, offset
+    except TypeError as e:
+      if not isinstance(value, FStr):
+        with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
+          return self.convert_via_method_or_attr(FStr(value), format_spec)
+      raise
 
   def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
