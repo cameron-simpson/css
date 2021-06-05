@@ -528,13 +528,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       self[attr] = value
 
   @classmethod
-  def from_line(cls, line, offset=0, *, ontology=None, verbose=None):
+  def from_line(
+      cls, line, offset=0, *, ontology=None, extra_types=None, verbose=None
+  ):
     ''' Create a new `TagSet` from a line of text.
     '''
     tags = cls(_ontology=ontology)
     offset = skipwhite(line, offset)
     while offset < len(line):
-      tag, offset = Tag.from_str2(line, offset, ontology=ontology)
+      tag, offset = Tag.from_str2(
+          line, offset, ontology=ontology, extra_types=extra_types
+      )
       tags.add(tag, verbose=verbose)
       offset = skipwhite(line, offset)
     return tags
@@ -884,6 +888,19 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           False
   '''
 
+  # A JSON encoder used for tag values which lack a special encoding.
+  # The default here is "compact": no whitespace in delimiters.
+  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+
+  # A JSON decoder.
+  JSON_DECODER = JSONDecoder()
+
+  EXTRA_TYPES = [
+      (UUID, UUID, str),
+      (date, date_fromisoformat, date.isoformat),
+      (datetime, datetime_fromisoformat, datetime.isoformat),
+  ]
+
   @require(
       lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
   )
@@ -934,19 +951,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         because we subclass `namedtuple` which has no `__init__`.
     '''
 
-  # A JSON encoder used for tag values which lack a special encoding.
-  # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
-
-  # A JSON decoder.
-  JSON_DECODER = JSONDecoder()
-
-  EXTRA_TYPES = [
-      (UUID, UUID, str),
-      (date, date_fromisoformat, date.isoformat),
-      (datetime, datetime_fromisoformat, datetime.isoformat),
-  ]
-
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
 
@@ -976,10 +980,27 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return name + '=' + value_s
 
   @classmethod
-  def transcribe_value(cls, value):
+  def transcribe_value(cls, value, extra_types=None):
     ''' Transcribe `value` for use in `Tag` transcription.
+
+        The optional `extra_types` parameter may be an iterable of
+        `(type,from_str,to_str)` tuples where `to_str` is a
+        function which takes a string and returns a Python object
+        (expected to be an instance of `type`).
+        The default comes from `cls.EXTRA_TYPES`.
+
+        If `value` is an instance of `type`
+        then the `to_str` function is used to transcribe the value
+        as a `str`, which should not include any whitespace
+        (because of the implementation of `parse_value`).
+        If there is no matching `to_str` function,
+        `cls.JSON_ENCODER.encode` is used to transcribe `value`.
+
+        This supports storage of nonJSONable values in text form.
     '''
-    for type_, _, to_str in cls.EXTRA_TYPES:
+    if extra_types is None:
+      extra_types = cls.EXTRA_TYPES
+    for type_, _, to_str in extra_types:
       if isinstance(value, type_):
         value_s = to_str(value)
         # should be nonwhitespace
@@ -1031,7 +1052,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def from_str2(cls, s, offset=0, *, ontology):
+  def from_str2(cls, s, offset=0, *, ontology, extra_types=None):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
@@ -1043,7 +1064,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             value = None
           elif sep == '=':
             offset += 1
-            value, offset = cls.parse_value(s, offset)
+            value, offset = cls.parse_value(s, offset, extra_types=extra_types)
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -1055,14 +1076,32 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0):
+  def parse_value(cls, s, offset=0, extra_types=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
+
+        The optional `extra_types` parameter may be an iterable of
+        `(type,from_str,to_str)` tuples where `from_str` is a
+        function which takes a string and returns a Python object
+        (expected to be an instance of `type`).
+        The default comes from `cls.EXTRA_TYPES`.
+
+        Nonwhitespace at `s[offset:]` is tried against each such `from_str`
+        function in turn;
+        if the function does not raise `ValueError`
+        then its result is accepted as the parsed value.
+        If none matches,
+        `cls.JSON_DECODER.raw_decode` is used to parse the value.
+
+        This supports storage of nonJSONable values in text form.
     '''
+    if extra_types is None:
+      extra_types = cls.EXTRA_TYPES
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
     else:
+      # look for a "bare" name
       try:
         value, offset2 = cls.parse_name(s, offset)
       except ValueError:
@@ -1071,12 +1110,13 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         if offset == offset2:
           value = None
       if value is not None:
+        # a bare name, use as is
         offset = offset2
       else:
         # check for special "nonwhitespace" transcription
         nonwhite, nw_offset = get_nonwhite(s, offset)
         nw_value = None
-        for _, from_str, _ in cls.EXTRA_TYPES:
+        for _, from_str, _ in extra_types:
           try:
             nw_value = from_str(nonwhite)
           except ValueError:
@@ -2069,7 +2109,6 @@ class TagsOntology(SingletonMixin, TagSets):
     '''
     prefix = self.meta_index(type_name=type_name) + '.'
     for key in self.keys(prefix=prefix):
-      X("meta_names: key=%r",key)
       assert key.startswith(prefix)
       yield cutprefix(key, prefix)
 
@@ -2296,10 +2335,14 @@ class TagFile(SingletonMixin, TagSets):
 
   @classmethod
   @pfx_method
-  def parse_tags_line(cls, line, ontology=None, verbose=None):
+  def parse_tags_line(
+      cls, line, ontology=None, verbose=None, extra_types=None
+  ):
     ''' Parse a "name tags..." line as from a `.fstags` file,
         return `(name,TagSet)`.
     '''
+    if extra_types is None:
+      extra_types = getattr(cls, 'EXTRA_TYPES', None)
     name, offset = Tag.parse_value(line)
     if offset < len(line) and not line[offset].isspace():
       _, offset2 = get_nonwhite(line, offset)
@@ -2311,11 +2354,17 @@ class TagFile(SingletonMixin, TagSets):
       offset = offset2
     if offset < len(line) and not line[offset].isspace():
       warning("offset %d: expected whitespace", offset)
-    tags = TagSet.from_line(line, offset, ontology=ontology, verbose=verbose)
+    tags = TagSet.from_line(
+        line,
+        offset,
+        extra_types=extra_types,
+        ontology=ontology,
+        verbose=verbose
+    )
     return name, tags
 
   @classmethod
-  def load_tagsets(cls, filepath, ontology):
+  def load_tagsets(cls, filepath, ontology, extra_types=None):
     ''' Load `filepath` and return `(tagsets,unparsed)`.
 
         The returned `tagsets` are a mapping of `name`=>`tag_name`=>`value`.
@@ -2337,7 +2386,9 @@ class TagFile(SingletonMixin, TagSets):
                 unparsed.append((lineno, line0))
                 continue
               try:
-                name, tags = cls.parse_tags_line(line, ontology=ontology)
+                name, tags = cls.parse_tags_line(
+                    line, extra_types=extra_types, ontology=ontology
+                )
               except ValueError as e:
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
@@ -2352,10 +2403,12 @@ class TagFile(SingletonMixin, TagSets):
       return tagsets, unparsed
 
   @classmethod
-  def tags_line(cls, name, tags):
+  def tags_line(cls, name, tags, extra_types=None):
     ''' Transcribe a `name` and its `tags` for use as a `.fstags` file line.
     '''
-    fields = [Tag.transcribe_value(name)]
+    if extra_types is None:
+      extra_types = getattr(cls, 'EXTRA_TYPES', None)
+    fields = [Tag.transcribe_value(name, extra_types=extra_types)]
     for tag in tags:
       if tag.name == 'name':
         # we don't write this one out, but we do expect it to match
@@ -2371,7 +2424,7 @@ class TagFile(SingletonMixin, TagSets):
 
   @classmethod
   @pfx_method
-  def save_tagsets(cls, filepath, tagsets, unparsed):
+  def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
         This method will create the required intermediate directories
@@ -2394,7 +2447,7 @@ class TagFile(SingletonMixin, TagSets):
           for name, tags in name_tags:
             if not tags:
               continue
-            f.write(cls.tags_line(name, tags))
+            f.write(cls.tags_line(name, tags, extra_types=extra_types))
             f.write('\n')
       except OSError as e:
         error("save(%r) fails: %s", filepath, e)
@@ -2402,7 +2455,7 @@ class TagFile(SingletonMixin, TagSets):
         for _, tags in name_tags:
           tags.modified = False
 
-  def save(self):
+  def save(self, extra_types=None):
     ''' Save the tag map to the tag file.
     '''
     tagsets = self._tagsets
@@ -2412,7 +2465,9 @@ class TagFile(SingletonMixin, TagSets):
     with self._lock:
       if any(map(lambda tagset: tagset.modified, tagsets.values())):
         # there are modified TagSets
-        self.save_tagsets(self.filepath, tagsets, self.unparsed)
+        self.save_tagsets(
+            self.filepath, tagsets, self.unparsed, extra_types=extra_types
+        )
         for tagset in tagsets.values():
           tagset.modified = False
 

@@ -58,15 +58,16 @@ DISTINFO = {
     ],
 }
 
-unhexify = binascii.unhexlify
+unhexify = binascii.unhexlify  # pylint: disable=c-extension-no-member
+hexify = binascii.hexlify  # pylint: disable=c-extension-no-member
 if sys.hexversion >= 0x030000:
+  _hexify = hexify
 
+  # pylint: disable=function-redefined
   def hexify(bs):
     ''' A flavour of `binascii.hexlify` returning a `str`.
     '''
-    return binascii.hexlify(bs).decode()
-else:
-  hexify = binascii.hexlify
+    return _hexify(bs).decode()
 
 ord_space = ord(' ')
 
@@ -1190,7 +1191,11 @@ class FormatableFormatter(Formatter):
   FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+)'
   FORMAT_RE_ATTRIBUTE_NAME_s = rf'\.{FORMAT_RE_IDENTIFIER_s}'
   FORMAT_RE_ELEMENT_INDEX_s = r'[^]]*'
-  FORMAT_RE_FIELD_EXPR_s = rf'{FORMAT_RE_ARG_NAME_s}({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\])*'
+  FORMAT_RE_FIELD_EXPR_s = (
+      rf'{FORMAT_RE_ARG_NAME_s}'
+      rf'({FORMAT_RE_ATTRIBUTE_NAME_s}|\[{FORMAT_RE_ELEMENT_INDEX_s}\]'
+      rf')*'
+  )
   FORMAT_RE_FIELD_EXPR = re.compile(FORMAT_RE_FIELD_EXPR_s, re.I)
   FORMAT_RE_FIELD = re.compile(
       (
@@ -1234,6 +1239,14 @@ class FormatableFormatter(Formatter):
             m_field.group('conversion'),
         )
         offset = m_field.end()
+
+  @staticmethod
+  def get_arg_name(field_name):
+    ''' Default initial arg_name is an identifier.
+
+        Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
+    '''
+    return get_identifier(field_name)
 
   # pylint: disable=arguments-differ
   @pfx_method
@@ -1325,6 +1338,7 @@ class FormatableFormatter(Formatter):
       try:
         value.convert_via_method_or_attr
       except AttributeError:
+        # promote to something with convert_via_method_or_attr
         value = FStr(value)
       value, offset = value.convert_via_method_or_attr(value, format_subspec)
       if offset < len(format_subspec):
@@ -1455,6 +1469,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       conversion = None
     return super().convert_field(value, conversion)
 
+  @pfx_method
   def convert_via_method_or_attr(self, value, format_spec):
     ''' Apply a method or attribute name based conversion to `value`
         where `format_spec` starts with a method name
@@ -1464,34 +1479,49 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
         The methods/attributes are looked up in the mapping
         returned by `.format_attributes()` which represents allowed methods
-        (broadly, one should avoid allowing methods which modify any state).
+        (broadly, one should not allow methods which modify any state).
 
         If this returns a callable, it is called to obtain the converted value
         otherwise it is used as is.
+
+        As a final tweak,
+        if `value.get_format_attribute()` raises an `AttributeError`
+        (the attribute is not an allowed attribute)
+        or calling the attribute raises a `TypeError`
+        (the `value` isn't suitable)
+        and the `value` is not an instance of `FStr`,
+        convert it to an `FStr` and try again.
+        This provides the command utility methods on other types.
+
+        The motivating example was a `PurePosixPath`,
+        which does not JSON transcribe;
+        this tweak supports both
+        `posixpath:basename` via the pathlib stuff
+        and `posixpath:json` via `FStr`
+        even though a `PurePosixPath` does not subclass `FStr`.
     '''
-    attr, offset = get_identifier(format_spec)
-    if not attr:
-      # no leading method/attribute name, return unchanged
-      return value, 0
     try:
-      attribute = value.get_format_attribute(attr)
-    except AttributeError as e:
-      raise ValueError(
-          "convert_via_method_or_attr(%s,%r): %s" %
-          (typed_repr(value), format_spec, e)
-      ) from e
-    if callable(attribute):
+      attr, offset = get_identifier(format_spec)
+      if not attr:
+        # no leading method/attribute name, return unchanged
+        return value, 0
       try:
+        attribute = value.get_format_attribute(attr)
+      except AttributeError as e:
+        raise TypeError(
+            "convert_via_method_or_attr(%s,%r): %s" %
+            (typed_repr(value), format_spec, e)
+        ) from e
+      if callable(attribute):
         converted = attribute()
-      except TypeError as e:
-        # pylint: disable=raise-missing-from
-        raise ValueError(
-            "TypeError calling %s.%s():%s: %s" %
-            (type(self).__name__, attr, attribute, e)
-        )
-    else:
-      converted = attribute
-    return converted, offset
+      else:
+        converted = attribute
+      return converted, offset
+    except TypeError as e:
+      if not isinstance(value, FStr):
+        with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
+          return self.convert_via_method_or_attr(FStr(value), format_spec)
+      raise
 
   def format_as(self, format_s, error_sep=None, **control_kw):
     ''' Return the string `format_s` formatted using the mapping
@@ -1510,18 +1540,10 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         )
       format_mapping = self
     else:
-      format_mapping = get_format_mapping(**control_kw)
+      format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
     return _format_as(
         format_s, format_mapping, formatter=self, error_sep=error_sep
     )
-
-  @staticmethod
-  def get_arg_name(field_name):
-    ''' Default initial arg_name is an identifier.
-
-        Returns `(prefix,offset)`, and `('',0)` if there is no arg_name.
-    '''
-    return get_identifier(field_name)
 
   # Utility methods for formats.
   @format_attribute

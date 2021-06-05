@@ -1146,7 +1146,7 @@ class SQLTagSet(SingletonMixin, TagSet):
 
       As with the `TagSet` superclass,
       tag values can be any Python type.
-      Howeverm because we are storing these values in an SQL database
+      However, because we are storing these values in an SQL database
       it is necessary to provide a conversion facility
       to prepare those values for storage.
 
@@ -1160,10 +1160,10 @@ class SQLTagSet(SingletonMixin, TagSet):
       using the scheme described below.
 
       Because the ORM has distinct `float` and `str` columns to support indexing,
-      there will be no strings in the remaining JSON blob column.
+      there will be no plain strings in the remaining JSON blob column.
       Therefore we support other types by providing functions
       to convert each type to a `str` and back,
-      and an associate "type label" which will be prefixed to the string;
+      and an associated "type label" which will be prefixed to the string;
       the resulting string is stored in the JSON blob.
 
       The default mechanism is based on the following class attributes and methods:
@@ -1185,18 +1185,20 @@ class SQLTagSet(SingletonMixin, TagSet):
       * `"bigint"`: conversions for `int`
       * `"date"`: conversions for `datetime.date`
       * `"datetime"`: conversions for `datetime.datetime`
+
+      Subclasses wanting to augument the `TYPE_JS_MAPPING`
+      should prepare their own with code such as:
+
+          class SubSQLTagSet(SQLTagSet,....):
+              ....
+              TYPE_JS_MAPPING=dict(SQLTagSet.TYPE_JS_MAPPING)
+              TYPE_JS_MAPPING.update(
+                typelabel=(type, to_str, from_str),
+                ....
+              )
   '''
 
   # Conversion mappings for various nonJSONable types.
-  # Subclasses wanting to augument this should prepare their own
-  # with code such as:
-  #
-  #  TYPE_JS_MAPPING=dict(SQLTagSet.TYPE_JS_MAPPING)
-  #  TYPE_JS_MAPPING.update(
-  #    typelabel=(type, to_str, from_str),
-  #    ....
-  #  )
-  #
   TYPE_JS_MAPPING = {
       'bigint': (int, str, int),  # for ints which do not round trip with float
       'date': (date, date.isoformat, date.fromisoformat),
