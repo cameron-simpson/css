@@ -3,7 +3,15 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd convs... srcfile [dstfile]"
+usage="Usage:
+  $cmd [--skip-existing] convs... srcfile [dstfile]
+    --skip-existing
+      Skip conversion if the destination file already exists.
+  $cmd [--multi] [--skip-existing] convs... srcfile...
+    --multi
+      Multiple file conversion: instead of specifying the destination
+      path, accept multiple srcfiles and use the default dstfile
+      path."
 
 trace=
 [ -t 2 ] && trace=set-x
@@ -12,8 +20,27 @@ acodec=
 vcodec=
 ext=
 dst=
+subopts=
+skip_existing_dst=
+multifile=
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --multi)    multifile=1 ;;
+    --skip-existing)
+                subopts="$subopts $1"
+                skip_existing_dst=1
+                ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+  esac
+  shift
+done
 
 while [ $# -gt 0 ]
 do
@@ -49,9 +76,30 @@ done
   badopts=1
 }
 
+# multifile mode
+if [ $multifile ]
+then
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing srcfiles" >&2
+    badopts=1
+  fi
+  [ $badopts ] && {
+    echo "$usage" >&2
+    exit 2
+  }
+  for srcfile
+  do
+    # shellcheck disable=SC2086
+    $trace "$0" $subopts -- "$srcfile" || exit $?
+  done
+  exit 0
+fi
+
+# single file with optional dstfile
 if [ $# = 0 ]
 then
-  echo "$cmd: missing src" >&2
+  echo "$cmd: missing srcfile" >&2
   badopts=1
 else
   src=$1
@@ -60,7 +108,7 @@ else
   then
     srcext=$( expr "x$src" : 'x.*\.\([^.][^.]*\)' )
   else
-    echo "$cmd: no extension on src: $src" >&2
+    echo "$cmd: no extension on srcfile: $src" >&2
     badopts=1
   fi
 
@@ -93,7 +141,7 @@ else
   }
 
   [ "x$src" = "x$dst" ] && {
-    echo "$cmd: src and dst may not be the same: $src" >&2
+    echo "$cmd: srcfile and dstfile may not be the same: $src" >&2
     badopts=1
   }
 
@@ -109,5 +157,16 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -e "$dst" ]
+then
+  if [ $skip_existing_dst ]
+  then
+    echo "$cmd: $src: destination already exists: $dst"
+    exit 0
+  fi
+  echo "$cmd: $src: destination already exists: $dst" >&2
+  exit 1
+fi
 
 $trace ffmpeg -i "$src" -c:v "$vcodec" -c:a "$acodec" "$dst"
