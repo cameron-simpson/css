@@ -2,7 +2,7 @@
 
 set -ue
 
-cmd=$0
+cmd=$( basename "$0" )
 usage="Usage:
   $cmd [--skip-existing] convs... srcfile [dstfile]
     --skip-existing
