@@ -92,7 +92,7 @@ then
   for srcfile
   do
     # shellcheck disable=SC2086
-    $trace "$0" $subopts -- "$srcfile" || exit $?
+    $trace "$0" $subopts -- $vcodec $acodec "$srcfile" || exit $?
   done
   exit 0
 fi
