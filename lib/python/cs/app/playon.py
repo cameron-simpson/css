@@ -570,13 +570,14 @@ class PlayOnAPI(MultiOpenMixin):
   def login_state(self):
     ''' The login state, a `dict`. Performs a login if necessary.
     '''
-    state = self._login_state
-    if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
-      self._login_state = None
-      self._jwt = None
-      # not logged in or login about to expire
-      state = self._login_state = self._dologin()
-      self._jwt = state['token']
+    with self._lock:
+      state = self._login_state
+      if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
+        self._login_state = None
+        self._jwt = None
+        # not logged in or login about to expire
+        state = self._login_state = self._dologin()
+        self._jwt = state['token']
     return state
 
   @pfx_method
