@@ -33,6 +33,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.lex import cutprefix
 from cs.logutils import error, warning, info
 from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
@@ -93,7 +94,8 @@ class CDRipCommand(BaseCommand):
     options = self.options
     options.force = False
     options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
-    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or expanduser(CDRIP_DIR_DEFAULT)
+    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR
+                                     ) or expanduser(CDRIP_DIR_DEFAULT)
     options.mbdb_path = None
 
   def apply_opts(self, opts):
@@ -506,7 +508,7 @@ class MBDB(MultiOpenMixin):
       )
 
   @typechecked
-  def _fill_in_artist(self, mb_tags: MBTagSet, force: bool = False):
+  def _fill_in_artist(self, mb_tags: _MBTagSet, force: bool = False):
     assert mb_tags.name.startswith('meta.artist.')
     artist_id = mb_tags.name.split('.', 2)[-1]
     mb_tags['musicbrainz.artist_id'] = artist_id
@@ -530,7 +532,7 @@ class MBDB(MultiOpenMixin):
 
   # pylint: disable=too-many-branches,too-many-locals
   @typechecked
-  def _fill_in_disc(self, mb_tags: MBTagSet, force=False):
+  def _fill_in_disc(self, mb_tags: _MBTagSet, force=False):
     ''' Return the `disc.`*disc_id* entry.
         Update from MB as required before return.
     '''
@@ -579,7 +581,7 @@ class MBDB(MultiOpenMixin):
     return disc_tags
 
   @typechecked
-  def _fill_in_recording(self, mb_tags: MBTagSet, force=False):
+  def _fill_in_recording(self, mb_tags: _MBTagSet, force=False):
     ''' Return the recording for `recording_id`.
     '''
     ##force = True
