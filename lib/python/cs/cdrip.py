@@ -149,6 +149,23 @@ class CDRipCommand(BaseCommand):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  def cmd_meta(self, argv):
+    ''' Usage: {cmd} metaname...
+          Print the metadata about metaname, where metaname name the form
+          type_name.uuid being an ontology type such as "artist"
+          and a Musicbrainz UUID for that type.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    if not argv:
+      raise GetoptError("missing metanames")
+    for metaname in argv:
+      with Pfx("metaname %r", metaname):
+        ontkey = 'meta.' + metaname
+        X("  ontkey = %r", ontkey)
+        metadata = mbdb.ontology[ontkey]
+        print(' ', metadata)
+
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
     ''' Usage: {cmd} [disc_id]
