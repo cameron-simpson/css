@@ -293,7 +293,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
   os.system("eject")
 
 # pylint: disable=too-many-ancestors
-class MBTagSet(SQLTagSet):
+class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
 
@@ -304,10 +304,43 @@ class MBTagSet(SQLTagSet):
     return self.sqltags.mbdb
 
   @property
+  def mbkey(self):
+    ''' The MusicBrainz key (a UUID).
+    '''
+    return self.name.split('.', 2)[2]
+
+  @property
+  def type_name(self):
+    ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
+    '''
+    return self.name.split('.', 2)[2]
+
+  @property
   def ontology(self):
     ''' The `TagsOntology` for this entity.
     '''
     return self.mbdb.ontology
+
+  def infill(self, force=False):
+    ''' Fill in missing fields if required.
+    '''
+    onttype = self.type_name
+    mbkey = self.mbkey
+    includes = []
+    for cached in 'tags', :
+      if force or cached not in self:
+        includes.append(cached)
+    if includes:
+      A = self.mbdb._get('artist', mbkey, includes)
+      corrections = getattr(self, 'CORRECTIONS', {}).get(mbkey)
+      if corrections:
+        A.update(corrections)
+      for k, v in A.items():
+        if k == 'id':
+          assert v == mbkey, "A[%r]=%r != mbkey %r" % (k, v, mbkey)
+          continue
+        tag_name = onttype + '_' + k if k == 'name' else k.replace('-', '_')
+        self[tag_name] = v
 
   def artists(self):
     ''' Return a list of the artists' metadata.
@@ -324,11 +357,51 @@ class MBTagSet(SQLTagSet):
     '''
     return [artist.artist_name for artist in self.artists()]
 
+class MBArtist(_MBTagSet):
+  ''' A Musicbrainz artist entry.
+  '''
+
+  VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
+
+  CORRECTIONS = {
+      ## fixed! ## VARIOUS_ARTISTS_ID: {'name': 'Various Artists'},
+  }
+
+class MBDisc(_MBTagSet):
+  ''' A Musicbrainz disc entry.
+  '''
+
+class MBRecording(_MBTagSet):
+  ''' A Musicbrainz recording entry.
+  '''
+
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
-  TagSetClass = MBTagSet
+  # map 'foo' frm 'meta.foo.bah' to a particular TagSet subclass
+  TAGSET_CLASSES = {
+      'artist': MBArtist,
+      'disc': MBDisc,
+      'recording': MBRecording,
+  }
+
+  def TagSetClass(self, *, name, **kw):
+    X("TagSetClass(name=%r,...)...", name)
+    cls = None
+    meta1 = cutprefix(name, 'meta.')
+    if meta1 is not name:
+      type_name, _ = meta1.split('.', 1)
+      cls = self.TAGSET_CLASSES[type_name]
+    if cls is None:
+      cls = super().TagSetClass
+    te = cls(name=name, **kw)
+    infill = te.infill
+    if infill:
+      infill()
+    return te
+
+  TagSetClass.singleton_also_by = _MBTagSet.singleton_also_by
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
@@ -347,29 +420,9 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
-  @pfx_method
-  def default_factory(self, name: str, *, unixtime=None):
-    te = super().default_factory(name, unixtime=unixtime)
-    assert te.name == name
-    mbdb = te.sqltags.mbdb
-    if name.startswith('meta.'):
-      try:
-        _, typename, _ = name.split('.', 2)
-      except ValueError:
-        pass
-      else:
-        fill_in = getattr(mbdb, '_fill_in_' + typename, None)
-        if fill_in:
-          fill_in(te)
-        else:
-          warning("no fill_in for typename=%r", typename)
-    return te
-
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
-
-  VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
 
   def __init__(self, mbdb_path=None):
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
