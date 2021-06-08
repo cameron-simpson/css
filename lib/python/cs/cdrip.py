@@ -170,13 +170,18 @@ class CDRipCommand(BaseCommand):
 
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
-    ''' Usage: {cmd} [disc_id]
+    ''' Usage: {cmd} [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
+          -n  No action; recite planned actions.
     '''
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
+    no_action = False
     disc_id = None
+    if argv and argv[0] == '-n':
+      no_action = True
+      argv.pop(0)
     if argv:
       disc_id = argv.pop(0)
     if argv:
@@ -187,7 +192,8 @@ class CDRipCommand(BaseCommand):
           options.mbdb,
           output_dirpath=dirpath,
           disc_id=disc_id,
-          fstags=fstags
+          fstags=fstags,
+          no_action=no_action,
       )
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
@@ -222,7 +228,15 @@ class CDRipCommand(BaseCommand):
         )
 
 # pylint: disable=too-many-locals
-def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
+def rip(
+    device,
+    mbdb,
+    *,
+    output_dirpath,
+    disc_id=None,
+    fstags=None,
+    no_action=False
+):
   ''' Pull audio from `device` and save in `output_dirpath`.
   '''
   if disc_id is None:
@@ -264,11 +278,17 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
           info("using existing WAV file: %r", wav_filename)
         else:
           argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
-          with Pfx("+ %r", argv, print=True):
-            subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-          with Pfx("%r => %r", T.name, wav_filename, print=True):
-            os.link(T.name, wav_filename)
-      fstags[wav_filename].update(track_tags)
+          if no_action:
+            print(*argv)
+          else:
+            with Pfx("+ %r", argv, print=True):
+              subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+            with Pfx("%r => %r", T.name, wav_filename, print=True):
+              os.link(T.name, wav_filename)
+      if no_action:
+        print("fstags[%r].update(%s)" % (wav_filename, track_tags))
+      else:
+        fstags[wav_filename].update(track_tags)
       argv = [
           'lame',
           '-q',
@@ -289,10 +309,17 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
           wav_filename,
           mp3_filename
       ]
-      with Pfx("+ %r", argv, print=True):
-        subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-    fstags[mp3_filename].update(track_tags)
-  os.system("eject")
+      if no_action:
+        print(*argv)
+      else:
+        with Pfx("+ %r", argv, print=True):
+          subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+    if no_action:
+      print("fstags[%r].update(%s)" % (mp3_filename, track_tags))
+    else:
+      fstags[mp3_filename].update(track_tags)
+  if not no_action:
+    os.system("eject")
 
 # pylint: disable=too-many-ancestors
 class _MBTagSet(SQLTagSet):
