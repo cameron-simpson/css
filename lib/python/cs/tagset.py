@@ -2114,7 +2114,7 @@ class TagsOntology(SingletonMixin, TagSets):
 
   @staticmethod
   @pfx
-  @ensure(lambda result: Tag.is_valid_name(result))  # pylint: disable=unnecessary-lambda
+  ##@ensure(lambda result: Tag.is_valid_name(result))  # pylint: disable=unnecessary-lambda
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
