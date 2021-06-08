@@ -1496,21 +1496,25 @@ class SQLTags(TagSets):
       tags = ()
     te = None if name is None else self.get(name)
     if te is None:
+      # create the new SQLTagSet
       if unixtime is None:
         unixtime = time.time()
       with self.db_session() as session:
         entity = self.orm.entities(name=name, unixtime=unixtime)
         session.add(entity)
-        for tag in tags:
-          entity.add_tag(
-              tag.name,
-              self.TagSetClass.to_polyvalue(tag.name, tag.value),
-              session=session
-          )
         session.flush()
         te = self.get(entity.id)
-      assert te is not None
+        assert te is not None
+        to_polyvalue = te.to_polyvalue
+        for tag in tags:
+          entity.add_tag(
+              tag.name, to_polyvalue(tag.name, tag.value), session=session
+          )
+      autofill = te.autofill
+      if autofill:
+        autofill()
     else:
+      # update the existing SQLTagSet
       if unixtime is not None:
         te.unixtime = unixtime
       for tag in tags:
