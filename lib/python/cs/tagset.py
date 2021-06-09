@@ -457,11 +457,31 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return value, arg_name
 
   def __getattr__(self, attr):
-    ''' Support access to dotted name attributes
-        if `attr` is not found via the superclass `__getattr__`.
+    ''' Support access to dotted name attributes.
 
-        This is done by returning a subtags of those tags
-        commencing with `attr+'.'`.
+        The following attribute access are supported:
+
+        If `attr` is a key, return `self[attr]`.
+
+        If this `TagSet` has an ontology
+        and `attr looks like *typename*`_`*fieldname* 
+        and *typename* is a key,
+        look up the metadata for the `Tag` value
+        and return the metadata's *fieldname* key.
+        This also works for plural values.
+
+        For example if a `TagSet` has the tag `artists=["fred","joe"]`
+        and `attr` is `artist_names`
+        then the metadata entries for `"fred"` and `"joe"` looked up
+        and their `artist_name` tags are returned,
+        perhaps resulting in the list
+        `["Fred Thing","Joe Thang"]`.
+
+        If there are keys commencing with `attr+'.'`
+        then this returns a view of those keys
+        so that a subsequent attribute access can access one of those keys.
+
+        Otherwise, a superclass attribute access is performed.
 
         Example:
 
@@ -496,7 +516,43 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     try:
       return self[attr]
     except KeyError:
-      # magic dotted name access to foo.bar if there are keys
+      # support for {type}_{field} and {type}_{field}s attributes
+      # these dereference through the ontology if there is one
+      ont = self.ontology
+      if ont is not None:
+        try:
+          type_name, field_part = attr.split('_',1)
+        except ValueError:
+          pass
+        else:
+          if type_name in self:
+            value = self[type_name]
+            md = ont.metadata(type_name,value)
+            return md.get(field_part)
+          type_name_s=type_name+'s'
+          if type_name_s in self:
+            # plural field
+            values=self[type_name_s]
+            if isinstance(values,(tuple,list)):
+              # dereference lists and tuples
+              field_name=cutsuffix(field_part,'s')
+              md_field = type_name+'_'+field_name
+              mds = [ ont.metadata(type_name,value) for value in values]
+              if field_name is field_part:
+                # singular - take the first element
+                if not mds:
+                  return None
+                md = mds[0]
+                dereffed= md.get(md_field)
+                return dereffed
+              dereffed=[md.get(md_field) for md in mds]
+              return dereffed
+            # misfilled field - seems to be a scalar
+            value = values
+            md = ont.metadata(type_name,value)
+            dereffed= md.get(field_part)
+            return dereffed
+      # magic dotted name access to attr.bar if there are keys
       # starting with "attr."
       if attr and attr[0].isalpha():
         attr_ = attr + '.'
