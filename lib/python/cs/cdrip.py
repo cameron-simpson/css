@@ -392,6 +392,8 @@ class _MBTagSet(SQLTagSet):
     elif onttype == 'recording':
       includes = ['artists', 'tags']
     A = self.mbdb._get(get_type, mbkey, includes, id_name, record_key)
+    # record the full response data for forensics
+    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}']=A
     # modify A for discs
     if onttype == 'disc':
       # drill down to the release and medium containing the disc id
