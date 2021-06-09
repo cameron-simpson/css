@@ -346,7 +346,13 @@ class _MBTagSet(SQLTagSet):
   def type_name(self):
     ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
     '''
-    return self.name.split('.', 2)[2]
+    try:
+      ontish, onttype, _ = self.name.split('.', 2)
+    except ValueError:
+      return None
+    if ontish != 'meta':
+      return None
+    return onttype
 
   @property
   def ontology(self):
