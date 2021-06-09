@@ -26,6 +26,7 @@ from pprint import pformat
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
+from uuid import UUID
 import discid
 import musicbrainzngs
 from typeguard import typechecked
@@ -337,7 +338,7 @@ class _MBTagSet(SQLTagSet):
 
   @property
   def mbkey(self):
-    ''' The MusicBrainz key (a UUID).
+    ''' The MusicBrainz key (usually a UUID).
     '''
     return self.name.split('.', 2)[2]
 
@@ -420,6 +421,9 @@ class MBSQLTags(SQLTags):
 
   def TagSetClass(self, *, name, **kw):
     X("TagSetClass(name=%r,...)...", name)
+    ''' Instead of a fixed class we use a factory to construct a
+        type specific instance.
+    '''
     cls = None
     meta1 = cutprefix(name, 'meta.')
     if meta1 is not name:
