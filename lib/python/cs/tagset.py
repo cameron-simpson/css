@@ -521,36 +521,36 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       ont = self.ontology
       if ont is not None:
         try:
-          type_name, field_part = attr.split('_',1)
+          type_name, field_part = attr.split('_', 1)
         except ValueError:
           pass
         else:
           if type_name in self:
             value = self[type_name]
-            md = ont.metadata(type_name,value)
+            md = ont.metadata(type_name, value)
             return md.get(field_part)
-          type_name_s=type_name+'s'
+          type_name_s = type_name + 's'
           if type_name_s in self:
             # plural field
-            values=self[type_name_s]
-            if isinstance(values,(tuple,list)):
+            values = self[type_name_s]
+            if isinstance(values, (tuple, list)):
               # dereference lists and tuples
-              field_name=cutsuffix(field_part,'s')
-              md_field = type_name+'_'+field_name
-              mds = [ ont.metadata(type_name,value) for value in values]
+              field_name = cutsuffix(field_part, 's')
+              md_field = type_name + '_' + field_name
+              mds = [ont.metadata(type_name, value) for value in values]
               if field_name is field_part:
                 # singular - take the first element
                 if not mds:
                   return None
                 md = mds[0]
-                dereffed= md.get(md_field)
+                dereffed = md.get(md_field)
                 return dereffed
-              dereffed=[md.get(md_field) for md in mds]
+              dereffed = [md.get(md_field) for md in mds]
               return dereffed
             # misfilled field - seems to be a scalar
             value = values
-            md = ont.metadata(type_name,value)
-            dereffed= md.get(field_part)
+            md = ont.metadata(type_name, value)
+            dereffed = md.get(field_part)
             return dereffed
       # magic dotted name access to attr.bar if there are keys
       # starting with "attr."
@@ -2135,7 +2135,8 @@ class TagsOntology(SingletonMixin, TagSets):
   def meta_index(cls, type_name=None, value=None, convert=None):
     ''' Return the entry index for the metadata for `(type_name,value)`.
     '''
-    with Pfx("%s.meta_index(type_name=%r,value=%r)",cls.__name__,type_name,value):
+    with Pfx("%s.meta_index(type_name=%r,value=%r)", cls.__name__, type_name,
+             value):
       index = 'meta'
       if type_name is None:
         assert value is None
@@ -2171,7 +2172,7 @@ class TagsOntology(SingletonMixin, TagSets):
 
   @staticmethod
   @pfx
-  @ensure(lambda result: Tag.is_valid_name('_'+result.replace('-','_')))  # pylint: disable=unnecessary-lambda
+  @ensure(lambda result: Tag.is_valid_name('_' + result.replace('-', '_')))  # pylint: disable=unnecessary-lambda
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
