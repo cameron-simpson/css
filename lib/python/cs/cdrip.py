@@ -258,9 +258,9 @@ def rip(
       TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names())
   )
   for tracknum, recording in enumerate(disc.recordings(), 1):
-    track_tags = TagSet(
         discid=disc['musicbrainz.disc_id'],
         artists=recording.artist_names(),
+    track_fstags = TagSet(
         title=recording.title,
         track=tracknum
     )
@@ -286,9 +286,9 @@ def rip(
             with Pfx("%r => %r", T.name, wav_filename, print=True):
               os.link(T.name, wav_filename)
       if no_action:
-        print("fstags[%r].update(%s)" % (wav_filename, track_tags))
+        print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
       else:
-        fstags[wav_filename].update(track_tags)
+        fstags[wav_filename].update(track_fstags)
       argv = [
           'lame',
           '-q',
@@ -315,9 +315,9 @@ def rip(
         with Pfx("+ %r", argv, print=True):
           subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
     if no_action:
-      print("fstags[%r].update(%s)" % (mp3_filename, track_tags))
+      print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
     else:
-      fstags[mp3_filename].update(track_tags)
+      fstags[mp3_filename].update(track_fstags)
   if not no_action:
     os.system("eject")
 
