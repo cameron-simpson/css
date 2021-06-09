@@ -2135,18 +2135,19 @@ class TagsOntology(SingletonMixin, TagSets):
   def meta_index(cls, type_name=None, value=None, convert=None):
     ''' Return the entry index for the metadata for `(type_name,value)`.
     '''
-    index = 'meta'
-    if type_name is None:
-      assert value is None
-    else:
-      index += '.' + type_name
-      if value is not None:
-        if convert is None:
-          convert = cls.value_to_tag_name
-        value_tag_name = convert(value)
-        assert isinstance(value_tag_name, str) and value_tag_name
-        index += '.' + value_tag_name
-    return index
+    with Pfx("%s.meta_index(type_name=%r,value=%r)",cls.__name__,type_name,value):
+      index = 'meta'
+      if type_name is None:
+        assert value is None
+      else:
+        index += '.' + type_name
+        if value is not None:
+          if convert is None:
+            convert = cls.value_to_tag_name
+          value_tag_name = convert(value)
+          assert isinstance(value_tag_name, str) and value_tag_name
+          index += '.' + value_tag_name
+      return index
 
   def meta_names(self, type_name=None):
     ''' Generator yielding defined metadata names.
