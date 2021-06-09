@@ -2171,14 +2171,15 @@ class TagsOntology(SingletonMixin, TagSets):
 
   @staticmethod
   @pfx
-  ##@ensure(lambda result: Tag.is_valid_name(result))  # pylint: disable=unnecessary-lambda
+  @ensure(lambda result: Tag.is_valid_name('_'+result.replace('-','_')))  # pylint: disable=unnecessary-lambda
   def value_to_tag_name(value):
     ''' Convert a tag value to a tagnamelike dotted identifierish string
         for use in ontology lookup.
         Raises `ValueError` for unconvertable values.
 
-        `int`s are converted to `str`
-        and their leading dash, if any, converted to an underscroe.
+        We are allowing dashes in the result (UUIDs, MusicBrainz discids, etc).
+
+        `int`s are converted to `str`.
 
         Strings are converted as follows:
         * a trailing `(.*)` is turned into a prefix with a dot,
@@ -2190,14 +2191,13 @@ class TagsOntology(SingletonMixin, TagSets):
           becomes `"marvel.captain_america"`.
     '''
     if isinstance(value, int):
-      return str(value).replace('-', '_')
+      return str(value)
     if isinstance(value, str):
       value = value.strip()
       m = re.match(r'(.*)\(([^()]*)\)\s*$', value)
       if m:
         value = m.group(2).strip() + '.' + m.group(1).strip()
       value = '_'.join(value.lower().split())
-      value = value.replace('-', '_')
       return value
     raise ValueError(value)
 
