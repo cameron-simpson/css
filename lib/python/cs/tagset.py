@@ -1860,7 +1860,7 @@ class TagSets(MultiOpenMixin, MutableMapping):
     te.ontology = self.ontology
     return te
 
-  @pfx_method(use_str=True)
+  @pfx_method
   def __missing__(self, name: str, **kw):
     ''' Like `dict`, the `__missing__` method may autocreate a new `TagSet`.
 
@@ -2201,7 +2201,6 @@ class TagsOntology(SingletonMixin, TagSets):
       return value
     raise ValueError(value)
 
-  @pfx_method
   @require(lambda type_name: isinstance(type_name, str))
   def metadata(self, type_name, value, convert=None):
     ''' Return the metadata `TagSet` for `type_name` and `value`.
