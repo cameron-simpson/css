@@ -871,7 +871,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       session.add(entity)
       entity.add_tag(
           'headline',
-          "%s node 0: the metanode." % (type(self).__name__,),
+          PolyValue(
+              float_value=None,
+              string_value="%s node 0: the metanode." % (type(self).__name__,),
+              structured_value=None
+          ),
           session=session,
       )
     return entity
