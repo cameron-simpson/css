@@ -564,12 +564,12 @@ class MBDB(MultiOpenMixin):
     return self.sqltags.find(criteria)
 
   @staticmethod
-  def _get(typename, db_id, includes, id_name='id', record_key=None):
+  def _get(typename, db_id, includes=None, id_name='id', record_key=None):
     ''' Fetch data from the Musicbrainz API.
     '''
+    getter_name = f'get_{typename}_by_{id_name}'
     if record_key is None:
       record_key = typename
-    getter_name = f'get_{typename}_by_{id_name}'
     try:
       getter = getattr(musicbrainzngs, getter_name)
     except AttributeError:
@@ -578,10 +578,21 @@ class MBDB(MultiOpenMixin):
           pformat(dir(musicbrainzngs))
       )
       raise
-    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes):
+    if includes is None:
+      includes = ['tags']
+      warning(
+          "_get(%r,..): no includes specified, using %r", typename, includes
+      )
+      help(getter)
+    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes, print=True):
       try:
         mb_info = getter(db_id, includes=includes)
-      except musicbrainzngs.InvalidIncludeError:
+      except musicbrainzngs.InvalidIncludeError as e:
+        warning("BAD INCLUDES: %s", e)
+        warning("help(%s):\n%s", getter_name, getter.__doc__)
+        raise
+      except musicbrainzngs.ResponseError as e:
+        warning("RESPONSE ERROR: %s", e)
         warning("help(%s):\n%s", getter_name, getter.__doc__)
         raise
       mb_info = mb_info[record_key]
