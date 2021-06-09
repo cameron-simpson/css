@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Convenience routines to access MegaRAID adapters via the megacli
 # command line tool.
@@ -159,35 +159,35 @@ def main(argv=None):
     if command == "report":
       for An in M.adapters:
         A = M.adapters[An]
-        print "Adapter", An, A.product_name, "serial#", A.serial_no
+        print("Adapter", An, A.product_name, "serial#", A.serial_no)
         for Vn, V in A.virtual_drives.items():
-          print "  Virtual Drive", Vn
-          print "    %s: %d drives, size = %s%s, raid = %s" % (V.state, len(V.physical_disks), V.size, V.size_units, V.raid_level)
+          print("  Virtual Drive", Vn)
+          print("    %s: %d drives, size = %s%s, raid = %s" % (V.state, len(V.physical_disks), V.size, V.size_units, V.raid_level))
           for DRVn, DRV in V.physical_disks.items():
-            print "      physical drive %s[%s] %s" % (DRV.id, DRV.enc_slot, DRV.firmware_state)
-        print "  %d drives:" % (len(A.physical_disks),)
+            print("      physical drive %s[%s] %s" % (DRV.id, DRV.enc_slot, DRV.firmware_state))
+        print("  %d drives:" % (len(A.physical_disks),))
         for DRV in A.physical_disks.values():
-          print "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
+          print("    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
                                                              getattr(DRV, 'virtual_drive', NS(number=None)).number,
                                                              getattr(DRV, 'disk_group', NS(number=None)).number,
                                                              DRV.fru, DRV.raw_size, DRV.raw_size_units,
                                                              DRV.firmware_state
-                                                            ),
+                                                            ),end='')
           try:
             count = DRV.media_error_count
           except AttributeError:
             pass
           else:
             if count:
-              print ", media errors %s" % count,
+              print(", media errors %s" % count,end='')
           try:
             count = DRV.other_error_count
           except AttributeError:
             pass
           else:
             if count:
-              print ", other errors %s" % count,
-          print
+              print(", other errors %s" % count,end='')
+          print()
     elif command == "save":
       save_file, = argv
       if save_raid(save_file) != 0:
@@ -237,15 +237,15 @@ def main(argv=None):
                                    getattr(DRV, 'virtual_drive', NS(number=None)).number,
                                    DRV.firmware_state))
         if adapter_errs:
-          print "FAIL A%d %s" % (An, ",".join(adapter_errs))
+          print("FAIL A%d %s" % (An, ",".join(adapter_errs)))
         else:
-          print "OK A%d" % (An,)
+          print("OK A%d" % (An,))
     else:
       error("unsupported command")
       xit = 1
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   return xit
@@ -510,7 +510,7 @@ class MegaRAID(NS):
     '''
     cmdargs = [self.megacli] + list(args)
     D("+ %r", cmdargs)
-    P = Popen(cmdargs, stdout=PIPE, close_fds=True)
+    P = Popen(cmdargs, stdout=PIPE, close_fds=True, encoding='ascii')
     for line in P.stdout:
       yield line
     P.wait()
@@ -631,7 +631,7 @@ def message(msg, fp, prefix, *a):
   global cmd
   if a:
     msg = msg % a
-  print >>fp, cmd+":", prefix+":", msg
+  print(cmd+":", prefix+":", msg, file=fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
