@@ -345,6 +345,7 @@ class _MBTagSet(SQLTagSet):
   @property
   def type_name(self):
     ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
+        This is `None` if `self.name` is not a `meta.`*type_name*`.` name.
     '''
     try:
       ontish, onttype, _ = self.name.split('.', 2)
