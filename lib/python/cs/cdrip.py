@@ -18,7 +18,6 @@ import os
 from os.path import (
     exists as existspath,
     expanduser,
-    expandvars,
     isdir as isdirpath,
     join as joinpath,
 )
@@ -29,14 +28,13 @@ from tempfile import NamedTemporaryFile
 from uuid import UUID
 import discid
 import musicbrainzngs
-from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.lex import cutprefix
 from cs.logutils import error, warning, info
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
@@ -165,7 +163,6 @@ class CDRipCommand(BaseCommand):
     for metaname in argv:
       with Pfx("metaname %r", metaname):
         ontkey = 'meta.' + metaname
-        X("  ontkey = %r", ontkey)
         metadata = mbdb.ontology[ontkey]
         print(' ', metadata)
 
@@ -199,6 +196,7 @@ class CDRipCommand(BaseCommand):
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
       return 1
+    return 0
 
   def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
@@ -227,8 +225,9 @@ class CDRipCommand(BaseCommand):
             tracknum, recording.title, '--',
             ", ".join(recording.artist_names())
         )
+    return 0
 
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def rip(
     device,
     mbdb,
@@ -361,6 +360,7 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
+  # pylint: disable=too-many-branches,too-many-statements
   def refresh(self, force=False):
     ''' Query MusicBrainz, fill in tags.
 
@@ -381,9 +381,7 @@ class _MBTagSet(SQLTagSet):
     record_key = None
     includes = None
     if onttype == 'artist':
-      includes = [  ##'aliases',
-          'annotation'
-      ]
+      includes = ['annotation']
     elif onttype == 'disc':
       includes = ['artists', 'recordings']
       get_type = 'releases'
@@ -391,9 +389,9 @@ class _MBTagSet(SQLTagSet):
       record_key = 'disc'
     elif onttype == 'recording':
       includes = ['artists', 'tags']
-    A = self.mbdb._get(get_type, mbkey, includes, id_name, record_key)
+    A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
     # record the full response data for forensics
-    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}']=A
+    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}'] = A
     # modify A for discs
     if onttype == 'disc':
       # drill down to the release and medium containing the disc id
@@ -414,8 +412,6 @@ class _MBTagSet(SQLTagSet):
               found_medium = medium
               found_release = release
       assert found_medium
-      medium_count = found_release['medium-count']
-      medium_position = found_medium['position']
       A = {
           'title':
           found_release.get('title'),
@@ -566,7 +562,7 @@ class MBDB(MultiOpenMixin):
     return self.sqltags.find(criteria)
 
   @staticmethod
-  def _get(typename, db_id, includes=None, id_name='id', record_key=None):
+  def query(typename, db_id, includes=None, id_name='id', record_key=None):
     ''' Fetch data from the Musicbrainz API.
     '''
     getter_name = f'get_{typename}_by_{id_name}'
@@ -583,7 +579,7 @@ class MBDB(MultiOpenMixin):
     if includes is None:
       includes = ['tags']
       warning(
-          "_get(%r,..): no includes specified, using %r", typename, includes
+          "query(%r,..): no includes specified, using %r", typename, includes
       )
       help(getter)
     with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes, print=True):
