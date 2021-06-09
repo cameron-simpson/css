@@ -338,7 +338,7 @@ class _MBTagSet(SQLTagSet):
 
   @property
   def mbkey(self):
-    ''' The MusicBrainz key (usually a UUID).
+    ''' The MusicBrainz key (usually a UUID or discid).
     '''
     return self.name.split('.', 2)[2]
 
