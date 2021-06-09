@@ -543,7 +543,6 @@ class MBDB(MultiOpenMixin):
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
-      sqltags.init()
       ont = self.ontology = TagsOntology(sqltags)
       self.artists = sqltags.subdomain('meta.artist')
       ont['type.artists'].update(type='list', member_type='artist')
@@ -552,15 +551,12 @@ class MBDB(MultiOpenMixin):
       self.recordings = sqltags.subdomain('meta.recording')
       ont['type.recordings'].update(type='list', member_type='recording')
 
-  def startup(self):
-    ''' Start up the `MBDB`: open the `SQLTags`.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Context manager for open/close.
     '''
-    self.sqltags.open()
-
-  def shutdown(self):
-    ''' Shut down the `MBDB`: close the `SQLTags`.
-    '''
-    self.sqltags.close()
+    with self.sqltags:
+      yield
 
   def find(self, criteria):
     ''' Find entities in the cache database.
