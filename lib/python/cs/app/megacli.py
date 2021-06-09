@@ -9,7 +9,8 @@ r'''
 Command line tool to inspect and manipulate LSI MegaRAID adapters,
 such as used in IBM ServeRAID systems and Dell PowerEdge RAID Controller (PERC).
 
-Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers, under the name IBM ServerRAID.
+Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers,
+under the name IBM ServerRAID.
 These controllers are also used by Dell as Dell PowerEdge RAID Controller (PERC).
 
 These can be accessed during the machine boot process via the BIOS screens
@@ -17,15 +18,16 @@ using a conventional BIOS-like text interface or a ghastly and painful to use
 GUI interface. However, either of these requires the machine OS to be down.
 
 The RAID adapters can also be accessed while the machine OS is up.
-For Linux, IBM offer a set of command line tools named MegaCLI_, which are installed in `/opt/MegaRAID`.
-Unfortunately, their MegaCLI executable is both fiddly to invoke and, in its reporting mode,
-produces a barely human readable report which is quite hostlie to machine parsing.
+For Linux, IBM offer a set of command line tools named MegaCLI_,
+which are installed in `/opt/MegaRAID`.
+Unfortunately, their MegaCLI executable is both fiddly to invoke
+and, in its reporting mode, produces a barely human readable report
+which is quite hostlie to machine parsing.
 I would surmise that someone was told to dump the adapter data in text form,
 and did so with an ad hoc report; it is pages long and arduous to inspect by eye.
 
 The situation was sufficiently painful that I wrote this module
 which runs a couple of the report modes and parses their output.
-It is deliberately python 2.4 compatible so that it can run on RHEL 5 systems.
 
 Report Mode
 -----------
