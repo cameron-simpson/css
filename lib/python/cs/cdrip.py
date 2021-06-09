@@ -260,10 +260,12 @@ def rip(
   for tracknum, recording_id in enumerate(disc.recordings, 1):
     recording = disc.ontology.metadata('recording', recording_id)
     track_fstags = TagSet(
+        discid=disc.mbkey,
+        artists=recording.artist_names,
         title=recording.title,
         track=tracknum
     )
-    track_artists = ", ".join(recording.artist_names())
+    track_artists = ", ".join(recording.artist_names)
     track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
@@ -288,6 +290,7 @@ def rip(
         print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
       else:
         fstags[wav_filename].update(track_fstags)
+        fstags[wav_filename].rip_command = argv
       argv = [
           'lame',
           '-q',
@@ -317,6 +320,7 @@ def rip(
       print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
     else:
       fstags[mp3_filename].update(track_fstags)
+      fstags[mp3_filename].conversion_command = argv
   if not no_action:
     os.system("eject")
 
