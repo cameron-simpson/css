@@ -257,9 +257,8 @@ def rip(
   fstags[subdir].update(
       TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names)
   )
-  for tracknum, recording in enumerate(disc.recordings(), 1):
-        discid=disc['musicbrainz.disc_id'],
-        artists=recording.artist_names(),
+  for tracknum, recording_id in enumerate(disc.recordings, 1):
+    recording = disc.ontology.metadata('recording', recording_id)
     track_fstags = TagSet(
         title=recording.title,
         track=tracknum
