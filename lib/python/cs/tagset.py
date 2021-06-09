@@ -203,6 +203,7 @@ from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
 import time
+from typing import Optional
 from uuid import UUID
 from icontract import ensure, require
 from typeguard import typechecked
@@ -456,6 +457,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       value = attribute() if callable(attribute) else attribute
     return value, arg_name
 
+  # pylint: disable=too-many-nested-blocks,too-many-return-statements
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
 
@@ -464,7 +466,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         If `attr` is a key, return `self[attr]`.
 
         If this `TagSet` has an ontology
-        and `attr looks like *typename*`_`*fieldname* 
+        and `attr looks like *typename*`_`*fieldname*
         and *typename* is a key,
         look up the metadata for the `Tag` value
         and return the metadata's *fieldname* key.
@@ -957,10 +959,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
-  @require(
-      lambda ontology: ontology is None or isinstance(ontology, TagsOntology)
-  )
-  def __new__(cls, name, value=None, *, ontology=None, prefix=None):
+  @typechecked
+  def __new__(
+      cls,
+      name,
+      value=None,
+      *,
+      ontology: Optional["TagsOntology"] = None,
+      prefix: Optional[str] = None
+  ):
     # simple case: name is a str: make a new Tag
     if isinstance(name, str):
       # (name[,value[,ontology][,prefix]]) => Tag
