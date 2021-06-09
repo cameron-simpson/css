@@ -1514,9 +1514,10 @@ class SQLTags(TagSets):
           entity.add_tag(
               tag.name, to_polyvalue(tag.name, tag.value), session=session
           )
-      autofill = te.autofill
-      if autofill:
-        autofill()
+      # refresh entry from some source if there is a .refresh() method
+      refresh = te.refresh
+      if refresh is not None and callable(refresh):
+        refresh()
     else:
       # update the existing SQLTagSet
       if unixtime is not None:
