@@ -107,12 +107,12 @@ DISTINFO = {
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
-        ],
+    ],
     'entry_points': {
-      'console_scripts': [
-          'mcli = cs.app.megacli:main',
-          ],
-        },
+        'console_scripts': [
+            'mcli = cs.app.megacli:main',
+        ],
+    },
 }
 
 cmd = __file__
@@ -128,8 +128,8 @@ USAGE = '''Usage:
 # default location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
 
-mode_CFGDSPLY = 0       # -CfgDsply mode
-mode_PDLIST = 1         # -PDlist mode
+mode_CFGDSPLY = 0  # -CfgDsply mode
+mode_PDLIST = 1  # -PDlist mode
 
 re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
 
@@ -164,31 +164,42 @@ def main(argv=None):
         print("Adapter", An, A.product_name, "serial#", A.serial_no)
         for Vn, V in A.virtual_drives.items():
           print("  Virtual Drive", Vn)
-          print("    %s: %d drives, size = %s%s, raid = %s" % (V.state, len(V.physical_disks), V.size, V.size_units, V.raid_level))
+          print(
+              "    %s: %d drives, size = %s%s, raid = %s" % (
+                  V.state, len(V.physical_disks
+                               ), V.size, V.size_units, V.raid_level
+              )
+          )
           for DRVn, DRV in V.physical_disks.items():
-            print("      physical drive %s[%s] %s" % (DRV.id, DRV.enc_slot, DRV.firmware_state))
+            print(
+                "      physical drive %s[%s] %s" %
+                (DRV.id, DRV.enc_slot, DRV.firmware_state)
+            )
         print("  %d drives:" % (len(A.physical_disks),))
         for DRV in A.physical_disks.values():
-          print("    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
-                                                             getattr(DRV, 'virtual_drive', NS(number=None)).number,
-                                                             getattr(DRV, 'disk_group', NS(number=None)).number,
-                                                             DRV.fru, DRV.raw_size, DRV.raw_size_units,
-                                                             DRV.firmware_state
-                                                            ),end='')
+          print(
+              "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (
+                  DRV.id, DRV.enc_slot,
+                  getattr(DRV, 'virtual_drive', NS(number=None)).number,
+                  getattr(DRV, 'disk_group', NS(number=None)).number, DRV.fru,
+                  DRV.raw_size, DRV.raw_size_units, DRV.firmware_state
+              ),
+              end=''
+          )
           try:
             count = DRV.media_error_count
           except AttributeError:
             pass
           else:
             if count:
-              print(", media errors %s" % count,end='')
+              print(", media errors %s" % count, end='')
           try:
             count = DRV.other_error_count
           except AttributeError:
             pass
           else:
             if count:
-              print(", other errors %s" % count,end='')
+              print(", other errors %s" % count, end='')
           print()
     elif command == "save":
       save_file, = argv
@@ -206,7 +217,9 @@ def main(argv=None):
           warning("locate: bad start/stop setting: %r", do_start)
           badopts = True
         if argv:
-          warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+          warning(
+              "locate: extra arguments after start/stop: %s", ' '.join(argv)
+          )
           badopts = True
       else:
         do_start = True
@@ -233,11 +246,15 @@ def main(argv=None):
         A = M.adapters[An]
         for DRV in A.physical_disks.values():
           firmware_state = getattr(DRV, 'firmware_state', 'UNKNOWN')
-          if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
-            adapter_errs.append("drive:%s[%s]/VD:%s/%s"
-                                % (DRV.id, DRV.enc_slot,
-                                   getattr(DRV, 'virtual_drive', NS(number=None)).number,
-                                   DRV.firmware_state))
+          if firmware_state not in ("Online, Spun Up",
+                                    "Unconfigured(good), Spun Up"):
+            adapter_errs.append(
+                "drive:%s[%s]/VD:%s/%s" % (
+                    DRV.id, DRV.enc_slot,
+                    getattr(DRV, 'virtual_drive',
+                            NS(number=None)).number, DRV.firmware_state
+                )
+            )
         if adapter_errs:
           print("FAIL A%d %s" % (An, ",".join(adapter_errs)))
         else:
@@ -318,9 +335,8 @@ class MegaRAID(NS):
         continue
       if line.startswith('======='):
         continue
-      if ( line == 'Virtual Drive Information:'
-        or line == 'Physical Disk Information:'
-         ):
+      if (line == 'Virtual Drive Information:'
+          or line == 'Physical Disk Information:'):
         o = None
         continue
       if line.startswith('Adapter #'):
@@ -343,7 +359,9 @@ class MegaRAID(NS):
         continue
       heading = heading.rstrip()
       info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
+      attr = heading.lower().replace(' ', '_').replace('.', '').replace(
+          "'", ''
+      ).replace('/', '_')
       try:
         n = int(info)
       except ValueError:
@@ -354,7 +372,9 @@ class MegaRAID(NS):
         if heading == 'Adapter':
           An = info
           ##D("new adapter %d", An)
-          A = M.adapters[info] = Adapter(number=An, disk_groups={}, physical_disks={}, virtual_drives={})
+          A = M.adapters[info] = Adapter(
+              number=An, disk_groups={}, physical_disks={}, virtual_drives={}
+          )
           o = A
           continue
         if heading == 'DISK GROUP':
@@ -376,7 +396,9 @@ class MegaRAID(NS):
           Vn = int(Vn)
           Tn = int(Tn[:-1])
           ##D("new virtual drive %d (target id %d)", Vn, Tn)
-          V = A.virtual_drives[Vn] = Virtual_Drive(adapter=A, number=Vn, physical_disks={})
+          V = A.virtual_drives[Vn] = Virtual_Drive(
+              adapter=A, number=Vn, physical_disks={}
+          )
           o = V
           continue
         if heading == 'Physical Disk':
@@ -403,13 +425,13 @@ class MegaRAID(NS):
           o = DRV
       if attr in ('size', 'mirror_data', 'strip_size'):
         size, size_units = info.split()
-        setattr(o, attr+'_units', size_units)
+        setattr(o, attr + '_units', size_units)
         info = float(size)
       elif attr in ('raw_size', 'non_coerced_size', 'coerced_size'):
         size, size_units, sectors = info.split(None, 2)
-        setattr(o, attr+'_units', size_units)
+        setattr(o, attr + '_units', size_units)
         if sectors.startswith('[0x') and sectors.endswith(' Sectors]'):
-          setattr(o, attr+'_sectors', int(sectors[3:-9], 16))
+          setattr(o, attr + '_sectors', int(sectors[3:-9], 16))
         else:
           warning("invalid sectors: %s", sectors)
         info = float(size)
@@ -417,7 +439,7 @@ class MegaRAID(NS):
         m = re_SPEED.match(info)
         if m:
           speed, speed_units = m.group(1), m.group(3)
-          setattr(o, attr+'_units', speed_units)
+          setattr(o, attr + '_units', speed_units)
           info = float(speed)
         elif info != "Unknown":
           warning("failed to match re_SPEED against: %s", info)
@@ -463,19 +485,21 @@ class MegaRAID(NS):
       start_opt = '-start'
     else:
       start_opt = '-stop'
-    return self.docmd('-PdLocate',
-                      start_opt,
-                      '-physdrv[%s]' % (enc_slot,),
-                      '-a%d' % (adapter,),
-                     )
+    return self.docmd(
+        '-PdLocate',
+        start_opt,
+        '-physdrv[%s]' % (enc_slot,),
+        '-a%d' % (adapter,),
+    )
 
   def offline(self, adapter, enc_slot):
     ''' Take a drive offline (==> failed).
     '''
-    return self.docmd('-PDOffline',
-                      '-physdrv[%s]' % (enc_slot,),
-                      '-a%d' % (adapter,),
-                     )
+    return self.docmd(
+        '-PDOffline',
+        '-physdrv[%s]' % (enc_slot,),
+        '-a%d' % (adapter,),
+    )
 
   def new_raid(self, level, enc_slots, adapter=0):
     ''' Construct a new RAID device with specified RAID `level` on
@@ -497,7 +521,10 @@ class MegaRAID(NS):
           ok = False
         else:
           if DRV.firmware_state != 'Unconfigured(good), Spun Up':
-            error("rejecting drive, firmware state not unconfigured good: %s", DRV.firmware_state)
+            error(
+                "rejecting drive, firmware state not unconfigured good: %s",
+                DRV.firmware_state
+            )
             ok = False
           else:
             D("acceptable drive: %s", DRV.firmware_state)
@@ -505,7 +532,10 @@ class MegaRAID(NS):
     cmd_pop()
     if not ok:
       return False
-    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slots) + "]", '-a%d' % (adapter,))
+    return self.docmd(
+        '-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slots) + "]",
+        '-a%d' % (adapter,)
+    )
 
   def readcmd(self, *args):
     ''' Open a pipe from the megacli command and yield lines from its output.
@@ -536,6 +566,7 @@ class MegaRAID(NS):
     return self.docmd('-CfgSave', '-f', save_file, '-a%d' % (adapter,))
 
 class Adapter(NS):
+
   def DRV_by_enc_slot(self, enc_slot):
     ''' Find first matching drive by enclosure id and slot number.
         Report errors on multiple matches - serious misconfiguration.
@@ -547,18 +578,25 @@ class Adapter(NS):
         if DRV is None:
           DRV = aDRV
         else:
-          error("Adapter #%d: DRV_by_enc_slot(%s): multiple enc_slot matches: %s vs %s",
-                self.number, enc_slot, DRV.id, aDRV.id)
+          error(
+              "Adapter #%d: DRV_by_enc_slot(%s): multiple enc_slot matches: %s vs %s",
+              self.number, enc_slot, DRV.id, aDRV.id
+          )
     return DRV
 
 class Virtual_Drive(NS):
+
   def __init__(self, **kw):
     NS.__init__(self, **kw)
+
 class Disk_Group(NS):
+
   def __init__(self, **kw):
     NS.__init__(self, **kw)
+
 class Span(NS):
   pass
+
 class Physical_Disk(NS):
 
   def __init__(self, **kw):
@@ -584,9 +622,11 @@ class Physical_Disk(NS):
         misconfigure/misinstalled.
     '''
     return "%s:%s" % (self.enclosure_device_id, self.slot_number)
+
   @property
   def fru(self):
     return self.ibm_fru_cru
+
 class Disk_Port(NS):
   pass
 
@@ -617,9 +657,11 @@ def merge_attrs(o, **kw):
 
 debug = os.environ.get('DEBUG')
 if debug:
+
   def D(msg, *a):
     message(msg, sys.stderr, "debug", *a)
 else:
+
   def D(msg, *a):
     pass
 
@@ -633,7 +675,7 @@ def message(msg, fp, prefix, *a):
   global cmd
   if a:
     msg = msg % a
-  print(cmd+":", prefix+":", msg, file=fp)
+  print(cmd + ":", prefix + ":", msg, file=fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
