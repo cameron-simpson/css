@@ -246,7 +246,7 @@ def rip(
     fstags = FSTags()
   with Pfx("MB: discid %s", disc_id, print=True):
     disc = mbdb.discs[disc_id]
-  level1 = ", ".join(disc.artist_names()).replace(os.sep, '_') or "NO_ARTISTS"
+  level1 = ", ".join(disc.artist_names).replace(os.sep, '_') or "NO_ARTISTS"
   level2 = disc.title or "UNTITLED"
   if disc.medium_count > 1:
     level2 += f" ({disc.medium_position} of {disc.medium_count})"
@@ -255,7 +255,7 @@ def rip(
     with Pfx("makedirs(%r)", subdir, print=True):
       os.makedirs(subdir)
   fstags[subdir].update(
-      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names())
+      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names)
   )
   for tracknum, recording in enumerate(disc.recordings(), 1):
         discid=disc['musicbrainz.disc_id'],
