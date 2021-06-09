@@ -483,12 +483,6 @@ class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
   '''
 
-  VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
-
-  CORRECTIONS = {
-      ## fixed! ## VARIOUS_ARTISTS_ID: {'name': 'Various Artists'},
-  }
-
 class MBDisc(_MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
@@ -509,7 +503,6 @@ class MBSQLTags(SQLTags):
   }
 
   def TagSetClass(self, *, name, **kw):
-    X("TagSetClass(name=%r,...)...", name)
     ''' Instead of a fixed class we use a factory to construct a
         type specific instance.
     '''
@@ -521,9 +514,6 @@ class MBSQLTags(SQLTags):
     if cls is None:
       cls = super().TagSetClass
     te = cls(name=name, **kw)
-    infill = te.infill
-    if infill:
-      infill()
     return te
 
   TagSetClass.singleton_also_by = _MBTagSet.singleton_also_by
@@ -607,120 +597,6 @@ class MBDB(MultiOpenMixin):
     with self.sqltags:
       if value is not None:
         tags.set(name, value)
-
-  @staticmethod
-  def tag_from_tag_list(tags, mb_dict):
-    ''' Set `tags.tag_list` from `mb_dict['tag-list'].
-    '''
-    tags.set(
-        'tags', [tag_elem['name'] for tag_elem in mb_dict.get('tag-list', ())]
-    )
-
-  @staticmethod
-  def tag_artists_from_credits(tags, mb_dict):
-    ''' Set `tags.artists` from `mb_dict['artist-credit']`.
-    '''
-    artist_credits = mb_dict.get('artist-credit')
-    if artist_credits is not None:
-      tags.set(
-          'artists', [
-              credit['artist']['id']
-              for credit in artist_credits
-              if not isinstance(credit, str)
-          ]
-      )
-
-  @typechecked
-  def _fill_in_artist(self, mb_tags: _MBTagSet, force: bool = False):
-    assert mb_tags.name.startswith('meta.artist.')
-    artist_id = mb_tags.name.split('.', 2)[-1]
-    mb_tags['musicbrainz.artist_id'] = artist_id
-    A = None
-    if artist_id == self.VARIOUS_ARTISTS_ID:
-      A = {
-          'name': 'Various Artists',
-      }
-    else:
-      includes = []
-      for cached in 'tags', :
-        if force or cached not in mb_tags:
-          includes.append(cached)
-      if includes:
-        A = self._get('artist', artist_id, includes)
-    if A is not None:
-      self._tagif(mb_tags, 'artist_name', A.get('name'))
-      self._tagif(mb_tags, 'sort_name', A.get('sort-name'))
-      self.tag_from_tag_list(mb_tags, A)
-    return mb_tags
-
-  # pylint: disable=too-many-branches,too-many-locals
-  @typechecked
-  def _fill_in_disc(self, mb_tags: _MBTagSet, force=False):
-    ''' Return the `disc.`*disc_id* entry.
-        Update from MB as required before return.
-    '''
-    ##force = True
-    assert mb_tags.name.startswith('meta.disc.')
-    disc_id = mb_tags.name.split('.', 2)[-1]
-    disc_tags = self.discs[disc_id]
-    disc_tags['musicbrainz.disc_id'] = disc_id
-    includes = []
-    for cached in 'artists', 'recordings':
-      if force or cached not in disc_tags:
-        includes.append(cached)
-    if includes:
-      D = self._get('releases', disc_id, includes, 'discid', 'disc')
-      assert D['id'] == disc_id
-      found_medium = None
-      found_release = None
-      for release in D['release-list']:
-        if found_medium:
-          break
-        for medium in release['medium-list']:
-          if found_medium:
-            break
-          for disc in medium['disc-list']:
-            if found_medium:
-              break
-            if disc['id'] == disc_id:
-              # matched disc
-              found_medium = medium
-              found_release = release
-      assert found_medium
-      medium_count = found_release['medium-count']
-      medium_position = found_medium['position']
-      self._tagif(disc_tags, 'title', found_release.get('title'))
-      self._tagif(disc_tags, 'medium_count', medium_count)
-      self._tagif(disc_tags, 'medium_position', medium_position)
-      self.tag_artists_from_credits(disc_tags, found_release)
-      if 'recordings' in includes:
-        track_list = found_medium.get('track-list')
-        if not track_list:
-          warning('no medium[track-list]')
-        else:
-          disc_tags.set(
-              'recordings', [track['recording']['id'] for track in track_list]
-          )
-    return disc_tags
-
-  @typechecked
-  def _fill_in_recording(self, mb_tags: _MBTagSet, force=False):
-    ''' Return the recording for `recording_id`.
-    '''
-    ##force = True
-    assert mb_tags.name.startswith('meta.recording.')
-    recording_id = mb_tags.name.split('.', 2)[-1]
-    mb_tags['musicbrainz.recording_id'] = recording_id
-    includes = []
-    for cached in 'artists', 'tags':
-      if force or cached not in mb_tags:
-        includes.append(cached)
-    if includes:
-      R = self._get('recording', recording_id, includes)
-      self._tagif(mb_tags, 'title', R.get('title'))
-      self.tag_from_tag_list(mb_tags, R)
-      self.tag_artists_from_credits(mb_tags, R)
-    return mb_tags
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
