@@ -195,10 +195,8 @@ class PlayOnCommand(BaseCommand):
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
-        if R():
-          print("OK ", dl_id, recording.download_path)
-        else:
-          print("BAD", dl_id)
+        if not R():
+          print("FAILED", dl_id)
           xit = 1
 
     return xit
