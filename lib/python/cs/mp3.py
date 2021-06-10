@@ -31,7 +31,10 @@ def framesof(bfr):
   return MP3Frame.scan(bfr)
 
 class MP3Frame(AbstractBinary):
-  ''' An `AbstractBinary` class whose parse method is a factory for other MP3 frames.
+  ''' An `AbstractBinary` class
+      whose `parse` method is a factory for other MP3 frames,
+      returning one of `EnhancedTagFrame`, `ID3V1Frame`, `ID3V2Frame`
+      or `MP3AudioFrame`.
   '''
 
   def __init__(self, *_, **__):
@@ -40,9 +43,11 @@ class MP3Frame(AbstractBinary):
   @staticmethod
   def parse(bfr):
     ''' Parse an `MP3Frame` from the buffer.
+        Returns one of `EnhancedTagFrame`, `ID3V1Frame`, `ID3V2Frame`
+        or `MP3AudioFrame`.
 
         Supposedly all the ID3v2 tags are up the front and the ID3v1
-        tags are after the audio, but we do not verify that.
+        tags are after the audio, but we do not rely on that.
     '''
     bs3 = bfr.peek(3, short_ok=True)
     if bs3 == b'TAG':
