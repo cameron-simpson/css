@@ -17,7 +17,7 @@ from cs.threads import locked, locked_property
 
 DISTINFO = {
     'description':
-    "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
+    "support for ID3 tags",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -875,6 +875,9 @@ class ID3V2Tags(SimpleNamespace):
 
 class ID3(SimpleNamespace):
   ''' Wrapper for pyid3lib.tag.
+
+      OBSOLETE.
+      Going away when I'm sure the other classes cover all this stuff off.
   '''
 
   # mapping from frameids to nice names ("artist" etc)
