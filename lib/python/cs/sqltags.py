@@ -69,7 +69,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, TagSets, tag_or_tag_value, as_unixtime
+    TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
 )
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -1439,7 +1439,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       )
     return children
 
-class SQLTags(TagSets):
+class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 

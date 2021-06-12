@@ -75,7 +75,7 @@ class Ont(TagsOntology, MultiOpenMixin):
 
   @staticmethod
   def tagsets_from_path(ont_path):
-    ''' Return a `TagSets` instance from `ont_path`,
+    ''' Return a `BaseTagSets` instance from `ont_path`,
         provided for subclassing.
     '''
     if not isfilepath(ont_path):

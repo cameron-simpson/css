@@ -52,7 +52,7 @@
         Tag(name='subtopic',value='ontologies',ontology=None)
         >>> print(subtopic)
         subtopic=ontologies
-        >>> # TagSets also have nice repr() and str()
+        >>> # a TagSet also has a nice repr() and str()
         >>> tags
         TagSet:{'blue': None, 'topic': 'tagging', 'subtopic': 'ontologies'}
         >>> print(tags)
@@ -1807,12 +1807,12 @@ class TagSetPrefixView(FormatableMixin):
     '''
     return self._tags.get(self._prefix)
 
-class TagSets(MultiOpenMixin, MutableMapping):
+class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   ''' Base class for collections of `TagSet` instances
       such as `cs.fstags.FSTags` and `cs.sqltags.SQLTags`.
 
       Examples of this include:
-      * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSets`
+      * `cs.fstags.FSTags`: a mapping of filesystem paths to their associated `TagSet`
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
@@ -1969,14 +1969,14 @@ class TagSets(MultiOpenMixin, MutableMapping):
         "%s: no .get(name,default=None) method" % (type(self).__name__,)
     )
 
-  def subdomain(self, subname):
-    ''' Return a proxy for this `TagSets` for the `name`s
+  def subdomain(self, subname: str):
+    ''' Return a proxy for this `BaseTagSets` for the `name`s
         starting with `subname+'.'`.
     '''
     return TagSetsSubdomain(self, subname)
 
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
-  ''' A view into a `TagSets` for keys commencing with a prefix.
+  ''' A view into a `BaseTagSets` for keys commencing with a prefix.
   '''
 
   @classmethod
@@ -1993,7 +1993,7 @@ class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
     '''
     return self.tes.TAGGED_ENTITY_FACTORY
 
-class TagsOntology(SingletonMixin, TagSets):
+class TagsOntology(SingletonMixin, BaseTagSets):
   ''' An ontology for tag names.
 
       This is based around a mapping of names
@@ -2085,7 +2085,7 @@ class TagsOntology(SingletonMixin, TagSets):
     return True
 
   ##################################################################
-  # TagSets required methods
+  # BaseTagSets required methods
   def get(self, name, default=None):
     ''' Proxy `.get` through to `self.tagsets`.
     '''
@@ -2313,7 +2313,7 @@ class TagsOntology(SingletonMixin, TagSets):
         del self[old_index]
     return changed_tes
 
-class TagFile(SingletonMixin, TagSets):
+class TagFile(SingletonMixin, BaseTagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -2524,7 +2524,7 @@ class TagFile(SingletonMixin, TagSets):
     '''
     tagsets = self._tagsets
     if tagsets is None:
-      # TagSets never loaded
+      # never loaded - no need to save
       return
     with self._lock:
       if any(map(lambda tagset: tagset.modified, tagsets.values())):
