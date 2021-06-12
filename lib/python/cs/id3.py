@@ -210,7 +210,7 @@ class ID3V1Frame(SimpleBinary):
       comment_bs = comment_bs[:-2]
     else:
       self.track = 0
-    self.comment = comment_bs.decode('ascii').rstrip()
+    self.comment = comment_bs.decode('ascii').rstrip('\0').rstrip()
     self.genre_id = bfr.byte0()
     assert bfr.offset - offset0 == 128
     return self
