@@ -2111,15 +2111,19 @@ class TagsOntology(SingletonMixin, BaseTagSets):
   def _singleton_key(cls, tagsets):
     return id(tagsets)
 
-  def __init__(self, tagsets):
+  def __init__(self, tagsets=None, **initial_tags):
     if hasattr(self, 'tagsets'):
       return
+    if tagsets is None:
+      tagsets = MappingTagSets()
     self.__dict__.update(
         tagsets=tagsets,
         default_factory=getattr(
             tagsets, 'default_factory', lambda name: TagSet(_ontology=self)
         ),
     )
+    for name, tagset in initial_tags.items():
+      tagsets[name] = tagset
 
   def __str__(self):
     return str(self.as_dict())
