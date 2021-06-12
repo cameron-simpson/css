@@ -1,3 +1,4 @@
+TagFile: should subclass MappingTagSets
 TagSet.subtags: subclass PrefixedMappingProxy also
 let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
 cs.pop3: buffering for the SSL mode
