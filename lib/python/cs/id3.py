@@ -836,7 +836,12 @@ class ID3V2Frame(SimpleBinary):
   def tagset(self):
     ''' Return a `TagSet` with the ID3 tag information.
     '''
-    tags = TagSet()
+    tags = TagSet(
+        _ontology=self.ONTOLOGY,
+        v1=self.v1,
+        v2=self.v2,
+        version=f'{self.v1}.{self.v2}',
+    )
     for tag_frame in self.tag_frames:
       tag_id = tag_frame.tag_id.decode('ascii').lower()
       tags.set(tag_id, tag_frame.datafrome_body.value)
