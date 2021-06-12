@@ -223,6 +223,7 @@ from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
+from cs.seq import seq
 from cs.threads import locked_property
 
 __version__ = '20210428-post'
@@ -2108,8 +2109,8 @@ class TagsOntology(SingletonMixin, BaseTagSets):
   }
 
   @classmethod
-  def _singleton_key(cls, tagsets):
-    return id(tagsets)
+  def _singleton_key(cls, tagsets=None, **_):
+    return -seq() if tagsets is None else id(tagsets)
 
   def __init__(self, tagsets=None, **initial_tags):
     if hasattr(self, 'tagsets'):
