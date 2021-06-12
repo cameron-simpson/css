@@ -1,0 +1,2 @@
+can SQLTagProxies be dropped in favour of the .subdomain() method?
+
