@@ -2110,7 +2110,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
 
   @classmethod
   def _singleton_key(cls, tagsets=None, **_):
-    return -seq() if tagsets is None else id(tagsets)
+    return None if tagsets is None else id(tagsets)
 
   def __init__(self, tagsets=None, **initial_tags):
     if hasattr(self, 'tagsets'):
