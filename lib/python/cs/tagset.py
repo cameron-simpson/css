@@ -1993,6 +1993,57 @@ class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
     '''
     return self.tes.TAGGED_ENTITY_FACTORY
 
+class MappingTagSets(BaseTagSets):
+  ''' A `BaseTagSets` subclass using an arbitrary mapping.
+
+      If no mapping is supplied, a `dict` is created for the purpose.
+
+      Example:
+
+          >>> tagsets = MappingTagSets()
+          >>> list(tagsets.keys())
+          []
+          >>> tagsets.get('foo')
+          >>> tagsets['foo'] = TagSet(bah=1, zot=2)
+          >>> list(tagsets.keys())
+          ['foo']
+          >>> tagsets.get('foo')
+          TagSet:{'bah': 1, 'zot': 2}
+          >>> list(tagsets.keys(prefix='foo'))
+          ['foo']
+          >>> list(tagsets.keys(prefix='bah'))
+          []
+  '''
+
+  def __init__(self, mapping=None, ontology=None):
+    if mapping is None:
+      mapping = {}
+    super().__init__(ontology=ontology)
+    self.mapping = mapping
+
+  def get(self, name: str, default=None):
+    return self.mapping.get(name, default)
+
+  def __setitem__(self, name, te):
+    ''' Save `te` in the backend under the key `name`.
+    '''
+    self.mapping[name] = te
+
+  def __delitem__(self, name):
+    ''' Delete the `TagSet` named `name`.
+    '''
+    del self.mapping[name]
+
+  @typechecked
+  def keys(self, *, prefix: Optional[str] = None):
+    ''' Return an iterable of the keys commencing with `prefix`
+        or all keys if `prefix` is `None`.
+    '''
+    ks = self.mapping.keys()
+    if prefix:
+      ks = filter(lambda k: k.startswith(prefix), ks)
+    return ks
+
 class TagsOntology(SingletonMixin, BaseTagSets):
   ''' An ontology for tag names.
 
