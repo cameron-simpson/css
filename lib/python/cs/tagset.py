@@ -936,7 +936,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           True
           >>> tag = Tag(tag0, ontology=ont)
           >>> tag # doctest: +ELLIPSIS
-          Tag(name='colour',value='blue',ontology=<...>)
+          Tag(name='colour',value='blue',ontology=...)
           >>> tag is tag0
           False
           >>> tag = Tag(tag0, prefix='surface')
@@ -1939,13 +1939,13 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       yield k, self.get(k)
 
   def __contains__(self, name: str):
-    ''' Test whether `name` is present in `self.te_mapping`.
+    ''' Test whether `name` is present in the underlying mapping.
     '''
     missing = object()
     return self.get(name, missing) is not missing
 
   def __len__(self):
-    ''' Return the length of `self.te_mapping`.
+    ''' Return the length of the underlying mapping.
     '''
     raise NotImplementedError(
         "%s: no .__len__() method" % (type(self).__name__,)
