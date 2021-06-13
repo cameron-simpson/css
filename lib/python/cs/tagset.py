@@ -159,7 +159,7 @@ for the direct values in a `TagSet`,
 since it subclasses `dict`.
 
 However, `TagSet`s subclass `cs.lex.FormatableMixin`
-as therefore have a richer `format_as` method which has an extended syntax
+and therefore have a richer `format_as` method which has an extended syntax
 for the format component.
 Command line tools like `fstags` use this for output format specifications.
 
@@ -182,7 +182,7 @@ An example:
     >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
     >>> tags.format_as('The colour is {colour}.')
     'The colour is blue.'
-    >>> tags.format_as('Information about the colour may be found here: {colour:meta.url}')
+    >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
     'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
 
 
