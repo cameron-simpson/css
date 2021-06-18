@@ -1,3 +1,4 @@
+_scan.c: the # for PyArg_ParseTuple is no longer valid - maybe only when PY_SSIZE_T_CLEAN is not defined - maybe drop that half of the ifdef in an error raising way
 _scan.c: the # for PyArg_ParseTuple is no longer valid - find out what to do - or is it only PyArg_Parse which breaks?
 file merge - dig through common ancestor data revisions? fork a copy if not direct ancestor?
 IndexClasses to be singletons based on their pathname
