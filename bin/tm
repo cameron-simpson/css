@@ -168,6 +168,7 @@ case "$op" in
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
+    detached=
     ;;
   up | down | left |right )
     if [ $# -gt 0 ]
