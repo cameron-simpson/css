@@ -1,3 +1,4 @@
+TagsOntology: accept directory, process files within, deduce prefix from filename, ONTOLOGY.sqlite for the default
 gitlog - record the branch too - maybe totally record dlog
 extended prime seive impl?
 TagSet.subtags: subclass PrefixedMappingProxy also
