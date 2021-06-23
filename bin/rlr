@@ -1,17 +1,19 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Replace text between two lines denoted by regexps.
-#	- Cameron Simpson <cs@cskk.id.au> 20sep95
+#       - Cameron Simpson <cs@cskk.id.au> 20sep1995
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
 usage="Usage: $cmd -f from -t to {-i input -o output | target-file} [replacement-files...]
-	-f from	    Start line marked specified by regexp \"from\".
-	-t to	    Start line marked specified by regexp \"to\".
-	-i input    Take input from \"input\"; \"-\" means standard input.
-	-o output   Write result to \"output\"; \"-\" means standard output.
+        -f from     Start line marked specified by regexp \"from\".
+        -t to       Start line marked specified by regexp \"to\".
+        -i input    Take input from \"input\"; \"-\" means standard input.
+        -o output   Write result to \"output\"; \"-\" means standard output.
     target-file If no -i and no -o, use \"target-file\" for both.
     replacement-files
                 Files providing the replacement text. \"-\" means standard input.
@@ -27,14 +29,14 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -f)	from=$2; shift ;;
-    -t)	to=$2; shift ;;
-    -i)	input=$2; shift ;;
-    -o)	output=$2; shift ;;
-    --)	shift; break ;;
+    -f) from=$2; shift ;;
+    -t) to=$2; shift ;;
+    -i) input=$2; shift ;;
+    -o) output=$2; shift ;;
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1 ;;
-    *)	break ;;
+        badopts=1 ;;
+    *)  break ;;
   esac
   shift
 done
@@ -76,10 +78,10 @@ front=$tmp.a
 back=$tmp.b
 
 case $from in
-    */*)	from=`printf '%s\n' "$from"|sed 's|/|\\\\/|g'` ;;
+    */*)        from=`printf '%s\n' "$from"|sed 's|/|\\\\/|g'` ;;
 esac
 case $to in
-    */*)	to=`printf '%s\n' "$to"|sed 's|/|\\\\/|g'` ;;
+    */*)        to=`printf '%s\n' "$to"|sed 's|/|\\\\/|g'` ;;
 esac
 
 ok=1
@@ -87,7 +89,7 @@ ok=1
 trap 'rm -f "$front" "$back"' 0
 trap 'rm -f "$front" "$back"; exit 1' 1 2 13 15
 
-exec 3<&0	# save stdin
+exec 3<&0       # save stdin
 
 [ "x$input" = x- ] || exec <"$input"
 
@@ -102,9 +104,9 @@ then
     for file in "$front" "$@" "$back"
     do
       case $file in
-	-)	cat <&3 ;;
-	/*)	cat "$file" ;;
-	*)	cat "./$file" ;;
+        -)      cat <&3 ;;
+        /*)     cat "$file" ;;
+        *)      cat "./$file" ;;
       esac || ok=
     done
 fi
