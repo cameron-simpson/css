@@ -116,8 +116,8 @@ then
     for file
     do
       case $file in
-        -)      sh -c "$pipecmd" <"$middle" ;;
-        *)      sh -c "$pipecmd" <"$file" ;;
+        -)      sh -uec "$pipecmd" <"$middle" ;;
+        *)      sh -uec "$pipecmd" <"$file" ;;
       esac || { ok=; break; }
     done
     [ $ok ] && cat <"$back"
