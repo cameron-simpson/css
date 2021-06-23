@@ -14,6 +14,7 @@ usage="Usage: $cmd -f from -t to {-i input -o output | target-file} [replacement
         -t to       Start line marked specified by regexp \"to\".
         -i input    Take input from \"input\"; \"-\" means standard input.
         -o output   Write result to \"output\"; \"-\" means standard output.
+        -p shcmd    Pipe the line range through shcmd, a shell command.
     target-file If no -i and no -o, use \"target-file\" for both.
     replacement-files
                 Files providing the replacement text. \"-\" means standard input.
@@ -23,6 +24,7 @@ input=
 output=
 from=
 to=
+pipecmd='exec cat'
 
 badopts=
 
@@ -33,6 +35,7 @@ do
     -t) to=$2; shift ;;
     -i) input=$2; shift ;;
     -o) output=$2; shift ;;
+    -p) pipecmd=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1 ;;
@@ -74,20 +77,22 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 tmp=$TMPDIR/$cmd.$$
-front=$tmp.a
-back=$tmp.b
+front=$tmp.front
+middle=$tmp.middle
+back=$tmp.back
 
+# convert "/" in from/to regexps for embedding in sed
 case $from in
-    */*)        from=`printf '%s\n' "$from"|sed 's|/|\\\\/|g'` ;;
+  */*)  from=$( printf '%s\n' "$from" | sed 's|/|\\\\/|g' ) ;;
 esac
 case $to in
-    */*)        to=`printf '%s\n' "$to"|sed 's|/|\\\\/|g'` ;;
+  */*)  to=$( printf '%s\n' "$to" | sed 's|/|\\\\/|g' ) ;;
 esac
 
 ok=1
 
-trap 'rm -f "$front" "$back"' 0
-trap 'rm -f "$front" "$back"; exit 1' 1 2 13 15
+trap 'rm -f "$front" "$middle" "$back"' 0
+trap 'rm -f "$front" "$middle" "$back"; exit 1' 1 2 13 15
 
 exec 3<&0       # save stdin
 
@@ -96,19 +101,26 @@ exec 3<&0       # save stdin
 # read the whole input file and grab the top and bottom bits
 # this lets us use the same file for input and output
 sed -n "1,/$from/w $front
+        /$from/,/$to/{
+          /$from/b next
+          /$to/b next
+          w $middle
+        }
+        :next
         /$to/,\$w $back" || ok=
 
 if [ $ok ]
 then
     [ "x$output" = x- ] || exec >"$output"
-    for file in "$front" "$@" "$back"
+    cat <"$front"
+    for file
     do
       case $file in
-        -)      cat <&3 ;;
-        /*)     cat "$file" ;;
-        *)      cat "./$file" ;;
-      esac || ok=
+        -)      sh -c "$pipecmd" <"$middle" ;;
+        *)      sh -c "$pipecmd" <"$file" ;;
+      esac || { ok=; break; }
     done
+    [ $ok ] && cat <"$back"
 fi
 
 [ $ok ] && exit 0
