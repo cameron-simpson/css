@@ -12,10 +12,11 @@ from cs.lex import unctrl
 from cs.logutils import setup_logging, warning, error
 from cs.pfx import Pfx
 
-USAGE_FORMAT = r'''Usage: {cmd} [-H hostsfile] s/regexp/replacement[/[ig]]... [sourcefiles...]
+USAGE_FORMAT = r'''Usage: {cmd} [-H hostsfile] [-q] s/regexp/replacement[/[ig]]... [sourcefiles...]
   -H hostsfile  An /etc/hosts format file whose hostnames become
                 replacement keys. Only the first key value is kept,
                 prioritising earlier lines in the file.
+  -q            Quiet. Do not warn about unknown replacement keys.
   s/regexp/replacement/ig
                 Specify a regular expression for replacement in the source 
                 text and a Python format string to use for the replacement.
@@ -35,6 +36,7 @@ def main(argv=None):
   usage = USAGE_FORMAT.format(cmd=cmd)
   setup_logging(cmd)
   settings = {}
+  quiet = False
   replacements = []
   badopts = False
   # parse options
@@ -64,6 +66,8 @@ def main(argv=None):
                     continue
                   settings[name_lc] = ip
                   seen_hosts.add(name_lc)
+      elif arg == '-q':
+        quiet = True
       else:
         warning("unhandled option")
         badopts = True
@@ -121,17 +125,17 @@ def main(argv=None):
   for source_path in source_paths:
     with Pfx(source_path):
       if source_path == '-':
-        replace(sys.stdin, replacements, settings)
+        replace(sys.stdin, replacements, settings, quiet=quiet)
       else:
         with open(source_path) as f:
-          replace(f, replacements, settings)
+          replace(f, replacements, settings, quiet=quiet)
 
-def replace(f, replacements, base_repl_map):
+def replace(f, replacements, base_repl_map, quiet=False):
   ''' Read the file `f`, apply the `replacements`
       and write the results to `sys.stdout`.
   '''
   for lineno, line in enumerate(f, 1):
-    with Pfx(lineno):
+    with Pfx("%s: line=%r", lineno, line):
 
       used_repls = set()
       pos = 0
@@ -161,11 +165,20 @@ def replace(f, replacements, base_repl_map):
           repl_map.update(m.groupdict())
           replaced = repl.replacement.format_map(repl_map)
           if repl.reformat:
-            try:
-              replaced = replaced.format_map(repl_map)
-            except KeyError as e:
-              warning("substitution of %r failed, unknown: %s", m.group(0), e)
-              replaced = m.group()
+            from pprint import pformat
+            import sys
+            ##print(repr(sorted(repl_map.keys())))
+            with Pfx("replaced=%r, repl_map=%r", replaced,
+                     sorted(repl_map.keys())):
+              try:
+                replaced = replaced.format_map(repl_map)
+              except KeyError as e:
+                quiet or warning(
+                    "substitution of %r failed, unknown: %s", m.group(0), e
+                )
+                ##replaced = m.group()
+              except ValueError as e:
+                warning("substitution of %r failed: %s",  m.group(0), e)
           line = line[:m.start()] + replaced + line[m.end():]
           pos = m.start() + len(replaced)
         if repl.once:
