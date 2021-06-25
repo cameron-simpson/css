@@ -32,8 +32,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     branch      Report current branch name.
     branches    Report all branch names.
     clone2      Wrapper for \"$cmd sibling\" which copies some additional state:
-                  Files or directories named in \$CLONE2_CP are copied.
-                  Files or directories named in \$CLONE2_SYM are symlinked.
+                  Files or directories named in \$VCS_CLONE2_CP are copied.
+                  Files or directories named in \$VCS_CLONE2_SYM are symlinked.
                 Relative paths in these variables are resolved
                 relative to the VCS top.
     diff        Run the VCS diff command.
