@@ -1,30 +1,63 @@
 #!/bin/sh
 #
 # Replace text between two lines denoted by regexps.
-#       - Cameron Simpson <cs@cskk.id.au> 20sep1995
+# - Cameron Simpson <cs@cskk.id.au> 20sep1995
 #
 
 set -ue
 
-: ${TMPDIR:=/tmp}
+: "${TMPDIR:=/tmp}"
 
-cmd=`basename "$0"`
-usage="Usage: $cmd -f from -t to {-i input -o output | target-file} [replacement-files...]
-        -f from     Start line marked specified by regexp \"from\".
-        -t to       Start line marked specified by regexp \"to\".
-        -i input    Take input from \"input\"; \"-\" means standard input.
-        -o output   Write result to \"output\"; \"-\" means standard output.
-        -p shcmd    Pipe the line range through shcmd, a shell command.
-    target-file If no -i and no -o, use \"target-file\" for both.
-    replacement-files
-                Files providing the replacement text. \"-\" means standard input.
-                Default: standard input."
+cmd=$( basename "$0" )
+usage="Usage: $cmd -f from -t to {-|target-file} [replacement-files...]
+  Replace line range: replace text in \"target-file\" between \"from\" and
+  \"to\" with the text from the \"replacement-files\", default standard input.
 
-input=
-output=
+  Arguments:
+  -f from     Start line marked specified by regexp \"from\".
+  -t to       Start line marked specified by regexp \"to\".
+  -p pipecmd  Pipe the contents of the replacement-files through pipecmd,
+              a shell command.  The line range being replaced will be
+              available on file descriptor 3 should it be useful.
+  target-file The file to patch. If \"-\", run in \"filter\" mode, patching
+              standard input and writing the result to standard output.
+  replacement-files
+                Files providing the replacement text. \"-\" means standard
+                input.  Default: standard input.
+
+  Examples:
+
+  Patch the lines in the file \"target\" between \"# W START\"
+  and \"# W END\" with the output of the \"w\" command:
+
+    w | rlr -f '^# W START' -t '^# W END' target
+
+  Filter a template on standard input, replacing lines between \"# PFX START\"
+  and \"# PFX END\" with input from the file \"data\" processed by the sed
+  command:
+
+    rlr -f '^# SH START' -t '^# SH END' -p 'sed \"s/^/## /\"' - data <template >result
+
+  Filter a template on standard input, replacing the shell script between
+  \"# SH START\" and \"# SH END\" with input from the file \"shdata\"
+  processed by the shell script. The descriptor shuffle below moves the
+  replacement text from standard input to file descriptor 4 and the shell
+  script, previously on 3, to standard input where the shell can read it.
+  The script inside the template should then process descriptor 4:
+
+    rlr -f '^# SH START' -t '^# SH END' -p \"sh 4<&0 0<&3\" - shdata <template >result
+
+  The corresponding script inside the template might be marked out like this:
+
+      # SH START
+      while read data <&4
+      do  do something with \$data
+      done
+      # SH END"
+
 from=
 to=
-pipecmd='exec cat'
+pipecmd=
 
 badopts=
 
@@ -33,8 +66,6 @@ do
   case $1 in
     -f) from=$2; shift ;;
     -t) to=$2; shift ;;
-    -i) input=$2; shift ;;
-    -o) output=$2; shift ;;
     -p) pipecmd=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -44,35 +75,37 @@ do
   shift
 done
 
-# sanity check -i and -o; if both missing expect target-file next
-if [ -n "$input" ]
-then
-  if [ -z "$output" ]
-  then
-    echo "$cmd: -i but no -o" >&2
-    badopts=1
-  fi
-else
-  if [ -n "$output" ]
-  then
-    echo "$cmd: -o but no -i" >&2
-    badopts=1
-  else
-    if [ $# = 0 ]
-    then
-      echo "$cmd: no -i and no -o, missing target-file" >&2
-      badopts=1
-    else
-      input=$1
-      output=$1
-      shift
-    fi
-  fi
-fi
-
 [ -n "$from" ] || { echo "$cmd: missing -f option" >&2; badopts=1; }
 [ -n "$to" ] || { echo "$cmd: missing -t option" >&2; badopts=1; }
-[ $# -gt 0 ] || set -- -
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1; shift
+  case "$target" in
+    -)  filter_mode=1 ;;
+    *)  filter_mode= ;;
+  esac
+fi
+
+[ $# = 0 ] && set -- -
+
+# if ok so far, sanity check the replacement-files
+[ $badopts ] || \
+  if [ $filter_mode ]
+  then
+    # sanity check the replacement files
+    for src
+    do
+      [ "x$src" = x- ] && {
+        echo "$cmd: cannot use standard input (aka \"-\") in replacement-files in filter mode" >&2
+        badopts=1
+        break
+      }
+    done
+  fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -96,7 +129,7 @@ trap 'rm -f "$front" "$middle" "$back"; exit 1' 1 2 13 15
 
 exec 3<&0       # save stdin
 
-[ "x$input" = x- ] || exec <"$input"
+[ $filter_mode ] || exec <"$target"
 
 # read the whole input file and grab the top and bottom bits
 # this lets us use the same file for input and output
@@ -111,17 +144,14 @@ sed -n "1,/$from/w $front
 
 if [ $ok ]
 then
-    [ "x$output" = x- ] || exec >"$output"
+    [ $filter_mode ] || exec >"$target"
     cat <"$front"
-    for file
-    do
-      case $file in
-        -)      sh -uec "$pipecmd" <"$middle" ;;
-        *)      sh -uec "$pipecmd" <"$file" ;;
-      esac || { ok=; break; }
-    done
-    [ $ok ] && cat <"$back"
+    cat "$@" \
+    | if [ -n "$pipecmd" ]
+      then  sh -uec "$pipecmd" 3<"$middle"
+      else  cat
+      fi
+    cat <"$back"
 fi
 
-[ $ok ] && exit 0
-exit 1
+[ $ok ] && exit 0 || exit 1
