@@ -168,8 +168,7 @@ def replace(f, replacements, base_repl_map, quiet=False):
             from pprint import pformat
             import sys
             ##print(repr(sorted(repl_map.keys())))
-            with Pfx("replaced=%r, repl_map=%r", replaced,
-                     sorted(repl_map.keys())):
+            with Pfx("replaced=%r", replaced):
               try:
                 replaced = replaced.format_map(repl_map)
               except KeyError as e:
