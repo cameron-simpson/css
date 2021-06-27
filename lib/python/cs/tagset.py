@@ -1308,7 +1308,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     )
     return ont[member_metadata_name]
 
-
   @property
   def basetype(self):
     ''' The base type name for this tag.
@@ -2210,7 +2209,6 @@ class TagsOntology(SingletonMixin):
             match_re_s = fn_translate(match)
             assert match_re_s.endswith('\\Z')
             match_re_s = cutsuffix(match_re_s, '\\Z')
-            X("%r => %r", match, match_re_s)
             match_re = re.compile(match_re_s)
 
             def match_func(type_name):
@@ -2355,14 +2353,9 @@ class TagsOntology(SingletonMixin):
     for subtagsets in self._subtagsetses:
       match_func = subtagsets.match_func
       if match_func is None:
-        X("type_name %r => %r in %r", type_name, type_name, tagsets)
         return subtagsets.tagsets, type_name
       subtype_name = match_func(type_name)
       if subtype_name:
-        X(
-            "type_name %r => %r in %r", type_name, subtype_name,
-            subtagsets.tagsets
-        )
         return subtagsets.tagsets, subtype_name
     raise ValueError("no TagSets for type name %r" % (type_name,))
 
