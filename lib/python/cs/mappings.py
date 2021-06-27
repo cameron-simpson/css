@@ -1047,7 +1047,7 @@ class LoadableMappingMixin:
 
       Subclasses must provide the following attributes and methods:
       * `loadable_mapping_key`: the name of the primary key;
-        it is an error for a multiple records to have the same primary key
+        it is an error for multiple records to have the same primary key
       * `scan_mapping`: a generator method to scan the backing store
         and yield records, used for the inital load of the mapping
       * `append_to_mapping(record)`: add a new record to the backing store;
@@ -1159,6 +1159,32 @@ class LoadableMappingMixin:
     ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_mapping`.
     '''
     self.__scan_length = length
+
+class IndexedMapping(LoadableMappingMixin):
+  ''' Interface to a mapping with `LoadableMappingMixin` style `.by_*` attributes.
+  '''
+
+  def __init__(self, mapping=None, pk='id'):
+    ''' Initialise the `IndexedMapping`.
+
+        Parameters:
+        * `mapping`: the mapping to wrap; a new `dict` will be made if not specified
+        * `pk`: the primary key of the mapping, default `'id'`
+    '''
+    if mapping is None:
+      mapping = {}
+    self.mapping = mapping
+    self.loadable_mapping_key = pk
+
+  def scan_mapping(self):
+    ''' The records from the mapping.
+    '''
+    return self.mapping.values()
+
+  def append_to_mapping(self, record):
+    ''' Save `record` in the mapping.
+    '''
+    self.mapping[record[self.loadable_mapping_key]] = record
 
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
