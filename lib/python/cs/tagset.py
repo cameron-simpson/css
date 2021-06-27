@@ -2129,6 +2129,200 @@ class TagsOntology(SingletonMixin, BaseTagSets):
   def __str__(self):
     return str(self.as_dict())
 
+  class SubTagSets(namedtuple('SubTagSets',
+                              'tagsets match_func unmatch_func type_map')):
+    ''' A specification for a `TagSets` instance backing an ontology.
+
+        Each instance has the following attributes:
+        * `tagsets`: the `TagSets` instance containing ontology information
+        * `match_func`: a function of the type name used in the main ontology,
+          returning `None` if the type name is not supported
+          by this particular `TagSets`;
+          if this function is `None` that all type names are accepted unchanged.
+        * `unmatch_func`: a function of the type name used within
+          this particular `TagSets`,
+          returning the type name used in the main ontology;
+          it should be the reverse of `match_func`;
+          if this function is `None` the subtype name is returned unchanged.
+        * `type_map`: a 
+    '''
+
+    @classmethod
+    @pfx_method(with_args=True)
+    def from_match(cls, tagsets, match, unmatch=None):
+      ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
+
+          Parameters:
+          * `tagsets`: a `TagSets` holding ontology information
+          * `match`: a match function used to choose entries based on a type name
+          * `unmatch`: an optional reverse for `match`, accepting a subtype
+            name and returning its public name
+
+          If `match` is `None`
+          then `tagsets` will always be chosen if no prior entry matched.
+
+          Otherwise, `match` is resolved to a function `match-func(type_name)`
+          which returns a subtype name on a match and a false value on no match.
+
+          If `match` is a callable it is used as `match_func` directly.
+
+          if `match` is a list, tuple or set
+          then this method calls itself with `(tagsets,submatch)`
+          for each member `submatch` if `match`.
+
+          If `match` is a `str`,
+          if it ends in a dot '.', dash '-' or underscore '_'
+          then it is considered a prefix of `type_name` and the returned subtype name
+          is the text from `type_name` after the prefix
+          othwerwise it is considered a full match for the `type_name`
+          and the returns subtype name is `type_name` unchanged.
+          The `match` string is a shell style glob supporting `*` but not `?` or `[`*seq*`]`.
+
+          The value of `unmatch` is constrained by `match`.
+          If `match` is `None`, `unmatch` must also be `None`;
+          the type name is used unchanged.
+          If `match` is callable`, `unmatch` must also be callable;
+          it is expected to reverse `match`.
+
+          Examples:
+
+              >>> from os.path import expanduser as u
+              >>> # an initial empty ontology with a default in memory mapping
+              >>> ont = TagsOntology()
+              # divert the types actor, role and series to my media ontology
+              >>> ont.add_tagsets(
+              ...     SQLTags(u('~/var/media-ontology.sqlite'),
+              ...     ['actor', 'role', 'series'])
+              # divert type "musicbrainz.recording" to mbdb.sqlite
+              # mapping to the type "recording"
+              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
+              # divert type "tvdb.actor" to tvdb.sqlite
+              # mapping to the type "actor"
+              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
+      '''
+      if match is None:
+        assert unmatch is None
+        match_func = None
+        unmatch_func = None
+      elif callable(match):
+        assert callable(unmatch)
+        match_func = match
+        unmatch_func = unmatch
+      elif isinstance(match, str):
+        if not match:
+          raise ValueError("empty match string")
+        if '?' in match or '[' in match:
+          raise ValueError("match globs only support *, not ? or [seq]")
+        if match.endswith(('.', '-', '_')):
+          if len(match) == 1:
+            raise ValueError("empty prefix")
+          if '*' in match:
+            match_re_s = fn_translate(match)
+            assert match_re_s.endswith('\\Z')
+            match_re_s = cutsuffix(match_re_s, '\\Z')
+            X("%r => %r", match, match_re_s)
+            match_re = re.compile(match_re_s)
+
+            def match_func(type_name):
+              ''' Glob based prefix match, return the suffix.
+              '''
+              m = match_re.match(type_name)
+              if not m:
+                return None
+              subtype_name = type_name[m.end():]
+              return subtype_name
+
+            # TODO: define this function if there is exactly 1 asterisk
+            unmatch_func = None
+
+          else:
+
+            def match_func(type_name):
+              ''' Literal prefix match, return the suffix.
+              '''
+              subtype_name = cutprefix(type_name, match)
+              if subtype_name is type_name:
+                return None
+              return subtype_name
+
+            def unmatch_func(subtype_name):
+              ''' Return the `subtype_name` with the prefix restored
+              '''
+              return match + subtype_name
+
+        else:
+          # not a prefix
+
+          if '*' in match:
+
+            def match_func(type_name):
+              ''' Glob `type_name` match, return `type_name` unchanged.
+              '''
+              if fnmatch(type_name, match):
+                return type_name
+              return None
+
+            # TODO: define unmatch_func is there is exactly 1 asterisk
+            unmatch_func = None
+
+          else:
+
+            def match_func(type_name):
+              ''' Fixed string exact `type_name` match, return `type_name` unchanged.
+              '''
+              if type_name == match:
+                return type_name
+              return None
+
+            def unmatch_func(subtype_name):
+              ''' Fixed string match
+              '''
+              assert subtype_name == match
+              return subtype_name
+
+      else:
+
+        raise ValueError(
+            "unhandled match value %s:%r" % (type(match).__name__, match)
+        )
+
+      return cls(
+          tagsets=tagsets,
+          match_func=match_func,
+          unmatch_func=unmatch_func,
+          type_map=IndexedMapping(pk='type_name')
+      )
+
+    def subtype_name(self, type_name):
+      ''' Return the type name for use within `self.tagsets` from `type_name`.
+          Returns `None` if this is not a supported `type_name`.
+      '''
+      if self.match_func is None:
+        return type_name
+      try:
+        return self.type_map.by_type_name[type_name]
+      except KeyError:
+        name = self.match_func(type_name)
+        self.type_map.add_to_mapping = dict(
+            type_name=type_name, subtype_name=name
+        )
+        return name
+
+    def type_name(self, subtype_name):
+      ''' Return the external type name from the internal `subtype_name`
+          which is used within `self.tagsets`.
+      '''
+      if self.match_func is None:
+        return subtype_name
+      try:
+        return self.type_map.by_subtype_name[type_name]
+      except KeyError:
+        name = self.unmatch(subtype_name)
+        self.type_map.add_to_mapping = dict(
+            type_name=name, subtype_name=subtype_name
+        )
+        return name
+
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
