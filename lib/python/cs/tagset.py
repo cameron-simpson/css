@@ -1370,7 +1370,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if ont is None:
       warning("no ontology, returning None")
       return None
-    return ont.basetype(self.type)
+    return ont.basetype(self.name)
 
   @format_attribute
   def metadata(self, *, ontology=None, convert=None):
