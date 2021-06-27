@@ -2147,11 +2147,13 @@ class TagsOntology(SingletonMixin):
     if tagsets is None:
       tagsets = MappingTagSets()
     self.__dict__.update(
-        tagsets=tagsets,
+        _subtagsetses=[],
+        _type_name2subtype_name={},
         default_factory=getattr(
             tagsets, 'default_factory', lambda name: TagSet(_ontology=self)
         ),
     )
+    self.add_tagsets(tagsets, None)
     for name, tagset in initial_tags.items():
       tagsets[name] = tagset
 
@@ -2344,18 +2346,25 @@ class TagsOntology(SingletonMixin):
       if self.match_func is None:
         return subtype_name
       try:
-        return self.type_map.by_subtype_name[type_name]
+        return self.type_map.by_subtype_name[subtype_name]
       except KeyError:
-        name = self.unmatch(subtype_name)
+        name = self.unmatch_func(subtype_name)
         self.type_map.add_to_mapping = dict(
             type_name=name, subtype_name=subtype_name
         )
         return name
 
+  @property
+  def _default_tagsets(self):
+    ''' The default `TagSets` instance
+        i.e. the sets used for type names which are not specially diverted.
+    '''
+    return self._subtagsetses[-1].tagsets
+
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
-    return dict(self.tagsets)
+    return dict(self._default_tagsets)
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
@@ -2363,7 +2372,67 @@ class TagsOntology(SingletonMixin):
     '''
     return True
 
+  def _tagsets_for_type_name(self, type_name):
+    ''' Locate a `TagSet`s for use against `type_name`.
+        Return `(tagSets,subtype_name)`
+        where `tagsets` is a `TagSets` instance
+        and `subtype_name` is a variable on `type_name`
+        appropriate to the chosen `tagsets`.
+
+        This method is used to direct accesses to `type.`*type_name*
+        and `meta.`*type_name*`.`*value_key*
+        to particular `TagSets`,
+        possibly keyed by a variation on *type_name*.
+
+        For example,
+        perhaps we keep a cache of Musicbrainz data in an `SQLTags`
+        stored as `~/.cache/mbdb.sqlite`.
+        This method might recognise the type `musicbrainz.recording`
+        and return that `SQLTags` instance and the subtype `recording`.
+
+        See the `add_tagsets` method for inserting additional `TagSets`
+        and their *type_name* mapping functions.
     '''
+    for subtagsets in self._subtagsetses:
+      match_func = subtagsets.match_func
+      if match_func is None:
+        X("type_name %r => %r in %r", type_name, type_name, tagsets)
+        return subtagsets.tagsets, type_name
+      subtype_name = match_func(type_name)
+      if subtype_name:
+        X(
+            "type_name %r => %r in %r", type_name, subtype_name,
+            subtagsets.tagsets
+        )
+        return subtagsets.tagsets, subtype_name
+    raise ValueError("no TagSets for type name %r" % (type_name,))
+
+  @pfx_method(with_args=True)
+  def add_tagsets(self, tagsets, match, unmatch=None, index=0):
+    ''' Insert a `SubTagSets` at `index` in the list of `SubTagSets`es.
+        This is the list consulted by the `_tagsets_for_type_name` method.
+
+        The new `SubTagSets` instance is initialised
+        from the supplied `tagsets, match, unmatch` parameters.
+
+        Examples:
+
+            >>> from os.path import expanduser as u
+            >>> # an initial empty ontology with a default in memory mapping
+            >>> ont = TagsOntology()
+            # divert the types actor, role and series to my media ontology
+            >>> ont.add_tagsets(
+            ...     SQLTags(u('~/var/media-ontology.sqlite'),
+            ...     ['actor', 'role', 'series'])
+            # divert type "musicbrainz.recording" to mbdb.sqlite
+            # mapping to the type "recording"
+            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
+            # divert type "tvdb.actor" to tvdb.sqlite
+            # mapping to the type "actor"
+            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
+    '''
+    subtagsets = self.SubTagSets.from_match(tagsets, match, unmatch)
+    self._subtagsetses.insert(index, subtagsets)
 
   ##################################################################
   # Types.
@@ -2371,7 +2440,8 @@ class TagsOntology(SingletonMixin):
   def type(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
-    return self[self.type_index(type_name)]
+    tagsets, subtype_name = self._tagsets_for_type_name(type_name)
+    return tagsets['type.' + subtype_name]
 
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
@@ -2382,31 +2452,31 @@ class TagsOntology(SingletonMixin):
   def type_names(self):
     ''' Generator yielding defined type names.
     '''
-    for key in self.keys(prefix='type.'):
-      assert key.startswith('type.')
-      yield cutprefix(key, 'type.')
+    for subtagsets in self._subtagsetses:
+      for key in subtagsets.tagsets.keys(prefix='type.'):
+        assert key.startswith('type.')
+        subtype_name = cutprefix(key, 'type.')
+        type_name = subtagsets.type_name(subtype_name)
+        yield type_name
 
   ################################################################
   # Metadata.
 
-  @classmethod
-  def meta_index(cls, type_name=None, value=None, convert=None):
-    ''' Return the entry index for the metadata for `(type_name,value)`.
+  @ensure(lambda result: result[1].startswith('meta.'))
+  def _meta_ref(self, type_name, value, convert=None):
+    ''' Return `(tagsets,metakey)` for the metadata for `(type_name,value)`.
     '''
-    with Pfx("%s.meta_index(type_name=%r,value=%r)", cls.__name__, type_name,
-             value):
-      index = 'meta'
-      if type_name is None:
-        assert value is None
-      else:
-        index += '.' + type_name
-        if value is not None:
-          if convert is None:
-            convert = cls.value_to_tag_name
-          value_tag_name = convert(value)
-          assert isinstance(value_tag_name, str) and value_tag_name
-          index += '.' + value_tag_name
-      return index
+    with Pfx("%s._meta_ref(type_name=%r,value=%r)", type(self).__name__,
+             type_name, value):
+      tagsets, subtype_name = self._tagsets_for_type_name(type_name)
+      index = 'meta.' + subtype_name
+      if value is not None:
+        if convert is None:
+          convert = self.value_to_tag_name
+        value_tag_name = convert(value)
+        assert isinstance(value_tag_name, str) and value_tag_name
+        index += '.' + value_tag_name
+    return tagsets, index
 
   def meta_names(self, type_name=None):
     ''' Generator yielding defined metadata names.
@@ -2423,10 +2493,16 @@ class TagsOntology(SingletonMixin):
         on an ontology with a `meta.character.marvel.black_widow`
         would yield `'character.marvel.black_widow'`.
     '''
-    prefix = self.meta_index(type_name=type_name) + '.'
-    for key in self.keys(prefix=prefix):
+    if type_name is None:
+      for type_name in self.type_names():
+        yield from self.meta_names(type_name)
+        return
+    tagsets, subtype_name = self._tagsets_for_type_name(type_name)
+    prefix = f'meta.{subtype_name}.'
+    for key in tagsets.keys(prefix=prefix):
       assert key.startswith(prefix)
-      yield cutprefix(key, prefix)
+      meta_suffix = cutprefix(key, prefix)
+      yield type_name + '.' + meta_suffix
 
   @staticmethod
   @pfx
@@ -2480,8 +2556,8 @@ class TagsOntology(SingletonMixin):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    ontkey = self.meta_index(type_name, value, convert=convert)
-    return self[ontkey]
+    tagsets, key = self._meta_ref(type_name, value, convert=convert)
+    return tagsets[key]
 
   def basetype(self, typename):
     ''' Infer the base type name from a type name.
@@ -2864,9 +2940,9 @@ class TagsOntologyCommand(BaseCommand):
             for ptn in argv:
               selected.update(fnmatch.filter(meta_names, ptn))
             indices = [
-                ont.meta_index(type_name, value) for value in sorted(selected)
+                ont._meta_ref(type_name, value) for value in sorted(selected)
             ]
-            ont.edit_indices(indices, prefix=ont.meta_index(type_name) + '.')
+            ont.edit_indices(indices, prefix=ont._meta_ref(type_name) + '.')
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
