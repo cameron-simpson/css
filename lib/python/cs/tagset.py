@@ -2053,7 +2053,7 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class TagsOntology(SingletonMixin, BaseTagSets):
+class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
 
       This is based around a mapping of names
@@ -2363,28 +2363,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     '''
     return True
 
-  ##################################################################
-  # BaseTagSets required methods
-  def get(self, name, default=None):
-    ''' Proxy `.get` through to `self.tagsets`.
     '''
-    return self.tagsets.get(name, default)
-
-  def __setitem__(self, name, te):
-    ''' Save `te` against the key `name`.
-    '''
-    self.tagsets[name] = te
-
-  ##################################################################
-  # Mapping methods.
-  def keys(self, *, prefix=None):
-    return self.tagsets.keys(prefix=prefix)
-
-  def __iter__(self):
-    return self.keys()
-
-  def __delitem__(self, index):
-    del self.tagsets[index]
 
   ##################################################################
   # Types.
@@ -2393,13 +2372,6 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     return self[self.type_index(type_name)]
-
-  @staticmethod
-  @require(lambda type_name: Tag.is_valid_name(type_name))  # pylint: disable=unnecessary-lambda
-  def type_index(type_name):
-    ''' Return the entry index for the type `type_name`.
-    '''
-    return 'type.' + type_name
 
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
