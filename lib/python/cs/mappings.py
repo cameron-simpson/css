@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from functools import partial
 import json
 import re
+from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
@@ -1175,6 +1176,7 @@ class IndexedMapping(LoadableMappingMixin):
       mapping = {}
     self.mapping = mapping
     self.loadable_mapping_key = pk
+    self._lock = RLock()
 
   def scan_mapping(self):
     ''' The records from the mapping.
