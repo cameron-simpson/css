@@ -95,7 +95,7 @@ However, an ontology brings meaning to those annotations.
 See the `TagsOntology` class for implementation details,
 access methods and more examples.
 
-Consider a record about a movie, with this `TagSet`:
+Consider a record about a movie, with these tags (a `TagSet`):
 
     title="Avengers Assemble"
     series="Avengers (Marvel)"
@@ -1355,7 +1355,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' The base type name for this tag.
         Returns `None` if there is no ontology.
 
-        This calls `TagsOntology.basetype(self.ontology,self.type)`.
+        This calls `self.onotology.basetype(self.name)`.
+        The basetype is the endpoint of a cascade down the defined types.
+
+        For example, this might tell us that a `Tag` `role="Fred"`
+        has a basetype `"str"`
+        by cascading through a hypothetical chain `role`->`character`->`str`:
+
+            type.role type=character
+            type.character type=str
     '''
     ont = self.ontology
     if ont is None:
@@ -2051,22 +2059,58 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
 
-      A `cs.fstags.FSTags` uses ontologies initialised from `TagFile`s
-      containing ontology mappings.
-
       There are two main categories of entries in an ontology:
-      * types: an entry named `type.{typename}` contains a `TagSet`
-        defining the type named `typename`
-      * metadata: an entry named `meta.{typename}.{value_key}`
-        contains a `TagSet` holding metadata for a value of type {typename}
+      * types: an entry named `type.`*typename* contains a `TagSet`
+        defining the type named *typename*
+      * metadata: an entry named `meta.`*typename*`.`*value_key*
+        contains a `TagSet` holding metadata for a value of type *typename*
+        whose value is mapped to *value_key*
 
-      Types:
+      For any `Tag` *name*=*value* the associated *typename* is just *name*.
+      For example, a `Tag` `colour="blue"`
+      would have type information at the entry `type.colour`
+      and metadata about `"blue"` at `meta.colour.blue`.
 
-      The type of a `Tag` is nothing more than its `name`.
+      Metadata are `TagSet`s describing particular values of a type.
+      For example, some metadata for the `Tag` `colour="blue"`:
+
+          meta.colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
+
+      Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
+
+          meta.actor.scarlett_johansson roles=["Black Widow (Marvel)"]
+          meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
+
+      Getting from the role `"Black Widow (Marvel)"`
+      to its metadata is done with the method `metadata(type_name,value)`,
+      where the *type_name* is `"role"`.
+
+      this requires type information about a `role`.
+      Here are some type definitions supporting the above metadata:
+
+          type.person type=str description="A person."
+          type.actor type=person description="An actor's stage name."
+          type.character type=str description="A person in a story."
+          type.role type=character description="A character role in a performance."
+          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
 
       The basic types have their Python names: `int`, `float`, `str`, `list`,
       `dict`, `date`, `datetime`.
-      You can define subtypes of these for your own purposes,
+      You can define subtypes of these for your own purposes
+      as illustrated above.
+
+      The `role` `"Black Widow (Marvel)"`
+      is mapped to its metadata as follows:
+      * the value `"Black Widow (Marvel)"` if converted to a key
+        by the ontology method `value_to_tag_name`;
+        it moves a bracket suffix such as `(Marvel)` to the front as a prefix
+        `marvel.` and downcases the rest of the string and turns spaces into underscores.
+        This yields the value key `marvel.black_widow`.
+      * the type is `role`, so the ontology entry for the metadata
+        is `meta.role.marvel.black_widow`
+
+      l
+
       for example:
 
           type.colour type=str description="A hue."
@@ -2080,21 +2124,6 @@ class TagsOntology(SingletonMixin, BaseTagSets):
 
       Subtypes of `dict` include a `key_type` and a `member_type`
       specifying the type for keys and members of a `Tag` value:
-
-          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
-          type.actor type=person description="An actor's stage name."
-          type.person type=str description="A person."
-          type.role type=character description="A character role in a performance."
-          type.character type=str description="A person in a story."
-
-      Metadata:
-
-      Metadata are `Tag`s describing particular values of a type.
-      For example, the metadata for the `Tag` `colour=blue`:
-
-          meta.colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
-          meta.actor.scarlett_johansson
-          meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
 
       Accessing type data and metadata:
 
