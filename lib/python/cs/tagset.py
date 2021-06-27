@@ -193,8 +193,9 @@ from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
 from datetime import date, datetime
 import errno
-import fnmatch
-from fnmatch import fnmatchcase
+from fnmatch import (
+    filter as fn_filter, fnmatch, fnmatchcase, translate as fn_translate
+)
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -2938,7 +2939,7 @@ class TagsOntologyCommand(BaseCommand):
               return 1
             selected = set()
             for ptn in argv:
-              selected.update(fnmatch.filter(meta_names, ptn))
+              selected.update(fn_filter(meta_names, ptn))
             indices = [
                 ont._meta_ref(type_name, value) for value in sorted(selected)
             ]
