@@ -219,12 +219,11 @@ from cs.lex import (
     has_format_attributes, format_attribute, FStr, typed_repr as r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
-from cs.mappings import AttrableMappingMixin, PrefixedMappingProxy
+from cs.mappings import AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
-from cs.seq import seq
 from cs.threads import locked_property
 
 __version__ = '20210428-post'
@@ -2133,7 +2132,7 @@ class TagsOntology(SingletonMixin):
           returning the type name used in the main ontology;
           it should be the reverse of `match_func`;
           if this function is `None` the subtype name is returned unchanged.
-        * `type_map`: a 
+        * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
     '''
 
     @classmethod
