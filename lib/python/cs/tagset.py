@@ -1219,7 +1219,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont.type(self.name)
+    return ont.typedata(self.name)
 
   @property
   @pfx_method(use_str=True)
@@ -1240,7 +1240,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont.type(key_type)
+    return ont.typedata(key_type)
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
@@ -1282,7 +1282,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont.type(member_type)
+    return ont.typedata(member_type)
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
@@ -2437,7 +2437,7 @@ class TagsOntology(SingletonMixin):
   ##################################################################
   # Types.
 
-  def type(self, type_name):
+  def typedata(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     tagsets, subtype_name = self._tagsets_for_type_name(type_name)
@@ -2447,7 +2447,7 @@ class TagsOntology(SingletonMixin):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
     for type_name in self.type_names():
-      yield type_name, self.type(type_name)
+      yield type_name, self.typedata(type_name)
 
   def type_names(self):
     ''' Generator yielding defined type names.
@@ -2918,7 +2918,7 @@ class TagsOntologyCommand(BaseCommand):
       return 0
     type_name = argv.pop(0)
     with Pfx(type_name):
-      tags = ont.type(type_name)
+      tags = ont.typedata(type_name)
       if not argv:
         print("Tags for type", type_name, "=", tags)
         for tag in sorted(tags):
