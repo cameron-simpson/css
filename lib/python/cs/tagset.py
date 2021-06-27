@@ -1308,48 +1308,6 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     )
     return ont[member_metadata_name]
 
-  @property
-  @pfx_method(use_str=True)
-  def type(self):
-    ''' The type name for this `Tag`.
-
-        Unless the definition for `self.name` has a `type` tag,
-        the type is `self.ontology.value_to_tag_name(self.name)`.
-
-        For example, the tag `series="Avengers (Marvel)"`
-        would look up the definition for `series`.
-        If that had no `type=` tag, then the type
-        would default to `series`
-        which is what would be returned.
-
-        The corresponding metadata `TagSet` for that tag
-        would have the name `series.marvel.avengers`.
-
-        By contrast, the tag `cast={"Scarlett Johansson":"Black Widow (Marvel)"}`
-        would look up the definition for `cast`
-        which might look like this:
-
-            cast type=dict key_type=person member_type=character
-
-        That says that the type name is `dict`,
-        which is what would be returned.
-
-        Because the type is `dict`
-        the definition also has `key_type` and `member_type` tags
-        identifying the type names for the keys and values
-        of the `cast=` tag.
-        As such, the corresponding metadata `TagSet`s
-        in this example would be named
-        `person.scarlett_johansson`
-        and `character.marvel.black_widow` respectively.
-    '''
-    typedata = self.typedata
-    if typedata is None:
-      return None
-    type_name = typedata.type
-    if type_name is None:
-      type_name = self.ontology.value_to_tag_name(self.name)
-    return type_name
 
   @property
   def basetype(self):
