@@ -303,7 +303,7 @@ class CloudBackupCommand(BaseCommand):
         if subcmd == 'rewrite':
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
-          state.rewrite_mapping()
+          state.rewrite_backend()
         else:
           raise GetoptError("unrecognised subsubcommand")
 
@@ -1691,7 +1691,7 @@ class NamedBackup(SingletonMixin):
             # serialise these because we can run out of file descriptors
             # in a multithread environment
             with self._lock:
-              dirstate.rewrite_mapping()
+              dirstate.rewrite_backend()
 
         proxy('')
       return ok

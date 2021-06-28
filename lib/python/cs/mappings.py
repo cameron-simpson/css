@@ -1052,7 +1052,7 @@ class IndexedSetMixin(ABC):
         it is an error for multiple records to have the same primary key
       * `scan`: a generator method to scan the backing store
         and yield records, used for the inital load of the mapping
-      * `append_to_mapping(record)`: add a new record to the backing store;
+      * `add_backend(record)`: add a new record to the backing store;
         this is called from the `.add(record)` method
         after indexing to persist the record in the backing store
 
@@ -1074,7 +1074,7 @@ class IndexedSetMixin(ABC):
     ''' Add a record to the mapping.
 
         This indexes the record against the various `by_`* indices
-        and then calls `self.append_to_mapping(record)`
+        and then calls `self.add_backend(record)`
         to save the record to the backing store.
     '''
     pk_name = self.IndexedSetMixin__pk
@@ -1094,7 +1094,7 @@ class IndexedSetMixin(ABC):
         else:
           by_map = getattr(self, 'by_' + map_name)
           by_map[k] = record
-      self.append_to_mapping(record)
+      self.add_backend(record)
 
   def __getattr__(self, attr):
     field_name = cutprefix(attr, 'by_')
@@ -1159,7 +1159,7 @@ class IndexedSetMixin(ABC):
 
   @scan_length.setter
   def scan_length(self, length):
-    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_mapping`.
+    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_backend`.
     '''
     self.__scan_length = length
 
@@ -1185,7 +1185,7 @@ class IndexedMapping(IndexedSetMixin):
     '''
     return self.mapping.values()
 
-  def append_to_mapping(self, record):
+  def add_backend(self, record):
     ''' Save `record` in the mapping.
     '''
     self.mapping[record[self.IndexedSetMixin__pk]] = record

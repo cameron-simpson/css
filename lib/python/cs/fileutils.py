@@ -1831,14 +1831,14 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
                                 error_list=self.scan_errors):
         yield record
 
-  def append_to_mapping(self, record):
+  def add_backend(self, record):
     ''' Append `record` to the backing file.
     '''
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
 
-  def rewrite_mapping(self):
+  def rewrite_backend(self):
     ''' Rewrite the backing file.
 
         Because the record updates are normally written in append mode,
