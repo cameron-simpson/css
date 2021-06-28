@@ -150,7 +150,7 @@ def named_row_tuple(*column_names, **kw):
         name_of_[attr] = name
         index_of_[name] = i
         i += 1
-    del i, name, attr
+    del i, name, attr  # pylint: disable=undefined-loop-variable
     index_of_.update((s, i) for i, s in enumerate(attributes_))
 
     def __getitem__(self, key):
@@ -166,6 +166,7 @@ def named_row_tuple(*column_names, **kw):
             func = self.computed_.get(key)
             if func is not None:
               return func(self)
+            # pylint: disable=raise-missing-from
             raise RuntimeError("no method or func for key %r" % (key,))
           else:
             return method()
@@ -843,6 +844,7 @@ class StackableValues(object):
       try:
         vs = self._values[attr]
       except KeyError:
+        # pylint: disable=raise-missing-from
         raise AttributeError(attr)
       else:
         if vs:
@@ -861,6 +863,7 @@ class StackableValues(object):
         fallback_func = self._fallback
       except AttributeError:
         # no fallback function
+        # pylint: disable=raise-missing-from
         raise KeyError(key)
       with Pfx("%s._fallback(%r)", type(self).__name__, key):
         try:
@@ -895,6 +898,7 @@ class StackableValues(object):
     try:
       v = vs.pop()
     except IndexError:
+      # pylint: disable=raise-missing-from
       raise KeyError(key)
     if not vs:
       del self._values[key]
@@ -973,6 +977,7 @@ class AttrableMappingMixin(object):
         dks = self.__dict__.keys()
         if dks:
           names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        # pylint: disable=raise-missing-from
         raise AttributeError(
             "%s.%s (attrs=%s)" % (
                 type(self).__name__,
@@ -1256,6 +1261,8 @@ class PrefixedMappingProxy:
     self.prefix = prefix
 
   def keys(self):
+    ''' Yield the post-prefix suffix of the keys in `self.mapping`.
+    '''
     prefix = self.prefix
     return map(
         lambda k: cutprefix(k, prefix),
@@ -1269,6 +1276,8 @@ class PrefixedMappingProxy:
     return self.mapping[self.prefix + k]
 
   def get(self, k, default=None):
+    ''' Return the value for key `k` or `default`.
+    '''
     try:
       return self[k]
     except KeyError:
