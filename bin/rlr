@@ -129,18 +129,19 @@ trap 'rm -f "$front" "$middle" "$back"; exit 1' 1 2 13 15
 
 exec 3<&0       # save stdin
 
-[ $filter_mode ] || exec <"$target"
-
-# read the whole input file and grab the top and bottom bits
+# read the whole target file and grab the top and bottom bits
 # this lets us use the same file for input and output
-sed -n "1,/$from/w $front
-        /$from/,/$to/{
-          /$from/b next
-          /$to/b next
-          w $middle
-        }
-        :next
-        /$to/,\$w $back" || ok=
+
+( [ $filter_mode ] || exec <"$target"
+  sed -n "1,/$from/w $front
+          /$from/,/$to/{
+            /$from/b next
+            /$to/b next
+            w $middle
+          }
+          :next
+          /$to/,\$w $back"
+) || ok=
 
 if [ $ok ]
 then
