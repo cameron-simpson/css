@@ -324,7 +324,7 @@ class BaseCommand:
         main_context = Pfx(subcmd)
       else:
         try:
-          main = lambda: self.main(argv, **kw)
+          main = lambda: self.main(argv)
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
         main_cmd = cmd
