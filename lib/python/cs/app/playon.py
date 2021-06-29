@@ -865,7 +865,7 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with Pfx("open(%r,'wb')"):
+      with Pfx("open(%r,'wb')", filename):
         with open(filename, 'wb') as f:
           for chunk in progressbar(
               dl_rsp.iter_content(chunk_size=131072),
