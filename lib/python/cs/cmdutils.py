@@ -292,10 +292,13 @@ class BaseCommand:
       if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
-          raise GetoptError(
-              "missing subcommand, expected one of: %s" %
-              (', '.join(sorted(subcmds.keys())),)
-          )
+          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          if not default_argv:
+            raise GetoptError(
+                "missing subcommand, expected one of: %s" %
+                (', '.join(sorted(subcmds.keys())),)
+            )
+          argv = list(default_argv)
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
