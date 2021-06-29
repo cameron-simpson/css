@@ -877,14 +877,15 @@ class PlayOnAPI(MultiOpenMixin):
           ):
             offset = 0
             length = len(chunk)
-            while length > 0:
-              with Pfx("write %d bytes", length):
-                written = f.write(chunk[offset:length])
+            while offset < length:
+              with Pfx("write %d bytes", length - offset):
+                written = f.write(chunk[offset:])
                 if written < 1:
-                  warning("write %d bytes")
+                  warning("less than 1 bytes written")
                 else:
                   offset += written
-                  length -= written
+                  assert offset <= length
+            assert offset == length
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:
