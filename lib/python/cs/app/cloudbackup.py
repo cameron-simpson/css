@@ -98,6 +98,8 @@ class CloudBackupCommand(BaseCommand):
   # TODO: rekey -K oldkey backup_name [subpaths...]: add per-file keys for new key
   # TODO: openssl-like -passin option for passphrase
 
+  SUBCOMMAND_ARGV_DEFAULT = ('ls',)
+
   # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
     ''' Options namespace with convenience methods.
