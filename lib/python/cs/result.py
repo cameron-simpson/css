@@ -65,7 +65,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20210407-post'
+__version__ = '20210420-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -75,8 +75,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
-        'cs.threads', 'icontract'
+        'cs.logutils',
+        'cs.mappings',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
     ],
 }
 
@@ -451,6 +457,9 @@ def report(LFs):
     yield Q.get()
 
 class ResultSet(set):
+  ''' A `set` if `Result`s,
+      on which one may iterate as `Result`s complete.
+  '''
 
   def __enter__(self):
     return self
@@ -467,7 +476,7 @@ class ResultSet(set):
   def wait(self):
     ''' Convenience function to wait for all the `Result`s.
     '''
-    for R in self:
+    for _ in self:
       pass
 
 def after(Rs, R, func, *a, **kw):

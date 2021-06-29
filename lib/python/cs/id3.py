@@ -17,7 +17,7 @@ from cs.threads import locked, locked_property
 
 DISTINFO = {
     'description':
-    "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
+    "support for ID3 tags",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -210,7 +210,7 @@ class ID3V1Frame(SimpleBinary):
       comment_bs = comment_bs[:-2]
     else:
       self.track = 0
-    self.comment = comment_bs.decode('ascii').rstrip()
+    self.comment = comment_bs.decode('ascii').rstrip('\0').rstrip()
     self.genre_id = bfr.byte0()
     assert bfr.offset - offset0 == 128
     return self
@@ -836,7 +836,12 @@ class ID3V2Frame(SimpleBinary):
   def tagset(self):
     ''' Return a `TagSet` with the ID3 tag information.
     '''
-    tags = TagSet()
+    tags = TagSet(
+        _ontology=self.ONTOLOGY,
+        v1=self.v1,
+        v2=self.v2,
+        version=f'{self.v1}.{self.v2}',
+    )
     for tag_frame in self.tag_frames:
       tag_id = tag_frame.tag_id.decode('ascii').lower()
       tags.set(tag_id, tag_frame.datafrome_body.value)
@@ -875,6 +880,9 @@ class ID3V2Tags(SimpleNamespace):
 
 class ID3(SimpleNamespace):
   ''' Wrapper for pyid3lib.tag.
+
+      OBSOLETE.
+      Going away when I'm sure the other classes cover all this stuff off.
   '''
 
   # mapping from frameids to nice names ("artist" etc)

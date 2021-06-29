@@ -79,9 +79,9 @@ from getopt import getopt, GetoptError
 import json
 import os
 from os.path import (
-    abspath, basename, dirname, exists as existspath, expanduser, isdir as
-    isdirpath, isfile as isfilepath, join as joinpath, realpath, relpath,
-    samefile, splitext
+    abspath, basename, dirname, exists as existspath, expanduser, isabs as
+    isabspath, isdir as isdirpath, isfile as isfilepath, join as joinpath,
+    realpath, relpath, samefile
 )
 from pathlib import PurePath
 import shutil
@@ -123,9 +123,19 @@ DISTINFO = {
         'console_scripts': ['fstags = cs.fstags:main'],
     },
     'install_requires': [
-        'cs.cmdutils>=20210404', 'cs.context', 'cs.deco', 'cs.fileutils', 'cs.lex',
-        'cs.logutils', 'cs.pfx', 'cs.resources', 'cs.tagset', 'cs.threads',
-        'cs.upd', 'icontract', 'typeguard'
+        'cs.cmdutils>=20210404',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.resources',
+        'cs.tagset',
+        'cs.threads',
+        'cs.upd',
+        'icontract',
+        'typeguard',
     ],
 }
 
@@ -137,8 +147,8 @@ XATTR_B = (
     if hasattr(os, 'getxattr') and hasattr(os, 'setxattr') else None
 )
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{filepath.pathname}'
-LS_OUTPUT_FORMAT_DEFAULT = '{filepath.encoded} {tags}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{filepath}'
+LS_OUTPUT_FORMAT_DEFAULT = '{filepath:json} {tags}'
 
 # pylint: disable=too-many-locals
 
@@ -172,7 +182,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    self.options.ontology_path = None
+    self.options.ontology_path = os.environ.get('FSTAGS_ONTOLOGY')
 
   def apply_opt(self, opt, val):
     ''' Apply command line option.
@@ -188,7 +198,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Push the `FSTags`.
     '''
     options = self.options
-    fstags = FSTags(ontologyfile=options.ontology_path)
+    fstags = FSTags(ontology_filepath=options.ontology_path)
     with fstags:
       with stackattrs(options, fstags=fstags):
         yield
@@ -497,13 +507,13 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-d] [--direct] [-o output_format] [paths...]
-        List files from paths and their tags.
-        -d          Treat directories like files, do not recurse.
-        --direct    List direct tags instead of all tags.
-        -o output_format
-                    Use output_format as a Python format string to lay out
-                    the listing.
-                    Default: {LS_OUTPUT_FORMAT_DEFAULT}
+          List files from paths and their tags.
+          -d          Treat directories like files, do not recurse.
+          --direct    List direct tags instead of all tags.
+          -o output_format
+                      Use output_format as a Python format string to lay out
+                      the listing.
+                      Default: {LS_OUTPUT_FORMAT_DEFAULT}
     '''
     options = self.options
     fstags = options.fstags
@@ -677,10 +687,10 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       )
     if not argv:
       print(ont)
-      return
+      return 0
+    print("argv =", repr(argv))
     with stackattrs(options, ontology=ont):
-      TagsOntologyCommand().run([options.cmd] + argv, options=options)
-    return
+      return TagsOntologyCommand(argv, **options.__dict__).run()
 
   def cmd_rename(self, argv):
     ''' Usage: {cmd} -n newbasename_format paths...
@@ -922,15 +932,15 @@ class FSTags(MultiOpenMixin):
   ''' A class to examine filesystem tags.
   '''
 
-  def __init__(self, tagsfile_basename=None, ontologyfile=None):
+  def __init__(self, tagsfile_basename=None, ontology_filepath=None):
     MultiOpenMixin.__init__(self)
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
-    if ontologyfile is None:
-      ontologyfile = tagsfile_basename + '-ontology'
+    if ontology_filepath is None:
+      ontology_filepath = tagsfile_basename + '-ontology'
     self.config = FSTagsConfig()
     self.config.tagsfile_basename = tagsfile_basename
-    self.config.ontologyfile = ontologyfile
+    self.config.ontology_filepath = ontology_filepath
     self._tagfiles = {}  # cache of `FSTagsTagFile`s from their actual paths
     self._tagged_paths = {}  # cache of per abspath `TaggedPath`
     self._dirpath_ontologies = {}  # cache of per dirpath(path) `TagsOntology`
@@ -975,10 +985,10 @@ class FSTags(MultiOpenMixin):
     return self.config.tagsfile_basename
 
   @property
-  def ontologyfile(self):
+  def ontology_filepath(self):
     ''' The ontology file basename.
     '''
-    return self.config.ontologyfile
+    return self.config.ontology_filepath
 
   def __str__(self):
     return "%s(tagsfile_basename=%r)" % (
@@ -1016,43 +1026,74 @@ class FSTags(MultiOpenMixin):
 
   @property
   def ontology(self):
-    ''' The primary `TagsOntology`, or `None` if `self.ontologyfile` was `None`.
+    ''' The primary `TagsOntology`, or `None` if `self.ontology_filepath` was `None`.
     '''
-    if not self.ontologyfile:
+    ontpath = self.ontology_filepath
+    if not ontpath:
       return None
-    ont_tagfile = self._tagfile(self.ontologyfile, no_ontology=True)
+    if not isabspath(ontpath):
+      ontbase = ontpath
+      ontpath = self.find_ontpath('.', ontbase=ontbase)
+      if ontpath is None:
+        return None
+    return self.open_ontology(ontpath)
+
+  def open_ontology(self, ontpath):
+    ''' Open the contology file at `ontpath`.
+    '''
+    ont_tagfile = self._tagfile(ontpath, no_ontology=True)
     ont = TagsOntology(ont_tagfile)
     ont_tagfile.ontology = ont
     return ont
 
+  def find_ontpath(self, dirpath, ontbase=None):
+    ''' Locate an ontology file for the directory `dirpath`.
+        The optional `ontbase` may override the relative path to the file,
+        default is `self.ontology_filepath`.
+        Return the found ontology file or `None` if not found.
+    '''
+    if ontbase is None:
+      ontbase = self.ontology_filepath
+    ontdirpath = next(
+        findup(
+            realpath(dirpath),
+            lambda p: isfilepath(joinpath(p, ontbase)),
+            first=True
+        )
+    )
+    if ontdirpath is None:
+      return None
+    return joinpath(ontdirpath, ontbase)
+
+  def find_ontology(self, dirpath, ontbase=None):
+    ''' Locate an ontology for the directory `dirpath`.
+        The optional `ontbase` may override the relative path to the file,
+        default is `self.ontology_filepath`.
+        Return a `TagOntology` or `None` if not found.
+    '''
+    ontpath = self.find_ontpath(dirpath, ontbase=ontbase)
+    if ontpath is None:
+      return None
+    return self.open_ontology(ontpath)
+
   @locked
-  def ontology_for(self, path):
+  def ontology_for(self, path, ontbase=None):
     ''' Return the `TagsOntology` associated with `path`.
         Returns `None` if an ontology cannot be found.
     '''
     ont = self.ontology
     if ont:
+      # global ontology, use it
       return ont
+    # find an ontology file in the filesystem above path
     cache = self._dirpath_ontologies
     path = abspath(path)
     dirpath = path if isdirpath(path) else dirname(path)
     ont = cache.get(dirpath)
     if ont is None:
-      # locate the ancestor directory containing the first ontology file
-      ontbase = self.ontologyfile
-      ontdirpath = next(
-          findup(
-              realpath(dirpath),
-              lambda p: isfilepath(joinpath(p, ontbase)),
-              first=True
-          )
-      )
-      if ontdirpath is not None:
-        ontpath = joinpath(ontdirpath, ontbase)
-        ont_tagfile = self._tagfile(ontpath, no_ontology=True)
-        ont = TagsOntology(ont_tagfile)
-        ont_tagfile.ontology = ont
-        cache[dirpath] = ont
+      ont = self.find_ontology(dirpath, ontbase=ontbase)
+    if ont is not None:
+      cache[dirpath] = ont
     return ont
 
   def path_tagfiles(self, filepath):
@@ -1372,6 +1413,7 @@ class HasFSTagsMixin:
     '''
     self._fstags = new_fstags
 
+# pylint: disable=too-many-ancestors
 class TaggedPath(TagSet, HasFSTagsMixin):
   ''' Class to manipulate the tags for a specific path.
   '''
@@ -1406,7 +1448,10 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     assert tag_name != 'name'
     super().discard(tag_name, value, verbose=verbose)
 
+  @tag_or_tag_value
   def set(self, tag_name, value, **kw):
+    ''' Forbid the special tag name `'name'`, reserved for the filename.
+    '''
     assert tag_name != 'name'
     super().set(tag_name, value, **kw)
 
@@ -1448,15 +1493,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
       if tag.name not in kwtags:
         kwtags.add(tag)
     # tags based on the filepath
-    filepath = self.filepath
-    for pathtag in (
-        Tag('filepath.basename', basename(filepath), ontology=ont),
-        Tag('filepath.ext', splitext(basename(filepath))[1], ontology=ont),
-        Tag('filepath.pathname', filepath, ontology=ont),
-        Tag('filepath.encoded', Tag.transcribe_value(filepath), ontology=ont),
-    ):
-      if pathtag.name not in kwtags:
-        kwtags.add(pathtag)
+    kwtags['filepath'] = PurePath(self.filepath)
     return kwtags
 
   def format_kwargs(self, *, direct=False):
@@ -1474,10 +1511,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     kwtags = self.format_tagset(direct=direct)
     kwtags['tags'] = str(kwtags)
-    # convert the TagSet to an ExtendedNamespace
-    kwargs = kwtags.format_kwargs()
-    ##XP("format_kwargs=%s", kwargs)
-    return kwargs
+    return kwtags
 
   @property
   def basename(self):

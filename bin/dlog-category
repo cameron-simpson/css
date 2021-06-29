@@ -7,7 +7,16 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [path]"
+usage="Usage: $cmd [CATEGORY] [path]"
+
+category=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [A-Z]*) category=$1; shift ;;
+  esac
+fi
 
 if [ $# = 0 ]
 then  path=.
@@ -20,4 +29,14 @@ fi
   exit 2
 }
 
-exec fstags ls -d -o '{cs.dlog}' -- "$path"
+if [ -n "$category" ]
+then
+  fstags tag . "cs.dlog=$category"
+else
+  format={cs.dlog}
+  category=$( fstags ls -d -o "$format" -- "$path" )
+  case "$category" in
+    '' | '{}' | "$format" ) ;;
+    *)  echo "$category" ;;
+  esac
+fi

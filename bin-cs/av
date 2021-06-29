@@ -1,0 +1,173 @@
+#!/bin/sh
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage:
+  $cmd [--skip-existing] convs... srcfile [dstfile]
+    --skip-existing
+      Skip conversion if the destination file already exists.
+  $cmd [--multi] [--skip-existing] convs... srcfile...
+    --multi
+      Multiple file conversion: instead of specifying the destination
+      path, accept multiple srcfiles and use the default dstfile
+      path."
+
+trace=
+[ -t 2 ] && trace=set-x
+
+acodec=
+vcodec=
+ext=
+dst=
+subopts=
+skip_existing_dst=
+multifile=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --multi)    multifile=1 ;;
+    --skip-existing)
+                subopts="$subopts $1"
+                skip_existing_dst=1
+                ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    h264 | avc | avc1 )
+      if [ -n "$vcodec" ]
+      then  echo "$cmd: video codec already set to $vcodec" >&2
+            badopts=1
+      else  vcodec=h264
+      fi
+      ;;
+    h265 | hevc )
+      if [ -n "$vcodec" ]
+      then  echo "$cmd: video codec already set to $vcodec" >&2
+            badopts=1
+      else  vcodec=hevc
+      fi
+      ;;
+    mp4 | mkv )
+      if [ -n "$ext" ]
+      then  echo "$cmd: extension already set to $ext" >&2
+            badopts=1
+      else  ext=$1
+      fi
+      ;;
+    *)break ;;
+  esac
+  shift
+done
+
+[ -n "$acodec" ] || [ -n "$vcodec" ] || {
+  echo "$cmd: an audio or video codec must be specified" >&2
+  badopts=1
+}
+
+# multifile mode
+if [ $multifile ]
+then
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing srcfiles" >&2
+    badopts=1
+  fi
+  [ $badopts ] && {
+    echo "$usage" >&2
+    exit 2
+  }
+  for srcfile
+  do
+    # shellcheck disable=SC2086
+    $trace "$0" $subopts -- $vcodec $acodec "$srcfile" || exit $?
+  done
+  exit 0
+fi
+
+# single file with optional dstfile
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcfile" >&2
+  badopts=1
+else
+  src=$1
+  shift
+  if src_=$( expr "x$src" : 'x\(.*\)\.[^.][^.]*' )
+  then
+    srcext=$( expr "x$src" : 'x.*\.\([^.][^.]*\)' )
+  else
+    echo "$cmd: no extension on srcfile: $src" >&2
+    badopts=1
+  fi
+
+  [ $# = 0 ] || {
+    dst=$1
+    shift
+    [ -z "$ext" ] || {
+      echo "$cmd: may not specify both ext ($ext) and dstfile ($dst)" >&2
+      badopts=1
+    }
+  }
+
+  [ $# = 0 ] || {
+    echo "$cmd: extra arguments: $*" >&2
+    badopts=1
+  }
+
+  if [ -z "$vcodec" ]
+  then  vcodec=copy
+  else  src_=$src_--$vcodec
+  fi
+
+  if [ -z "$acodec" ]
+  then  acodec=copy
+  else  src_=$src_--$acodec
+  fi
+
+  [ -n "$dst" ] || {
+    dst=$src_.${ext:-${srcext:-mp4}}
+  }
+
+  [ "x$src" = "x$dst" ] && {
+    echo "$cmd: srcfile and dstfile may not be the same: $src" >&2
+    badopts=1
+  }
+
+  [ -s "$src" ] || {
+    echo "$cmd: $src: not a regular file" >&2
+    badopts=1
+  }
+
+  [ ! -e "$dst" ] || {
+    echo "$cmd: $dst: already exists" >&2
+    badopts=1
+  }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -e "$dst" ]
+then
+  if [ $skip_existing_dst ]
+  then
+    echo "$cmd: $src: destination already exists: $dst"
+    exit 0
+  fi
+  echo "$cmd: $src: destination already exists: $dst" >&2
+  exit 1
+fi
+
+$trace ffmpeg -i "$src" -c:v "$vcodec" -c:a "$acodec" "$dst"

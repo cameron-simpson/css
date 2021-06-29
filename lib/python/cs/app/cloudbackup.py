@@ -293,7 +293,7 @@ class CloudBackupCommand(BaseCommand):
     for record in state.by_uuid.values():
       record._clean_backups()
     ##print(state)
-    by_name = {record.name: record for record in state.scan_mapping()}
+    by_name = {record.name: record for record in state.scan()}
     for name, record in sorted(by_name.items()):
       with Pfx(name):
         record._clean_backups()
@@ -303,7 +303,7 @@ class CloudBackupCommand(BaseCommand):
         if subcmd == 'rewrite':
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
-          state.rewrite_mapping()
+          state.rewrite_backend()
         else:
           raise GetoptError("unrecognised subsubcommand")
 
@@ -1277,7 +1277,7 @@ class NamedBackup(SingletonMixin):
   def add_backup_record(self, backup_record: BackupRecord):
     ''' Record a new `BackupRecord`.
     '''
-    self.backup_records.add_to_mapping(backup_record, exists_ok=True)
+    self.backup_records.add(backup_record, exists_ok=True)
 
   ##############################################################
   # DirStates
@@ -1295,7 +1295,7 @@ class NamedBackup(SingletonMixin):
       else:
         uu = uuid4()
         uu_sp = UUIDedDict(uuid=uu, subpath=subpath)
-        self.diruuids.add_to_mapping(uu_sp)
+        self.diruuids.add(uu_sp)
     return uu_sp
 
   def dirstate_uuid_pathname(self, subpath):
@@ -1447,7 +1447,7 @@ class NamedBackup(SingletonMixin):
             if not S_ISDIR(S.st_mode):
               raise ValueError("not a directory")
           base_backups.add_dir(backup_uuid=backup_uuid, stat=S)
-          dirstate.add_to_mapping(base_backups, exists_ok=True)
+          dirstate.add(base_backups, exists_ok=True)
         subpath = updirpath
 
   ##############################################################
@@ -1564,7 +1564,7 @@ class NamedBackup(SingletonMixin):
             name_backups = dirstate.by_name.get(name)
             if name_backups is None:
               name_backups = FileBackupState(name=name, backups=[])
-              dirstate.add_to_mapping(name_backups)
+              dirstate.add(name_backups)
             try:
               stat = dir_entry.stat(follow_symlinks=False)
             except FileNotFoundError as e:
@@ -1647,7 +1647,7 @@ class NamedBackup(SingletonMixin):
               warning("unsupported type st_mode=%o", stat.st_mode)
               ok = False
               continue
-            dirstate.add_to_mapping(name_backups, exists_ok=True)
+            dirstate.add(name_backups, exists_ok=True)
 
         if Rs:
           if runstate.cancelled:
@@ -1676,22 +1676,22 @@ class NamedBackup(SingletonMixin):
                     stat=backedup_stat,
                     hashcode=backedup_hashcode
                 )
-                dirstate.add_to_mapping(name_backups, exists_ok=True)
+                dirstate.add(name_backups, exists_ok=True)
 
         if dirstate.scan_errors or (
-            dirstate.scan_mapping_length >= 64
-            and dirstate.scan_mapping_length >= 3 * len(dirstate)):
+            dirstate.scan_length >= 64
+            and dirstate.scan_length >= 3 * len(dirstate)):
           with Pfx(
-              "rewrite %s: %d scan_errors, len=%d and scan_mapping_length=%d",
+              "rewrite %s: %d scan_errors, len=%d and scan_length=%d",
               dirstate,
               len(dirstate.scan_errors),
               len(dirstate),
-              dirstate.scan_mapping_length,
+              dirstate.scan_length,
           ):
             # serialise these because we can run out of file descriptors
             # in a multithread environment
             with self._lock:
-              dirstate.rewrite_mapping()
+              dirstate.rewrite_backend()
 
         proxy('')
       return ok

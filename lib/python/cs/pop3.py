@@ -36,7 +36,7 @@ import sys
 from threading import RLock
 from cs.cmdutils import BaseCommand
 from cs.lex import cutprefix, cutsuffix
-from cs.logutils import warning
+from cs.logutils import debug, warning, exception
 from cs.pfx import pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -104,24 +104,39 @@ class POP3(MultiOpenMixin):
   def shutdown(self):
     ''' Quit and disconnect.
     '''
-    quitR = self.client_quit_bg()
-    self.flush()
-    quitR.join()
+    logmsg = debug
+    logmsg("send client QUIT")
+    try:
+      quitR = self.client_quit_bg()
+      logmsg("flush QUIT")
+      self.flush()
+      logmsg("join QUIT")
+      quitR.join()
+    except Exception as e:
+      exception("client quit: %s", e)
+      logmsg = warning
     if self._result_queue:
+      logmsg("close result queue")
       self._result_queue.close()
       self._result_queue = None
     if self._client_worker:
+      logmsg("join client worker")
       self._client_worker.join()
       self._client_worker = None
+    logmsg("close sendf")
     self.sendf.close()
     self.sendf = None
+    logmsg("check for uncollected server responses")
     bs = self.recvf.read()
     if bs:
       warning("received %d bytes from the server at shutdown", len(bs))
+    logmsg("close recvf")
     self.recvf.close()
     self.recvf = None
+    logmsg("close socket")
     self._sock.close()
     self._sock = None
+    logmsg("shutdown complete")
 
   def readline(self):
     ''' Read a CRLF terminated line from `self.recvf`.
@@ -483,7 +498,7 @@ class POP3Command(BaseCommand):
         typically an ssh port forward to a remote private cleartext POP service,
         logging in as `username`
       * `username@localhost!mail.example.com:1995`:
-        use cleartext to connect to `localhost:1995`,
+        use TLS/SSL to connect to `localhost:1995`,
         usually an ssh port forward to a remote private TLS/SSL POP service,
         logging in as `username` and passing `mail.exampl.com`
         as the TLS/SSL server name indication
