@@ -69,7 +69,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.tagset import (
     TagSet, Tag, TagFile, TagSetCriterion, TagBasedTest, TagsCommandMixin,
-    TagsOntology, TagSets, tag_or_tag_value, as_unixtime
+    TagsOntology, BaseTagSets, tag_or_tag_value, as_unixtime
 )
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
@@ -871,7 +871,11 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
       session.add(entity)
       entity.add_tag(
           'headline',
-          "%s node 0: the metanode." % (type(self).__name__,),
+          PolyValue(
+              float_value=None,
+              string_value="%s node 0: the metanode." % (type(self).__name__,),
+              structured_value=None
+          ),
           session=session,
       )
     return entity
@@ -1435,7 +1439,7 @@ class SQLTagSet(SingletonMixin, TagSet):
       )
     return children
 
-class SQLTags(TagSets):
+class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
@@ -1496,21 +1500,26 @@ class SQLTags(TagSets):
       tags = ()
     te = None if name is None else self.get(name)
     if te is None:
+      # create the new SQLTagSet
       if unixtime is None:
         unixtime = time.time()
       with self.db_session() as session:
         entity = self.orm.entities(name=name, unixtime=unixtime)
         session.add(entity)
-        for tag in tags:
-          entity.add_tag(
-              tag.name,
-              self.TagSetClass.to_polyvalue(tag.name, tag.value),
-              session=session
-          )
         session.flush()
         te = self.get(entity.id)
-      assert te is not None
+        assert te is not None
+        to_polyvalue = te.to_polyvalue
+        for tag in tags:
+          entity.add_tag(
+              tag.name, to_polyvalue(tag.name, tag.value), session=session
+          )
+      # refresh entry from some source if there is a .refresh() method
+      refresh = te.refresh
+      if refresh is not None and callable(refresh):
+        refresh()
     else:
+      # update the existing SQLTagSet
       if unixtime is not None:
         te.unixtime = unixtime
       for tag in tags:

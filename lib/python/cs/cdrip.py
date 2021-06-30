@@ -18,7 +18,6 @@ import os
 from os.path import (
     exists as existspath,
     expanduser,
-    expandvars,
     isdir as isdirpath,
     join as joinpath,
 )
@@ -26,15 +25,16 @@ from pprint import pformat
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
+from uuid import UUID
 import discid
 import musicbrainzngs
-from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.lex import cutprefix
 from cs.logutils import error, warning, info
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
@@ -93,7 +93,8 @@ class CDRipCommand(BaseCommand):
     options = self.options
     options.force = False
     options.device = os.environ.get(CDRIP_DEV_ENVVAR) or CDRIP_DEV_DEFAULT
-    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR) or expanduser(CDRIP_DIR_DEFAULT)
+    options.dirpath = os.environ.get(CDRIP_DIR_ENVVAR
+                                     ) or expanduser(CDRIP_DIR_DEFAULT)
     options.mbdb_path = None
 
   def apply_opts(self, opts):
@@ -149,15 +150,36 @@ class CDRipCommand(BaseCommand):
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
+  def cmd_meta(self, argv):
+    ''' Usage: {cmd} metaname...
+          Print the metadata about metaname, where metaname name the form
+          type_name.uuid being an ontology type such as "artist"
+          and a Musicbrainz UUID for that type.
+    '''
+    options = self.options
+    mbdb = options.mbdb
+    if not argv:
+      raise GetoptError("missing metanames")
+    for metaname in argv:
+      with Pfx("metaname %r", metaname):
+        ontkey = 'meta.' + metaname
+        metadata = mbdb.ontology[ontkey]
+        print(' ', metadata)
+
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
-    ''' Usage: {cmd} [disc_id]
+    ''' Usage: {cmd} [-n] [disc_id]
           Pull the audio into a subdirectory of the current directory.
+          -n  No action; recite planned actions.
     '''
     options = self.options
     fstags = options.fstags
     dirpath = options.dirpath
+    no_action = False
     disc_id = None
+    if argv and argv[0] == '-n':
+      no_action = True
+      argv.pop(0)
     if argv:
       disc_id = argv.pop(0)
     if argv:
@@ -168,11 +190,13 @@ class CDRipCommand(BaseCommand):
           options.mbdb,
           output_dirpath=dirpath,
           disc_id=disc_id,
-          fstags=fstags
+          fstags=fstags,
+          no_action=no_action,
       )
     except discid.disc.DiscError as e:
       error("disc error: %s", e)
       return 1
+    return 0
 
   def cmd_toc(self, argv):
     ''' Usage: {cmd} [disc_id]
@@ -201,9 +225,18 @@ class CDRipCommand(BaseCommand):
             tracknum, recording.title, '--',
             ", ".join(recording.artist_names())
         )
+    return 0
 
-# pylint: disable=too-many-locals
-def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def rip(
+    device,
+    mbdb,
+    *,
+    output_dirpath,
+    disc_id=None,
+    fstags=None,
+    no_action=False
+):
   ''' Pull audio from `device` and save in `output_dirpath`.
   '''
   if disc_id is None:
@@ -213,7 +246,7 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     fstags = FSTags()
   with Pfx("MB: discid %s", disc_id, print=True):
     disc = mbdb.discs[disc_id]
-  level1 = ", ".join(disc.artist_names()).replace(os.sep, '_') or "NO_ARTISTS"
+  level1 = ", ".join(disc.artist_names).replace(os.sep, '_') or "NO_ARTISTS"
   level2 = disc.title or "UNTITLED"
   if disc.medium_count > 1:
     level2 += f" ({disc.medium_position} of {disc.medium_count})"
@@ -222,16 +255,17 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
     with Pfx("makedirs(%r)", subdir, print=True):
       os.makedirs(subdir)
   fstags[subdir].update(
-      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names())
+      TagSet(discid=disc.id, title=disc.title, artists=disc.artist_names)
   )
-  for tracknum, recording in enumerate(disc.recordings(), 1):
-    track_tags = TagSet(
-        discid=disc['musicbrainz.disc_id'],
-        artists=recording.artist_names(),
+  for tracknum, recording_id in enumerate(disc.recordings, 1):
+    recording = disc.ontology.metadata('recording', recording_id)
+    track_fstags = TagSet(
+        discid=disc.mbkey,
+        artists=recording.artist_names,
         title=recording.title,
         track=tracknum
     )
-    track_artists = ", ".join(recording.artist_names())
+    track_artists = ", ".join(recording.artist_names)
     track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
@@ -245,11 +279,18 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
           info("using existing WAV file: %r", wav_filename)
         else:
           argv = ['cdparanoia', '-d', '1', '-w', str(tracknum), T.name]
-          with Pfx("+ %r", argv, print=True):
-            subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-          with Pfx("%r => %r", T.name, wav_filename, print=True):
-            os.link(T.name, wav_filename)
-      fstags[wav_filename].update(track_tags)
+          if no_action:
+            print(*argv)
+          else:
+            with Pfx("+ %r", argv, print=True):
+              subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+            with Pfx("%r => %r", T.name, wav_filename, print=True):
+              os.link(T.name, wav_filename)
+      if no_action:
+        print("fstags[%r].update(%s)" % (wav_filename, track_fstags))
+      else:
+        fstags[wav_filename].update(track_fstags)
+        fstags[wav_filename].rip_command = argv
       argv = [
           'lame',
           '-q',
@@ -270,13 +311,21 @@ def rip(device, mbdb, *, output_dirpath, disc_id=None, fstags=None):
           wav_filename,
           mp3_filename
       ]
-      with Pfx("+ %r", argv, print=True):
-        subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
-    fstags[mp3_filename].update(track_tags)
-  os.system("eject")
+      if no_action:
+        print(*argv)
+      else:
+        with Pfx("+ %r", argv, print=True):
+          subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+    if no_action:
+      print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
+    else:
+      fstags[mp3_filename].update(track_fstags)
+      fstags[mp3_filename].conversion_command = argv
+  if not no_action:
+    os.system("eject")
 
 # pylint: disable=too-many-ancestors
-class MBTagSet(SQLTagSet):
+class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
 
@@ -287,31 +336,185 @@ class MBTagSet(SQLTagSet):
     return self.sqltags.mbdb
 
   @property
+  def mbkey(self):
+    ''' The MusicBrainz key (usually a UUID or discid).
+    '''
+    return self.name.split('.', 2)[2]
+
+  @property
+  def type_name(self):
+    ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
+        This is `None` if `self.name` is not a `meta.`*type_name*`.` name.
+    '''
+    try:
+      ontish, onttype, _ = self.name.split('.', 2)
+    except ValueError:
+      return None
+    if ontish != 'meta':
+      return None
+    return onttype
+
+  @property
   def ontology(self):
     ''' The `TagsOntology` for this entity.
     '''
     return self.mbdb.ontology
 
-  def artists(self):
-    ''' Return a list of the artists' metadata.
-    '''
-    return self.tag_metadata('artists', convert=str)
+  # pylint: disable=too-many-branches,too-many-statements
+  def refresh(self, force=False):
+    ''' Query MusicBrainz, fill in tags.
 
-  def recordings(self):
-    ''' Return a list of the recordings.
+        This method has a fair bit of entity type specific knowledge.
     '''
-    return self.tag_metadata('recordings', convert=str)
+    if not force:
+      onttype = self.type_name
+      if onttype in ('artist',):
+        if getattr(self, onttype + '_name', None):
+          return
+      elif onttype in ('disc', 'recording'):
+        if self.title:
+          return
+    mbkey = self.mbkey
+    onttype = self.type_name
+    get_type = onttype
+    id_name = 'id'
+    record_key = None
+    includes = None
+    if onttype == 'artist':
+      includes = ['annotation']
+    elif onttype == 'disc':
+      includes = ['artists', 'recordings']
+      get_type = 'releases'
+      id_name = 'discid'
+      record_key = 'disc'
+    elif onttype == 'recording':
+      includes = ['artists', 'tags']
+    A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
+    # record the full response data for forensics
+    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}'] = A
+    # modify A for discs
+    if onttype == 'disc':
+      # drill down to the release and medium containing the disc id
+      # replace A with a dict with selected values
+      found_medium = None
+      found_release = None
+      for release in A['release-list']:
+        if found_medium:
+          break
+        for medium in release['medium-list']:
+          if found_medium:
+            break
+          for disc in medium['disc-list']:
+            if found_medium:
+              break
+            if disc['id'] == mbkey:
+              # matched disc
+              found_medium = medium
+              found_release = release
+      assert found_medium
+      A = {
+          'title':
+          found_release.get('title'),
+          'medium-count':
+          found_release['medium-count'],
+          'medium-position':
+          found_medium['position'],
+          'artist-credit':
+          found_release['artist-credit'],
+          'recordings': [
+              track['recording']['id']
+              for track in found_medium.get('track-list')
+          ],
+      }
 
-  def artist_names(self):
-    ''' Return a list of artist names.
-    '''
-    return [artist.artist_name for artist in self.artists()]
+    # store salient fields
+    k_tag_map = {
+        'name': onttype + '_name',
+        'artist-credit': 'artists',
+    }
+    k_tag_map_reverse = {v: k for k, v in k_tag_map.items()}
+    for k, v in A.items():
+      with Pfx("%s=%r", k, v):
+        if k == 'id':
+          assert v == mbkey, "A[%r]=%r != mbkey %r" % (k, v, mbkey)
+          continue
+        if k in ('begin-area', 'life-span', 'release-count'):
+          continue
+        if k in k_tag_map_reverse:
+          warning(
+              "SKIP %r=%r, would be overridden by k_tag_map_reverse[%r]=%r", k,
+              v, k, k_tag_map_reverse[k]
+          )
+          continue
+        tag_name = k_tag_map.get(k, k.replace('-', '_'))
+        if k in ('artist-credit-phrase', 'disambiguation', 'offset-list',
+                 'medium-count', 'medium-position', 'name', 'sort-name',
+                 'recordings', 'title', 'type'):
+          tag_value = v
+        elif k in ('length', 'sectors'):
+          tag_value = int(v)
+        elif k == 'artist-credit':
+          # list of artist ids
+          tag_name = 'artists'
+          artist_uuids = []
+          for credit in v:
+            if isinstance(credit, str):
+              try:
+                uu = UUID(credit)
+              except ValueError as e:
+                warning("discarding credit %r, not a UUID: %s", credit, e)
+              else:
+                artist_uuids.append(str(uu))
+            else:
+              artist_uuids.append(credit['artist']['id'])
+          tag_value = artist_uuids
+        elif k == 'tag-list':
+          # list of unique tag strings
+          tag_value = list(set(map(lambda tag_dict: tag_dict['name'], v)))
+        else:
+          warning("SKIP unhandled A record %r", k)
+          print(pformat(v))
+          continue
+        self[tag_name] = tag_value
+
+class MBArtist(_MBTagSet):
+  ''' A Musicbrainz artist entry.
+  '''
+
+class MBDisc(_MBTagSet):
+  ''' A Musicbrainz disc entry.
+  '''
+
+class MBRecording(_MBTagSet):
+  ''' A Musicbrainz recording entry.
+  '''
 
 class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
-  TagSetClass = MBTagSet
+  # map 'foo' frm 'meta.foo.bah' to a particular TagSet subclass
+  TAGSET_CLASSES = {
+      'artist': MBArtist,
+      'disc': MBDisc,
+      'recording': MBRecording,
+  }
+
+  def TagSetClass(self, *, name, **kw):
+    ''' Instead of a fixed class we use a factory to construct a
+        type specific instance.
+    '''
+    cls = None
+    meta1 = cutprefix(name, 'meta.')
+    if meta1 is not name:
+      type_name, _ = meta1.split('.', 1)
+      cls = self.TAGSET_CLASSES[type_name]
+    if cls is None:
+      cls = super().TagSetClass
+    te = cls(name=name, **kw)
+    return te
+
+  TagSetClass.singleton_also_by = _MBTagSet.singleton_also_by
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
@@ -330,35 +533,14 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
-  @pfx_method
-  def default_factory(self, name: str, *, unixtime=None):
-    te = super().default_factory(name, unixtime=unixtime)
-    assert te.name == name
-    mbdb = te.sqltags.mbdb
-    if name.startswith('meta.'):
-      try:
-        _, typename, _ = name.split('.', 2)
-      except ValueError:
-        pass
-      else:
-        fill_in = getattr(mbdb, '_fill_in_' + typename, None)
-        if fill_in:
-          fill_in(te)
-        else:
-          warning("no fill_in for typename=%r", typename)
-    return te
-
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
-
-  VARIOUS_ARTISTS_ID = '89ad4ac3-39f7-470e-963a-56509c546377'
 
   def __init__(self, mbdb_path=None):
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
-      sqltags.init()
       ont = self.ontology = TagsOntology(sqltags)
       self.artists = sqltags.subdomain('meta.artist')
       ont['type.artists'].update(type='list', member_type='artist')
@@ -367,15 +549,12 @@ class MBDB(MultiOpenMixin):
       self.recordings = sqltags.subdomain('meta.recording')
       ont['type.recordings'].update(type='list', member_type='recording')
 
-  def startup(self):
-    ''' Start up the `MBDB`: open the `SQLTags`.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Context manager for open/close.
     '''
-    self.sqltags.open()
-
-  def shutdown(self):
-    ''' Shut down the `MBDB`: close the `SQLTags`.
-    '''
-    self.sqltags.close()
+    with self.sqltags:
+      yield
 
   def find(self, criteria):
     ''' Find entities in the cache database.
@@ -383,12 +562,12 @@ class MBDB(MultiOpenMixin):
     return self.sqltags.find(criteria)
 
   @staticmethod
-  def _get(typename, db_id, includes, id_name='id', record_key=None):
+  def query(typename, db_id, includes=None, id_name='id', record_key=None):
     ''' Fetch data from the Musicbrainz API.
     '''
+    getter_name = f'get_{typename}_by_{id_name}'
     if record_key is None:
       record_key = typename
-    getter_name = f'get_{typename}_by_{id_name}'
     try:
       getter = getattr(musicbrainzngs, getter_name)
     except AttributeError:
@@ -397,10 +576,21 @@ class MBDB(MultiOpenMixin):
           pformat(dir(musicbrainzngs))
       )
       raise
-    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes):
+    if includes is None:
+      includes = ['tags']
+      warning(
+          "query(%r,..): no includes specified, using %r", typename, includes
+      )
+      help(getter)
+    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes, print=True):
       try:
         mb_info = getter(db_id, includes=includes)
-      except musicbrainzngs.InvalidIncludeError:
+      except musicbrainzngs.InvalidIncludeError as e:
+        warning("BAD INCLUDES: %s", e)
+        warning("help(%s):\n%s", getter_name, getter.__doc__)
+        raise
+      except musicbrainzngs.ResponseError as e:
+        warning("RESPONSE ERROR: %s", e)
         warning("help(%s):\n%s", getter_name, getter.__doc__)
         raise
       mb_info = mb_info[record_key]
@@ -412,120 +602,6 @@ class MBDB(MultiOpenMixin):
     with self.sqltags:
       if value is not None:
         tags.set(name, value)
-
-  @staticmethod
-  def tag_from_tag_list(tags, mb_dict):
-    ''' Set `tags.tag_list` from `mb_dict['tag-list'].
-    '''
-    tags.set(
-        'tags', [tag_elem['name'] for tag_elem in mb_dict.get('tag-list', ())]
-    )
-
-  @staticmethod
-  def tag_artists_from_credits(tags, mb_dict):
-    ''' Set `tags.artists` from `mb_dict['artist-credit']`.
-    '''
-    artist_credits = mb_dict.get('artist-credit')
-    if artist_credits is not None:
-      tags.set(
-          'artists', [
-              credit['artist']['id']
-              for credit in artist_credits
-              if not isinstance(credit, str)
-          ]
-      )
-
-  @typechecked
-  def _fill_in_artist(self, mb_tags: MBTagSet, force: bool = False):
-    assert mb_tags.name.startswith('meta.artist.')
-    artist_id = mb_tags.name.split('.', 2)[-1]
-    mb_tags['musicbrainz.artist_id'] = artist_id
-    A = None
-    if artist_id == self.VARIOUS_ARTISTS_ID:
-      A = {
-          'name': 'Various Artists',
-      }
-    else:
-      includes = []
-      for cached in 'tags', :
-        if force or cached not in mb_tags:
-          includes.append(cached)
-      if includes:
-        A = self._get('artist', artist_id, includes)
-    if A is not None:
-      self._tagif(mb_tags, 'artist_name', A.get('name'))
-      self._tagif(mb_tags, 'sort_name', A.get('sort-name'))
-      self.tag_from_tag_list(mb_tags, A)
-    return mb_tags
-
-  # pylint: disable=too-many-branches,too-many-locals
-  @typechecked
-  def _fill_in_disc(self, mb_tags: MBTagSet, force=False):
-    ''' Return the `disc.`*disc_id* entry.
-        Update from MB as required before return.
-    '''
-    ##force = True
-    assert mb_tags.name.startswith('meta.disc.')
-    disc_id = mb_tags.name.split('.', 2)[-1]
-    disc_tags = self.discs[disc_id]
-    disc_tags['musicbrainz.disc_id'] = disc_id
-    includes = []
-    for cached in 'artists', 'recordings':
-      if force or cached not in disc_tags:
-        includes.append(cached)
-    if includes:
-      D = self._get('releases', disc_id, includes, 'discid', 'disc')
-      assert D['id'] == disc_id
-      found_medium = None
-      found_release = None
-      for release in D['release-list']:
-        if found_medium:
-          break
-        for medium in release['medium-list']:
-          if found_medium:
-            break
-          for disc in medium['disc-list']:
-            if found_medium:
-              break
-            if disc['id'] == disc_id:
-              # matched disc
-              found_medium = medium
-              found_release = release
-      assert found_medium
-      medium_count = found_release['medium-count']
-      medium_position = found_medium['position']
-      self._tagif(disc_tags, 'title', found_release.get('title'))
-      self._tagif(disc_tags, 'medium_count', medium_count)
-      self._tagif(disc_tags, 'medium_position', medium_position)
-      self.tag_artists_from_credits(disc_tags, found_release)
-      if 'recordings' in includes:
-        track_list = found_medium.get('track-list')
-        if not track_list:
-          warning('no medium[track-list]')
-        else:
-          disc_tags.set(
-              'recordings', [track['recording']['id'] for track in track_list]
-          )
-    return disc_tags
-
-  @typechecked
-  def _fill_in_recording(self, mb_tags: MBTagSet, force=False):
-    ''' Return the recording for `recording_id`.
-    '''
-    ##force = True
-    assert mb_tags.name.startswith('meta.recording.')
-    recording_id = mb_tags.name.split('.', 2)[-1]
-    mb_tags['musicbrainz.recording_id'] = recording_id
-    includes = []
-    for cached in 'artists', 'tags':
-      if force or cached not in mb_tags:
-        includes.append(cached)
-    if includes:
-      R = self._get('recording', recording_id, includes)
-      self._tagif(mb_tags, 'title', R.get('title'))
-      self.tag_from_tag_list(mb_tags, R)
-      self.tag_artists_from_credits(mb_tags, R)
-    return mb_tags
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

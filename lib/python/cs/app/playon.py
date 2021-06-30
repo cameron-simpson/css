@@ -47,6 +47,9 @@ DEFAULT_FILENAME_FORMAT = (
     '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
+# download parallelism
+DEFAULT_DL_PARALLELISM = 2
+
 def main(argv=None):
   ''' Playon command line mode.
   '''
@@ -63,6 +66,7 @@ class PlayOnCommand(BaseCommand):
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
 
   USAGE_KEYWORDS = {
+      'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
       'LS_FORMAT': LS_FORMAT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
@@ -127,21 +131,32 @@ class PlayOnCommand(BaseCommand):
       print(k, pformat(v))
 
   def cmd_dl(self, argv):
-    ''' Usage: {cmd} [-n] [recordings...]
+    ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
           Download the specified recordings, default "pending".
-          -n  No download. List the specified recordings.
+          -j jobs   Run this many downloads in parallel.
+                    The default is {DEFAULT_DL_PARALLELISM}.
+          -n        No download. List the specified recordings.
     '''
     options = self.options
     sqltags = options.sqltags
+    dl_jobs = DEFAULT_DL_PARALLELISM
     no_download = False
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      no_download = True
+    opts, argv = getopt(argv, 'j:n')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-j':
+          dl_jobs = int(val)
+          if dl_jobs < 1:
+            raise GetoptError(f"invalid jobs, should be >= 1, got: {dl_jobs}")
+        elif opt == '-n':
+          no_download = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
     filename_format = options.filename_format
-    sem = Semaphore(2)
+    sem = Semaphore(dl_jobs)
 
     @typechecked
     def _dl(dl_id: int, sem):
@@ -195,10 +210,8 @@ class PlayOnCommand(BaseCommand):
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
         recording = sqltags[dl_id]
-        if R():
-          print("OK ", dl_id, recording.download_path)
-        else:
-          print("BAD", dl_id)
+        if not R():
+          print("FAILED", dl_id)
           xit = 1
 
     return xit
@@ -570,13 +583,14 @@ class PlayOnAPI(MultiOpenMixin):
   def login_state(self):
     ''' The login state, a `dict`. Performs a login if necessary.
     '''
-    state = self._login_state
-    if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
-      self._login_state = None
-      self._jwt = None
-      # not logged in or login about to expire
-      state = self._login_state = self._dologin()
-      self._jwt = state['token']
+    with self._lock:
+      state = self._login_state
+      if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
+        self._login_state = None
+        self._jwt = None
+        # not logged in or login about to expire
+        state = self._login_state = self._dologin()
+        self._jwt = state['token']
     return state
 
   @pfx_method
@@ -851,7 +865,7 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with Pfx("open(%r,'wb')"):
+      with Pfx("open(%r,'wb')", filename):
         with open(filename, 'wb') as f:
           for chunk in progressbar(
               dl_rsp.iter_content(chunk_size=131072),
@@ -859,17 +873,19 @@ class PlayOnAPI(MultiOpenMixin):
               total=dl_length,
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
+              report_print=True,
           ):
             offset = 0
             length = len(chunk)
-            while length > 0:
-              with Pfx("write %d bytes", length):
-                written = f.write(chunk[offset:length])
+            while offset < length:
+              with Pfx("write %d bytes", length - offset):
+                written = f.write(chunk[offset:])
                 if written < 1:
-                  warning("write %d bytes")
+                  warning("less than 1 bytes written: %d", written)
                 else:
                   offset += written
-                  length -= written
+                  assert offset <= length
+            assert offset == length
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:

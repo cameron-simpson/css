@@ -42,7 +42,7 @@ from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import LoadableMappingMixin, UUIDedDict
+from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.progress import Progress, progressbar
@@ -1780,12 +1780,12 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
-  ''' A subclass of `LoadableMappingMixin` which maintains records
+class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
+  ''' A subclass of `IndexedSetMixin` which maintains records
       from a newline delimited JSON file.
   '''
 
-  loadable_mapping_key = 'uuid'
+  IndexedSetMixin__pk = 'uuid'
 
   # pylint: disable=unused-argument
   @staticmethod
@@ -1822,7 +1822,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
         type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
     )
 
-  def scan_mapping(self):
+  def scan(self):
     ''' Scan the backing file, yield records.
     '''
     if existspath(self.__ndjson_filename):
@@ -1831,14 +1831,14 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
                                 error_list=self.scan_errors):
         yield record
 
-  def append_to_mapping(self, record):
+  def add_backend(self, record):
     ''' Append `record` to the backing file.
     '''
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
 
-  def rewrite_mapping(self):
+  def rewrite_backend(self):
     ''' Rewrite the backing file.
 
         Because the record updates are normally written in append mode,
@@ -1851,7 +1851,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
           T.write(record.as_json())
           T.write('\n')
         T.flush()
-      self.scan_mapping_length = i
+      self.scan_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests

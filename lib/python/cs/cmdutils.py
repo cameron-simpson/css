@@ -292,10 +292,13 @@ class BaseCommand:
       if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
-          raise GetoptError(
-              "missing subcommand, expected one of: %s" %
-              (', '.join(sorted(subcmds.keys())),)
-          )
+          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          if not default_argv:
+            raise GetoptError(
+                "missing subcommand, expected one of: %s" %
+                (', '.join(sorted(subcmds.keys())),)
+            )
+          argv = list(default_argv)
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
@@ -321,7 +324,7 @@ class BaseCommand:
         main_context = Pfx(subcmd)
       else:
         try:
-          main = lambda: self.main(argv, **kw)
+          main = lambda: self.main(argv)
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
         main_cmd = cmd

@@ -1,4 +1,9 @@
 TagFile: should subclass MappingTagSets
+TagsOntology: reverse prefix mappings
+cs.app.playon: keep playon recording info as ontology, distinct from state db
+TagsOntology: accept directory, process files within, deduce prefix from filename, ONTOLOGY.sqlite for the default
+gitlog - record the branch too - maybe totally record dlog
+extended prime seive impl?
 TagSet.subtags: subclass PrefixedMappingProxy also
 let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
 cs.pop3: buffering for the SSL mode

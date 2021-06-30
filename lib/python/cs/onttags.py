@@ -59,11 +59,11 @@ class OntCommand(TagsOntologyCommand):
     ont_path = options.ont_path
     if ont_path is None:
       ont_path = options.ont_path = expanduser(ONTTAGS_PATH_DEFAULT)
-    with Ont(ont_path) as ont:
-      with stackattrs(options, ontology=ont):
-        yield
+    ont = Ont(ont_path)
+    with stackattrs(options, ontology=ont):
+      yield
 
-class Ont(TagsOntology, MultiOpenMixin):
+class Ont(TagsOntology):
   ''' A `TagsOntology` based on a persistent store.
   '''
 
@@ -75,7 +75,7 @@ class Ont(TagsOntology, MultiOpenMixin):
 
   @staticmethod
   def tagsets_from_path(ont_path):
-    ''' Return a `TagSets` instance from `ont_path`,
+    ''' Return a `BaseTagSets` instance from `ont_path`,
         provided for subclassing.
     '''
     if not isfilepath(ont_path):
