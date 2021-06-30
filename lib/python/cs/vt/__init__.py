@@ -83,7 +83,6 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.seq',
-        'cs.serialise',
         'cs.socketutils',
         'cs.threads',
         'cs.tty',
@@ -290,10 +289,10 @@ class _TestAdditionsMixin:
     else:
       self.assertEqual(olen, length, *a, **kw)
 
-  def assertIsOrdered(self, s, reverse, strict=False):
+  def assertIsOrdered(self, s, strict=False):
     ''' Assertion to test that an object's elements are ordered.
     '''
     self.assertTrue(
-        isordered(s, reverse, strict),
-        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s)
+        isordered(s, strict=strict),
+        "not ordered(strict=%s): %r" % (strict, s)
     )

@@ -1,0 +1,2 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init_subclass__: behave sanely if the subclass has no initial __doc__
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new .run_argv convenience method, obviates the "def main" boilerplate

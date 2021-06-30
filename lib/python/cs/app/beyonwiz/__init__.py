@@ -4,8 +4,7 @@ r'''
 Beyonwiz PVR and TVWiz recording utilities.
 
 Classes to support access to Beyonwiz TVWiz and Enigma2 on disc data
-structures and to access Beyonwiz devices via the net. Also support for
-newer Beyonwiz devices running Enigma and their recording format.
+structures and to access Beyonwiz devices via the net.
 '''
 
 from abc import ABC, abstractmethod
@@ -23,6 +22,7 @@ from cs.app.ffmpeg import (
     ConversionSource as FFSource,
 )
 from cs.deco import strable
+from cs.fileutils import crop_name
 from cs.fstags import HasFSTagsMixin
 from cs.logutils import info, warning, error
 from cs.mediainfo import EpisodeInfo
@@ -36,7 +36,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'requires': [
+    'install_requires': [
         'cs.app.ffmpeg',
         'cs.binary',
         'cs.deco',
@@ -53,6 +53,8 @@ DISTINFO = {
         ],
     },
 }
+
+DEFAULT_FORMAT = 'mp4'
 
 # UNUSED
 def trailing_nul(bs):
@@ -130,10 +132,10 @@ class RecordingMetaData(NS):
   def as_tags(self, prefix=None):
     ''' Generator yielding the metadata as `Tag`s.
     '''
-    yield from (Tag.with_prefix(tag, None, prefix=prefix) for tag in self.tags)
+    yield from (Tag(tag, prefix=prefix) for tag in self.tags)
     yield from self.episodeinfo.as_tags(prefix=prefix)
     for rawkey, rawvalue in self.raw.items():
-      yield Tag.with_prefix(rawkey, jsonable(rawvalue), prefix=prefix)
+      yield Tag(rawkey, jsonable(rawvalue), prefix=prefix)
 
   @property
   def start_dt(self):
@@ -194,7 +196,13 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     if format is None:
       format = self.DEFAULT_FILENAME_BASIS
-    return format.format_map(self.metadata.ns()) + ext
+    if not ext.startswith('.'):
+      ext = '.' + ext
+    return crop_name(
+        format.format_map(self.metadata.ns()
+                          ).replace('\r', '_').replace('\n', '_') + ext,
+        ext=ext
+    )
 
   @abstractmethod
   def data(self):
@@ -253,10 +261,12 @@ class _Recording(ABC, HasFSTagsMixin):
     )
 
   def convert(
-      self, dstpath, dstfmt='mp4', max_n=None, timespans=(), extra_opts=None
+      self, dstpath, dstfmt=None, max_n=None, timespans=(), extra_opts=None
   ):
     ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
     '''
+    if dstfmt is None:
+      dstfmt = DEFAULT_FORMAT
     if not timespans:
       timespans = ((None, None),)
     srcfmt = 'mpegts'
@@ -333,24 +343,24 @@ class _Recording(ABC, HasFSTagsMixin):
         ok = False
       return ok
 
-  def ffmpeg_metadata(self, dstfmt='mp4'):
+  def ffmpeg_metadata(self, dstfmt=None):
     ''' Return a new `FFmpegMetaData` containing our metadata.
     '''
+    if dstfmt is None:
+      dstfmt = DEFAULT_FORMAT
     M = self.metadata
-    comment = 'Transcoded from %r using ffmpeg. Recording date %s.' \
-              % (self.path, M.start_dt_iso)
+    comment = f'Transcoded from {self.path!r} using ffmpeg.'
+    recording_dt = M.get('file.datetime')
+    if recording_dt:
+      comment += f' Recording date {recording_dt.isoformat()}.'
     if M.tags:
-      comment += ' tags={%s}' % (','.join(sorted(M.tags)),)
-    episode_marker = str(M.episodeinfo)
+      comment += ' tags=' + ','.join(sorted(M.tags))
+    ## unused ## episode_marker = str(M.episodeinfo)
     return FFmpegMetaData(
         dstfmt,
-        title=(
-            '%s: %s' % (M.series_name, episode_marker)
-            if episode_marker else M.series_name
-        ),
-        show=M.series_name,
-        episode_id=episode_marker,
-        synopsis=M.description,
-        network=M.source_name,
+        title=M['meta.title'],
+        show=M['meta.title'],
+        synopsis=M['meta.description'],
+        network=M['file.channel'],
         comment=comment,
     )

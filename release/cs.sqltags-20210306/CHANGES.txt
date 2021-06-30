@@ -1,0 +1,236 @@
+lib/python/cs/sqltags.py: cs.sqltags: new module akin to cs.fstags, but for storing large numbers of tagged entities in a database, for example an SQLite file; entities may be named or unnamed (==> log entries)
+lib/python/cs/sqltags.py: cs.sqltags: now get the unixtime <=> datetime stuff from cs.dateutils.UNIXTimeMixin
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find subcommand and associated database query methods
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.with_tags: clean up
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.fstags: Entities.with_tags: implement select-by-multiple tag choices, still buggy for negative selections
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find, SQLTagsORM.by_tags: support returning the tags of the found entities
+lib/python/cs/sqltags.py: cs.sqltags: TaggedEntity: subclass FormatableMixin, implement format_kwargs
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: implement the output_format
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: Entities.add_tag: if the entity is new, flush it to obtain an id for use in the tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: make "-f db_url" optional, with defaults from $SQLTAGS_DBURL or '~/var/sqltags.sqlite'
+lib/python/cs/sqltags.py: cs.sqltags: sqltags log: new "-D strptime_format" option to parse the timestamp from the start of the headline
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.by_tags: fix recognition of bare tags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.value_test: return None, None if other_value is None
+lib/python/cs/sqltags.py: cs.sqltags: improve module docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: bugfix strptime cleanup
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.__init__: set self.Session before calling self.define_schema()
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: new .metanode property, make_metanode and get_modenode methods (the metanode as id=0 and is holds the metadata for the database as a whole)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: apply the new @orm_method decorator to some methods
+lib/python/cs/sqltags.py: cs.sqltags: TaggedEntity moved to cs.tagset
+lib/python/cs/sqltags.py: cs.sqltags: fixup __main__ mode
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: now yields `TaggedEntity` instances
+lib/python/cs/sqltags.py: cs.sqltags: docstring fixes and a __str__ tweak
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: adjust for SQLTags.find now returning TaggedEntity instances
+lib/python/cs/sqltags.py: cs,sqltags: new SQLTagsCommand.cmd_export to subcommand to export entities in CSV format
+lib/python/cs/sqltags.py: cs.sqltags: fix up imports
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: accept bare file paths as db_url, convert to sqlite URL; take a lock file in startup; new "init" subcommand; only call define_schema from "init" subcommand or if the filepath does not exist
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: avoid shadowing `options`
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.startup: makelockfile: poll every 0.2s, better response, not too onerous
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new add_tagged_entity and import_csv_file methods
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: new cmd_import subcommand to import CSV data in the same format as emitted by cmd_export
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: log: do not print out the logged Entities
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.cmd_import: fix usage typo
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: Entities: new by_name method returns a name query, modify by_tags to use this; both accept an optional existing query to extend
+lib/python/cs/sqltags.py: cs.sqltags: Entities: split the with_tags feature out of by_tags as separate method, and modify SQLTags.find to match
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.add_tagged_entity: auto session, make sure the new `Entities` row is added to the session
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: no db rows should escape from this class; new _run_query method with common code to run a query and yield TaggedEntity instances; make find, get, __getitem__ use this and all return TaggedEntity instances
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.get: raise TypeError if not given an int (for .id) or a str (for .name)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.by_tags: indentation fix for return value, was returning None if there were no Tag choices
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: changes and simplifications related to getting TaggedEntity from SQLTags methods
+lib/python/cs/sqltags.py: cs.sqltags: drop unused variable
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: merge default ==> sqltags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: fold newlines in the output into spaces, bit of a hack
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_tag: bugfix variable name
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: move "default db URL" logic into new SQLTags.indef_db_url method for reuse
+lib/python/cs/sqltags.py: cs.sqltags: module local TagSet class subclassing cs.tagset.TagSet and applying db changes on set/discard
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.import_csv_file: fix db session use
+lib/python/cs/sqltags.py: cs/sqltags: SQLTags.get: fix session query
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: default value for db_url
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: Tags: UniqueConstraint('entity_id', 'name'): only one tag name per entity - complex values in the structured_value column
+lib/python/cs/sqltags.py: cs.sqltags: update TaggedEntity and TagSet use
+lib/python/cs/sqltags.py: cs.sqltags: lint and docstrings
+lib/python/cs/sqltags.py: cs.sqltags: new TagChoice class subclassing cs.tagset.TagChoice with .extend_query method to extend a query with a JOIN for s epcific Tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: add .TAG_CHOICE_CLASS attribute specifying the new TagChoice subclass
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.find: return both the SQL Query and other_criteria not expressable with SQL for later application to the query results; the JOIN logic is now in the criteria .extend_query method
+lib/python/cs/sqltags.py: cs.fstags,cs.sqltags: parse_tag_choices is now called parse_tagset_criteria
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: -o: no config for resolving named output_formats
+lib/python/cs/sqltags.py: cs.sqltags: FIND_OUTPUT_FORMAT_DEFAULT: entity.isotime is now entity.isodatetime
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.run_context: push verbose=True onto the options
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: Entities.by_tags: distinguish between no `name` parameter and name=None - do not constrain to "log" entries if `name` not suppplied
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .db_query1 to prepare a query to look up an Entities instance by name or id, new .db_entity to fetch an Entities instance by name or id, refactor .get and .__contains__ to use these
+lib/python/cs/sqltags.py: cs.sqltags: TagSet subclass new SQLTagSet for clarity, new SQLTaggedEntity subclassing TaggedEntity, both now singletons; plumb TagSet.set,discard to new db methods
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.add_tagged_entity: when checking the import `te`, look up the existing SQLTaggedEntity by name in preference to id if not None
+lib/python/cs/sqltags.py: cs.sqltags: autoformat, lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: initial cmd_edit method
+lib/python/cs/sqltags.py: cs.sqltags: SQLTaggedEntity.db_entity: fix call to SQLTags.db_entity
+lib/python/cs/sqltags.py: cs.sqltags: lint
+lib/python/cs/sqltags.py: cs.sqltags: first use of @typeguard.typechecked decorator!
+lib/python/cs/sqltags.py: cs.sqltags: refactor the TagSetCriterion stuff to use the local SQLTagSetCriterion subclasses and hook into the new parsing stuff from cs.tagset
+lib/python/cs/sqltags.py: cs.sqltags: the .extend_query method is back to returning just an extended query - all criteria are matched against the returned TaggedEntities post the query
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities.tags: return an `SQLTagSet` instead of a plain `TagSet`, which means it can be used to affect the database
+lib/python/cs/sqltags.py: cs.sqltags: rename tag_choice to tag_criteria, they're more general now
+lib/python/cs/sqltags.py: cs.sqltags,tagset: abstract methods raise NotImplementedError
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_tag: parse TagChoices from the command line
+lib/python/cs/sqltags.py: cs.fstags: FSTagsCommand.cmd_tag: fix parse of TagChoice from command line; cs.sqltags: matching optimisation
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_tag: fix variable name
+lib/python/cs/sqltags.py: merge default ==> sqltags
+lib/python/cs/sqltags.py: cs.tagset,fstags,sqltags: replace TagChoice with a general purpose TagBasedTest supporting various operators
+lib/python/cs/sqltags.py: cs.tagset,fstags,sqltags: common TagsCommandMixin.parse_tag_choices
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.run_context: provide an SQLAlchemy session
+lib/python/cs/sqltags.py: cs.sqltags: clean lint, drop redundant class
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.extend_query: ~ (contains) only tests for tag presence, let .match winnow the results (TODO: JSON list membership test?)
+lib/python/cs/sqltags.py: cs.sqltags: use cs.threads.State for the "state" global
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.parse_tagset_criteria: override the super parser to accept a single bare int indicating a row id
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: update to new parse_tagset_criteria signature; SQLTags.find: handle criteria being a single int indicating a row id
+lib/python/cs/sqltags.py: merge default ==> sqltags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: bugfix for new parse_tagset_criteria return
+lib/python/cs/sqltags.py: cs.sqltags,cs.tagset: rename TagSetCriterion to TaggedEntityCriterion
+lib/python/cs/sqltags.py: cs.sqltags: SQLParameters: namedtuple with the parameters required to construct SQL queries to implement criteria
+lib/python/cs/sqltags.py: cs.sqltags: SQTEntityIdTest and SQLTagBasedTest: new implementations with sql_parameters and match_tagged_entity methods
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_find: drop the tags from the top line, list then below in subsequent indented lines
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.parse_tagset_criterion: update the parse implementation
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities.search now replaces by_name and by_tags and with_tags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: make find directly wrap SQLTagsORM.search, drop _run_query, reimpleent get, __contains__, __getitem__ using find
+lib/python/cs/sqltags.py: cs.sqltags: drop SQLTags.db_query1, unused
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: ~/ regexp test support (initial) and SQL support for tests of the name and unixtime
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .init method to define the schema and/or create the db; SQLTagsCommand.cmd_init: adjust call to match
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new add(name) and make(name) methods for creating and creating-if-necessary tagged entities
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: use SQLTags.add
+lib/python/cs/sqltags.py: cs.sqltags: new SQLTagsSubdomain, a proxy for a subset of entity names with a prefix; new SQLTags.subdomain method to obtain one
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: fix calls to SQLTags.find
+lib/python/cs/sqltags.py: cs.sqltags: better raise
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: fix post-headline Tag parse
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: tweak messaging, also in SQLTagBasedTest
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: fix calls to TaggedEntity.set
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.add: fix call to Entities.add_tag
+lib/python/cs/sqltags.py: cs.sqltags: clean lint, autoformat, add type annotation
+lib/python/cs/sqltags.py: cs.sqltags: drop debug
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.open/close to push/pop the cs.sqlalchemy_utils orm state
+lib/python/cs/sqltags.py: cs.sqltags: move SQLTags to below SQLTagSet and SQLTaggedEntity so that the default TaggedEntity subclass SQLTaggedEntity can be the TaggedEntityClass attribute of SQLTags; make SQLTags.find use that, overridable by a `cls` parameter
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: implement SQL side ~ glob  matching by transmuting into LIKE
+lib/python/cs/sqltags.py: cs.sqltags: rename tag_value to cmp_value for consistency, autoformat, tweak usage message
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__init__: pass the positional arguments through
+lib/python/cs/sqltags.py: cs.sqltags: autoformat
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Tags.pick_value: return float_value as an int if int(float_value) == float_value
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: subdomain support now comes from the TaggedEntities superclass
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: rename "e" to "te" for consistency
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: drop without_tags support
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__contains__ now comes from the superclass
+lib/python/cs/sqltags.py: cs.sqltags: implement SQLTags.keys, returning the names - "log" entities will be ignored
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: handles int indices specially (they are row ids) and pass other indices to the superclass __getitem__ (which can autocreate)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: drop the make() method and instead provide default_factory to support the superclass entity autocreation
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__init__ accept an optional ontology parameter, default it to use ourself as the ontology
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: move the default_factory up the top
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags now subclasses TaggedEntities
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__init__: new optional _ontology parameter, default uses self.sqltags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.SQL_TAG_VALUE_COMPARISON_FUNCS['~']: fix string_value IS NOT NULL test
+lib/python/cs/sqltags.py: cs.sqltags: update imports and DISTINFO, clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTaggedEntity: put SingletonMixin first, shuffle __init__ args for readability
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: accept optional tags, redo with create-or-update logic
+lib/python/cs/sqltags.py: cs.sqltags: dry up SQLTaggedEntity.name property: use self.db_entity() method
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: move .add, .get and .__getitem__ up the top and modify their implementations, particularly .add which is now a shim for default_factory; add .keys()
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: drop the optional `cls` parameter - always use self.TaggedEntityClass
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: rename add_tagged_entity to import_tagged_entity to clarify its purpose and funtion
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.import_tagged_entity: rework the logic
+lib/python/cs/sqltags.py: cs.*: rename TaggedEntity to TagSet towards their merge
+lib/python/cs/sqltags.py: cs.fstags,sqltags,tagset: rename TaggedEntities to TagSets a part of the merge
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: fix calls to SQLTagSet()
+lib/python/cs/sqltags.py: cs.sqltags: drop obsolete SQLTagSet now part of the main SQLTagSet class
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: implement .st and .discard aware of the database backend
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.set,discard: special case name and unixtime
+lib/python/cs/sqltags.py: cs.sqltags: SQTEntityIdTest: implement __str__
+lib/python/cs/sqltags.py: cs.sqltags: drop some references to SQLTagSet.tags, no longer a separate subobject
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.run_context: establish an ORM session
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: get the ORM session from options
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: id, name, unixtime treated specially (not in the "tags" table)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet._singleton_key: correct spelling of `_id` parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: rename db_entity property to get_db_entity(session) method, plumb session
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__init__: set up .orm and .ontology correctly
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: add the new entity to the session immediately
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: drop .add(), superceded by default_factory
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.get: plumb the session to self.find
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: supply _id and _ontology to the new SQLTagSet
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand.cmd_log: refactor the main logging loop a bit (plus indent changes from earlier session reshuffle)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: add an assertion that the new entity was found in the db after creation
+lib/python/cs/sqltags.py: cs.sqltags: hash SQLTagSets on thier id, they're singletons
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.add,discard: handle verbose parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: fall back to self.__missing__ for non-int keys
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__init__: update for new __setattr__ behaviour
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__setitem__: dummy implementation with sanity checks because the factory does the database insert
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.__init__: adapt for new getattr returning None
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: call default_factory directly, do not need __setitem__ call because the factory inserts into the db
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsCommand: discard unsed variable, autoformat
+lib/python/cs/sqltags.py: cs.sqltags: SQLParameters: drop .table (not used), improve docstring
+lib/python/cs/sqltags.py: cs.sqltags: new SQLTagProxy and SQLTagProxies; the latter is the initial hook allowing attribute based access to dotted tags names; the former manages a specific tag name, allows further dotted access to subtag names, and emits an SQLParameters instance when compared to a value
+lib/python/cs/sqltags.py: cs.sqltags: drop redundant variables, formating tweak
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: attach an SQLTagProxies to the .tags attribute
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy.__getattr__: return an SQLTagProxy for self._tag_name+'.'+sub_tag_name
+lib/python/cs/sqltags.py: cs.sqltags: previous diff was just moving the method, here is the delete half
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.keys: accepts new optional `prefix` parameter, does a raw SELECT to look up the entity names
+lib/python/cs/sqltags.py: cs.sqltags: fix imports, clean a little lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy: implement .startswith, provide docstring and doctest for __eq__ and .startswith
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy: new by_op_text(op_text,other) method accepting a comparison operator string as from the comparison syntax, eg by_op_text('<',9)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy: add __ne__ and friends, autoformat, make doctests more readable, fix import
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.sql_parameters: use SQLTagProxy.by_op_text() to prepare the tag base comparison SQLParameters
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy.op_by_text: include '~':self.globlike, although that is yet to be written
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new sql_session context manager to create an SQLAlchemy session for the duration of a suite - helps with multithreaded client code; adjust import
+lib/python/cs/sqltags.py: cs.sqltags: port to new cs.cmdutils API
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.__init__: set "echo" on the engine based on the presence of "echo" in the new $SQLTAGS_MODES environment variable
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy: plumb an optional table alias through the comparison functions to support combining them in the same query alias
+lib/python/cs/sqltags.py: cs.sqltags: SQTCriterion: new SQL_COMPLETE attribute indicating, if true, that an SQL query need not be followed up with a post test via match_tagged_entity
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.sql_parameters: optional alias parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.match_tagged_entity: bugfix for tag_value=None test, should test presence of tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.SQL_TAG_VALUE_COMPARISON_FUNCS: bugfix '=' when cmp_value=None
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: refactor the query generation - bundle conditions for the same tag together, treat tag based tests specially
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: test criteria for SQL_COMPLETE status, only run post checks for those which it is false
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.value setter: bugfix for datetime
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest: add SQL_ID_VALUE_COMPARISON_FUNCS, presently unused
+lib/python/cs/sqltags.py: cs.sqltags: add missing import
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagProxy.likeglob: produce a LIKE expression matching a "*" glob
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.sql_parameters: use as_unixtime with unixtime', autoformat, use tag_name and tag_value throughout
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.match_tagged_entity: use as_unixtime() against 'unixtime'
+lib/python/cs/sqltags.py: cs.sqltags: add missing import
+lib/python/cs/sqltags.py: merge default ==> sqltags
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand.parse_tagset_criterion is a class method
+lib/python/cs/sqltags.py: cs.sqltags: BaseSQLTagsCommand: replace boilerplate apply_opts with simpler apply_opt method
+lib/python/cs/sqltags.py: cs.sqltags: new prefix2like(prefix[,esc]) returning an SQL LIKE pattern string
+lib/python/cs/sqltags.py: cs.sqltags: prefix2like._cmp: startswith: use prefix2like()
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.keys: honour the `prefix` parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new parent_tagset and child_tagsets methods for finding related SQLTagSets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .items() and .values() mapping methods accepting an optional `prefix` parameter
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new __str__; SQLTags: fix docstring, autoformat
+lib/python/cs/sqltags.py: cs.sqltags: move BaseSQLTagsCommand and SQLTagsCommand to the bottom, after other classes; add new BaseSQLTagsCommand.TAGSETS_CLASS for use by find() when assembling entities
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: accept a single str criterion; items() and values(): make efficient by calling find()
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: define secondary indices on 'id' and 'name' via ._singleton_also_indexmap; check these indices from .get() before falling back to querying the database
+lib/python/cs/sqltags.py: cs.sqltags: type check SQLTagSet.__init__, tweak some __str__ implementations
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: make an SQLAState to track the current Thread's session state, and automake a new session if required on __enter__
+lib/python/cs/sqltags.py: cs.sqltags: tweak import of cs.threads.State, call it ThreadState
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: keep the stack of peading teardowns as a thread local state
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: rename .get_db_entity to ._get_db_entity
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .flush() method to flush the current session
+lib/python/cs/sqltags.py: cs.sqltags: move the metanode methods from SQLTagsORM to SQLTags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new ._session property getting the current per-Thread session, small fixes for __enter__ and __exit__
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagBasedTest.SQL_TAG_VALUE_COMPARISON_FUNCS: suppress lint warning about ==None, this is deliberate to use SQLAlchemy column comparison
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: remove all the session plumbing, we now use the per-SQLTags per-Thread shared state
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: drop startup and shutdown, the ORM is set up in __init__ and the shared state is per Thread and maintained in __enter__/__exit__
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: drop redundant assignments
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities.{tag_rows,tags}: drop, unused
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: turn the Entities.search class method into a normal SQLTagsORM.search method
+lib/python/cs/sqltags.py: cs.sqltags: drop SQLTags.make_metanode, replace with SQLTagsORM.prepare_metanode; just keep the convenience SQLTags.metanode property
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities.add_tag: do not make an intermediate Tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.add_db_tag: pass the current session in to Entities.add_tag
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: search now comes from the ORM, not the Entities mapping within it
+lib/python/cs/sqltags.py: cs.sqltags: SingletonMixin.singleton_also_by is now public
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet.discard_db_tag: pass the current session in to SQLTagsORM.discard_tag
+lib/python/cs/sqltags.py: cs.sqltags: tidy imports, clean lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: mention creation of new database
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: Tags: drop id column, make (entity_id,name) the primary key
+lib/python/cs/sqltags.py: cs.sqltags: update imports
+lib/python/cs/sqltags.py: cs.sqltags: update DISTINFO

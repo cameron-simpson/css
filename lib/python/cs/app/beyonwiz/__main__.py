@@ -11,7 +11,7 @@ from pprint import pformat
 import sys
 from cs.cmdutils import BaseCommand
 from cs.pfx import Pfx
-from . import Recording
+from . import Recording, DEFAULT_FORMAT
 from .tvwiz import TVWiz
 from .wizpnp import WizPnP
 
@@ -20,14 +20,13 @@ TRY_N = 32
 def main(argv=None, cmd=None):
   ''' Main command line.
   '''
-  return BWizCmd().run(argv, cmd=cmd)
+  return BWizCmd(argv, cmd=cmd).run()
 
 class BWizCmd(BaseCommand):
   ''' Command line handler.
   '''
 
-  @staticmethod
-  def cmd_cat(args, options):
+  def cmd_cat(self, args):
     ''' Output the tvwiz transport stream data.
 
         Usage: {cmd} tvwizdirs...
@@ -45,8 +44,7 @@ class BWizCmd(BaseCommand):
       stdout_bfp.close()
     return 0
 
-  @staticmethod
-  def cmd_convert(args, options):
+  def cmd_convert(self, args):
     ''' Convert a recording to MP4.
 
         Usage: {cmd} recording [start..end]... [output.mp4]
@@ -94,8 +92,7 @@ class BWizCmd(BaseCommand):
       R = Recording(srcpath)
       return 0 if R.convert(dstpath, max_n=TRY_N, timespans=timespans) else 1
 
-  @staticmethod
-  def cmd_mconvert(args, options):
+  def cmd_mconvert(self, args):
     ''' Usage: {cmd} recording...
           Convert multiple named recordings to automatically named .mp4 files
           in the current directory.
@@ -111,8 +108,7 @@ class BWizCmd(BaseCommand):
           xit = 1
     return xit
 
-  @staticmethod
-  def cmd_meta(args, options):
+  def cmd_meta(self, args):
     ''' Usage: {cmd} recording...
           Report metadata for the supplied recordings.
     '''
@@ -124,11 +120,10 @@ class BWizCmd(BaseCommand):
         print(filename)
         print(pformat(R.metadata))
         print(R.DEFAULT_FILENAME_BASIS)
-        print(R.filename(ext='.mp4'))
+        print(R.filename(ext=DEFAULT_FORMAT))
     return 0
 
-  @staticmethod
-  def cmd_scan(args, options):
+  def cmd_scan(self, args):
     ''' Scan a TVWiz directory.
 
         Usage: {cmd} recording...
@@ -162,8 +157,7 @@ class BWizCmd(BaseCommand):
       print("  total %d" % total)
     return 0
 
-  @staticmethod
-  def cmd_stat(args, options):
+  def cmd_stat(self, args):
     ''' Report information about a recording.
 
         Usage: {cmd} tvwizdirs...
@@ -179,8 +173,7 @@ class BWizCmd(BaseCommand):
           print(" ", json_line)
     return 0
 
-  @staticmethod
-  def cmd_test(args, options):
+  def cmd_test(self, args):
     ''' Usage: {cmd}
           Run unit tests.
     '''

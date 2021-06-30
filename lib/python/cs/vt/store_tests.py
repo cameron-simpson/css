@@ -14,7 +14,10 @@ from os.path import join as joinpath
 import random
 import sys
 import tempfile
+import threading
+from time import sleep
 import unittest
+from cs.context import stackkeys
 from cs.debug import thread_dump
 from cs.logutils import setup_logging
 from cs.pfx import Pfx
@@ -22,7 +25,7 @@ from cs.randutils import rand0, randbool, make_randblock
 from . import _TestAdditionsMixin
 from .cache import FileCacheStore, MemoryCacheStore
 from .index import class_names as get_index_names, class_by_name as get_index_by_name
-from .hash import HASHCLASS_BY_NAME
+from .hash import HashCode, HASHCLASS_BY_NAME
 from .socket import (
     TCPStoreServer, TCPClientStore, UNIXSocketStoreServer,
     UNIXSocketClientStore
@@ -30,119 +33,149 @@ from .socket import (
 from .store import MappingStore, DataDirStore, ProxyStore
 from .stream import StreamStore
 
-##from cs.debug import thread_dump
+HASHCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__HASHCLASS_NAMES'
+INDEXCLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__INDEXCLASS_NAMES'
+STORECLASS_NAMES_ENVVAR = 'VT_STORE_TESTS__STORECLASS_NAMES'
 
-# test all classes if empty, just the listed classes if not empty
-STORE_CLASS_TESTS = ()  ## (ProxyStore,)
+# constrain the tests if not empty, try every permutation if empty
+HASHCLASS_NAMES = tuple(
+    os.environ.get(HASHCLASS_NAMES_ENVVAR, '').split()
+    or sorted(HashCode.by_name.keys())
+)
+INDEXCLASS_NAMES = tuple(
+    os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
+)
+STORECLASS_NAMES = tuple(os.environ.get(STORECLASS_NAMES_ENVVAR, '').split())
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
+      Yield `(subtest,Store)` tuples.
+
+      `subtest` is a dict containing decriptive fields for `unittest.subtest()`.
+
+      `Store` is an empty Store to test.
   '''
   # test all Store types against all the hash classes
-  for hashclass_name in sorted(HASHCLASS_BY_NAME.keys()):
+  subtest = {}
+  for hashclass_name in HASHCLASS_NAMES:
     hashclass = HASHCLASS_BY_NAME[hashclass_name]
-    # MappingStore
-    subtest = {'hashclass': hashclass}
-    yield subtest, MappingStore('MappingStore', mapping={}, **subtest)
-    # MemoryCacheStore
-    yield subtest, MemoryCacheStore(
-        'MemoryCacheStore', 1024 * 1024 * 1024, **subtest
-    )
-    # DataDirStore
-    for index_name in get_index_names():
-      indexclass = get_index_by_name(index_name)
-      subtest = {
-          'hashclass': hashclass,
-          'indexclass': indexclass,
-          'rollover': 200000,
-      }
-      T = tempfile.TemporaryDirectory(prefix=prefix)
-      with T as tmpdirpath:
-        yield subtest, DataDirStore('DataDirStore', tmpdirpath, **subtest)
-    subtest = {
-        'hashclass': hashclass,
-    }
-    # FileCacheStore
-    T = tempfile.TemporaryDirectory(prefix=prefix)
-    with T as tmpdirpath:
-      yield subtest, FileCacheStore(
-          'FileCacheStore', MappingStore('MappingStore', {}), tmpdirpath,
-          **subtest
-      )
-    # StreamStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      upstream_rd, upstream_wr = os.pipe()
-      downstream_rd, downstream_wr = os.pipe()
-      remote_S = StreamStore(
-          "remote_S",
-          upstream_rd,
-          downstream_wr,
-          local_store=local_store,
-          addif=addif,
-          hashclass=hashclass
-      )
-      S = StreamStore(
-          "S", downstream_rd, upstream_wr, addif=addif, hashclass=hashclass
-      )
-      with local_store:
-        with remote_S:
-          yield subtest, S
-    # TCPClientStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      base_port = 9999
-      while True:
-        bind_addr = ('127.0.0.1', base_port)
-        try:
-          remote_S = TCPStoreServer(bind_addr, local_store=local_store)
-        except OSError as e:
-          if e.errno == errno.EADDRINUSE:
-            base_port += 1
-          else:
-            raise
-        else:
-          break
-      S = TCPClientStore(None, bind_addr, **subtest)
-      with local_store:
-        with remote_S:
-          yield subtest, S
-    # UNIXSocketClientStore
-    for addif in False, True:
-      subtest = {
-          "hashclass": hashclass,
-          "addif": addif,
-      }
-      local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
-      T = tempfile.TemporaryDirectory(prefix=prefix)
-      with T as tmpdirpath:
-        socket_path = joinpath(tmpdirpath, 'sock')
-        remote_S = UNIXSocketStoreServer(socket_path, local_store=local_store)
-        S = UNIXSocketClientStore(None, socket_path, **subtest)
-        with local_store:
-          with remote_S:
-            yield subtest, S
-    # ProxyStore
-    subtest = {
-        "hashclass": hashclass,
-    }
-    main1 = MappingStore("main1", {}, hashclass=hashclass)
-    main2 = MappingStore("main2", {}, hashclass=hashclass)
-    save2 = MappingStore("save2", {}, hashclass=hashclass)
-    S = ProxyStore(
-        "ProxyStore", (main1, main2), (main2, save2),
-        hashclass=hashclass,
-        save2=(save2,)
-    )
-    yield subtest, S
+    with stackkeys(
+        subtest,
+        hashname=hashclass_name,
+        hashclass=hashclass.__name__,
+    ):
+      # MappingStore
+      with stackkeys(subtest, storetype=MappingStore):
+        yield subtest, MappingStore(
+            'MappingStore', mapping={}, hashclass=hashclass
+        )
+      # MemoryCacheStore
+      with stackkeys(subtest, storetype=MemoryCacheStore):
+        yield subtest, MemoryCacheStore(
+            'MemoryCacheStore', 1024 * 1024 * 1024, hashclass=hashclass
+        )
+      # DataDirStore
+      with stackkeys(subtest, storetype=DataDirStore):
+        for index_name in INDEXCLASS_NAMES:
+          indexclass = get_index_by_name(index_name)
+          with stackkeys(subtest, indexname=index_name, indexclass=indexclass):
+            for rollover in 200000, :
+              with stackkeys(subtest, rollover=rollover):
+                T = tempfile.TemporaryDirectory(prefix=prefix)
+                with T as tmpdirpath:
+                  yield subtest, DataDirStore(
+                      'DataDirStore',
+                      tmpdirpath,
+                      hashclass=hashclass,
+                      indexclass=indexclass,
+                      rollover=rollover
+                  )
+      # FileCacheStore
+      with stackkeys(subtest, storetype=FileCacheStore):
+        T = tempfile.TemporaryDirectory(prefix=prefix)
+        with T as tmpdirpath:
+          yield subtest, FileCacheStore(
+              'FileCacheStore',
+              MappingStore('MappingStore', {}),
+              tmpdirpath,
+              hashclass=hashclass
+          )
+      # StreamStore
+      with stackkeys(subtest, storetype=StreamStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            upstream_rd, upstream_wr = os.pipe()
+            downstream_rd, downstream_wr = os.pipe()
+            remote_S = StreamStore(
+                "remote_S",
+                upstream_rd,
+                downstream_wr,
+                local_store=local_store,
+                addif=addif,
+                hashclass=hashclass
+            )
+            S = StreamStore(
+                "S",
+                downstream_rd,
+                upstream_wr,
+                addif=addif,
+                hashclass=hashclass
+            )
+            with local_store:
+              with remote_S:
+                yield subtest, S
+      # TCPClientStore
+      with stackkeys(subtest, storetype=TCPClientStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            base_port = 9999
+            while True:
+              bind_addr = ('127.0.0.1', base_port)
+              try:
+                remote_S = TCPStoreServer(bind_addr, local_store=local_store)
+              except OSError as e:
+                if e.errno == errno.EADDRINUSE:
+                  base_port += 1
+                else:
+                  raise
+              else:
+                break
+            S = TCPClientStore(
+                None, bind_addr, addif=addif, hashclass=hashclass
+            )
+            with local_store:
+              with remote_S:
+                yield subtest, S
+      # UNIXSocketClientStore
+      with stackkeys(subtest, storetype=UNIXSocketClientStore):
+        for addif in False, True:
+          with stackkeys(subtest, addif=addif):
+            local_store = MappingStore("MappingStore", {}, hashclass=hashclass)
+            T = tempfile.TemporaryDirectory(prefix=prefix)
+            with T as tmpdirpath:
+              socket_path = joinpath(tmpdirpath, 'sock')
+              remote_S = UNIXSocketStoreServer(
+                  socket_path, local_store=local_store
+              )
+              S = UNIXSocketClientStore(
+                  None, socket_path, addif=addif, hashclass=hashclass
+              )
+              with local_store:
+                with remote_S:
+                  yield subtest, S
+      # ProxyStore
+      with stackkeys(subtest, storetype=ProxyStore):
+        main1 = MappingStore("main1", {}, hashclass=hashclass)
+        main2 = MappingStore("main2", {}, hashclass=hashclass)
+        save2 = MappingStore("save2", {}, hashclass=hashclass)
+        S = ProxyStore(
+            "ProxyStore", (main1, main2), (main2, save2),
+            hashclass=hashclass,
+            save2=(save2,)
+        )
+        yield subtest, S
 
 def multitest(method):
   ''' Decorator to permute a test method for multiple Store types and hash classes.
@@ -151,7 +184,7 @@ def multitest(method):
   def testMethod(self):
     for subtest, S in get_test_stores(prefix=method.__module__ + '.' +
                                       method.__name__):
-      if STORE_CLASS_TESTS and not isinstance(S, STORE_CLASS_TESTS):
+      if STORECLASS_NAMES and S.__name__ not in STORECLASS_NAMES:
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):
@@ -167,28 +200,6 @@ def multitest(method):
 
   return testMethod
 
-def hcutest(method):
-  ''' Decorator to perform additional setup for HashCodeUtils test methods.
-  '''
-
-  def testHCUMethod(self):
-    self.maxDiff = 16384
-    self.keys1 = set()
-    try:
-      keys_method = self.S.keys
-    except AttributeError:
-      self.has_keys = False
-    else:
-      try:
-        _ = keys_method()
-      except NotImplementedError:
-        self.has_keys = False
-      else:
-        self.has_keys = True
-    method(self)
-
-  return testHCUMethod
-
 class TestStore(unittest.TestCase, _TestAdditionsMixin):
   ''' Tests for Stores.
   '''
@@ -199,6 +210,8 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     self.keys1 = None
 
   def tearDown(self):
+    if self.S is not None:
+      self.S.close()
     Ts = threading.enumerate()
     if len(Ts) > 1:
       thread_dump(Ts=Ts, fp=open('/dev/tty', 'w'))
@@ -216,21 +229,18 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     '''
     S = self.S
     # compute block hash but do not store
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
-                                                     ):
-      with self.subTest(hashname=hashname):
-        size = random.randint(127, 16384)
-        data = make_randblock(size)
-        h = S.hash(data, hashclass)
-        ok = S.contains(h)
-        self.assertFalse(ok)
-        self.assertNotIn(h, S)
-        # now add the block
-        h2 = S.add(data, type(h))
-        self.assertEqual(h, h2)
-        ok = S.contains(h)
-        self.assertTrue(ok)
-        self.assertIn(h, S)
+    size = random.randint(127, 16384)
+    data = make_randblock(size)
+    h = S.hash(data)
+    ok = S.contains(h)
+    self.assertFalse(ok)
+    self.assertNotIn(h, S)
+    # now add the block
+    h2 = S.add(data)
+    self.assertEqual(h, h2)
+    ok = S.contains(h)
+    self.assertTrue(ok)
+    self.assertIn(h, S)
 
   @multitest
   def test02add_get(self):
@@ -239,92 +249,92 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
     S = self.S
     self.assertLen(S, 0)
     random_chunk_map = {}
-    for hashname, hashclass in [[None, None]] + list(HASHCLASS_BY_NAME.items()
-                                                     ):
-      with self.subTest(hashname=hashname):
-        for _ in range(16):
-          size = random.randint(127, 16384)
-          data = make_randblock(size)
-          h = S.hash(data, hashclass)
-          h2 = S.add(data, type(h))
-          self.assertEqual(h, h2)
-          random_chunk_map[h] = data
+    for _ in range(16):
+      size = random.randint(127, 16384)
+      data = make_randblock(size)
+      h = S.hash(data)
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
+      random_chunk_map[h] = data
     for h in random_chunk_map:
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
       self.assertEqual(chunk, random_chunk_map[h])
 
   @multitest
-  @hcutest
   def testhcu00first(self):
     ''' Trivial test adding 2 blocks.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     # test emptiness
     self.assertLen(M1, 0)
     # add one block
     data = make_randblock(rand0(8193))
     h = M1.add(data)
+    self.assertIn(h, M1)
+    self.assertEqual(M1[h], data)
     KS1.add(h)
+    self.assertIn(h, M1)
+    mks = set(M1.keys())
+    self.assertIn(h, mks)
+    mks = set(M1.hashcodes())
     self.assertEqual(set(M1.hashcodes()), KS1)
     # add another block
     data2 = make_randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
-    self.assertEqual(set(M1.hashcodes()), KS1)
+    mks2 = set(M1.hashcodes())
+    self.assertEqual(mks2, KS1)
 
   @multitest
-  @hcutest
   def testhcu01test_hashcodes_from(self):
     ''' Test the hashcodes_from method.
     '''
     # fill map1 with 16 random data blocks
     M1 = self.S
-    KS1 = self.keys1
+    hashcodes_added = set()
     for _ in range(16):
       data = make_randblock(rand0(8193))
       h = M1.add(data)
-      KS1.add(h)
+      hashcodes_added.add(h)
     # make a block not in the map
     data2 = make_randblock(rand0(8193))
-    h2 = self.S.hash(data2)
-    self.assertNotIn(h2, KS1, "abort test: %s in previous blocks" % (h2,))
+    hashcode_other = self.S.hash(data2)
+    self.assertNotIn(
+        hashcode_other, hashcodes_added,
+        "abort test: %s in previous blocks" % (hashcode_other,)
+    )
     #
-    # extract hashes, check results
+    # extract hashes using Store.hashcodes_from, check results
     #
-    ks = sorted(KS1)
-    for reverse in False, True:
-      for start_hashcode in [None] + ks + [h2]:
-        with self.subTest(M1type=type(M1).__name__, reverse=reverse,
-                          start_hashcode=start_hashcode):
-          hs = list(
-              M1.hashcodes_from(
-                  start_hashcode=start_hashcode, reverse=reverse
-              )
+    ks = sorted(hashcodes_added)
+    for start_hashcode in [None] + list(hashcodes_added) + [hashcode_other]:
+      with self.subTest(M1type=type(M1).__name__,
+                        start_hashcode=start_hashcode):
+        hashcodes_from = list(M1.hashcodes_from(start_hashcode=start_hashcode))
+        self.assertIsOrdered(hashcodes_from, strict=True)
+        if start_hashcode is not None:
+          for h in hashcodes_from:
+            self.assertGreaterEqual(
+                h, start_hashcode,
+                "NOT start_hashocde=%s <= h=%s" % (start_hashcode, h)
+            )
+          self.assertTrue(
+              all(map(lambda h: h >= start_hashcode, hashcodes_from))
           )
-          self.assertIsOrdered(hs, reverse=reverse, strict=True)
-          if reverse:
-            ksrev = reversed(ks)
-            hs2 = [
-                h for h in ksrev
-                if start_hashcode is None or h <= start_hashcode
-            ]
-          else:
-            hs2 = [
-                h for h in ks if start_hashcode is None or h >= start_hashcode
-            ]
-          hs = list(sorted(hs))
-          hs2 = list(sorted(hs2))
-          self.assertEqual(hs, hs2)
+        hashcodes_expected = sorted(
+            h for h in hashcodes_added
+            if start_hashcode is None or h >= start_hashcode
+        )
+        self.assertEqual(hashcodes_from, hashcodes_expected)
 
   @multitest
-  @hcutest
   def testhcu02hashcodes(self):
     ''' Various tests.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
       data = make_randblock(rand0(8193))
@@ -332,7 +342,7 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
       self.assertIn(h, M1)
       self.assertNotIn(h, KS1)
       KS1.add(h)
-      self.assertIn(h, KS1)
+      sleep(0.1)
       self.assertLen(M1, n + 1)
       self.assertEqual(len(KS1), n + 1)
       self.assertEqual(set(iter(M1)), KS1)
@@ -382,17 +392,14 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
             after = start_hashcode is not None
             hs = list(
                 M1.hashcodes(
-                    start_hashcode=start_hashcode,
-                    length=n,
-                    reverse=False,
-                    after=after
+                    start_hashcode=start_hashcode, length=n, after=after
                 )
             )
             # verify that no key has been seen before
             for h in hs:
               self.assertNotIn(h, seen)
             # verify ordering of returned list
-            self.assertIsOrdered(hs, reverse=False, strict=True)
+            self.assertIsOrdered(hs, strict=True)
             # verify that least key is > start_hashcode
             if start_hashcode is not None:
               self.assertLess(start_hashcode, hs[0])
@@ -409,12 +416,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
         self.assertEqual(sorted_keys, sorted(seen))
 
   @multitest
-  @hcutest
   def testhcu03hashcodes_missing(self):
     ''' Test the hashcodes_missing function.
     '''
     M1 = self.S
-    KS1 = self.keys1
+    KS1 = set()
     for _ in range(16):
       data = make_randblock(rand0(8193))
       h = M1.add(data)

@@ -5,7 +5,7 @@
 #
 
 r'''
-Result and friends: various classable classes for deferred delivery of values.
+Result and friends: various subclassable classes for deferred delivery of values.
 
 A Result is the base class for several callable subclasses
 which will receive values at a later point in time,
@@ -65,7 +65,7 @@ from cs.py3 import Queue, raise3, StringTypes
 from cs.seq import seq
 from cs.threads import bg as bg_thread
 
-__version__ = '20201102-post'
+__version__ = '20210420-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -75,8 +75,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.logutils', 'cs.pfx', 'cs.py.func', 'cs.py3', 'cs.seq',
-        'cs.threads', 'icontract'
+        'cs.logutils',
+        'cs.mappings',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.py3',
+        'cs.seq',
+        'cs.threads',
+        'icontract',
     ],
 }
 
@@ -421,9 +427,16 @@ class Result(object):
 
 def bg(func, *a, **kw):
   ''' Dispatch a `Thread` to run `func`, return a `Result` to collect its value.
+
+      Parameters:
+      * `_name`: optional name for the `Result`, passed to the initialiser
+      * `_extra`: optional extra data for the `Result`, passed to the initialiser
+
+      Other parameters are passed to `func`.
   '''
-  _name = kw.pop('_name', None)
-  R = Result(name=_name)
+  name = kw.pop('_name', None)
+  extra = kw.pop('_extra', None)
+  R = Result(name=name, extra=extra)
   R.bg(func, *a, **kw)
   return R
 
@@ -442,6 +455,29 @@ def report(LFs):
     LF.notify(notify)
   for _ in range(n):
     yield Q.get()
+
+class ResultSet(set):
+  ''' A `set` if `Result`s,
+      on which one may iterate as `Result`s complete.
+  '''
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *_):
+    pass
+
+  def __iter__(self):
+    ''' Iterating on a `ResultSet` yields `Result`s as they complete.
+    '''
+    for R in report(super().__iter__()):
+      yield R
+
+  def wait(self):
+    ''' Convenience function to wait for all the `Result`s.
+    '''
+    for _ in self:
+      pass
 
 def after(Rs, R, func, *a, **kw):
   ''' After the completion of `Rs` call `func(*a,**kw)` and return

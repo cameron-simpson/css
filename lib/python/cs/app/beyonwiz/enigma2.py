@@ -11,8 +11,8 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
-import struct
-from cs.binary import structtuple
+from cs.binary import BinaryMultiValue
+from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py3 import datetime_fromisoformat
@@ -22,10 +22,10 @@ from cs.x import X
 from . import _Recording, RecordingMetaData
 
 # an "access poiint" record from the .ap file
-Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
+Enigma2APInfo = BinaryMultiValue('Enigma2APInfo', '>QQ', 'pts offset')
 
 # a "cut" record from the .cuts file
-Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
+Enigma2Cut = BinaryMultiValue('Enigma2Cut', '>QL', 'pts type')
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -33,7 +33,7 @@ class Enigma2(_Recording):
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
 
-  DEFAULT_FILENAME_BASIS = '{meta.title_lc}--{file.channel_lc}--beyonwiz--{file.datetime}'
+  DEFAULT_FILENAME_BASIS = '{meta.title_lc}--{file.channel_lc}--beyonwiz--{file.datetime}--{meta.description_lc}'
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
@@ -119,12 +119,17 @@ class Enigma2(_Recording):
 
   @staticmethod
   def scanpath(path, packet_type):
-    ''' Read packets from `path`, yield packets, issue a warning
-        if the file is short or missing.
+    ''' Generator yielding packets from `path`,
+        issues a warning if the file is short or missing.
     '''
     with Pfx(path):
       try:
-        yield from packet_type.parse_file(path)
+        with open(path, 'rb') as f:
+          bfr = CornuCopyBuffer.from_file(f)
+          try:
+            yield from packet_type.scan(bfr)
+          except EOFError as e:
+            warning("short file: %s", e)
       except OSError as e:
         if e.errno == errno.ENOENT:
           warning("cannot open: %s", e)

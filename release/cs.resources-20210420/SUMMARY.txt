@@ -1,0 +1,1 @@
+MultiOpenMixin: run startup/shutdown entirely via the new default method @contextmanager(startup_shutdown), paving the way for subclasses to just define their own startup_shutdown context manager methods instead of distinct startup/shutdown methods.

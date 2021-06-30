@@ -6,4 +6,4 @@
 
 set -ue
 [ -t 2 ] && set -x
-exec python2 -c 'import sys; import cs.app.megacli; sys.argv[0]="mcli"; sys.exit(cs.app.megacli.main(sys.argv))' ${1+"$@"}
+exec python3 -c 'import sys; import cs.app.megacli; sys.argv[0]="mcli"; sys.exit(cs.app.megacli.main(sys.argv))' ${1+"$@"}

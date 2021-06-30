@@ -1,0 +1,1 @@
+BaseCommand: bugfix for __init_subclass__ docstring update.

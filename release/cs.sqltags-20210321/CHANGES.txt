@@ -1,0 +1,14 @@
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: create the ORM in serial mode for SQLite db URLs, supports transparent use in multithreaded apps
+lib/python/cs/sqltags.py: cs.sqltags: update module docstring
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: drop a lot of logic now part of cs.sqlalchemy_utils.ORM
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: there's no self.meta any more
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagSet: new .db_session context manager wrapping SQLTags.db_session, use where needed and drop session= plumbing
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: drop unused ._orm_state attribute, now integrated into cs.sqlalchemy_utils.ORM
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .db_session context manager wrapping SQLTags.orm.session, drop __enter__/__exit__ default session logic
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: new .default_db_session property for when there should already be a session
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags: use default_db_session and db_session, drop session= plumbing
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.flush: rely on default_db_session
+lib/python/cs/sqltags.py: cs.sqltags: update imports clean lint
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.default_factory: plumb session to entity.add_tag()
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: cs.sqltags: update DISTINFO

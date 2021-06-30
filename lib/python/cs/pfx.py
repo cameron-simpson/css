@@ -7,9 +7,10 @@
 r'''
 Dynamic message prefixes providing execution context.
 
-The primary facility here is Pfx,
+The primary facility here is `Pfx`,
 a context manager which maintains a per thread stack of context prefixes.
 There are also decorators for functions.
+This stack is used to prefix logging messages and exception text with context.
 
 Usage is like this:
 
@@ -550,30 +551,81 @@ def pfx(func, message=None, message_args=()):
   return wrapper
 
 @decorator
-def pfx_method(method, use_str=False):
+def pfx_method(method, use_str=False, with_args=False):
   ''' Decorator to provide a `Pfx` context for an instance method prefixing
-      *classname.methodname*
-      (or `str(self).`*methodname* if `use_str` is true).
+      *classname.methodname*.
 
-      Example usage:
+      If `use_str` is true (default `False`)
+      use `str(self)` instead of `classname`.
+
+      If `with_args` is true (default `False`)
+      include the specified arguments in the `Pfx` context.
+      If `with_args` is `True`, this includes all the arguments.
+      Otherwise `with_args` should be a sequence of argument references:
+      an `int` specifies one of the positional arguments
+      and a string specifies one of the keyword arguments.
+
+      Examples:
 
           class O:
+              # just use "O.foo"
               @pfx_method
               def foo(self, .....):
+                  ....
+              # use the value of self instead of the class name
+              @pfx_method(use_str=True)
+              def foo2(self, .....):
+                  ....
+              # include all the arguments
+              @pfx_method(with_args=True)
+              def foo3(self, a, b, c, *, x=1, y):
+                  ....
+              # include the "b", "c" and "x" arguments
+              @pfx_method(with_args=[1,2,'x'])
+              def foo3(self, a, b, c, *, x=1, y):
                   ....
   '''
 
   fname = method.__name__
 
-  def wrapper(self, *a, **kw):
+  def pfx_method_wrapper(self, *a, **kw):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
-    with Pfx("%s.%s", self if use_str else type(self).__name__, fname):
+    classref = self if use_str else type(self).__name__
+    pfxfmt = "%s.%s"
+    arg_args = []
+    if with_args:
+      # include "(arguments...)" in the Pfx string
+      argrefs = (
+          list(range(len(a))) +
+          list(kw.keys()) if with_args is True else with_args
+      )
+      for argref in argrefs:
+        if isinstance(argref, int):
+          # positional argument
+          try:
+            arg = a[argref]
+          except IndexError:
+            arg = "?" + str(argref)
+          else:
+            arg = repr(arg)
+        else:
+          # keyword argument
+          try:
+            arg = kw[argref]
+          except KeyError:
+            arg = "?"
+          else:
+            arg = repr(arg)
+          arg = argref + "=" + arg
+        arg_args.append(arg)
+      pfxfmt += "(" + ','.join(map(lambda _: '%s', arg_args)) + ")"
+    with Pfx(pfxfmt, classref, fname, *arg_args):
       return method(self, *a, **kw)
 
-  wrapper.__doc__ = method.__doc__
-  wrapper.__name__ = fname
-  return wrapper
+  pfx_method_wrapper.__doc__ = method.__doc__
+  pfx_method_wrapper.__name__ = fname
+  return pfx_method_wrapper
 
 def XP(msg, *args, **kwargs):
   ''' Variation on `cs.x.X`
