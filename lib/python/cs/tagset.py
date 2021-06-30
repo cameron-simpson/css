@@ -33,9 +33,8 @@
       but that tag value can of course be a sequence or mapping
       for more elaborate tag values.
     * `TagsOntology`:
-      a mapping of type names to `TagSet`s defining the type.
-      This mapping also contains entries for the metadata
-      for specific type values.
+      a mapping of type names to `TagSet`s defining the type
+      and also to entries for the metadata for specific per-type values.
 
     Here's a simple example with some `Tag`s and a `TagSet`.
 
@@ -80,6 +79,8 @@
         >>> 'subtopic' in tags
         True
         >>> # test for subtopic=ontologies
+        >>> print(subtopic)
+        subtopic=ontologies
         >>> subtopic in tags
         True
         >>> # test for subtopic=libraries
