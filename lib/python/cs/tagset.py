@@ -670,10 +670,11 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
-  def add(self, tag, **kw):
+  @tag_or_tag_value
+  def add(self, tag_name, value, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    return self.set(tag, **kw)
+    return self.set(tag_name, value, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
