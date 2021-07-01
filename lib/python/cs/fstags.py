@@ -241,6 +241,24 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
               if tag.name not in tagged_path:
                 tagged_path.add(tag)
 
+  # cmd_cp, cmd_ln and cmd_mv are grouped together lower down
+
+  def cmd_cptags(self, argv):
+    ''' Usage: {cmd} srcpath dstpath
+          Copy the direct tags from srcpath to dstpath.
+    '''
+    if not argv:
+      raise GetopError("missing srcpath")
+    srcpath = argv.pop(0)
+    if not argv:
+      raise GetopError("missing dstpath")
+    dstpath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    fstags = self.options.fstags
+    srctags = fstags[srcpath]
+    fstags[dstpath].update(srctags)
+
   def cmd_edit(self, argv):
     ''' Usage: {cmd} [-ad] [path]
           Edit the direct tagsets of path, default: '.'
