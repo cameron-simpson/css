@@ -881,7 +881,7 @@ class PlayOnAPI(MultiOpenMixin):
               with Pfx("write %d bytes", length - offset):
                 written = f.write(chunk[offset:])
                 if written < 1:
-                  warning("less than 1 bytes written: %d", written)
+                  warning("fewer than 1 bytes written")
                 else:
                   offset += written
                   assert offset <= length
