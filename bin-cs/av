@@ -150,11 +150,6 @@ else
     echo "$cmd: $src: not a regular file" >&2
     badopts=1
   }
-
-  [ ! -e "$dst" ] || {
-    echo "$cmd: $dst: already exists" >&2
-    badopts=1
-  }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
