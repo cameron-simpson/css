@@ -2397,7 +2397,6 @@ class TagsOntology(SingletonMixin):
   ################################################################
   # Metadata.
 
-  @ensure(lambda result: result[1].startswith('meta.'))
   def _meta_ref(self, type_name, value, convert=None):
     ''' Return `(tagsets,metakey)` for the metadata for `(type_name,value)`.
     '''
