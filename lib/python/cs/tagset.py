@@ -1341,7 +1341,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     ont = ontology or self.ontology
     assert ont, "ont is false: %r" % (ont,)
-    return ont.metadata(self.name, self.value, convert=convert)
+    return ont.metadata(self, convert=convert)
 
   @property
   def meta(self):
