@@ -1686,14 +1686,6 @@ class TagSetPrefixView(FormatableMixin):
     return self._prefix_ + k in self._tags
 
   def __getitem__(self, k):
-    if not isinstance(k, str):
-      raise ValueError(
-          "%s.__getitem__: str required, received %s:%r" %
-          (type(self).__name__, type(k), k)
-      )
-    tag = self.tag
-    if tag is not None:
-      return tag.value[k]
     return self._tags[self._prefix_ + k]
 
   def __setitem__(self, k, v):
