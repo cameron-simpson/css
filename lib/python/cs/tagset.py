@@ -1341,20 +1341,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     ont = ontology or self.ontology
     assert ont, "ont is false: %r" % (ont,)
-    basetype = self.basetype
-    if basetype == 'list':
-      member_type = self.member_type
-      return [
-          ont.metadata(member_type, value, convert=convert)
-          for value in self.value
-      ]
-    if basetype == 'dict':
-      member_type = self.member_type
-      return {
-          key: ont.metadata(member_type, value)
-          for key, value in self.value.items()
-      }
-    return ont.metadata(self.name, self.value)
+    return ont.metadata(self.name, self.value, convert=convert)
 
   @property
   def meta(self):
@@ -2504,6 +2491,39 @@ class TagsOntology(SingletonMixin):
     '''
     tagsets, key = self._meta_ref(type_name, value, convert=convert)
     return tagsets[key]
+    md = None
+    if not isinstance(value, str):
+      # strs look a lot like other sequences, sidestep the probes
+      try:
+        items = value.items
+      except AttributeError:
+        # not a mapping
+        try:
+          it = iter(value)
+        except TypeError:
+          # not iterable
+          pass
+        else:
+          md = [self.metadata(type_name, item) for item in it]
+      else:
+        # split the type_name on underscore to derive key and member type names
+        # otherwise fall back to {type_name}_key, {type_name}_member
+        try:
+          key_type_name, member_type_name = type_name.split('_')
+        except ValueError:
+          key_type_name = type_name + '_key'
+          member_type_name = type_name + '_member'
+        md = {
+            k: (
+                self.metadata(key_type_name,
+                              k), self.metadata(member_type_name, v)
+            )
+            for k, v in items
+        }
+    # neither mapping nor iterable
+    if md is None:
+      md = ont.metadata(type_name, value)
+    return md
 
   def basetype(self, typename):
     ''' Infer the base type name from a type name.
