@@ -2457,8 +2457,9 @@ class TagsOntology(SingletonMixin):
       return value
     raise ValueError(value)
 
+  @tag_or_tag_value
   @require(lambda type_name: isinstance(type_name, str))
-  def metadata(self, type_name, value, convert=None):
+  def metadata(self, type_name, value, *, convert=None):
     ''' Return the metadata `TagSet` for `type_name` and `value`.
         This implements the mapping between a type's value and its semantics.
 
