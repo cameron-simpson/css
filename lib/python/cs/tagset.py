@@ -113,8 +113,8 @@ Here's an example ontology supporting the above `TagSet`:
     type.cast type=dict key_type=person member_type=character description="members of a production"
     type.character description="an identified member of a story"
     type.series type=str
-    meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
-    meta.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+    character.marvel.black_widow type=character names=["Natasha Romanov"]
+    person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
 The type information for a `cast`
 is defined by the ontology entry named `type.cast`,
@@ -132,9 +132,8 @@ it is now possible to look up the metadata for the described cast members.
 
 The key `"Scarlett Johansson"` is a `person`
 (from the type definition of `cast`).
-The ontology entry for her is named `meta.person.scarlett_johansson`
+The ontology entry for her is named `person.scarlett_johansson`
 which is computed as:
-* `meta`: the name prefix for metadata entries
 * `person`: the type name
 * `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
   and replacing whitespace with an underscore.
@@ -143,9 +142,8 @@ which is computed as:
 
 The key `"Black Widow (Marvel)"` is a `character`
 (again, from the type definition of `cast`).
-The ontology entry for her is named `meta.character.marvel.black_widow`
+The ontology entry for her is named `character.marvel.black_widow`
 which is computed as:
-* `meta`: the name prefix for metadata entries
 * `character`: the type name
 * `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
   replacing whitespace with an underscore,
@@ -172,7 +170,7 @@ An example:
     ...   {
     ...       'type.colour':
     ...       TagSet(description="a colour, a hue", type="str"),
-    ...       'meta.colour.blue':
+    ...       'colour.blue':
     ...       TagSet(
     ...           url='https://en.wikipedia.org/wiki/Blue',
     ...           wavelengths='450nm-495nm'
@@ -927,7 +925,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
       Examples:
 
-          >>> ont = TagsOntology({'meta.colour.blue': TagSet(wavelengths='450nm-495nm')})
+          >>> ont = TagsOntology({'colour.blue': TagSet(wavelengths='450nm-495nm')})
           >>> tag0 = Tag('colour', 'blue')
           >>> tag0
           Tag(name='colour',value='blue',ontology=None)
@@ -1248,7 +1246,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Return the metadata definition for `key`.
 
         The metadata `TagSet` is obtained from the ontology entry
-        'meta.`*type*`.`*key_tag_name*
+        *type*`.`*key_tag_name*
         where *type* is the `Tag`'s `key_type`
         and *key_tag_name* is the key converted
         into a dotted identifier by `TagsOntology.value_to_tag_name`.
@@ -1260,7 +1258,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if key_type is None:
       return None
     ont = self.ontology
-    key_metadata_name = 'meta.' + key_type + '.' + ont.value_to_tag_name(key)
+    key_metadata_name = key_type + '.' + ont.value_to_tag_name(key)
     return ont[key_metadata_name]
 
   @property
@@ -1290,7 +1288,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Return the metadata definition for self[member_key].
 
         The metadata `TagSet` is obtained from the ontology entry
-        'meta.`*type*`.`*member_tag_name*
+        *type*`.`*member_tag_name*
         where *type* is the `Tag`'s `member_type`
         and *member_tag_name* is the member value converted
         into a dotted identifier by `TagsOntology.value_to_tag_name`.
@@ -1303,9 +1301,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return None
     ont = self.ontology
     value = self.value[member_key]
-    member_metadata_name = 'meta.' + member_type + '.' + ont.value_to_tag_name(
-        value
-    )
+    member_metadata_name = member_type + '.' + ont.value_to_tag_name(value)
     return ont[member_metadata_name]
 
   @property
@@ -2018,26 +2014,26 @@ class TagsOntology(SingletonMixin):
       to ontological information expressed as a `TagSet`.
 
       There are two main categories of entries in an ontology:
-      * types: an entry named `type.`*typename* contains a `TagSet`
+      * types: an optional entry named `type.`*typename* contains a `TagSet`
         defining the type named *typename*
-      * metadata: an entry named `meta.`*typename*`.`*value_key*
+      * metadata: other entries named *typename*`.`*value_key*
         contains a `TagSet` holding metadata for a value of type *typename*
         whose value is mapped to *value_key*
 
       For any `Tag` *name*=*value* the associated *typename* is just *name*.
       For example, a `Tag` `colour="blue"`
       would have type information at the entry `type.colour`
-      and metadata about `"blue"` at `meta.colour.blue`.
+      and metadata about `"blue"` at `colour.blue`.
 
       Metadata are `TagSet`s describing particular values of a type.
       For example, some metadata for the `Tag` `colour="blue"`:
 
-          meta.colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
+          colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
 
       Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
 
-          meta.actor.scarlett_johansson roles=["Black Widow (Marvel)"]
-          meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
+          actor.scarlett_johansson roles=["Black Widow (Marvel)"]
+          character.marvel.black_widow type=character names=["Natasha Romanov"]
 
       Getting from the role `"Black Widow (Marvel)"`
       to its metadata is done with the method `metadata(type_name,value)`,
@@ -2065,7 +2061,7 @@ class TagsOntology(SingletonMixin):
         `marvel.` and downcases the rest of the string and turns spaces into underscores.
         This yields the value key `marvel.black_widow`.
       * the type is `role`, so the ontology entry for the metadata
-        is `meta.role.marvel.black_widow`
+        is `role.marvel.black_widow`
 
       l
 
@@ -2337,7 +2333,7 @@ class TagsOntology(SingletonMixin):
         appropriate to the chosen `tagsets`.
 
         This method is used to direct accesses to `type.`*type_name*
-        and `meta.`*type_name*`.`*value_key*
+        and *type_name*`.`*value_key*
         to particular `TagSets`,
         possibly keyed by a variation on *type_name*.
 
@@ -2421,7 +2417,7 @@ class TagsOntology(SingletonMixin):
     with Pfx("%s._meta_ref(type_name=%r,value=%r)", type(self).__name__,
              type_name, value):
       tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-      index = 'meta.' + subtype_name
+      index = subtype_name
       if value is not None:
         if convert is None:
           convert = self.value_to_tag_name
@@ -2437,12 +2433,12 @@ class TagsOntology(SingletonMixin):
         for that `type_name`.
 
         For example, `meta_names('character')`
-        on an ontology with a `meta.character.marvel.black_widow`
+        on an ontology with a `character.marvel.black_widow`
         would yield `'marvel.black_widow'`
         i.e. only the suffix part for `character` metadata.
 
         By contrast, `meta_names()`
-        on an ontology with a `meta.character.marvel.black_widow`
+        on an ontology with a `character.marvel.black_widow`
         would yield `'character.marvel.black_widow'`.
     '''
     if type_name is None:
@@ -2450,7 +2446,7 @@ class TagsOntology(SingletonMixin):
         yield from self.meta_names(type_name)
         return
     tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-    prefix = f'meta.{subtype_name}.'
+    prefix = subtype_name + '.'
     for key in tagsets.keys(prefix=prefix):
       assert key.startswith(prefix)
       meta_suffix = cutprefix(key, prefix)
@@ -2496,14 +2492,13 @@ class TagsOntology(SingletonMixin):
         may specify a function to use to convert `value` to a tag name component
         to be used in place of `self.value_to_tag_name` (the default).
 
-        For example,
-        if a `TagSet` had a list of characters such as:
+        For example, if a `TagSet` had a list of characters such as:
 
-            characters=["Captain America (Marvel)","Black Widow (Marvel)"]
+            character=["Captain America (Marvel)","Black Widow (Marvel)"]
 
         then these values could be converted to the dotted identifiers
-        `characters.marvel.captain_america`
-        and `characters.marvel.black_widow` respectively,
+        `character.marvel.captain_america`
+        and `character.marvel.black_widow` respectively,
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
@@ -2826,8 +2821,6 @@ class TagsOntologyCommand(BaseCommand):
   def cmd_edit(self, argv):
     ''' Usage: {cmd} entity
           Edit the named entity.
-          If the entity name for not start with type. or meta. then
-          meta. is prepended to the name.
     '''
     options = self.options
     ont = options.ontology
@@ -2836,8 +2829,6 @@ class TagsOntologyCommand(BaseCommand):
     entity_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments after entity: %r" % (argv,))
-    if not entity_name.startswith(('type.', 'meta.')):
-      entity_name = 'meta.' + entity_name
     tags = ont[entity_name]
     tags.edit()
 
@@ -2857,7 +2848,7 @@ class TagsOntologyCommand(BaseCommand):
           {cmd} type_name ls
             List the metadata names for this type and their tags.
           {cmd} type_name + entity_name [tags...]
-            Create meta.entity_name and apply the tags.
+            Create type_name.entity_name and apply the tags.
     '''
     options = self.options
     ont = options.ontology
@@ -3067,7 +3058,7 @@ def selftest(argv):
       {
           'type.colour':
           TagSet(description="a colour, a hue", type="str"),
-          'meta.colour.blue':
+          'colour.blue':
           TagSet(
               url='https://en.wikipedia.org/wiki/Blue',
               wavelengths='450nm-495nm'
