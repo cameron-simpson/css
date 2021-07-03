@@ -2477,8 +2477,6 @@ class TagsOntology(SingletonMixin):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    tagsets, key = self._meta_ref(type_name, value, convert=convert)
-    return tagsets[key]
     md = None
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
@@ -2510,7 +2508,9 @@ class TagsOntology(SingletonMixin):
         }
     # neither mapping nor iterable
     if md is None:
-      md = ont.metadata(type_name, value)
+      # look up the type_name in the relevant subtagsets
+      tagsets, key = self._meta_ref(type_name, value)
+      md = tagsets[key]
     return md
 
   def basetype(self, typename):
