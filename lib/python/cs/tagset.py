@@ -2274,9 +2274,7 @@ class TagsOntology(SingletonMixin):
         return self.type_map.by_type_name[type_name]
       except KeyError:
         name = self.match_func(type_name)
-        self.type_map.add = dict(
-            type_name=type_name, subtype_name=name
-        )
+        self.type_map.add = dict(type_name=type_name, subtype_name=name)
         return name
 
     def type_name(self, subtype_name):
@@ -2289,9 +2287,7 @@ class TagsOntology(SingletonMixin):
         return self.type_map.by_subtype_name[subtype_name]
       except KeyError:
         name = self.unmatch_func(subtype_name)
-        self.type_map.add = dict(
-            type_name=name, subtype_name=subtype_name
-        )
+        self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
         return name
 
   @property
