@@ -2385,8 +2385,11 @@ class TagsOntology(SingletonMixin):
   ################################################################
   # Metadata.
 
-  def _meta_ref(self, type_name, value, convert=None):
-    ''' Return `(tagsets,metakey)` for the metadata for `(type_name,value)`.
+  def _meta_ref(self, type_name, value, *, convert=None):
+    ''' Return a references for the `TagSet` holding the metadata for `(type_name,value)`
+        as `(tagsets,metakey)`
+        being the `TagSets` containing the target `TagSet`
+        and the key for the per-value metadata `TagSet` within it.
     '''
     with Pfx("%s._meta_ref(type_name=%r,value=%r)", type(self).__name__,
              type_name, value):
@@ -2399,6 +2402,12 @@ class TagsOntology(SingletonMixin):
         assert isinstance(value_tag_name, str) and value_tag_name
         index += '.' + value_tag_name
     return tagsets, index
+
+  def _meta(self, type_name, value, *, convert=None):
+    ''' Return the `TagSet` holding the metadata for `(type_name,value)`.
+    '''
+    tagsets, metakey = self._meta_ref(type_name, value, convert=convert)
+    return tagsets[metakey]
 
   def meta_names(self, type_name=None):
     ''' Generator yielding defined metadata names.
