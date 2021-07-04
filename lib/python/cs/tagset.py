@@ -157,7 +157,7 @@ You can just use `str.format_map` as shown above
 for the direct values in a `TagSet`,
 since it subclasses `dict`.
 
-However, `TagSet`s subclass `cs.lex.FormatableMixin`
+However, `TagSet`s also subclass `cs.lex.FormatableMixin`
 and therefore have a richer `format_as` method which has an extended syntax
 for the format component.
 Command line tools like `fstags` use this for output format specifications.
@@ -181,6 +181,7 @@ An example:
     >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
     >>> tags.format_as('The colour is {colour}.')
     'The colour is blue.'
+    >>> # format a string about the tags showing some metadata about the colour
     >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
     'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
 
@@ -1988,21 +1989,36 @@ class MappingTagSets(BaseTagSets):
 
 class TagsOntology(SingletonMixin):
   ''' An ontology for tag names.
-
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
 
+      Normally an object's tags are not a self contained repository of all the information;
+      instead a tag just names some information.
+
+      As a example, consider the tag `colour=blue`.
+      Meta information about `blue` is obtained via the ontology,
+      which has an entry for the colour `blue`.
+      We adopt the convention that the type is just the tag name,
+      so we obtain the metadata by calling `ontology.metadata(tag)`
+      or alternatively `ontology.metadata(tag.name,tag.value)`
+      being the type name and value respectively.
+
+      The ontology itself is based around `TagSets` and effectively the call
+      `ontology.metadata('colour','blue')`
+      would look up the `TagSet` named `colour.blue` in the underlying `Tagsets`.
+
+      For a self contained dataset this means that it can be its own ontology.
+      For tags associated with arbitrary objects
+      such as the filesystem tags maintained by `cs.fstags`
+      the ontology would be a separate tags collection stored in a central place.
+
       There are two main categories of entries in an ontology:
-      * types: an optional entry named `type.`*typename* contains a `TagSet`
-        defining the type named *typename*
       * metadata: other entries named *typename*`.`*value_key*
         contains a `TagSet` holding metadata for a value of type *typename*
         whose value is mapped to *value_key*
-
-      For any `Tag` *name*=*value* the associated *typename* is just *name*.
-      For example, a `Tag` `colour="blue"`
-      would have type information at the entry `type.colour`
-      and metadata about `"blue"` at `colour.blue`.
+      * types: an optional entry named `type.`*typename* contains a `TagSet`
+        describing the type named *typename*;
+        really this is just more metadata where the "type name" is `type`
 
       Metadata are `TagSet`s describing particular values of a type.
       For example, some metadata for the `Tag` `colour="blue"`:
@@ -2011,29 +2027,13 @@ class TagsOntology(SingletonMixin):
 
       Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
 
-          actor.scarlett_johansson roles=["Black Widow (Marvel)"]
-          character.marvel.black_widow type=character names=["Natasha Romanov"]
+          actor.scarlett_johansson role=["Black Widow (Marvel)"]
+          character.marvel.black_widow name=["Natasha Romanov"]
 
-      Getting from the role `"Black Widow (Marvel)"`
-      to its metadata is done with the method `metadata(type_name,value)`,
-      where the *type_name* is `"role"`.
+      The tag values are lists above because an actor might play many roles, etc.
 
-      this requires type information about a `role`.
-      Here are some type definitions supporting the above metadata:
-
-          type.person type=str description="A person."
-          type.actor type=person description="An actor's stage name."
-          type.character type=str description="A person in a story."
-          type.role type=character description="A character role in a performance."
-          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
-
-      The basic types have their Python names: `int`, `float`, `str`, `list`,
-      `dict`, `date`, `datetime`.
-      You can define subtypes of these for your own purposes
-      as illustrated above.
-
-      The `role` `"Black Widow (Marvel)"`
-      is mapped to its metadata as follows:
+      There's a convention for converting human descriptions
+      such as the role string `"Black Widow (Marvel)"` to its metadata.
       * the value `"Black Widow (Marvel)"` if converted to a key
         by the ontology method `value_to_tag_name`;
         it moves a bracket suffix such as `(Marvel)` to the front as a prefix
@@ -2041,6 +2041,20 @@ class TagsOntology(SingletonMixin):
         This yields the value key `marvel.black_widow`.
       * the type is `role`, so the ontology entry for the metadata
         is `role.marvel.black_widow`
+
+      this requires type information about a `role`.
+      Here are some type definitions supporting the above metadata:
+
+          type.person type=str description="A person."
+          type.actor type=person description="An actor's stage name."
+          type.character type=str description="A person in a story."
+          type.role type_name=character description="A character role in a performance."
+          type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
+
+      The basic types have their Python names: `int`, `float`, `str`, `list`,
+      `dict`, `date`, `datetime`.
+      You can define subtypes of these for your own purposes
+      as illustrated above.
 
       l
 
