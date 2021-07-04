@@ -2854,6 +2854,20 @@ class TagsOntologyCommand(BaseCommand):
     tags = ont[entity_name]
     tags.edit()
 
+  def cmd_meta(self, argv):
+    ''' Usage: {cmd} tag=value
+    '''
+    options = self.options
+    ont = options.ontology
+    if not argv:
+      raise GetoptError("missing tag=value")
+    tag_s = argv.pop(0)
+    tag = Tag.from_str(tag_s, ontology=ont)
+    print(tag)
+    md = tag.metadata()
+    for md_tag in md:
+      print(" ", md_tag)
+
   # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
     ''' Usage:
