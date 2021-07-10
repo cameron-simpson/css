@@ -835,25 +835,37 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   @classmethod
   @pfx_method
   def edit_many(cls, tes, editor=None, verbose=True):
-    ''' Edit an iterable of `TagSet`s.
+    ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
+        The collection `tes` may be either a mapping of name/key
+        to `TagSet` or an iterable of `TagSets`. If the latter, a
+        mapping is made based on `te.name or te.id` for each item
+        `te` in the iterable.
+
         This function supports modifying both `name` and `Tag`s.
+        The `Tag`s are updated directly.
+        The changed names are returning in the `old_name,new_name` above.
     '''
     if editor is None:
       editor = EDITOR
-    te_map = {te.name or te.id: te for te in tes}
+    try:
+      items = tes.items
+    except AttributeError:
+      te_map = {te.name or te.id: te for te in tes}
+    else:
+      te_map = tes
     assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
         "not all entities have str or int keys: %r" % list(te_map.keys())
     lines = list(
         map(
-            lambda te: ' '.join(
-                [Tag.transcribe_value(te.name or te.id)] + [
-                    str(te.tag(tag_name))
-                    for tag_name in te.keys()
+            lambda te_item: ' '.join(
+                [Tag.transcribe_value(te_item[0])] + [
+                    str(te_item[1].tag(tag_name))
+                    for tag_name in te_item[1].keys()
                     if tag_name != 'name'
                 ]
-            ), te_map.values()
+            ), te_map.items()
         )
     )
     changes = edit_strings(lines, editor=editor)
