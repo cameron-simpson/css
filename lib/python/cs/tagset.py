@@ -2032,7 +2032,7 @@ class TagsOntology(SingletonMixin):
         describing the type named *typename*;
         really this is just more metadata where the "type name" is `type`
 
-      Metadata are `TagSet`s describing particular values of a type.
+      Metadata are `TagSets` nstances describing particular values of a type.
       For example, some metadata for the `Tag` `colour="blue"`:
 
           colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
@@ -2040,7 +2040,7 @@ class TagsOntology(SingletonMixin):
       Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
 
           actor.scarlett_johansson role=["Black Widow (Marvel)"]
-          character.marvel.black_widow name=["Natasha Romanov"]
+          character.marvel.black_widow fullname=["Natasha Romanov"]
 
       The tag values are lists above because an actor might play many roles, etc.
 
@@ -2068,9 +2068,7 @@ class TagsOntology(SingletonMixin):
       You can define subtypes of these for your own purposes
       as illustrated above.
 
-      l
-
-      for example:
+      For example:
 
           type.colour type=str description="A hue."
 
@@ -2140,7 +2138,7 @@ class TagsOntology(SingletonMixin):
     @classmethod
     @pfx_method(with_args=True)
     def from_match(cls, tagsets, match, unmatch=None):
-      ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
+      ''' Factory to create a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
 
           Parameters:
           * `tagsets`: a `TagSets` holding ontology information
@@ -2327,10 +2325,10 @@ class TagsOntology(SingletonMixin):
     return True
 
   def _tagsets_for_type_name(self, type_name):
-    ''' Locate a `TagSet`s for use against `type_name`.
-        Return `(tagSets,subtype_name)`
+    ''' Locate a `TagSets` for use against `type_name`.
+        Return `(tagsets,subtype_name)`
         where `tagsets` is a `TagSets` instance
-        and `subtype_name` is a variable on `type_name`
+        and `subtype_name` is a variation on `type_name`
         appropriate to the chosen `tagsets`.
 
         This method is used to direct accesses to `type.`*type_name*
@@ -2399,7 +2397,8 @@ class TagsOntology(SingletonMixin):
       yield type_name, self.typedata(type_name)
 
   def type_names(self):
-    ''' Generator yielding defined type names.
+    ''' Generator yielding defined type names
+        i.e. all entries starting `type.`.
     '''
     for subtagsets in self._subtagsetses:
       for key in subtagsets.tagsets.keys(prefix='type.'):
