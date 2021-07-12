@@ -2454,15 +2454,20 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     subtagsets, subtype_name_ = self._subtagsets_for_type_name(type_name_)
     assert subtype_name_.endswith('.')
     subtype_prefix = subtype_name_[:-1]
+    assert subtype_prefix
     tagsets = subtagsets.tagsets
     unmatch_func = subtagsets.unmatch_func
-    for subkey in tagsets.keys(prefix=(subtype_prefix or None),):
-      assert subkey.startswith(subtype_name_)
-      key = unmatch_func(subkey) if unmatch_func else subkey
-      assert key.startswith(type_name_)
-      if with_tagsets:
-        yield key, tagsets[subkey]
-      else:
+    if with_tagsets:
+      for subkey, tags in tagsets.items(prefix=subtype_prefix):
+        assert subkey.startswith(subtype_name_)
+        key = unmatch_func(subkey) if unmatch_func else subkey
+        assert key.startswith(type_name_)
+        yield key, tags
+    else:
+      for subkey in tagsets.keys(prefix=(subtype_prefix or None),):
+        assert subkey.startswith(subtype_name_)
+        key = unmatch_func(subkey) if unmatch_func else subkey
+        assert key.startswith(type_name_)
         yield key
 
   ################################################################
