@@ -191,6 +191,7 @@ An example:
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
+from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (
@@ -1999,8 +2000,9 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class _TagsOntology_SubTagSets(namedtuple('_TagsOntology_SubTagSets',
-                            'tagsets match_func unmatch_func type_map')):
+class _TagsOntology_SubTagSets(namedtuple(
+    '_TagsOntology_SubTagSets', 'tagsets match_func unmatch_func type_map'),
+                               MultiOpenMixin):
   ''' A specification for a `TagSets` instance backing an ontology.
 
       Each instance has the following attributes:
@@ -2016,6 +2018,14 @@ class _TagsOntology_SubTagSets(namedtuple('_TagsOntology_SubTagSets',
         if this function is `None` the subtype name is returned unchanged.
       * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
   '''
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the enclosed `TagSets`.
+    '''
+    with self.tagsets:
+      X("opened %s", self.tagsets)
+      yield
 
   @classmethod
   @pfx_method(with_args=True)
@@ -2188,7 +2198,7 @@ class _TagsOntology_SubTagSets(namedtuple('_TagsOntology_SubTagSets',
       self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
       return name
 
-class TagsOntology(SingletonMixin):
+class TagsOntology(SingletonMixin, MultiOpenMixin):
   ''' An ontology for tag names.
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
@@ -2305,6 +2315,17 @@ class TagsOntology(SingletonMixin):
 
   def __str__(self):
     return str(self.as_dict())
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open all the sub`TagSets` and close on exit.
+    '''
+    subs = list(self._subtagsetses)
+    for subtagsets in subs:
+      subtagsets.open()
+    yield
+    for subtagsets in subs:
+      subtagsets.close()
 
   @property
   def _default_tagsets(self):
@@ -2875,6 +2896,11 @@ class TagFile(SingletonMixin, BaseTagSets):
 class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
+
+  @contextmanager
+  def run_context(self):
+    with self.options.ontology:
+      yield
 
   def cmd_edit(self, argv):
     ''' Usage: {cmd} entity
