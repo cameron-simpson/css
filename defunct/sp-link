@@ -21,6 +21,7 @@ from os.path import (
 import re
 from subprocess import run, Popen, PIPE
 import sys
+from time import sleep
 from types import SimpleNamespace
 from cs.cmdutils import BaseCommand
 from cs.csvutils import csv_import
@@ -31,6 +32,7 @@ from cs.pfx import Pfx
 from cs.psutils import groupargv
 from cs.py.func import prop
 from cs.x import X
+import matplotlib.pyplot as plt
 
 ENV_BASEDIR = 'SP_LINK_BASEDIR'
 ENV_BASEDIR_DEFAULT = '$HOME/var/sp-link'
@@ -221,20 +223,76 @@ class SPLinkCommand(BaseCommand):
         print(list(dataset.rrd_field_defns()))
 
   @staticmethod
-  def cmd_plot(argv,cfg):
+  def cmd_plot(argv, cfg):
     ''' Usage: {cmd} {{-|csvfile}} plot-cli-arguments
          Plot data from csvfile using the plot-cli "plot" command.
     '''
     csvfilename = argv.pop(0)
     rowcls, rows = csv_import(sys.stdin if csvfilename == '-' else csvfilename)
-    P=Popen(['plot','--header','--index-col','0'],stdin=PIPE,encoding='utf-8')
-    f=P.stdin
-    print('unixtime',*rowcls.names_,sep=',',file=f)
+    P = Popen(
+        ['plot', '--header', '--index-col', '0'], stdin=PIPE, encoding='utf-8'
+    )
+    f = P.stdin
+    print('unixtime', *rowcls.names_, sep=',', file=f)
     for row in rows:
-      print(sp_unixtime(row[0]),*row,sep=',',file=f)
+      print(sp_unixtime(row[0]), *row, sep=',', file=f)
     f.close()
-    exitcode=P.wait()
+    exitcode = P.wait()
     return exitcode
+
+  @staticmethod
+  def cmd_plt(argv, cfg):
+    ''' Usage: {cmd} {{-|csvfile}} [y-columns...]
+         Plot data from csvfile using matplotlib.
+    '''
+
+    def convert_value(value):
+      ''' Convert quoted strings (they all are) to an `int` or `float`.
+        '''
+      try:
+        value = int(value)
+      except ValueError:
+        try:
+          value = float(value)
+        except ValueError:
+          pass
+      return value
+
+    csvfilename = argv.pop(0)
+    rowcls, rows = csv_import(sys.stdin if csvfilename == '-' else csvfilename)
+    # no args? list the available columns
+    if not argv:
+      for header in rowcls.names_:
+        print(header)
+      return 0
+    # iterable of rows with strings promoted to int or float
+    rows = map(lambda row: rowcls(*map(convert_value, row)), rows)
+    # comsume so that we can pull out columns for plotting
+    rows = list(rows)
+    x_values = list(
+        map(lambda row: datetime.fromtimestamp(sp_unixtime(row[0])), rows)
+    )
+    fig, axs = plt.subplots(1,len(argv))
+    if len(argv) == 1:
+      axs=axs,
+    for column, ax in zip(argv,axs):
+      if column.startswith('/'):
+        ptn = column[1:].rstrip('/')
+        X("ptn=%r", ptn)
+        ptn_re = re.compile(ptn, re.I)
+        for header in rowcls.names_:
+          if ptn_re.search(header):
+            print(header)
+            ax.plot(
+                x_values,
+                list(map(lambda row: row[header], rows)),
+                label=header,
+            )
+        ax.set_title(column)
+        ax.set_xlabel("Date/Time")
+        ax.legend()
+    plt.show()
+    ##fig.show()
 
 UNIX_EPOCH = datetime(1970, 1, 1)
 SP_EPOCH = datetime(2001, 1, 1).astimezone()
