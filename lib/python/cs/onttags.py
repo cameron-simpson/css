@@ -62,8 +62,10 @@ class OntCommand(TagsOntologyCommand):
     if ont_path is None:
       ont_path = options.ont_path = expanduser(ONTTAGS_PATH_DEFAULT)
     ont = Ont(ont_path)
-    with stackattrs(options, ontology=ont):
-      yield
+    with ont:
+      with stackattrs(options, ontology=ont):
+        with super().run_context():
+          yield
 
 class Ont(TagsOntology):
   ''' A `TagsOntology` based on a persistent store.
