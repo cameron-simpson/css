@@ -2438,13 +2438,14 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for type_name in self.type_names():
-      yield type_name, self.typedata(type_name)
+    for type_name, typedef in self.by_type('type', with_tagsets=True):
+      yield type_name, typedef
 
   def type_names(self):
     ''' Generator yielding defined type names
         i.e. all entries starting `type.`.
     '''
+    return self.by_type('type')
 
   def by_type(self, type_name, with_tagsets=False):
     ''' Yield keys or (key,tagset) of type `type_name`
