@@ -566,13 +566,23 @@ class SQLTagBasedTest(TagBasedTest, SQTCriterion):
   }
 
   SQL_NAME_VALUE_COMPARISON_FUNCS = {
-      None: lambda entity, name_value: entity.name is not None,
-      '=': lambda entity, name_value: entity.name == name_value,
-      '<=': lambda entity, name_value: entity.name <= name_value,
-      '<': lambda entity, name_value: entity.name < name_value,
-      '>=': lambda entity, name_value: entity.name >= name_value,
-      '>': lambda entity, name_value: entity.name > name_value,
-      '~': lambda entity, name_value: entity.name.like(glob2like(name_value)),
+      None:
+      lambda entity, name_value: entity.name is not None,
+      '=':
+      lambda entity, name_value: (
+          entity.name != None
+          if name_value is None else entity.name == name_value
+      ),
+      '<=':
+      lambda entity, name_value: entity.name <= name_value,
+      '<':
+      lambda entity, name_value: entity.name < name_value,
+      '>=':
+      lambda entity, name_value: entity.name >= name_value,
+      '>':
+      lambda entity, name_value: entity.name > name_value,
+      '~':
+      lambda entity, name_value: entity.name.like(glob2like(name_value)),
       ##'~/': lambda entity, name_value: re.search(name_value, entity.name),
   }
 
