@@ -1627,7 +1627,7 @@ class SQLTags(BaseTagSets):
     if prefix is None:
       criterion = "name"
     else:
-      criterion = f"name~{prefix}*"
+      criterion = 'name>' + Tag.transcribe_value(prefix)
     return self.find(criterion)
 
   @staticmethod
