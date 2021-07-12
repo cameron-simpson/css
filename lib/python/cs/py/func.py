@@ -9,6 +9,7 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
+from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 
 __version__ = '20200518-post'
@@ -20,7 +21,11 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': [
+        'cs.pfx',
+        'cs.py3',
+        'cs.x',
+    ],
 }
 
 def funcname(func):
@@ -43,6 +48,38 @@ def funccite(func):
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
   return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+
+@decorator
+def trace(func, call=True, retval=False, exception=False, pfx=False):
+  ''' Decorator to report the call and return of a function.
+  '''
+
+  citation = funccite(func)
+
+  def traced_function_wrapper(*a, **kw):
+    ''' Wrapper for `func` to trace call and return.
+    '''
+    # late import so that we can use this in modules we import
+    if pfx:
+      from cs.pfx import XP as xlog
+    else:
+      from cs.x import X as xlog
+    if call:
+      xlog("CALL %s (a=%r,kw=%r)...", citation, a, kw)
+    try:
+      retval = func(*a, **kw)
+    except Exception as e:
+      if exception:
+        xlog("CALL %s RAISE %r", citation, e)
+      raise
+    else:
+      if retval:
+        xlog("CALL %s RETURN %r", citation, retval)
+      return retval
+
+  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
+  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
+  return traced_function_wrapper
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
   ''' Call the named `method` on the object `o` if it exists.
@@ -72,13 +109,14 @@ def prop(func):
       into RuntimeErrors.
   '''
 
-  def wrapper(*a, **kw):
+  def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)
     except AttributeError as e:
       raise_from(RuntimeError("inner function %s raised %s" % (func, e)), e)
 
-  return property(wrapper)
+  prop_wrapper.__name__ = "@prop(%s)" % (funcname(func),)
+  return property(prop_wrapper)
 
 def derived_property(
     func,
@@ -95,7 +133,6 @@ def derived_property(
     property_name = '_' + func.__name__
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
-  from cs.x import X
 
   def property_value(self):
     ''' Attempt lockless fetch of property first.
@@ -113,28 +150,9 @@ def derived_property(
           p_revision = getattr(self, property_revision_name, 0)
           o_revision = getattr(self, original_revision_name)
           if p is unset_object or p_revision < o_revision:
-            X(
-                "COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name,
-                p_revision, o_revision
-            )
             p = func(self)
             setattr(self, property_name, p)
-            X(
-                "COMPUTE .%s: set .%s to %s", property_name,
-                property_revision_name, o_revision
-            )
             setattr(self, property_revision_name, o_revision)
-          else:
-            ##debug("inside lock, already computed up to date %s", property_name)
-            pass
-        X(
-            "property_value returns new: property_name=%s, new revision=%s, ref revision=%s",
-            property_name, getattr(self, property_revision_name),
-            getattr(self, original_revision_name)
-        )
-      else:
-        ##debug("outside lock, already computed up to date %s", property_name)
-        pass
     except AttributeError as e:
       raise_from(RuntimeError("AttributeError: %s" % (e,)), e)
     return p

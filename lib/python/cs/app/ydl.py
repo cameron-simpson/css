@@ -41,10 +41,9 @@ from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
-from cs.tagset import Tag
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20200621-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -60,12 +59,15 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
+        'cs.excutils',
         'cs.fstags',
         'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
         'cs.result',
         'cs.tagset',
-        'cs.upd',
+        'cs.upd>=multiline',
         'youtube_dl',
     ],
     'entry_points': {
@@ -82,10 +84,10 @@ DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
 
 FSTAGS_PREFIX = 'youtube_dl'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return YDLCommand().run(argv, cmd=cmd)
+  return YDLCommand(argv).run()
 
 class YDLCommand(BaseCommand):
   ''' `ydl` command line implementation.
@@ -95,28 +97,27 @@ class YDLCommand(BaseCommand):
   USAGE_FORMAT = '''Usage: {cmd} [-f] {{URLs|-}}...
     -f  Force download - do not use the cache.'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Initial defaults options.
     '''
-    options.ydl_opts = dict(logger=options.loginfo.logger)
+    self.options.ydl_opts = dict(logger=self.loginfo.logger)
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Command line main switches.
     '''
+    options = self.options
     for opt, val in opts:
       if opt == '-f':
         options.ydl_opts.update(cachedir=False)
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
-  @staticmethod
-  def main(argv, options):
+  def main(self, argv):
     ''' Command line main programme.
     '''
     if not argv:
       raise GetoptError("missing URLs")
+    options = self.options
     with FSTags() as fstags:
       over_ydl = OverYDL(fstags=fstags, ydl_opts=options.ydl_opts)
       for url in argv:
@@ -131,8 +132,6 @@ class YDLCommand(BaseCommand):
           over_ydl.queue(url)
       for _ in over_ydl.report():
         pass
-
-YDLCommand.add_usage_to_docstring()
 
 # pylint: disable=too-many-instance-attributes
 class OverYDL:
@@ -152,7 +151,7 @@ class OverYDL:
     if all_progress is None:
       all_progress = OverProgress()
     self.upd = upd
-    self.proxy0 = upd.proxy(0)
+    self.proxy0 = upd.insert(0)
     self.fstags = fstags
     self.all_progress = all_progress
     self.ydl_opts = ydl_opts
@@ -327,7 +326,7 @@ class YDL:
         tagged_path = self.fstags[output_path]
         for key, value in ie_result.items():
           tag_name = FSTAGS_PREFIX + '.' + key
-          tagged_path.direct_tags.add(Tag(tag_name, value))
+          tagged_path.set(tag_name, value)
         self.fstags.sync()
         print(output_path)
       except DownloadError as e:

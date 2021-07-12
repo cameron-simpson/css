@@ -1,0 +1,7 @@
+CornuCopyBuffer.from_file: changes to the test for a .seek method.
+CornuCopyBuffer.read: call extend with short_ok=True.
+CornuCopyBuffer.from_fd: record the fd as .fd, lets users os.fstat(bfr.fd).
+New CornuCopyBuffer.as_fd method to return a readable file descriptor fed from the buffer by a Thread, intended for feeding subprocesses.
+New CornuCopyBuffer.iter(maxlength) to return an iterator of up to maxlength bytes.
+CornuCopyBuffer.__init__: new "close" parameter to release resources; new CornuCopyBuffer.close method to call this.
+Some small fixes.

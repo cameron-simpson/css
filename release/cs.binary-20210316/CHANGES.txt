@@ -1,0 +1,3 @@
+lib/python/cs/binary.py: cs.binary: switch aound scan and scan_with_offsets so that scan is the inner function - it is the common case and will be a bit faster this way
+lib/python/cs/binary.py: cs.binary: BSUInt: rename parse_bytes to decode_bytes, the former name conflicted with BinaryMixin.parse_bytes and broken the semantics
+lib/python/cs/binary.py: cs.binary: BinaryMixin.scan_with_offsets: bugfix call to scan()

@@ -1,0 +1,1 @@
+lib/python/cs/serialise.py: cs.serialise: drop tests, mark as Development Status :: 7 - Inactive in PyPI

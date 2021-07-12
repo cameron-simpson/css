@@ -38,6 +38,8 @@ import os
 import sys
 from cs.ansi_colour import colourise
 
+__version__ = '20210123-post'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
@@ -59,6 +61,7 @@ else:
 X_logger = None
 # set to true to write direct to /dev/tty
 X_via_tty = os.environ.get('CS_X_VIA_TTY', '')
+X_default_colour = os.environ.get('CS_X_COLOUR')
 
 def X(msg, *args, **kw):
   ''' Unconditionally write the message `msg`.
@@ -85,7 +88,7 @@ def X(msg, *args, **kw):
       `X_discard` is true unless `sys.stderr.isatty()` is true.
   '''
   fp = kw.pop('file', None)
-  colour = kw.pop('colour', None)
+  colour = kw.pop('colour', X_default_colour)
   if kw:
     raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
@@ -143,3 +146,8 @@ def Xtty(msg, *args, **kw):
   X_via_tty = True
   X(msg, *args, **kw)
   X_via_tty = old
+
+def Y(msg, *a, **kw):
+  ''' Wrapper for `X()` rendering in yellow.
+  '''
+  X(msg, *a, colour='yellow', **kw)

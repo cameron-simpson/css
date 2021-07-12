@@ -1,0 +1,7 @@
+Some formatting improvements.
+BaseProgress.bar: new insert_pos parameter to position the progress bar, default still 1.
+BaseProgress.bar: new deferred parameter putting off the status bar until the first update.
+BaseProgress.bar: accept new optional `proxy` parameter to use (and not delete) an existing UpdProxy for display.
+Progress.text_pos_of_total: new `pos_first=False` parameter, rendering the total before the position by default (less progress bar noise).
+New @auto_progressbar decorator to provide a progress bar and initialise progress= parameter to functions which can use a Progress for reporting.
+Assorted fixes.

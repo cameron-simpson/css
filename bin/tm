@@ -91,8 +91,9 @@ usage="Usage: $cmd [options...] [op [args...]]
       These sessions are started from the \$HOME directory.
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name [tmux-new-session-options...]
+    use-session session-name [-d] [tmux-new-session-options...]
       Join the session named \"session-name\", creating it if necessary.
+      -d  Detached: do not attach to the session.
       If the session does not exist:
         a) run the supplied command if specified, otherwise \$SHELL.
         b) pass each keyline with a trailing carriage return.
@@ -167,6 +168,7 @@ case "$op" in
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
+    detached=
     ;;
   up | down | left |right )
     if [ $# -gt 0 ]
@@ -268,6 +270,19 @@ case "$op" in
   start)
     ;;
   use-session)
+    detached=
+    while [ $# -gt 0 ]
+    do
+      case "$1" in
+        -d) detached=1 ;;
+        --) shift; break ;;
+        -?*)echo "unsupported $op option: $1" >&2
+            badopts=1
+            ;;
+        *)  break ;;
+      esac
+      shift
+    done
     if [ $# = 0 ]
     then
       echo "$cmd: $op: missing session-name" >&2
@@ -509,10 +524,12 @@ case "$op" in
       }
       do_tmux new-session -d -s "$session_name" "$@"
     }
-    if [ -n "$TMUX" ]
-    then do_tmux switch-client -t "$session_name"
-    else do_tmux attach-session -t "$session_name"
-    fi
+    [ $detached ] || {
+      if [ -n "$TMUX" ]
+      then do_tmux switch-client -t "$session_name"
+      else do_tmux attach-session -t "$session_name"
+      fi
+    }
     ;;
   use-session-remote)
     # connect to remote session, tmux by choice, screen if no tmux

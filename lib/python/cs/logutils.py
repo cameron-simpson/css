@@ -69,7 +69,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20200729-post'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -90,11 +90,15 @@ DEFAULT_PFX_FORMAT_TTY = '%(pfx)s: %(message)s'
 
 # High level action tracking, above INFO and below WARNING.
 TRACK = logging.INFO + 5
-assert TRACK < logging.WARNING
 
 # Special status line tracking, above INFO and below TRACK and WARNING
 STATUS = TRACK - 1
-assert STATUS > logging.INFO and STATUS < logging.WARNING
+
+# Special verbose value, below INFO but above DEBUG.
+VERBOSE = logging.INFO - 1
+
+# check the hierarchy
+assert logging.DEBUG < VERBOSE < logging.INFO < STATUS < TRACK < logging.WARNING
 
 loginfo = None
 D_mode = False
@@ -107,6 +111,8 @@ def ifdebug():
     loginfo = setup_logging()
   return loginfo.level <= logging.DEBUG
 
+# pylint: disable=too-many-branches,too-many-statements,too-many-locals
+# pylint: disable=too-many-arguments,redefined-builtin
 def setup_logging(
     cmd_name=None,
     main_log=None,
@@ -183,7 +189,7 @@ def setup_logging(
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  import cs.pfx
+  import cs.pfx  # pylint: disable=import-outside-toplevel
   cs.pfx.cmd = cmd_name
 
   if main_log is None:
@@ -232,9 +238,11 @@ def setup_logging(
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
+    # pylint: disable=import-outside-toplevel
     import signal
     import cs.debug
 
+    # pylint: disable=unused-argument
     def handler(sig, frame):
       cs.debug.thread_dump(None, main_log)
 
@@ -299,6 +307,7 @@ def setup_logging(
   loginfo = NS(
       logger=root_logger,
       level=level,
+      verbose=verbose,
       trace_level=trace_level,
       flags=flags,
       module_names=module_names,
@@ -385,20 +394,21 @@ class PfxFormatter(Formatter):
     record.message = s
     return s
 
+# pylint: disable=too-many-branches,too-many-statements
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
       comes from the environment variable `$DEBUG`.
 
       Usually default to `logging.WARNING`, but if `sys.stderr` is a terminal,
-      default to `STATUS`.
+      default to `logging.INFO`.
 
       Parse the environment variable `$DEBUG` as a comma separated
       list of flags.
 
       Examine the in sequence flags to affect the logging level:
-      * `numeric < 1`: `logging.WARNING`
-      * `numeric >= 1 and < 2`: `logging.INFO`
-      * `numeric >= 2`: `logging.DEBUG`
+      * numeric < 1: `logging.WARNING`
+      * numeric >= 1 and < 2: `logging.INFO`
+      * numeric >= 2: `logging.DEBUG`
       * `"DEBUG"`: `logging.DEBUG`
       * `"STATUS"`: `STATUS`
       * `"INFO"`: `logging.INFO`
@@ -416,16 +426,12 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
     if environ is None:
       environ = os.environ
     env_debug = os.environ.get('DEBUG', '')
+  level = TRACK
   if verbose is None:
-    if sys.stderr.isatty():
-      level = STATUS
-    else:
+    if not sys.stderr.isatty():
       level = logging.WARNING
   elif verbose:
-    if sys.stderr.isatty():
-      level = STATUS
-    else:
-      level = logging.INFO
+    level = logging.VERBOSE
   else:
     level = logging.WARNING
   flags = [F.upper() for F in env_debug.split(',') if len(F)]
@@ -461,6 +467,7 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
         level = logging.INFO
       elif uc_flag == 'TRACK':
         level = TRACK
+      # pylint: disable=consider-using-in
       elif uc_flag == 'WARN' or uc_flag == 'WARNING':
         level = logging.WARNING
       elif uc_flag == 'ERROR':
@@ -481,6 +488,7 @@ def D(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# pylint: disable=too-many-arguments,redefined-builtin
 def add_logfile(
     filename,
     logger=None,
@@ -536,7 +544,6 @@ class NullHandler(logging.Handler):
   def emit(self, record):
     ''' Discard the log record.
     '''
-    pass
 
 __logExLock = Lock()
 
@@ -589,18 +596,24 @@ def track(msg, *args, **kwargs):
   log(TRACK, msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
-def ifverbose(verbose, msg, *args, **kwargs):
-  ''' Conditionally log a message.
-      If verbose is `None`
-      then the caller has not indicated a specific verbosity
-      and we use the `track` function.
-      If verbose is true
-      then we use the `info` function.
+def verbose(msg, *args, **kwargs):
+  ''' Emit a log at `VERBOSE` level with the current `Pfx` prefix.
   '''
-  if verbose is None:
+  log(VERBOSE, msg, *args, **kwargs)
+
+@logging_wrapper(stacklevel_increment=1)
+def ifverbose(is_verbose, msg, *args, **kwargs):
+  ''' Conditionally log a message.
+
+      If `is_verbose` is `None`, log at `VERBOSE` level and rely on the logging setup.
+      Otherwise, if `is_verbose` is true, log at `INFO` level.
+  '''
+  if is_verbose is None:
+    # emit at VERBOSE level, use the logging handler levels to emit or not
+    verbose(msg, *args, **kwargs)
+  elif is_verbose:
+    # emit at INFO level
     info(msg, *args, **kwargs)
-  elif verbose:
-    track(msg, *args, **kwargs)
 
 @logging_wrapper(stacklevel_increment=1)
 def warning(msg, *args, **kwargs):
@@ -752,6 +765,7 @@ if __name__ == '__main__':
 
   @logging_wrapper
   def test_warning(msg, *a, **kw):
+    'test function for warning'
     warning(msg, *a, **kw)
 
   setup_logging(

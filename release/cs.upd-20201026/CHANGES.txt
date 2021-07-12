@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: Release information for cs.upd-20201025.
+lib/python/cs/upd.py: cs.upd: Upd.insert: accept insert(1) when len(self)==0

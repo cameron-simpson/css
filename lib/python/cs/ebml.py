@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 #
+# Cameron Simpson <cs@cskk.id.au>
+#
 
-''' yet another implementation of EBML (Extensible Binary Meta Language).
-
-    Cameron Simpson <cs@cskk.id.au>
+''' Yet another implementation of EBML (Extensible Binary Meta Language).
 '''
 
-from cs.binary import PacketField
-from cs.x import X
+from cs.binary import BinarySingleValue
 
 def get_length_encoded_bytes(bfr) -> bytes:
   ''' Read a run length encoded byte sequence
@@ -71,33 +70,46 @@ def transcribe_length_encoded_value(value):
   bvalues[-1] |= bitmask
   return bytes(reversed(bvalues))
 
-class ElementID(PacketField):
+class ElementID(BinarySingleValue):
   ''' An ElementID.
   '''
 
   @staticmethod
-  def value_from_buffer(bfr):
-    bitmask, bs = get_length_encoded_bytes(bfr)
-    assert bs and len(bs) <= 4
-    return bs
+  def parse_buffer(bfr):
+    ''' Read and return an `ElementID` value from the buffer.
+    '''
+    _, element_id_bs = get_length_encoded_bytes(bfr)
+    assert element_id_bs and len(element_id_bs) <= 4
+    return element_id_bs
 
+  # pylint: disable=arguments-differ
   @staticmethod
-  def transcribe_value(bs):
-    return bs
+  def transcribe_value(element_id_bs):
+    ''' Return the binary transcription of an `ElementID` value.
+    '''
+    return transcribe_length_encoded_value(element_id_bs)
 
-class DataSize(PacketField):
+class DataSize(BinarySingleValue):
   ''' A run length encoded data size.
   '''
 
   @staticmethod
-  def value_from_buffer(bfr):
+  def parse_buffer(bfr):
+    ''' Fetch a data size.
+    '''
     return get_length_encoded_value(bfr)
 
+  # pylint: disable=arguments-differ
   @staticmethod
-  def transcribe_value(value):
-    return transcribe_length_encoded_value(value)
+  def transcribe_value(date_size):
+    ''' Transcribe a data size.
+    '''
+    return transcribe_length_encoded_value(date_size)
 
-if __name__ == '__main__':
+def selftest():
+  ''' Run some self tests.
+  '''
+  # pylint: disable=import-outside-toplevel
   from cs.buffer import CornuCopyBuffer
   for n in (0, 1, 2, 3, 16, 17, 127, 128, 129, 32767, 32768, 32769, 65535,
             65536, 65537):
@@ -117,3 +129,6 @@ if __name__ == '__main__':
     ds2 = DataSize(n)
     bs3 = bytes(ds2)
     assert bs == bs3
+
+if __name__ == '__main__':
+  selftest()

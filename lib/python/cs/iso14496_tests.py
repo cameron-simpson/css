@@ -1,20 +1,17 @@
 #!/usr/bin/python
-#
-# Unit tests for cs.iso14496.
-#   - Cameron Simpson <cs@cskk.id.au> 06may2017
-#
+
+''' Unit tests for cs.iso14496.
+'''
 
 from __future__ import print_function
 import sys
 import os
 import os.path
 import unittest
+from cs.logutils import setup_logging
 from .binary_tests import _TestPacketFields
-from .fileutils import read_from
-from .logutils import D
-from .iso14496 import parse_file
+from .iso14496 import parse
 from . import iso14496 as iso14496_module
-from .x import X
 
 TESTFILE = 'TEST.mp4'
 
@@ -24,22 +21,18 @@ class Test_iso14496(unittest.TestCase):
 
   @unittest.skipUnless(os.path.exists(TESTFILE), 'no ' + TESTFILE)
   def test(self):
+    ''' Basic scan of the test MP4 file.
+    '''
     S = os.stat(TESTFILE)
     mp4_size = S.st_size
-    total_blocks = 0
     with open(TESTFILE, 'rb') as mp4fp:
-      total_size = 0
-      for B in parse_file(mp4fp):
-        total_blocks += 1
-        total_size += B.length
-        X("Box %s, %d bytes", bytes(B.box_type), B.length)
-    X(
-        "%s: total top level blocks = %d, total_size = %d", TESTFILE,
-        total_blocks, total_size
-    )
+      over_box = parse(mp4fp)
+      self.assertEqual(over_box.end_offset - over_box.offset, mp4fp.tell())
+    self.assertEqual(over_box.offset, 0)
     self.assertEqual(
-        total_size, mp4_size,
-        "file size = %d, frames total = %d" % (mp4_size, total_size)
+        over_box.end_offset, mp4_size,
+        "over_box.end_offset=%d, mp4fp.tell=%d" %
+        (over_box.end_offset, mp4_size)
     )
 
 class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
@@ -54,6 +47,9 @@ class TestISO14496PacketFields(_TestPacketFields, unittest.TestCase):
     self.module = iso14496_module
 
 def selftest(argv, **kw):
+  ''' Run the unit tests.
+  '''
+  setup_logging(__file__)
   sys.argv = argv
   unittest.main(__name__, defaultTest=None, argv=argv, failfast=True, **kw)
 

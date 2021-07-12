@@ -22,7 +22,7 @@ default_composedir=$HOME/var/mutt/compose
 : ${TMPDIR:=/tmp}
 : ${TMUX:=''}
 wprog=${MUTTEDIT_WINDOWPROG:-}
-editor=${MUTTEDIT_EDITOR:-${EDITOR:-$default_editor}}
+editor=${MUTTEDIT_EDITOR:-$default_editor}
 composedir=${MUTTEDIT_COMPOSEDIR:-"$default_composedir"}
 
 cmd=$0
@@ -122,7 +122,7 @@ filename=$tmpf
 
 set -- \
   rmafter "$filename" \
-    mutt -e "set editor=$editor" -e 'unset signature' -H "$filename"
+    mutt -e "set editor=$editor" -e 'unset signature' -e 'set sidebar_visible=no' -H "$filename"
 
 if tmux start-server
 then  use_tmux=1
