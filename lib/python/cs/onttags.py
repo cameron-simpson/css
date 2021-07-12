@@ -38,6 +38,8 @@ class OntCommand(TagsOntologyCommand):
       'ONTTAGS_PATH_ENVVAR': ONTTAGS_PATH_ENVVAR,
   }
 
+  SUBCOMMAND_ARGV_DEFAULT = 'type'
+
   def apply_defaults(self):
     ''' Provide a default `self.options.ont_path`.
     '''
