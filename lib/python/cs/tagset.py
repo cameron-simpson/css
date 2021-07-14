@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from cs.py.func import trace
+from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -2293,12 +2295,15 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     ''' Yield keys or (key,tagset) of type `type_name`
         i.e. all keys commencing with *type_name*`.`.
     '''
+    X("by_type(%r,..)...", type_name)
     type_name_ = type_name + '.'
     subtagsets = self._subtagsets_for_type_name(type_name)
     subtype_name_ = subtagsets.subtype_name(type_name) + '.'
     tagsets = subtagsets.tagsets
+    X("  tagsets = %s", tagsets)
     if with_tagsets:
       for subkey, tags in tagsets.items(prefix=subtype_name_):
+        X("  subkey = %r, tags=%s", subkey, tags)
         assert subkey.startswith(subtype_name_)
         key = subtagsets.key(subkey)
         X("  => key=%r", key)
@@ -2306,8 +2311,10 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         yield key, tags
     else:
       for subkey in tagsets.keys(prefix=subtype_name_):
+        X("  subkey = %r", subkey)
         assert subkey.startswith(subtype_name_)
         key = subtagsets.key(subkey)
+        X("  => key=%r", key)
         assert key.startswith(type_name_)
         yield key
 
@@ -2389,12 +2396,14 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
+    X("ONT Metadata: type_name=%r, value=%r", type_name, value)
     md = None
     typedef = (
         TagSet() if type_name == 'type' else self.metadata('type', type_name)
     )
     primary_type_name = typedef.type_name
     if primary_type_name:
+      X("metadata(%r,..): type_name => %r", type_name, primary_type_name)
       type_name = primary_type_name
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
@@ -2818,22 +2827,33 @@ class TagsOntologyCommand(BaseCommand):
             tags.edit()
           else:
             # edit the metadata of this type
-            meta_names = ont.meta_names(type_name=type_name)
-            if not meta_names:
-              error("no metadata of type %r", type_name)
-              return 1
-            selected = set()
-            for ptn in argv:
-              selected.update(fn_filter(meta_names, ptn))
-            indices = [
-                ont._meta_ref(type_name, value) for value in sorted(selected)
-            ]
-            ont.edit_indices(indices, prefix=ont._meta_ref(type_name) + '.')
+            # obtain the collection
+            type_name_ = type_name + '.'
+            tagset_map = {}
+            for key, tagset in ont.by_type(type_name, with_tagsets=True):
+              assert key.startswith(type_name_)
+              print("%r vs %r" % (key, argv))
+              if any(map(lambda ptn: fnmatchcase(key, ptn), argv)):
+                print("matched")
+                subkey = cutprefix(key, type_name_)
+                assert subkey not in tagset_map
+                tagset_map[subkey] = tagset
+            for old_subkey, new_subkey, new_tags in TagSet.edit_many(
+                tagset_map, verbose=True):
+              X("edit_many: %r=>%r %s", old_subkey, new_subkey, new_tags)
+              tags = tagset_map[old_subkey]
+              if old_subkey != new_subkey:
+                warning(
+                    "rename not implemented, skipping %r => %r", old_subkey,
+                    new_subkey
+                )
+              tags.set_from(new_tags, verbose=True)
+              X("tags => %s", tags)
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
-          for meta_name in sorted(ont.meta_names(type_name=type_name)):
+          for meta_name in sorted(ont.meta_names(type_name)):
             print(meta_name, ont.metadata(type_name, meta_name))
           return 0
         if subcmd == '+':
@@ -3011,13 +3031,20 @@ def selftest(argv):
   )
   print(ont)
   tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-  pprint(tags.as_dict())
+  print("tags =", tags)
+  print(tags['colour'])
+  colour = Tag('colour', 'blue')
+  print(colour)
+  print(colour.metadata(ontology=ont))
+  print("================")
   tags['aa.bb'] = 'aabb'
   tags['aa'] = 'aa'
+  pprint(tags.as_dict())
   for format_str in argv:
-    print(format_str)
+    X("FORMAT_STR = %r", format_str)
+    ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
-    print("tag.format_as() => ", formatted)
+    print("tag.format_as(%r) => %s" % (format_str, formatted))
 
 if __name__ == '__main__':
   import sys

@@ -5,15 +5,21 @@
 
 from contextlib import contextmanager
 import os
-from os.path import expanduser, isfile as isfilepath
+from os.path import (
+    expanduser, isdir as isdirpath, isfile as isfilepath, join as joinpath
+)
 import sys
 from typeguard import typechecked
 from cs.context import stackattrs
 from cs.fstags import TagFile
+from cs.lex import cutsuffix
+from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagsOntology, TagsOntologyCommand
+
+from cs.x import X
 
 ONTTAGS_PATH_DEFAULT = '~/var/ontology.sqlite'
 ONTTAGS_PATH_ENVVAR = 'ONTTAGS'
@@ -74,21 +80,49 @@ class Ont(TagsOntology):
   @typechecked
   def __init__(self, ont_path: str):
     self.ont_path = ont_path
-    tagsets = self.tagsets_from_path(ont_path)
+    tagsets, ont_pfx_map = self.tagsetses_from_path(ont_path)
     super().__init__(tagsets)
+    # apply any prefix TagSetses
+    for prefix, subtagsets in sorted(ont_pfx_map.items(), key=lambda item:
+                                     (len(item[0]), item[0])):
+      prefix_ = prefix + '.'
+      X("add %r => %s", prefix_, subtagsets)
+      self.add_tagsets(subtagsets, prefix_)
 
   @staticmethod
-  def tagsets_from_path(ont_path):
-    ''' Return a `BaseTagSets` instance from `ont_path`,
+  def tagsetses_from_path(ont_path):
+    ''' Return `(tagsets, `BaseTagSets` instance from `ont_path`,
         provided for subclassing.
     '''
-    if not isfilepath(ont_path):
-      raise ValueError("not a file: %r" % (ont_path,))
-    if ont_path.endswith('.sqlite'):
-      tagsets = SQLTags(ont_path)
+    ont_pfx_map = {}
+    if isfilepath(ont_path):
+      if ont_path.endswith('.sqlite'):
+        tagsets = SQLTags(ont_path)
+      else:
+        tagsets = TagFile(ont_path)
+    elif isdirpath(ont_path):
+      with Pfx("listdir(%r)", ont_path):
+        for subont_name in os.listdir(ont_path):
+          if not subont_name or subont_name.startswith('.'):
+            continue
+          subont_path = joinpath(ont_path, subont_name)
+          with Pfx(subont_path):
+            if not isfilepath(subont_path):
+              warning("not a file")
+            prefix = cutsuffix(subont_name, '.sqlite')
+            if prefix is not subont_name:
+              ont_pfx_map[prefix] = SQLTags(subont_path)
+              continue
+            prefix = cutsuffix(subont_name, '.tags')
+            if prefix is not subont_name:
+              ont_pfx_map[prefix] = TagFile(subont_path)
+              continue
+            warning("unsupported name, does not end in .sqlite or .tags")
+            continue
+      tagsets = ont_pfx_map.pop('_', None)
     else:
-      tagsets = TagFile(ont_path)
-    return tagsets
+      raise ValueError(f"unsupported ont_path={ont_path!r}")
+    return tagsets, ont_pfx_map
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

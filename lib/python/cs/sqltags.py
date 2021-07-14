@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -1053,6 +1054,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         The `criteria` should be an iterable of `SQTCriterion` instances
         used to construct the query.
     '''
+    X("search(%r,...)...", criteria)
     entities = self.entities
     tags = self.tags
     # first condition:
@@ -1115,8 +1117,10 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             continue
           sqlps.append(sqlp)
     query = session.query(entities.id, entities.unixtime, entities.name)
+    X("query start: %s", query)
     prev_entity_id_column = entities.id
     if entity_tests:
+      X(".filter(*%r)", entity_tests)
       query = query.filter(*entity_tests)
     for tag_name, tag_tests in per_tag_tests.items():
       alias = per_tag_aliases[tag_name]
@@ -1153,6 +1157,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         )
       else:
         raise ValueError("unrecognised mode")
+    X("final query = %s", query)
     return query
 
 class SQLTagSet(SingletonMixin, TagSet):
@@ -1469,7 +1474,7 @@ class SQLTags(BaseTagSets):
     self.db_url = db_url
     self.ontology = ontology
     self._lock = RLock()
-    self.tags = SQLTagProxies(self.orm)
+    ## UNUSED? ## self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
     return "%s(db_url=%r)" % (
@@ -1584,6 +1589,7 @@ class SQLTags(BaseTagSets):
         Constrain the names to those starting with `prefix`
         if not `None`.
     '''
+    X("%s.keys(prefix=%r)...", self, prefix)
     entities = self.orm.entities
     entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
@@ -1592,12 +1598,15 @@ class SQLTags(BaseTagSets):
       q = q.where(name_column.isnot(None))
     else:
       q = q.where(name_column.like(prefix2like(prefix, '\\'), '\\'))
+    X("q=%s", q)
     conn = self.orm.engine.connect()
     result = conn.execute(q)
     for row in result:
       name = row.name
       if prefix is None or name.startswith(prefix):
         yield name
+      else:
+        X("unexpected name=%r", name)
     conn.close()
 
   def __iter__(self):
@@ -1686,12 +1695,16 @@ class SQLTags(BaseTagSets):
       criteria = [criteria]
     else:
       criteria = list(criteria)
+    X("find: criteria=%r", criteria)
     post_criteria = []
     for i, criterion in enumerate(criteria):
+      cr0 = criterion
       with Pfx(str(criterion)):
         if isinstance(criterion, str):
           criterion = criteria[i] = SQTCriterion.from_str(criterion)
+          X("%r => %r", cr0, criterion)
         if not criterion.SQL_COMPLETE:
+          X("has post")
           post_criteria.append(criterion)
     with self.db_session() as session:
       orm = self.orm
@@ -1903,7 +1916,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(sqltags.find(tag_criteria))
-    changed_tes = SQLTagSet.edit_entities(tes)  # verbose=state.verbose
+    changed_tes = TagSet.edit_many(tes)  # verbose=state.verbose
     for te in changed_tes:
       print("changed", repr(te.name or te.id))
 
@@ -2225,28 +2238,41 @@ class SQLTagsCommand(BaseSQLTagsCommand):
   '''
 
   def cmd_list(self, argv):
-    ''' Usage: {cmd} entity-names...
+    ''' Usage: {cmd} [entity-names...]
           List entities and their tags.
     '''
-    if not argv:
-      raise GetoptError("missing entity_names")
     xit = 0
     options = self.options
     sqltags = options.sqltags
-    for name in argv:
-      with Pfx(name):
-        try:
-          index = int(name)
-        except ValueError:
-          index = name
-        te = sqltags.get(index)
-        if te is None:
-          error("missing")
-          xit = 1
-          continue
-        print(name)
-        for tag in sorted(te.tags()):
-          print(" ", tag)
+    long_mode = False
+    if argv and argv[0] == '-l':
+      long_mode = true
+    if not argv:
+      if long_mode:
+        for name, tags in sorted(sqltags.items()):
+          with Pfx(name):
+            print(name)
+            for tag in sorted(tags):
+              print(" ", tag)
+      else:
+        for name in sorted(sqltags.keys()):
+          with Pfx(name):
+            print(name)
+    else:
+      for name in argv:
+        with Pfx(name):
+          try:
+            index = int(name)
+          except ValueError:
+            index = name
+          tags = sqltags.get(index)
+          if tags is None:
+            error("missing")
+            xit = 1
+            continue
+          print(name)
+          for tag in sorted(tags):
+            print(" ", tag)
     return xit
 
   cmd_ls = cmd_list

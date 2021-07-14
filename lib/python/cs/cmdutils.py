@@ -567,7 +567,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
+  def cmd_help(cls, argv):  # pylint: disable=unused-argument
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.
