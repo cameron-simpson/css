@@ -1251,40 +1251,86 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
 
-class PrefixedMappingProxy:
+class RemappedMappingProxy:
+  ''' A proxy for another mapping
+      with translation functions between the external keys
+      and the keys used inside the other mapping.
+  '''
+
+  def __init__(self, mapping, to_subkey, from_subkey):
+    self.mapping = mapping
+    self._to_subkey = to_subkey
+    self._from_subkey = from_subkey
+    self._mapped_keys = {}
+    self._mapped_subkeys = {}
+
+  def subkey(self, key):
+    ''' Return the internal key for `key`.
+    '''
+    try:
+      subk = self._mapped_keys[key]
+    except KeyError:
+      subk = self._to_subkey(key)
+      assert subk not in self._mapped_subkeys
+      self._mapped_keys[key] = subk
+      self._mapped_subkeys[subk] = key
+    return subk
+
+  def key(self, subkey):
+    ''' Return the external key for `subkey`.
+    '''
+    try:
+      k = self._mapped_subkeys[subkey]
+    except KeyError:
+      k = self._from_subkey(subkey)
+      assert k not in self._mapped_keys
+      self._mapped_keys[k] = subkey
+      self._mapped_subkeys[subkey] = k
+    return k
+
+  def keys(self, select_key=None):
+    ''' Yield the external keys.
+    '''
+    key_iter = self.mapping.keys()
+    if select_key is not None:
+      key_iter = filter(lambda subkey: select_key(self.key(subkey)), key_iter)
+    return map(self.key, key_iter)
+
+  def __contains__(self, key):
+    return self.subkey(key) in self.mapping
+
+  def __getitem__(self, key):
+    return self.mapping[self.subkey(key)]
+
+  def get(self, key, default=None):
+    ''' Return the value for key `key` or `default`.
+    '''
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
+  def __setitem__(self, key, v):
+    self.mapping[self.subkey(key)] = v
+
+  def __delitem__(self, key):
+    del self.mapping[self.subkey(key)]
+
+class PrefixedMappingProxy(RemappedMappingProxy):
   ''' A proxy for another mapping
       operating on keys commencing with a prefix.
   '''
 
   def __init__(self, mapping, prefix):
-    self.mapping = mapping
+    super().__init__(
+        mapping,
+        lambda key: prefix + key,
+        lambda subkey: cutprefix(subkey, prefix),
+    )
     self.prefix = prefix
 
+  # pylint: disable=arguments-differ
   def keys(self):
     ''' Yield the post-prefix suffix of the keys in `self.mapping`.
     '''
-    prefix = self.prefix
-    return map(
-        lambda k: cutprefix(k, prefix),
-        filter(lambda k: k.startswith(prefix), self.mapping.keys())
-    )
-
-  def __contains__(self, k):
-    return self.prefix + k in self.mapping
-
-  def __getitem__(self, k):
-    return self.mapping[self.prefix + k]
-
-  def get(self, k, default=None):
-    ''' Return the value for key `k` or `default`.
-    '''
-    try:
-      return self[k]
-    except KeyError:
-      return default
-
-  def __setitem__(self, k, v):
-    self.mapping[self.prefix + k] = v
-
-  def __delitem__(self, k):
-    del self.mapping[self.prefix + k]
+    return super().keys(lambda subkey: subkey.startswith(self.prefix))
