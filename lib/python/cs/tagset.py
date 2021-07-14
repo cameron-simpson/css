@@ -1218,7 +1218,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   @property
   @pfx_method(use_str=True)
-  def typedata(self):
+  def typedef(self):
     ''' The defining `TagSet` for this tag's name.
 
         This is how its type is defined,
@@ -1232,11 +1232,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont.typedata(self.name)
+    return ont.typedef(self.name)
 
   @property
   @pfx_method(use_str=True)
-  def key_typedata(self):
+  def key_typedef(self):
     ''' The typedata definition for this `Tag`'s keys.
 
         This is for `Tag`s which store mappings,
@@ -1253,7 +1253,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont.typedata(key_type)
+    return ont.typedef(key_type)
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
@@ -1277,7 +1277,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   @property
   @pfx_method(use_str=True)
-  def member_typedata(self):
+  def member_typedef(self):
     ''' The typedata definition for this `Tag`'s members.
 
         This is for `Tag`s which store mappings or sequences,
@@ -1295,7 +1295,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont.typedata(member_type)
+    return ont.typedef(member_type)
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
@@ -2429,7 +2429,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   ##################################################################
   # Types.
 
-  def typedata(self, type_name):
+  def typedef(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     tagsets, subtype_name = self._tagsets_for_type_name(type_name)
@@ -2964,7 +2964,7 @@ class TagsOntologyCommand(BaseCommand):
       return 0
     type_name = argv.pop(0)
     with Pfx(type_name):
-      tags = ont.typedata(type_name)
+      tags = ont.typedef(type_name)
       if not argv:
         print("Tags for type", type_name, "=", tags)
         for tag in sorted(tags):
