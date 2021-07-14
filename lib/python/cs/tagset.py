@@ -851,7 +851,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     if editor is None:
       editor = EDITOR
     try:
-      items = tes.items
+      tes.items
     except AttributeError:
       te_map = {te.name or te.id: te for te in tes}
     else:
