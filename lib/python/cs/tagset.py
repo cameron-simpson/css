@@ -2292,25 +2292,15 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
 
         The new `_TagsOntology_SubTagSets` instance is initialised
         from the supplied `tagsets, match, unmatch` parameters.
-
-        Examples:
-
-            >>> from os.path import expanduser as u
-            >>> # an initial empty ontology with a default in memory mapping
-            >>> ont = TagsOntology()
-            # divert the types actor, role and series to my media ontology
-            >>> ont.add_tagsets(
-            ...     SQLTags(u('~/var/media-ontology.sqlite'),
-            ...     ['actor', 'role', 'series'])
-            # divert type "musicbrainz.recording" to mbdb.sqlite
-            # mapping to the type "recording"
-            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
-            # divert type "tvdb.actor" to tvdb.sqlite
-            # mapping to the type "actor"
-            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
     '''
-    subtagsets = _TagsOntology_SubTagSets.from_match(tagsets, match, unmatch)
-    self._subtagsetses.insert(index, subtagsets)
+    if isinstance(match, (list, tuple)):
+      assert unmatch is None
+      for match in match:
+        self.add_tagsets(match, index=index)
+    else:
+      subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
+      self._subtagsetses.insert(index, subtagsets)
+    '''
 
   ##################################################################
   # Types.
