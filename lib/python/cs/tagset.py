@@ -2213,13 +2213,6 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     for subtagsets in subs:
       subtagsets.close()
 
-  @property
-  def _default_tagsets(self):
-    ''' The default `TagSets` instance
-        i.e. the sets used for type names which are not specially diverted.
-    '''
-    return self._subtagsetses[-1].tagsets
-
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
@@ -2230,60 +2223,6 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         since ontologies are broadly optional.
     '''
     return True
-
-  def _subtagsets_for_type_name(self, type_name):
-    ''' Locate a `_TagsOntology_SubTagSets` for use against `type_name`.
-        Return `(subtagsets,subtype_name)`
-        where `subtagsets` is a `_TagsOntology_SubTagSets` instance
-        and `subtype_name` is a variation on `type_name`
-        appropriate to the chosen `tagsets`.
-
-        This method is used to direct accesses to `type.`*type_name*
-        and *type_name*`.`*value_key*
-        to particular `_TagsOntology_SubTagSets`,
-        possibly keyed by a variation on *type_name*.
-
-        For example,
-        perhaps we keep a cache of Musicbrainz data in an `SQLTags`
-        stored as `~/.cache/mbdb.sqlite`.
-        This method might recognise the type `musicbrainz.recording`
-        and return that `SQLTags` instance and the subtype `recording`.
-
-        See the `add_tagsets` method for inserting additional `TagSets`
-        and their *type_name* mapping functions.
-    '''
-    for subtagsets in self._subtagsetses:
-      match_func = subtagsets.match_func
-      if match_func is None:
-        return subtagsets, type_name
-      subtype_name = match_func(type_name)
-      if subtype_name:
-        return subtagsets, subtype_name
-    raise ValueError("no subTagSets for type name %r" % (type_name,))
-
-  def _tagsets_for_type_name(self, type_name):
-    ''' Locate a `TagSets` for use against `type_name`.
-        Return `(tagsets,subtype_name)`
-        where `tagsets` is a `TagSets` instance
-        and `subtype_name` is a variation on `type_name`
-        appropriate to the chosen `tagsets`.
-
-        This method is used to direct accesses to `type.`*type_name*
-        and *type_name*`.`*value_key*
-        to particular `TagSets`,
-        possibly keyed by a variation on *type_name*.
-
-        For example,
-        perhaps we keep a cache of Musicbrainz data in an `SQLTags`
-        stored as `~/.cache/mbdb.sqlite`.
-        This method might recognise the type `musicbrainz.recording`
-        and return that `SQLTags` instance and the subtype `recording`.
-
-        See the `add_tagsets` method for inserting additional `TagSets`
-        and their *type_name* mapping functions.
-    '''
-    subtagsets, subtype_name = self._subtagsets_for_type_name(type_name)
-    return subtagsets.tagsets, subtype_name
 
   @pfx_method(with_args=True)
   def add_tagsets(self, tagsets, match, unmatch=None, index=0):
@@ -2300,7 +2239,31 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     else:
       subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
       self._subtagsetses.insert(index, subtagsets)
+
+  @property
+  def _default_tagsets(self):
+    ''' The default `TagSets` instance
+        i.e. the sets used for type names which are not specially diverted.
     '''
+    return self._subtagsetses[-1].tagsets
+
+  def _subtagsets_for_key(self, key):
+    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`.
+        Returns the default subtagsets if no explicit match is found.
+    '''
+    for subtagsets in self._subtagsetses:
+      if subtagsets.accepts_key(key):
+        return subtagsets
+    return self._default_tagsets()
+
+  def _subtagsets_for_type(self, type_name):
+    ''' Locate a `_TagsOntology_SubTagSets` for use with the type `type_name`.
+        Returns the default subtagsets if no explicit match is found.
+    '''
+    for subtagsets in self._subtagsetses:
+      if subtagsets.accepts_type(type_name):
+        return subtagsets
+    return self._default_tagsets()
 
   ##################################################################
   # Types.
@@ -2308,42 +2271,43 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   def typedef(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
-    tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-    return tagsets['type.' + subtype_name]
+    subtagsets = self._tagsets_for_type_name(type_name)
+    return subtagsets.typedef(type_name)
+
+  def type_names(self):
+    ''' Return defined type names i.e. all entries starting `type.`.
+    '''
+    return set(
+        subtagsets.key(subtype_name)
+        for subtagsets in self._subtagsetses
+        for subtype_name in subtagsets.type_names()
+    )
 
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
-    for type_name, typedef in self.by_type('type', with_tagsets=True):
-      yield type_name, typedef
-
-  def type_names(self):
-    ''' Generator yielding defined type names
-        i.e. all entries starting `type.`.
-    '''
-    return self.by_type('type')
+    for type_name in self.type_names():
+      yield type_name, self._subtagsets_for_type(type_name).typedef(type_name)
 
   def by_type(self, type_name, with_tagsets=False):
     ''' Yield keys or (key,tagset) of type `type_name`
         i.e. all keys commencing with *type_name*`.`.
     '''
     type_name_ = type_name + '.'
-    subtagsets, subtype_name_ = self._subtagsets_for_type_name(type_name_)
-    assert subtype_name_.endswith('.')
-    subtype_prefix = subtype_name_[:-1]
-    assert subtype_prefix
+    subtagsets = self._subtagsets_for_type_name(type_name)
+    subtype_name_ = subtagsets.subtype_name(type_name) + '.'
     tagsets = subtagsets.tagsets
-    unmatch_func = subtagsets.unmatch_func
     if with_tagsets:
-      for subkey, tags in tagsets.items(prefix=subtype_prefix):
+      for subkey, tags in tagsets.items(prefix=subtype_name_):
         assert subkey.startswith(subtype_name_)
-        key = unmatch_func(subkey) if unmatch_func else subkey
+        key = subtagsets.key(subkey)
+        X("  => key=%r", key)
         assert key.startswith(type_name_)
         yield key, tags
     else:
-      for subkey in tagsets.keys(prefix=(subtype_prefix or None),):
+      for subkey in tagsets.keys(prefix=subtype_name_):
         assert subkey.startswith(subtype_name_)
-        key = unmatch_func(subkey) if unmatch_func else subkey
+        key = subtagsets.key(subkey)
         assert key.startswith(type_name_)
         yield key
 
