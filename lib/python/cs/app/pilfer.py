@@ -180,7 +180,7 @@ class PilferCommand(BaseCommand):
       raise GetoptError("invalid main pipeline")
 
     LTR = Later(options.jobs)
-    P.flagnames = options.flagnames
+    P.flagnames = options.flagnames.split()
     if cs.logutils.D_mode or ifdebug():
       # poll the status of the Later regularly
       def pinger(L):
