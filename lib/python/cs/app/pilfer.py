@@ -82,7 +82,9 @@ class PilferCommand(BaseCommand):
       -j jobs
       How many jobs (actions: URL fetches, minor computations)
       to run at a time.
-          Default: ''' + str(DEFAULT_JOBS) + '''
+          Default: ''' + str(
+      DEFAULT_JOBS
+  ) + '''
       -q  Quiet. Don't recite surviving URLs at the end.
       -u  Unbuffered. Flush print actions as they occur.
       -x  Trace execution.'''
@@ -924,10 +926,12 @@ def url_srcs(U):
 # actions that work on the whole list of in-play URLs
 # these return Pilfers
 many_to_many = {
-      'sort':         lambda Ps, key=lambda P: P._, reverse=False: \
-                        sorted(Ps, key=key, reverse=reverse),
-      'last':         lambda Ps: Ps[-1:],
-    }
+    'sort':
+    lambda Ps, key=lambda P: P._, reverse=False:
+    sorted(Ps, key=key, reverse=reverse),
+    'last':
+    lambda Ps: Ps[-1:],
+}
 
 # actions that work on individual Pilfer instances, returning multiple strings
 one_to_many = {
