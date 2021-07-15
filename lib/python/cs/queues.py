@@ -262,6 +262,13 @@ class PushQueue(MultiOpenMixin):
   def __repr__(self):
     return "<%s outQ=%s>" % (self, self.outQ)
 
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the output queue.
+    '''
+    with self.outQ:
+      yield
+
   @not_closed
   def put(self, item):
     ''' Receive a new item.
@@ -275,17 +282,6 @@ class PushQueue(MultiOpenMixin):
     with outQ:
       for computed in functor(item):
         outQ.put(computed)
-
-  def startup(self):
-    ''' Start up.
-    '''
-    pass
-
-  def shutdown(self):
-    ''' shutdown() is called by MultiOpenMixin._close() to close
-        the outQ for real.
-    '''
-    self.outQ.close()
 
 class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
