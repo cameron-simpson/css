@@ -162,7 +162,7 @@ def IterablePriorityQueue(*args, capacity=0, name=None, **kw):
 
 class Channel(object):
   ''' A zero-storage data passage.
-      Unlike a Queue(1), put() blocks waiting for the matching get().
+      Unlike a `Queue`, `put(item)` blocks waiting for the matching `get()`.
   '''
 
   def __init__(self):
@@ -189,7 +189,7 @@ class Channel(object):
     return "%s[%s]" % (type(self).__name__, state)
 
   def __call__(self, *a):
-    ''' Call the Channel.
+    ''' Call the `Channel`.
         With no arguments, do a .get().
         With an argument, do a .put().
     '''
@@ -199,7 +199,7 @@ class Channel(object):
 
   @not_closed
   def get(self):
-    ''' Read a value from the Channel.
+    ''' Read a value from the `Channel`.
         Blocks until someone put()s to the Channel.
     '''
     # allow a writer to proceed
@@ -234,7 +234,7 @@ class PushQueue(MultiOpenMixin):
 
       Calling .put(item) calls `func_push` supplied at initialisation
       to trigger a function on data arrival, whose processing is mediated
-      queued via a Later for delivery to the output queue.
+      via a Later for delivery to the output queue.
   '''
 
   def __init__(self, name, functor, outQ):
@@ -246,7 +246,7 @@ class PushQueue(MultiOpenMixin):
           item of input and returns an iterable of outputs; it may be a
           generator. These outputs are passed to outQ.put individually as
           received.
-        * `outQ` is a MultiOpenMixin which accepts via its .put() method.
+        * `outQ` is a `MultiOpenMixin` which accepts via its .put() method.
     '''
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
