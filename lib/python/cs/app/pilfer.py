@@ -226,7 +226,7 @@ class PilferCommand(BaseCommand):
       #  - close the div
       #  - wait for that div to drain
       #  - repeat
-      # drain all the divserions, choosing the busy ones first
+      # drain all the diversions, choosing the busy ones first
       divnames = P.open_diversion_names
       while divnames:
         busy_name = None
@@ -450,6 +450,7 @@ class Pilfer:
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
+
         Installs the tested names into the status dictionary as side effect.
         Note that it deliberately probes all flags instead of stopping
         at the first false condition.
@@ -487,12 +488,14 @@ class Pilfer:
     return seen[name]
 
   def seen(self, url, seenset='_'):
-    ''' Test if the named `url` has been seen. Default seetset is '_'.
+    ''' Test if the named `url` has been seen.
+        The default seenset is named `'_'`.
     '''
     return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
-    ''' Mark a `url` as seen. Default seetset is '_'.
+    ''' Mark a `url` as seen.
+        The default seenset is named `'_'`.
     '''
     self.seenset(seenset).add(url)
 
@@ -1041,7 +1044,9 @@ def pilferifysel(func):
   return pf
 
 def parse_action(action, do_trace):
-  ''' Accept a string `action` and return an _Action subclass instance or a (sig, function) tuple.
+  ''' Accept a string `action` and return an _Action subclass
+      instance or a (sig, function) tuple.
+
       This is primarily used by action_func below, but also called
       by subparses such as selectors applied to the values of named
       variables.
