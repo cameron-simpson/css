@@ -2416,8 +2416,9 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
           # not iterable
           pass
         else:
-          md = [self.metadata(type_name, item) for item in it]
+          md = [self.metadata(type_name, item, convert=convert) for item in it]
       else:
+        # a mapping
         # split the type_name on underscore to derive key and member type names
         # otherwise fall back to {type_name}_key, {type_name}_member
         try:
@@ -2427,15 +2428,24 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
           member_type_name = type_name + '_member'
         md = {
             k: (
-                self.metadata(key_type_name,
-                              k), self.metadata(member_type_name, v)
+                self.metadata(key_type_name, k, convert=convert),
+                self.metadata(member_type_name, v, convert=convert),
             )
             for k, v in items
         }
-    # neither mapping nor iterable
     if md is None:
-      # look up the type_name in the relevant subtagsets
-      md = self._meta(type_name, value)
+      # neither mapping nor iterable
+      # fetch the metadata TagSet
+      subtagsets = self._subtagsets_for_type(type_name)
+      if value is None:
+        value_key = '_'
+      else:
+        if convert is None:
+          convert = self.value_to_tag_name
+        value_key = convert(value)
+        assert isinstance(value_key, str) and value_key
+      key = type_name + '.' + value_key
+      md = subtagsets[value_key]
     return md
 
   def basetype(self, typename):
