@@ -2062,7 +2062,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
   def subtype_name(self, type_name):
     ''' Return the subkey used for `type_name`.
     '''
-    subtype_name__ = self._subkey(type_name + '._')
+    subtype_name__ = self.subkey(type_name + '._')
     assert subtype_name__.endswith('._')
     return cutsuffix(subtype_name__, '._')
 
@@ -2229,7 +2229,6 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   @pfx_method(with_args=True)
   def add_tagsets(self, tagsets, match, unmatch=None, index=0):
     ''' Insert a `_TagsOntology_SubTagSets` at `index` in the list of `_TagsOntology_SubTagSets`es.
-        This is the list consulted by the `_tagsets_for_type_name` method.
 
         The new `_TagsOntology_SubTagSets` instance is initialised
         from the supplied `tagsets, match, unmatch` parameters.
@@ -2273,7 +2272,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   def typedef(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
-    subtagsets = self._tagsets_for_type_name(type_name)
+    subtagsets = self._subtagsets_for_type(type_name)
     return subtagsets.typedef(type_name)
 
   def type_names(self):
@@ -2289,7 +2288,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
     for type_name in self.type_names():
-      yield type_name, self._subtagsets_for_type(type_name).typedef(type_name)
+      yield type_name, self.typedef(type_name)
 
   def by_type(self, type_name, with_tagsets=False):
     ''' Yield keys or (key,tagset) of type `type_name`
@@ -2297,7 +2296,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     '''
     X("by_type(%r,..)...", type_name)
     type_name_ = type_name + '.'
-    subtagsets = self._subtagsets_for_type_name(type_name)
+    subtagsets = self._subtagsets_for_type(type_name)
     subtype_name_ = subtagsets.subtype_name(type_name) + '.'
     tagsets = subtagsets.tagsets
     X("  tagsets = %s", tagsets)
@@ -2329,7 +2328,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     '''
     with Pfx("%s._meta_ref(type_name=%r,value=%r)", type(self).__name__,
              type_name, value):
-      tagsets, subtype_name = self._tagsets_for_type_name(type_name)
+      tagsets, subtype_name = self._subtagsets_for_type(type_name)
       index = subtype_name
       if value is not None:
         if convert is None:
