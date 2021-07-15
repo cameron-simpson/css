@@ -2838,8 +2838,8 @@ class TagsOntologyCommand(BaseCommand):
         if subcmd in ('list', 'ls'):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
-          for meta_name in sorted(ont.meta_names(type_name)):
-            print(meta_name, ont.metadata(type_name, meta_name))
+          for key, tags in sorted(ont.by_type(type_name, with_tagsets=True)):
+            print(key, tags)
           return 0
         if subcmd == '+':
           if not argv:
