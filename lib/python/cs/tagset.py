@@ -844,14 +844,14 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
+        This function supports modifying both `name` and `Tag`s.
+        The `Tag`s are updated directly.
+        The changed names are returning in the `old_name,new_name` above.
+
         The collection `tes` may be either a mapping of name/key
         to `TagSet` or an iterable of `TagSets`. If the latter, a
         mapping is made based on `te.name or te.id` for each item
         `te` in the iterable.
-
-        This function supports modifying both `name` and `Tag`s.
-        The `Tag`s are updated directly.
-        The changed names are returning in the `old_name,new_name` above.
     '''
     if editor is None:
       editor = EDITOR
