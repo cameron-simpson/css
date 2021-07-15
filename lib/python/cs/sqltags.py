@@ -1634,9 +1634,11 @@ class SQLTags(BaseTagSets):
         if not `None`.
     '''
     if prefix is None:
+      # anything with a non-None .name
       criterion = "name"
     else:
-      criterion = 'name>' + Tag.transcribe_value(prefix)
+      # anything with a name commencing with prefix
+      criterion = 'name~' + Tag.transcribe_value(prefix + '?*')
     return self.find(criterion)
 
   @staticmethod
