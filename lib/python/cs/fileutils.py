@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210420-post'
+__version__ = '20210717'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
