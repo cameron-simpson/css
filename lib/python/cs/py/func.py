@@ -22,7 +22,6 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.pfx',
         'cs.py3',
         'cs.x',
     ],
@@ -61,7 +60,10 @@ def trace(func, call=True, retval=False, exception=False, pfx=False):
     '''
     # late import so that we can use this in modules we import
     if pfx:
-      from cs.pfx import XP as xlog
+      try:
+        from cs.pfx import XP as xlog
+      except ImportError:
+        from cs.x import X as xlog
     else:
       from cs.x import X as xlog
     if call:
