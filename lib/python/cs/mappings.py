@@ -30,7 +30,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20210306-post'
+__version__ = '20210717'
 
 DISTINFO = {
     'description':
