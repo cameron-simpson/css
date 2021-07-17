@@ -69,7 +69,7 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings',
+        'cs.mappings>=20210717',
         'cs.obj',
         'cs.pfx',
         'cs.progress',
