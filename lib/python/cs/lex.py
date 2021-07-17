@@ -52,9 +52,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
+        'cs.pfx',
         'cs.py.func',
         'cs.py3',
         'cs.seq>=20200914',
+        'typeguard',
     ],
 }
 
