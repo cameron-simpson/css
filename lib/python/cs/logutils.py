@@ -124,7 +124,8 @@ def setup_logging(
     trace_mode=None,
     module_names=None,
     function_names=None,
-    verbose=None
+    verbose=None,
+    supplant_root_logger=False,
 ):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
@@ -261,6 +262,8 @@ def setup_logging(
     # only do this the first time
     # TODO: fix this clumsy hack, some kind of stackable state?
     main_handler.setFormatter(PfxFormatter(format))
+    if supplant_root_logger:
+        root_logger.handlers.pop(0)
     root_logger.addHandler(main_handler)
 
   if trace_mode:
