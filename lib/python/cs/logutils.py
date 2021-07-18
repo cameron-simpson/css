@@ -106,7 +106,7 @@ D_mode = False
 def ifdebug():
   ''' Test the `loginfo.level` against `logging.DEBUG`.
   '''
-  global loginfo
+  global loginfo  # pylint: disable=global-statement
   if loginfo is None:
     loginfo = setup_logging()
   return loginfo.level <= logging.DEBUG
@@ -175,7 +175,7 @@ def setup_logging(
         level is `INFO` otherwise `WARNING`. Otherwise, if `verbose` is
         true then the log level is `INFO` otherwise `WARNING`.
   '''
-  global D_mode, loginfo
+  global D_mode, loginfo  # pylint: disable=global-statement
 
   # infer logging modes, these are the initial defaults
   inferred = infer_logging_level(verbose=verbose)
@@ -190,7 +190,6 @@ def setup_logging(
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
-  import cs.pfx  # pylint: disable=import-outside-toplevel
   cs.pfx.cmd = cmd_name
 
   if main_log is None:
@@ -241,20 +240,20 @@ def setup_logging(
     # do a thread dump to the main_log on SIGHUP
     # pylint: disable=import-outside-toplevel
     import signal
-    import cs.debug
+    import cs.debug as cs_debug
 
     # pylint: disable=unused-argument
     def handler(sig, frame):
-      cs.debug.thread_dump(None, main_log)
+      cs_debug.thread_dump(None, main_log)
 
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
     main_handler = UpdHandler(main_log, ansi_mode=ansi_mode)
-    upd = main_handler.upd
+    upd_ = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
-    upd = Upd()
+    upd_ = Upd()
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
@@ -316,7 +315,7 @@ def setup_logging(
       module_names=module_names,
       function_names=function_names,
       cmd=cmd_name,
-      upd=upd,
+      upd=upd_,
       upd_mode=upd_mode,
       ansi_mode=ansi_mode,
       format=format,
@@ -397,7 +396,7 @@ class PfxFormatter(Formatter):
     record.message = s
     return s
 
-# pylint: disable=too-many-branches,too-many-statements
+# pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
   ''' Infer a logging level from the `env_debug`, which by default
       comes from the environment variable `$DEBUG`.
@@ -487,6 +486,7 @@ def D(msg, *args):
       `D_mode` is true, bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
+  # pylint: disable=global-statement
   global D_mode
   if D_mode:
     XP(msg, *args)
@@ -657,6 +657,7 @@ def upd(msg, *args, **kwargs):
   else:
     info(msg, *args, **kwargs)
 
+# pylint: disable=too-many-instance-attributes
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
