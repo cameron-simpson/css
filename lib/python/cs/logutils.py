@@ -248,12 +248,11 @@ def setup_logging(
 
     signal.signal(signal.SIGHUP, handler)
 
+  main_handler = logging.StreamHandler(main_log)
+  upd_ = Upd()
   if upd_mode:
-    main_handler = UpdHandler(main_log, ansi_mode=ansi_mode)
+    main_handler = UpdHandler(main_log, ansi_mode=ansi_mode, over_handler=main_handler)
     upd_ = main_handler.upd
-  else:
-    main_handler = logging.StreamHandler(main_log)
-    upd_ = Upd()
 
   root_logger = logging.getLogger()
   root_logger.setLevel(level)
@@ -716,7 +715,7 @@ class UpdHandler(StreamHandler):
       uses a `cs.upd.Upd` for transcription.
   '''
 
-  def __init__(self, strm=None, upd_level=None, ansi_mode=None):
+  def __init__(self, strm=None, upd_level=None, ansi_mode=None, over_handler=None):
     ''' Initialise the `UpdHandler`.
 
         Parameters:
@@ -737,6 +736,7 @@ class UpdHandler(StreamHandler):
     self.upd = Upd(strm)
     self.upd_level = upd_level
     self.ansi_mode = ansi_mode
+    self.over_handler = over_handler
     self.__lock = Lock()
 
   def emit(self, logrec):
@@ -746,10 +746,11 @@ class UpdHandler(StreamHandler):
         For other levels write a distinct line
         to the output stream, possibly colourised.
     '''
+    upd = self.upd
     if logrec.levelno == self.upd_level:
       line = self.format(logrec)
       with self.__lock:
-        self.upd.out(line)
+        upd.out(line)
     else:
       if self.ansi_mode:
         if logrec.levelno >= logging.ERROR:
@@ -758,7 +759,10 @@ class UpdHandler(StreamHandler):
           logrec.msg = colourise(logrec.msg, 'yellow')
       line = self.format(logrec)
       with self.__lock:
-        self.upd.nl(line)
+        if upd.disabled:
+          self.over_handler.emit(logrec)
+        else:
+          upd.nl(line)
 
   def flush(self):
     ''' Flush the update status.
