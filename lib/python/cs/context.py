@@ -277,6 +277,9 @@ def stackkeys(d, **key_values):
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.
 
+      The first iteration performs the "enter" phase and yields the result.
+      The second iteration performs the "exit" phase and yields `None`.
+
       See also the `setup_cmgr(cmgr)` function
       which is a convenience wrapper for this low level generator.
 
@@ -307,9 +310,6 @@ def twostep(cmgr):
       A common situation is the `__enter__` and `__exit__` methods
       of another context manager class
       or the `setUp` and `tearDown` methods of a unit test case.
-
-      The first iteration performs the "enter" phase and yields the result.
-      The second iteration performs the "exit" phase and yields `None`.
 
       Example use in a class:
 
@@ -384,7 +384,7 @@ def setup_cmgr(cmgr):
   return lambda: next(cmgr_twostep)
 
 def push_cmgr(o, attr, cmgr):
-  ''' A convenince wrapper for `twostep(cmgr)`
+  ''' A convenience wrapper for `twostep(cmgr)`
       to run the `__enter__` phase of `cmgr` and save its value as `o.`*attr*`.
       The `__exit__` phase is run by `pop_cmgr(o,attr)`,
       returning the return value of the exit phase.
