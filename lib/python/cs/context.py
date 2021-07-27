@@ -6,7 +6,7 @@
 from contextlib import contextmanager
 import threading
 try:
-  from contextlib import nullcontext  # pylint: disable=unused-import
+  from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
 
   @contextmanager
