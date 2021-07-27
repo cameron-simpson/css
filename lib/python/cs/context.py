@@ -305,10 +305,11 @@ def twostep(cmgr):
       across two steps when the set up and tear down phases must operate
       in different parts of your code.
       A common situation is the `__enter__` and `__exit__` methods
-      of another context manager class.
+      of another context manager class
+      or the `setUp` and `tearDown` methods of a unit test case.
 
-      The first iteration performs the "enter" phase and yields.
-      The second iteration performs the "exit" phase and yields.
+      The first iteration performs the "enter" phase and yields the result.
+      The second iteration performs the "exit" phase and yields `None`.
 
       Example use in a class:
 
@@ -324,9 +325,9 @@ def twostep(cmgr):
                   next(self._cmgr_stepped)
                   self._cmgr = None
   '''
-  with cmgr:
-    yield cmgr
-  yield cmgr
+  with cmgr as enter:
+    yield enter
+  yield
 
 def setup_cmgr(cmgr):
   ''' Run the set up phase of the context manager `cmgr`
