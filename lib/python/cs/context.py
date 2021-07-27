@@ -280,11 +280,21 @@ def twostep(cmgr):
       The first iteration performs the "enter" phase and yields the result.
       The second iteration performs the "exit" phase and yields `None`.
 
-      See also the `setup_cmgr(cmgr)` function
-      which is a convenience wrapper for this low level generator.
+      See also the `push_cmgr(obj,attr,cmgr)` function
+      and its partner `pop_cmgr(obj,attr)`
+      which form a convenience wrapper for this low level generator.
+
+      The purpose of `twostep()` is to split any context manager's operation
+      across two steps when the set up and tear down phases must operate
+      in different parts of your code.
+      A common situation is the `__enter__` and `__exit__` methods
+      of another context manager class
+      or the `setUp` and `tearDown` methods of a unit test case.
 
       *Note*:
-      this function expects `cmgr` to be an existing context manager.
+      this function expects `cmgr` to be an existing context manager
+      and _not_ the function which returns the context manager.
+
       In particular, if you define some function like this:
 
           @contextmanager
@@ -302,16 +312,10 @@ def twostep(cmgr):
       and _not_:
 
           cmgr_iter = twostep(my_cmgr_func)
-          ...
+          next(cmgr_iter)   # set up
+          next(cmgr_iter)   # tear down
 
-      The purpose of `twostep()` is to split any context manager's operation
-      across two steps when the set up and tear down phases must operate
-      in different parts of your code.
-      A common situation is the `__enter__` and `__exit__` methods
-      of another context manager class
-      or the `setUp` and `tearDown` methods of a unit test case.
-
-      Example use in a class:
+      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead)::
 
           class SomeClass:
               def __init__(self, foo)
