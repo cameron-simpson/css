@@ -100,6 +100,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
