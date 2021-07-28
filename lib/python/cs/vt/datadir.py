@@ -904,7 +904,8 @@ class DataDir(FilesDir):
                 position=offset,
                 total=new_size,
                 units_scale=BINARY_BYTES_SCALE,
-                itemlenfunc=lambda t3: t3[2] - t3[0],
+                itemlenfunc=(
+                    lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]),
             ):
               hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(
