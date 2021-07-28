@@ -87,6 +87,18 @@ class _Block(Transcriber, ABC):
     self.blockmap = None
     self._lock = RLock()
 
+  def __bytes__(self):
+    ''' `bytes(_Block)` returns allo the data together as a single `bytes` instance.
+
+        Try not to do this for indirect blocks, it gets expensive.
+    '''
+    return b''.join(self)
+
+  def __iter__(self):
+    ''' Iterating over a `_Block` yields chunsk from `self.datafrom()`.
+    '''
+    return self.datafrom()
+
   # pylint: disable=too-many-branches,too-many-locals,too-many-return-statements
   def __eq__(self, oblock):
     ''' Compare this Block with another Block for data equality.
