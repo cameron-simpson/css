@@ -670,10 +670,11 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
-  def add(self, tag, **kw):
+  @tag_or_tag_value
+  def add(self, tag_name, value, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    return self.set(tag, **kw)
+    return self.set(tag_name, value, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
@@ -2290,9 +2291,7 @@ class TagsOntology(SingletonMixin):
         return self.type_map.by_type_name[type_name]
       except KeyError:
         name = self.match_func(type_name)
-        self.type_map.add = dict(
-            type_name=type_name, subtype_name=name
-        )
+        self.type_map.add = dict(type_name=type_name, subtype_name=name)
         return name
 
     def type_name(self, subtype_name):
@@ -2305,9 +2304,7 @@ class TagsOntology(SingletonMixin):
         return self.type_map.by_subtype_name[subtype_name]
       except KeyError:
         name = self.unmatch_func(subtype_name)
-        self.type_map.add = dict(
-            type_name=name, subtype_name=subtype_name
-        )
+        self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
         return name
 
   @property

@@ -173,3 +173,4 @@ then
 fi
 
 $trace ffmpeg -i "$src" -c:v "$vcodec" -c:a "$acodec" "$dst"
+$trace fstags cptags "$src" "$dst"
