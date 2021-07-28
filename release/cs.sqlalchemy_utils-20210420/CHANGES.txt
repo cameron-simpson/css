@@ -1,0 +1,6 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: drop .Session from docstring, no longer used
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: rename ORM.sessionmaker to ORM._sessionmaker, not for public use
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: replace session with arranged_session, which allocates a session in conformance with ORM.serial_sessions
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: drop @ORM.auto_session and @ORM.orm_method decorators, no longer used
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: SQLAState.new_session: use orm.arranged_session(), use begin_nested(); SQLAState.auto_session: use begin_nested()
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: ORM: drop debug, clean lint, fix init

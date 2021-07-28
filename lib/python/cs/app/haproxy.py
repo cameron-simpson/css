@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience facilities for working with HAProxy.
-#       - Cameron Simpson <cs@cskk.id.au> 14jul2012
+# - Cameron Simpson <cs@cskk.id.au> 14jul2012
 #
 
 from __future__ import print_function
@@ -21,10 +21,10 @@ from cs.pfx import Pfx
 
 USAGE = '''Usage: {cmd} stats host:port print [columns...]'''
 
-def main(argv=None, stdin=None):
+def main(argv=None):
   ''' haproxy-tool main programme.
   '''
-  return HAProxyToolCommand().run(argv)
+  return HAProxyToolCommand(argv).run()
 
 class HAProxyToolCommand(BaseCommand):
   ''' haproxy-tool command line implementation.

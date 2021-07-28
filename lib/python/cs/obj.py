@@ -18,7 +18,7 @@ from weakref import WeakValueDictionary
 from cs.deco import OBSOLETE
 from cs.py3 import StringTypes
 
-__version__ = '20210131-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -412,10 +412,13 @@ class SingletonMixin:
         Return the instance.
 
         This creates the class registry if missing,
-        and then
+        prepares a key from `cls._singleton_key`,
+        then returns the entry from the registry is present,
+        or creates a new entry if not.
+        Note: if the key is `None` a new entry is always created
+        and not recorded in the registry.
     '''
     super_new = super().__new__
-    registry = cls._singleton_get_registry()
 
     # pylint: disable=unused-argument
     def factory(*fargs, **fkwargs):
@@ -425,8 +428,16 @@ class SingletonMixin:
       return super_new(cls)
 
     okey = cls._singleton_key(*a, **kw)
-    with registry._singleton_lock:
-      _, instance = singleton(registry, okey, factory, (), {})
+    if okey is None:
+      # if the returned key is None we always make a new instance
+      # and do not register in the registry
+      instance = factory()
+    else:
+      # normal behaviour:
+      # reuse an existing instance or make a new one
+      registry = cls._singleton_get_registry()
+      with registry._singleton_lock:
+        _, instance = singleton(registry, okey, factory, (), {})
     return instance
 
   @classmethod

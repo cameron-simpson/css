@@ -41,10 +41,9 @@ from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
-from cs.tagset import Tag
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20200621-post'
+__version__ = '20210404-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -60,12 +59,15 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
+        'cs.excutils',
         'cs.fstags',
         'cs.logutils',
+        'cs.pfx',
+        'cs.progress',
         'cs.result',
         'cs.tagset',
-        'cs.upd',
+        'cs.upd>=multiline',
         'youtube_dl',
     ],
     'entry_points': {
@@ -82,7 +84,7 @@ DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
 
 FSTAGS_PREFIX = 'youtube_dl'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
   return YDLCommand(argv).run()
@@ -130,8 +132,6 @@ class YDLCommand(BaseCommand):
           over_ydl.queue(url)
       for _ in over_ydl.report():
         pass
-
-YDLCommand.add_usage_to_docstring()
 
 # pylint: disable=too-many-instance-attributes
 class OverYDL:

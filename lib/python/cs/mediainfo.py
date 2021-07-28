@@ -161,7 +161,7 @@ class EpisodeInfo(NS):
     ''' Generator yielding the episode info as `Tag`s.
     '''
     for field, value in self.as_dict().items():
-      yield Tag.with_prefix(field, value, prefix=prefix)
+      yield Tag(field, value, prefix=prefix)
 
   def __str__(self):
     marks = []

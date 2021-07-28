@@ -14,11 +14,13 @@
     from `cs.csvutils`.
 '''
 
+from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import json
 import re
+from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
@@ -28,7 +30,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20210123-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'description':
@@ -148,7 +150,7 @@ def named_row_tuple(*column_names, **kw):
         name_of_[attr] = name
         index_of_[name] = i
         i += 1
-    del i, name, attr
+    del i, name, attr  # pylint: disable=undefined-loop-variable
     index_of_.update((s, i) for i, s in enumerate(attributes_))
 
     def __getitem__(self, key):
@@ -164,6 +166,7 @@ def named_row_tuple(*column_names, **kw):
             func = self.computed_.get(key)
             if func is not None:
               return func(self)
+            # pylint: disable=raise-missing-from
             raise RuntimeError("no method or func for key %r" % (key,))
           else:
             return method()
@@ -841,6 +844,7 @@ class StackableValues(object):
       try:
         vs = self._values[attr]
       except KeyError:
+        # pylint: disable=raise-missing-from
         raise AttributeError(attr)
       else:
         if vs:
@@ -859,6 +863,7 @@ class StackableValues(object):
         fallback_func = self._fallback
       except AttributeError:
         # no fallback function
+        # pylint: disable=raise-missing-from
         raise KeyError(key)
       with Pfx("%s._fallback(%r)", type(self).__name__, key):
         try:
@@ -893,6 +898,7 @@ class StackableValues(object):
     try:
       v = vs.pop()
     except IndexError:
+      # pylint: disable=raise-missing-from
       raise KeyError(key)
     if not vs:
       del self._values[key]
@@ -971,6 +977,7 @@ class AttrableMappingMixin(object):
         dks = self.__dict__.keys()
         if dks:
           names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        # pylint: disable=raise-missing-from
         raise AttributeError(
             "%s.%s (attrs=%s)" % (
                 type(self).__name__,
@@ -1030,13 +1037,13 @@ class JSONableMappingMixin:
   def __repr__(self):
     return type(self).__name__ + str(self)
 
-class LoadableMappingMixin:
+class IndexedSetMixin(ABC):
   ''' A base mixin to provide `.by_`* attributes
       which index records from an autoloaded backing store,
       which might be a file or might be another related data structure.
       The records are themselves key->value mappings, such as `dict`s.
 
-      The primary key name is provided by the `.loadable_mapping_key`
+      The primary key name is provided by the `.IndexedSetMixin__pk`
       class attribute, to be provided by subclasses.
 
       Note that this mixin keeps the entire loadable mapping in memory.
@@ -1046,36 +1053,37 @@ class LoadableMappingMixin:
       does not update the index associated with the .by_k attribute.
 
       Subclasses must provide the following attributes and methods:
-      * `loadable_mapping_key`: the name of the primary key;
-        it is an error for a multiple records to have the same primary key
-      * `scan_mapping`: a generator method to scan the backing store
+      * `IndexedSetMixin__pk`: the name of the primary key;
+        it is an error for multiple records to have the same primary key
+      * `scan`: a generator method to scan the backing store
         and yield records, used for the inital load of the mapping
-      * `append_to_mapping(record)`: add a new record to the backing store;
-        this is called from the `.add_to_mapping(record)` method
+      * `add_backend(record)`: add a new record to the backing store;
+        this is called from the `.add(record)` method
         after indexing to persist the record in the backing store
 
       See `UUIDNDJSONMapping` and `UUIDedDict` for an example subclass
       indexing records from a newline delimited JSON file.
   '''
 
-  loadable_mapping_key = ''
+  IndexedSetMixin__pk = ''
 
-  def scan_mapping(self):
+  @abstractmethod
+  def scan(self):
     ''' Scan the mapping records (themselves mappings) from the backing store,
         which might be a file or another related data structure.
         Yield each record as scanned.
     '''
-    raise NotImplementedError("scan_mapping")
+    raise NotImplementedError("scan")
 
-  def add_to_mapping(self, record, exists_ok=False):
+  def add(self, record, exists_ok=False):
     ''' Add a record to the mapping.
 
         This indexes the record against the various `by_`* indices
-        and then calls `self.append_to_mapping(record)`
+        and then calls `self.add_backend(record)`
         to save the record to the backing store.
     '''
-    pk_name = self.loadable_mapping_key
-    assert pk_name, "empty .loadable_mapping_key"
+    pk_name = self.IndexedSetMixin__pk
+    assert pk_name, "empty .IndexedSetMixin__pk"
     # ensure the primary mapping is loaded
     pk_mapping = getattr(self, 'by_' + pk_name)
     with self._lock:
@@ -1091,14 +1099,14 @@ class LoadableMappingMixin:
         else:
           by_map = getattr(self, 'by_' + map_name)
           by_map[k] = record
-      self.append_to_mapping(record)
+      self.add_backend(record)
 
   def __getattr__(self, attr):
     field_name = cutprefix(attr, 'by_')
     if field_name is not attr:
       with Pfx("%s.%s", type(self).__name__, attr):
-        pk_name = self.loadable_mapping_key
-        assert pk_name, "empty .loadable_mapping_key"
+        pk_name = self.IndexedSetMixin__pk
+        assert pk_name, "empty .IndexedSetMixin__pk"
         by_pk = 'by_' + pk_name
         indexed = self.__indexed
         with self._lock:
@@ -1106,7 +1114,7 @@ class LoadableMappingMixin:
             return self.__dict__[attr]
           by_map = {}
           if field_name == pk_name:
-            records = self.scan_mapping()
+            records = self.scan()
           else:
             records = getattr(self, by_pk).values()
           # load the
@@ -1129,7 +1137,7 @@ class LoadableMappingMixin:
           if field_name == pk_name:
             self.__scan_length = i
       return by_map
-    if attr == '_LoadableMappingMixin__indexed':
+    if attr == '_IndexedSetMixin__indexed':
       # .__indexed
       indexed = self.__indexed = set()
       return indexed
@@ -1143,22 +1151,49 @@ class LoadableMappingMixin:
   def __len__(self):
     ''' The length of the primary key mapping.
     '''
-    return len(getattr(self, 'by_' + self.loadable_mapping_key))
+    return len(getattr(self, 'by_' + self.IndexedSetMixin__pk))
 
   @property
-  def scan_mapping_length(self):
+  def scan_length(self):
     ''' The number of records encountered during the backend scan.
     '''
     # ensure the mapping has been scanned
-    getattr(self, 'by_' + self.loadable_mapping_key)
+    getattr(self, 'by_' + self.IndexedSetMixin__pk)
     # return the length of the scan
     return self.__scan_length
 
-  @scan_mapping_length.setter
-  def scan_mapping_length(self, length):
-    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_mapping`.
+  @scan_length.setter
+  def scan_length(self, length):
+    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_backend`.
     '''
     self.__scan_length = length
+
+class IndexedMapping(IndexedSetMixin):
+  ''' Interface to a mapping with `IndexedSetMixin` style `.by_*` attributes.
+  '''
+
+  def __init__(self, mapping=None, pk='id'):
+    ''' Initialise the `IndexedMapping`.
+
+        Parameters:
+        * `mapping`: the mapping to wrap; a new `dict` will be made if not specified
+        * `pk`: the primary key of the mapping, default `'id'`
+    '''
+    if mapping is None:
+      mapping = {}
+    self.mapping = mapping
+    self.IndexedSetMixin__pk = pk
+    self._lock = RLock()
+
+  def scan(self):
+    ''' The records from the mapping.
+    '''
+    return self.mapping.values()
+
+  def add_backend(self, record):
+    ''' Save `record` in the mapping.
+    '''
+    self.mapping[record[self.IndexedSetMixin__pk]] = record
 
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
@@ -1226,6 +1261,8 @@ class PrefixedMappingProxy:
     self.prefix = prefix
 
   def keys(self):
+    ''' Yield the post-prefix suffix of the keys in `self.mapping`.
+    '''
     prefix = self.prefix
     return map(
         lambda k: cutprefix(k, prefix),
@@ -1239,6 +1276,8 @@ class PrefixedMappingProxy:
     return self.mapping[self.prefix + k]
 
   def get(self, k, default=None):
+    ''' Return the value for key `k` or `default`.
+    '''
     try:
       return self[k]
     except KeyError:

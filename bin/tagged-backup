@@ -14,6 +14,7 @@ backup_area=/mnt
 do_mount=1
 rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
 rsync_delete_exclude_opts='--delete-excluded'
+rsync_extra_opts=
 quiet=
 hbopts=
 
@@ -31,12 +32,16 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
+    --progress              Passed to rsync via histbackup.
     --tag-name=tagname      Tag name, default: $tag_name
     -q                      Quiet.
     -x                      Trace execution."
 
 trace=
-##[ -t 2 ] && trace=set-x
+[ -t 2 ] && {
+  ##trace=set-x
+  rsync_extra_opts="$rsync_extra_opts --progress"
+}
 
 badopts=
 
@@ -51,6 +56,8 @@ do
         rsync_exclude_opts="$rsync_exclude_opts $1" ;;
     --no-mount)
         do_mount= ;;
+    --progress)
+        rsync_extra_opts="$rsync_extra_opts $1" ;;
     --tag-name=?*)
         tag_name=$( expr "x$1" : 'x--tag-name=\(.*\)' ) ;;
     -q) quiet=1 ;;
@@ -142,7 +149,8 @@ do
           && $trace histbackup $hbopts --copy-times \
                -- "$src_path" "$backup_path" \
                "--include-from=$tmpf" \
-               -O $rsync_exclude_opts $rsync_delete_exclude_opts
+               -O $rsync_exclude_opts $rsync_delete_exclude_opts \
+               $rsync_extra_opts
         } || xit=1
         [ $quiet ] || {
           du -sh "$backup_path/LATEST/" \

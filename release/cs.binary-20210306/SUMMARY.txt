@@ -1,0 +1,1 @@
+MAJOR RELEASE: The PacketField classes and friends were hard to use; this release supplied a suite of easier to use and more consistent Binary* classes, and ports most of those things based on the old scheme to the new scheme.

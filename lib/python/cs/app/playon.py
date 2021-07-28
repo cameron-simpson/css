@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from functools import partial
 from getopt import getopt, GetoptError
 from netrc import netrc
+import os
 from os import environ
 from os.path import (
     basename, exists as pathexists, expanduser, realpath, splitext
@@ -26,7 +27,9 @@ import requests
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.lex import has_format_attributes, format_attribute
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.progress import progressbar
@@ -37,9 +40,15 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
+DBURL_DEFAULT = '~/var/playon.sqlite'
+
 DEFAULT_FILENAME_FORMAT = (
     '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
 )
+
+# download parallelism
+DEFAULT_DL_PARALLELISM = 2
 
 def main(argv=None):
   ''' Playon command line mode.
@@ -51,30 +60,36 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID}'
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
 
   USAGE_KEYWORDS = {
+      'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
       'LS_FORMAT': LS_FORMAT,
+      'DBURL_ENVVAR': DBURL_ENVVAR,
+      'DBURL_DEFAULT': DBURL_DEFAULT,
       'QUEUE_FORMAT': QUEUE_FORMAT,
   }
 
   USAGE_FORMAT = r'''Usage: {cmd} subcommand [args...]
 
     Environment:
-      PLAYON_USER               PlayOn login name.
+      PLAYON_USER               PlayOn login name, default from $EMAIL.
       PLAYON_PASSWORD           PlayOn password.
                                 This is obtained from .netrc if omitted.
       PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
+      {DBURL_ENVVAR:17}         Location of state tags database.
+                                Default: {DBURL_DEFAULT}
 
     Recording specification:
       an int        The specific recording id.
       all           All known recordings.
       downloaded    Recordings already downloaded.
+      expired       Recording which are no longer available.
       pending       Recordings not already downloaded.
       /regexp       Recordings whose Series or Name match the regexp,
                     case insensitive.
@@ -82,7 +97,7 @@ class PlayOnCommand(BaseCommand):
 
   def apply_defaults(self):
     options = self.options
-    options.user = environ.get('PLAYON_USER')
+    options.user = environ.get('PLAYON_USER', environ.get('EMAIL'))
     options.password = environ.get('PLAYON_PASSWORD')
     options.filename_format = environ.get(
         'PLAYON_FILENAME_FORMAT', DEFAULT_FILENAME_FORMAT
@@ -116,21 +131,32 @@ class PlayOnCommand(BaseCommand):
       print(k, pformat(v))
 
   def cmd_dl(self, argv):
-    ''' Usage: {cmd} [-n] [recordings...]
+    ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
           Download the specified recordings, default "pending".
-          -n  No download. List the specified recordings.
+          -j jobs   Run this many downloads in parallel.
+                    The default is {DEFAULT_DL_PARALLELISM}.
+          -n        No download. List the specified recordings.
     '''
     options = self.options
     sqltags = options.sqltags
+    dl_jobs = DEFAULT_DL_PARALLELISM
     no_download = False
-    if argv and argv[0] == '-n':
-      argv.pop(0)
-      no_download = True
+    opts, argv = getopt(argv, 'j:n')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-j':
+          dl_jobs = int(val)
+          if dl_jobs < 1:
+            raise GetoptError(f"invalid jobs, should be >= 1, got: {dl_jobs}")
+        elif opt == '-n':
+          no_download = True
+        else:
+          raise RuntimeError("unhandled option")
     if not argv:
       argv = ['pending']
     api = options.api
     filename_format = options.filename_format
-    sem = Semaphore(2)
+    sem = Semaphore(dl_jobs)
 
     @typechecked
     def _dl(dl_id: int, sem):
@@ -138,10 +164,8 @@ class PlayOnCommand(BaseCommand):
         with sqltags:
           filename = api[dl_id].format_as(filename_format)
           filename = (
-              filename.lower().replace(' - ',
-                                       '--').replace('_',
-                                                     ':').replace(' ', '-') +
-              '.'
+              filename.lower().replace(' - ', '--').replace('_', ':')
+              .replace(' ', '-').replace(os.sep, ':') + '.'
           )
           try:
             api.download(dl_id, filename=filename)
@@ -162,18 +186,22 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         for dl_id in recording_ids:
-          te = sqltags[dl_id]
-          with Pfx(te.name):
-            if te.is_expired():
-              warning("expired, skipping")
+          recording = sqltags[dl_id]
+          with Pfx(recording.name):
+            citation = recording.nice_name()
+            if recording.is_expired():
+              warning("expired, skipping %r", citation)
               continue
-            if not te.is_available():
-              warning("not yet available, skipping")
+            if not recording.is_available():
+              warning("not yet available, skipping %r", citation)
               continue
-            if te.is_downloaded():
-              warning("already downloaded to %r", te.download_path)
+            if recording.is_downloaded():
+              warning(
+                  "already downloaded %r to %r", citation,
+                  recording.download_path
+              )
             if no_download:
-              te.ls()
+              recording.ls()
             else:
               sem.acquire()
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
@@ -181,11 +209,9 @@ class PlayOnCommand(BaseCommand):
     if Rs:
       for R in report_results(Rs):
         dl_id = R.extra['dl_id']
-        te = sqltags[dl_id]
-        if R():
-          print("OK ", dl_id, te.download_path)
-        else:
-          print("BAD", dl_id)
+        recording = sqltags[dl_id]
+        if not R():
+          print("FAILED", dl_id)
           xit = 1
 
     return xit
@@ -195,10 +221,10 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    tes = set(sqltags.recordings())
-    if (any(map(
-        lambda te: not te.is_expired() and te.is_stale(max_age=max_age), tes))
-        or all(map(lambda te: te.is_expired(), tes))):
+    recordings = set(sqltags.recordings())
+    if (any(map(lambda recording: not recording.is_expired() and recording.
+                is_stale(max_age=max_age), recordings))
+        or all(map(lambda recording: recording.is_expired(), recordings))):
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -235,9 +261,9 @@ class PlayOnCommand(BaseCommand):
           xit = 1
           continue
         for dl_id in recording_ids:
-          te = sqltags[dl_id]
-          with Pfx(te.name):
-            te.ls(ls_format=listing_format, long_mode=long_mode)
+          recording = sqltags[dl_id]
+          with Pfx(recording.name):
+            recording.ls(ls_format=listing_format, long_mode=long_mode)
     return xit
 
   def cmd_ls(self, argv):
@@ -285,6 +311,28 @@ class PlayOnCommand(BaseCommand):
       T.join()
     return xit
 
+  def cmd_service(self, argv, locale='en_US'):
+    ''' Usage: {cmd} [service_id]
+          List services.
+    '''
+    if argv:
+      service_id = argv.pop(0)
+    else:
+      service_id = None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    api = self.options.api
+    for service in sorted(api.services(), key=lambda svc: svc['playon.ID']):
+      playon = service.subtags('playon')
+      if service_id is not None and playon.ID != service_id:
+        print("skip", playon.ID)
+        continue
+      print(playon.ID, playon.Name, playon.LoginMetadata["URL"])
+      if service_id is None:
+        continue
+      for tag in playon:
+        print(" ", tag)
+
 # pylint: disable=too-few-public-methods
 class _RequestsNoAuth(requests.auth.AuthBase):
   ''' The API has a distinct login call, avoid basic auth from netrc etc.
@@ -293,6 +341,7 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
+@has_format_attributes
 class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
   '''
@@ -300,41 +349,58 @@ class PlayOnSQLTagSet(SQLTagSet):
   # recording data stale after 10 minutes
   STALE_AGE = 600
 
+  @format_attribute
   def recording_id(self):
     ''' The recording id or `None`.
     '''
     return self.get('playon.ID')
 
-  @property
+  @format_attribute
+  def nice_name(self):
+    ''' A nice name for the recording: the PlayOn series and name,
+        omitting the series if None.
+    '''
+    playon_tags = self.subtags('playon')
+    citation = playon_tags.Name
+    if playon_tags.Series:
+      citation = playon_tags.Series + " - " + citation
+    return citation
+
+  @format_attribute
   def status(self):
-    ''' A short status string.
+    ''' Return a short status string.
     '''
     for status_label in 'queued', 'expired', 'downloaded', 'pending':
       if getattr(self, f'is_{status_label}')():
         return status_label
     raise RuntimeError("cannot infer a status string: %s" % (self,))
 
+  @format_attribute
   def is_available(self):
     ''' Is a recording available for download?
     '''
     return not self.is_expired() and not self.is_queued()
 
+  @format_attribute
   def is_queued(self):
     ''' Is a recording still in the queue?
     '''
     return 'playon.Created' not in self
 
+  @format_attribute
   def is_downloaded(self):
     ''' Test whether this recording has been downloaded
         based on the presence of a `download_path` `Tag`.
     '''
     return self.download_path is not None
 
+  @format_attribute
   def is_pending(self):
     ''' A pending download: available and not already downloaded.
     '''
     return self.is_available() and not self.is_downloaded()
 
+  @format_attribute
   def is_expired(self):
     ''' Test whether this recording is expired,
         should imply no longer available for download.
@@ -344,6 +410,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       return False
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
+  @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this entry is stale
         i.e. the time since `self.last_updated` exceeds `max_age` seconds,
@@ -365,7 +432,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       ls_format = PlayOnCommand.LS_FORMAT
     if print_func is None:
       print_func = print
-    print_func(ls_format.format_map(self.ns()), f'{self.status.upper()}')
+    print_func(self.format_as(ls_format))
     if long_mode:
       for tag in sorted(self):
         print_func(" ", tag)
@@ -382,6 +449,21 @@ class PlayOnSQLTags(SQLTags):
     if dbpath is None:
       dbpath = expanduser(self.STATEDBPATH)
     super().__init__(db_url=dbpath)
+
+  @staticmethod
+  @fmtdoc
+  def infer_db_url(envvar=None, default_path=None):
+    ''' Infer the database URL.
+
+        Parameters:
+        * `envvar`: environment variable to specify a default,
+          default from `DBURL_ENVVAR` (`{DBURL_ENVVAR}`).
+    '''
+    if envvar is None:
+      envvar = DBURL_ENVVAR
+    if default_path is None:
+      default_path = DBURL_DEFAULT
+    return super().infer_db_url(envvar=envvar, default_path=default_path)
 
   def __getitem__(self, index):
     if isinstance(index, int):
@@ -402,19 +484,30 @@ class PlayOnSQLTags(SQLTags):
     ''' Convert a string to a list of recording ids.
     '''
     with Pfx(arg):
-      tes = []
+      recordings = []
       if arg == 'all':
-        tes.extend(iter(self))
+        recordings.extend(iter(self))
       elif arg == 'available':
-        tes.extend(te for te in self if te.is_available())
+        recordings.extend(
+            recording for recording in self if recording.is_available()
+        )
       elif arg == 'downloaded':
-        tes.extend(te for te in self if te.is_downloaded())
+        recordings.extend(
+            recording for recording in self if recording.is_downloaded()
+        )
+      elif arg == 'expired':
+        recordings.extend(
+            recording for recording in self if recording.is_expired()
+        )
       elif arg == 'pending':
-        tes.extend(
-            te for te in self if not te.is_downloaded() and te.is_available()
+        recordings.extend(
+            recording for recording in self
+            if not recording.is_downloaded() and recording.is_available()
         )
       elif arg == 'queued':
-        tes.extend(te for te in self if te.is_queued())
+        recordings.extend(
+            recording for recording in self if recording.is_queued()
+        )
       elif arg.startswith('/'):
         # match regexp against playon.Series or playon.Name
         r_text = arg[1:]
@@ -422,11 +515,11 @@ class PlayOnSQLTags(SQLTags):
           r_text = r_text[:-1]
         with Pfx("re.compile(%r, re.I)", r_text):
           r = re.compile(r_text, re.I)
-        for te in self:
-          pl_tags = te.subtags('playon')
+        for recording in self:
+          pl_tags = recording.subtags('playon')
           if (pl_tags.Series and r.search(pl_tags.Series)
               or pl_tags.Name and r.search(pl_tags.Name)):
-            tes.append(te)
+            recordings.append(recording)
       else:
         # integer recording id
         try:
@@ -434,11 +527,11 @@ class PlayOnSQLTags(SQLTags):
         except ValueError:
           warning("unsupported word")
         else:
-          tes.append(self[dl_id])
+          recordings.append(self[dl_id])
       return list(
           filter(
               lambda dl_id: dl_id is not None,
-              map(lambda te: te.get('playon.ID'), tes)
+              map(lambda recording: recording.get('playon.ID'), recordings)
           )
       )
 
@@ -451,6 +544,9 @@ class PlayOnAPI(MultiOpenMixin):
   API_HOSTNAME = 'api.playonrecorder.com'
   API_BASE = f'https://{API_HOSTNAME}/v3/'
   API_AUTH_GRACETIME = 30
+
+  CDS_HOSTNAME = 'cds.playonrecorder.com'
+  CDS_BASE = f'https://{CDS_HOSTNAME}/api/v6/'
 
   def __init__(self, login, password, sqltags=None):
     if sqltags is None:
@@ -466,19 +562,15 @@ class PlayOnAPI(MultiOpenMixin):
     self.sqltags = sqltags
     self._fstags = FSTags()
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Start up: open and init the `SQLTags`, open the `FSTags`.
     '''
     sqltags = self.sqltags
-    sqltags.open()
-    sqltags.init()
-    self._fstags.open()
-
-  def shutdown(self):
-    ''' Shutdown: close the `SQLTags`, close the `FSTags`.
-    '''
-    self._fstags.close()
-    self.sqltags.close()
+    with sqltags:
+      sqltags.init()
+      with self._fstags:
+        yield
 
   @property
   @pfx_method
@@ -491,13 +583,14 @@ class PlayOnAPI(MultiOpenMixin):
   def login_state(self):
     ''' The login state, a `dict`. Performs a login if necessary.
     '''
-    state = self._login_state
-    if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
-      self._login_state = None
-      self._jwt = None
-      # not logged in or login about to expire
-      state = self._login_state = self._dologin()
-      self._jwt = state['token']
+    with self._lock:
+      state = self._login_state
+      if not state or time.time() + self.API_AUTH_GRACETIME >= state['exp']:
+        self._login_state = None
+        self._jwt = None
+        # not logged in or login about to expire
+        state = self._login_state = self._dologin()
+        self._jwt = state['token']
     return state
 
   @pfx_method
@@ -509,14 +602,21 @@ class PlayOnAPI(MultiOpenMixin):
     password = self._password
     if not login or not password:
       N = netrc()
+      netrc_hosts = []
       if login:
-        entry = N.hosts.get(f"{login}:{self.API_HOSTNAME}")
+        assert login is not None and login != 'None', "login=%r" % login
+        netrc_host = f"{login}:{self.API_HOSTNAME}"
+        netrc_hosts.append(netrc_host)
+        with Pfx(".netrc host %r", netrc_host):
+          entry = N.hosts.get(netrc_host)
       else:
         entry = None
       if not entry:
-        entry = N.hosts.get(self.API_HOSTNAME)
+        netrc_hosts.append(self.API_HOSTNAME)
+        with Pfx(".netrc host %r", self.API_HOSTNAME):
+          entry = N.hosts.get(self.API_HOSTNAME)
       if not entry:
-        raise ValueError("no netrc entry")
+        raise ValueError("no netrc entry for %r" % (netrc_hosts,))
       n_login, _, n_password = entry
       if login is None:
         login = n_login
@@ -549,22 +649,22 @@ class PlayOnAPI(MultiOpenMixin):
 
   @staticmethod
   def from_playon_date(date_s):
-    ''' The PlayOnAPI seems to use UTC date strings.
+    ''' The PlayOn API seems to use UTC date strings.
     '''
     return datetime.strptime(date_s,
                              "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
   @typechecked
   def __getitem__(self, download_id: int):
-    ''' Return the `TagSet` associated with the recording `download_id`.
+    ''' Return the recording `TagSet` associated with the recording `download_id`.
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, method, suburl):
+  def suburl_request(self, base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
-    url = self.API_BASE + suburl
+    url = base_url + suburl
     rqm = partial(
         {
             'GET': requests.get,
@@ -576,7 +676,15 @@ class PlayOnAPI(MultiOpenMixin):
     )
     return rqm
 
-  def suburl_data(self, suburl, _method='GET', headers=None, **kw):
+  def suburl_data(
+      self,
+      suburl,
+      _base_url=None,
+      _method='GET',
+      headers=None,
+      raw=False,
+      **kw
+  ):
     ''' Call `suburl` and return the `'data'` component on success.
 
         Parameters:
@@ -587,10 +695,14 @@ class PlayOnAPI(MultiOpenMixin):
         Other keyword arguments are passed to the `requests` method
         used to perform the HTTP call.
     '''
+    if _base_url is None:
+      _base_url = self.API_BASE
     if headers is None:
       headers = dict(Authorization=self.jwt)
-    rqm = self.suburl_request(_method, suburl)
+    rqm = self.suburl_request(_base_url, _method, suburl)
     result = rqm(headers=headers, **kw).json()
+    if raw:
+      return result
     ok = result.get('success')
     if not ok:
       raise ValueError("failed: %r" % (result,))
@@ -602,12 +714,23 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.suburl_data('account')
 
-  def _entities_from_entries(self, entries):
-    ''' Return the `TagSet` instances from PlayOn data entries.
+  def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
+    return self.suburl_data(
+        suburl,
+        _base_url=self.CDS_BASE,
+        _method=_method,
+        headers=headers,
+        raw=True,
+        **kw
+    )
+
+  @pfx_method
+  def _recordings_from_entries(self, entries):
+    ''' Return the recording `TagSet` instances from PlayOn data entries.
     '''
     with self.sqltags:
       now = time.time()
-      tes = set()
+      recordings = set()
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
@@ -634,11 +757,11 @@ class PlayOnAPI(MultiOpenMixin):
                     warning("%r: %s", value, e)
                   else:
                     entry[field] = value2
-          te = self[entry_id]
-          te.update(entry, prefix='playon')
-          te.update(dict(last_updated=now))
-          tes.add(te)
-      return tes
+          recording = self[entry_id]
+          recording.update(entry, prefix='playon')
+          recording.update(dict(last_updated=now))
+          recordings.add(recording)
+      return recordings
 
   @pfx_method
   def queue(self):
@@ -646,7 +769,7 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     data = self.suburl_data('queue')
     entries = data['entries']
-    return self._entities_from_entries(entries)
+    return self._recordings_from_entries(entries)
 
   @pfx_method
   def recordings(self):
@@ -654,7 +777,53 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     data = self.suburl_data('library/all')
     entries = data['entries']
-    return self._entities_from_entries(entries)
+    return self._recordings_from_entries(entries)
+
+  @pfx_method
+  def _services_from_entries(self, entries):
+    ''' Return the service `TagSet` instances from PlayOn data entries.
+    '''
+    with self.sqltags:
+      now = time.time()
+      services = set()
+      for entry in entries:
+        entry_id = entry['ID']
+        with Pfx(entry_id):
+          for field, conv in sorted(dict(
+              ##Created=self.from_playon_date,
+              ##Expires=self.from_playon_date,
+              ##Updated=self.from_playon_date,
+          ).items()):
+            try:
+              value = entry[field]
+            except KeyError:
+              pass
+            else:
+              with Pfx("%s=%r", field, value):
+                if value is None:
+                  del entry[field]
+                else:
+                  try:
+                    value2 = conv(value)
+                  except ValueError as e:
+                    warning("%r: %s", value, e)
+                  else:
+                    entry[field] = value2
+          service = self.service(entry_id)
+          service.update(entry, prefix='playon')
+          service.update(dict(last_updated=now))
+          services.add(service)
+      return services
+
+  @pfx_method
+  def services(self):
+    entries = self.cdsurl_data('content')
+    return self._services_from_entries(entries)
+
+  def service(self, service_id):
+    ''' Return the service `SQLTags` instance for `service_id`.
+    '''
+    return self.sqltags[f'service.{service_id}']
 
   # pylint: disable=too-many-locals
   @pfx_method
@@ -696,7 +865,7 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with Pfx("open(%r,'wb')"):
+      with Pfx("open(%r,'wb')", filename):
         with open(filename, 'wb') as f:
           for chunk in progressbar(
               dl_rsp.iter_content(chunk_size=131072),
@@ -704,24 +873,26 @@ class PlayOnAPI(MultiOpenMixin):
               total=dl_length,
               units_scale=BINARY_BYTES_SCALE,
               itemlenfunc=len,
+              report_print=True,
           ):
             offset = 0
             length = len(chunk)
-            while length > 0:
-              with Pfx("write %d bytes", length):
-                written = f.write(chunk[offset:length])
+            while offset < length:
+              with Pfx("write %d bytes", length - offset):
+                written = f.write(chunk[offset:])
                 if written < 1:
-                  warning("write %d bytes")
+                  warning("fewer than 1 bytes written: %s", written)
                 else:
                   offset += written
-                  length -= written
+                  assert offset <= length
+            assert offset == length
     fullpath = realpath(filename)
-    te = self[download_id]
+    recording = self[download_id]
     if dl_rsp is not None:
-      te.set('download_path', fullpath)
+      recording.set('download_path', fullpath)
     # apply the SQLTagSet to the FSTags TagSet
-    self._fstags[fullpath].update(te.subtags('playon'), prefix='playon')
-    return te
+    self._fstags[fullpath].update(recording.subtags('playon'), prefix='playon')
+    return recording
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

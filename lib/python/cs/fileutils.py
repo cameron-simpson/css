@@ -42,7 +42,7 @@ from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import LoadableMappingMixin, UUIDedDict
+from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 from cs.progress import Progress, progressbar
@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210131-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,7 +69,7 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings',
+        'cs.mappings>=20210717',
         'cs.obj',
         'cs.pfx',
         'cs.progress',
@@ -185,6 +185,9 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
                                   progress_label=progress_label, **kw) as T:
             yield T
     return
+  prefix = kw.pop('prefix', None)
+  if prefix is None:
+    prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
   if isinstance(f, CornuCopyBuffer):
     length = None
@@ -214,7 +217,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(**kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -699,6 +702,7 @@ def makelockfile(
           raise
         if timeout is not None and timeout <= 0:
           # immediate failure
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
@@ -719,6 +723,7 @@ def makelockfile(
           sleep_for = min(poll_interval, start + timeout - now)
         # test for timeout
         if sleep_for <= 0:
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         time.sleep(sleep_for)
         continue
@@ -1775,13 +1780,14 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
-  ''' A subclass of `LoadableMappingMixin` which maintains records
+class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
+  ''' A subclass of `IndexedSetMixin` which maintains records
       from a newline delimited JSON file.
   '''
 
-  loadable_mapping_key = 'uuid'
+  IndexedSetMixin__pk = 'uuid'
 
+  # pylint: disable=unused-argument
   @staticmethod
   def _singleton_key(filename, dictclass=UUIDedDict, create=False):
     ''' Key off the absolute path of `filename`.
@@ -1808,6 +1814,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
       # make sure the file exists
       with open(filename, 'a'):
         pass
+    self.scan_errors = []
     self._lock = RLock()
 
   def __str__(self):
@@ -1815,7 +1822,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
         type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
     )
 
-  def scan_mapping(self):
+  def scan(self):
     ''' Scan the backing file, yield records.
     '''
     if existspath(self.__ndjson_filename):
@@ -1824,14 +1831,14 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
                                 error_list=self.scan_errors):
         yield record
 
-  def append_to_mapping(self, record):
+  def add_backend(self, record):
     ''' Append `record` to the backing file.
     '''
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
 
-  def rewrite_mapping(self):
+  def rewrite_backend(self):
     ''' Rewrite the backing file.
 
         Because the record updates are normally written in append mode,
@@ -1844,7 +1851,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
           T.write(record.as_json())
           T.write('\n')
         T.flush()
-      self.scan_mapping_length = i
+      self.scan_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests

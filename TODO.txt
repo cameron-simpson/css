@@ -1,16 +1,26 @@
+cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
+cs.upd: add pprint wrapper
+TagsOntology: reverse prefix mappings
+cs.app.playon: keep playon recording info as ontology, distinct from state db
+TagsOntology: accept directory, process files within, deduce prefix from filename, ONTOLOGY.sqlite for the default
+gitlog - record the branch too - maybe totally record dlog
+extended prime seive impl?
+TagSet.subtags: subclass PrefixedMappingProxy also
+let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
+cs.pop3: buffering for the SSL mode
+an atomic-sh make scratch dir then rename to target name decorator
+cs.units: maybe we can embed "%2.1f" in the UnitStep instead of max_width? may be faster
+pfx_method: pass printf_func arg to Pfx
 BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
 BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
-maybe we want an intermeidate TagSetsWithMapping subclass between this and TagSets proviing .te_maping based methods
-cs.mp3: should it yield various Binary packets or is that overkill?
 cs.mp3: parse tags? pull names etc from cs.id3
 progress/upd: fixed with trailing units, eg %2d
 run-backups: single file: src type desthost[:dstpath?] [options...]
-cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue
+cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue (NO, WE CANNOT)
 cs.logutils,pilfer: drop D_mode and the D function
 cs.upd: what to do when the number of status lines exceeds the terminal height?
 try to strip out use of cs.py3.bytes
 replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
-MutliOpenMixin: __enter__/__exit__ for open/close? thought it already did that - check use
 cs.logutils: warning et all: once=key (or key on the warning format string if True)
 general facility to do things just once, particularly warnings - then port cs.progress to it
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
@@ -22,12 +32,11 @@ cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that
 vbox: cmd to associate the current default interface before starting vm?
 vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
 does dbdigraph really need T_SEQ and friends? try to push that into cs.hier too
-cs.distinfo: update URLs from bitbucket to sr.ht
 securer findup: sanity check on ownership or perms to stop walk? tunable?
 BaseCommand: can we provide the expected command name instead of the class name in the docstring?
 cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
 cs.upd: ansi_mode to accept coloured message strings - requires an ansi_len function in cs.tty
-cs.upd: some kind of ANSI escape support so that we can mbed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
+cs.upd: some kind of ANSI escape support so that we can embed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
 cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
 cs.progress: control over status display - units etc
 cs.upd: rate per proxy, bisect to update counter, autotune?
@@ -44,7 +53,6 @@ treet - a tree tool to read "parentkey key text" and render various tree listing
 pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
 cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
 cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
-import the examples in the module docstring
 cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111cda5f0>
 incd: only save target for remote targets
 incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?

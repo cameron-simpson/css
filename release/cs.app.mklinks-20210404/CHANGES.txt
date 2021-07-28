@@ -1,0 +1,2 @@
+lib/python/cs/app/mklinks.py: cs.app.mklinks: FileInfo.checksum: bump read size to 1MiB
+lib/python/cs/app/mklinks.py: update module DISTINFOs for recent cs.cmdutils BaseCommand change

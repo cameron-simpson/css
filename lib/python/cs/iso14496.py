@@ -51,7 +51,7 @@ from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek as geek, transcribe_time
 from cs.upd import print, out  # pylint: disable=redefined-builtin
 
-__version__ = '20200229'
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -66,12 +66,14 @@ DISTINFO = {
         'cs.binary',
         'cs.buffer',
         'cs.cmdutils',
+        'cs.context',
         'cs.fstags',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
         'cs.py.func',
         'cs.tagset',
+        'cs.threads',
         'cs.units',
         'cs.upd',
     ],
@@ -2674,10 +2676,7 @@ def parse_tags(path, tag_prefix=None):
         if tags:
           if tag_prefix:
             new_tags = TagSet()
-            new_tags.update(
-                Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
-                for tag in tags
-            )
+            new_tags.update(Tag(tag, prefix=tag_prefix) for tag in tags)
             tags = new_tags
           yield box, tags
 

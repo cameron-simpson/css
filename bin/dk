@@ -53,6 +53,12 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     rsync rsync-args...
       Rsync into or out of the container where the container name
       comes from the \"host\" part of an rsync remote path.
+    try [name [command...]]
+      Shorthand for \"docker-compose run --rm name command...\".
+      The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
+      The default command is bash.
+    update
+      Run down, volume rm var, pull, build, up setup.
 
   Environment:
     DK_COMPOSE_YML
@@ -241,6 +247,21 @@ case "$op" in
   rsync)
       set -x
       exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
+  try)
+      if [ $# = 0 ]
+      then
+        service=$DK_PRIMARY_SERVICE
+        [ -n "$service" ] || {
+          echo "$cmd try: no service name and name \$DK_PRIMARY_SERVICE" >&2
+          exit 1
+        }
+      else
+        service=$1; shift
+      fi
+      [ $# - gt 0 ] || set -- bash
+      set -x
+      docker-compose run --rm "$service" "$@"
+      ;;
   update)
       set -ex
       "$0" down

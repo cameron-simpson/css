@@ -9,6 +9,7 @@ mypy
 musicbrainzngs
 pycodestyle
 pyflakes
+pyicontract-lint
 pylint
 pytest
 requests

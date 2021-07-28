@@ -85,7 +85,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20210122-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -94,8 +94,14 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.context', 'cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
+    'install_requires': [
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.obj>=20210122',
+        'cs.tty',
+    ],
 }
 
 def _cleanup():
@@ -160,11 +166,33 @@ class Upd(SingletonMixin):
       backend = sys.stderr
     return id(backend)
 
+  # pylint: disable=too-many-branches
   def __init__(self, backend=None, columns=None, disabled=None):
+    ''' Initialise the `Upd`.
+
+        Parameters:
+        * `backend`: the output file, default `sys.stderr`
+        * `columns`: the width of the output,
+          default from the width of the `backend` tty if it is a tty,
+          `80` otherwise
+        * `disabled`: if true, disable the output - just keep state;
+          default true if the output is not a tty;
+          this automatically silences the `Upd` if stderr is not a tty
+    '''
     if hasattr(self, '_backend'):
       return
     if backend is None:
       backend = sys.stderr
+    # test isatty and the associated file descriptor
+    isatty = backend.isatty()
+    if isatty:
+      try:
+        backend_fd = backend.fileno()
+      except OSError:
+        backend_fd = None
+        isatty = False
+    else:
+      backend_fd = None
     if columns is None:
       columns = 80
       if backend.isatty():
@@ -177,11 +205,32 @@ class Upd(SingletonMixin):
       except AttributeError:
         disabled = True
     self._backend = backend
+    self._backend_isatty = isatty
+    self._backend_fd = backend_fd
+    # prepare the terminfo capability mapping, if any
+    self._ti_strs = {}
+    if isatty:
+      if curses is not None:
+        try:
+          curses.setupterm(fd=backend_fd)
+        except TypeError:
+          pass
+        else:
+          for ti_name in (
+              'vi',
+              'vs',  # cursor invisible/visible
+              'cuu1',  # cursor up 1 line
+              'dl1',  # delete 1 line
+              'il1',  # insert one line
+              'el',  # clear to end of line
+          ):
+            s = curses.tigetstr(ti_name)
+            if s is not None:
+              s = s.decode('ascii')
+            self._ti_strs[ti_name] = s
     self._disabled = disabled
     self._disabled_backend = None
     self.columns = columns
-    self._ti_ready = False
-    self._ti_strs = {}
     self._cursor_visible = True
     self._current_slot = None
     self._reset()
@@ -369,27 +418,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
-    global curses  # pylint: disable=global-statement
-    try:
-      return self._ti_strs[ti_name]
-    except KeyError:
-      with self._lock:
-        if curses is None:
-          s = None
-        else:
-          if not self._ti_ready:
-            try:
-              curses.setupterm()
-            except TypeError:
-              curses = None
-              self._ti_ready = True
-              return None
-            self._ti_ready = True
-          s = curses.tigetstr(ti_name)
-          if s is not None:
-            s = s.decode('ascii')
-        self._ti_strs[ti_name] = s
-      return s
+    return self._ti_strs.get(ti_name, None)
 
   @staticmethod
   def normalise(txt):
@@ -895,7 +924,7 @@ class Upd(SingletonMixin):
           txts.append('\r')
           txts.append(slots[index])
         else:
-          # the effectiove index has now moved down
+          # the effective index has now moved down
           index -= 1
           if delete_line:
             # delete line and advance to the end of the new current line

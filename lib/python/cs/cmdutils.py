@@ -3,7 +3,8 @@
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
 
-''' Convenience functions for working with the Cmd module
+''' Convenience functions for working with the Cmd module,
+    the BaseCommand class for constructing command line programmes,
     and other command line related stuff.
 '''
 
@@ -16,13 +17,13 @@ from types import SimpleNamespace
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, stripped_dedent
+from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210123-post'
+__version__ = '20210420-post'
 
 DISTINFO = {
     'description':
@@ -36,8 +37,14 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.context', 'cs.deco', 'cs.lex', 'cs.logutils', 'cs.pfx',
-        'cs.py.doc', 'cs.resources'
+        'cs.context',
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.doc',
+        'cs.resources',
     ],
 }
 
@@ -60,13 +67,13 @@ def docmd(dofunc):
           from cs.cmdutils import docmd
           ...
           class MyCmd(Cmd):
-            @docmd
-            def do_something(...):
-              ... do something ...
+              @docmd
+              def do_something(...):
+                  ... do something ...
   '''
   funcname = dofunc.__name__
 
-  def wrapped(self, *a, **kw):
+  def docmd_wrapper(self, *a, **kw):
     ''' Run a `Cmd` "do" method with some context and handling.
     '''
     if not funcname.startswith('do_'):
@@ -83,9 +90,9 @@ def docmd(dofunc):
         exception("%s", e)
         return None
 
-  wrapped.__name__ = '@docmd(%s)' % (funcname,)
-  wrapped.__doc__ = dofunc.__doc__
-  return wrapped
+  docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
+  docmd_wrapper.__doc__ = dofunc.__doc__
+  return docmd_wrapper
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -93,7 +100,7 @@ class BaseCommand:
       This class provides the basic parse and dispatch mechanisms
       for command lines.
       To implement a command line
-      one instantiates a subclass of BaseCommand:
+      one instantiates a subclass of `BaseCommand`:
 
           class MyCommand(BaseCommand):
               GETOPT_SPEC = 'ab:c'
@@ -102,26 +109,51 @@ class BaseCommand:
                 -b    But using bvalue.
                 -c    The 'c' option!
               """
-            ...
+              ...
+
+      and provides either a `main` method if the command has no subcommands
+      or a suite of `cmd_`*subcommand* methods, one per subcommand.
 
       Running a command is done by:
 
           MyCommand(argv).run()
 
-      Modules which implement a command line mode generally look like:
+      or via the convenience method:
+
+          MyCommand.run_argv(argv)
+
+      Modules which implement a command line mode generally look like this:
 
           ... imports etc ...
-          def main(argv=None):
-              return MyCommand(argv).run()
           ... other code ...
           class MyCommand(BaseCommand):
           ... other code ...
           if __name__ == '__main__':
-              sys.exit(main(sys.argv))
+              sys.exit(MyCommand.run_argv(sys.argv))
 
       Instances have a `self.options` attribute on which optional
       modes are set,
       avoiding conflict with the attributes of `self`.
+
+      Subclasses with no subcommands
+      generally just implement a `main(argv)` method.
+
+      Subclasses with subcommands
+      should implement a `cmd_`*subcommand*`(argv)` method
+      for each subcommand.
+      If there is a paragraph in the method docstring
+      commencing with `Usage:`
+      then that paragraph is incorporated automatically
+      into the main usage message.
+      Example:
+
+          def cmd_ls(self, argv):
+              """ Usage: {cmd} [paths...]
+                    Emit a listing for the named paths.
+
+                  Further docstring non-usage information here.
+              """
+              ... do the "ls" subcommand ...
 
       The subclass is customised by overriding the following methods:
       * `apply_defaults()`:
@@ -161,6 +193,19 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   OPTIONS_CLASS = SimpleNamespace
+
+  def __init_subclass__(cls):
+    ''' Update subclasses of `BaseCommand`.
+
+        Appends the usage message to the class docstring.
+    '''
+    usage_message = cls.usage_text()
+    usage_doc = (
+        'Command line usage:\n\n    ' + usage_message.replace('\n', '\n    ')
+    )
+    cls_doc = obj_docstring(cls)
+    cls_doc = cls_doc + '\n\n' + usage_doc if cls_doc else usage_doc
+    cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   def __init__(self, argv=None, *, cmd=None, **kw_options):
@@ -211,7 +256,7 @@ class BaseCommand:
     '''
     self._run = None  # becomes the run state later if no GetoptError
     self._printed_usage = False
-    self.options = self.OPTIONS_CLASS()
+    options = self.options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -221,7 +266,7 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
-    log_level = getattr(self.options, 'log_level', None)
+    log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.cmd = cmd
@@ -230,7 +275,7 @@ class BaseCommand:
     self.apply_defaults()
     # override the default options
     for option, value in kw_options.items():
-      setattr(self.options, option, value)
+      setattr(options, option, value)
     # we catch GetoptError from this suite...
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
@@ -247,14 +292,17 @@ class BaseCommand:
       if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
-          raise GetoptError(
-              "missing subcommand, expected one of: %s" %
-              (', '.join(sorted(subcmds.keys())),)
-          )
+          default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
+          if not default_argv:
+            raise GetoptError(
+                "missing subcommand, expected one of: %s" %
+                (', '.join(sorted(subcmds.keys())),)
+            )
+          argv = list(default_argv)
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
-          main = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
+          main_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError(
@@ -264,22 +312,23 @@ class BaseCommand:
               )
           )
         try:
-          main_is_class = issubclass(main, BaseCommand)
+          main_is_class = issubclass(main_method, BaseCommand)
         except TypeError:
           main_is_class = False
         if main_is_class:
-          subcmd_cls = main
-          main = subcmd_cls(argv, cmd=subcmd).run
+          subcmd_cls = main_method
+          main = lambda: subcmd_cls(argv, cmd=subcmd).run
+        else:
+          main = lambda: main_method(argv)
         main_cmd = subcmd
         main_context = Pfx(subcmd)
       else:
         try:
-          main = self.main
+          main = lambda: self.main(argv)
         except AttributeError:
           raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
         main_cmd = cmd
         main_context = nullcontext()
-      # stash for use by .run()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(cmd, self.options, e, self.usage):
@@ -305,7 +354,7 @@ class BaseCommand:
   @classmethod
   @cachedmethod
   def usage_text(cls, *, cmd=None, format_mapping=None):
-    ''' Compute the "Usage: message for this class
+    ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
         and the `'Usage:'`-containing docstrings
         from its `cmd_*` methods.
@@ -315,11 +364,11 @@ class BaseCommand:
         happens more than once.
     '''
     if cmd is None:
-      cmd = cls.__name__
+      cmd = cutsuffix(cls.__name__, 'Command').lower()
     if format_mapping is None:
       format_mapping = {}
-    if cmd is not None or 'cmd' not in format_mapping:
-      format_mapping['cmd'] = cls.__name__ if cmd is None else cmd
+    if 'cmd' not in format_mapping:
+      format_mapping['cmd'] = cmd
     usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
     usage_format_mapping.update(format_mapping)
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
@@ -389,16 +438,6 @@ class BaseCommand:
             subusage = '\n\n'.join(parts)
     return subusage if subusage else None
 
-  @classmethod
-  def add_usage_to_docstring(cls):
-    ''' Append `cls.usage_text()` to `cls.__doc__`.
-    '''
-    usage_message = cls.usage_text()
-    cls.__doc__ += (
-        '\n\nCommand line usage:\n\n    ' +
-        usage_message.replace('\n', '\n    ')
-    )
-
   def apply_defaults(self):
     ''' Stub `apply_defaults` method.
 
@@ -413,24 +452,25 @@ class BaseCommand:
   def apply_opts(self, opts):
     ''' Apply command line options.
     '''
-    options = self.options
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
 
-  def apply_opts(self, opts, options):
-    ''' The `apply_opts` method is required
-        if the subclass defines a nonempty `GETOPT_SPEC` attribute.
-        It should apply `opts` (the result of `getopt.getopt`)
-        to `options`.
+  @classmethod
+  def run_argv(cls, argv, **kw):
+    ''' Create an instance for `argv` and call its `.run()` method.
     '''
-    raise NotImplementedError("%s.apply_opts" % (type(self).__name__,))
+    return cls(argv).run(**kw)
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def run(self):
+  def run(self, **kw_options):
     ''' Run a command.
         Returns the exit status of the command.
         May raise `GetoptError` from subcommands.
+
+        Any keyword arguments are used to override `self.options` attributes
+        for the duration of the run,
+        for example to presupply a shared `RunState` from an outer context.
 
         If the first command line argument *foo*
         has a corresponding method `cmd_`*foo*
@@ -452,20 +492,21 @@ class BaseCommand:
         main_cmd = self.cmd  # used in "except" below
         raise GetoptError("bad invocation")
       main, main_cmd, main_argv, main_context = self._run
-      upd_context = self.loginfo.upd
-      if upd_context is None:
-        upd_context = nullcontext()
-      with RunState(main_cmd) as runstate:
+      runstate = getattr(options, 'runstate', RunState(main_cmd))
+      upd = getattr(options, 'upd', self.loginfo.upd)
+      upd_context = nullcontext() if upd is None else upd
+      with runstate:
         with upd_context:
           with stackattrs(
               options,
               cmd=main_cmd,
               runstate=runstate,
-              upd=self.loginfo.upd,
+              upd=upd,
           ):
-            with self.run_context():
-              with main_context:
-                return main(main_argv)
+            with stackattrs(options, **kw_options):
+              with self.run_context():
+                with main_context:
+                  return main()
     except GetoptError as e:
       handler = getattr(self, 'getopt_error_handler')
       if handler and handler(main_cmd, options, e,
@@ -492,8 +533,8 @@ class BaseCommand:
         It returns a false value if the exception is considered unhandled,
         in which case the main `run` method reraises the `GetoptError`.
 
-        This default handler prints an error message to standard error,
-        prints the usage message (if specified) to standard error,
+        This default handler issues a warning containing the exception text,
+        prints the usage message to standard error,
         and returns `True` to indicate that the error has been handled.
 
         To let the exceptions out unhandled
@@ -505,7 +546,7 @@ class BaseCommand:
         and return `True` to contain the exception
         or `False` to cause the exception to be reraised.
     '''
-    print("%s: %s" % (cmd, e), file=sys.stderr)
+    warning("%s", e)
     if usage:
       print(usage.rstrip(), file=sys.stderr)
     return True

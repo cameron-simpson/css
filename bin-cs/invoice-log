@@ -6,6 +6,8 @@
 
 set -ue
 
+cd
+
 cmd=$0
 usage="Usage: $cmd org startdate enddate [repo-dirs...]"
 
@@ -22,26 +24,27 @@ else
   for d in $repodirs
   do
     [ -d "$d/.git" ] || [ -d "$d/.hg" ] || {
-      echo "$cmd: repodir $d: no .git or .hg subdir" >&2
-      badopts=1
+      echo "$cmd: repodir $d: no .git or .hg subdir, SKIPPING" >&2
     }
   done
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-
 rcfile=$HOME/rc/invoice/$org.sh
-[ -s "$rcfile" ] || { echo "$cmd: missing rcfile: $rcfile" >&2; exit 1; }
-. "$rcfile"
+if [ -s "$rcfile" ]
+then  . "$rcfile"
+else  echo "$cmd: missing rcfile: $rcfile" >&2
+fi
 
 set -x
 (
   set -ue
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
   [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
-  for d in $repodirs
+  for d in $repodirs*
   do
+    [ -d "$d/" ] || continue
     ( cd "$d"
       if [ -d ".git/" ]
       then  git log '--format=tformat:%ci %ae %s %d' "--since=$start" "--until=$end"
