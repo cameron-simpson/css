@@ -46,6 +46,13 @@ done
 while [ $# -gt 0 ]
 do
   case "$1" in
+    mp4a | aac )
+      if [ -n "$acodec" ]
+      then  echo "$cmd: audio codec already set to $acodec" >&2
+            badopts=1
+      else  acodec=aac
+      fi
+      ;;
     h264 | avc | avc1 )
       if [ -n "$vcodec" ]
       then  echo "$cmd: video codec already set to $vcodec" >&2
@@ -148,11 +155,6 @@ else
 
   [ -s "$src" ] || {
     echo "$cmd: $src: not a regular file" >&2
-    badopts=1
-  }
-
-  [ ! -e "$dst" ] || {
-    echo "$cmd: $dst: already exists" >&2
     badopts=1
   }
 fi

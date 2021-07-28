@@ -14,6 +14,7 @@ usage="Usage: $cmd -f from -t to {-|target-file} [replacement-files...]
   \"to\" with the text from the \"replacement-files\", default standard input.
 
   Arguments:
+  -d          Use rewriteif on the target, producing a diff.
   -f from     Start line marked specified by regexp \"from\".
   -t to       Start line marked specified by regexp \"to\".
   -p pipecmd  Pipe the contents of the replacement-files through pipecmd,
@@ -55,6 +56,7 @@ usage="Usage: $cmd -f from -t to {-|target-file} [replacement-files...]
       done
       # SH END"
 
+diff_mode=
 from=
 to=
 pipecmd=
@@ -64,6 +66,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -d) diff_mode=1 ;;
     -f) from=$2; shift ;;
     -t) to=$2; shift ;;
     -p) pipecmd=$2; shift ;;
@@ -90,12 +93,17 @@ else
   esac
 fi
 
+# no source files? use stdin
 [ $# = 0 ] && set -- -
 
 # if ok so far, sanity check the replacement-files
 [ $badopts ] || \
   if [ $filter_mode ]
   then
+    [ $diff_mode ] && {
+      echo "$cmd: in filter mode, disabling diff mode" >&2
+      diff_mode=
+    }
     # sanity check the replacement files
     for src
     do
@@ -145,14 +153,23 @@ exec 3<&0       # save stdin
 
 if [ $ok ]
 then
-    [ $filter_mode ] || exec >"$target"
-    cat <"$front"
-    cat "$@" \
-    | if [ -n "$pipecmd" ]
-      then  sh -uec "$pipecmd" 3<"$middle"
-      else  cat
+    output(){
+      cat <"$front"
+      cat "$@" \
+      | if [ -n "$pipecmd" ]
+        then  sh -uec "$pipecmd" 3<"$middle"
+        else  cat
+        fi
+      cat <"$back"
+    }
+    if [ $filter_mode ]
+    then  output "$@"
+    else
+      if [ $diff_mode ]
+      then  output "$@" | rewriteif -d "$target"
+      else  output "$@" >"$target"
       fi
-    cat <"$back"
+    fi
 fi
 
 [ $ok ] && exit 0 || exit 1

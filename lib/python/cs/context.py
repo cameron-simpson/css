@@ -6,7 +6,7 @@
 from contextlib import contextmanager
 import threading
 try:
-  from contextlib import nullcontext  # pylint: disable=unused-import
+  from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
 
   @contextmanager
@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20210420.1-post'
+__version__ = '20210727-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -277,11 +277,24 @@ def stackkeys(d, **key_values):
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.
 
-      See also the `setup_cmgr(cmgr)` function
-      which is a convenience wrapper for this low level generator.
+      The first iteration performs the "enter" phase and yields the result.
+      The second iteration performs the "exit" phase and yields `None`.
+
+      See also the `push_cmgr(obj,attr,cmgr)` function
+      and its partner `pop_cmgr(obj,attr)`
+      which form a convenience wrapper for this low level generator.
+
+      The purpose of `twostep()` is to split any context manager's operation
+      across two steps when the set up and tear down phases must operate
+      in different parts of your code.
+      A common situation is the `__enter__` and `__exit__` methods
+      of another context manager class
+      or the `setUp` and `tearDown` methods of a unit test case.
 
       *Note*:
-      this function expects `cmgr` to be an existing context manager.
+      this function expects `cmgr` to be an existing context manager
+      and _not_ the function which returns the context manager.
+
       In particular, if you define some function like this:
 
           @contextmanager
@@ -299,18 +312,10 @@ def twostep(cmgr):
       and _not_:
 
           cmgr_iter = twostep(my_cmgr_func)
-          ...
+          next(cmgr_iter)   # set up
+          next(cmgr_iter)   # tear down
 
-      The purpose of `twostep()` is to split any context manager's operation
-      across two steps when the set up and tear down phases must operate
-      in different parts of your code.
-      A common situation is the `__enter__` and `__exit__` methods
-      of another context manager class.
-
-      The first iteration performs the "enter" phase and yields.
-      The second iteration performs the "exit" phase and yields.
-
-      Example use in a class:
+      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead)::
 
           class SomeClass:
               def __init__(self, foo)
@@ -324,9 +329,9 @@ def twostep(cmgr):
                   next(self._cmgr_stepped)
                   self._cmgr = None
   '''
-  with cmgr:
-    yield cmgr
-  yield cmgr
+  with cmgr as enter:
+    yield enter
+  yield
 
 def setup_cmgr(cmgr):
   ''' Run the set up phase of the context manager `cmgr`
@@ -334,6 +339,8 @@ def setup_cmgr(cmgr):
 
       This is a convenience wrapper for the lower level `twostep()` function
       which produces a two iteration generator from a context manager.
+
+      Please see the `push_cmgr` function, a superior wrapper for `twostep()`.
 
       *Note*:
       this function expects `cmgr` to be an existing context manager.
@@ -379,3 +386,47 @@ def setup_cmgr(cmgr):
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
   return lambda: next(cmgr_twostep)
+
+def push_cmgr(o, attr, cmgr):
+  ''' A convenience wrapper for `twostep(cmgr)`
+      to run the `__enter__` phase of `cmgr` and save its value as `o.`*attr*`.
+      The `__exit__` phase is run by `pop_cmgr(o,attr)`,
+      returning the return value of the exit phase.
+
+      Example use in a unit test:
+
+          class TestThing(unittest.TestCase):
+              def setUp(self):
+                  # save the temp dir path as self.dirpath
+                  push_cmgr(self, 'dirpath', TemporaryDirectory())
+              def tearDown(self):
+                  # clean up the temporary directory, discard self.dirpath
+                  pop_cmgr(self, 'dirpath')
+
+      Doc test:
+
+          >>> from os.path import isdir as isdirpath
+          >>> from tempfile import TemporaryDirectory
+          >>> from types import SimpleNamespace
+          >>> obj = SimpleNamespace()
+          >>> dirpath = push_cmgr(obj, 'path', TemporaryDirectory())
+          >>> assert dirpath == obj.path
+          >>> assert isdirpath(dirpath)
+          >>> pop_cmgr(obj, 'path')
+          >>> assert not hasattr(obj, 'path')
+          >>> assert not isdirpath(dirpath)
+  '''
+  cmgr_twostep = twostep(cmgr)
+  enter_value = next(cmgr_twostep)
+  pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
+  pop_func_attr = '_push_cmgr__popfunc__' + attr
+  pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})
+  return enter_value
+
+def pop_cmgr(o, attr):
+  ''' Run the `__exit__` phase of a context manager commenced with `push_cmgr`.
+      Restore `attr` as it was before `push_cmgr`.
+      Return the result of `__exit__`.
+  '''
+  pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
+  return pop_func()
