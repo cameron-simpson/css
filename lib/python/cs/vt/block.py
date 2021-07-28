@@ -95,7 +95,7 @@ class _Block(Transcriber, ABC):
     return b''.join(self)
 
   def __iter__(self):
-    ''' Iterating over a `_Block` yields chunsk from `self.datafrom()`.
+    ''' Iterating over a `_Block` yields chunks from `self.datafrom()`.
     '''
     return self.datafrom()
 

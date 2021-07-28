@@ -159,7 +159,7 @@ class TestAll(unittest.TestCase):
       with open(__file__, 'rb') as f:
         data = f.read()
       blocks = list(blockify([data]))
-      data2 = b''.join(chain(*[B.datafrom() for B in blocks]))
+      data2 = b''.join(chain(*blocks))
       self.assertEqual(
           len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" %
           (len(data), len(data2))
