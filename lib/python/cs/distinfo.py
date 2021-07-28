@@ -283,7 +283,7 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       pkg_names = argv
     else:
-      pkg_names = sorted(options.tagsets.keys())
+      pkg_names = sorted(options.pkg_tagsets.keys())
     for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
