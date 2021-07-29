@@ -265,7 +265,7 @@ case "$op" in
   update)
       set -ex
       "$0" down
-      docker volume rm "${base}_var"
+      docker volume rm "${base}_var" || :
       "$0" pull
       "$0" build
       "$0" up setup
