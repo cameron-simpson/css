@@ -326,7 +326,10 @@ class Pfx(object):
         value = getattr(e, attr)
       except AttributeError:
         continue
-      if isinstance(value, StringTypes):
+      # special case various known exception type attributes
+      if attr == 'args' and isinstance(e, OSError):
+        value = (value[0], cls.prefixify(value[1]))
+      elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
         # set did_prefix if we modify this in place
