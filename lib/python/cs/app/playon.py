@@ -29,9 +29,10 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.fileutils import atomic_filename
 from cs.lex import has_format_attributes, format_attribute
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_method, pfx_call
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.result import bg as bg_result, report as report_results
@@ -882,27 +883,26 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with Pfx("open(%r,'wb')", filename):
-        with open(filename, 'wb') as f:
-          for chunk in progressbar(
-              dl_rsp.iter_content(chunk_size=131072),
-              label=filename,
-              total=dl_length,
-              units_scale=BINARY_BYTES_SCALE,
-              itemlenfunc=len,
-              report_print=True,
-          ):
-            offset = 0
-            length = len(chunk)
-            while offset < length:
-              with Pfx("write %d bytes", length - offset):
-                written = f.write(chunk[offset:])
-                if written < 1:
-                  warning("fewer than 1 bytes written: %s", written)
-                else:
-                  offset += written
-                  assert offset <= length
-            assert offset == length
+      with pfx_call(atomic_filename, filename, mode='wb', placeholder=True) as f:
+        for chunk in progressbar(
+            dl_rsp.iter_content(chunk_size=131072),
+            label=filename,
+            total=dl_length,
+            units_scale=BINARY_BYTES_SCALE,
+            itemlenfunc=len,
+            report_print=True,
+        ):
+          offset = 0
+          length = len(chunk)
+          while offset < length:
+            with Pfx("write %d bytes", length - offset):
+              written = f.write(chunk[offset:])
+              if written < 1:
+                warning("fewer than 1 bytes written: %s", written)
+              else:
+                offset += written
+                assert offset <= length
+          assert offset == length
     fullpath = realpath(filename)
     recording = self[download_id]
     if dl_rsp is not None:
