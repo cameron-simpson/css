@@ -43,8 +43,9 @@ from cs.upd import print  # pylint: disable=redefined-builtin
 DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
 DBURL_DEFAULT = '~/var/playon.sqlite'
 
+FILENAME_FORMAT_ENVVAR = 'PLAYON_FILENAME_FORMAT'
 DEFAULT_FILENAME_FORMAT = (
-    '{playon.Series}--{playon.Name}--{playon.ProviderID}--playon--{playon.ID}'
+    '{playon.Series}--{playon.Name}--{resolution}--{playon.ProviderID}--playon--{playon.ID}'
 )
 
 # download parallelism
@@ -60,7 +61,7 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+  LS_FORMAT = '{playon.ID} {playon.HumanSize} {resolution} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
@@ -68,6 +69,7 @@ class PlayOnCommand(BaseCommand):
   USAGE_KEYWORDS = {
       'DEFAULT_DL_PARALLELISM': DEFAULT_DL_PARALLELISM,
       'DEFAULT_FILENAME_FORMAT': DEFAULT_FILENAME_FORMAT,
+      'FILENAME_FORMAT_ENVVAR': FILENAME_FORMAT_ENVVAR,
       'LS_FORMAT': LS_FORMAT,
       'DBURL_ENVVAR': DBURL_ENVVAR,
       'DBURL_DEFAULT': DBURL_DEFAULT,
@@ -80,7 +82,7 @@ class PlayOnCommand(BaseCommand):
       PLAYON_USER               PlayOn login name, default from $EMAIL.
       PLAYON_PASSWORD           PlayOn password.
                                 This is obtained from .netrc if omitted.
-      PLAYON_FILENAME_FORMAT    Format string for downloaded filenames.
+      {FILENAME_FORMAT_ENVVAR}  Format string for downloaded filenames.
                                 Default: {DEFAULT_FILENAME_FORMAT}
       {DBURL_ENVVAR:17}         Location of state tags database.
                                 Default: {DBURL_DEFAULT}
