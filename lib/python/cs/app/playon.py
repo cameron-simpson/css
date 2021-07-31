@@ -41,6 +41,34 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Console",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Topic :: Utilities",
+    ],
+    'install_requires': [
+        'cs.cmdutils',
+        'cs.context',
+        'cs.deco',
+        'cs.fileutils>=atomic_filename',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx>=pfx_call',
+        'cs.progress',
+        'cs.resources',
+        'cs.result',
+        'cs.sqltags',
+        'cs.threads',
+        'cs.units',
+        'cs.upd',
+    ],
+}
+
 DBURL_ENVVAR = 'PLAYON_TAGS_DBURL'
 DBURL_DEFAULT = '~/var/playon.sqlite'
 
@@ -62,7 +90,10 @@ class PlayOnCommand(BaseCommand):
   '''
 
   # default "ls" output format
-  LS_FORMAT = '{playon.ID} {playon.HumanSize} {resolution} {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+  LS_FORMAT = (
+      '{playon.ID} {playon.HumanSize} {resolution}'
+      ' {playon.Series} {playon.Name} {playon.ProviderID} {status:upper}'
+  )
 
   # default "queue" output format
   QUEUE_FORMAT = '{playon.ID} {playon.Series} {playon.Name} {playon.ProviderID}'
@@ -117,7 +148,7 @@ class PlayOnCommand(BaseCommand):
       with stackattrs(options, api=api, sqltags=sqltags):
         with api:
           # preload all the recordings from the db
-          all_recordings = list(sqltags.recordings())
+          list(sqltags.recordings())
           # if there are unexpired stale entries or no unexpired entries,
           # refresh them
           self._refresh_sqltags_data(api, sqltags)
@@ -133,6 +164,7 @@ class PlayOnCommand(BaseCommand):
     for k, v in sorted(api.account().items()):
       print(k, pformat(v))
 
+  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
   def cmd_dl(self, argv):
     ''' Usage: {cmd} [-j jobs] [-n] [recordings...]
           Download the specified recordings, default "pending".
@@ -344,6 +376,7 @@ class _RequestsNoAuth(requests.auth.AuthBase):
   def __call__(self, r):
     return r
 
+# pylint: disable=too-many-ancestors
 @has_format_attributes
 class PlayOnSQLTagSet(SQLTagSet):
   ''' An `SQLTagSet` with some special methods.
@@ -431,7 +464,7 @@ class PlayOnSQLTagSet(SQLTagSet):
         i.e. the time since `self.last_updated` exceeds `max_age` seconds,
         default from `self.STALE_AGE`.
     '''
-    if self.is_expired:
+    if self.is_expired():
       # expired recording will never become unstale
       return False
     if max_age is None:
@@ -455,6 +488,7 @@ class PlayOnSQLTagSet(SQLTagSet):
       for tag in sorted(self):
         print_func(" ", tag)
 
+# pylint: disable=too-many-ancestors
 class PlayOnSQLTags(SQLTags):
   ''' `SQLTags` subclass with PlayOn related methods.
   '''
@@ -497,6 +531,7 @@ class PlayOnSQLTags(SQLTags):
 
   __iter__ = recordings
 
+  # pylint: disable=too-many-branches
   @pfx_method
   def recording_ids_from_str(self, arg):
     ''' Convert a string to a list of recording ids.
@@ -678,7 +713,8 @@ class PlayOnAPI(MultiOpenMixin):
     '''
     return self.sqltags[download_id]
 
-  def suburl_request(self, base_url, method, suburl):
+  @staticmethod
+  def suburl_request(base_url, method, suburl):
     ''' Return a curried `requests` method
         to fetch `API_BASE/suburl`.
     '''
@@ -733,6 +769,8 @@ class PlayOnAPI(MultiOpenMixin):
     return self.suburl_data('account')
 
   def cdsurl_data(self, suburl, _method='GET', headers=None, **kw):
+    ''' Wrapper for `suburl_data` using `CDS_BASE` as the base URL.
+    '''
     return self.suburl_data(
         suburl,
         _base_url=self.CDS_BASE,
@@ -835,6 +873,8 @@ class PlayOnAPI(MultiOpenMixin):
 
   @pfx_method
   def services(self):
+    ''' Fetch the list of services.
+    '''
     entries = self.cdsurl_data('content')
     return self._services_from_entries(entries)
 
@@ -883,7 +923,8 @@ class PlayOnAPI(MultiOpenMixin):
           dl_url, auth=_RequestsNoAuth(), cookies=jar, stream=True
       )
       dl_length = int(dl_rsp.headers['Content-Length'])
-      with pfx_call(atomic_filename, filename, mode='wb', placeholder=True) as f:
+      with pfx_call(atomic_filename, filename, mode='wb',
+                    placeholder=True) as f:
         for chunk in progressbar(
             dl_rsp.iter_content(chunk_size=131072),
             label=filename,
