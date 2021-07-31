@@ -430,6 +430,9 @@ class PlayOnSQLTagSet(SQLTagSet):
         i.e. the time since `self.last_updated` exceeds `max_age` seconds,
         default from `self.STALE_AGE`.
     '''
+    if self.is_expired:
+      # expired recording will never become unstale
+      return False
     if max_age is None:
       max_age = self.STALE_AGE
     if max_age <= 0:
