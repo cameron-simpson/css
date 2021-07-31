@@ -501,7 +501,7 @@ def PrePfx(tag, *args):
     state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
-  ''' Subclass of Pfx to insert current function an caller into messages.
+  ''' Subclass of Pfx to insert current function and caller into messages.
   '''
 
   def __init__(self):
@@ -544,13 +544,14 @@ def pfx(func, message=None, message_args=()):
   if message is None:
     if message_args:
       raise ValueError("no message, but message_args=%r" % (message_args,))
-    message = fname
 
   if isgeneratorfunction(func):
 
     # persistent in-generator stack to be reused across calls to
     # the context manager
     saved_stack = []
+    if message is None:
+      message = funcname
 
     @contextdecorator
     def cmgrdeco(func, a, kw):
@@ -573,8 +574,11 @@ def pfx(func, message=None, message_args=()):
     def wrapper(*a, **kw):
       ''' Run function inside `Pfx` context manager.
       '''
-      with Pfx(message, *message_args):
-        return func(*a, **kw)
+      if message is None:
+        pfx_call(func, *a, **kw)
+      else:
+        with Pfx(message, *message_args):
+          return func(*a, **kw)
 
   wrapper.__name__ = "@pfx(%s)" % (fname,)
   wrapper.__doc__ = func.__doc__
