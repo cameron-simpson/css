@@ -410,7 +410,7 @@ class PlayOnSQLTagSet(SQLTagSet):
     '''
     playon_tags = self.subtags('playon')
     citation = playon_tags.Name
-    if playon_tags.Series:
+    if playon_tags.Series and playon_tags.Series != 'none':
       citation = playon_tags.Series + " - " + citation
     return citation
 
