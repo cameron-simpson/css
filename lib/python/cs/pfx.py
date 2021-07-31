@@ -348,7 +348,7 @@ class Pfx(object):
     '''
     current_prefix = cls._state.prefix
     did_prefix = False
-    for attr in 'args', 'message', 'msg', 'reason':
+    for attr in 'args', 'message', 'msg', 'reason', 'strerror':
       try:
         value = getattr(e, attr)
       except AttributeError:
