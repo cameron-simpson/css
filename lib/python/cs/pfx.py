@@ -104,6 +104,33 @@ def pfx_iter(tag, iterable):
         break
     yield i
 
+def _func_a_kw_fmt(func, *a, **kw):
+  ''' Prepare a format string and associated argument list
+      describing a call to `func(*a,**kw)`.
+      Return `format,args`.
+
+  '''
+  av = [ getattr(func, '__name__', str(func)) ]
+  afv = ['%r'] * len(a)
+  av.extend(a)
+  afv.extend(['%s=%r'] * len(kw))
+  for kv in kw.items():
+    av.extend(kv)
+  return '%s(' + ','.join(afv) + ')', av
+
+def pfx_call(func, *a, **kw):
+  ''' Call `func(*a,**kw)` within an enclosing `Pfx` context manager
+      reciting the function name and arguments.
+
+      Example:
+
+          >>> import os
+          >>> pfx_call(os.rename, "oldname", "newname")
+  '''
+  pfxf, pfxav = _func_a_kw_fmt(func, *a, **kw)
+  with Pfx(pfxf, *pfxav):
+    return func(*a, **kw)
+
 class _PfxThreadState(threading.local):
   ''' A Thread local class to track `Pfx` stack state.
   '''
