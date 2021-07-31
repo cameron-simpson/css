@@ -32,6 +32,7 @@ DISTINFO = {
         'cs.context',
         'cs.logutils',
         'cs.obj',
+        'cs.pfx',
         'cs.py.func',
         'cs.py.stack',
     ],
