@@ -349,6 +349,18 @@ class PlayOnSQLTagSet(SQLTagSet):
   # recording data stale after 10 minutes
   STALE_AGE = 600
 
+  RECORDING_QUALITY = {
+      1: '720p',
+      2: '1080p',
+  }
+
+  @format_attribute
+  def resolution(self):
+    ''' The recording resultion derived from the quality.
+    '''
+    quality = self.get('playon.Quality')
+    return self.RECORDING_QUALITY.get(quality, quality)
+
   @format_attribute
   def recording_id(self):
     ''' The recording id or `None`.
