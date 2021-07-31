@@ -626,35 +626,8 @@ def pfx_method(method, use_str=False, with_args=False):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     classref = self if use_str else type(self).__name__
-    pfxfmt = "%s.%s"
-    arg_args = []
-    if with_args:
-      # include "(arguments...)" in the Pfx string
-      argrefs = (
-          list(range(len(a))) +
-          list(kw.keys()) if with_args is True else with_args
-      )
-      for argref in argrefs:
-        if isinstance(argref, int):
-          # positional argument
-          try:
-            arg = a[argref]
-          except IndexError:
-            arg = "?" + str(argref)
-          else:
-            arg = repr(arg)
-        else:
-          # keyword argument
-          try:
-            arg = kw[argref]
-          except KeyError:
-            arg = "?"
-          else:
-            arg = repr(arg)
-          arg = argref + "=" + arg
-        arg_args.append(arg)
-      pfxfmt += "(" + ','.join(map(lambda _: '%s', arg_args)) + ")"
-    with Pfx(pfxfmt, classref, fname, *arg_args):
+    pfxfmt, pfxargs = _func_a_kw_fmt(method, *a, **kw)
+    with Pfx("%s."+ pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 
   pfx_method_wrapper.__doc__ = method.__doc__
