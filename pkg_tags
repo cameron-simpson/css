@@ -44,7 +44,7 @@ cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210717" ok_revision="6fe0bbd5d1f1008aeb4fea447704ab9628deb3e5" features={"20210717":["SingletonMixin_key_is_none"]}
 cs.packetstream pypi.release="20210306" ok_revision="5288dfe60e38aed5a428228c9f309381e13a609e"
-cs.pfx pypi.release="20210731" ok_revision="68616c0c236a3991dcd3805dbd248ee69e271822" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"]}
+cs.pfx pypi.release="20210731" ok_revision="8a09aa9f8645f34f1941b1d65114db46dde483fd" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"]}
 cs.pipeline pypi.release=20191007.1 ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="86e03391b63b3b26367f2d00e3d828311cb12c5b" pypi.release="20210407.2"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
