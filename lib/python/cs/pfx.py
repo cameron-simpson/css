@@ -571,12 +571,18 @@ def pfx(func, message=None, message_args=()):
 
   else:
 
-    def wrapper(*a, **kw):
-      ''' Run function inside `Pfx` context manager.
-      '''
-      if message is None:
-        pfx_call(func, *a, **kw)
-      else:
+    if message is None:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
+        return pfx_call(func, *a, **kw)
+
+    else:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
         with Pfx(message, *message_args):
           return func(*a, **kw)
 
