@@ -104,6 +104,33 @@ def pfx_iter(tag, iterable):
         break
     yield i
 
+def _func_a_kw_fmt(func, *a, **kw):
+  ''' Prepare a format string and associated argument list
+      describing a call to `func(*a,**kw)`.
+      Return `format,args`.
+
+  '''
+  av = [ getattr(func, '__name__', str(func)) ]
+  afv = ['%r'] * len(a)
+  av.extend(a)
+  afv.extend(['%s=%r'] * len(kw))
+  for kv in kw.items():
+    av.extend(kv)
+  return '%s(' + ','.join(afv) + ')', av
+
+def pfx_call(func, *a, **kw):
+  ''' Call `func(*a,**kw)` within an enclosing `Pfx` context manager
+      reciting the function name and arguments.
+
+      Example:
+
+          >>> import os
+          >>> pfx_call(os.rename, "oldname", "newname")
+  '''
+  pfxf, pfxav = _func_a_kw_fmt(func, *a, **kw)
+  with Pfx(pfxf, *pfxav):
+    return func(*a, **kw)
+
 class _PfxThreadState(threading.local):
   ''' A Thread local class to track `Pfx` stack state.
   '''
@@ -321,12 +348,15 @@ class Pfx(object):
     '''
     current_prefix = cls._state.prefix
     did_prefix = False
-    for attr in 'args', 'message', 'msg', 'reason':
+    for attr in 'args', 'message', 'msg', 'reason', 'strerror':
       try:
         value = getattr(e, attr)
       except AttributeError:
         continue
-      if isinstance(value, StringTypes):
+      # special case various known exception type attributes
+      if attr == 'args' and isinstance(e, OSError):
+        value = (value[0], cls.prefixify(value[1]))
+      elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
         # set did_prefix if we modify this in place
@@ -471,7 +501,7 @@ def PrePfx(tag, *args):
     state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
-  ''' Subclass of Pfx to insert current function an caller into messages.
+  ''' Subclass of Pfx to insert current function and caller into messages.
   '''
 
   def __init__(self):
@@ -514,13 +544,14 @@ def pfx(func, message=None, message_args=()):
   if message is None:
     if message_args:
       raise ValueError("no message, but message_args=%r" % (message_args,))
-    message = fname
 
   if isgeneratorfunction(func):
 
     # persistent in-generator stack to be reused across calls to
     # the context manager
     saved_stack = []
+    if message is None:
+      message = funcname
 
     @contextdecorator
     def cmgrdeco(func, a, kw):
@@ -543,8 +574,11 @@ def pfx(func, message=None, message_args=()):
     def wrapper(*a, **kw):
       ''' Run function inside `Pfx` context manager.
       '''
-      with Pfx(message, *message_args):
-        return func(*a, **kw)
+      if message is None:
+        pfx_call(func, *a, **kw)
+      else:
+        with Pfx(message, *message_args):
+          return func(*a, **kw)
 
   wrapper.__name__ = "@pfx(%s)" % (fname,)
   wrapper.__doc__ = func.__doc__
@@ -592,35 +626,8 @@ def pfx_method(method, use_str=False, with_args=False):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     classref = self if use_str else type(self).__name__
-    pfxfmt = "%s.%s"
-    arg_args = []
-    if with_args:
-      # include "(arguments...)" in the Pfx string
-      argrefs = (
-          list(range(len(a))) +
-          list(kw.keys()) if with_args is True else with_args
-      )
-      for argref in argrefs:
-        if isinstance(argref, int):
-          # positional argument
-          try:
-            arg = a[argref]
-          except IndexError:
-            arg = "?" + str(argref)
-          else:
-            arg = repr(arg)
-        else:
-          # keyword argument
-          try:
-            arg = kw[argref]
-          except KeyError:
-            arg = "?"
-          else:
-            arg = repr(arg)
-          arg = argref + "=" + arg
-        arg_args.append(arg)
-      pfxfmt += "(" + ','.join(map(lambda _: '%s', arg_args)) + ")"
-    with Pfx(pfxfmt, classref, fname, *arg_args):
+    pfxfmt, pfxargs = _func_a_kw_fmt(method, *a, **kw)
+    with Pfx("%s."+ pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 
   pfx_method_wrapper.__doc__ = method.__doc__

@@ -564,7 +564,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
+  def cmd_help(cls, argv):
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.
@@ -583,7 +583,10 @@ class BaseCommand:
           warning("unknown subcommand")
           xit = 1
           continue
-        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
+        usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+        subusage = cls.subcommand_usage_text(
+            subcmd, fulldoc=fulldoc, usage_format_mapping=usage_format_mapping
+        )
         if not subusage:
           warning("no help")
           xit = 1
