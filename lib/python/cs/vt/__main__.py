@@ -313,6 +313,42 @@ class VTCmd(BaseCommand):
     P.print_stats(sort='cumulative')
     return xit
 
+  def cmd_benchmark(self, argv):
+    ''' Usage: {cmd} mode [args...]
+          Modes:
+            scan < data
+              Run the raw data scan, report throughput.
+    '''
+    runstate = self.options.runstate
+    if not argv:
+      raise GetoptError("missing mode")
+    mode = argv.pop(0)
+    inbfr = CornuCopyBuffer.from_fd(0, readsize=1024 * 1024)
+    try:
+      S = os.fstat(0)
+    except OSError as e:
+      warning("fstat(0): %s", e)
+      length = None
+    else:
+      length = S.st_size or None
+    with Pfx(mode):
+      if mode == 'read':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+        ):
+          pass
+      else:
+        raise GetoptError("unknown mode")
+    return 0
+
   def cmd_cat(self, argv):
     ''' Usage: {cmd} filerefs...
           Concatentate the contents of the supplied filerefs to stdout.
