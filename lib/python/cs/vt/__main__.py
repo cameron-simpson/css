@@ -45,7 +45,7 @@ from cs.tty import ttysize
 from cs.upd import Upd, print
 import cs.x
 from cs.x import X
-from . import common, defaults, DEFAULT_CONFIG_PATH
+from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import blocked_chunks_of
 from .compose import get_store_spec
@@ -64,7 +64,7 @@ from .store import ProxyStore, DataDirStore
 from .transcribe import parse
 
 def main(argv=None):
-  ''' Create a VTCmd instance and call its main method.
+  ''' Create a `VTCmd` instance and call its main method.
   '''
   return VTCmd(argv).run()
 
@@ -81,24 +81,39 @@ class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
+  VT_STORE_ENVVAR = 'VT_STORE'
+  VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+  DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
+  VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
+
   GETOPT_SPEC = 'C:S:f:h:qv'
+
+  USAGE_KEYWORDS = {
+      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
+      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
+      'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
+      'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.HASHNAME,
+      'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
+  }
 
   USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
-              Default: from $VT_CACHE_STORE or "[cache]".
+              Default: from ${VT_CACHE_STORE_ENVVAR} or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
                 /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from $VT_STORE, or "[default]", except for
+              Default from ${VT_STORE_ENVVAR}, or "[default]", except for
               the "serve" subcommand which defaults to "[server]"
-              and ignores $VT_STORE.
-    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
-    + DEFAULT_CONFIG_PATH + '''
-    -h hashclass Hashclass for Stores.
+              and ignores ${VT_STORE_ENVVAR}.
+    -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
+              otherwise {DEFAULT_CONFIG_PATH}
+    -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
+              otherwise {DEFAULT_HASHCLASS_NAME}
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
@@ -115,10 +130,12 @@ class VTCmd(BaseCommand):
         'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
     )
     options.store_spec = None
-    options.cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
-    options.dflt_log = os.environ.get('VT_LOGFILE')
+    options.cache_store_spec = os.environ.get(
+        self.VT_CACHE_STORE_ENVVAR, '[cache]'
+    )
+    options.dflt_log = os.environ.get(self.VT_LOGFILE_ENVVAR)
     options.hashname = os.environ.get(
-        'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
+        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
     )
     options.progress = None
     options.ticker = None
@@ -220,7 +237,7 @@ class VTCmd(BaseCommand):
               if cmd == "serve":
                 store_spec = '[server]'
               else:
-                store_spec = os.environ.get('VT_STORE', '[default]')
+                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
               options.store_spec = store_spec
             try:
               # set up the primary Store using the main programme RunState for control
