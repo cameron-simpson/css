@@ -184,10 +184,6 @@ class VTCmd(BaseCommand):
   @contextmanager
   def run_context(self):
     ''' Set up and tear down the surrounding context.
-
-        Parameters:
-        * `options`:
-        * `argv`: the command line arguments after the command name
     '''
     options = self.options
     cmd = self.cmd
