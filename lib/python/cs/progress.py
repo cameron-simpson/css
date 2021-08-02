@@ -30,7 +30,7 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210717-post'
+__version__ = '20210730-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -304,12 +304,12 @@ class BaseProgress(object):
       remaining = self.remaining_time
       if remaining:
         remaining = int(remaining)
-      if remaining is None:
-        rightv.append('ETA ??')
-      else:
+      if remaining is not None:
         rightv.append('ETA ' + transcribe_time(remaining))
     if self.total is not None and self.total > 0:
       leftv.append(self.text_pos_of_total())
+    else:
+      leftv.append(self.format_counter(self.position))
     left = ' '.join(leftv)
     right = ' '.join(rightv)
     if self.total is None:
@@ -1093,12 +1093,17 @@ def selftest(argv):
   lines += lines
   for _ in progressbar(lines, "lines"):
     time.sleep(0.005)
-  for _ in progressbar(lines, "blines",units_scale=BINARY_BYTES_SCALE, itemlenfunc=len):
+  for _ in progressbar(lines, "blines", units_scale=BINARY_BYTES_SCALE,
+                       itemlenfunc=len):
     time.sleep(0.005)
   for _ in progressbar(lines, "lines step 100", update_frequency=100,
                        report_print=True):
     time.sleep(0.005)
-  P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
+  P = Progress(
+      name=__file__,
+      ##total=len(lines),
+      units_scale=DECIMAL_SCALE,
+  )
   with open(__file__) as f:
     for _ in P.iterbar(f):
       time.sleep(0.005)
