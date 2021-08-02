@@ -214,12 +214,12 @@ def parse(s, scale, offset=0):
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()
-      for factor, unit in scale:
-        if unit.lower() == vunit:
+      for unit in scale:
+        if unit.unit.lower() == vunit:
           break
-        if not factor:
+        if not unit.factor:
           raise ValueError("unrecognised unit: %r" % (vunit0,))
-        value *= factor
+        value *= unit.factor
   return value, offset
 
 def multiparse(s, scales, offset=0):
