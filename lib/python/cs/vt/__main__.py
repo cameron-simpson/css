@@ -316,8 +316,10 @@ class VTCmd(BaseCommand):
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...]
           Modes:
+            read < data
+              Read from data.
             scan < data
-              Run the raw data scan, report throughput.
+              Run the raw data scan.
     '''
     runstate = self.options.runstate
     if not argv:
@@ -343,6 +345,7 @@ class VTCmd(BaseCommand):
             total=length,
             units_scale=BINARY_BYTES_SCALE,
             runstate=runstate,
+            report_print=True,
         ):
           pass
       else:
