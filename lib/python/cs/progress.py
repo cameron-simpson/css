@@ -456,6 +456,7 @@ class BaseProgress(object):
       update_frequency=1,
       update_min_size=0,
       report_print=None,
+      runstate=None,
   ):
     ''' An iterable progress bar: a generator yielding values
         from the iterable `it` while updating a progress bar.
@@ -500,6 +501,7 @@ class BaseProgress(object):
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
+        * `runstate`: optional `RunState` whose `.cancelled` property can be consulted
 
         Example use:
 
@@ -556,6 +558,8 @@ class BaseProgress(object):
       if not incfirst:
         self += length
         update_status()
+      if runstate is not None and runstate.cancelled:
+        break
     if delete_proxy:
       proxy.delete()
     else:
@@ -564,7 +568,10 @@ class BaseProgress(object):
       if isinstance(report_print, bool):
         report_print = print
       report_print(
-          label + ':', self.format_counter(self.position - start_pos), 'in',
+          label + (
+              ': (cancelled)'
+              if runstate is not None and runstate.cancelled else ':'
+          ), self.format_counter(self.position - start_pos), 'in',
           transcribe(
               self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
           )
