@@ -62,6 +62,7 @@ from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
+from .scan import scanbuf
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore
 from .transcribe import parse
@@ -348,6 +349,21 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
+      elif mode == 'scan':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
       else:
         raise GetoptError("unknown mode")
     return 0
