@@ -102,6 +102,14 @@ def blockify(chunks, scanner=None, min_block=None, max_block=None):
                                  max_block=max_block):
     yield Block(data=chunk)
 
+def block_from_chunks(bfr, **kw):
+  ''' Return a Block for the contents `chunks`, an iterable of `bytes`like objects
+      such as a `CornuCopyBuffer`.
+
+      Keyword arguments are passed to `blockify`.
+  '''
+  return top_block_for(blockify(bfr, **kw))
+
 def spliced_blocks(B, new_blocks):
   ''' Splice `new_blocks` into the data of the `Block` `B`.
       Yield high level blocks covering the result

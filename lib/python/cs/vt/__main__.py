@@ -47,13 +47,13 @@ import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
-from .blockify import blocked_chunks_of
+from .blockify import blocked_chunks_of, block_from_chunks
 from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
-from .dir import Dir
+from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
 from .merge import merge
@@ -871,6 +871,25 @@ class VTCmd(BaseCommand):
           raise GetoptError("unparsed: %s" % (e,)) from e
         pushables.append(obj)
     return self._push(srcS, dstS, pushables)
+
+  def cmd_save(self, argv):
+    ''' Usage: {cmd} [{ospath|-}...]
+          Save the contents of each ospath to the Store and print a fielref 
+          or dirref for each.
+          The argument "-" reads data from standard input and prints a fileref.
+          The default argument list is "-".
+    '''
+    if not argv:
+      argv = ['-']
+    for ospath in argv:
+      with Pfx(ospath):
+        if ospath == '-':
+          chunks = CornuCopyBuffer.from_fd(0)
+        else:
+          chunks = CornuCopyBuffer.from_filename(ospath)
+        block = block_from_chunks(chunks)
+        print(FileDirent(ospath, block=block), ospath)
+    return 0
 
   def cmd_serve(self, argv):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
