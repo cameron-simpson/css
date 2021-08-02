@@ -227,6 +227,13 @@ class _Block(Transcriber, ABC):
       return chunks[0]
     return b''.join(chunks)
 
+  @property
+  def data(self):
+    ''' This provides very easy access to `get_spanned_data()`.
+        It is overridden on `IndirectBlock` because of the likely expense.
+    '''
+    return self.get_spanned_data()
+
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
         NB: _not_ defined on indirect Blocks to avoid mistakes.
@@ -577,11 +584,11 @@ class HashCodeBlock(_Block):
   transcribe_prefix = 'B'
 
   def __init__(self, hashcode=None, data=None, added=False, span=None, **kw):
-    ''' Initialise a BT_HASHCODE Block or IndirectBlock.
+    ''' Initialise a `BT_HASHCODE` Block.
 
         A HashCodeBlock always stores its hashcode directly.
         If `data` is supplied, store it and compute or check the hashcode.
-        If `span` is not None, store it. Otherwise compute it on
+        If `span` is not `None`, store it. Otherwise compute it on
           demand from the data, fetching that if necessary.
 
         NB: The data are not kept in memory; fetched on demand.
@@ -611,6 +618,12 @@ class HashCodeBlock(_Block):
     self._span = None
     _Block.__init__(self, BlockType.BT_HASHCODE, span=span, **kw)
     self.hashcode = hashcode
+
+  @property
+  def data(self):
+    ''' The data stored in this Block.
+    '''
+    return self.get_direct_data()
 
   def get_direct_data(self):
     ''' Return the direct data of this Block, fetching it if necessary.
@@ -772,6 +785,16 @@ class IndirectBlock(_Block):
       span = sum(subB.span for subB in self.subblocks)
     self.span = span
     self.hashcode = superblock.hashcode
+
+  @property
+  def data(self):
+    ''' Prevent use of `.data` on IndirectBlock` instances.
+        Use `get_spanned_data()` if you really need a flat `bytes` instance.
+    '''
+    raise RuntimeError(
+        "no .data on %s, likely to be expensive; it truly required, call get_spanned_data()"
+        % (type(self),)
+    )
 
   @classmethod
   def from_hashcode(cls, hashcode, span):
