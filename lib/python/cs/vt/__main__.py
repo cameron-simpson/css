@@ -873,7 +873,7 @@ class VTCmd(BaseCommand):
     return self._push(srcS, dstS, pushables)
 
   def cmd_save(self, argv):
-    ''' Usage: {cmd} [{ospath|-}...]
+    ''' Usage: {cmd} [{{ospath|-}}...]
           Save the contents of each ospath to the Store and print a fielref 
           or dirref for each.
           The argument "-" reads data from standard input and prints a fileref.
