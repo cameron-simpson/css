@@ -992,12 +992,18 @@ class LiteralBlock(_Block):
 
   def __init__(self, data, **kw):
     _Block.__init__(self, BlockType.BT_LITERAL, span=len(data), **kw)
-    self.data = data
+    self._data = data
+
+  @property
+  def data(self):
+    ''' The data.
+    '''
+    return self._data
 
   def transcribe_inner(self, T, fp):
     ''' Transcribe the block data in texthexified form.
     '''
-    fp.write(hexify(self.data))
+    fp.write(hexify(self._data))
 
   @classmethod
   # pylint: disable=too-many-arguments
@@ -1013,7 +1019,7 @@ class LiteralBlock(_Block):
   def get_direct_data(self):
     ''' Return the direct data of this Block>
     '''
-    return self.data
+    return self._data
 
   @require(
       lambda self, start, end: 0 <= start and
@@ -1024,14 +1030,14 @@ class LiteralBlock(_Block):
     '''
     if end is None:
       end = self.span
-    yield self.data[start:end]
+    yield self._data[start:end]
 
   @io_fail
   def fsck(self, recurse=False):  # pylint: disable=unused-argument
     ''' Check this LiteralBlock.
     '''
     ok = True
-    data = self.data
+    data = self._data
     if len(self) != len(data):
       error("len(self)=%d, len(data)=%d", len(self), len(data))
       ok = False
