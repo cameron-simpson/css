@@ -170,8 +170,8 @@ def transcribe(
     count_i = int(count)
     count_s = str(count_i) if count_i == count else "%.1f" % count
     if not no_pad and step.max_width > len(count_s):
-      count_s=" " * (step.max_width - len(count_s))+count_s
-    count_s+=step.unit
+      count_s = " " * (step.max_width - len(count_s)) + count_s
+    count_s += step.unit
     text.append(count_s)
     if max_parts is not None and len(text) == max_parts:
       break
