@@ -17,6 +17,7 @@ import os
 from os.path import (
     basename,
     splitext,
+    exists as existspath,
     expanduser,
     exists as pathexists,
     join as joinpath,
@@ -25,6 +26,7 @@ from os.path import (
 )
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
+from stat import S_ISREG
 import sys
 from time import sleep
 from typeguard import typechecked
@@ -39,9 +41,10 @@ from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
 from cs.pfx import Pfx
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print
 import cs.x
 from cs.x import X
@@ -873,23 +876,68 @@ class VTCmd(BaseCommand):
     return self._push(srcS, dstS, pushables)
 
   def cmd_save(self, argv):
-    ''' Usage: {cmd} [{{ospath|-}}...]
-          Save the contents of each ospath to the Store and print a fielref 
+    ''' Usage: {cmd} [-F] [{{ospath|-}}...]
+          Save the contents of each ospath to the Store and print a fileref 
           or dirref for each.
           The argument "-" reads data from standard input and prints a fileref.
           The default argument list is "-".
+          -F  Print a FileDirent instead of a bockref for file contents.
     '''
+    runstate = self.options.runstate
+    use_filedirent = False
+    if argv and argv[0] == '-F':
+      use_filedirent = True
+      argv.pop(0)
     if not argv:
       argv = ['-']
+    xit = 0
     for ospath in argv:
       with Pfx(ospath):
         if ospath == '-':
           chunks = CornuCopyBuffer.from_fd(0)
+          try:
+            S = os.fstat(0)
+          except OSError as e:
+            warning("fstat(0): %s", e)
+            S = None
+        elif not existspath(ospath):
+          error("missing")
+          xit = 1
+          continue
+        elif isdirpath(ospath):
+          target = Dir(basename(ospath))
+          source = OSDir(ospath)
+          merge(target, source, self.options.runstate)
+          print(target, ospath)
+          continue
         else:
+          try:
+            S = os.stat(ospath)
+          except OSError as e:
+            warning("stat(%r): %s", ospath, e)
+            S = None
           chunks = CornuCopyBuffer.from_filename(ospath)
-        block = block_from_chunks(chunks)
-        print(FileDirent(ospath, block=block), ospath)
-    return 0
+        block = block_from_chunks(
+            progressbar(
+                chunks,
+                label=ospath,
+                itemlenfunc=len,
+                units_scale=BINARY_BYTES_SCALE,
+                runstate=runstate,
+                total=(
+                    S.st_size if S is not None and S_ISREG(S.st_mode) else None
+                ),
+            )
+        )
+        if runstate.cancelled:
+          error("cancelled")
+          xit = 1
+          break
+        print(
+            FileDirent(ospath, block=block) if use_filedirent else block,
+            ospath
+        )
+    return xit
 
   def cmd_serve(self, argv):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]
