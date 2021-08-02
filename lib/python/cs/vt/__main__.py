@@ -50,7 +50,7 @@ import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
-from .blockify import blocked_chunks_of, block_from_chunks
+from .blockify import blocked_chunks_of, block_from_chunks, top_block_for, blockify
 from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
@@ -916,14 +916,15 @@ class VTCmd(BaseCommand):
           except OSError as e:
             warning("stat(%r): %s", ospath, e)
             S = None
-          chunks = CornuCopyBuffer.from_filename(ospath)
-        block = block_from_chunks(
+          chunks = CornuCopyBuffer.from_filename(ospath, readsize=1024 * 1024)
+        block = top_block_for(
             progressbar(
-                chunks,
+                blockify(chunks),
                 label=ospath,
                 itemlenfunc=len,
                 units_scale=BINARY_BYTES_SCALE,
                 runstate=runstate,
+                update_frequency=64,
                 total=(
                     S.st_size if S is not None and S_ISREG(S.st_mode) else None
                 ),
