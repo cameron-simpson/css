@@ -42,13 +42,6 @@ def openfd_read(pathname):
   with Pfx("os.open(%r,O_RDONLY|O_CLOEXEC)", pathname):
     return os.open(pathname, O_RDONLY | O_CLOEXEC)
 
-def buffer_from_pathname(pathname, *, readsize=None, offset=None):
-  ''' Return a `CornuCopyBuffer` reading from the file `pathname`.
-  '''
-  return CornuCopyBuffer.from_fd(
-      openfd_read(pathname), readsize=readsize, offset=offset
-  )
-
 def append_data(wfd, bs):
   ''' Append the bytes `bs` to the writable file descriptor `wfd`.
 

@@ -17,6 +17,7 @@ import os
 from os.path import (
     basename,
     splitext,
+    exists as existspath,
     expanduser,
     exists as pathexists,
     join as joinpath,
@@ -25,6 +26,7 @@ from os.path import (
 )
 import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
+from stat import S_ISREG
 import sys
 from time import sleep
 from typeguard import typechecked
@@ -39,32 +41,34 @@ from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
 from cs.pfx import Pfx
-from cs.progress import Progress
+from cs.progress import Progress, progressbar
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
+from cs.units import BINARY_BYTES_SCALE
 from cs.upd import Upd, print
 import cs.x
 from cs.x import X
-from . import common, defaults, DEFAULT_CONFIG_PATH
+from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
-from .blockify import blocked_chunks_of
+from .blockify import blocked_chunks_of, block_from_chunks, top_block_for, blockify
 from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
 from .datafile import DataRecord, DataFilePushable
 from .debug import dump_chunk, dump_Block
-from .dir import Dir
+from .dir import Dir, FileDirent
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
+from .scan import scanbuf
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore
 from .transcribe import parse
 
 def main(argv=None):
-  ''' Create a VTCmd instance and call its main method.
+  ''' Create a `VTCmd` instance and call its main method.
   '''
   return VTCmd(argv).run()
 
@@ -81,24 +85,39 @@ class VTCmd(BaseCommand):
   ''' A main programme instance.
   '''
 
+  VT_STORE_ENVVAR = 'VT_STORE'
+  VT_CACHE_STORE_ENVVAR = 'VT_CACHE_STORE'
+  DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
+  VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
+
   GETOPT_SPEC = 'C:S:f:h:qv'
+
+  USAGE_KEYWORDS = {
+      'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
+      'VT_CACHE_STORE_ENVVAR': VT_CACHE_STORE_ENVVAR,
+      'DEFAULT_CONFIG_ENVVAR': DEFAULT_CONFIG_ENVVAR,
+      'DEFAULT_CONFIG_PATH': DEFAULT_CONFIG_PATH,
+      'DEFAULT_HASHCLASS_NAME': DEFAULT_HASHCLASS.HASHNAME,
+      'DEFAULT_HASHCLASS_ENVVAR': DEFAULT_HASHCLASS_ENVVAR,
+  }
 
   USAGE_FORMAT = '''Usage: {cmd} [option...] [profile] subcommand [arg...]
   Options:
     -C store  Specify the store to use as a cache.
               Specify "NONE" for no cache.
-              Default: from $VT_CACHE_STORE or "[cache]".
+              Default: from ${VT_CACHE_STORE_ENVVAR} or "[cache]".
     -S store  Specify the store to use:
                 [clause]        Specification from .vtrc.
                 /path/to/dir    DataDirStore
                 tcp:[host]:port TCPStore
                 |sh-command     StreamStore via sh-command
-              Default from $VT_STORE, or "[default]", except for
+              Default from ${VT_STORE_ENVVAR}, or "[default]", except for
               the "serve" subcommand which defaults to "[server]"
-              and ignores $VT_STORE.
-    -f config Config file. Default from $VT_CONFIG, otherwise ''' \
-    + DEFAULT_CONFIG_PATH + '''
-    -h hashclass Hashclass for Stores.
+              and ignores ${VT_STORE_ENVVAR}.
+    -f config Config file. Default from ${DEFAULT_CONFIG_ENVVAR},
+              otherwise {DEFAULT_CONFIG_PATH}
+    -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
+              otherwise {DEFAULT_HASHCLASS_NAME}
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
@@ -115,10 +134,12 @@ class VTCmd(BaseCommand):
         'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
     )
     options.store_spec = None
-    options.cache_store_spec = os.environ.get('VT_CACHE_STORE', '[cache]')
-    options.dflt_log = os.environ.get('VT_LOGFILE')
+    options.cache_store_spec = os.environ.get(
+        self.VT_CACHE_STORE_ENVVAR, '[cache]'
+    )
+    options.dflt_log = os.environ.get(self.VT_LOGFILE_ENVVAR)
     options.hashname = os.environ.get(
-        'VT_HASHCLASS', DEFAULT_HASHCLASS.HASHNAME
+        self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
     )
     options.progress = None
     options.ticker = None
@@ -167,10 +188,6 @@ class VTCmd(BaseCommand):
   @contextmanager
   def run_context(self):
     ''' Set up and tear down the surrounding context.
-
-        Parameters:
-        * `options`:
-        * `argv`: the command line arguments after the command name
     '''
     options = self.options
     cmd = self.cmd
@@ -220,7 +237,7 @@ class VTCmd(BaseCommand):
               if cmd == "serve":
                 store_spec = '[server]'
               else:
-                store_spec = os.environ.get('VT_STORE', '[default]')
+                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
               options.store_spec = store_spec
             try:
               # set up the primary Store using the main programme RunState for control
@@ -296,6 +313,77 @@ class VTCmd(BaseCommand):
     P.create_stats()
     P.print_stats(sort='cumulative')
     return xit
+
+  def cmd_benchmark(self, argv):
+    ''' Usage: {cmd} mode [args...]
+          Modes:
+            blocked_chunks < data
+              Scan the data into edge aligned chunks without a parser.
+            read < data
+              Read from data.
+            scan < data
+              Run the raw data scan.
+    '''
+    runstate = self.options.runstate
+    if not argv:
+      raise GetoptError("missing mode")
+    mode = argv.pop(0)
+    inbfr = CornuCopyBuffer.from_fd(0, readsize=1024 * 1024)
+    try:
+      S = os.fstat(0)
+    except OSError as e:
+      warning("fstat(0): %s", e)
+      length = None
+    else:
+      length = S.st_size or None
+    with Pfx(mode):
+      if mode == 'blocked_chunks':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            blocked_chunks_of(inbfr),
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          pass
+      elif mode == 'read':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          pass
+      elif mode == 'scan':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+      else:
+        raise GetoptError("unknown mode")
+    return 0
 
   def cmd_cat(self, argv):
     ''' Usage: {cmd} filerefs...
@@ -858,6 +946,71 @@ class VTCmd(BaseCommand):
           raise GetoptError("unparsed: %s" % (e,)) from e
         pushables.append(obj)
     return self._push(srcS, dstS, pushables)
+
+  def cmd_save(self, argv):
+    ''' Usage: {cmd} [-F] [{{ospath|-}}...]
+          Save the contents of each ospath to the Store and print a fileref 
+          or dirref for each.
+          The argument "-" reads data from standard input and prints a fileref.
+          The default argument list is "-".
+          -F  Print a FileDirent instead of a bockref for file contents.
+    '''
+    runstate = self.options.runstate
+    use_filedirent = False
+    if argv and argv[0] == '-F':
+      use_filedirent = True
+      argv.pop(0)
+    if not argv:
+      argv = ['-']
+    xit = 0
+    for ospath in argv:
+      with Pfx(ospath):
+        if ospath == '-':
+          chunks = CornuCopyBuffer.from_fd(0)
+          try:
+            S = os.fstat(0)
+          except OSError as e:
+            warning("fstat(0): %s", e)
+            S = None
+        elif not existspath(ospath):
+          error("missing")
+          xit = 1
+          continue
+        elif isdirpath(ospath):
+          target = Dir(basename(ospath))
+          source = OSDir(ospath)
+          merge(target, source, self.options.runstate)
+          print(target, ospath)
+          continue
+        else:
+          try:
+            S = os.stat(ospath)
+          except OSError as e:
+            warning("stat(%r): %s", ospath, e)
+            S = None
+          chunks = CornuCopyBuffer.from_filename(ospath, readsize=1024 * 1024)
+        block = top_block_for(
+            progressbar(
+                blockify(chunks),
+                label=ospath,
+                itemlenfunc=len,
+                units_scale=BINARY_BYTES_SCALE,
+                runstate=runstate,
+                update_frequency=64,
+                total=(
+                    S.st_size if S is not None and S_ISREG(S.st_mode) else None
+                ),
+            )
+        )
+        if runstate.cancelled:
+          error("cancelled")
+          xit = 1
+          break
+        print(
+            FileDirent(ospath, block=block) if use_filedirent else block,
+            ospath
+        )
+    return xit
 
   def cmd_serve(self, argv):
     ''' Usage: {cmd} [{{DEFAULT|-|/path/to/socket|[host]:port}} [name:storespec]...]

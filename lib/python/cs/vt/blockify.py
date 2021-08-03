@@ -95,15 +95,38 @@ def indirect_blocks(blocks):
     yield block
 
 def blockify(chunks, scanner=None, min_block=None, max_block=None):
-  ''' Wrapper for `blocked_chunks_of` which yields `Block`s from the data chunks.
+  ''' Wrapper for `blocked_chunks_of` which yields `Block`s
+      from the data from `chunks`.
   '''
   for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block,
                                  max_block=max_block):
     yield Block(data=chunk)
 
+def block_from_chunks(bfr, **kw):
+  ''' Return a Block for the contents `chunks`, an iterable of `bytes`like objects
+      such as a `CornuCopyBuffer`.
+
+      Keyword arguments are passed to `blockify`.
+  '''
+  return top_block_for(blockify(bfr, **kw))
+
 def spliced_blocks(B, new_blocks):
-  ''' Splice an iterable of `(offset,Block)` into the data of the `Block` `B`.
-      Yield high level blocks.
+  ''' Splice `new_blocks` into the data of the `Block` `B`.
+      Yield high level blocks covering the result
+      i.e. all the data from `B` with `new_blocks` inserted.
+
+      The parameter `new_blocks` is an iterable of `(offset,Block)`
+      where `offset` is a position for `Block` within `B`.
+      The `Block`s in `new_blocks` must be in `offset` order.
+
+      Example:
+
+          >>> from .block import LiteralBlock as LB
+          >>> B=LB(b'xxyyzz')
+          >>> newBs=( (2,LB(b'aa')), (4,LB(b'bb')), (4,LB(b'cc')) )
+          >>> splicedBs = spliced_blocks(B,newBs)
+          >>> b''.join(map(bytes, splicedBs))
+          b'xxaayybbcczz'
   '''
   upto = 0  # data span yielded so far
   for offset, newB in new_blocks:
@@ -111,9 +134,13 @@ def spliced_blocks(B, new_blocks):
     if offset > upto:
       yield from B.top_blocks(upto, offset)
       upto = offset
+    elif offset < upto:
+      raise ValueError(
+          "new_blocks: offset=%d,newB=%s: this position has already been passed"
+          % (offset, newB)
+      )
     # splice in th the new Block
     yield newB
-    upto += len(newB)
   if upto < len(B):
     # yield high level Blocks for the data which follow
     yield from B.top_blocks(upto, len(B))
