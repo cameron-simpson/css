@@ -48,7 +48,7 @@ cs.pfx pypi.release="20210801" ok_revision="8a09aa9f8645f34f1941b1d65114db46dde4
 cs.pipeline pypi.release=20191007.1 ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="86e03391b63b3b26367f2d00e3d828311cb12c5b" pypi.release="20210407.2"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
-cs.progress pypi.release="20210730" ok_revision=ce93ef8cfe318b64e0358678e469757d0f5e0359 features={"20210803":["progress_runstate"]}
+cs.progress pypi.release="20210803" ok_revision=ce93ef8cfe318b64e0358678e469757d0f5e0359 features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release=20190101 ok_revision=d48263d393ca9e6c9e3ee698307e5a6a19696efb
 cs.py.doc pypi.release="20210306" ok_revision=fc38c09619a42f8d8b9f15edb391e598401b7c5d
 cs.py.func pypi.release="20210717" ok_revision="7ce51bef249af4134f2fdbe82266fe68e4ed5f1e" features={"20210717":["trace_decorator"]}
