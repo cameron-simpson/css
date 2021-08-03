@@ -317,6 +317,8 @@ class VTCmd(BaseCommand):
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...]
           Modes:
+            blocked_chunks < data
+              Scan the data into edge aligned chunks without a parser.
             read < data
               Read from data.
             scan < data
@@ -335,7 +337,22 @@ class VTCmd(BaseCommand):
     else:
       length = S.st_size or None
     with Pfx(mode):
-      if mode == 'read':
+      if mode == 'blocked_chunks':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            blocked_chunks_of(inbfr),
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          pass
+      elif mode == 'read':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
         for chunk in progressbar(
