@@ -50,7 +50,13 @@ import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
-from .blockify import blocked_chunks_of, block_from_chunks, top_block_for, blockify
+from .blockify import (
+    blocked_chunks_of,
+    blocked_chunks_of2,
+    block_from_chunks,
+    top_block_for,
+    blockify,
+)
 from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
@@ -326,6 +332,7 @@ class VTCmd(BaseCommand):
     ''' Usage: {cmd} mode [args...] < data
           Modes:
             blocked_chunks  Scan the data into edge aligned chunks without a parser.
+            blocked_chunks2 Scan the data into edge aligned chunks without a parser.
             blockify        Scan the data into edge aligned Blocks without a parser.
             py_scanbuf      Run the old pure Python scanbuf against the data.
             py_scanbuf2     Run the new pure Python scanbuf against the data.
@@ -353,6 +360,22 @@ class VTCmd(BaseCommand):
         hash_value = 0
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
+            label=mode,
+            ##update_min_size=65536,
+            update_frequency=256,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          pass
+      elif mode == 'blocked_chunks2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            blocked_chunks_of2(inbfr),
             label=mode,
             ##update_min_size=65536,
             update_frequency=256,
