@@ -1,4 +1,5 @@
 #!/usr/bin/python -tt
+from cs.x import X
 #
 # - Cameron Simpson <cs@cskk.id.au>
 #
@@ -12,16 +13,13 @@ import sys
 from cs.buffer import CornuCopyBuffer
 from cs.deco import fmtdoc
 from cs.logutils import warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx
 from cs.queues import IterableQueue
 from cs.seq import tee
 from cs.threads import bg as bg_thread
+from . import defaults
 from .block import Block, IndirectBlock
-from .scan import scanbuf
-
-# constraints on the chunk sizes yields from blocked_chunks_of
-MIN_BLOCKSIZE = 80  # less than this seems silly
-MAX_BLOCKSIZE = 16383  # fits in 2 octets BS-encoded
+from .scan import scan, scanbuf, scanbuf2, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 
 # default read size for file scans
 DEFAULT_SCAN_SIZE = 1024 * 1024
@@ -184,6 +182,7 @@ class _PendingBuffer:
       self.pending.append(chunk)
       self.pending_room -= len(chunk)
 
+@pfx
 @fmtdoc
 def blocked_chunks_of(
     chunks,
@@ -424,6 +423,153 @@ def blocked_chunks_of(
         out_chunk_size = len(out_chunk)
         histogram['bytes_total'] += out_chunk_size
         histogram[out_chunk_size] += 1
+
+@pfx
+@fmtdoc
+def blocked_chunks_of2(
+    chunks,
+    *,
+    scanner=None,
+    min_block=None,
+    max_block=None,
+):
+  ''' Generator which connects to a scanner of a chunk stream in
+      order to emit low level edge aligned data chunks.
+
+      Parameters:
+      * `chunks`: a source iterable of data chunks, handed to `scanner`
+      * `scanner`: optional callable accepting a `CornuCopyBuffer` and
+        returning an iterable of `int`s, such as a generator. `scanner`
+        may be `None`, in which case only the rolling hash is used
+        to locate boundaries.
+      * `min_block`: the smallest amount of data that will be used
+        to create a Block, default from `MIN_BLOCKSIZE` (`{MIN_BLOCKSIZE}`)
+      * `max_block`: the largest amount of data that will be used to
+        create a Block, default from `MAX_BLOCKSIZE` (`{MAX_BLOCKSIZE}`)
+
+      The iterable returned from `scanner(chunks)` yields `int`s which are
+      considered desirable block boundaries.
+  '''
+  if min_block is None:
+    min_block = MIN_BLOCKSIZE
+  elif min_block < 8:
+    raise ValueError("rejecting min_block < 8: %s" % (min_block,))
+  if max_block is None:
+    max_block = MAX_BLOCKSIZE
+  elif max_block >= 1024 * 1024:
+    raise ValueError("rejecting max_block >= 1024*1024: %s" % (max_block,))
+  if min_block >= max_block:
+    raise ValueError(
+        "rejecting min_block:%d >= max_block:%d" % (min_block, max_block)
+    )
+  # source data for aligned chunk construction
+  dataQ = IterableQueue()
+  # queue of offsets from the parser
+  offsetQ = IterableQueue()
+  # copy chunks to the parser and also to the post-parser chunk assembler
+  tee_chunks = tee(chunks, dataQ)
+  parse_bfr = CornuCopyBuffer(tee_chunks)
+
+  runstate = defaults.runstate
+
+  def run_parser(runstate, bfr, min_block, max_block, offsetQ):
+    ''' Thread body to scan `chunks` for offsets.
+        The chunks are copied to `parseQ`, then their boundary offsets.
+
+        If thwere is a scanner we scan the input data with it first.
+        When it terminates (including from some exception), we scan
+        the remaining chunks with scanbuf.
+
+        The main function processes `parseQ` and uses its chunks and offsets
+        to assemble aligned chunks of data.
+    '''
+    try:
+      offset = 0
+      if scanner:
+        # Consume the chunks and offsets via a queue.
+        # The scanner puts offsets onto the queue.
+        # When the scanner fetches from the chunks, those chunks are copied to the queue.
+        # Accordingly, chunks _should_ arrive before offsets within them.
+        # pylint: disable=broad-except
+        try:
+          for offset in scanner(bfr):
+            if runstate.cancelled:
+              break
+            # the scanner should yield only offsets, not chunks and offsets
+            if not isinstance(offset, int):
+              warning(
+                  "discarding non-int from scanner %s: %s", scanner, offset
+              )
+            else:
+              offsetQ.put(offset)
+        except Exception as e:
+          warning("exception from scanner %s: %s", scanner, e)
+      # Consume the remainder of chunk_iter; the tee() will copy it to parseQ.
+      # This is important to ensure that no chunk is missed.
+      # We run these blocks through scanbuf() to find offsets.
+      cso = bfr.offset  # offset after all the chunks so far
+      assert offset <= cso
+      sofar = cso - offset
+      if sofar >= max_block:
+        offsetQ.put(cso)
+        sofar = 0
+      for offset in scan(bfr, sofar=sofar, min_block=min_block,
+                         max_block=max_block):
+        if runstate.cancelled:
+          break
+        ##X("offsetQ.put %d", cso + offset)
+        offsetQ.put(cso + offset)
+    finally:
+      # end of offsets and chunks
+      offsetQ.close()
+      dataQ.close()
+
+  # dispatch the parser
+  bg_thread(
+      run_parser,
+      args=(runstate, parse_bfr, min_block, max_block, offsetQ),
+      daemon=True
+  )
+
+  # data source for assembling aligned chunks
+  data_bfr = CornuCopyBuffer(dataQ)
+  sofar = 0
+  for offset in offsetQ:
+    assert offset >= sofar
+    block_size = offset - sofar
+    assert block_size >= 0, (
+        "block_size:%d <= 0 -- sofar=%d, offset=%d" %
+        (block_size, sofar, offset)
+    )
+    if block_size < min_block:
+      # skip over small edges
+      X("skip block_size=%d", block_size)
+      assert scanner is not None, (
+          "scanner=None but still got an overly near offset"
+          " (sofar=%d, offset=%d => block_size=%d < min_block:%d)" %
+          (sofar, offset, block_size, min_block)
+      )
+      continue
+    subchunks = data_bfr.takev(block_size)
+    assert sum(map(len, subchunks)) == block_size
+    if block_size > max_block:
+      # break up overly long blocks without a parser
+      assert scanner is not None, (
+          "scanner=None but still got an overly distant offset"
+          " (sofar=%d, offset=%d => block_size=%d > max_block:%d)" %
+          (sofar, offset, block_size, max_block)
+      )
+      yield from blocked_chunks_of2(subchunks, None, min_block, max_block)
+    else:
+      yield b''.join(subchunks)
+    sofar += block_size
+  X("after end of offsetQ, last offset was %r, sofar=%d", offset, sofar)
+  if not dataQ.at_eof():
+    for bs in dataQ:
+      X("trailing %d bytes", len(bs))
+  ### guard to prevent recursion
+  ##if not data_bfr.at_eof():
+  ##  yield from blocked_chunks_of2(data_bfr, None, min_block, max_block)
 
 if __name__ == '__main__':
   from .blockify_tests import selftest
