@@ -62,7 +62,9 @@ from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
-from .scan import scanbuf
+from .scan import (
+    py_scanbuf, py_scanbuf2, scanbuf, scanbuf2, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+)
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore
 from .transcribe import parse
@@ -315,14 +317,14 @@ class VTCmd(BaseCommand):
     return xit
 
   def cmd_benchmark(self, argv):
-    ''' Usage: {cmd} mode [args...]
+    ''' Usage: {cmd} mode [args...] < data
           Modes:
-            blocked_chunks < data
-              Scan the data into edge aligned chunks without a parser.
-            read < data
-              Read from data.
-            scan < data
-              Run the raw data scan.
+            blocked_chunks  Scan the data into edge aligned Blocks without a parser.
+            py_scanbuf      Run the old pure Python scanbuf against the data.
+            py_scanbuf2     Run the new pure Python scanbuf against the data.
+            read            Read from data.
+            scanbuf         Run the old C scanbuf against the data.
+            scanbuf2        Run the new C scanbuf2 against the data.
     '''
     runstate = self.options.runstate
     if not argv:
@@ -352,6 +354,38 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
+      elif mode == 'py_scanbuf':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = py_scanbuf(hash_value, chunk)
+      elif mode == 'py_scanbuf2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = py_scanbuf2(
+              chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+          )
       elif mode == 'read':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
@@ -366,7 +400,7 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
-      elif mode == 'scan':
+      elif mode == 'scanbuf':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
         hash_value = 0
@@ -381,6 +415,23 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+      elif mode == 'scanbuf2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = scanbuf2(
+              chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+          )
       else:
         raise GetoptError("unknown mode")
     return 0
