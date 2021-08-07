@@ -129,10 +129,10 @@ class TestScanBuf(unittest.TestCase):
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
-        last_offset = None
         for offset in scan(chunks):
+        last_offset = 0
           self.assertGreater(offset, 0)
-          self.assertTrue(last_offset is None or last_offset < offset)
+          self.assertTrue(last_offset < offset)
 
   @unittest.skipIf(
       py_scanbuf2 is scanbuf2, "no C implementation: py_scanbuf2 is scanbuf2"
