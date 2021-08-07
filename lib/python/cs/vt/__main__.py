@@ -325,10 +325,12 @@ class VTCmd(BaseCommand):
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...] < data
           Modes:
-            blocked_chunks  Scan the data into edge aligned Blocks without a parser.
+            blocked_chunks  Scan the data into edge aligned chunks without a parser.
+            blockify        Scan the data into edge aligned Blocks without a parser.
             py_scanbuf      Run the old pure Python scanbuf against the data.
             py_scanbuf2     Run the new pure Python scanbuf against the data.
             read            Read from data.
+            scan            Run the new scan function against the data.
             scanbuf         Run the old C scanbuf against the data.
             scanbuf2        Run the new C scanbuf2 against the data.
     '''
@@ -352,7 +354,8 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
             label=mode,
-            update_min_size=65536,
+            ##update_min_size=65536,
+            update_frequency=256,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -360,6 +363,22 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
+      elif mode == 'blockify':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        last_offset = 0
+        for offset in progressbar(
+            blockify(inbfr),
+            label=mode,
+            update_frequency=256,
+            ##update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          last_offset = offset
       elif mode == 'py_scanbuf':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
