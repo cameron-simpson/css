@@ -132,6 +132,9 @@ scan_mp3_from_chunks = chunky(scan_mp3)
 
 def scan_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
+
+      This is more complex than the MP3 scanner because Boxes nest
+      in the MP4 structure.
   '''
   from cs.iso14496 import Box
   with Pfx("parse_mp4"):
@@ -145,7 +148,7 @@ def scan_mp4(bfr):
 parse_mp4_from_chunks = chunky(scan_mp4)
 
 def scanner_from_filename(filename):
-  ''' Choose a scanner based a filename.
+  ''' Choose a scanner based on a filename.
       Returns None if these is no special scanner.
   '''
   _, ext = splitext(basename(filename))
@@ -157,7 +160,7 @@ def scanner_from_filename(filename):
   return None
 
 def scanner_from_mime_type(mime_type):
-  ''' Choose a scanner based a mime_type.
+  ''' Choose a scanner based on a mime_type.
   '''
   return SCANNERS_BY_MIME_TYPE.get(mime_type)
 
