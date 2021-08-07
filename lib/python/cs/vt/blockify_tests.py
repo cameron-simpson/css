@@ -128,23 +128,6 @@ class BlockifyTestMixin:
       if src_total is not None:
         self.assertEqual(src_total, chunk_total)
         self.assertEqual(b''.join(source_chunks), b''.join(all_chunks))
-      # TODO: reenable the histogram stuff so that we can check on scanner behaviour
-      if False:
-        X(
-            "%s|%s: received %d chunks in %gs, %d bytes at %g B/s", input_desc,
-            scanner, nchunks, end_time - start_time, chunk_total,
-            float(chunk_total) / (end_time - start_time)
-        )
-        X(
-            "    %d offsets from scanner, %d offsets from hash scan",
-            histogram['offsets_from_scanner'],
-            histogram['offsets_from_hash_scan']
-        )
-        for hits, size in sorted([(hits, size)
-                                  for size, hits in histogram.items()
-                                  if isinstance(size, int)]):
-          if hits > 1:
-            X("size %d: %d", size, hits)
 
   def test03blockifyAndRetrieve(self):
     ''' Blockify some data and ensure that the blocks match the data.
