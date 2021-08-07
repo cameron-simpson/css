@@ -110,10 +110,9 @@ class TestScanBuf(unittest.TestCase):
               self.assertLessEqual(block_size, max_block)
               last_chunk_offset = chunk_offset
             # advance for next chunk
+            hash_value = hash_value2
             sofar = len(chunk) - last_chunk_offset
             self.assertGreaterEqual(sofar, 0)
-            hash_value = hash_value2
-            # check we haven't skipped too far
             self.assertLessEqual(sofar, max_block)
         # end of input
         # tally last unparsed section
