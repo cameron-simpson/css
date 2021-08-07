@@ -116,8 +116,8 @@ def scan(
     raise ValueError("rejecting min_block < 8: %s" % (min_block,))
   if max_block is None:
     max_block = MAX_BLOCKSIZE
-  elif max_block >= 1024 * 1024:
-    raise ValueError("rejecting max_block >= 1024*1024: %s" % (max_block,))
+  elif max_block > 1024 * 1024:
+    raise ValueError("rejecting max_block > 1024*1024: %s" % (max_block,))
   if min_block >= max_block:
     raise ValueError(
         "rejecting min_block:%d >= max_block:%d" % (min_block, max_block)
