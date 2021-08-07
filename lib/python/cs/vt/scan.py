@@ -135,3 +135,4 @@ def scan(
     # Measure from the last offset if there were offset
     # otherwise add the chunk length because it was not subdivided.
     sofar = (len(chunk) - offset if scan_offsets else sofar + len(chunk))
+    chunk_base += len(chunk)
