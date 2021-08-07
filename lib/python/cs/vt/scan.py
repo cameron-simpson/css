@@ -34,6 +34,33 @@ def py_scanbuf(hash_value, chunk):
       offsets.append(offset)
   return hash_value, offsets
 
+def py_scanbuf2(chunk, hash_value, sofar, min_block, max_block):
+  ''' Pure Python scanbuf for use if there's no C version.
+      (Implementation 2, honours block size constraints.)
+      Return `(hash_value2,offsets)`
+      being the updates rolling hash value at the end of `chunk`
+      and a list of block edge offsets.
+
+      Parameters:
+      * `chunk`: a `bytes`like buffer of data
+      * `hash_value`: initial value of the rolling hash
+      * `sofar`: the length of the initial partially scanner block prior to `chunk`
+      * `min_block`: the smallest block size allowed
+      * `max_block`: the largest block size allowed
+  '''
+  offsets = []
+  block_size = sofar
+  for offset, b in enumerate(chunk):
+    hash_value = (
+        ((hash_value & 0x001fffff) << 7)
+        | ((b & 0x7f) ^ ((b & 0x80) >> 7))
+    )
+    if block_size >= min_block:
+      if block_size >= max_block or hash_value % 4093 == 4091:
+        offsets.append(offset)
+        block_size = 0
+    block_size += 1
+  return hash_value, offsets
 
 # endeavour to obtain the C implementations of canbuf and scanbuf2
 # but fall back to the pure Python implementations
