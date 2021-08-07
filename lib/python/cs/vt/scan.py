@@ -99,3 +99,39 @@ except ImportError as e:
         scanbuf = py_scanbuf
         scanbuf2 = py_scanbuf2
 
+def scan(
+    chunks,
+    *,
+    sofar=0,
+    hash_value=0,
+    min_block=None,
+    max_block=None,
+    scan_buffer=None
+):
+  ''' Scan `chunks` with the basic hash based scanner, yield offsets.
+  '''
+  if min_block is None:
+    min_block = MIN_BLOCKSIZE
+  elif min_block < 8:
+    raise ValueError("rejecting min_block < 8: %s" % (min_block,))
+  if max_block is None:
+    max_block = MAX_BLOCKSIZE
+  elif max_block >= 1024 * 1024:
+    raise ValueError("rejecting max_block >= 1024*1024: %s" % (max_block,))
+  if min_block >= max_block:
+    raise ValueError(
+        "rejecting min_block:%d >= max_block:%d" % (min_block, max_block)
+    )
+  if scan_buffer is None:
+    scan_buffer = scanbuf2
+  chunk_base = 0
+  for chunk in chunks:
+    hash_value, scan_offsets = scan_buffer(
+        chunk, hash_value, sofar, min_block, max_block
+    )
+    for offset in scan_offsets:
+      yield chunk_base + offset
+    # Update the length of the unpartitioned data at the end of chunk.
+    # Measure from the last offset if there were offset
+    # otherwise add the chunk length because it was not subdivided.
+    sofar = (len(chunk) - offset if scan_offsets else sofar + len(chunk))
