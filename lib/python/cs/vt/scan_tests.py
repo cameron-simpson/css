@@ -129,8 +129,8 @@ class TestScanBuf(unittest.TestCase):
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
-        for offset in scan(chunks):
         last_offset = 0
+        for offset in scan(chunks, min_block=min_block, max_block=max_block):
           self.assertGreater(offset, 0)
           self.assertTrue(last_offset < offset)
           block_size = offset - last_offset
