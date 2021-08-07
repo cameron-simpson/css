@@ -16,9 +16,12 @@ import time
 import unittest
 from cs.buffer import chunky, CornuCopyBuffer
 from cs.fileutils import read_from
+from cs.pfx import pfx
 from cs.randutils import randomish_chunks
-from .blockify import blockify, blocked_chunks_of, \
-                      MAX_BLOCKSIZE, DEFAULT_SCAN_SIZE
+from .blockify import (
+    blockify, blocked_chunks_of, blocked_chunks_of2, MAX_BLOCKSIZE,
+    DEFAULT_SCAN_SIZE
+)
 from .parsers import scan_text, scan_mp3, scan_mp4
 from .store import MappingStore
 
