@@ -133,6 +133,10 @@ class TestScanBuf(unittest.TestCase):
         last_offset = 0
           self.assertGreater(offset, 0)
           self.assertTrue(last_offset < offset)
+          block_size = offset - last_offset
+          self.assertGreaterEqual(block_size, min_block)
+          self.assertLessEqual(block_size, max_block)
+          last_offset = offset
 
   @unittest.skipIf(
       py_scanbuf2 is scanbuf2, "no C implementation: py_scanbuf2 is scanbuf2"
