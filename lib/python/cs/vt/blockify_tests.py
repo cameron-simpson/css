@@ -44,7 +44,7 @@ def scanner_testfile(parser):
     return None
   return os.environ.get(envvar, default_filename)
 
-class TestAll(unittest.TestCase):
+class BlockifyTestMixin:
   ''' All the unit tests.
   '''
 
@@ -169,6 +169,20 @@ class TestAll(unittest.TestCase):
           data, data2,
           "data mismatch: data and data2 same length but contents differ"
       )
+
+##class TestBlockedChunksOf(unittest.TestCase, BlockifyTestMixin):
+##  ''' Run the tests against blocked_chunks_of.
+##  '''
+##
+##  def BLOCKED(self, *a, **kw):
+##    return blocked_chunks_of(*a, **kw)
+
+class TestBlockedChunksOf2(unittest.TestCase, BlockifyTestMixin):
+  ''' Run the tests against blocked_chunks_of2.
+  '''
+
+  def BLOCKED(self, *a, **kw):
+    return blocked_chunks_of2(*a, **kw)
 
 def selftest(argv):
   ''' Run the unit tests.
