@@ -28,18 +28,18 @@ cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
-SCANNERS = scan_text, scan_mp3, scan_mp4
+PARSERS = scan_text, scan_mp3, scan_mp4
 SCAN_TESTFILES = {
     scan_text: ('CS_VT_BLOCKIFY_TESTS__TESTFILE_TEXT', __file__),
     scan_mp3: ('CS_VT_BLOCKIFY_TESTS__TESTFILE_MP3', 'TEST.mp3'),
     scan_mp4: ('CS_VT_BLOCKIFY_TESTS__TESTFILE_MP4', 'TEST.mp4'),
 }
 
-def scanner_testfile(scanner):
-  ''' Return the filename to scan for a specified `scanner`, or `None`.
+def scanner_testfile(parser):
+  ''' Return the filename to scan for a specified `parser`, or `None`.
   '''
   try:
-    envvar, default_filename = SCAN_TESTFILES[scanner]
+    envvar, default_filename = SCAN_TESTFILES[parser]
   except KeyError:
     return None
   return os.environ.get(envvar, default_filename)
@@ -61,10 +61,10 @@ class TestAll(unittest.TestCase):
   def test01scanners(self):
     ''' Test some domain specific data parsers.
     '''
-    for scanner in SCANNERS:
-      with self.subTest(scanner.__name__):
+    for parser in PARSERS:
+      with self.subTest(parser.__name__):
         f = None
-        testfilename = scanner_testfile(scanner)
+        testfilename = scanner_testfile(parser)
         if testfilename is None:
           input_chunks = self.random_data
         else:
@@ -90,20 +90,21 @@ class TestAll(unittest.TestCase):
   def test02blocked_chunks_of(self):
     ''' Blockify some input sources.
     '''
-    for scanner in [None] + list(SCANNERS):
-      testfilename = None if scanner is None else scanner_testfile(scanner)
+    for parser in [None] + list(PARSERS):
+      X("parser=%r", parser)
+      testfilename = None if parser is None else scanner_testfile(parser)
       if testfilename is None:
         self._test_blocked_chunks_of(
-            scanner, '100 x ' + __file__, [self.mycode for _ in range(100)]
+            parser, '100 x ' + __file__, [self.mycode for _ in range(100)]
         )
-        self._test_blocked_chunks_of(scanner, 'random data', self.random_data)
+        self._test_blocked_chunks_of(parser, 'random data', self.random_data)
       else:
         with open(testfilename, 'rb') as f:
           input_chunks = read_from(f, DEFAULT_SCAN_SIZE)
-          self._test_blocked_chunks_of(scanner, testfilename, input_chunks)
+          self._test_blocked_chunks_of(parser, testfilename, input_chunks)
 
-  def _test_blocked_chunks_of(self, scanner, input_desc, input_chunks):
-    with self.subTest("blocked_chunks_of", scanner=scanner, source=input_desc):
+  def _test_blocked_chunks_of(self, parser, input_desc, input_chunks):
+    with self.subTest(self.BLOCKED.__name__, parser=parser, source=input_desc):
       source_chunks = list(input_chunks)
       src_total = sum(map(len, source_chunks))
       chunk_total = 0
