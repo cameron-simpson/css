@@ -63,7 +63,13 @@ from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
 from .scan import (
-    py_scanbuf, py_scanbuf2, scanbuf, scanbuf2, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+    MIN_BLOCKSIZE,
+    MAX_BLOCKSIZE,
+    scanbuf,
+    py_scanbuf,
+    scanbuf2,
+    py_scanbuf2,
+    scan,
 )
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore
@@ -400,6 +406,22 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
+      elif mode == 'scan':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        last_offset = 0
+        for offset in progressbar(
+            scan(inbfr),
+            label=mode,
+            update_frequency=256,
+            ##update_min_size=65536,
+            itemlenfunc=lambda offset: offset - last_offset,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          last_offset = offset
       elif mode == 'scanbuf':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
@@ -407,7 +429,8 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
+            ##update_min_size=65536,
+            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -422,7 +445,8 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
+            ##update_min_size=65536,
+            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
