@@ -107,10 +107,8 @@ class BlockifyTestMixin:
       all_chunks = []
       start_time = time.time()
       offset = 0
-      chunky_scanner = chunky(scanner) if scanner else None
-      histogram = defaultdict(int)
-      for chunk in blocked_chunks_of(source_chunks, chunky_scanner,
-                                     histogram=histogram):
+      for chunk in self.BLOCKED(source_chunks, scanner=parser):
+        X("chunk %d-bytes", len(chunk))
         nchunks += 1
         chunk_total += len(chunk)
         all_chunks.append(chunk)
