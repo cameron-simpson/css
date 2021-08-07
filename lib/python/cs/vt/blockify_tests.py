@@ -71,18 +71,13 @@ class BlockifyTestMixin:
           self.assertIsNotNone(testfilename)
           f = open(testfilename, 'rb')
           input_chunks = read_from(f)
-        Q = scanner(CornuCopyBuffer(iter(input_chunks)))
-        last_qoffset = 0
-        for qoffset in Q:
-          self.assertIsInstance(
-              qoffset, int, 'scanner must yield only ints, received %s:%r' %
-              (type(qoffset), qoffset)
-          )
+        last_offset = 0
+        for offset in parser(CornuCopyBuffer(input_chunks)):
           self.assertTrue(
-              last_qoffset <= qoffset,
-              "qoffset %d <= last_qoffset %d" % (qoffset, last_qoffset)
+              last_offset <= offset,
+              "offset %d <= last_offset %d" % (offset, last_offset)
           )
-          last_qoffset = qoffset
+          last_offset = offset
         if f is not None:
           f.close()
           f = None
