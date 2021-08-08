@@ -551,7 +551,6 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
   def flush(self):
     ''' Flush all the components.
     '''
-    self._queue_index_flush()
     self._cache.flush()
     self.index.flush()
 
@@ -602,7 +601,7 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     unindexed = self._unindexed
     try:
-      entry = unindexed[hashcode]
+      return unindexed[hashcode]
     except KeyError:
       index = self.index
       try:
@@ -611,19 +610,19 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       except KeyError:
         raise KeyError("%s[%s]: hash not in index" % (self, hashcode))
       entry = FileDataIndexEntry.from_bytes(entry_bs)
-    filenum = entry.filenum
-    try:
+      filenum = entry.filenum
       try:
-        rfd = self._rfds[filenum]
-      except KeyError:
-        # TODO: shove this sideways to self.open_datafile
-        # which releases an existing datafile if too many are open
-        DFstate = self._filemap[filenum]
-        rfd = self._rfds[filenum] = openfd_read(DFstate.pathname)
-      return entry.fetch_fd(rfd)
-    except Exception as e:
-      exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
-      raise KeyError(str(hashcode)) from e
+        try:
+          rfd = self._rfds[filenum]
+        except KeyError:
+          # TODO: shove this sideways to self.open_datafile
+          # which releases an existing datafile if too many are open
+          DFstate = self._filemap[filenum]
+          rfd = self._rfds[filenum] = openfd_read(DFstate.pathname)
+        return entry.fetch_fd(rfd)
+      except Exception as e:
+        exception("%s[%s]:%s not available: %s", self, hashcode, entry, e)
+        raise KeyError(str(hashcode)) from e
 
 class SqliteFilemap:
   ''' The file mapping of `filenum` to `DataFileState`.
