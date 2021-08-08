@@ -561,7 +561,9 @@ def blocked_chunks_of2(
           " (sofar=%d, offset=%d => block_size=%d > max_block:%d)" %
           (sofar, offset, block_size, max_block)
       )
-      yield from blocked_chunks_of2(subchunks, None, min_block, max_block)
+      yield from blocked_chunks_of2(
+          subchunks, min_block=min_block, max_block=max_block
+      )
     else:
       yield b''.join(subchunks)
     sofar += block_size
