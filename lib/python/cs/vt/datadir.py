@@ -849,7 +849,6 @@ class DataDir(FilesDir):
     proxy = upd_state.proxy
     proxy.prefix = str(self) + " monitor "
     filemap = self._filemap
-    indexQ = self._indexQ
     datadirpath = self.pathto('data')
     while not self.cancelled:
       if self.flag_scan_disable:
@@ -910,17 +909,15 @@ class DataDir(FilesDir):
                 update_frequency=64,
             ):
               hashcode = hashclass.from_chunk(DR.data)
-              indexQ.put(
-                  (
-                      hashcode,
-                      FileDataIndexEntry(
-                          filenum=filenum,
-                          data_offset=pre_offset + DR.data_offset,
-                          data_length=DR.raw_data_length,
-                          flags=DR.flags,
-                      ), post_offset
-                  )
+              entry = FileDataIndexEntry(
+                  filenum=filenum,
+                  data_offset=pre_offset + DR.data_offset,
+                  data_length=DR.raw_data_length,
+                  flags=DR.flags,
               )
+              entry_bs = bytes(entry)
+              with self._lock:
+                index[hashcode] = entry_bs
               DFstate.scanned_to = post_offset
               if self.cancelled:
                 break
@@ -1147,7 +1144,6 @@ class PlatonicDir(FilesDir):
     proxy.prefix = str(self) + " monitor "
     meta_store = self.meta_store
     filemap = self._filemap
-    indexQ = self._indexQ
     datadirpath = self.pathto('data')
     if meta_store is not None:
       topdir = self.topdir
@@ -1289,17 +1285,15 @@ class PlatonicDir(FilesDir):
                             update_frequency=128,
                         ):
                           hashcode = self.hashclass.from_chunk(data)
-                          indexQ.put(
-                              (
-                                  hashcode,
-                                  FileDataIndexEntry(
-                                      filenum=DFstate.filenum,
-                                      data_offset=pre_offset,
-                                      data_length=len(data),
-                                      flags=0,
-                                  ), post_offset
-                              )
+                          entry = FileDataIndexEntry(
+                              filenum=DFstate.filenum,
+                              data_offset=pre_offset,
+                              data_length=len(data),
+                              flags=0,
                           )
+                          entry_bs = bytes(entry)
+                          with self._lock:
+                            index[hashcode] = entry_bs
                           if meta_store is not None:
                             B = Block(data=data, hashcode=hashcode, added=True)
                             blockQ.put((pre_offset, B))
