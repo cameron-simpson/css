@@ -96,8 +96,8 @@ def blockify(chunks, scanner=None, min_block=None, max_block=None):
   ''' Wrapper for `blocked_chunks_of` which yields `Block`s
       from the data from `chunks`.
   '''
-  for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block,
-                                 max_block=max_block):
+  for chunk in blocked_chunks_of2(chunks, scanner=scanner, min_block=min_block,
+                                  max_block=max_block):
     yield Block(data=chunk)
 
 def block_from_chunks(bfr, **kw):
@@ -186,6 +186,7 @@ class _PendingBuffer:
 @fmtdoc
 def blocked_chunks_of(
     chunks,
+    *,
     scanner=None,
     min_block=None,
     max_block=None,
@@ -193,6 +194,8 @@ def blocked_chunks_of(
 ):
   ''' Generator which connects to a scanner of a chunk stream in
       order to emit low level edge aligned data chunks.
+
+      *OBSOLETE*: we now use the simpler and faster `blocked_chunks_of2`.
 
       Parameters:
       * `chunks`: a source iterable of data chunks, handed to `scanner`
