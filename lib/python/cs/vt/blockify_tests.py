@@ -89,7 +89,6 @@ class BlockifyTestMixin:
     ''' Blockify some input sources.
     '''
     for parser in [None] + list(PARSERS):
-      X("parser=%r", parser)
       testfilename = None if parser is None else scanner_testfile(parser)
       if testfilename is None:
         self._test_blocked_chunks_of(
@@ -111,13 +110,10 @@ class BlockifyTestMixin:
       start_time = time.time()
       offset = 0
       for chunk in self.BLOCKED(source_chunks, scanner=parser):
-        X("chunk %d-bytes", len(chunk))
         nchunks += 1
         chunk_total += len(chunk)
         all_chunks.append(chunk)
         offset += len(chunk)
-        # the pending.flush operation can return short blocks
-        ##self.assertTrue(len(chunk) >= MIN_BLOCKSIZE)
         self.assertTrue(
             len(chunk) <= MAX_BLOCKSIZE,
             "len(chunk)=%d > MAX_BLOCKSIZE=%d" % (len(chunk), MAX_BLOCKSIZE)
