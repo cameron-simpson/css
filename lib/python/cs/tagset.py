@@ -2731,6 +2731,7 @@ class TagFile(SingletonMixin, BaseTagSets):
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
               else:
+                tags.modified = False
                 if 'name' in tags:
                   warning("discard explicit tag name=%s", tags.name)
                   tags.discard('name')
