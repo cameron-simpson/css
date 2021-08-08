@@ -904,9 +904,10 @@ class DataDir(FilesDir):
                 "%s: scan %s" % (self, relpath(datadirpath, DFstate.filename)),
                 position=offset,
                 total=new_size,
-                units_scale=BINARY_BYTES_SCALE,
                 itemlenfunc=(
                     lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]),
+                units_scale=BINARY_BYTES_SCALE,
+                update_frequency=64,
             ):
               hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(
