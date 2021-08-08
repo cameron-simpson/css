@@ -7,27 +7,23 @@
 ''' Unit tests for cs.vt.blockify.
 '''
 
-from collections import defaultdict
 from itertools import chain
 import os
 import os.path
 import sys
-import time
 import unittest
-from cs.buffer import chunky, CornuCopyBuffer
+from cs.buffer import CornuCopyBuffer
 from cs.fileutils import read_from
-from cs.pfx import pfx
 from cs.randutils import randomish_chunks
 from .blockify import (
-    blockify, blocked_chunks_of, blocked_chunks_of2, MAX_BLOCKSIZE,
-    DEFAULT_SCAN_SIZE
+    blockify,
+    blocked_chunks_of,
+    blocked_chunks_of2,
+    DEFAULT_SCAN_SIZE,
 )
 from .parsers import scan_text, scan_mp3, scan_mp4
+from .scan import MAX_BLOCKSIZE
 from .store import MappingStore
-
-from cs.x import X
-import cs.x
-cs.x.X_via_tty = True
 
 QUICK = len(os.environ.get('QUICK', '')) > 0
 
@@ -107,7 +103,6 @@ class BlockifyTestMixin:
       chunk_total = 0
       nchunks = 0
       all_chunks = []
-      start_time = time.time()
       offset = 0
       for chunk in self.BLOCKED(source_chunks, scanner=parser):
         nchunks += 1
@@ -123,7 +118,6 @@ class BlockifyTestMixin:
               chunk_total <= src_total,
               "chunk_total:%d > src_total:%d" % (chunk_total, src_total)
           )
-      end_time = time.time()
       if src_total is not None:
         self.assertEqual(src_total, chunk_total)
         self.assertEqual(b''.join(source_chunks), b''.join(all_chunks))
@@ -149,14 +143,20 @@ class TestBlockedChunksOf(unittest.TestCase, BlockifyTestMixin):
   ''' Run the tests against blocked_chunks_of.
   '''
 
-  def BLOCKED(self, *a, **kw):
+  @staticmethod
+  def BLOCKED(*a, **kw):
+    ''' Call `blocked_chunks_of` for this subclass.
+    '''
     return blocked_chunks_of(*a, **kw)
 
 class TestBlockedChunksOf2(unittest.TestCase, BlockifyTestMixin):
   ''' Run the tests against blocked_chunks_of2.
   '''
 
-  def BLOCKED(self, *a, **kw):
+  @staticmethod
+  def BLOCKED(*a, **kw):
+    ''' Call `blocked_chunks_of2` for this subclass.
+    '''
     return blocked_chunks_of2(*a, **kw)
 
 def selftest(argv):
