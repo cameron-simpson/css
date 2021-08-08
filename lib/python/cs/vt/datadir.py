@@ -848,6 +848,7 @@ class DataDir(FilesDir):
     '''
     proxy = upd_state.proxy
     proxy.prefix = str(self) + " monitor "
+    index = self.index
     filemap = self._filemap
     datadirpath = self.pathto('data')
     while not self.cancelled:
