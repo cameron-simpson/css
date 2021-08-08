@@ -34,10 +34,10 @@ class TestScanBuf(unittest.TestCase):
   with open(__file__, 'rb') as myfp:
     mycode = myfp.read()
 
-  def _generate_test_permutations(self):
+  def _generate_test_permutations(self, no_scan_chunk=False):
     ''' Generator yielding test dictionaries.
     '''
-    for scan_chunk in py_scanbuf2, scanbuf2:
+    for scan_chunk in (None,) if no_scan_chunk else (py_scanbuf2, scanbuf2):
       if scan_chunk is py_scanbuf2 and QUICK:
         continue
       # catch "no C implementation"
@@ -67,9 +67,12 @@ class TestScanBuf(unittest.TestCase):
     elif isinstance(data_spec, (list, tuple)):
       chunks = data_spec
     else:
-      raise RuntimeError("unexpected data_spec of type %s", type(data_spec))
+      raise RuntimeError(
+          "unexpected data_spec of type %s" % (type(data_spec),)
+      )
     return chunks
 
+  # pylint: disable=too-many-locals
   def test01scanbuf2(self):
     ''' Run the scanbuf2 functions against various data.
     '''
@@ -138,7 +141,8 @@ class TestScanBuf(unittest.TestCase):
         if chunks is None:
           continue
         last_offset = 0
-        for offset in scan(chunks, min_block=min_block, max_block=max_block):
+        for offset in scan(chunks, min_block=min_block, max_block=max_block,
+                           scan_buffer=scan_chunk):
           self.assertGreater(offset, 0)
           self.assertTrue(last_offset < offset)
           block_size = offset - last_offset
@@ -152,18 +156,31 @@ class TestScanBuf(unittest.TestCase):
   def test03scanbuf2_py_vs_c(self):
     ''' Test `py_scanbuf2` vs C `scanbuf2`.
     '''
-    for test_combo in self._generate_test_permutations():
+    for test_combo in self._generate_test_permutations(no_scan_chunk=True):
       with self.subTest(**test_combo):
-        scan_chunk = test_combo['scan_chunk']
         min_block = test_combo['min_block']
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
         if chunks is None:
           continue
-        py_offsets = list(scan(chunks, scan_buffer=py_scanbuf2))
+        py_offsets = list(
+            scan(
+                chunks,
+                scan_buffer=py_scanbuf2,
+                min_block=min_block,
+                max_block=max_block
+            )
+        )
         chunks = self._test_chunks(data_spec)
-        c_offsets = list(scan(chunks, scan_buffer=scanbuf2))
+        c_offsets = list(
+            scan(
+                chunks,
+                scan_buffer=scanbuf2,
+                min_block=min_block,
+                max_block=max_block
+            )
+        )
         self.assertEqual(py_offsets, c_offsets)
 
 def selftest(argv):
