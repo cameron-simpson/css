@@ -1350,7 +1350,8 @@ class PlatonicDir(FilesDir):
     scanner = scanner_from_filename(filepath)
     with open(filepath, 'rb') as fp:
       fp.seek(offset)
-      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE), scanner):
+      for data in blocked_chunks_of(read_from(fp, DEFAULT_SCAN_SIZE),
+                                    scanner=scanner):
         post_offset = offset + len(data)
         yield offset, data, post_offset
         offset = post_offset
