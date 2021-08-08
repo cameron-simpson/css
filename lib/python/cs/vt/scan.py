@@ -12,7 +12,6 @@ from distutils.core import setup, Extension
 from os import chdir, getcwd
 from os.path import dirname, join as joinpath
 import sys
-##from time import sleep
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.logutils import error, warning
@@ -66,7 +65,7 @@ def py_scanbuf2(chunk, hash_value, sofar, min_block, max_block):
 # endeavour to obtain the C implementations of canbuf and scanbuf2
 # but fall back to the pure Python implementations
 try:
-  from ._scan import scanbuf
+  from ._scan import scanbuf  # pylint: disable=unused-import
   from ._scan import scanbuf2
 except ImportError as e:
   warning("%s: building _scan from _scan.c", e)
@@ -93,7 +92,7 @@ except ImportError as e:
     else:
       chdir(owd)
       try:
-        from ._scan import scanbuf
+        from ._scan import scanbuf  # pylint: disable=unused-import
         from ._scan import scanbuf2
       except ImportError as e:
         error("import fails after setup: %s", e)
@@ -149,5 +148,5 @@ def scan(
     # Update the length of the unpartitioned data at the end of chunk.
     # Measure from the last offset if there were offset
     # otherwise add the chunk length because it was not subdivided.
-    sofar = (len(chunk) - offset if scan_offsets else sofar + len(chunk))
+    sofar = (len(chunk) - offset if scan_offsets else sofar + len(chunk))  # pylint: disable=undefined-loop-variable
     chunk_base += len(chunk)
