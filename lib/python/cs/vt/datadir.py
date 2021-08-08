@@ -54,7 +54,7 @@ from os.path import (
 import sqlite3
 import stat
 import sys
-import time
+from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
 from icontract import require
@@ -853,7 +853,7 @@ class DataDir(FilesDir):
     datadirpath = self.pathto('data')
     while not self.cancelled:
       if self.flag_scan_disable:
-        time.sleep(1)
+        sleep(1)
         continue
       # scan for new datafiles
       with proxy.extend_prefix(" check datafiles"):
@@ -863,7 +863,7 @@ class DataDir(FilesDir):
           except OSError as e:
             if e.errno == errno.ENOENT:
               error("listing failed: %s", e)
-              time.sleep(2)
+              sleep(2)
               continue
             raise
         for filename in listing:
@@ -925,7 +925,7 @@ class DataDir(FilesDir):
                 break
             self.flush()
         self.flush()
-      time.sleep(1)
+      sleep(1)
 
 class RawDataDir(FilesDir):
   ''' Maintenance of a collection of raw data files in a directory.
@@ -1155,7 +1155,7 @@ class PlatonicDir(FilesDir):
     updated = False
     disabled = False
     while not self.cancelled:
-      time.sleep(self.DELAY_INTERSCAN)
+      sleep(self.DELAY_INTERSCAN)
       if self.flag_scan_disable:
         if not disabled:
           info("scan %r DISABLED", shortpath(datadirpath))
@@ -1173,7 +1173,7 @@ class PlatonicDir(FilesDir):
                                                       followlinks=True):
             dirnames[:] = sorted(dirnames)
             filenames = sorted(filenames)
-            time.sleep(self.DELAY_INTRASCAN)
+            sleep(self.DELAY_INTRASCAN)
             if self.cancelled or self.flag_scan_disable:
               break
             rdirpath = relpath(dirpath, datadirpath)
@@ -1277,7 +1277,7 @@ class PlatonicDir(FilesDir):
                               E.block, blockQ
                           )
                         scan_from = DFstate.scanned_to
-                        scan_start = time.time()
+                        scan_start = time()
                         for pre_offset, data, post_offset in progressbar(
                             DFstate.scanfrom(offset=DFstate.scanned_to),
                             "scan " + rfilepath,
@@ -1316,7 +1316,7 @@ class PlatonicDir(FilesDir):
                           E.block = top_block
                           D.changed = True
                           updated = True
-                      elapsed = time.time() - scan_start
+                      elapsed = time() - scan_start
                       scanned = DFstate.scanned_to - scan_from
                       if elapsed > 0:
                         scan_rate = scanned / elapsed
@@ -1335,7 +1335,7 @@ class PlatonicDir(FilesDir):
                         )
                       # stall after a file scan, briefly, to limit impact
                       if elapsed > 0:
-                        time.sleep(min(elapsed, self.DELAY_INTRASCAN))
+                        sleep(min(elapsed, self.DELAY_INTRASCAN))
             # update the archive after updating from a directory
             if updated and meta_store is not None:
               self.sync_meta()
