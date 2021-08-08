@@ -1243,7 +1243,7 @@ class VTCmd(BaseCommand):
           scanner = scanner_from_filename(filename)
           size_counts = defaultdict(int)
           with open(filename, 'rb') as fp:
-            for chunk in blocked_chunks_of(file_data(fp, None), scanner):
+            for chunk in blocked_chunks_of2(file_data(fp, None), scanner):
               print(len(chunk), str(chunk[:16]))
               size_counts[len(chunk)] += 1
           for size, count in sorted(size_counts.items()):
