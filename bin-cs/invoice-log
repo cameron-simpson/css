@@ -42,7 +42,7 @@ set -x
   set -ue
   egrep -e "$dlog_re" "$HOME/var/log/dlog-quick"
   [ -s "$HOME/var/log/shell-$org" ] && sed 's/^:  *//' "$HOME/var/log/shell-$org"
-  for d in $repodirs
+  for d in $repodirs*
   do
     [ -d "$d/" ] || continue
     ( cd "$d"

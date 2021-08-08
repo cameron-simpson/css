@@ -14,7 +14,7 @@ import errno
 from functools import partial
 import json
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
   from os import pread
 except ImportError:
@@ -42,9 +42,9 @@ from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import LoadableMappingMixin, UUIDedDict
+from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210306-post'
+__version__ = '20210731-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,9 +69,9 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings',
+        'cs.mappings>=20210717',
         'cs.obj',
-        'cs.pfx',
+        'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.py3',
         'cs.range',
@@ -702,6 +702,7 @@ def makelockfile(
           raise
         if timeout is not None and timeout <= 0:
           # immediate failure
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
@@ -722,6 +723,7 @@ def makelockfile(
           sleep_for = min(poll_interval, start + timeout - now)
         # test for timeout
         if sleep_for <= 0:
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         time.sleep(sleep_for)
         continue
@@ -1707,6 +1709,75 @@ def lines_of(fp, partials=None):
     partials = []
   return as_lines(read_from(fp), partials)
 
+# pylint: disable=redefined-builtin
+@contextmanager
+def atomic_filename(
+    filename,
+    exists_ok=False,
+    placeholder=False,
+    dir=None,
+    prefix=None,
+    suffix=None,
+    **kw
+):
+  ''' A context manager to create `filename` atomicly on completion.
+      This returns a `NamedTemporaryFile` to use to create the file contents.
+      On completion the temporary file is renamed to the target name `filename`.
+
+      Parameters:
+      * `filename`: the file name to create
+      * `exists_ok`: default `False`;
+        if true it not an error if `filename` already exists
+      * `placeholder`: create a placeholder file at `filename`
+        while the real contents are written to the temporary file
+      * `dir`: passed to `NamedTemporaryFile`, specifies the directory
+        to hold the temporary file; the default is `dirname(filename)`
+        to ensure the rename is atomic
+      * `prefix`: passed to `NamedTemporaryFile`, specifies a prefix
+        for the temporary file; the default is a dot (`'.'`) plus the prefix
+        from `splitext(basename(filename))`
+      * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
+        for the temporary file; the default is the extension obtained
+        from `splitext(basename(filename))`
+      Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
+
+      Example:
+
+          >>> from os.path import exists as existspath
+          >>> fn = 'test_atomic_filename'
+          >>> with atomic_filename(fn, mode='w') as f:
+          ...     assert not existspath(fn)
+          ...     print('foo', file=f)
+          ...     assert not existspath(fn)
+          ...
+          >>> assert existspath(fn)
+          >>> assert open(fn).read() == 'foo\n'
+  '''
+  if dir is None:
+    dir = dirname(filename)
+  fprefix, fsuffix = splitext(basename(filename))
+  if prefix is None:
+    prefix = '.' + fprefix
+  if suffix is None:
+    suffix = fsuffix
+  if existspath(filename) and not exists_ok:
+    raise ValueError("already exists: %r" % (filename,))
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
+                          **kw) as T:
+    if placeholder:
+      # create a placeholder file
+      with open(filename, 'ab' if exists_ok else 'xb'):
+        pass
+    yield T
+    if placeholder:
+      try:
+        pfx_call(shutil.copymode, filename, T.name)
+      except OSError as e:
+        warning(
+            "defaut modes not copied from from placehodler %r: %s", filename, e
+        )
+    pfx_call(rename, T.name, filename)
+
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.
   '''
@@ -1778,13 +1849,14 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
-  ''' A subclass of `LoadableMappingMixin` which maintains records
+class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
+  ''' A subclass of `IndexedSetMixin` which maintains records
       from a newline delimited JSON file.
   '''
 
-  loadable_mapping_key = 'uuid'
+  IndexedSetMixin__pk = 'uuid'
 
+  # pylint: disable=unused-argument
   @staticmethod
   def _singleton_key(filename, dictclass=UUIDedDict, create=False):
     ''' Key off the absolute path of `filename`.
@@ -1819,7 +1891,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
         type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
     )
 
-  def scan_mapping(self):
+  def scan(self):
     ''' Scan the backing file, yield records.
     '''
     if existspath(self.__ndjson_filename):
@@ -1828,14 +1900,14 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
                                 error_list=self.scan_errors):
         yield record
 
-  def append_to_mapping(self, record):
+  def add_backend(self, record):
     ''' Append `record` to the backing file.
     '''
     with open(self.__ndjson_filename, 'a') as f:
       f.write(record.as_json())
       f.write('\n')
 
-  def rewrite_mapping(self):
+  def rewrite_backend(self):
     ''' Rewrite the backing file.
 
         Because the record updates are normally written in append mode,
@@ -1848,7 +1920,7 @@ class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
           T.write(record.as_json())
           T.write('\n')
         T.flush()
-      self.scan_mapping_length = i
+      self.scan_length = i
 
 if __name__ == '__main__':
   import cs.fileutils_tests

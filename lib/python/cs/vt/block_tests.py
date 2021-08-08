@@ -208,7 +208,7 @@ class TestAll(unittest.TestCase):
             self._verify_block(B2.superblock)
           else:
             self.assertFalse(B.indirect)
-            self.assertEqual(B.span, sum(len(chunk) for chunk in B.datafrom()))
+            self.assertEqual(B.span, sum(map(len, B)))
             if Btype == BlockType.BT_HASHCODE:
               self.assertEqual(B.hashcode, B2.hashcode)
             elif Btype == BlockType.BT_RLE:

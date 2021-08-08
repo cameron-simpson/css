@@ -15,9 +15,10 @@ Presupplied scales:
 * `UNSCALED_SCALE`: no units
 '''
 
+from collections import namedtuple
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20201025-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -29,62 +30,81 @@ DISTINFO = {
     'install_requires': ['cs.lex'],
 }
 
-UNSCALED_SCALE = ((0, ''),)
+class UnitStep(namedtuple('UnitStep', 'factor unit max_width')):
+  ''' A `namedtuple` expressing a scale step for a unit scale.
+      The last tuple in a scale should have `factor=0`.
+
+      Attributes:
+      * `factor`: the scale factor for the unit in terms of the following unit.
+        For example, `60` for seconds because there are `60` in the
+        next unit, minutes.
+      * `unit`: the textual abbreviation for the unit.
+        For example, `'s'` for seconds.
+      * `max_width`: the maximum width for a modulus of this unit.
+        For example, `2` for seconds because the maximum value is less than `100`.
+  '''
+
+  def __new__(cls, factor, unit, max_width=0):
+    return super().__new__(cls, factor, unit, max_width)
+
+UNSCALED_SCALE = (UnitStep(0, ''),)
 
 TIME_SCALE = (
-    (60, 's'),
-    (60, 'm'),
-    (24, 'h'),
-    (7, 'd'),
-    (0, 'w'),
+    UnitStep(60, 's', 2),
+    UnitStep(60, 'm', 2),
+    UnitStep(24, 'h', 2),
+    UnitStep(7, 'd', 1),
+    UnitStep(0, 'w', 1),
 )
 
 # BINARY BYTES CALE
 BINARY_BYTES_SCALE = (
-    (1024, 'B'),
-    (1024, 'KiB'),
-    (1024, 'MiB'),
-    (1024, 'GiB'),
-    (1024, 'TiB'),
-    (0, 'PiB'),
+    UnitStep(1024, 'B', 4),
+    UnitStep(1024, 'KiB', 4),
+    UnitStep(1024, 'MiB', 4),
+    UnitStep(1024, 'GiB', 4),
+    UnitStep(1024, 'TiB', 4),
+    UnitStep(0, 'PiB', 4),
 )
 
 DECIMAL_BYTES_SCALE = (
-    (1000, 'B'),
-    (1000, 'KB'),
-    (1000, 'MB'),
-    (1000, 'GB'),
-    (1000, 'TB'),
-    (0, 'PB'),
+    UnitStep(1000, 'B', 3),
+    UnitStep(1000, 'KB', 3),
+    UnitStep(1000, 'MB', 3),
+    UnitStep(1000, 'GB', 3),
+    UnitStep(1000, 'TB', 3),
+    UnitStep(0, 'PB', 3),
 )
 
 DECIMAL_SCALE = (
-    (1000, ''),
-    (1000, 'K'),
-    (1000, 'M'),
-    (1000, 'G'),
-    (1000, 'T'),
-    (0, 'P'),
+    UnitStep(1000, '', 3),
+    UnitStep(1000, 'K', 3),
+    UnitStep(1000, 'M', 3),
+    UnitStep(1000, 'G', 3),
+    UnitStep(1000, 'T', 3),
+    UnitStep(0, 'P', 3),
 )
 
 def human(n, scale):
   ''' Decompose a nonnegative integer `n` into counts by unit from `scale`.
+      Returns a list of `(modulus,UnitStep)`.
 
       Parameters:
       * `n`: a nonnegative integer.
-      * `scale`: a sequence of `(factor,unit)` where factor is the
-        size factor to the following scale item
+      * `scale`: a sequence of `UnitStep` or `(factor,unit[,max_width])`
+        where factor is the size factor to the following scale item
         and `unit` is the designator of the unit.
   '''
   components = []
-  for factor, unit in scale:
-    if factor == 0:
-      components.append((n, unit))
+  for scale_step in scale:
+    step = UnitStep(*scale_step)
+    if step.factor == 0:
+      components.append((n, step))
       n = 0
       break
-    remainder = n % factor
-    components.append((remainder, unit))
-    n //= factor
+    modulus = n % step.factor
+    components.append((modulus, step))
+    n //= step.factor
     if n == 0:
       break
   if n > 0:
@@ -107,24 +127,30 @@ def human_time(n, scale=None):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `TIME_SCALE`.
   '''
-  return human(n, TIME_SCALE)
+  if scale is None:
+    scale = TIME_SCALE
+  return human(n, scale)
 
 def combine(components, scale):
   ''' Combine a sequence of value components as from `human()` into an integer.
   '''
   factors = {}
   current_factor = 1
-  for factor, unit in scale:
-    factors[unit] = current_factor
-    if factor == 0:
+  for scale_step in scale:
+    step = UnitStep(*scale_step)
+    factors[step.unit] = current_factor
+    if step.factor == 0:
       break
-    current_factor *= factor
+    current_factor *= step.factor
   total = 0
-  for count, unit in components:
-    total += count * factors[unit]
+  for count, step in components:
+    total += count * factors[step.unit]
   return total
 
-def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
+# pylint: disable=too-many-arguments
+def transcribe(
+    n, scale, max_parts=None, skip_zero=False, sep='', no_pad=False
+):
   ''' Transcribe a nonnegative integer `n` against `scale`.
 
       Parameters:
@@ -138,11 +164,15 @@ def transcribe(n, scale, max_parts=None, skip_zero=False, sep=''):
   '''
   components = human(n, scale)
   text = []
-  for count, unit in reversed(components):
+  for count, step in reversed(components):
     if skip_zero and count == 0:
       continue
     count_i = int(count)
-    text.append( (str(count_i) if count_i == count else "%.1f" % count) + unit )
+    count_s = str(count_i) if count_i == count else "%.1f" % count
+    if not no_pad and step.max_width > len(count_s):
+      count_s = " " * (step.max_width - len(count_s)) + count_s
+    count_s += step.unit
+    text.append(count_s)
     if max_parts is not None and len(text) == max_parts:
       break
   return sep.join(text)
@@ -184,12 +214,12 @@ def parse(s, scale, offset=0):
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()
-      for factor, unit in scale:
-        if unit.lower() == vunit:
+      for unit in scale:
+        if unit.unit.lower() == vunit:
           break
-        if not factor:
+        if not unit.factor:
           raise ValueError("unrecognised unit: %r" % (vunit0,))
-        value *= factor
+        value *= unit.factor
   return value, offset
 
 def multiparse(s, scales, offset=0):
