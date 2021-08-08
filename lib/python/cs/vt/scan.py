@@ -14,6 +14,7 @@ from os.path import dirname, join as joinpath
 import sys
 ##from time import sleep
 from cs.context import stackattrs
+from cs.deco import fmtdoc
 from cs.logutils import error, warning
 
 # default constraints on the chunk sizes yielded from scans
@@ -99,6 +100,7 @@ except ImportError as e:
         scanbuf = py_scanbuf
         scanbuf2 = py_scanbuf2
 
+@fmtdoc
 def scan(
     chunks,
     *,
@@ -109,6 +111,19 @@ def scan(
     scan_buffer=None
 ):
   ''' Scan `chunks` with the basic hash based scanner, yield offsets.
+
+      Parameters:
+      * `chunks`: an iterable of `bytes`-like objects
+      * `sofar`: optional count of preceeding bytes to be counted
+        towards the aligned block size, default `0`
+      * `hash_value`: optional initial hash value for the rolling hash,
+        default `0`
+      * `min_block`: optional minimum block size,
+        default MIN_BLOCKSIZE ({MIN_BLOCKSIZE})
+      * `max_block`: optional maximum block size,
+        default MAX_BLOCKSIZE ({MAX_BLOCKSIZE})
+      * `scan_buffer`: optional function to scan `chunks` for offsets,
+        default `scanbuf2` (the new C implementation)
   '''
   if min_block is None:
     min_block = MIN_BLOCKSIZE
