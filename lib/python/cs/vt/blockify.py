@@ -1,5 +1,4 @@
 #!/usr/bin/python -tt
-from cs.x import X
 #
 # - Cameron Simpson <cs@cskk.id.au>
 #
@@ -19,7 +18,7 @@ from cs.seq import tee
 from cs.threads import bg as bg_thread
 from . import defaults
 from .block import Block, IndirectBlock
-from .scan import scan, scanbuf, scanbuf2, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+from .scan import scan, scanbuf, MIN_BLOCKSIZE, MAX_BLOCKSIZE
 
 # default read size for file scans
 DEFAULT_SCAN_SIZE = 1024 * 1024
@@ -336,8 +335,6 @@ def blocked_chunks_of(
       nonlocal last_offset, first_possible_point, max_possible_point
       first_possible_point = last_offset + min_block
       max_possible_point = last_offset + max_block
-      ##X("recomputed offsets: last_offset=%d, first_possible_point=%d, max_possible_point=%d",
-      ##  last_offset, first_possible_point, max_possible_point)
 
     # prepare initial state
     last_offset = 0  # latest released boundary
@@ -355,7 +352,7 @@ def blocked_chunks_of(
         break
       # verify current chunk start offset against end of previous chunk
       assert chunk0 is None or offset == offset0 + len(chunk0), \
-          "offset0=%d, len(chunk0)=%d: sum(%d) != current offset %d" \
+          "offset0=%s, len(chunk0)=%d: sum(%d) != current offset %d" \
           % (offset0, len(chunk0), offset0 + len(chunk0), offset)
       chunk0 = chunk
       offset0 = offset
@@ -427,6 +424,7 @@ def blocked_chunks_of(
         histogram['bytes_total'] += out_chunk_size
         histogram[out_chunk_size] += 1
 
+# pylint: disable=too-many-statements,too-many-locals
 @pfx
 @fmtdoc
 def blocked_chunks_of2(
