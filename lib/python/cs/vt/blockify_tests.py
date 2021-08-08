@@ -149,12 +149,12 @@ class BlockifyTestMixin:
           "data mismatch: data and data2 same length but contents differ"
       )
 
-##class TestBlockedChunksOf(unittest.TestCase, BlockifyTestMixin):
-##  ''' Run the tests against blocked_chunks_of.
-##  '''
-##
-##  def BLOCKED(self, *a, **kw):
-##    return blocked_chunks_of(*a, **kw)
+class TestBlockedChunksOf(unittest.TestCase, BlockifyTestMixin):
+  ''' Run the tests against blocked_chunks_of.
+  '''
+
+  def BLOCKED(self, *a, **kw):
+    return blocked_chunks_of(*a, **kw)
 
 class TestBlockedChunksOf2(unittest.TestCase, BlockifyTestMixin):
   ''' Run the tests against blocked_chunks_of2.
