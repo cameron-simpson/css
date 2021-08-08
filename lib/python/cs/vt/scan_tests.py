@@ -23,7 +23,7 @@ SCAN_DATA = [
         if QUICK else randomish_chunks(12000, limit=1280)
     ),
     'TEST.mp3',
-    'TEST.mp4',
+    None if QUICK else 'TEST.mp4',
 ]
 
 class TestScanBuf(unittest.TestCase):
@@ -38,6 +38,8 @@ class TestScanBuf(unittest.TestCase):
     ''' Generator yielding test dictionaries.
     '''
     for scan_chunk in py_scanbuf2, scanbuf2:
+      if scan_chunk is py_scanbuf2 and QUICK:
+        continue
       # catch "no C implementation"
       if scanbuf2 is py_scanbuf2:
         continue
@@ -58,7 +60,9 @@ class TestScanBuf(unittest.TestCase):
     ''' Return an iterable of chunks from a data spec (filename or list-of-bytes).
     '''
     # obtain the test data
-    if isinstance(data_spec, str):
+    if data_spec is None:
+      chunks = None
+    elif isinstance(data_spec, str):
       chunks = CornuCopyBuffer.from_filename(data_spec)
     elif isinstance(data_spec, (list, tuple)):
       chunks = data_spec
@@ -76,6 +80,8 @@ class TestScanBuf(unittest.TestCase):
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
+        if chunks is None:
+          continue
         # scan the test data
         sofar = 0
         hash_value = 0
@@ -129,6 +135,8 @@ class TestScanBuf(unittest.TestCase):
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
+        if chunks is None:
+          continue
         last_offset = 0
         for offset in scan(chunks, min_block=min_block, max_block=max_block):
           self.assertGreater(offset, 0)
@@ -151,6 +159,8 @@ class TestScanBuf(unittest.TestCase):
         max_block = test_combo['max_block']
         data_spec = test_combo['data_spec']
         chunks = self._test_chunks(data_spec)
+        if chunks is None:
+          continue
         py_offsets = list(scan(chunks, scan_buffer=py_scanbuf2))
         chunks = self._test_chunks(data_spec)
         c_offsets = list(scan(chunks, scan_buffer=scanbuf2))
