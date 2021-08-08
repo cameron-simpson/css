@@ -566,13 +566,10 @@ def blocked_chunks_of2(
     else:
       yield b''.join(subchunks)
     sofar += block_size
-  X("after end of offsetQ, last offset was %r, sofar=%d", offset, sofar)
-  if not dataQ.at_eof():
-    for bs in dataQ:
-      X("trailing %d bytes", len(bs))
-  ### guard to prevent recursion
-  ##if not data_bfr.at_eof():
-  ##  yield from blocked_chunks_of2(data_bfr, None, min_block, max_block)
+  bs = b''.join(data_bfr)
+  if bs:
+    assert len(bs) <= max_block
+    yield bs
 
 if __name__ == '__main__':
   from .blockify_tests import selftest
