@@ -520,7 +520,6 @@ def blocked_chunks_of2(
                          max_block=max_block):
         if runstate.cancelled:
           break
-        ##X("offsetQ.put %d", cso + offset)
         offsetQ.put(cso + offset)
     finally:
       # end of offsets and chunks
@@ -537,6 +536,7 @@ def blocked_chunks_of2(
   # data source for assembling aligned chunks
   data_bfr = CornuCopyBuffer(dataQ)
   sofar = 0
+  offset = None
   for offset in offsetQ:
     assert offset >= sofar
     block_size = offset - sofar
@@ -546,7 +546,6 @@ def blocked_chunks_of2(
     )
     if block_size < min_block:
       # skip over small edges
-      X("skip block_size=%d", block_size)
       assert scanner is not None, (
           "scanner=None but still got an overly near offset"
           " (sofar=%d, offset=%d => block_size=%d < min_block:%d)" %
