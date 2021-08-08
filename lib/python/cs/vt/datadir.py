@@ -40,6 +40,7 @@
 
 from collections import namedtuple
 from collections.abc import Mapping
+from contextlib import contextmanager
 import errno
 import os
 from os import (
@@ -72,19 +73,19 @@ from cs.fileutils import (
 from cs.logutils import debug, info, warning, error, exception
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
-from cs.progress import progressbar
+from cs.progress import Progress, progressbar
 from cs.py.func import prop as property  # pylint: disable=redefined-builtin
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
-from cs.upd import Upd, upd_proxy, state as upd_state
+from cs.upd import Upd, upd_proxy, state as upd_state, print
 from . import MAX_FILE_SIZE, Lock, RLock
 from .archive import Archive
 from .block import Block
 from .blockify import (
-    DEFAULT_SCAN_SIZE, blocked_chunks_of, spliced_blocks, top_block_for
+    DEFAULT_SCAN_SIZE, blocked_chunks_of2, spliced_blocks, top_block_for
 )
 from .datafile import DataRecord, DATAFILE_DOT_EXT
 from .dir import Dir, FileDirent
@@ -298,11 +299,13 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self.statefilepath = joinpath(
         topdirpath, self.STATE_FILENAME_FORMAT.format(hashname=self.hashname)
     )
+    self.index = None
     self._filemap = None
     self._unindexed = None
     self._cache = None
-    self._indexQ = None
-    self._index_Thread = None
+    self._data_proxy = None
+    self._dataQ = None
+    self._data_progress = None
     self._monitor_Thread = None
     self._WDFstate = None
     self._lock = RLock()
@@ -330,8 +333,9 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
       with Pfx("mkdir(%r)", datasubdirpath):
         os.mkdir(datasubdirpath)
 
-  def startup(self):
-    ''' Start up the FilesDir: take locks, start worker threads etc.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Start up and shut down the `FilesDir`: take locks, start worker threads etc.
     '''
     self.initdir()
     self._rfds = {}
@@ -347,54 +351,45 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     self._cache = LRU_Cache(
         maxsize=4, on_remove=lambda k, datafile: datafile.close()
     )
-    # Set up indexing thread.
-    # Map individual hashcodes to locations before being persistently stored.
-    # This lets us add data, stash the location in _unindexed and
-    # drop the location onto the _indexQ for persistent storage in
-    # the index asynchronously.
-    self._indexQ = IterableQueue(64)
-    self._index_Thread = bg_thread(
-        self._index_updater,
-        name="%s-index-thread" % (self,),
-    )
-    self._monitor_Thread = bg_thread(
-        self._monitor_datafiles,
-        name="%s-datafile-monitor" % (self,),
-    )
-
-  def shutdown(self):
-    ''' Shut down the `FilesDir`: cancel the runstate, close the
-        queues, join the worker threads.
-    '''
-    self.runstate.cancel()
-    self.flush()
-    # shut down the monitor Thread
-    mon_thread = self._monitor_Thread
-    if mon_thread is not None:
-      mon_thread.join()
-      self._monitor_Thread = None
-    # drain index update queue
-    Q = self._indexQ
-    if Q is not None:
-      Q.close()
-      self._indexQ = None
-    index_thread = self._index_Thread
-    if index_thread is not None:
-      index_thread.join()
-      self._index_Thread = None
-    if self._unindexed:
-      error("UNINDEXED BLOCKS: %r", self._unindexed)
+    # Set up data queue.
+    # The .add() method adds the data to self._unindexed, puts the
+    # data onto the data queue, and returns.
+    # The data queue worker saves the data to backing files and
+    # updates the indices.
+    with upd_state.upd.insert(1) as data_proxy:
+      self._data_proxy = data_proxy
+      self._data_progress = Progress(
+          name=str(self) + " data queue ",
+          total=0,
+          units_scale=BINARY_BYTES_SCALE,
+      )
+      self._dataQ = IterableQueue(65536)
+      self._data_Thread = bg_thread(
+          self._data_queue,
+          name="%s._data_queue" % (self,),
+      )
+      self._monitor_Thread = bg_thread(
+          self._monitor_datafiles,
+          name="%s-datafile-monitor" % (self,),
+      )
+      yield
+      self.runstate.cancel()
+      self.flush()
+      # shut down the monitor Thread
+      mon_thread = self._monitor_Thread
+      if mon_thread is not None:
+        mon_thread.join()
+        self._monitor_Thread = None
+      # drain the data queue
+      self._dataQ.close()
+      self._data_Thread.join()
+      self._dataQ = None
+      self._data_thread = None
     # update state to substrate
     self._cache = None
     self._filemap.close()
     self._filemap = None
     self.index.close()
-    # close the write file descriptor, if any
-    wfd = self.__dict__.get('_wfd')
-    if wfd is not None:
-      with Pfx("os.close(wfd:%d)", wfd):
-        os.close(wfd)
-      del self._wfd
     # close the read file descriptors
     for rfd in self._rfds.values():
       with Pfx("os.close(rfd:%d)", rfd):
@@ -411,18 +406,6 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     ''' Return the path to `rpath`, which is relative to the `datadirpath`.
     '''
     return self.pathto(joinpath('data', rpath))
-
-  def __getattr__(self, attr):
-    if attr == '_wfd':
-      # no ._wfd: create a new write data file and return the new wfd
-      with self._lock:
-        wfd = self.__dict__.get('_wfd')
-        if wfd is None:
-          DFstate = self.new_datafile()
-          wfd = self._wfd = openfd_append(DFstate.pathname)
-          self._WDFstate = DFstate
-      return wfd
-    return super().__getattr__(attr)
 
   def new_datafile(self):
     ''' Create a new datafile.
@@ -446,42 +429,99 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     return self._filemap.add_path(filename)
 
   def add(self, data):
-    ''' Add the supplied data chunk to the current save `DataFile`,
-        return the hashcode.
-        Roll the internal state over to a new file if the current
-        datafile has reached the rollover threshold.
-
-        Subclasses must define the `data_save_information(data)` method.
+    ''' Add `data` to the cache, queue data for indexing, return hashcode.
     '''
-    # pretranscribe the in-file data record
-    bs, data_offset, data_length, flags = self.data_save_information(data)
-    with self._lock:
-      wfd = self._wfd
-      filenum = self._WDFstate.filenum
-      offset = os.lseek(wfd, 0, SEEK_END)
-      n = os.write(wfd, bs)
-      rollover = self.rollover
-      if rollover is not None and offset + n >= rollover:
-        # file now full, close it so as to start a new one on next write
-        os.close(wfd)
-        del self._wfd
-        del self._WDFstate
-    length = len(bs)
-    if n != length:
-      raise ValueError(
-          "filenum %d: os.write(%d-bytes) wrote only %d bytes" %
-          (filenum, length, n)
-      )
-    entry = FileDataIndexEntry(
-        filenum=filenum,
-        data_offset=offset + data_offset,
-        data_length=data_length,
-        flags=flags,
-    )
-    post_offset = offset + length
     hashcode = self.hashclass.from_chunk(data)
-    self._queue_index(hashcode, entry, post_offset)
+    if hashcode not in self._unindexed:
+      self._unindexed[hashcode] = data
+      self._data_progress.total += len(data)
+      self._dataQ.put(data)
     return hashcode
+
+  def _data_queue(self):
+    wf = None
+    DFstate = None
+    filenum = None
+    index = self.index
+    unindexed = self._unindexed
+    dataQ = self._dataQ
+    progress = self._data_progress
+    hashchunk = self.hashclass.from_chunk
+    batch_size = 128
+
+    def data_batches(dataQ, batch_size):
+      for data in dataQ:
+        # assemble up to 64 chunks at a time
+        data_batch = [data]
+        while not dataQ.empty() and len(data_batch) < batch_size:
+          data_batch.append(next(dataQ))
+        yield data_batch
+        data_batch = None
+
+    for data_batch in progress.iterbar(
+        data_batches(dataQ, batch_size),
+        itemlenfunc=lambda batch: sum(map(len, batch)),
+        proxy=self._data_proxy,
+    ):
+      batch_length = len(data_batch)
+      ##print("data batch of", batch_length)
+      # FileDataIndexEntry by hashcode for batch update of index after flush
+      entry_bs_by_hashcode = {}
+      for data in data_batch:
+        hashcode = hashchunk(data)
+        if hashcode not in index:
+          # new data, save to a datafile and update the index
+          # pretranscribe the in-file data record
+          # save the data record to the current file
+          if wf is None:
+            DFstate = self.new_datafile()
+            filenum = DFstate.filenum
+            wf = open(DFstate.pathname, 'ab')
+            self._WDFstate = DFstate
+          bs, data_offset, data_length, flags = self.data_save_information(
+              data
+          )
+          offset = wf.tell()
+          wf.write(bs)
+          length = len(bs)
+          post_offset = offset + length
+          # make a record for this chunk
+          entry_bs_by_hashcode[hashcode] = bytes(
+              FileDataIndexEntry(
+                  filenum=filenum,
+                  data_offset=offset + data_offset,
+                  data_length=data_length,
+                  flags=flags,
+              )
+          )
+      # after the batch, flush and roll over if beyond the high water mark
+      if wf is not None:
+        wf.flush()
+        with self._lock:
+          for hashcode, entry_bs in entry_bs_by_hashcode.items():
+            index[hashcode] = entry_bs
+            try:
+              del unindexed[hashcode]
+            except KeyError:
+              # this can happen when the same key is indexed twice
+              # entirely plausible if a new datafile is added to the datadir
+              pass
+        # note that the index is up to post_offset
+        DFstate.indexed_to = post_offset
+        rollover = self.rollover
+        if rollover is not None and wf.tell() >= rollover:
+          # file now full, close it so as to start a new one on next write
+          os.close(wfd)
+          wfd = None
+          self._filemap.set_indexed_to(DFstate.filenum, DFstate.indexed_to)
+          DFstate = None
+      if batch_length < batch_size:
+        sleep(0.2)
+    if wf is not None:
+      wf.close()
+      wf = None
+    if DFstate is not None:
+      self._filemap.set_indexed_to(DFstate.filenum, DFstate.indexed_to)
 
   def get_Archive(self, name=None, **kw):
     ''' Return the Archive named `name`.
@@ -501,51 +541,6 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
           raise ValueError("invalid name: %r" % (name,))
         archivepath = self.topdirpath + '-' + name + '.vt'
       return Archive(archivepath, **kw)
-
-  def _queue_index(self, hashcode, entry, post_offset):
-    with self._lock:
-      self._unindexed[hashcode] = entry
-    self._indexQ.put((hashcode, entry, post_offset))
-
-  def _queue_index_flush(self):
-    self._indexQ.put(None)
-
-  @upd_proxy
-  def _index_updater(self):
-    ''' Thread body to collect hashcode index data from `.indexQ` and store it.
-    '''
-    proxy = upd_state.proxy
-    proxy.prefix = str(self) + " index "
-    index = self.index
-    unindexed = self._unindexed
-    filemap = self._filemap
-    old_DFstate = None
-    indexQ = self._indexQ
-    for item in indexQ:
-      # dummy item to sync state
-      if item is None:
-        if old_DFstate is not None:
-          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-          old_DFstate = None
-        continue
-      hashcode, entry, post_offset = item
-      entry_bs = bytes(entry)
-      with self._lock:
-        index[hashcode] = entry_bs
-        try:
-          del unindexed[hashcode]
-        except KeyError:
-          # this can happen when the same key is indexed twice
-          # entirely plausible if a new datafile is added to the datadir
-          pass
-      DFstate = filemap[entry.filenum]
-      if DFstate is not old_DFstate:
-        if old_DFstate is not None:
-          filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
-        old_DFstate = DFstate
-      DFstate.indexed_to = post_offset
-    if old_DFstate is not None:
-      filemap.set_indexed_to(old_DFstate.filenum, old_DFstate.indexed_to)
 
   @locked
   def flush(self):
