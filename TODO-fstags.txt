@@ -1,3 +1,4 @@
+a TagFile is also modified if set( (name,id(tagset)) for all tagsets ) is different from the post-load snapshot i.e. switched out a tagset, added/removed a tagset
 fstags to return TaggedEntities, TaggedPath to subclass TagSetMixin and rename to FSTagSet
 bring the jsonable hook from cs.app.beyonwiz in house for subclassing
 fstags: support sqlite SQLTags for ontology
