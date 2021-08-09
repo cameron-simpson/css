@@ -2798,6 +2798,15 @@ class TagFile(SingletonMixin, BaseTagSets):
         for _, tags in name_tags:
           tags.modified = False
 
+  def is_modified(self):
+    ''' Test whether this `TagSet` has been modified.
+
+        TODO: save set( (name,id(tags)) for all tagsets ) on construction, 
+        compare here again the current equivalent.
+    '''
+    tagsets = self._tagsets
+    return any(map(lambda tagset: tagset.modified, tagsets.values()))
+
   def save(self, extra_types=None):
     ''' Save the tag map to the tag file if modified.
     '''
@@ -2806,7 +2815,7 @@ class TagFile(SingletonMixin, BaseTagSets):
       # never loaded - no need to save
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, tagsets.values())):
+      if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
             self.filepath, tagsets, self.unparsed, extra_types=extra_types
