@@ -151,9 +151,9 @@ class CDRipCommand(BaseCommand):
       print("changed", repr(te.name or te.id))
 
   def cmd_meta(self, argv):
-    ''' Usage: {cmd} metaname...
-          Print the metadata about metaname, where metaname name the form
-          type_name.uuid being an ontology type such as "artist"
+    ''' Usage: {cmd} entity...
+          Print the metadata about entity, where entity has the form
+          *type_name*`.`*uuid* such as "artist"
           and a Musicbrainz UUID for that type.
     '''
     options = self.options
@@ -162,7 +162,7 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("missing metanames")
     for metaname in argv:
       with Pfx("metaname %r", metaname):
-        ontkey = 'meta.' + metaname
+        # TODO: just mbdb.ontology.metadata(mbdb[m
         metadata = mbdb.ontology[ontkey]
         print(' ', metadata)
 
