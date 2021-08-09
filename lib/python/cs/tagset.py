@@ -2769,6 +2769,9 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This method will create the required intermediate directories
         if missing.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
@@ -2796,7 +2799,7 @@ class TagFile(SingletonMixin, BaseTagSets):
           tags.modified = False
 
   def save(self, extra_types=None):
-    ''' Save the tag map to the tag file.
+    ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
     if tagsets is None:
