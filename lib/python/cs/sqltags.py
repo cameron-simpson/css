@@ -1442,7 +1442,18 @@ class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
-  TagSetClass = SQLTagSet
+  # the default TagSet subclass
+  TAGSETCLASS_DEFAULT = SQLTagSet
+
+  @pfx_method
+  def TagSetClass(self, *, name, **kw):
+    ''' Local implementation of `TagSetClass` so that we can annotate it with a `.singleton_also_by` attribute.
+    '''
+    return super().TagSetClass(name=name, **kw)
+
+  # Annotate the factory function wth .singleton_also_by
+  # so that it acts more like a singleton class.
+  TagSetClass.singleton_also_by = SQLTagSet.singleton_also_by
 
   # pylint: disable=super-init-not-called
   @require(
