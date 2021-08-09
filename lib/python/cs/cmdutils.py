@@ -298,7 +298,10 @@ class BaseCommand:
                 "missing subcommand, expected one of: %s" %
                 (', '.join(sorted(subcmds.keys())),)
             )
-          argv = list(default_argv)
+          argv = (
+              [default_argv]
+              if isinstance(default_argv, str) else list(default_argv)
+          )
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:

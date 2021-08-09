@@ -1317,7 +1317,8 @@ class FormatableFormatter(Formatter):
       except KeyError as e:
         raise ValueError("no value for arg_name=%r: %s" % (arg_name, e)) from e
       # resolve the rest of the field
-      return self.get_subfield(arg_value, field_name[offset:]), field_name
+      subfield = self.get_subfield(arg_value, field_name[offset:])
+      return subfield, field_name
 
   @staticmethod
   def get_subfield(value, subfield_text: str):
