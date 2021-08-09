@@ -72,7 +72,7 @@ cs.tagset pypi.release="20210428" ok_revision=ab577f72ccacd2c0617461c2e3f368ccae
 cs.threads pypi.release="20210306" ok_revision=fe403fed26cda83b04f8fc26830897164d6dabcd
 cs.timeutils pypi.release=20190220
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
-cs.units pypi.release="20210717" ok_revision=c80d2889b58ebb4cf17cf572604e65e3a7d9060b
+cs.units pypi.release="20210809" ok_revision=c80d2889b58ebb4cf17cf572604e65e3a7d9060b
 cs.upd pypi.release="20210717" ok_revision=e5963adf825873d78a355cd66b62437b10033f94 features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"]}
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
