@@ -2794,9 +2794,6 @@ class TagFile(SingletonMixin, BaseTagSets):
             f.write('\n')
       except OSError as e:
         error("save(%r) fails: %s", filepath, e)
-      else:
-        for _, tags in name_tags:
-          tags.modified = False
 
   def is_modified(self):
     ''' Test whether this `TagSet` has been modified.
