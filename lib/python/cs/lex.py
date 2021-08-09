@@ -419,6 +419,60 @@ def stripped_dedent(s):
   adjusted = dedent('\n'.join(lines))
   return line1 + '\n' + adjusted
 
+def strip_prefix_n(s, prefix, n=None):
+  ''' Strip a leading `prefix` and numeric value `n` from the start of a
+      string.  Return the remaining string, or the original string if the
+      prefix or numeric value do not match.
+
+      Parameters:
+      * `s`: the string to strip
+      * `prefix`: the prefix string which must appear at the start of `s`
+      * `n`: optional integer value;
+        if omitted any value will be accepted, otherise the numeric
+        part must match `n`
+
+      Examples:
+
+         >>> strip_prefix_n('s03e01--', 's', 3)
+         'e01--'
+         >>> strip_prefix_n('s03e01--', 's', 4)
+         's03e01--'
+         >>> strip_prefix_n('s03e01--', 's')
+         'e01--'
+  '''
+  s0 = s
+  if prefix:
+    s = cutprefix(s, prefix)
+    if s is s0:
+      # no match, return unchanged
+      return s0
+  else:
+    s = s0
+  if not s or not s[0].isdigit():
+    # no following digits, return unchanged
+    return s0
+  if n is None:
+    # strip all following digits
+    s = s.lstrip(digits)
+  else:
+    # evaluate the numeric part
+    s = s.lstrip('0')
+    if not s or not s[0].isdigit():
+      # all zeroes, leading value is 0
+      sn = 0
+      pos = 0
+    else:
+      pos = 1
+      slen = len(s)
+      while pos < slen and s[pos].isdigit():
+        pos += 1
+      sn = int(s[:pos])
+    if sn != n:
+      # wrong numeric value
+      return s0
+    s = s[pos:]
+  return s
+
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default `0`).
