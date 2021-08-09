@@ -1210,8 +1210,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   }
 
   @staticmethod
-  # pylint: disable=redefined-builtin
-  def _singleton_key(*, sqltags, _id, **_):
+  def _singleton_key(sqltags, *, _id, **_):
     return builtin_id(sqltags), _id
 
   def _singleton_also_indexmap(self):
@@ -1226,7 +1225,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, sqltags, name=None, _id: int, unixtime=None, **kw):
+  def __init__(self, sqltags, *, name=None, _id: int, unixtime=None, **kw):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
