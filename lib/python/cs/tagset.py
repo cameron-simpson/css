@@ -1783,30 +1783,61 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called
-        from `__missing__` for missing names,
-        and also from `add`.
-        If set to `None` then `__getitem__` will raise `KeyError`
-        for missing names.
-        _Unlike_ `defaultdict`, the factory is called with the key `name`
-        and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
       * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
         this is called by the `__missing__` method with a newly created `TagSet`.
-
-      Subclasses may reasonably want to define the following:
-      * `startup(self)`: allocate any needed resources
-        such as database connections
-      * `shutdown(self)`: write pending changes to a backing store,
-        release resources acquired during `startup`
       * `keys(self)`: return an iterable of names
+
+      Subclasses may reasonably want to override the following:
+      * `startup_shutdown(self)`: context manager to allocate and release any 
+        needed resources such as database connections
+
+      Subclasses may implement:
       * `__len__(self)`: return the number of names
+
+      The `TagSet` factory used to fetch or create a `TagSet` is
+      named `TagSetClass`. The default implementation honours two
+      class attributes:
+      * `TAGSETCLASS_DEFAULT`: initially `TagSet`
+      * `TAGSETCLASS_PREFIX_MAPPING`: a mapping of type names to `TagSet` subclasses
+
+      The type name of a `TagSet` name is the first dotted component.
+      For example, `artist.nick_cave` has the type name `artist`.
+      A subclass of `BaseTagSets` could utiliise an `ArtistTagSet` subclass of `TagSet`
+      and provide:
+
+          TAGSETCLASS_PREFIX_MAPPING = {
+            'artist': ArtistTagSet,
+          }
+
+      in its class definition. Accesses to `artist.`* entities would
+      result in `ArtistTagSet` instances and access to other enitities
+      would result in ordinary `TagSet` instances.
   '''
 
   _missing = object()
 
-  TagSetClass = TagSet
+  # the default `TagSet` subclass
+  TAGSETCLASS_DEFAULT = TagSet
+
+  # a mapping of TagSet name prefixs to TagSet subclasses
+  # used to automatically map certain tagsets to types
+  TAGSETCLASS_PREFIX_MAPPING = {}
+
+  @pfx_method
+  def TagSetClass(self, *, name, **kw):
+    ''' Factory to create a new `TagSet` from `name`.
+    '''
+    cls = self.TAGSETCLASS_DEFAULT
+    try:
+      type_name, _ = name.split('.', 1)
+    except ValueError:
+      pass
+    else:
+      cls = self.TAGSETCLASS_PREFIX_MAPPING.get(type_name, cls)
+    tags = cls(self, name=name, **kw)
+    return tags
 
   def __init__(self, *, ontology=None):
     ''' Initialise the collection.
