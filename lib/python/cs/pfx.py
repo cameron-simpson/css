@@ -110,7 +110,7 @@ def _func_a_kw_fmt(func, *a, **kw):
       Return `format,args`.
 
   '''
-  av = [ getattr(func, '__name__', str(func)) ]
+  av = [getattr(func, '__name__', str(func))]
   afv = ['%r'] * len(a)
   av.extend(a)
   afv.extend(['%s=%r'] * len(kw))
@@ -571,12 +571,18 @@ def pfx(func, message=None, message_args=()):
 
   else:
 
-    def wrapper(*a, **kw):
-      ''' Run function inside `Pfx` context manager.
-      '''
-      if message is None:
-        pfx_call(func, *a, **kw)
-      else:
+    if message is None:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
+        return pfx_call(func, *a, **kw)
+
+    else:
+
+      def wrapper(*a, **kw):
+        ''' Run function inside `Pfx` context manager.
+        '''
         with Pfx(message, *message_args):
           return func(*a, **kw)
 
@@ -627,7 +633,7 @@ def pfx_method(method, use_str=False, with_args=False):
     '''
     classref = self if use_str else type(self).__name__
     pfxfmt, pfxargs = _func_a_kw_fmt(method, *a, **kw)
-    with Pfx("%s."+ pfxfmt, classref, *pfxargs):
+    with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 
   pfx_method_wrapper.__doc__ = method.__doc__
