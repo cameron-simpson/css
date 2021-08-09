@@ -1710,7 +1710,6 @@ class SQLTags(BaseTagSets):
               _ontology=self.ontology,
               name=row.name,
               unixtime=row.unixtime,
-              sqltags=self
           )
         # a None tag_name means no tags
         if row.tag_name is not None:
