@@ -2119,7 +2119,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         describing the type named *typename*;
         really this is just more metadata where the "type name" is `type`
 
-      Metadata are `TagSets` nstances describing particular values of a type.
+      Metadata are `TagSets` instances describing particular values of a type.
       For example, some metadata for the `Tag` `colour="blue"`:
 
           colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
