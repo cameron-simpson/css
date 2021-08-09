@@ -2647,6 +2647,24 @@ class TagFile(SingletonMixin, BaseTagSets):
   def __delitem__(self, name):
     del self.tagsets[name]
 
+  def _loadsave_signature(self):
+    ''' Compute a signature of the existing names and `TagSet` id values.
+        We use this to check for added/removed `TagSet`s at save time.
+    '''
+    return set((name, id(tags)) for name, tags in self.items() if tags)
+
+  def is_modified(self):
+    ''' Test whether this `TagSet` has been modified.
+    '''
+    tagsets = self._tagsets
+    if tagsets is None:
+      return False
+    sig = self._loadsave_signature()
+    if self._loaded_signature != sig:
+      X("changed sig from %r to %r", self._loaded_signature, sig)
+      return True
+    return any(map(lambda tagset: tagset.modified, tagsets.values()))
+
   @locked_property
   @pfx_method
   def tagsets(self):
@@ -2655,7 +2673,7 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This is loaded on demand.
     '''
-    ts = self._tagsets = {}
+    ts = {}
     loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
@@ -2663,6 +2681,9 @@ class TagFile(SingletonMixin, BaseTagSets):
       te = ts[name] = self.default_factory(name)
       te.ontology = ont
       te.update(tags)
+      te.modified = False
+    self._tagsets = ts
+    self._loaded_signature = self._loadsave_signature()
     return ts
 
   @property
@@ -2768,6 +2789,9 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This method will create the required intermediate directories
         if missing.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
@@ -2790,23 +2814,21 @@ class TagFile(SingletonMixin, BaseTagSets):
             f.write('\n')
       except OSError as e:
         error("save(%r) fails: %s", filepath, e)
-      else:
-        for _, tags in name_tags:
-          tags.modified = False
 
   def save(self, extra_types=None):
-    ''' Save the tag map to the tag file.
+    ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
     if tagsets is None:
       # never loaded - no need to save
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, tagsets.values())):
+      if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
             self.filepath, tagsets, self.unparsed, extra_types=extra_types
         )
+        self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False
 
