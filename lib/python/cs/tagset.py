@@ -1849,15 +1849,6 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
 
   __repr__ = __str__
 
-  def startup(self):
-    ''' Allocate any needed resources such as database connections.
-    '''
-
-  def shutdown(self):
-    ''' Write any pending changes to a backing store,
-        release resources allocated during `startup`.
-    '''
-
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
     '''
