@@ -2663,6 +2663,7 @@ class TagFile(SingletonMixin, BaseTagSets):
       te = ts[name] = self.default_factory(name)
       te.ontology = ont
       te.update(tags)
+      te.modified = False
     return ts
 
   @property
