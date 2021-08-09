@@ -195,7 +195,7 @@ from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (
-    filter as fn_filter, fnmatch, fnmatchcase, translate as fn_translate
+    fnmatch, fnmatchcase, translate as fn_translate
 )
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
@@ -207,7 +207,7 @@ from threading import Lock
 import time
 from typing import Optional
 from uuid import UUID
-from icontract import ensure, require
+from icontract import require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
@@ -2407,13 +2407,6 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
         return name
 
-  @property
-  def _default_tagsets(self):
-    ''' The default `TagSets` instance
-        i.e. the sets used for type names which are not specially diverted.
-    '''
-    return self._subtagsetses[-1].tagsets
-
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
@@ -2493,26 +2486,20 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     ''' Yield keys or (key,tagset) of type `type_name`
         i.e. all keys commencing with *type_name*`.`.
     '''
-    X("by_type(%r,..)...", type_name)
     type_name_ = type_name + '.'
     subtagsets = self._subtagsets_for_type(type_name)
     subtype_name_ = subtagsets.subtype_name(type_name) + '.'
     tagsets = subtagsets.tagsets
-    X("  tagsets = %s", tagsets)
     if with_tagsets:
       for subkey, tags in tagsets.items(prefix=subtype_name_):
-        X("  subkey = %r, tags=%s", subkey, tags)
         assert subkey.startswith(subtype_name_)
         key = subtagsets.key(subkey)
-        X("  => key=%r", key)
         assert key.startswith(type_name_)
         yield key, tags
     else:
       for subkey in tagsets.keys(prefix=subtype_name_):
-        X("  subkey = %r", subkey)
         assert subkey.startswith(subtype_name_)
         key = subtagsets.key(subkey)
-        X("  => key=%r", key)
         assert key.startswith(type_name_)
         yield key
 
@@ -2570,14 +2557,12 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    X("ONT Metadata: type_name=%r, value=%r", type_name, value)
     md = None
     typedef = (
         TagSet() if type_name == 'type' else self.metadata('type', type_name)
     )
     primary_type_name = typedef.type_name
     if primary_type_name:
-      X("metadata(%r,..): type_name => %r", type_name, primary_type_name)
       type_name = primary_type_name
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
@@ -2778,7 +2763,6 @@ class TagFile(SingletonMixin, BaseTagSets):
       return False
     sig = self._loadsave_signature()
     if self._loaded_signature != sig:
-      X("changed sig from %r to %r", self._loaded_signature, sig)
       return True
     return any(map(lambda tagset: tagset.modified, tagsets.values()))
 
@@ -3047,7 +3031,6 @@ class TagsOntologyCommand(BaseCommand):
                 tagset_map[subkey] = tagset
             for old_subkey, new_subkey, new_tags in TagSet.edit_many(
                 tagset_map, verbose=True):
-              X("edit_many: %r=>%r %s", old_subkey, new_subkey, new_tags)
               tags = tagset_map[old_subkey]
               if old_subkey != new_subkey:
                 warning(
@@ -3055,7 +3038,6 @@ class TagsOntologyCommand(BaseCommand):
                     new_subkey
                 )
               tags.set_from(new_tags, verbose=True)
-              X("tags => %s", tags)
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
@@ -3224,6 +3206,7 @@ def selftest(argv):
   ''' Run some ad hoc self tests.
   '''
   from pprint import pprint  # pylint: disable=import-outside-toplevel
+  from cs.x import X
   setup_logging(argv.pop(0))
   ont = TagsOntology(
       {
