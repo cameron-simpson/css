@@ -493,28 +493,12 @@ class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
-  # map 'foo' frm 'meta.foo.bah' to a particular TagSet subclass
-  TAGSET_CLASSES = {
+  # map 'foo' from 'foo.bah' to a particular TagSet subclass
+  TAGSETCLASS_PREFIX_MAPPING = {
       'artist': MBArtist,
       'disc': MBDisc,
       'recording': MBRecording,
   }
-
-  def TagSetClass(self, *, name, **kw):
-    ''' Instead of a fixed class we use a factory to construct a
-        type specific instance.
-    '''
-    cls = None
-    meta1 = cutprefix(name, 'meta.')
-    if meta1 is not name:
-      type_name, _ = meta1.split('.', 1)
-      cls = self.TAGSET_CLASSES[type_name]
-    if cls is None:
-      cls = super().TagSetClass
-    te = cls(name=name, **kw)
-    return te
-
-  TagSetClass.singleton_also_by = _MBTagSet.singleton_also_by
 
   @fmtdoc
   def __init__(self, mbdb_path=None):
@@ -542,11 +526,11 @@ class MBDB(MultiOpenMixin):
     sqltags.mbdb = self
     with sqltags:
       ont = self.ontology = TagsOntology(sqltags)
-      self.artists = sqltags.subdomain('meta.artist')
+      self.artists = sqltags.subdomain('artist')
       ont['type.artists'].update(type='list', member_type='artist')
-      self.discs = sqltags.subdomain('meta.disc')
+      self.discs = sqltags.subdomain('disc')
       ont['type.discs'].update(type='list', member_type='disc')
-      self.recordings = sqltags.subdomain('meta.recording')
+      self.recordings = sqltags.subdomain('recording')
       ont['type.recordings'].update(type='list', member_type='recording')
 
   @contextmanager
