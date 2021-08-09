@@ -18,7 +18,7 @@ Presupplied scales:
 from collections import namedtuple
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20210717-post'
+__version__ = '20210809-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -170,8 +170,8 @@ def transcribe(
     count_i = int(count)
     count_s = str(count_i) if count_i == count else "%.1f" % count
     if not no_pad and step.max_width > len(count_s):
-      count_s=" " * (step.max_width - len(count_s))+count_s
-    count_s+=step.unit
+      count_s = " " * (step.max_width - len(count_s)) + count_s
+    count_s += step.unit
     text.append(count_s)
     if max_parts is not None and len(text) == max_parts:
       break
@@ -214,12 +214,12 @@ def parse(s, scale, offset=0):
     if vunit:
       vunit0 = vunit
       vunit = vunit.lower()
-      for factor, unit in scale:
-        if unit.lower() == vunit:
+      for unit in scale:
+        if unit.unit.lower() == vunit:
           break
-        if not factor:
+        if not unit.factor:
           raise ValueError("unrecognised unit: %r" % (vunit0,))
-        value *= factor
+        value *= unit.factor
   return value, offset
 
 def multiparse(s, scales, offset=0):

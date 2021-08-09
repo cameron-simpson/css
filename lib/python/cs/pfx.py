@@ -49,12 +49,13 @@ from inspect import isgeneratorfunction
 import logging
 import sys
 import threading
+import traceback
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
 from cs.py.func import funcname
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20210717-post'
+__version__ = '20210801-post'
 
 DISTINFO = {
     'description':
@@ -147,7 +148,7 @@ class _PfxThreadState(threading.local):
   def cur(self):
     ''' The current/topmost `Pfx` instance.
     '''
-    global cmd
+    global cmd  # pylint: disable=global-statement
     stack = self.stack
     if not stack:
       if not cmd:
@@ -162,7 +163,7 @@ class _PfxThreadState(threading.local):
   def prefix(self):
     ''' Return the prevailing message prefix.
     '''
-    global cmd
+    global cmd  # pylint: disable=global-statement
     # Because P.umark can call str() on the mark, which in turn may
     # call arbitrary code which in turn may issue log messages, which
     # in turn may call this, we prevent such recursion.
@@ -272,7 +273,7 @@ class Pfx(object):
     if _state.trace:
       _state.trace(_state.prefix)
 
-  def __exit__(self, exc_type, exc_value, traceback):
+  def __exit__(self, exc_type, exc_value, _):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
@@ -444,7 +445,7 @@ class Pfx(object):
     for L in self.loggers:
       try:
         L.log(level, msg, *args, **kwargs)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
         print(
             "%s: exception logging to %s msg=%r, args=%r, kwargs=%r: %s" %
             (self._state.prefix, L, msg, args, kwargs, e),
@@ -505,7 +506,6 @@ class PfxCallInfo(Pfx):
   '''
 
   def __init__(self):
-    import traceback
     grandcaller, caller, _ = traceback.extract_stack(None, 3)
     Pfx.__init__(
         self, "at %s:%d %s(), called from %s:%d %s()", caller[0], caller[1],

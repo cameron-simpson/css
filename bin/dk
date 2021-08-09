@@ -5,7 +5,6 @@
 
 set -ue
 
-: ${DK_BASE_PREFIX:-$( basename "$ymlbasedir" )}
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
 : ${DK_CP_PREFIX:='.'}
 : ${DK_ENVVARS:=''}
@@ -168,6 +167,7 @@ resolve_container_path(){
 
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
+: ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
 base=$DK_BASE_PREFIX
 primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )
 

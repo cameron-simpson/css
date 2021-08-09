@@ -1119,6 +1119,15 @@ def upd_proxy(func, prefix=None, insert_at=1):
       * `func`: the function to decorate
       * `prefix`: initial proxy prefix, default `func.__name__`
       * `insert_at`: the position for the new proxy, default `1`
+
+      Typical example:
+
+          from cs.upd import upd_proxy, state as upd_state
+          ...
+          @upd_proxy
+          def func*(self, ...):
+              proxy = upd_state.proxy
+              proxy.prefix = str(self) + " taskname"
   '''
   if prefix is None:
     prefix = func.__name__
