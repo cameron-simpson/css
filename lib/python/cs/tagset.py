@@ -1823,12 +1823,13 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     ''' Factory to create a new `TagSet` from `name`.
     '''
     cls = self.TAGSETCLASS_DEFAULT
-    try:
-      type_name, _ = name.split('.', 1)
-    except ValueError:
-      pass
-    else:
-      cls = self.TAGSETCLASS_PREFIX_MAPPING.get(type_name, cls)
+    if isinstance(name, str):
+      try:
+        type_name, _ = name.split('.', 1)
+      except ValueError:
+        pass
+      else:
+        cls = self.TAGSETCLASS_PREFIX_MAPPING.get(type_name, cls)
     tags = cls(self, name=name, **kw)
     return tags
 
