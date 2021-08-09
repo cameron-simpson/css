@@ -15,7 +15,7 @@ cs.binary pypi.release="20210316" ok_revision=e0d01b9045138b3bfb6175e5abfcd96549
 cs.buffer pypi.release="20210316" ok_revision="5ed745dde92e9f0734f14e7e80969978eca80258"
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
-cs.cmdutils pypi.release="20210731" ok_revision=bb283d4dc01efbca803f200393a83ff0bc4aa95d
+cs.cmdutils pypi.release="20210809" ok_revision=bb283d4dc01efbca803f200393a83ff0bc4aa95d
 cs.configutils pypi.release="20210306" ok_revision="6046ff720496ea03f85ea7979f62da908a884d3b"
 cs.context pypi.release="20210727" ok_revision=c2eb7bdd8f00df187f5cc1430eac89575ef562b1 features={"20210306":["stackable_state"],"20210727":["push_cmgr"]}
 cs.csvutils pypi.release="20201228"
