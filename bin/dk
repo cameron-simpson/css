@@ -167,7 +167,8 @@ resolve_container_path(){
 
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
-base=$( basename "$ymlbasedir" )
+: ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
+base=$DK_BASE_PREFIX
 primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )
 
 case "$op" in
@@ -265,7 +266,7 @@ case "$op" in
   update)
       set -ex
       "$0" down
-      docker volume rm "${base}_var"
+      docker volume rm "${base}_var" || :
       "$0" pull
       "$0" build
       "$0" up setup

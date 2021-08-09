@@ -1,0 +1,2 @@
+twostep: iteration 1 now returns the result of __enter__, iteration 2 now returns None.
+New functions push_cmgr(obj,attr,cmgr) and partner pop_cmgr(obj,attr) to run a twostep()ed context manager conveniently, more conveniently than setup_cmgr().

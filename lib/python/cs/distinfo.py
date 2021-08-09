@@ -100,6 +100,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
@@ -283,7 +284,7 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       pkg_names = argv
     else:
-      pkg_names = sorted(options.tagsets.keys())
+      pkg_names = sorted(options.pkg_tagsets.keys())
     for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]

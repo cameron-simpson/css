@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from cs.py.func import trace
-from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -676,10 +674,11 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
-  def add(self, tag, **kw):
+  @tag_or_tag_value
+  def add(self, tag_name, value, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    return self.set(tag, **kw)
+    return self.set(tag_name, value, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
@@ -2215,6 +2214,184 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     for subtagsets in subs:
       subtagsets.close()
 
+    @classmethod
+    @pfx_method(with_args=True)
+    def from_match(cls, tagsets, match, unmatch=None):
+      ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
+
+          Parameters:
+          * `tagsets`: a `TagSets` holding ontology information
+          * `match`: a match function used to choose entries based on a type name
+          * `unmatch`: an optional reverse for `match`, accepting a subtype
+            name and returning its public name
+
+          If `match` is `None`
+          then `tagsets` will always be chosen if no prior entry matched.
+
+          Otherwise, `match` is resolved to a function `match-func(type_name)`
+          which returns a subtype name on a match and a false value on no match.
+
+          If `match` is a callable it is used as `match_func` directly.
+
+          if `match` is a list, tuple or set
+          then this method calls itself with `(tagsets,submatch)`
+          for each member `submatch` if `match`.
+
+          If `match` is a `str`,
+          if it ends in a dot '.', dash '-' or underscore '_'
+          then it is considered a prefix of `type_name` and the returned subtype name
+          is the text from `type_name` after the prefix
+          othwerwise it is considered a full match for the `type_name`
+          and the returns subtype name is `type_name` unchanged.
+          The `match` string is a shell style glob supporting `*` but not `?` or `[`*seq*`]`.
+
+          The value of `unmatch` is constrained by `match`.
+          If `match` is `None`, `unmatch` must also be `None`;
+          the type name is used unchanged.
+          If `match` is callable`, `unmatch` must also be callable;
+          it is expected to reverse `match`.
+
+          Examples:
+
+              >>> from os.path import expanduser as u
+              >>> # an initial empty ontology with a default in memory mapping
+              >>> ont = TagsOntology()
+              # divert the types actor, role and series to my media ontology
+              >>> ont.add_tagsets(
+              ...     SQLTags(u('~/var/media-ontology.sqlite'),
+              ...     ['actor', 'role', 'series'])
+              # divert type "musicbrainz.recording" to mbdb.sqlite
+              # mapping to the type "recording"
+              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
+              # divert type "tvdb.actor" to tvdb.sqlite
+              # mapping to the type "actor"
+              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
+      '''
+      if match is None:
+        assert unmatch is None
+        match_func = None
+        unmatch_func = None
+      elif callable(match):
+        assert callable(unmatch)
+        match_func = match
+        unmatch_func = unmatch
+      elif isinstance(match, str):
+        if not match:
+          raise ValueError("empty match string")
+        if '?' in match or '[' in match:
+          raise ValueError("match globs only support *, not ? or [seq]")
+        if match.endswith(('.', '-', '_')):
+          if len(match) == 1:
+            raise ValueError("empty prefix")
+          if '*' in match:
+            match_re_s = fn_translate(match)
+            assert match_re_s.endswith('\\Z')
+            match_re_s = cutsuffix(match_re_s, '\\Z')
+            match_re = re.compile(match_re_s)
+
+            def match_func(type_name):
+              ''' Glob based prefix match, return the suffix.
+              '''
+              m = match_re.match(type_name)
+              if not m:
+                return None
+              subtype_name = type_name[m.end():]
+              return subtype_name
+
+            # TODO: define this function if there is exactly 1 asterisk
+            unmatch_func = None
+
+          else:
+
+            def match_func(type_name):
+              ''' Literal prefix match, return the suffix.
+              '''
+              subtype_name = cutprefix(type_name, match)
+              if subtype_name is type_name:
+                return None
+              return subtype_name
+
+            def unmatch_func(subtype_name):
+              ''' Return the `subtype_name` with the prefix restored
+              '''
+              return match + subtype_name
+
+        else:
+          # not a prefix
+
+          if '*' in match:
+
+            def match_func(type_name):
+              ''' Glob `type_name` match, return `type_name` unchanged.
+              '''
+              if fnmatch(type_name, match):
+                return type_name
+              return None
+
+            # TODO: define unmatch_func is there is exactly 1 asterisk
+            unmatch_func = None
+
+          else:
+
+            def match_func(type_name):
+              ''' Fixed string exact `type_name` match, return `type_name` unchanged.
+              '''
+              if type_name == match:
+                return type_name
+              return None
+
+            def unmatch_func(subtype_name):
+              ''' Fixed string match
+              '''
+              assert subtype_name == match
+              return subtype_name
+
+      else:
+
+        raise ValueError(
+            "unhandled match value %s:%r" % (type(match).__name__, match)
+        )
+
+      return cls(
+          tagsets=tagsets,
+          match_func=match_func,
+          unmatch_func=unmatch_func,
+          type_map=IndexedMapping(pk='type_name')
+      )
+
+    def subtype_name(self, type_name):
+      ''' Return the type name for use within `self.tagsets` from `type_name`.
+          Returns `None` if this is not a supported `type_name`.
+      '''
+      if self.match_func is None:
+        return type_name
+      try:
+        return self.type_map.by_type_name[type_name]
+      except KeyError:
+        name = self.match_func(type_name)
+        self.type_map.add = dict(type_name=type_name, subtype_name=name)
+        return name
+
+    def type_name(self, subtype_name):
+      ''' Return the external type name from the internal `subtype_name`
+          which is used within `self.tagsets`.
+      '''
+      if self.match_func is None:
+        return subtype_name
+      try:
+        return self.type_map.by_subtype_name[subtype_name]
+      except KeyError:
+        name = self.unmatch_func(subtype_name)
+        self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
+        return name
+
+  @property
+  def _default_tagsets(self):
+    ''' The default `TagSets` instance
+        i.e. the sets used for type names which are not specially diverted.
+    '''
+    return self._subtagsetses[-1].tagsets
+
   def as_dict(self):
     ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
     '''
@@ -2565,6 +2742,24 @@ class TagFile(SingletonMixin, BaseTagSets):
   def __delitem__(self, name):
     del self.tagsets[name]
 
+  def _loadsave_signature(self):
+    ''' Compute a signature of the existing names and `TagSet` id values.
+        We use this to check for added/removed `TagSet`s at save time.
+    '''
+    return set((name, id(tags)) for name, tags in self.items() if tags)
+
+  def is_modified(self):
+    ''' Test whether this `TagSet` has been modified.
+    '''
+    tagsets = self._tagsets
+    if tagsets is None:
+      return False
+    sig = self._loadsave_signature()
+    if self._loaded_signature != sig:
+      X("changed sig from %r to %r", self._loaded_signature, sig)
+      return True
+    return any(map(lambda tagset: tagset.modified, tagsets.values()))
+
   @locked_property
   @pfx_method
   def tagsets(self):
@@ -2573,7 +2768,7 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This is loaded on demand.
     '''
-    ts = self._tagsets = {}
+    ts = {}
     loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
@@ -2581,6 +2776,9 @@ class TagFile(SingletonMixin, BaseTagSets):
       te = ts[name] = self.default_factory(name)
       te.ontology = ont
       te.update(tags)
+      te.modified = False
+    self._tagsets = ts
+    self._loaded_signature = self._loadsave_signature()
     return ts
 
   @property
@@ -2649,6 +2847,7 @@ class TagFile(SingletonMixin, BaseTagSets):
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
               else:
+                tags.modified = False
                 if 'name' in tags:
                   warning("discard explicit tag name=%s", tags.name)
                   tags.discard('name')
@@ -2685,6 +2884,9 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This method will create the required intermediate directories
         if missing.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
@@ -2707,23 +2909,21 @@ class TagFile(SingletonMixin, BaseTagSets):
             f.write('\n')
       except OSError as e:
         error("save(%r) fails: %s", filepath, e)
-      else:
-        for _, tags in name_tags:
-          tags.modified = False
 
   def save(self, extra_types=None):
-    ''' Save the tag map to the tag file.
+    ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
     if tagsets is None:
       # never loaded - no need to save
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, tagsets.values())):
+      if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
             self.filepath, tagsets, self.unparsed, extra_types=extra_types
         )
+        self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False
 

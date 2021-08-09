@@ -40,7 +40,7 @@ from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210306-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -52,9 +52,11 @@ DISTINFO = {
     'install_requires': [
         'cs.deco',
         'cs.gimmicks',
+        'cs.pfx',
         'cs.py.func',
         'cs.py3',
         'cs.seq>=20200914',
+        'typeguard',
     ],
 }
 

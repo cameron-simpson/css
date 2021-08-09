@@ -184,7 +184,7 @@ def multitest(method):
   def testMethod(self):
     for subtest, S in get_test_stores(prefix=method.__module__ + '.' +
                                       method.__name__):
-      if STORECLASS_NAMES and S.__name__ not in STORECLASS_NAMES:
+      if STORECLASS_NAMES and type(S).__name__ not in STORECLASS_NAMES:
         continue
       with Pfx("%s:%s", S, ",".join(["%s=%s" % (k, v)
                                      for k, v in sorted(subtest.items())])):

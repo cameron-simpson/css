@@ -23,7 +23,7 @@ from cs.pfx import Pfx
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210420-post'
+__version__ = '20210809-post'
 
 DISTINFO = {
     'description':
@@ -567,7 +567,7 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv):  # pylint: disable=unused-argument
+  def cmd_help(cls, argv):
     ''' Usage: {cmd} [subcommand-names...]
           Print the help for the named subcommands,
           or for all subcommands if no names are specified.
@@ -586,7 +586,10 @@ class BaseCommand:
           warning("unknown subcommand")
           xit = 1
           continue
-        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
+        usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+        subusage = cls.subcommand_usage_text(
+            subcmd, fulldoc=fulldoc, usage_format_mapping=usage_format_mapping
+        )
         if not subusage:
           warning("no help")
           xit = 1

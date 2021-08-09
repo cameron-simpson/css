@@ -4,3 +4,5 @@ TagsOntology: reverse prefix mappings
 TagsOntology: accept directory, process files within, deduce prefix from filename, ONTOLOGY.sqlite for the default
 TagSet.subtags: subclass PrefixedMappingProxy also
 TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
+BaseTagSets: rename TagSetClass throughout to new_TagSet for clarity
+TagsOntology: reverse prefix mappings
