@@ -44,6 +44,7 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
                 Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
+    record      Record partial changes: \"hg record\" or \"git add -p\".
     remote      Report remote paths.
     report      (Default.) Report brief summary.
     sibling clonedir
@@ -246,6 +247,12 @@ case "$op" in
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      # record partial changes
+      record,hg)    hg record ${1+"$@"} ;;
+      record,git)   git add -p ${1+"$@"} && git diff --staged \
+                    && msg=$( readline "commit message? " ) && [ -n "$msg" ] \
+                    && git commit -m "$msg"
+                    ;;
       # report remote repo paths
       remote,git)   git remote ${1+"$@"} ${1-"-v"} ;;
       remote,hg)    hg config paths ${1+"$@"} ;;

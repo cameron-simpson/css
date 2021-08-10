@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -1054,7 +1053,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         The `criteria` should be an iterable of `SQTCriterion` instances
         used to construct the query.
     '''
-    X("search(%r,...)...", criteria)
     entities = self.entities
     tags = self.tags
     # first condition:
@@ -1117,10 +1115,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             continue
           sqlps.append(sqlp)
     query = session.query(entities.id, entities.unixtime, entities.name)
-    X("query start: %s", query)
     prev_entity_id_column = entities.id
     if entity_tests:
-      X(".filter(*%r)", entity_tests)
       query = query.filter(*entity_tests)
     for tag_name, tag_tests in per_tag_tests.items():
       alias = per_tag_aliases[tag_name]
@@ -1157,7 +1153,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         )
       else:
         raise ValueError("unrecognised mode")
-    X("final query = %s", query)
     return query
 
 class SQLTagSet(SingletonMixin, TagSet):
@@ -1225,8 +1220,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   }
 
   @staticmethod
-  # pylint: disable=redefined-builtin
-  def _singleton_key(*, sqltags, _id, **_):
+  def _singleton_key(sqltags, *, _id, **_):
     return builtin_id(sqltags), _id
 
   def _singleton_also_indexmap(self):
@@ -1241,7 +1235,7 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, sqltags, name=None, _id: int, unixtime=None, **kw):
+  def __init__(self, sqltags, *, name=None, _id: int, unixtime=None, **kw):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
@@ -1458,7 +1452,18 @@ class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
-  TagSetClass = SQLTagSet
+  # the default TagSet subclass
+  TAGSETCLASS_DEFAULT = SQLTagSet
+
+  @pfx_method
+  def TagSetClass(self, *, name, **kw):
+    ''' Local implementation of `TagSetClass` so that we can annotate it with a `.singleton_also_by` attribute.
+    '''
+    return super().TagSetClass(name=name, **kw)
+
+  # Annotate the factory function wth .singleton_also_by
+  # so that it acts more like a singleton class.
+  TagSetClass.singleton_also_by = SQLTagSet.singleton_also_by
 
   # pylint: disable=super-init-not-called
   @require(
@@ -1589,7 +1594,6 @@ class SQLTags(BaseTagSets):
         Constrain the names to those starting with `prefix`
         if not `None`.
     '''
-    X("%s.keys(prefix=%r)...", self, prefix)
     entities = self.orm.entities
     entities_table = entities.__table__  # pylint: disable=no-member
     name_column = entities_table.c.name
@@ -1598,15 +1602,12 @@ class SQLTags(BaseTagSets):
       q = q.where(name_column.isnot(None))
     else:
       q = q.where(name_column.like(prefix2like(prefix, '\\'), '\\'))
-    X("q=%s", q)
     conn = self.orm.engine.connect()
     result = conn.execute(q)
     for row in result:
       name = row.name
       if prefix is None or name.startswith(prefix):
         yield name
-      else:
-        X("unexpected name=%r", name)
     conn.close()
 
   def __iter__(self):
@@ -1697,16 +1698,13 @@ class SQLTags(BaseTagSets):
       criteria = [criteria]
     else:
       criteria = list(criteria)
-    X("find: criteria=%r", criteria)
     post_criteria = []
     for i, criterion in enumerate(criteria):
       cr0 = criterion
       with Pfx(str(criterion)):
         if isinstance(criterion, str):
           criterion = criteria[i] = SQTCriterion.from_str(criterion)
-          X("%r => %r", cr0, criterion)
         if not criterion.SQL_COMPLETE:
-          X("has post")
           post_criteria.append(criterion)
     with self.db_session() as session:
       orm = self.orm
@@ -1727,7 +1725,6 @@ class SQLTags(BaseTagSets):
               _ontology=self.ontology,
               name=row.name,
               unixtime=row.unixtime,
-              sqltags=self
           )
         # a None tag_name means no tags
         if row.tag_name is not None:
@@ -2251,7 +2248,7 @@ class SQLTagsCommand(BaseSQLTagsCommand):
     sqltags = options.sqltags
     long_mode = False
     if argv and argv[0] == '-l':
-      long_mode = true
+      long_mode = True
     if not argv:
       if long_mode:
         for name, tags in sorted(sqltags.items()):
