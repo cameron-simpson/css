@@ -249,7 +249,7 @@ case "$op" in
       modified,hg)  hg status -n -am ${1+"$@"} ;;
       # record partial changes
       record,hg)    hg record ${1+"$@"} ;;
-      record,git)   if git add -p ${1+"$@"} && git diff --staged \
+      record,git)   git add -p ${1+"$@"} && git diff --staged \
                     && msg=$( readline "commit message? " ) && [ -n "$msg" ] \
                     && git commit -m "$msg"
                     ;;
