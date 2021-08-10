@@ -21,7 +21,7 @@ from cs.tagset import TagsOntology, TagsOntologyCommand
 
 from cs.x import X
 
-ONTTAGS_PATH_DEFAULT = '~/var/ontology.sqlite'
+ONTTAGS_PATH_DEFAULT = '~/var/ontology'
 ONTTAGS_PATH_ENVVAR = 'ONTTAGS'
 
 def main(argv=None):
@@ -121,6 +121,10 @@ class Ont(TagsOntology):
             continue
       tagsets = ont_pfx_map.pop('_', None)
     else:
+      if not ont_path.endswith('.sqlite'):
+        ont_path_sqlite = ont_path + '.sqlite'
+        if isfilepath(ont_path_sqlite):
+          return cls.tagsetses_from_path(ont_path_sqlite)
       raise ValueError(f"unsupported ont_path={ont_path!r}")
     return tagsets, ont_pfx_map
 
