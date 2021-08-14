@@ -1,0 +1,173 @@
+#!/bin/sh
+#
+# Script to do various things for squid, particularly a squid
+# distinct from the system default.
+# - Cameron Simpson <cs@cskk.id.au> 14aug2021
+#
+
+set -ue
+
+: ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
+: ${CACHDIR:=$HOME/var/cache}
+
+default_src_config=/etc/squid/squid.conf
+default_config=$HOME/.squid.conf
+default_listen=127.0.0.1:3128
+default_pidfile=$VARRUN/squid.pid
+default_logdir=$LOGDIR/squid
+default_etc_hosts=/etc/hosts
+default_peer_config=$HOME/.proxy-peerage
+
+default_basic_settings='
+acl nobannerport myport 8080
+acl alwaysdirect myport 3127
+redirector_access allow nobannerport
+collapsed_forwarding on
+cache allow all
+http_access allow all
+icp_access allow all
+nonhierarchical_direct off
+prefer_direct off
+always_direct allow alwaysdirect
+never_direct deny alwaysdirect
+retry_on_error on'
+
+name=
+src_config=${SQUID_TOOL_SRC_CONFIG:-$default_src_config}
+config=${SQUID_TOOL_CONFIG:-$default_config}
+listen=${SQUID_TOOL_LISTEN:-$default_listen}
+pidfile=$default_pidfile
+logdir=$default_logdir
+access_log=$logdir/squid-access.log
+cache_log=$logdir/squid-cache.log
+cache_dir=$CACHDIR/squid
+basic_settings=$default_basic_settings
+etc_hosts=$default_etc_hosts
+peer_config=${SQUID_TOOL_PROXY_PEERAGE:-$default_peer_config}
+squid=${SQUID_TOOL_SQUID:-squid}
+rewriter=
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [options...] [--] command [args...]
+  Options:
+    -F  Source configuration, from \$SQUID_TOOL_SRC_CONFIG or $default_src_config
+    -f  Destination configuration, from \$SQUID_TOOL_CONFIG or $default_config
+    -H  Hosts file used to replace {hostname} in the proxy peer configurations.
+    -L  Listen address:port pairs, space or comma separated.
+        From \$SQUID_TOOL_LISTEN or $default_listen
+    -n name
+        A name for this squid instance, used as a basis for various pathnames.
+        This sets various paths as a side effect, so overrides such as the
+        -f option need to follow this option.
+    -P  Proxy peer configuration, default from \$SQUID_TOOL_PROXY_PEERAGE or $default_peer_config
+    -X  Extra settings file, overriding the default core settings.
+  Commands:
+    config          Generate the configuration to the standard output.
+    squid           Run $squid.
+    svc
+    update-config   Rewrite the destination configuration.
+"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -F) src_config=$2; shift ;;
+    -f) config=$2; shift ;;
+    -H) etc_hosts=$2; shift ;;
+    -L) listen=$2; shift ;;
+    -P) peer_config=$2; shift ;;
+    -n) name=$2; shift
+        logdir=$LOGDIR/squid-$name
+        pidfile=$VARRUN/squid-$name.pid
+        workdir=$HOME/var/squid-$name
+        config=$HOME/.squid-$name.conf
+        access_log=$LOGDIR/squid-$name-access.log
+        cache_log=$LOGDIR/squid-$name-cache.log
+        cache_dir=$CACHDIR/squid-$name
+        ;;
+    -X) basic_settings=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+else
+  command=$1
+  shift
+  cmd="$cmd $command"
+fi
+
+[ -s "$src_config" ] || {
+  echo "$cmd: missing source configuration: $src_config" >&2
+  badopts=1
+}
+[ -s "$etc_hosts" ] || {
+  echo "$cmd: missing hosts file: $etc_hosts" >&2
+  badopts=1
+}
+[ -s "$peer_config" ] || {
+  echo "$cmd: missing peer configuration: $peer_config" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+gen_config(){
+  ( set -ue
+    echo "# Generated on $(date) by $0."
+    echo
+    echo "visible_hostname $HOST.$MAILDOMAIN"
+    for addrport in $( printf '%s\n' "$listen" | tr , ' ' )
+    do  echo "http_port $addrport"
+    done
+    [ -z "$rewriter" ] || {
+      echo "url_rewrite_program $rewriter"
+      echo "url_rewrite_children 2"
+    }
+    echo
+    echo "pid_filename $pidfile"
+    echo "access_log $access_log"
+    echo "cache_log $cache_log"
+    echo "cache_store_log /dev/null"
+    echo "coredump_dir $cache_dir"
+    echo "cache_dir ufs $cache_dir 1024 16 256"
+    echo
+    echo "$basic_settings"
+    echo
+    unhostsify "$etc_hosts" <"$peer_config" | proxy-peerage squid
+  ) \
+  | patch-config -I -i "$src_config" \
+  | grep '^[^#]' \
+  | sed -e 's/^ *hierarchy_stoplist/##&/' \
+        -e 's/^ *strip_query_terms/##&/'
+}
+
+xit=0
+
+case "$command" in
+  config)           gen_config ;;
+  squid)            exec $trace "$squid" -N -f "$config" ${1+"$@"} ;;
+  svc)              exec $trace svcd -n "${name:-squid}" -s "cat $config" \
+                        "$squid" -N -f "$config" ${1+"$@"}
+                    ;;
+  update-config)    gen_config | rewriteif -d "$config" ;;
+  *)                echo "$cmd: unrecognised command" >&2; badopts=1 ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exit $xit
