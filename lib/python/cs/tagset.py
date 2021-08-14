@@ -2042,6 +2042,21 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
         it should be the reverse of `match_func`;
         if this function is `None` the subtype name is returned unchanged.
       * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
+
+      Example:
+
+          >>> subTS = _TagsOntology_SubTagSets(MappingTagSets(), 'prefix.')
+          >>> subkey = subTS.subkey('prefix.key')
+          >>> subkey
+          'key'
+          >>> key = subTS.key(subkey)
+          >>> key
+          'prefix.key'
+          >>> subTS['prefix.bah'].add('x', 1)
+          >>> list(subTS.tagsets.keys())
+          ['bah']
+          >>> list(subTS.keys())
+          ['prefix.bah']
   '''
 
   @typechecked
