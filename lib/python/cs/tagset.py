@@ -205,7 +205,7 @@ from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
 import time
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 from icontract import require
 from typeguard import typechecked
@@ -2044,7 +2044,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
   '''
 
-  def __init__(self, tagsets, match, unmatch=None):
+  @typechecked
+  def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
     accepts_key = None
     if match is None:
       assert unmatch is None
@@ -2207,7 +2208,9 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   def _singleton_key(cls, tagsets=None, **_):
     return None if tagsets is None else id(tagsets)
 
-  def __init__(self, tagsets=None, **initial_tags):
+  def __init__(
+      self, tagsets: Union[BaseTagSets, dict, None] = None, **initial_tags
+  ):
     if hasattr(self, 'tagsets'):
       return
     if tagsets is None:
@@ -2420,8 +2423,9 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     return True
 
   @pfx_method(with_args=True)
-  def add_tagsets(self, tagsets, match, unmatch=None, index=0):
     ''' Insert a `_TagsOntology_SubTagSets` at `index` in the list of `_TagsOntology_SubTagSets`es.
+  @typechecked
+  def add_tagsets(self, tagsets: BaseTagSets, match, unmatch=None, index=0):
 
         The new `_TagsOntology_SubTagSets` instance is initialised
         from the supplied `tagsets, match, unmatch` parameters.
