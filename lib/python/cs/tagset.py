@@ -2234,8 +2234,8 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   ):
     if hasattr(self, 'tagsets'):
       return
-    if tagsets is None:
-      tagsets = MappingTagSets()
+    if tagsets is None or not isinstance(tagsets, BaseTagSets):
+      tagsets = MappingTagSets(tagsets)
     self.__dict__.update(
         _subtagsetses=[],
         _type_name2subtype_name={},
