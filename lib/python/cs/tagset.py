@@ -2445,12 +2445,13 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     return True
 
   @pfx_method(with_args=True)
-    ''' Insert a `_TagsOntology_SubTagSets` at `index` in the list of `_TagsOntology_SubTagSets`es.
   @typechecked
   def add_tagsets(self, tagsets: BaseTagSets, match, unmatch=None, index=0):
+    ''' Insert a `_TagsOntology_SubTagSets` at `index`
+        in the list of `_TagsOntology_SubTagSets`es.
 
         The new `_TagsOntology_SubTagSets` instance is initialised
-        from the supplied `tagsets, match, unmatch` parameters.
+        from the supplied `tagsets`, `match`, `unmatch` parameters.
     '''
     if isinstance(match, (list, tuple)):
       assert unmatch is None
