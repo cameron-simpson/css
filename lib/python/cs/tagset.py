@@ -2455,7 +2455,7 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     if isinstance(match, (list, tuple)):
       assert unmatch is None
       for match in match:
-        self.add_tagsets(match, index=index)
+        self.add_tagsets(tagsets, match, index=index)
     else:
       subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
       self._subtagsetses.insert(index, subtagsets)
