@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from getopt import GetoptError
 import os
 from os.path import (
     expanduser, isdir as isdirpath, isfile as isfilepath, join as joinpath
@@ -72,6 +73,17 @@ class OntCommand(TagsOntologyCommand):
       with stackattrs(options, ontology=ont):
         with super().run_context():
           yield
+
+  def cmd_test(self, argv):
+    ''' Usage: {cmd}
+          Run some tests.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    ont = self.options.ontology
+    type_names = sorted(ont.type_names())
+    for tn in type_names:
+      print(tn)
 
 class Ont(TagsOntology):
   ''' A `TagsOntology` based on a persistent store.
