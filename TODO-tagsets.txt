@@ -1,3 +1,4 @@
+TagsOntology: where do metadata live in a split ontology? ideally the subontology - move to a tag_metadata method to keep the context?
 ontologies: subtags should have their tag names prefixed/unprefixed?
 TagFile: should subclass MappingTagSets
 TagsOntology: reverse prefix mappings
