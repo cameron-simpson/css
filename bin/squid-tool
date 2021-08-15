@@ -91,7 +91,7 @@ do
         cache_log=$LOGDIR/squid-$name-cache.log
         cache_dir=$CACHDIR/squid-$name
         ;;
-    -X) basic_settings=$2; shift ;;
+    -X) basic_settings=$( cat <"$2" ); shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
