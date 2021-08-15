@@ -2122,7 +2122,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     '''
     assert self.accepts_type(type_name)
     assert not type_name.startswith('type.')
-    return self.tagsets['type.' + self.subkey(type_name)]
+    subtype_name = 'type.' + self.subkey(type_name)
+    return self.tagsets[subtype_name]
 
   def type_names(self):
     return map(
