@@ -89,10 +89,24 @@ class Ont(TagsOntology):
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
 
-  @staticmethod
-  def tagsetses_from_path(ont_path):
-    ''' Return `(tagsets, `BaseTagSets` instance from `ont_path`,
-        provided for subclassing.
+  @classmethod
+  @typechecked
+  def tagsetses_from_path(cls, ont_path: str):
+    ''' Return `(tagsets,ont_pfx_map)` instance from `ont_path`,
+        being the default `TagSets` and a mapping of name->`TagSets`
+        for various subontologies.
+
+        If `ont_path` resolves to a file the mapping wil be empty;
+        return an `SQLTags` if `ont_path` ends with `'.sqlite'`
+        otherwise a `TagFile`.
+
+        If `ont_path` resolves to a directory, scan the entries.
+        An entry named *prefix*`.sqlite` adds a *prefix*->`SQLTags`
+        entry to the mapping.
+        An entry named *prefix*`.tags` adds a *prefix*->`TagFile`
+        entry to the mapping.
+        After the scan, `tagsets` is set from the entry
+        whose prefix was `'_'`, or `None`.
     '''
     ont_pfx_map = {}
     if isfilepath(ont_path):
