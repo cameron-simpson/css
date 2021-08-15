@@ -194,9 +194,7 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import date, datetime
 import errno
-from fnmatch import (
-    fnmatch, fnmatchcase, translate as fn_translate
-)
+from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -3236,7 +3234,6 @@ def selftest(argv):
   ''' Run some ad hoc self tests.
   '''
   from pprint import pprint  # pylint: disable=import-outside-toplevel
-  from cs.x import X
   setup_logging(argv.pop(0))
   ont = TagsOntology(
       {
@@ -3261,7 +3258,7 @@ def selftest(argv):
   tags['aa'] = 'aa'
   pprint(tags.as_dict())
   for format_str in argv:
-    X("FORMAT_STR = %r", format_str)
+    print("FORMAT_STR = %r", format_str)
     ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
     print("tag.format_as(%r) => %s" % (format_str, formatted))
