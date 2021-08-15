@@ -2493,7 +2493,8 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     subtagsets = self._subtagsets_for_type(type_name)
-    return subtagsets.typedef(type_name)
+    subtype_name = subtagsets.subkey(type_name)
+    return subtagsets.typedef(subtype_name)
 
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
