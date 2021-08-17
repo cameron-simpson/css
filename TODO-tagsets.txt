@@ -1,3 +1,4 @@
+Tag.parse_value: recognise leading JSON punctuation - curly, bracket, quote - and skip straight to JSON for reliability, predictability and speed
 TagsOntology: where do metadata live in a split ontology? ideally the subontology - move to a tag_metadata method to keep the context?
 ontologies: subtags should have their tag names prefixed/unprefixed?
 TagFile: should subclass MappingTagSets
