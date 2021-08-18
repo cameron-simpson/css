@@ -2299,11 +2299,12 @@ class TagsOntology(SingletonMixin, BaseTagSets):
 
         If `match` is a `str`,
         if it ends in a dot '.', dash '-' or underscore '_'
-        then it is considered a prefix of `type_name` and the returned subtype name
-        is the text from `type_name` after the prefix
+        then it is considered a prefix of `type_name` and the returned
+        subtype name is the text from `type_name` after the prefix
         othwerwise it is considered a full match for the `type_name`
         and the returns subtype name is `type_name` unchanged.
-        The `match` string is a shell style glob supporting `*` but not `?` or `[`*seq*`]`.
+        The `match` string is a simplistic shell style glob
+        supporting `*` but not `?` or `[`*seq*`]`.
 
         The value of `unmatch` is constrained by `match`.
         If `match` is `None`, `unmatch` must also be `None`;
