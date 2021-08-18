@@ -2129,7 +2129,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
         self.tagsets.keys(prefix='type.')
     )
 
-class TagsOntology(SingletonMixin, MultiOpenMixin):
+class TagsOntology(SingletonMixin, BaseTagSets):
   ''' An ontology for tag names.
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
@@ -2256,7 +2256,8 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     subs = list(self._subtagsetses)
     for subtagsets in subs:
       subtagsets.open()
-    yield
+    with super().startup_shutdown():
+      yield
     for subtagsets in subs:
       subtagsets.close()
 
