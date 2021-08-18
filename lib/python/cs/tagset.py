@@ -1964,6 +1964,21 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     '''
     return TagSetsSubdomain(self, subname)
 
+  def edit(self, *, select_tagset=None, **kw):
+    ''' Edit the `TagSet`s.
+
+        Parameters:
+        * `select_tagset`: optional callable accepting a `TagSet`
+          which tests whether it should be included in the `TagSet`s
+          to be edited
+        Other keyword arguments are passed to `Tag.edit_many`.
+    '''
+    if select_tagset is None:
+      tes = self
+    else:
+      tes = {name: te for name, te in self.items() if select_tagset(te)}
+    return TagSet.edit_many(tes, **kw)
+
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
   ''' A view into a `BaseTagSets` for keys commencing with a prefix.
   '''
