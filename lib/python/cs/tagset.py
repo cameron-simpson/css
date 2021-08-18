@@ -2093,7 +2093,7 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       to_subkey = match
       from_subkey = unmatch
     if accepts_key is None:
-      raise ValueError("unsupported match=%r, unmatch=%r", match, unmatch)
+      raise ValueError("unsupported match=%r, unmatch=%r" % (match, unmatch))
     super().__init__(tagsets, to_subkey, from_subkey)
     self.tagsets = tagsets
     self.accepts_key = accepts_key
@@ -2463,8 +2463,8 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     '''
     if isinstance(match, (list, tuple)):
       assert unmatch is None
-      for match in match:
-        self.add_tagsets(tagsets, match, index=index)
+      for match1 in match:
+        self.add_tagsets(tagsets, match1, index=index)
     else:
       subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
       self._subtagsetses.insert(index, subtagsets)
