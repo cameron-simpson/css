@@ -2110,6 +2110,11 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     with self.tagsets:
       yield
 
+  def items(self):
+    ''' Enumerate the `TagSet`s by name.
+    '''
+    return self.tagsets.items()
+
   def subtype_name(self, type_name):
     ''' Return the subkey used for `type_name`.
     '''
