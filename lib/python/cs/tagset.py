@@ -3040,18 +3040,29 @@ class TagsOntologyCommand(BaseCommand):
       yield
 
   def cmd_edit(self, argv):
-    ''' Usage: {cmd} entity
-          Edit the named entity.
+    ''' Usage: {cmd} [{{/name-regexp | entity-name}}]
+          Edit entities.
+          With no arguments, edit all the entities.
+          With an argument starting with a slash, edit the entities
+          whose names match the regexp.
+          Otherwise the argument is expected to be an entity name;
+          edit the tags of that entity.
     '''
     options = self.options
     ont = options.ontology
     if not argv:
-      raise GetoptError("missing entity")
-    entity_name = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments after entity: %r" % (argv,))
-    tags = ont[entity_name]
-    tags.edit()
+      ont.edit()
+    else:
+      arg = argv.pop(0)
+      if argv:
+        raise GetoptError("extra arguments after argument: %r" % (argv,))
+      if arg.startswith('/'):
+        regexp = re.compile(arg[1:])
+        ont.edit(select_tagset=lambda te: regexp.match(te.name))
+      else:
+        entity_name = arg
+        tags = ont[entity_name]
+        tags.edit()
 
   def cmd_meta(self, argv):
     ''' Usage: {cmd} tag=value
