@@ -2415,6 +2415,50 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         type_map=IndexedMapping(pk='type_name')
     )
 
+  def __bool__(self):
+    ''' Support easy `ontology or some_default` tests,
+        since ontologies are broadly optional.
+    '''
+    return True
+
+  def as_dict(self):
+    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
+    '''
+    return dict(self.items())
+
+  def items(self):
+    ''' Yield `(entity_name,tags)` for all the items in each subtagsets.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name, tags in subtagsets.items():
+        yield subtagsets.key(entity_name), tags
+
+  def keys(self):
+    ''' Yield entity names for all the entities.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name in subtagsets.keys():
+        yield subtagsets.key(entity_name)
+
+  def get(self, name, default=None):
+    ''' Fetch the entity named `name` or `default`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets.get(subtagsets.subkey(name), default)
+
+  def __setitem__(self, name, tags):
+    ''' Apply `tags` to the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags.update(tags)
+
+  def __delitem__(self, name):
+    ''' Delete the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    del subtagsets[subtagsets.subkey(name)]
+
   def subtype_name(self, type_name):
     ''' Return the type name for use within `self.tagsets` from `type_name`.
         Returns `None` if this is not a supported `type_name`.
@@ -2440,17 +2484,6 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       name = self.unmatch_func(subtype_name)
       self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
       return name
-
-  def as_dict(self):
-    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
-    '''
-    return dict(self._default_tagsets)
-
-  def __bool__(self):
-    ''' Support easy `ontology or some_default` tests,
-        since ontologies are broadly optional.
-    '''
-    return True
 
   @pfx_method(with_args=True)
   @typechecked
