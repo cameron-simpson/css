@@ -1227,8 +1227,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         and is obtained from:
         `self.ontology['type.'+self.name]`
 
+        Basic `Tag`s often do not need a type definition;
+        these are only needed for structured tag values
+        (example: a mapping of cast members)
+        or when a `Tag` name is an alias for another type
+        (example: a cast member name might be an `actor`
+        which in turn might be a `person`).
+
         For example, a `Tag` `colour=blue`
-        gets its type information from the `type.colour` entry in an ontology.
+        gets its type information from the `type.colour` entry in an ontology;
+        that entry is just a `TagSet` with relevant information.
     '''
     ont = self.ontology
     if ont is None:
