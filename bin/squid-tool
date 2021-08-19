@@ -9,15 +9,12 @@ set -ue
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
-: ${CACHDIR:=$HOME/var/cache}
+: ${CACHEDIR:=$HOME/var/cache}
 
+default_name=default
 default_src_config=/etc/squid/squid.conf
-default_config=$HOME/.squid.conf
-default_listen=127.0.0.1:3128
-default_pidfile=$VARRUN/squid.pid
-default_logdir=$LOGDIR/squid
 default_etc_hosts=/etc/hosts
-default_peer_config=$HOME/.proxy-peerage
+default_listen=127.0.0.1:3128
 
 default_basic_settings='
 acl nobannerport myport 8080
@@ -33,19 +30,26 @@ always_direct allow alwaysdirect
 never_direct deny alwaysdirect
 retry_on_error on'
 
-name=
+# many paths derive from the instance name
+set_name(){
+  [ $# = 1 ] || exit 1
+  name=$1; shift
+  logdir=$LOGDIR/squid-$name
+  pidfile=$VARRUN/squid-$name.pid
+  config=$HOME/.squid-$name.conf
+  peer_config=$HOME/.proxy-peerage-$name
+  access_log=$logdir/squid-$name-access.log
+  cache_log=$logdir/squid-$name-cache.log
+  cache_dir=$CACHEDIR/squid-$name
+}
+
+set_name "${SQUID_TOOL_NAME:-$default_name}"
+
+squid=${SQUID_TOOL_SQUID:-squid}
 src_config=${SQUID_TOOL_SRC_CONFIG:-$default_src_config}
-config=${SQUID_TOOL_CONFIG:-$default_config}
 listen=${SQUID_TOOL_LISTEN:-$default_listen}
-pidfile=$default_pidfile
-logdir=$default_logdir
-access_log=$logdir/squid-access.log
-cache_log=$logdir/squid-cache.log
-cache_dir=$CACHDIR/squid
 basic_settings=$default_basic_settings
 etc_hosts=$default_etc_hosts
-peer_config=${SQUID_TOOL_PROXY_PEERAGE:-$default_peer_config}
-squid=${SQUID_TOOL_SQUID:-squid}
 rewriter=
 
 trace=
@@ -54,19 +58,20 @@ trace=
 cmd=$( basename "$0" )
 usage="Usage: $cmd [options...] [--] command [args...]
   Options:
-    -F  Source configuration, from \$SQUID_TOOL_SRC_CONFIG or $default_src_config
-    -f  Destination configuration, from \$SQUID_TOOL_CONFIG or $default_config
+    -F  Source configuration, from \$SQUID_TOOL_SRC_CONFIG or \"$default_src_config\"
+    -f  Destination configuration, default $config
     -H  Hosts file used to replace {hostname} in the proxy peer configurations.
     -L  Listen address:port pairs, space or comma separated.
         From \$SQUID_TOOL_LISTEN or $default_listen
     -n name
-        A name for this squid instance, used as a basis for various pathnames.
+        A name for this squid instance, default from \$SQUID_TOOL_NAME or \"$default_name\"
         This sets various paths as a side effect, so overrides such as the
         -f option need to follow this option.
-    -P  Proxy peer configuration, default from \$SQUID_TOOL_PROXY_PEERAGE or $default_peer_config
+    -P  Proxy peer configuration, default $peer_config
     -X  Extra settings file, overriding the default core settings.
   Commands:
     config          Generate the configuration to the standard output.
+    init            Initialise: update config, make directories.
     squid           Run $squid.
     svc
     update-config   Rewrite the destination configuration.
@@ -83,13 +88,7 @@ do
     -L) listen=$2; shift ;;
     -P) peer_config=$2; shift ;;
     -n) name=$2; shift
-        logdir=$LOGDIR/squid-$name
-        pidfile=$VARRUN/squid-$name.pid
-        workdir=$HOME/var/squid-$name
-        config=$HOME/.squid-$name.conf
-        access_log=$LOGDIR/squid-$name-access.log
-        cache_log=$LOGDIR/squid-$name-cache.log
-        cache_dir=$CACHDIR/squid-$name
+        set_name "$name"
         ;;
     -X) basic_settings=$( cat <"$2" ); shift ;;
     --) shift; break ;;
@@ -156,18 +155,37 @@ gen_config(){
         -e 's/^ *strip_query_terms/##&/'
 }
 
-xit=0
+main(){
+  ( set -ue
+    command=$1; shift
 
-case "$command" in
-  config)           gen_config ;;
-  squid)            exec $trace "$squid" -N -f "$config" ${1+"$@"} ;;
-  svc)              exec $trace svcd -n "${name:-squid}" -s "cat $config" \
-                        "$squid" -N -f "$config" ${1+"$@"}
-                    ;;
-  update-config)    gen_config | rewriteif -d "$config" ;;
-  *)                echo "$cmd: unrecognised command" >&2; badopts=1 ;;
-esac
+    xit=0
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+    case "$command" in
+      config)           gen_config ;;
+      init)             for d in "$VARRUN" "$logdir" "$cache_dir"
+                        do  [ -d "$d" ] || $trace mkdir "$d"
+                        done
+                        for f in "$pidfile" "$access_log" "$cache_log"
+                        do
+                          d=$( dirname "$f" )
+                          [ -d "$d" ] || $trace mkdir "$d"
+                        done
+                        main update-config
+                        main squid -z
+                        ;;
+      squid)            exec $trace "$squid" -N -f "$config" ${1+"$@"} ;;
+      svc)              exec $trace svcd -n "${name:-squid}" -s "cat $config" \
+                            "$squid" -N -f "$config" ${1+"$@"}
+                        ;;
+      update-config)    gen_config | rewriteif -d "$config" ;;
+      *)                echo "$cmd: unrecognised command" >&2; badopts=1 ;;
+    esac
 
-exit $xit
+    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+    exit $xit
+  )
+}
+
+main "$command" ${1+"$@"}
