@@ -1,3 +1,4 @@
+BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
 cs.upd: add pprint wrapper
 cs.app.playon: keep playon recording info as ontology, distinct from state db
