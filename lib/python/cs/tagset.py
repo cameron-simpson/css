@@ -2535,7 +2535,8 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     return self._subtagsetses[-1].tagsets
 
   def _subtagsets_for_key(self, key):
-    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`.
+    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`,
+        a tagset name.
         Returns the default subtagsets if no explicit match is found.
     '''
     for subtagsets in self._subtagsetses:
@@ -3061,9 +3062,11 @@ class TagsOntologyCommand(BaseCommand):
       if argv:
         raise GetoptError("extra arguments after argument: %r" % (argv,))
       if arg.startswith('/'):
+        # select entities and edit them
         regexp = re.compile(arg[1:])
         ont.edit(select_tagset=lambda te: regexp.match(te.name))
       else:
+        # edit a single entity's tags
         entity_name = arg
         tags = ont[entity_name]
         tags.edit()
