@@ -1977,7 +1977,11 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       tes = self
     else:
       tes = {name: te for name, te in self.items() if select_tagset(te)}
-    return TagSet.edit_many(tes, **kw)
+    changed_tes = TagSet.edit_many(tes, **kw)
+    for old_name, new_name, te in changed_tes:
+      if old_name != new_name:
+        with Pfx("rename %r => %r", old_name, new_name):
+          te.name = new_name
 
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
   ''' A view into a `BaseTagSets` for keys commencing with a prefix.
