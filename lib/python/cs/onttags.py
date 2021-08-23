@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from getopt import GetoptError
 import os
 from os.path import (
     expanduser, isdir as isdirpath, isfile as isfilepath, join as joinpath
@@ -21,7 +22,7 @@ from cs.tagset import TagsOntology, TagsOntologyCommand
 
 from cs.x import X
 
-ONTTAGS_PATH_DEFAULT = '~/var/ontology.sqlite'
+ONTTAGS_PATH_DEFAULT = '~/var/ontology'
 ONTTAGS_PATH_ENVVAR = 'ONTTAGS'
 
 def main(argv=None):
@@ -73,6 +74,17 @@ class OntCommand(TagsOntologyCommand):
         with super().run_context():
           yield
 
+  def cmd_test(self, argv):
+    ''' Usage: {cmd}
+          Run some tests.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    ont = self.options.ontology
+    type_names = sorted(ont.type_names())
+    for tn in type_names:
+      print(tn)
+
 class Ont(TagsOntology):
   ''' A `TagsOntology` based on a persistent store.
   '''
@@ -89,10 +101,24 @@ class Ont(TagsOntology):
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
 
-  @staticmethod
-  def tagsetses_from_path(ont_path):
-    ''' Return `(tagsets, `BaseTagSets` instance from `ont_path`,
-        provided for subclassing.
+  @classmethod
+  @typechecked
+  def tagsetses_from_path(cls, ont_path: str):
+    ''' Return `(tagsets,ont_pfx_map)` instance from `ont_path`,
+        being the default `TagSets` and a mapping of name->`TagSets`
+        for various subontologies.
+
+        If `ont_path` resolves to a file the mapping wil be empty;
+        return an `SQLTags` if `ont_path` ends with `'.sqlite'`
+        otherwise a `TagFile`.
+
+        If `ont_path` resolves to a directory, scan the entries.
+        An entry named *prefix*`.sqlite` adds a *prefix*->`SQLTags`
+        entry to the mapping.
+        An entry named *prefix*`.tags` adds a *prefix*->`TagFile`
+        entry to the mapping.
+        After the scan, `tagsets` is set from the entry
+        whose prefix was `'_'`, or `None`.
     '''
     ont_pfx_map = {}
     if isfilepath(ont_path):
@@ -121,6 +147,10 @@ class Ont(TagsOntology):
             continue
       tagsets = ont_pfx_map.pop('_', None)
     else:
+      if not ont_path.endswith('.sqlite'):
+        ont_path_sqlite = ont_path + '.sqlite'
+        if isfilepath(ont_path_sqlite):
+          return cls.tagsetses_from_path(ont_path_sqlite)
       raise ValueError(f"unsupported ont_path={ont_path!r}")
     return tagsets, ont_pfx_map
 

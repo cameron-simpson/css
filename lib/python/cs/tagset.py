@@ -194,9 +194,7 @@ from collections.abc import MutableMapping
 from contextlib import contextmanager
 from datetime import date, datetime
 import errno
-from fnmatch import (
-    fnmatch, fnmatchcase, translate as fn_translate
-)
+from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
@@ -205,7 +203,7 @@ from os.path import dirname, isdir as isdirpath
 import re
 from threading import Lock
 import time
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
 from icontract import require
 from typeguard import typechecked
@@ -1229,8 +1227,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         and is obtained from:
         `self.ontology['type.'+self.name]`
 
+        Basic `Tag`s often do not need a type definition;
+        these are only needed for structured tag values
+        (example: a mapping of cast members)
+        or when a `Tag` name is an alias for another type
+        (example: a cast member name might be an `actor`
+        which in turn might be a `person`).
+
         For example, a `Tag` `colour=blue`
-        gets its type information from the `type.colour` entry in an ontology.
+        gets its type information from the `type.colour` entry in an ontology;
+        that entry is just a `TagSet` with relevant information.
     '''
     ont = self.ontology
     if ont is None:
@@ -1958,6 +1964,25 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     '''
     return TagSetsSubdomain(self, subname)
 
+  def edit(self, *, select_tagset=None, **kw):
+    ''' Edit the `TagSet`s.
+
+        Parameters:
+        * `select_tagset`: optional callable accepting a `TagSet`
+          which tests whether it should be included in the `TagSet`s
+          to be edited
+        Other keyword arguments are passed to `Tag.edit_many`.
+    '''
+    if select_tagset is None:
+      tes = self
+    else:
+      tes = {name: te for name, te in self.items() if select_tagset(te)}
+    changed_tes = TagSet.edit_many(tes, **kw)
+    for old_name, new_name, te in changed_tes:
+      if old_name != new_name:
+        with Pfx("rename %r => %r", old_name, new_name):
+          te.name = new_name
+
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
   ''' A view into a `BaseTagSets` for keys commencing with a prefix.
   '''
@@ -2042,9 +2067,27 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
         it should be the reverse of `match_func`;
         if this function is `None` the subtype name is returned unchanged.
       * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
+
+      Example:
+
+          >>> subTS = _TagsOntology_SubTagSets(MappingTagSets(), 'prefix.')
+          >>> subkey = subTS.subkey('prefix.key')
+          >>> subkey
+          'key'
+          >>> key = subTS.key(subkey)
+          >>> key
+          'prefix.key'
+          >>> subTS['prefix.bah'].add('x', 1)
+          >>> list(subTS.tagsets.keys())
+          ['bah']
+          >>> list(subTS.keys())
+          ['prefix.bah']
   '''
 
-  def __init__(self, tagsets, match, unmatch=None):
+  @typechecked
+  def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
+    self.__match = match
+    self.__unmatch = unmatch
     accepts_key = None
     if match is None:
       assert unmatch is None
@@ -2069,10 +2112,15 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       to_subkey = match
       from_subkey = unmatch
     if accepts_key is None:
-      raise ValueError("unsupported match=%r, unmatch=%r", match, unmatch)
+      raise ValueError("unsupported match=%r, unmatch=%r" % (match, unmatch))
     super().__init__(tagsets, to_subkey, from_subkey)
     self.tagsets = tagsets
     self.accepts_key = accepts_key
+
+  def __repr__(self):
+    return "%s(match=%r,unmatch=%r)" % (
+        type(self).__name__, self.__match, self.__unmatch
+    )
 
   @contextmanager
   def startup_shutdown(self):
@@ -2080,6 +2128,11 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     '''
     with self.tagsets:
       yield
+
+  def items(self):
+    ''' Enumerate the `TagSet`s by name.
+    '''
+    return self.tagsets.items()
 
   def subtype_name(self, type_name):
     ''' Return the subkey used for `type_name`.
@@ -2099,16 +2152,16 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     '''
     assert self.accepts_type(type_name)
     assert not type_name.startswith('type.')
-    return self.tagsets['type.' +
-                        self._to_subkey(cutprefix(type_name, 'type.'))]
+    subtype_name = 'type.' + self.subkey(type_name)
+    return self.tagsets[subtype_name]
 
   def type_names(self):
     return map(
-        lambda subkey: self._from_subkey(cutprefix(subkey, 'type.')),
+        lambda subkey: self.key(cutprefix(subkey, 'type.')),
         self.tagsets.keys(prefix='type.')
     )
 
-class TagsOntology(SingletonMixin, MultiOpenMixin):
+class TagsOntology(SingletonMixin, BaseTagSets):
   ''' An ontology for tag names.
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
@@ -2207,11 +2260,13 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
   def _singleton_key(cls, tagsets=None, **_):
     return None if tagsets is None else id(tagsets)
 
-  def __init__(self, tagsets=None, **initial_tags):
+  def __init__(
+      self, tagsets: Union[BaseTagSets, dict, None] = None, **initial_tags
+  ):
     if hasattr(self, 'tagsets'):
       return
-    if tagsets is None:
-      tagsets = MappingTagSets()
+    if tagsets is None or not isinstance(tagsets, BaseTagSets):
+      tagsets = MappingTagSets(tagsets)
     self.__dict__.update(
         _subtagsetses=[],
         _type_name2subtype_name={},
@@ -2233,185 +2288,157 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     subs = list(self._subtagsetses)
     for subtagsets in subs:
       subtagsets.open()
-    yield
+    with super().startup_shutdown():
+      yield
     for subtagsets in subs:
       subtagsets.close()
 
-    @classmethod
-    @pfx_method(with_args=True)
-    def from_match(cls, tagsets, match, unmatch=None):
-      ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
+  @classmethod
+  @pfx_method(with_args=True)
+  def from_match(cls, tagsets, match, unmatch=None):
+    ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
 
-          Parameters:
-          * `tagsets`: a `TagSets` holding ontology information
-          * `match`: a match function used to choose entries based on a type name
-          * `unmatch`: an optional reverse for `match`, accepting a subtype
-            name and returning its public name
+        Parameters:
+        * `tagsets`: a `TagSets` holding ontology information
+        * `match`: a match function used to choose entries based on a type name
+        * `unmatch`: an optional reverse for `match`, accepting a subtype
+          name and returning its public name
 
-          If `match` is `None`
-          then `tagsets` will always be chosen if no prior entry matched.
+        If `match` is `None`
+        then `tagsets` will always be chosen if no prior entry matched.
 
-          Otherwise, `match` is resolved to a function `match-func(type_name)`
-          which returns a subtype name on a match and a false value on no match.
+        Otherwise, `match` is resolved to a function `match-func(type_name)`
+        which returns a subtype name on a match and a false value on no match.
 
-          If `match` is a callable it is used as `match_func` directly.
+        If `match` is a callable it is used as `match_func` directly.
 
-          if `match` is a list, tuple or set
-          then this method calls itself with `(tagsets,submatch)`
-          for each member `submatch` if `match`.
+        if `match` is a list, tuple or set
+        then this method calls itself with `(tagsets,submatch)`
+        for each member `submatch` if `match`.
 
-          If `match` is a `str`,
-          if it ends in a dot '.', dash '-' or underscore '_'
-          then it is considered a prefix of `type_name` and the returned subtype name
-          is the text from `type_name` after the prefix
-          othwerwise it is considered a full match for the `type_name`
-          and the returns subtype name is `type_name` unchanged.
-          The `match` string is a shell style glob supporting `*` but not `?` or `[`*seq*`]`.
+        If `match` is a `str`,
+        if it ends in a dot '.', dash '-' or underscore '_'
+        then it is considered a prefix of `type_name` and the returned
+        subtype name is the text from `type_name` after the prefix
+        othwerwise it is considered a full match for the `type_name`
+        and the returns subtype name is `type_name` unchanged.
+        The `match` string is a simplistic shell style glob
+        supporting `*` but not `?` or `[`*seq*`]`.
 
-          The value of `unmatch` is constrained by `match`.
-          If `match` is `None`, `unmatch` must also be `None`;
-          the type name is used unchanged.
-          If `match` is callable`, `unmatch` must also be callable;
-          it is expected to reverse `match`.
+        The value of `unmatch` is constrained by `match`.
+        If `match` is `None`, `unmatch` must also be `None`;
+        the type name is used unchanged.
+        If `match` is callable`, `unmatch` must also be callable;
+        it is expected to reverse `match`.
 
-          Examples:
+        Examples:
 
-              >>> from os.path import expanduser as u
-              >>> # an initial empty ontology with a default in memory mapping
-              >>> ont = TagsOntology()
-              # divert the types actor, role and series to my media ontology
-              >>> ont.add_tagsets(
-              ...     SQLTags(u('~/var/media-ontology.sqlite'),
-              ...     ['actor', 'role', 'series'])
-              # divert type "musicbrainz.recording" to mbdb.sqlite
-              # mapping to the type "recording"
-              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
-              # divert type "tvdb.actor" to tvdb.sqlite
-              # mapping to the type "actor"
-              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
-      '''
-      if match is None:
-        assert unmatch is None
-        match_func = None
-        unmatch_func = None
-      elif callable(match):
-        assert callable(unmatch)
-        match_func = match
-        unmatch_func = unmatch
-      elif isinstance(match, str):
-        if not match:
-          raise ValueError("empty match string")
-        if '?' in match or '[' in match:
-          raise ValueError("match globs only support *, not ? or [seq]")
-        if match.endswith(('.', '-', '_')):
-          if len(match) == 1:
-            raise ValueError("empty prefix")
-          if '*' in match:
-            match_re_s = fn_translate(match)
-            assert match_re_s.endswith('\\Z')
-            match_re_s = cutsuffix(match_re_s, '\\Z')
-            match_re = re.compile(match_re_s)
+            >>> from cs.sqltags import SQLTags
+            >>> from os.path import expanduser as u
+            >>> # an initial empty ontology with a default in memory mapping
+            >>> ont = TagsOntology()
+            >>> # divert the types actor, role and series to my media ontology
+            >>> ont.add_tagsets(
+            ...     SQLTags(u('~/var/media-ontology.sqlite')),
+            ...     ['actor', 'role', 'series'])
+            >>> # divert type "musicbrainz.recording" to mbdb.sqlite
+            >>> # mapping to the type "recording"
+            >>> ont.add_tagsets(SQLTags(u('~/.cache/mbdb.sqlite')), 'musicbrainz.')
+            >>> # divert type "tvdb.actor" to tvdb.sqlite
+            >>> # mapping to the type "actor"
+            >>> ont.add_tagsets(SQLTags(u('~/.cache/tvdb.sqlite')), 'tvdb.')
+    '''
+    if match is None:
+      assert unmatch is None
+      match_func = None
+      unmatch_func = None
+    elif callable(match):
+      assert callable(unmatch)
+      match_func = match
+      unmatch_func = unmatch
+    elif isinstance(match, str):
+      if not match:
+        raise ValueError("empty match string")
+      if '?' in match or '[' in match:
+        raise ValueError("match globs only support *, not ? or [seq]")
+      if match.endswith(('.', '-', '_')):
+        if len(match) == 1:
+          raise ValueError("empty prefix")
+        if '*' in match:
+          match_re_s = fn_translate(match)
+          assert match_re_s.endswith('\\Z')
+          match_re_s = cutsuffix(match_re_s, '\\Z')
+          match_re = re.compile(match_re_s)
 
-            def match_func(type_name):
-              ''' Glob based prefix match, return the suffix.
-              '''
-              m = match_re.match(type_name)
-              if not m:
-                return None
-              subtype_name = type_name[m.end():]
-              return subtype_name
+          def match_func(type_name):
+            ''' Glob based prefix match, return the suffix.
+            '''
+            m = match_re.match(type_name)
+            if not m:
+              return None
+            subtype_name = type_name[m.end():]
+            return subtype_name
 
-            # TODO: define this function if there is exactly 1 asterisk
-            unmatch_func = None
-
-          else:
-
-            def match_func(type_name):
-              ''' Literal prefix match, return the suffix.
-              '''
-              subtype_name = cutprefix(type_name, match)
-              if subtype_name is type_name:
-                return None
-              return subtype_name
-
-            def unmatch_func(subtype_name):
-              ''' Return the `subtype_name` with the prefix restored
-              '''
-              return match + subtype_name
+          # TODO: define this function if there is exactly 1 asterisk
+          unmatch_func = None
 
         else:
-          # not a prefix
 
-          if '*' in match:
-
-            def match_func(type_name):
-              ''' Glob `type_name` match, return `type_name` unchanged.
-              '''
-              if fnmatch(type_name, match):
-                return type_name
+          def match_func(type_name):
+            ''' Literal prefix match, return the suffix.
+            '''
+            subtype_name = cutprefix(type_name, match)
+            if subtype_name is type_name:
               return None
+            return subtype_name
 
-            # TODO: define unmatch_func is there is exactly 1 asterisk
-            unmatch_func = None
-
-          else:
-
-            def match_func(type_name):
-              ''' Fixed string exact `type_name` match, return `type_name` unchanged.
-              '''
-              if type_name == match:
-                return type_name
-              return None
-
-            def unmatch_func(subtype_name):
-              ''' Fixed string match
-              '''
-              assert subtype_name == match
-              return subtype_name
+          def unmatch_func(subtype_name):
+            ''' Return the `subtype_name` with the prefix restored
+            '''
+            return match + subtype_name
 
       else:
+        # not a prefix
 
-        raise ValueError(
-            "unhandled match value %s:%r" % (type(match).__name__, match)
-        )
+        if '*' in match:
 
-      return cls(
-          tagsets=tagsets,
-          match_func=match_func,
-          unmatch_func=unmatch_func,
-          type_map=IndexedMapping(pk='type_name')
+          def match_func(type_name):
+            ''' Glob `type_name` match, return `type_name` unchanged.
+            '''
+            if fnmatch(type_name, match):
+              return type_name
+            return None
+
+          # TODO: define unmatch_func is there is exactly 1 asterisk
+          unmatch_func = None
+
+        else:
+
+          def match_func(type_name):
+            ''' Fixed string exact `type_name` match, return `type_name` unchanged.
+            '''
+            if type_name == match:
+              return type_name
+            return None
+
+          def unmatch_func(subtype_name):
+            ''' Fixed string match
+            '''
+            assert subtype_name == match
+            return subtype_name
+
+    else:
+
+      raise ValueError(
+          "unhandled match value %s:%r" % (type(match).__name__, match)
       )
 
-    def subtype_name(self, type_name):
-      ''' Return the type name for use within `self.tagsets` from `type_name`.
-          Returns `None` if this is not a supported `type_name`.
-      '''
-      if self.match_func is None:
-        return type_name
-      try:
-        return self.type_map.by_type_name[type_name]
-      except KeyError:
-        name = self.match_func(type_name)
-        self.type_map.add = dict(type_name=type_name, subtype_name=name)
-        return name
-
-    def type_name(self, subtype_name):
-      ''' Return the external type name from the internal `subtype_name`
-          which is used within `self.tagsets`.
-      '''
-      if self.match_func is None:
-        return subtype_name
-      try:
-        return self.type_map.by_subtype_name[subtype_name]
-      except KeyError:
-        name = self.unmatch_func(subtype_name)
-        self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
-        return name
-
-  def as_dict(self):
-    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
-    '''
-    return dict(self._default_tagsets)
+    return cls(
+        tagsets=tagsets,
+        match_func=match_func,
+        unmatch_func=unmatch_func,
+        type_map=IndexedMapping(pk='type_name')
+    )
 
   def __bool__(self):
     ''' Support easy `ontology or some_default` tests,
@@ -2419,17 +2446,83 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     '''
     return True
 
+  def as_dict(self):
+    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
+    '''
+    return dict(self.items())
+
+  def items(self):
+    ''' Yield `(entity_name,tags)` for all the items in each subtagsets.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name, tags in subtagsets.items():
+        yield subtagsets.key(entity_name), tags
+
+  def keys(self):
+    ''' Yield entity names for all the entities.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name in subtagsets.keys():
+        yield subtagsets.key(entity_name)
+
+  def get(self, name, default=None):
+    ''' Fetch the entity named `name` or `default`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets.get(subtagsets.subkey(name), default)
+
+  def __setitem__(self, name, tags):
+    ''' Apply `tags` to the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags.update(tags)
+
+  def __delitem__(self, name):
+    ''' Delete the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    del subtagsets[subtagsets.subkey(name)]
+
+  def subtype_name(self, type_name):
+    ''' Return the type name for use within `self.tagsets` from `type_name`.
+        Returns `None` if this is not a supported `type_name`.
+    '''
+    if self.match_func is None:
+      return type_name
+    try:
+      return self.type_map.by_type_name[type_name]
+    except KeyError:
+      name = self.match_func(type_name)
+      self.type_map.add = dict(type_name=type_name, subtype_name=name)
+      return name
+
+  def type_name(self, subtype_name):
+    ''' Return the external type name from the internal `subtype_name`
+        which is used within `self.tagsets`.
+    '''
+    if self.match_func is None:
+      return subtype_name
+    try:
+      return self.type_map.by_subtype_name[subtype_name]
+    except KeyError:
+      name = self.unmatch_func(subtype_name)
+      self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
+      return name
+
   @pfx_method(with_args=True)
-  def add_tagsets(self, tagsets, match, unmatch=None, index=0):
-    ''' Insert a `_TagsOntology_SubTagSets` at `index` in the list of `_TagsOntology_SubTagSets`es.
+  @typechecked
+  def add_tagsets(self, tagsets: BaseTagSets, match, unmatch=None, index=0):
+    ''' Insert a `_TagsOntology_SubTagSets` at `index`
+        in the list of `_TagsOntology_SubTagSets`es.
 
         The new `_TagsOntology_SubTagSets` instance is initialised
-        from the supplied `tagsets, match, unmatch` parameters.
+        from the supplied `tagsets`, `match`, `unmatch` parameters.
     '''
     if isinstance(match, (list, tuple)):
       assert unmatch is None
-      for match in match:
-        self.add_tagsets(match, index=index)
+      for match1 in match:
+        self.add_tagsets(tagsets, match1, index=index)
     else:
       subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
       self._subtagsetses.insert(index, subtagsets)
@@ -2442,7 +2535,8 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     return self._subtagsetses[-1].tagsets
 
   def _subtagsets_for_key(self, key):
-    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`.
+    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`,
+        a tagset name.
         Returns the default subtagsets if no explicit match is found.
     '''
     for subtagsets in self._subtagsetses:
@@ -2466,7 +2560,8 @@ class TagsOntology(SingletonMixin, MultiOpenMixin):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     subtagsets = self._subtagsets_for_type(type_name)
-    return subtagsets.typedef(type_name)
+    subtype_name = subtagsets.subkey(type_name)
+    return subtagsets.typedef(subtype_name)
 
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
@@ -2950,18 +3045,31 @@ class TagsOntologyCommand(BaseCommand):
       yield
 
   def cmd_edit(self, argv):
-    ''' Usage: {cmd} entity
-          Edit the named entity.
+    ''' Usage: {cmd} [{{/name-regexp | entity-name}}]
+          Edit entities.
+          With no arguments, edit all the entities.
+          With an argument starting with a slash, edit the entities
+          whose names match the regexp.
+          Otherwise the argument is expected to be an entity name;
+          edit the tags of that entity.
     '''
     options = self.options
     ont = options.ontology
     if not argv:
-      raise GetoptError("missing entity")
-    entity_name = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments after entity: %r" % (argv,))
-    tags = ont[entity_name]
-    tags.edit()
+      ont.edit()
+    else:
+      arg = argv.pop(0)
+      if argv:
+        raise GetoptError("extra arguments after argument: %r" % (argv,))
+      if arg.startswith('/'):
+        # select entities and edit them
+        regexp = re.compile(arg[1:])
+        ont.edit(select_tagset=lambda te: regexp.match(te.name))
+      else:
+        # edit a single entity's tags
+        entity_name = arg
+        tags = ont[entity_name]
+        tags.edit()
 
   def cmd_meta(self, argv):
     ''' Usage: {cmd} tag=value
@@ -3207,7 +3315,6 @@ def selftest(argv):
   ''' Run some ad hoc self tests.
   '''
   from pprint import pprint  # pylint: disable=import-outside-toplevel
-  from cs.x import X
   setup_logging(argv.pop(0))
   ont = TagsOntology(
       {
@@ -3232,7 +3339,7 @@ def selftest(argv):
   tags['aa'] = 'aa'
   pprint(tags.as_dict())
   for format_str in argv:
-    X("FORMAT_STR = %r", format_str)
+    print("FORMAT_STR = %r", format_str)
     ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
     print("tag.format_as(%r) => %s" % (format_str, formatted))

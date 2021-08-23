@@ -1255,6 +1255,24 @@ class RemappedMappingProxy:
   ''' A proxy for another mapping
       with translation functions between the external keys
       and the keys used inside the other mapping.
+
+      Example:
+
+          >>> proxy = RemappedMappingProxy(
+          ...   {},
+          ...   lambda key: 'prefix.' + key,
+          ...   lambda subkey: cutprefix('prefix.', subkey))
+          >>> proxy['key'] = 1
+          >>> proxy['key']
+          1
+          >>> proxy.mapping
+          {'prefix.key': 1}
+          >>> list(proxy.keys())
+          ['key']
+          >>> proxy.subkey('key')
+          'prefix.key'
+          >>> proxy.key('prefix.key')
+          'key'
   '''
 
   def __init__(self, mapping, to_subkey, from_subkey):
