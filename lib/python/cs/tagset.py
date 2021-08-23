@@ -201,7 +201,7 @@ from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
 import re
-from threading import Lock
+from threading import Lock, RLock
 import time
 from typing import Optional, Union
 from uuid import UUID
@@ -1836,7 +1836,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         pass
       else:
         cls = self.TAGSETCLASS_PREFIX_MAPPING.get(type_name, cls)
-    tags = cls(self, name=name, **kw)
+    tags = cls(name=name, **kw)
     return tags
 
   def __init__(self, *, ontology=None):
