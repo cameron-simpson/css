@@ -94,7 +94,7 @@ def decorator(deco):
       decorated = deco(func, *da, **dkw)
       if decorated is not func:
         # pretty up the returned wrapper
-        decorated.__name__ =  getattr(func, '__name__', str(func))
+        decorated.__name__ = getattr(func, '__name__', str(func))
         if not getattr(decorated, '__doc__', None):
           decorated.__doc__ = getattr(func, '__doc__', '')
         func_module = getattr(func, '__module__', None)
@@ -297,7 +297,7 @@ def contextdecorator(cmgrfunc):
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
           if provide_context:
-            a = a.insert(0,ctxt)
+            a = a.insert(0, ctxt)
           return func(*a, **kw)
 
     return wrapped
