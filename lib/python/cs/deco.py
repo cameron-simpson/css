@@ -92,13 +92,16 @@ def decorator(deco):
       func = da[0]
       da = tuple(da[1:])
       decorated = deco(func, *da, **dkw)
-      if not getattr(decorated, '__doc__', None):
-        decorated.__doc__ = getattr(func, '__doc__', '')
-      func_module = getattr(func, '__module__', None)
-      try:
-        decorated.__module__ = func_module
-      except AttributeError:
-        pass
+      if decorated is not func:
+        # pretty up the returned wrapper
+        decorated.__name__ =  getattr(func, '__name__', str(func))
+        if not getattr(decorated, '__doc__', None):
+          decorated.__doc__ = getattr(func, '__doc__', '')
+        func_module = getattr(func, '__module__', None)
+        try:
+          decorated.__module__ = func_module
+        except AttributeError:
+          pass
       return decorated
 
     # `func` is not supplied, collect the arguments supplied and return a
