@@ -1244,8 +1244,8 @@ class SQLTagSet(SingletonMixin, TagSet):
       self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=_sqltags)
       self._singleton_also_index()
     else:
-      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
-          pre_sqltags, sqltags
+      assert pre_sqltags is _sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
+          pre_sqltags, _sqltags
       )
 
   def __str__(self):
