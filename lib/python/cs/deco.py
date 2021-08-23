@@ -94,7 +94,10 @@ def decorator(deco):
       decorated = deco(func, *da, **dkw)
       if decorated is not func:
         # pretty up the returned wrapper
-        decorated.__name__ = getattr(func, '__name__', str(func))
+        try:
+          decorated.__name__ = getattr(func, '__name__', str(func))
+        except AttributeError:
+          pass
         if not getattr(decorated, '__doc__', None):
           decorated.__doc__ = getattr(func, '__doc__', '')
         func_module = getattr(func, '__module__', None)
