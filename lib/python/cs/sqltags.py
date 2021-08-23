@@ -1477,13 +1477,19 @@ class SQLTags(BaseTagSets):
     self.ontology = ontology
     self._lock = RLock()
     # the default TagSet subclass: we pass in this SQLTags as a leading context variable
-    self.TAGSETCLASS_DEFAULT = lambda *a, **kw: SQLTagSet(*a, _sqltags=self, **kw)
     ## UNUSED? ## self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
     return "%s(db_url=%r)" % (
         type(self).__name__, getattr(self, 'db_url', None)
     )
+
+  def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
+    if _sqltags is None:
+      _sqltags = self
+    else:
+      assert _sqltags is self
+    return SQLTagSet(*a, _sqltags=_sqltags, **kw)
 
   @contextmanager
   def db_session(self, *, new=False):
