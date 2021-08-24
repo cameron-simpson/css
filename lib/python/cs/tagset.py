@@ -1164,58 +1164,74 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         function which takes a string and returns a Python object
         (expected to be an instance of `type`).
         The default comes from `cls.EXTRA_TYPES`.
-
-        Nonwhitespace at `s[offset:]` is tried against each such `from_str`
-        function in turn;
-        if the function does not raise `ValueError`
-        then its result is accepted as the parsed value.
-        If none matches,
-        `cls.JSON_DECODER.raw_decode` is used to parse the value.
-
         This supports storage of nonJSONable values in text form.
+
+        The core syntax for values is JSON;
+        value text commencing with any of `'"'`, `'['` or `'{'`
+        is treated as JSON and decoded directly,
+        leaving the offset at the end of the JSON parse.
+
+        Otherwise all the nonwhitespace at this point is collected
+        as the value text,
+        leaving the offset at the next whitespace character
+        or the end of the string.
+        The text so collected is then tried against the `from_str`
+        function of each `extra_types`;
+        the first successful parse is accepted as the value.
+        If no extra type match,
+        the text is tried against `int()` and `float()`;
+        if one of these parses the text and `str()` of the result round trips
+        to the original text
+        then that value is used.
+        Otherwise the text itself is kept as the value.
     '''
     if extra_types is None:
       extra_types = cls.EXTRA_TYPES
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
-    else:
-      # look for a "bare" name
+    elif s[offset] in '"[{':
+      # must be a JSON value - collect it
+      value_part = s[offset:]
       try:
-        value, offset2 = cls.parse_name(s, offset)
-      except ValueError:
-        value = None
-      else:
-        if offset == offset2:
-          value = None
-      if value is not None:
-        # a bare name, use as is
-        offset = offset2
-      else:
-        # check for special "nonwhitespace" transcription
-        nonwhite, nw_offset = get_nonwhite(s, offset)
-        nw_value = None
-        for _, from_str, _ in extra_types:
-          try:
-            nw_value = from_str(nonwhite)
-          except ValueError:
-            pass
-          else:
-            break
-        if nw_value is not None:
-          # special format found
-          value = nw_value
-          offset = nw_offset
+        value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+      except JSONDecodeError as e:
+        raise ValueError(
+            "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+        ) from e
+      offset += suboffset
+    else:
+      # collect nonwhitespace, check for special forms
+      nonwhite, offset = get_nonwhite(s, offset)
+      value = None
+      for _, from_str, _ in extra_types:
+        try:
+          value = from_str(nonwhite)
+        except ValueError:
+          pass
         else:
-          # decode as plain JSON data
-          value_part = s[offset:]
-          try:
-            value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
-          except JSONDecodeError as e:
-            raise ValueError(
-                "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
-            ) from e
-          offset += suboffset
+          break
+      if value is None:
+        # not one of the special formats
+        # check for round trip int or float
+        try:
+          i = int(nonwhite)
+        except ValueError:
+          pass
+        else:
+          if str(i) == nonwhite:
+            value = i
+          else:
+            try:
+              f = float(nonwhite)
+            except ValueError:
+              pass
+            else:
+              if str(f) == nonwhite:
+                value = f
+      if value is None:
+        # not a special value, preserve as a string
+        value = nonwhite
     return value, offset
 
   @property
