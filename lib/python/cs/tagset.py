@@ -2701,7 +2701,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         value_key = convert(value)
         assert isinstance(value_key, str) and value_key
       key = type_name + '.' + value_key
-      md = subtagsets[value_key]
+      md = subtagsets[key]
     return md
 
   def basetype(self, typename):
