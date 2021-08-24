@@ -1220,8 +1220,8 @@ class SQLTagSet(SingletonMixin, TagSet):
   }
 
   @staticmethod
-  def _singleton_key(sqltags, *, _id, **_):
-    return builtin_id(sqltags), _id
+  def _singleton_key(*, _id, _sqltags, **_):
+    return builtin_id(_sqltags), _id
 
   def _singleton_also_indexmap(self):
     ''' Return the map of secondary key names and their values.
@@ -1235,17 +1235,17 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, sqltags, *, name=None, _id: int, unixtime=None, **kw):
+  def __init__(self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
       super().__init__(_id=_id, **kw)
       # pylint: disable=unexpected-keyword-arg
-      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=sqltags)
+      self.__dict__.update(_name=name, _unixtime=unixtime, sqltags=_sqltags)
       self._singleton_also_index()
     else:
-      assert pre_sqltags is sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
-          pre_sqltags, sqltags
+      assert pre_sqltags is _sqltags, "pre_sqltags is not sqltags: %s vs %s" % (
+          pre_sqltags, _sqltags
       )
 
   def __str__(self):
@@ -1452,9 +1452,6 @@ class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
-  # the default TagSet subclass
-  TAGSETCLASS_DEFAULT = SQLTagSet
-
   @pfx_method
   def TagSetClass(self, *, name, **kw):
     ''' Local implementation of `TagSetClass` so that we can annotate it with a `.singleton_also_by` attribute.
@@ -1479,12 +1476,20 @@ class SQLTags(BaseTagSets):
     self.db_url = db_url
     self.ontology = ontology
     self._lock = RLock()
+    # the default TagSet subclass: we pass in this SQLTags as a leading context variable
     ## UNUSED? ## self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
     return "%s(db_url=%r)" % (
         type(self).__name__, getattr(self, 'db_url', None)
     )
+
+  def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
+    if _sqltags is None:
+      _sqltags = self
+    else:
+      assert _sqltags is self
+    return SQLTagSet(*a, _sqltags=_sqltags, **kw)
 
   @contextmanager
   def db_session(self, *, new=False):
@@ -1722,6 +1727,7 @@ class SQLTags(BaseTagSets):
           # not seen before
           te = entity_map[entity_id] = self.TagSetClass(
               _id=entity_id,
+              _sqltags=self,
               _ontology=self.ontology,
               name=row.name,
               unixtime=row.unixtime,
