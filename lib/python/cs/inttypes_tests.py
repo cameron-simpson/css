@@ -10,6 +10,8 @@ from cs.logutils import D
 from cs.inttypes import BitMask, Enum, Flags
 
 class TestInttypes(unittest.TestCase):
+  ''' Test `cs.inttypes`.
+  '''
 
   def setUp(self):
     pass

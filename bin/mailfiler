@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
 import sys
-from cs.app.mailfiler import MailFilerCommand
-sys.exit(MailFilerCommand().run(sys.argv))
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.mailfiler import main
+sys.exit(main(sys.argv))

@@ -1,0 +1,1 @@
+@locked: apply the interior __doc__ to the wrapper.

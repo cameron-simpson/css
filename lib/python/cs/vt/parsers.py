@@ -14,7 +14,7 @@ from cs.buffer import chunky
 from cs.logutils import warning, exception
 from cs.pfx import Pfx, PfxThread
 from cs.queues import IterableQueue
-from .datafile import DataFileReader
+from .datafile import DataRecord
 
 def linesof(chunks):
   ''' Process binary chunks, yield binary lines ending in '\n'.
@@ -71,11 +71,14 @@ scan_text_from_chunks = chunky(scan_text)
 
 def report_offsets(bfr, run_parser):
   ''' Dispatch a parser in a separate Thread, return an IterableQueue yielding offsets.
-      `bfr`: a CornuCopyBuffer providing data to parse
-      `run_parser`: a callable which runs the parser; it should accept a
-        CornuCopyBuffer as its sole argument.
-      This function allocates an IterableQueue to receive the parser offset
-      reports and sets the CornuCopyBuffer with report_offset copying
+
+      Parameters:
+      * `bfr`: a `CornuCopyBuffer` providing data to parse
+      * `run_parser`: a callable which runs the parser; it should accept a
+        `CornuCopyBuffer` as its sole argument.
+
+      This function allocates an `IterableQueue` to receive the parser offset
+      reports and sets the `CornuCopyBuffer` with `report_offset` copying
       offsets to the queue.
       It is the task of the parser to call `bfr.report_offset` as
       necessary to indicate suitable offsets.
@@ -108,7 +111,7 @@ def scan_vtd(bfr):
   with Pfx("scan_vtd"):
 
     def run_parser(bfr):
-      for offset, *_ in DataFileReader.scanbuffer(bfr):
+      for offset, _, _ in DataRecord.parse_buffer_with_offsets(bfr):
         bfr.report_offset(offset)
 
     return report_offsets(bfr, run_parser)
@@ -130,11 +133,11 @@ scan_mp3_from_chunks = chunky(scan_mp3)
 def scan_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
   '''
-  from cs.iso14496 import parse_buffer as parse_mp4_from_buffer
+  from cs.iso14496 import Box
   with Pfx("parse_mp4"):
 
     def run_parser(bfr):
-      for _ in parse_mp4_from_buffer(bfr, discard_data=True):
+      for _ in Box.scan(bfr):
         pass
 
     return report_offsets(bfr, run_parser)

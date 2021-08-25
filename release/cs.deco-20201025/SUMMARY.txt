@@ -1,0 +1,1 @@
+New @contextdecorator decorator for context managers to turn them into setup/teardown decorators.

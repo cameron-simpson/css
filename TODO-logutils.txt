@@ -1,1 +1,2 @@
+maybe tweak the message formatter of the default logger instead of having special eror/warning etc functions
 Pfx.__exit__: cascaded try: args=exc_value.args etc for prefixification, remove special exception type knowledge

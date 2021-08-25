@@ -1,0 +1,1 @@
+DISTINFO: require cs.obj>=20200716 for SingletonMixin API change.

@@ -13,8 +13,9 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 import time
+from cs.binary import BSData, BSString
+from cs.buffer import CornuCopyBuffer
 from cs.logutils import error, warning
-from cs.serialise import get_bss, get_bsdata
 from cs.threads import locked
 from cs.x import X
 from . import RLock
@@ -39,12 +40,12 @@ def username(uid):
   return pw.pw_name
 
 @lru_cache(maxsize=64)
-def userid(username):
+def userid(user_name):
   ''' Look up the user id associated with the supplied `username`.
       Return None if unknown. Caches results, including lookup failure.
   '''
   try:
-    pw = getpwnam(username)
+    pw = getpwnam(user_name)
   except KeyError:
     return None
   return pw.pw_uid
@@ -61,12 +62,12 @@ def groupname(gid):
   return gr.gr_name
 
 @lru_cache(maxsize=64)
-def groupid(groupname):
+def groupid(group_name):
   ''' Look up the group id associated with the supplied `groupname`.
       Return None if unknown. Caches results, including lookup failure.
   '''
   try:
-    gr = getgrnam(groupname)
+    gr = getgrnam(group_name)
   except KeyError:
     return None
   return gr.gr_gid
@@ -193,10 +194,13 @@ class ACL(list):
 def xattrs_from_bytes(bs, offset=0):
   ''' Decode an XAttrs from some bytes, return the xattrs dictionary.
   '''
+  bfr = CornuCopyBuffer.from_bytes(bs)
+  if offset > 0:
+    bfr.skip(offset)
   xattrs = {}
-  while offset < len(bs):
-    name, offset = get_bss(bs, offset)
-    data, offset = get_bsdata(bs, offset)
+  while not bfr.at_eof():
+    name = BSString.parse_value(bfr)
+    data = BSData.parse_value(bfr)
     if name in xattrs:
       warning("repeated name, ignored: %r", name)
     else:
@@ -204,6 +208,7 @@ def xattrs_from_bytes(bs, offset=0):
   return xattrs
 
 # This is a direct dict subclass for memory efficiency.
+# pylnt: disable=too-many-public-methods,too-many-instance-attributes
 class Meta(dict, Transcriber):
   ''' Inode metadata: times, permissions, ownership etc.
 
@@ -278,6 +283,7 @@ class Meta(dict, Transcriber):
     d = self._as_dict()
     return transcribe_mapping(d, fp, T=T)
 
+  # pylint: disable=too-many-arguments
   @classmethod
   def parse_inner(cls, T, s, offset, stopchar, prefix):
     ''' Parse a Meta transcription.
@@ -546,7 +552,7 @@ class Meta(dict, Transcriber):
         perms |= ac.unixmode
       else:
         warning("Meta.unix_perms: ignoring ACL element %s", ac)
-    # TODO: sticky
+    # TODO: sticky bit?
     if self.setuid:
       perms |= S_ISUID
     if self.setgid:
@@ -566,6 +572,7 @@ class Meta(dict, Transcriber):
     '''
     self['pathref'] = newref
 
+  # pylint: disable=too-many-arguments,too-many-return-statements,too-many-branches
   def access(
       self,
       access_mode,

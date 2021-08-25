@@ -21,6 +21,7 @@ statefile=$HOME/var/run/gpg-agent-$HOST
   && . "$statefile" && export GPG_AGENT_INFO \
   && gpg-agent >/dev/null 2>&1 \
   || { which gpg-agent >/dev/null 2>&1 || exit 0
+       rm "$GNUPGHOME"/S.*
        gpg-agent --daemon --sh "--homedir=$GNUPGHOME" "--write-env-file=$statefile" 3>&- \
        && . "$statefile" \
        && export GPG_AGENT_INFO

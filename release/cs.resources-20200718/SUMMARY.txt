@@ -1,0 +1,1 @@
+MultiOpenMixin: as a hack to avoid having an __init__, move state into an on demand object accesses by a private method.

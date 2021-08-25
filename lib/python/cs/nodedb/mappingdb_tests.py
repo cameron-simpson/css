@@ -14,7 +14,9 @@ from . import NodeDB
 from .mappingdb import MappingBackend
 from .node_tests import TestAll as NodeTestAll
 
-class TestAll(NodeTestAll):
+class MappingDBTestAll(NodeTestAll):
+  ''' Tests for `cs.nodedb.mappingdb`.
+  '''
   pass
 
 def selftest(argv):

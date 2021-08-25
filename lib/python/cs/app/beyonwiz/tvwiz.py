@@ -10,7 +10,7 @@ import os
 import os.path
 import struct
 from cs.logutils import warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
 from . import _Recording, RecordingMetaData
 
@@ -98,6 +98,7 @@ class TVWizMetaData(RecordingMetaData):
   ''' Metadata for pre-T3 Beyonwiz devices.
   '''
 
+  @pfx_method
   def __init__(self, raw):
     RecordingMetaData.__init__(self, raw)
     self.series_name = raw['evtName']
@@ -107,8 +108,10 @@ class TVWizMetaData(RecordingMetaData):
     if channel:
       self.source_name = channel
     episode = raw['episode']
-    if episode:
+    try:
       self.episodeinfo.episode = int(episode)
+    except ValueError:
+      self.episodeinfo.episode_title = episode
 
 class TVWiz(_Recording):
   ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
@@ -203,7 +206,21 @@ class TVWiz(_Recording):
   def metadata(self):
     ''' The decoded metadata.
     '''
-    return TVWizMetaData(self.read_header()._asdict())
+    hdrs = self.read_header()
+    tags = TagSet(
+        series_name=hdrs.evtName,
+        description=hdrs.synopsis,
+        start_unixtime=(raw['mjd'] - 40587) * DAY + raw['start'],
+        course_name=hdrs.svcName,
+    )
+    episode = hdrs.episode
+    try:
+      episode_num = int(episode)
+    except ValueError:
+      tags.update(episode_title=episode)
+    else:
+      tags.update(episode=episode_num)
+    return tags
 
   @staticmethod
   def tvwiz_parse_trunc(fp):

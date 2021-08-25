@@ -5,7 +5,7 @@
 
 import unittest
 from random import randint
-from .randutils import rand0, randblock
+from cs.randutils import rand0, make_randblock
 from cs.x import X
 from .hash import HashUtilDict
 from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
@@ -13,7 +13,9 @@ from cs.x import X
 import cs.x
 cs.x.X_via_tty = True
 
-class _TestMissingHashCodes(object):
+class _TestMissingHashCodes:
+  ''' Base class for testing missing hashcodes.
+  '''
 
   def setUp(self):
     self.map1 = HashUtilDict()
@@ -29,7 +31,7 @@ class _TestMissingHashCodes(object):
     ''' Fill map1 and map2 with identical some random blocks.
     '''
     for _ in range(32):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h1 = self.map1.add(data)
       h2 = self.map2.add(data)
       self.assertEqual(h1, h2)
@@ -40,7 +42,7 @@ class _TestMissingHashCodes(object):
     ''' Fill map1 with random blocks, nothing in map2.
     '''
     for n in range(32):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h1 = self.map1.add(data)
     missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), 0)
@@ -50,7 +52,7 @@ class _TestMissingHashCodes(object):
     '''
     ks2 = set()
     for n in range(32):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       h2 = self.map2.add(data)
       ks2.add(h2)
     missing = list(self.miss_generator(self.map1, self.map2))
@@ -62,7 +64,7 @@ class _TestMissingHashCodes(object):
     ks1 = set()
     ks2 = set()
     for n in range(32):
-      data = randblock(rand0(8193))
+      data = make_randblock(rand0(8193))
       choice = randint(0, 2)
       if choice <= 1:
         h1 = self.map1.add(data)
@@ -85,6 +87,8 @@ class _TestMissingHashCodes(object):
 
 class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes,
                                              unittest.TestCase):
+  ''' Test basic missing hashcodes function.
+  '''
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes
@@ -92,6 +96,8 @@ class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes,
 
 class TestMissingHashCodes_Missing_hashcodes_checksum(_TestMissingHashCodes,
                                                       unittest.TestCase):
+  ''' Test checksum based missing hashcodes function.
+  '''
 
   def __init__(self, *a, **kw):
     self.miss_generator = missing_hashcodes_by_checksum

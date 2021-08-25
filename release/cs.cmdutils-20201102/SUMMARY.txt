@@ -1,0 +1,7 @@
+BaseCommand.cmd_help: supply usage only for "all commands", full docstring for specified commands.
+BaseCommand: honour presupplied options.log_level.
+BaseCommand.usage_text: handle missing USAGE_FORMAT better.
+BaseCommand.run: provide options.upd.
+BaseCommand subclasses may now override BaseCommand.OPTIONS_CLASS (default SimpleNamespace) in order to provide convenience methods on the options.
+BaseCommand.run: separate variable for subcmd with dash translated to underscore to match method names.
+Minor fixes.

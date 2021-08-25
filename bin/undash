@@ -4,4 +4,4 @@
 #   - Cameron Simpson <cs@cskk.id.au> 16oct2016
 #
 
-sed 's/−\(....\)/-&/g' ${1+"$@"}
+sed 's/−/-/g' ${1+"$@"}

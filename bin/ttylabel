@@ -89,8 +89,6 @@ ttylabel=
 [ -n "$_start_title" ] && ttylabel=$ttylabel$_start_title$label$_end_title
 [ -n "$_start_icon"  ] && ttylabel=$ttylabel$_start_icon$label$_end_icon
 
-[ -z "${ITERM_SESSION_ID:-}" ] || {
-  iterm setvar terminal_badge "$TTYLABEL_BADGE"
-}
+iterm setvar terminal_badge "$TTYLABEL_BADGE"
 
 exec necho "$ttylabel"

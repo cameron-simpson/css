@@ -1,0 +1,1 @@
+lib/python/cs/gimmicks.py: cs.gimmicks: new module with gimmicks and hacks to avoid certain annoyances, initially stubs for the logging calls

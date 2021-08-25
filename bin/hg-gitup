@@ -1,0 +1,146 @@
+#!/bin/sh
+#
+# Update a git repo from the local Mercurial repo.
+# - Cameron Simpson <cs@cskk.id.au> 19aug2020
+#
+
+set -ue
+
+trace=command
+[ -t 2 ] && trace=set-x
+git_push_opts=
+git_default_branch=main     # vs historic "master"
+all_heads=
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-f] [--] hg-path [hg-branch...]
+  Push hg changesets to a git repo via the hggit extension.
+    -1      Push just the most recent branch head (default).
+    -a      Push all branch heads.
+    -f      Force push, passed to \"git push\".
+    -x      Trace execution of main commands.
+    hg-path The mercurial remote path.
+    hg-branch[:git-branch]
+            Mercurial branches to push, with optional corresponding git branch.
+            The default is the current branch, and if the current branch is
+            \"default\", also \"tip\"."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -1) all_heads= ;;
+    -a) all_heads=1 ;;
+    -f) git_push_opts="$git_push_opts -f" ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing hg-path" >&2
+  badopts=1
+else
+  hg_path=$1
+  shift
+fi
+
+[ $# -gt 0 ] || {
+  set -- $( hg branch )
+  [ "x$1" = xdefault ] && set -- "$@" tip
+}
+
+# not a loop, here to allow using break to skip further tests
+while [ -z "$badopts" ]
+do
+  case "$hg_path" in
+    /* | ./*)
+      echo "$cmd: unsupported local filesystem hg-path: $hg_path" >&2
+      badopts=1
+      break
+      ;;
+    *://*)
+      ;;
+    *)hg_path=$( $trace hg paths "$hg_path" )
+      ;;
+  esac
+  case "$hg_path" in
+    git+ssh://* | git://* )
+      git_repo=${hg_path#*://}
+      ;;
+    *)echo "$cmd: unsupported non-git hg-path: $hg_path" >&2
+      badopts=1
+      break
+      ;;
+  esac
+
+  hg_root=$( hg root )
+  git_dir=$hg_root/.hg/git
+  [ -d "$git_dir" ] || {
+    echo "$cmd: no git tree at $git_dir, runing gexport" >&2
+    $trace hg gexport || exit $?
+  }
+
+  break
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+git(){
+  $trace git "--git-dir=$git_dir" ${1+"$@"}
+}
+
+# update the git tree
+$trace hg gexport
+
+xit=0
+for hg_branch
+do
+  case "$hg_branch" in
+    default)git_branch=$git_default_branch ;;
+    *:*)    git_branch=${hg_branch#*:}
+            hg_branch=${hg_branch%%:*}
+            ;;
+    *)      git_branch=$hg_branch
+            ;;
+  esac
+  case "$hg_branch" in
+    tip)    revset=tip ;;
+    *)      if [ $all_heads ]
+            then  revset="heads(branch(\"$hg_branch\"))"
+            else  revset=$hg_branch
+            fi
+            ;;
+  esac
+  $trace hg-revs \
+    -T "{rev} {node} $hg_branch $git_branch {gitnode} {desc|firstline}\n" \
+    "$revset" \
+  | sort -rn
+done \
+| (
+  xit=0
+  set --
+  old_hg_branch=
+  n=0
+  while read -r rev node hg_branch git_branch gitrev desc
+  do
+    if [ "x$hg_branch" = "x$old_hg_branch" ]
+    then  n=$(( n + 1 ))
+    else  n=1 old_hg_branch=$hg_branch
+    fi
+    case "$n" in
+      1)  git_push_branch=$git_branch ;;
+      *)  git_push_branch=$git_branch-$n ;;
+    esac
+    set -- ${1+"$@"} "$gitrev:refs/heads/$git_push_branch"
+  done
+  git push $git_push_opts --atomic "$git_repo" "$@" || xit=1
+  exit $xit
+)

@@ -1,0 +1,16 @@
+#!/bin/sh -ue
+#
+# Record a Mercurial commit.
+#       - Cameron Simpson <cs@cskk.id.au> 25apr2007
+#
+
+set -ue
+
+revision=$HG_NODE
+
+hg log -r "$revision" --template='{desc}\n' --limit 1 \
+| \
+{ read -r headline
+  wdbase=$( basename "$(pwd)" )
+  buglog -- "$wdbase $headline [$revision]" </dev/null
+}

@@ -14,6 +14,8 @@ from cs.deco import decorator
 from cs.logutils import error
 from cs.py.func import funcname
 
+__version__ = '20210123-post'
+
 DISTINFO = {
     'description':
     "Convenience facilities for managing exceptions.",
@@ -25,6 +27,11 @@ DISTINFO = {
     ],
     'install_requires': ['cs.deco', 'cs.logutils', 'cs.py.func'],
 }
+
+if sys.hexversion >= 0x03000000:
+  exec("def raise_from(src_exc, dst_exc): raise dst_exc from src_exc")
+else:
+  exec("def raise_from(src_exc, dst_exc): raise dst_exc")
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
@@ -146,7 +153,8 @@ def noexc_gen(func):
   noexc_gen_wrapper.__name__ = 'noexc_gen(%s)' % (func.__name__,)
   return noexc_gen_wrapper
 
-def transmute(exc_from, exc_to=None):
+@decorator
+def transmute(func, exc_from, exc_to=None):
   ''' Decorator to transmute an inner exception to another exception type.
 
       The motivating use case is properties in a class with a
@@ -162,17 +170,22 @@ def transmute(exc_from, exc_to=None):
   if exc_to is None:
     exc_to = RuntimeError
 
-  def transmutor(func):
+  def transmute_transmutor_wrapper(*a, **kw):
+    try:
+      return func(*a, **kw)
+    except exc_from as src_exc:
+      # pylint: disable=unidiomatic-typecheck
+      dst_exc = (
+          exc_to(src_exc) if type(exc_to) is type else exc_to(
+              "inner %s:%s transmuted to %s" %
+              (type(src_exc), src_exc, exc_to)
+          )
+      )
+      # TODO: raise from for py3
+      raise_from(src_exc, dst_exc)  # pylint: disable=undefined-variable
+      raise RuntimeError("NOTREACHED")
 
-    def transmute_transmutor_wrapper(*a, **kw):
-      try:
-        return func(*a, **kw)
-      except exc_from as e:
-        raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
-
-    return transmute_transmutor_wrapper
-
-  return transmutor
+  return transmute_transmutor_wrapper
 
 def unattributable(func):
   ''' Decorator to transmute `AttributeError` into a `RuntimeError`.

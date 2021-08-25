@@ -1,0 +1,4 @@
+New Progress.bar generator method iterating over an iterable while displaying a progress bar.
+New convenience function progressbar(it,...) which rolls its own Progress instance.
+Progress: always support a throughput window, default to DEFAULT_THROUGHPUT_WINDOW = 5s.
+Improve the default progress bar render returned by Progress.status().

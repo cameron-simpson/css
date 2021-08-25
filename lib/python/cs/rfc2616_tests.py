@@ -10,6 +10,8 @@ import unittest
 from cs.rfc2616 import get_lws, parse_chunk_line1
 
 class TestRFC2616(unittest.TestCase):
+  ''' Tests for `cs.rfc2616`.
+  '''
 
   def test00get_lws(self):
     match, offset = get_lws('\r\n   ')

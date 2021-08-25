@@ -19,49 +19,22 @@ import os
 from os.path import isfile
 import time
 from icontract import require
-from cs.binary import PacketField, BSSFloat
+from cs.binary import BinaryMultiValue, BSSFloat
 from cs.fileutils import lockfile, shortpath
 from cs.inttypes import Flags
-from cs.lex import unctrl
+from cs.lex import unctrl, get_ini_clause_entryname
 from cs.logutils import warning, exception, debug
-from cs.pfx import Pfx, gen as pfxgen
+from cs.pfx import Pfx, pfx
 from cs.py.func import prop
-from .compose import get_clause_archive
 from .dir import _Dirent, DirentRecord
 from .meta import NOUSERID, NOGROUPID
 
 CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
-class ArchiveEntry(PacketField):
+class ArchiveEntry(BinaryMultiValue('ArchiveEntry',
+                                    dict(when=BSSFloat, dirent=DirentRecord))):
   ''' An Archive entry record.
   '''
-
-  @require(lambda when: when is None or isinstance(when, float))
-  @require(lambda dirent: dirent is None or isinstance(dirent, _Dirent))
-  @require(
-      lambda when, dirent: (
-          (when is None and dirent is None) or
-          (when is not None and dirent is not None)
-      )
-  )
-  def __init__(self, when, dirent):
-    super().__init__(None)
-    self.when = when
-    self.dirent = dirent
-
-  @classmethod
-  def from_buffer(cls, bfr, **kw):
-    ''' Parse the `when` and `dirent` values from `bfr`.
-    '''
-    when = BSSFloat.value_from_buffer(bfr)
-    dirent = DirentRecord.value_from_buffer(bfr)
-    return cls(when, dirent, **kw)
-
-  def transcribe(self):
-    ''' Transcribe the `when` and `dirent` fields.
-    '''
-    yield BSSFloat(self.when).transcribe()
-    yield DirentRecord(self.dirent).transcribe()
 
 def Archive(path, missing_ok=False, weird_ok=False, config=None):
   ''' Return an Archive from the specification `path`.
@@ -79,7 +52,7 @@ def Archive(path, missing_ok=False, weird_ok=False, config=None):
   '''
   if path.startswith('['):
     # expect "[clausename]name"
-    clause_name, archive_name, offset = get_clause_archive(path)
+    clause_name, archive_name, offset = get_ini_clause_entryname(path)
     if offset < len(path):
       raise ValueError(
           "unparsed text after archive name: %r" % (path[offset:],)
@@ -120,12 +93,12 @@ class BaseArchive(ABC):
       for entry in self:
         last_entry = entry
       if last_entry is None:
-        return ArchiveEntry(None, None)
+        return ArchiveEntry(when=None, dirent=None)
       self._last = last_entry
     return last_entry
 
   @staticmethod
-  @pfxgen
+  @pfx
   def parse(fp, first_lineno=1):
     ''' Parse lines from an open archive file, yield `(when, E)`.
     '''
@@ -144,7 +117,7 @@ class BaseArchive(ABC):
         if offset != len(dent):
           warning("unparsed dirent text: %r", dent[offset:])
         ##info("when=%s, E=%s", when, E)
-        yield ArchiveEntry(when, E)
+        yield ArchiveEntry(when=when, dirent=E)
 
   @staticmethod
   def read(fp, first_lineno=1):
@@ -153,7 +126,7 @@ class BaseArchive(ABC):
     '''
     for entry in BaseArchive.parse(fp, first_lineno=first_lineno):
       return entry
-    return ArchiveEntry(None, None)
+    return ArchiveEntry(when=None, dirent=None)
 
   @staticmethod
   def write(fp, E, when=None, etc=None):
@@ -244,7 +217,7 @@ class FilePathArchive(BaseArchive):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, shortpath(self.path))
 
-  @pfxgen
+  @pfx
   def __iter__(self):
     ''' Generator yielding (unixtime, Dirent) from the archive file.
     '''

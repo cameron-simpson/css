@@ -9,6 +9,8 @@ import unittest
 from cs.seq import imerge, onetoone, onetomany, Seq
 
 class TestSeq(unittest.TestCase):
+  ''' Tests for `cs.seq.Seq`.
+  '''
 
   def setUp(self):
     pass
