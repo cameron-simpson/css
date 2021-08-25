@@ -28,6 +28,7 @@ class CloudCommand(BaseCommand):
     -A cloud_area   A cloud storage area of the form prefix://bucket/subpath.
                     Default from the $CS_CLOUD_AREA environment variable.
   '''
+  SUBCOMMAND_ARGV_DEFAULT = 'stat'
 
   # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
@@ -59,6 +60,18 @@ class CloudCommand(BaseCommand):
       self.options.cloud_area_path = val
     else:
       raise RuntimeError("unimplemented option")
+
+  def cmd_stat(self, argv):
+    ''' Usage: {cmd}
+          Report the current settings.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    CAF = self.options.cloud_area
+    print("Cloud area:")
+    print("  cloud", CAF.cloud)
+    print("  bucket_name", CAF.bucket_name)
+    print("  basepath", CAF.basepath)
 
   @staticmethod
   def cmd_download(self, argv):
