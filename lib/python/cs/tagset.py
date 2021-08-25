@@ -33,9 +33,8 @@
       but that tag value can of course be a sequence or mapping
       for more elaborate tag values.
     * `TagsOntology`:
-      a mapping of type names to `TagSet`s defining the type.
-      This mapping also contains entries for the metadata
-      for specific type values.
+      a mapping of type names to `TagSet`s defining the type
+      and also to entries for the metadata for specific per-type values.
 
     Here's a simple example with some `Tag`s and a `TagSet`.
 
@@ -80,6 +79,8 @@
         >>> 'subtopic' in tags
         True
         >>> # test for subtopic=ontologies
+        >>> print(subtopic)
+        subtopic=ontologies
         >>> subtopic in tags
         True
         >>> # test for subtopic=libraries
@@ -112,8 +113,8 @@ Here's an example ontology supporting the above `TagSet`:
     type.cast type=dict key_type=person member_type=character description="members of a production"
     type.character description="an identified member of a story"
     type.series type=str
-    meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
-    meta.person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+    character.marvel.black_widow type=character names=["Natasha Romanov"]
+    person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
 The type information for a `cast`
 is defined by the ontology entry named `type.cast`,
@@ -131,9 +132,8 @@ it is now possible to look up the metadata for the described cast members.
 
 The key `"Scarlett Johansson"` is a `person`
 (from the type definition of `cast`).
-The ontology entry for her is named `meta.person.scarlett_johansson`
+The ontology entry for her is named `person.scarlett_johansson`
 which is computed as:
-* `meta`: the name prefix for metadata entries
 * `person`: the type name
 * `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
   and replacing whitespace with an underscore.
@@ -142,9 +142,8 @@ which is computed as:
 
 The key `"Black Widow (Marvel)"` is a `character`
 (again, from the type definition of `cast`).
-The ontology entry for her is named `meta.character.marvel.black_widow`
+The ontology entry for her is named `character.marvel.black_widow`
 which is computed as:
-* `meta`: the name prefix for metadata entries
 * `character`: the type name
 * `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
   replacing whitespace with an underscore,
@@ -158,7 +157,7 @@ You can just use `str.format_map` as shown above
 for the direct values in a `TagSet`,
 since it subclasses `dict`.
 
-However, `TagSet`s subclass `cs.lex.FormatableMixin`
+However, `TagSet`s also subclass `cs.lex.FormatableMixin`
 and therefore have a richer `format_as` method which has an extended syntax
 for the format component.
 Command line tools like `fstags` use this for output format specifications.
@@ -171,7 +170,7 @@ An example:
     ...   {
     ...       'type.colour':
     ...       TagSet(description="a colour, a hue", type="str"),
-    ...       'meta.colour.blue':
+    ...       'colour.blue':
     ...       TagSet(
     ...           url='https://en.wikipedia.org/wiki/Blue',
     ...           wavelengths='450nm-495nm'
@@ -182,6 +181,7 @@ An example:
     >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
     >>> tags.format_as('The colour is {colour}.')
     'The colour is blue.'
+    >>> # format a string about the tags showing some metadata about the colour
     >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
     'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
 
@@ -191,22 +191,21 @@ An example:
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
+from contextlib import contextmanager
 from datetime import date, datetime
 import errno
-from fnmatch import (
-    filter as fn_filter, fnmatch, fnmatchcase, translate as fn_translate
-)
+from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
 import re
-from threading import Lock
+from threading import Lock, RLock
 import time
-from typing import Optional
+from typing import Optional, Union
 from uuid import UUID
-from icontract import ensure, require
+from icontract import require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
@@ -219,7 +218,10 @@ from cs.lex import (
     has_format_attributes, format_attribute, FStr, typed_repr as r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
-from cs.mappings import AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy
+from cs.mappings import (
+    AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
+    RemappedMappingProxy
+)
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
@@ -670,10 +672,11 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   # "set" mode
   # note: cannot just be add=set because it won't follow subclass overrides
-  def add(self, tag, **kw):
+  @tag_or_tag_value
+  def add(self, tag_name, value, **kw):
     ''' Adding a `Tag` calls the class `set()` method.
     '''
-    return self.set(tag, **kw)
+    return self.set(tag_name, value, **kw)
 
   def __delitem__(self, tag_name):
     if tag_name not in self:
@@ -835,25 +838,37 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   @classmethod
   @pfx_method
   def edit_many(cls, tes, editor=None, verbose=True):
-    ''' Edit an iterable of `TagSet`s.
+    ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
         This function supports modifying both `name` and `Tag`s.
+        The `Tag`s are updated directly.
+        The changed names are returning in the `old_name,new_name` above.
+
+        The collection `tes` may be either a mapping of name/key
+        to `TagSet` or an iterable of `TagSets`. If the latter, a
+        mapping is made based on `te.name or te.id` for each item
+        `te` in the iterable.
     '''
     if editor is None:
       editor = EDITOR
-    te_map = {te.name or te.id: te for te in tes}
+    try:
+      tes.items
+    except AttributeError:
+      te_map = {te.name or te.id: te for te in tes}
+    else:
+      te_map = tes
     assert all(isinstance(k, (str, int)) for k in te_map.keys()), \
         "not all entities have str or int keys: %r" % list(te_map.keys())
     lines = list(
         map(
-            lambda te: ' '.join(
-                [Tag.transcribe_value(te.name or te.id)] + [
-                    str(te.tag(tag_name))
-                    for tag_name in te.keys()
+            lambda te_item: ' '.join(
+                [Tag.transcribe_value(te_item[0])] + [
+                    str(te_item[1].tag(tag_name))
+                    for tag_name in te_item[1].keys()
                     if tag_name != 'name'
                 ]
-            ), te_map.values()
+            ), te_map.items()
         )
     )
     changes = edit_strings(lines, editor=editor)
@@ -926,7 +941,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
       Examples:
 
-          >>> ont = TagsOntology({'meta.colour.blue': TagSet(wavelengths='450nm-495nm')})
+          >>> ont = TagsOntology({'colour.blue': TagSet(wavelengths='450nm-495nm')})
           >>> tag0 = Tag('colour', 'blue')
           >>> tag0
           Tag(name='colour',value='blue',ontology=None)
@@ -1149,81 +1164,105 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         function which takes a string and returns a Python object
         (expected to be an instance of `type`).
         The default comes from `cls.EXTRA_TYPES`.
-
-        Nonwhitespace at `s[offset:]` is tried against each such `from_str`
-        function in turn;
-        if the function does not raise `ValueError`
-        then its result is accepted as the parsed value.
-        If none matches,
-        `cls.JSON_DECODER.raw_decode` is used to parse the value.
-
         This supports storage of nonJSONable values in text form.
+
+        The core syntax for values is JSON;
+        value text commencing with any of `'"'`, `'['` or `'{'`
+        is treated as JSON and decoded directly,
+        leaving the offset at the end of the JSON parse.
+
+        Otherwise all the nonwhitespace at this point is collected
+        as the value text,
+        leaving the offset at the next whitespace character
+        or the end of the string.
+        The text so collected is then tried against the `from_str`
+        function of each `extra_types`;
+        the first successful parse is accepted as the value.
+        If no extra type match,
+        the text is tried against `int()` and `float()`;
+        if one of these parses the text and `str()` of the result round trips
+        to the original text
+        then that value is used.
+        Otherwise the text itself is kept as the value.
     '''
     if extra_types is None:
       extra_types = cls.EXTRA_TYPES
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
-    else:
-      # look for a "bare" name
+    elif s[offset] in '"[{':
+      # must be a JSON value - collect it
+      value_part = s[offset:]
       try:
-        value, offset2 = cls.parse_name(s, offset)
-      except ValueError:
-        value = None
-      else:
-        if offset == offset2:
-          value = None
-      if value is not None:
-        # a bare name, use as is
-        offset = offset2
-      else:
-        # check for special "nonwhitespace" transcription
-        nonwhite, nw_offset = get_nonwhite(s, offset)
-        nw_value = None
-        for _, from_str, _ in extra_types:
-          try:
-            nw_value = from_str(nonwhite)
-          except ValueError:
-            pass
-          else:
-            break
-        if nw_value is not None:
-          # special format found
-          value = nw_value
-          offset = nw_offset
+        value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
+      except JSONDecodeError as e:
+        raise ValueError(
+            "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
+        ) from e
+      offset += suboffset
+    else:
+      # collect nonwhitespace, check for special forms
+      nonwhite, offset = get_nonwhite(s, offset)
+      value = None
+      for _, from_str, _ in extra_types:
+        try:
+          value = from_str(nonwhite)
+        except ValueError:
+          pass
         else:
-          # decode as plain JSON data
-          value_part = s[offset:]
-          try:
-            value, suboffset = cls.JSON_DECODER.raw_decode(value_part)
-          except JSONDecodeError as e:
-            raise ValueError(
-                "offset %d: raw_decode(%r): %s" % (offset, value_part, e)
-            ) from e
-          offset += suboffset
+          break
+      if value is None:
+        # not one of the special formats
+        # check for round trip int or float
+        try:
+          i = int(nonwhite)
+        except ValueError:
+          pass
+        else:
+          if str(i) == nonwhite:
+            value = i
+          else:
+            try:
+              f = float(nonwhite)
+            except ValueError:
+              pass
+            else:
+              if str(f) == nonwhite:
+                value = f
+      if value is None:
+        # not a special value, preserve as a string
+        value = nonwhite
     return value, offset
 
   @property
   @pfx_method(use_str=True)
-  def typedata(self):
+  def typedef(self):
     ''' The defining `TagSet` for this tag's name.
 
         This is how its type is defined,
         and is obtained from:
         `self.ontology['type.'+self.name]`
 
+        Basic `Tag`s often do not need a type definition;
+        these are only needed for structured tag values
+        (example: a mapping of cast members)
+        or when a `Tag` name is an alias for another type
+        (example: a cast member name might be an `actor`
+        which in turn might be a `person`).
+
         For example, a `Tag` `colour=blue`
-        gets its type information from the `type.colour` entry in an ontology.
+        gets its type information from the `type.colour` entry in an ontology;
+        that entry is just a `TagSet` with relevant information.
     '''
     ont = self.ontology
     if ont is None:
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
-    return ont.typedata(self.name)
+    return ont.typedef(self.name)
 
   @property
   @pfx_method(use_str=True)
-  def key_typedata(self):
+  def key_typedef(self):
     ''' The typedata definition for this `Tag`'s keys.
 
         This is for `Tag`s which store mappings,
@@ -1240,14 +1279,14 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if key_type is None:
       return None
     ont = self.ontology
-    return ont.typedata(key_type)
+    return ont.typedef(key_type)
 
   @pfx_method(use_str=True)
   def key_metadata(self, key):
     ''' Return the metadata definition for `key`.
 
         The metadata `TagSet` is obtained from the ontology entry
-        'meta.`*type*`.`*key_tag_name*
+        *type*`.`*key_tag_name*
         where *type* is the `Tag`'s `key_type`
         and *key_tag_name* is the key converted
         into a dotted identifier by `TagsOntology.value_to_tag_name`.
@@ -1259,12 +1298,12 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if key_type is None:
       return None
     ont = self.ontology
-    key_metadata_name = 'meta.' + key_type + '.' + ont.value_to_tag_name(key)
+    key_metadata_name = key_type + '.' + ont.value_to_tag_name(key)
     return ont[key_metadata_name]
 
   @property
   @pfx_method(use_str=True)
-  def member_typedata(self):
+  def member_typedef(self):
     ''' The typedata definition for this `Tag`'s members.
 
         This is for `Tag`s which store mappings or sequences,
@@ -1282,14 +1321,14 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if member_type is None:
       return None
     ont = self.ontology
-    return ont.typedata(member_type)
+    return ont.typedef(member_type)
 
   @pfx_method(use_str=True)
   def member_metadata(self, member_key):
     ''' Return the metadata definition for self[member_key].
 
         The metadata `TagSet` is obtained from the ontology entry
-        'meta.`*type*`.`*member_tag_name*
+        *type*`.`*member_tag_name*
         where *type* is the `Tag`'s `member_type`
         and *member_tag_name* is the member value converted
         into a dotted identifier by `TagsOntology.value_to_tag_name`.
@@ -1302,9 +1341,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return None
     ont = self.ontology
     value = self.value[member_key]
-    member_metadata_name = 'meta.' + member_type + '.' + ont.value_to_tag_name(
-        value
-    )
+    member_metadata_name = member_type + '.' + ont.value_to_tag_name(value)
     return ont[member_metadata_name]
 
   @property
@@ -1344,20 +1381,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     ont = ontology or self.ontology
     assert ont, "ont is false: %r" % (ont,)
-    basetype = self.basetype
-    if basetype == 'list':
-      member_type = self.member_type
-      return [
-          ont.metadata(member_type, value, convert=convert)
-          for value in self.value
-      ]
-    if basetype == 'dict':
-      member_type = self.member_type
-      return {
-          key: ont.metadata(member_type, value)
-          for key, value in self.value.items()
-      }
-    return ont.metadata(self.name, self.value)
+    return ont.metadata(self, convert=convert)
 
   @property
   def meta(self):
@@ -1702,14 +1726,6 @@ class TagSetPrefixView(FormatableMixin):
     return self._prefix_ + k in self._tags
 
   def __getitem__(self, k):
-    if not isinstance(k, str):
-      raise ValueError(
-          "%s.__getitem__: str required, received %s:%r" %
-          (type(self).__name__, type(k), k)
-      )
-    tag = self.tag
-    if tag is not None:
-      return tag.value[k]
     return self._tags[self._prefix_ + k]
 
   def __setitem__(self, k, v):
@@ -1782,30 +1798,62 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `cs.sqltags.SQLTags`: a mapping of names to `TagSet`s stored in an SQL database
 
       Subclasses must implement:
-      * `default_factory(self,name,**kw)`: as with `defaultdict` this is called
-        from `__missing__` for missing names,
-        and also from `add`.
-        If set to `None` then `__getitem__` will raise `KeyError`
-        for missing names.
-        _Unlike_ `defaultdict`, the factory is called with the key `name`
-        and any additional keyword parameters.
       * `get(name,default=None)`: return the `TagSet` associated
         with `name`, or `default`.
       * `__setitem__(name,tagset)`: associate a `TagSet`with the key `name`;
         this is called by the `__missing__` method with a newly created `TagSet`.
-
-      Subclasses may reasonably want to define the following:
-      * `startup(self)`: allocate any needed resources
-        such as database connections
-      * `shutdown(self)`: write pending changes to a backing store,
-        release resources acquired during `startup`
       * `keys(self)`: return an iterable of names
+
+      Subclasses may reasonably want to override the following:
+      * `startup_shutdown(self)`: context manager to allocate and release any 
+        needed resources such as database connections
+
+      Subclasses may implement:
       * `__len__(self)`: return the number of names
+
+      The `TagSet` factory used to fetch or create a `TagSet` is
+      named `TagSetClass`. The default implementation honours two
+      class attributes:
+      * `TAGSETCLASS_DEFAULT`: initially `TagSet`
+      * `TAGSETCLASS_PREFIX_MAPPING`: a mapping of type names to `TagSet` subclasses
+
+      The type name of a `TagSet` name is the first dotted component.
+      For example, `artist.nick_cave` has the type name `artist`.
+      A subclass of `BaseTagSets` could utiliise an `ArtistTagSet` subclass of `TagSet`
+      and provide:
+
+          TAGSETCLASS_PREFIX_MAPPING = {
+            'artist': ArtistTagSet,
+          }
+
+      in its class definition. Accesses to `artist.`* entities would
+      result in `ArtistTagSet` instances and access to other enitities
+      would result in ordinary `TagSet` instances.
   '''
 
   _missing = object()
 
-  TagSetClass = TagSet
+  # the default `TagSet` subclass
+  TAGSETCLASS_DEFAULT = TagSet
+
+  # a mapping of TagSet name prefixs to TagSet subclasses
+  # used to automatically map certain tagsets to types
+  TAGSETCLASS_PREFIX_MAPPING = {}
+
+  @pfx_method
+  def TagSetClass(self, *, name, **kw):
+    ''' Factory to create a new `TagSet` from `name`.
+    '''
+    cls = self.TAGSETCLASS_DEFAULT
+    if isinstance(name, str):
+      try:
+        type_name, _ = name.split('.', 1)
+      except ValueError:
+        pass
+      else:
+        cls = self.TAGSETCLASS_PREFIX_MAPPING.get(type_name, cls)
+    tags = cls(name=name, **kw)
+    return tags
 
   def __init__(self, *, ontology=None):
     ''' Initialise the collection.
@@ -1816,15 +1864,6 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     return "%s<%s>" % (type(self).__name__, id(self))
 
   __repr__ = __str__
-
-  def startup(self):
-    ''' Allocate any needed resources such as database connections.
-    '''
-
-  def shutdown(self):
-    ''' Write any pending changes to a backing store,
-        release resources allocated during `startup`.
-    '''
 
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
@@ -1941,6 +1980,25 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
     '''
     return TagSetsSubdomain(self, subname)
 
+  def edit(self, *, select_tagset=None, **kw):
+    ''' Edit the `TagSet`s.
+
+        Parameters:
+        * `select_tagset`: optional callable accepting a `TagSet`
+          which tests whether it should be included in the `TagSet`s
+          to be edited
+        Other keyword arguments are passed to `Tag.edit_many`.
+    '''
+    if select_tagset is None:
+      tes = self
+    else:
+      tes = {name: te for name, te in self.items() if select_tagset(te)}
+    changed_tes = TagSet.edit_many(tes, **kw)
+    for old_name, new_name, te in changed_tes:
+      if old_name != new_name:
+        with Pfx("rename %r => %r", old_name, new_name):
+          te.name = new_name
+
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
   ''' A view into a `BaseTagSets` for keys commencing with a prefix.
   '''
@@ -2010,37 +2068,169 @@ class MappingTagSets(BaseTagSets):
       ks = filter(lambda k: k.startswith(prefix), ks)
     return ks
 
-class TagsOntology(SingletonMixin):
-  ''' An ontology for tag names.
+class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
+  ''' A wrapper for a `TagSets` instance backing an ontology.
 
+      Each instance has the following attributes:
+      * `tagsets`: the `TagSets` instance containing ontology information
+      * `match_func`: a function of the type name used in the main ontology,
+        returning `None` if the type name is not supported
+        by this particular `TagSets`;
+        if this function is `None` that all type names are accepted unchanged.
+      * `unmatch_func`: a function of the type name used within
+        this particular `TagSets`,
+        returning the type name used in the main ontology;
+        it should be the reverse of `match_func`;
+        if this function is `None` the subtype name is returned unchanged.
+      * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
+
+      Example:
+
+          >>> subTS = _TagsOntology_SubTagSets(MappingTagSets(), 'prefix.')
+          >>> subkey = subTS.subkey('prefix.key')
+          >>> subkey
+          'key'
+          >>> key = subTS.key(subkey)
+          >>> key
+          'prefix.key'
+          >>> subTS['prefix.bah'].add('x', 1)
+          >>> list(subTS.tagsets.keys())
+          ['bah']
+          >>> list(subTS.keys())
+          ['prefix.bah']
+  '''
+
+  @typechecked
+  def __init__(self, tagsets: BaseTagSets, match, unmatch=None):
+    self.__match = match
+    self.__unmatch = unmatch
+    accepts_key = None
+    if match is None:
+      assert unmatch is None
+      accepts_key = lambda _: True
+      to_subkey = lambda key: key
+      from_subkey = lambda subkey: subkey
+    elif isinstance(match, str):
+      assert unmatch is None
+      if match.endswith(('.', '-', '_')):
+        # prefixed based match and translation
+        accepts_key = lambda key: key.startswith(match)
+        to_subkey = lambda key: cutprefix(key, match)
+        from_subkey = lambda subkey: match + subkey
+      else:
+        # prefixed based match, use keys unchanged
+        match_ = match + '.'
+        accepts_key = lambda key: key.startswith(match_)
+        to_subkey = lambda key: key
+        from_subkey = lambda subkey: subkey
+    elif callable(match):
+      accepts_key = lambda key: match(key) is not None
+      to_subkey = match
+      from_subkey = unmatch
+    if accepts_key is None:
+      raise ValueError("unsupported match=%r, unmatch=%r" % (match, unmatch))
+    super().__init__(tagsets, to_subkey, from_subkey)
+    self.tagsets = tagsets
+    self.accepts_key = accepts_key
+
+  def __repr__(self):
+    return "%s(match=%r,unmatch=%r)" % (
+        type(self).__name__, self.__match, self.__unmatch
+    )
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open/close the wrapped tagsets.
+    '''
+    with self.tagsets:
+      yield
+
+  def items(self):
+    ''' Enumerate the `TagSet`s by name.
+    '''
+    return self.tagsets.items()
+
+  def subtype_name(self, type_name):
+    ''' Return the subkey used for `type_name`.
+    '''
+    subtype_name__ = self.subkey(type_name + '._')
+    assert subtype_name__.endswith('._')
+    return cutsuffix(subtype_name__, '._')
+
+  def accepts_type(self, type_name):
+    ''' Test whether this accepts the type `type_name`
+        by probing `self.accepts_key(type_name+'._').
+    '''
+    return self.accepts_key(type_name + '._')
+
+  def typedef(self, type_name):
+    ''' Return the type definition `TagSet` for the type `type_name`.
+    '''
+    assert self.accepts_type(type_name)
+    assert not type_name.startswith('type.')
+    subtype_name = 'type.' + self.subkey(type_name)
+    return self.tagsets[subtype_name]
+
+  def type_names(self):
+    return map(
+        lambda subkey: self.key(cutprefix(subkey, 'type.')),
+        self.tagsets.keys(prefix='type.')
+    )
+
+class TagsOntology(SingletonMixin, BaseTagSets):
+  ''' An ontology for tag names.
       This is based around a mapping of names
       to ontological information expressed as a `TagSet`.
 
+      Normally an object's tags are not a self contained repository of all the information;
+      instead a tag just names some information.
+
+      As a example, consider the tag `colour=blue`.
+      Meta information about `blue` is obtained via the ontology,
+      which has an entry for the colour `blue`.
+      We adopt the convention that the type is just the tag name,
+      so we obtain the metadata by calling `ontology.metadata(tag)`
+      or alternatively `ontology.metadata(tag.name,tag.value)`
+      being the type name and value respectively.
+
+      The ontology itself is based around `TagSets` and effectively the call
+      `ontology.metadata('colour','blue')`
+      would look up the `TagSet` named `colour.blue` in the underlying `Tagsets`.
+
+      For a self contained dataset this means that it can be its own ontology.
+      For tags associated with arbitrary objects
+      such as the filesystem tags maintained by `cs.fstags`
+      the ontology would be a separate tags collection stored in a central place.
+
       There are two main categories of entries in an ontology:
-      * types: an entry named `type.`*typename* contains a `TagSet`
-        defining the type named *typename*
-      * metadata: an entry named `meta.`*typename*`.`*value_key*
+      * metadata: other entries named *typename*`.`*value_key*
         contains a `TagSet` holding metadata for a value of type *typename*
         whose value is mapped to *value_key*
+      * types: an optional entry named `type.`*typename* contains a `TagSet`
+        describing the type named *typename*;
+        really this is just more metadata where the "type name" is `type`
 
-      For any `Tag` *name*=*value* the associated *typename* is just *name*.
-      For example, a `Tag` `colour="blue"`
-      would have type information at the entry `type.colour`
-      and metadata about `"blue"` at `meta.colour.blue`.
-
-      Metadata are `TagSet`s describing particular values of a type.
+      Metadata are `TagSets` instances describing particular values of a type.
       For example, some metadata for the `Tag` `colour="blue"`:
 
-          meta.colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
+          colour.blue url="https://en.wikipedia.org/wiki/Blue" wavelengths="450nm-495nm"
 
       Some metadata associated with the `Tag` `actor="Scarlett Johansson"`:
 
-          meta.actor.scarlett_johansson roles=["Black Widow (Marvel)"]
-          meta.character.marvel.black_widow type=character names=["Natasha Romanov"]
+          actor.scarlett_johansson role=["Black Widow (Marvel)"]
+          character.marvel.black_widow fullname=["Natasha Romanov"]
 
-      Getting from the role `"Black Widow (Marvel)"`
-      to its metadata is done with the method `metadata(type_name,value)`,
-      where the *type_name* is `"role"`.
+      The tag values are lists above because an actor might play many roles, etc.
+
+      There's a convention for converting human descriptions
+      such as the role string `"Black Widow (Marvel)"` to its metadata.
+      * the value `"Black Widow (Marvel)"` if converted to a key
+        by the ontology method `value_to_tag_name`;
+        it moves a bracket suffix such as `(Marvel)` to the front as a prefix
+        `marvel.` and downcases the rest of the string and turns spaces into underscores.
+        This yields the value key `marvel.black_widow`.
+      * the type is `role`, so the ontology entry for the metadata
+        is `role.marvel.black_widow`
 
       this requires type information about a `role`.
       Here are some type definitions supporting the above metadata:
@@ -2048,7 +2238,7 @@ class TagsOntology(SingletonMixin):
           type.person type=str description="A person."
           type.actor type=person description="An actor's stage name."
           type.character type=str description="A person in a story."
-          type.role type=character description="A character role in a performance."
+          type.role type_name=character description="A character role in a performance."
           type.cast type=dict key_type=actor member_type=role description="Cast members and their roles."
 
       The basic types have their Python names: `int`, `float`, `str`, `list`,
@@ -2056,19 +2246,7 @@ class TagsOntology(SingletonMixin):
       You can define subtypes of these for your own purposes
       as illustrated above.
 
-      The `role` `"Black Widow (Marvel)"`
-      is mapped to its metadata as follows:
-      * the value `"Black Widow (Marvel)"` if converted to a key
-        by the ontology method `value_to_tag_name`;
-        it moves a bracket suffix such as `(Marvel)` to the front as a prefix
-        `marvel.` and downcases the rest of the string and turns spaces into underscores.
-        This yields the value key `marvel.black_widow`.
-      * the type is `role`, so the ontology entry for the metadata
-        is `meta.role.marvel.black_widow`
-
-      l
-
-      for example:
+      For example:
 
           type.colour type=str description="A hue."
 
@@ -2098,11 +2276,13 @@ class TagsOntology(SingletonMixin):
   def _singleton_key(cls, tagsets=None, **_):
     return None if tagsets is None else id(tagsets)
 
-  def __init__(self, tagsets=None, **initial_tags):
+  def __init__(
+      self, tagsets: Union[BaseTagSets, dict, None] = None, **initial_tags
+  ):
     if hasattr(self, 'tagsets'):
       return
-    if tagsets is None:
-      tagsets = MappingTagSets()
+    if tagsets is None or not isinstance(tagsets, BaseTagSets):
+      tagsets = MappingTagSets(tagsets)
     self.__dict__.update(
         _subtagsetses=[],
         _type_name2subtype_name={},
@@ -2117,198 +2297,251 @@ class TagsOntology(SingletonMixin):
   def __str__(self):
     return str(self.as_dict())
 
-  class SubTagSets(namedtuple('SubTagSets',
-                              'tagsets match_func unmatch_func type_map')):
-    ''' A specification for a `TagSets` instance backing an ontology.
-
-        Each instance has the following attributes:
-        * `tagsets`: the `TagSets` instance containing ontology information
-        * `match_func`: a function of the type name used in the main ontology,
-          returning `None` if the type name is not supported
-          by this particular `TagSets`;
-          if this function is `None` that all type names are accepted unchanged.
-        * `unmatch_func`: a function of the type name used within
-          this particular `TagSets`,
-          returning the type name used in the main ontology;
-          it should be the reverse of `match_func`;
-          if this function is `None` the subtype name is returned unchanged.
-        * `type_map`: an `IndexedMapping` caching type_name<->subtype_name associations
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open all the sub`TagSets` and close on exit.
     '''
+    subs = list(self._subtagsetses)
+    for subtagsets in subs:
+      subtagsets.open()
+    with super().startup_shutdown():
+      yield
+    for subtagsets in subs:
+      subtagsets.close()
 
-    @classmethod
-    @pfx_method(with_args=True)
-    def from_match(cls, tagsets, match, unmatch=None):
-      ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
+  @classmethod
+  @pfx_method(with_args=True)
+  def from_match(cls, tagsets, match, unmatch=None):
+    ''' Initialise a `SubTagSets` from `tagsets`, `match` and optional `unmatch`.
 
-          Parameters:
-          * `tagsets`: a `TagSets` holding ontology information
-          * `match`: a match function used to choose entries based on a type name
-          * `unmatch`: an optional reverse for `match`, accepting a subtype
-            name and returning its public name
+        Parameters:
+        * `tagsets`: a `TagSets` holding ontology information
+        * `match`: a match function used to choose entries based on a type name
+        * `unmatch`: an optional reverse for `match`, accepting a subtype
+          name and returning its public name
 
-          If `match` is `None`
-          then `tagsets` will always be chosen if no prior entry matched.
+        If `match` is `None`
+        then `tagsets` will always be chosen if no prior entry matched.
 
-          Otherwise, `match` is resolved to a function `match-func(type_name)`
-          which returns a subtype name on a match and a false value on no match.
+        Otherwise, `match` is resolved to a function `match-func(type_name)`
+        which returns a subtype name on a match and a false value on no match.
 
-          If `match` is a callable it is used as `match_func` directly.
+        If `match` is a callable it is used as `match_func` directly.
 
-          if `match` is a list, tuple or set
-          then this method calls itself with `(tagsets,submatch)`
-          for each member `submatch` if `match`.
+        if `match` is a list, tuple or set
+        then this method calls itself with `(tagsets,submatch)`
+        for each member `submatch` if `match`.
 
-          If `match` is a `str`,
-          if it ends in a dot '.', dash '-' or underscore '_'
-          then it is considered a prefix of `type_name` and the returned subtype name
-          is the text from `type_name` after the prefix
-          othwerwise it is considered a full match for the `type_name`
-          and the returns subtype name is `type_name` unchanged.
-          The `match` string is a shell style glob supporting `*` but not `?` or `[`*seq*`]`.
+        If `match` is a `str`,
+        if it ends in a dot '.', dash '-' or underscore '_'
+        then it is considered a prefix of `type_name` and the returned
+        subtype name is the text from `type_name` after the prefix
+        othwerwise it is considered a full match for the `type_name`
+        and the returns subtype name is `type_name` unchanged.
+        The `match` string is a simplistic shell style glob
+        supporting `*` but not `?` or `[`*seq*`]`.
 
-          The value of `unmatch` is constrained by `match`.
-          If `match` is `None`, `unmatch` must also be `None`;
-          the type name is used unchanged.
-          If `match` is callable`, `unmatch` must also be callable;
-          it is expected to reverse `match`.
+        The value of `unmatch` is constrained by `match`.
+        If `match` is `None`, `unmatch` must also be `None`;
+        the type name is used unchanged.
+        If `match` is callable`, `unmatch` must also be callable;
+        it is expected to reverse `match`.
 
-          Examples:
+        Examples:
 
-              >>> from os.path import expanduser as u
-              >>> # an initial empty ontology with a default in memory mapping
-              >>> ont = TagsOntology()
-              # divert the types actor, role and series to my media ontology
-              >>> ont.add_tagsets(
-              ...     SQLTags(u('~/var/media-ontology.sqlite'),
-              ...     ['actor', 'role', 'series'])
-              # divert type "musicbrainz.recording" to mbdb.sqlite
-              # mapping to the type "recording"
-              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
-              # divert type "tvdb.actor" to tvdb.sqlite
-              # mapping to the type "actor"
-              >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
-      '''
-      if match is None:
-        assert unmatch is None
-        match_func = None
-        unmatch_func = None
-      elif callable(match):
-        assert callable(unmatch)
-        match_func = match
-        unmatch_func = unmatch
-      elif isinstance(match, str):
-        if not match:
-          raise ValueError("empty match string")
-        if '?' in match or '[' in match:
-          raise ValueError("match globs only support *, not ? or [seq]")
-        if match.endswith(('.', '-', '_')):
-          if len(match) == 1:
-            raise ValueError("empty prefix")
-          if '*' in match:
-            match_re_s = fn_translate(match)
-            assert match_re_s.endswith('\\Z')
-            match_re_s = cutsuffix(match_re_s, '\\Z')
-            match_re = re.compile(match_re_s)
+            >>> from cs.sqltags import SQLTags
+            >>> from os.path import expanduser as u
+            >>> # an initial empty ontology with a default in memory mapping
+            >>> ont = TagsOntology()
+            >>> # divert the types actor, role and series to my media ontology
+            >>> ont.add_tagsets(
+            ...     SQLTags(u('~/var/media-ontology.sqlite')),
+            ...     ['actor', 'role', 'series'])
+            >>> # divert type "musicbrainz.recording" to mbdb.sqlite
+            >>> # mapping to the type "recording"
+            >>> ont.add_tagsets(SQLTags(u('~/.cache/mbdb.sqlite')), 'musicbrainz.')
+            >>> # divert type "tvdb.actor" to tvdb.sqlite
+            >>> # mapping to the type "actor"
+            >>> ont.add_tagsets(SQLTags(u('~/.cache/tvdb.sqlite')), 'tvdb.')
+    '''
+    if match is None:
+      assert unmatch is None
+      match_func = None
+      unmatch_func = None
+    elif callable(match):
+      assert callable(unmatch)
+      match_func = match
+      unmatch_func = unmatch
+    elif isinstance(match, str):
+      if not match:
+        raise ValueError("empty match string")
+      if '?' in match or '[' in match:
+        raise ValueError("match globs only support *, not ? or [seq]")
+      if match.endswith(('.', '-', '_')):
+        if len(match) == 1:
+          raise ValueError("empty prefix")
+        if '*' in match:
+          match_re_s = fn_translate(match)
+          assert match_re_s.endswith('\\Z')
+          match_re_s = cutsuffix(match_re_s, '\\Z')
+          match_re = re.compile(match_re_s)
 
-            def match_func(type_name):
-              ''' Glob based prefix match, return the suffix.
-              '''
-              m = match_re.match(type_name)
-              if not m:
-                return None
-              subtype_name = type_name[m.end():]
-              return subtype_name
+          def match_func(type_name):
+            ''' Glob based prefix match, return the suffix.
+            '''
+            m = match_re.match(type_name)
+            if not m:
+              return None
+            subtype_name = type_name[m.end():]
+            return subtype_name
 
-            # TODO: define this function if there is exactly 1 asterisk
-            unmatch_func = None
-
-          else:
-
-            def match_func(type_name):
-              ''' Literal prefix match, return the suffix.
-              '''
-              subtype_name = cutprefix(type_name, match)
-              if subtype_name is type_name:
-                return None
-              return subtype_name
-
-            def unmatch_func(subtype_name):
-              ''' Return the `subtype_name` with the prefix restored
-              '''
-              return match + subtype_name
+          # TODO: define this function if there is exactly 1 asterisk
+          unmatch_func = None
 
         else:
-          # not a prefix
 
-          if '*' in match:
-
-            def match_func(type_name):
-              ''' Glob `type_name` match, return `type_name` unchanged.
-              '''
-              if fnmatch(type_name, match):
-                return type_name
+          def match_func(type_name):
+            ''' Literal prefix match, return the suffix.
+            '''
+            subtype_name = cutprefix(type_name, match)
+            if subtype_name is type_name:
               return None
+            return subtype_name
 
-            # TODO: define unmatch_func is there is exactly 1 asterisk
-            unmatch_func = None
-
-          else:
-
-            def match_func(type_name):
-              ''' Fixed string exact `type_name` match, return `type_name` unchanged.
-              '''
-              if type_name == match:
-                return type_name
-              return None
-
-            def unmatch_func(subtype_name):
-              ''' Fixed string match
-              '''
-              assert subtype_name == match
-              return subtype_name
+          def unmatch_func(subtype_name):
+            ''' Return the `subtype_name` with the prefix restored
+            '''
+            return match + subtype_name
 
       else:
+        # not a prefix
 
-        raise ValueError(
-            "unhandled match value %s:%r" % (type(match).__name__, match)
-        )
+        if '*' in match:
 
-      return cls(
-          tagsets=tagsets,
-          match_func=match_func,
-          unmatch_func=unmatch_func,
-          type_map=IndexedMapping(pk='type_name')
+          def match_func(type_name):
+            ''' Glob `type_name` match, return `type_name` unchanged.
+            '''
+            if fnmatch(type_name, match):
+              return type_name
+            return None
+
+          # TODO: define unmatch_func is there is exactly 1 asterisk
+          unmatch_func = None
+
+        else:
+
+          def match_func(type_name):
+            ''' Fixed string exact `type_name` match, return `type_name` unchanged.
+            '''
+            if type_name == match:
+              return type_name
+            return None
+
+          def unmatch_func(subtype_name):
+            ''' Fixed string match
+            '''
+            assert subtype_name == match
+            return subtype_name
+
+    else:
+
+      raise ValueError(
+          "unhandled match value %s:%r" % (type(match).__name__, match)
       )
 
-    def subtype_name(self, type_name):
-      ''' Return the type name for use within `self.tagsets` from `type_name`.
-          Returns `None` if this is not a supported `type_name`.
-      '''
-      if self.match_func is None:
-        return type_name
-      try:
-        return self.type_map.by_type_name[type_name]
-      except KeyError:
-        name = self.match_func(type_name)
-        self.type_map.add = dict(
-            type_name=type_name, subtype_name=name
-        )
-        return name
+    return cls(
+        tagsets=tagsets,
+        match_func=match_func,
+        unmatch_func=unmatch_func,
+        type_map=IndexedMapping(pk='type_name')
+    )
 
-    def type_name(self, subtype_name):
-      ''' Return the external type name from the internal `subtype_name`
-          which is used within `self.tagsets`.
-      '''
-      if self.match_func is None:
-        return subtype_name
-      try:
-        return self.type_map.by_subtype_name[subtype_name]
-      except KeyError:
-        name = self.unmatch_func(subtype_name)
-        self.type_map.add = dict(
-            type_name=name, subtype_name=subtype_name
-        )
-        return name
+  def __bool__(self):
+    ''' Support easy `ontology or some_default` tests,
+        since ontologies are broadly optional.
+    '''
+    return True
+
+  def as_dict(self):
+    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
+    '''
+    return dict(self.items())
+
+  def items(self):
+    ''' Yield `(entity_name,tags)` for all the items in each subtagsets.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name, tags in subtagsets.items():
+        yield subtagsets.key(entity_name), tags
+
+  def keys(self):
+    ''' Yield entity names for all the entities.
+    '''
+    for subtagsets in self._subtagsetses:
+      for entity_name in subtagsets.keys():
+        yield subtagsets.key(entity_name)
+
+  def get(self, name, default=None):
+    ''' Fetch the entity named `name` or `default`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets.get(subtagsets.subkey(name), default)
+
+  def __setitem__(self, name, tags):
+    ''' Apply `tags` to the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags.update(tags)
+
+  def __delitem__(self, name):
+    ''' Delete the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    del subtagsets[subtagsets.subkey(name)]
+
+  def subtype_name(self, type_name):
+    ''' Return the type name for use within `self.tagsets` from `type_name`.
+        Returns `None` if this is not a supported `type_name`.
+    '''
+    if self.match_func is None:
+      return type_name
+    try:
+      return self.type_map.by_type_name[type_name]
+    except KeyError:
+      name = self.match_func(type_name)
+      self.type_map.add = dict(type_name=type_name, subtype_name=name)
+      return name
+
+  def type_name(self, subtype_name):
+    ''' Return the external type name from the internal `subtype_name`
+        which is used within `self.tagsets`.
+    '''
+    if self.match_func is None:
+      return subtype_name
+    try:
+      return self.type_map.by_subtype_name[subtype_name]
+    except KeyError:
+      name = self.unmatch_func(subtype_name)
+      self.type_map.add = dict(type_name=name, subtype_name=subtype_name)
+      return name
+
+  @pfx_method(with_args=True)
+  @typechecked
+  def add_tagsets(self, tagsets: BaseTagSets, match, unmatch=None, index=0):
+    ''' Insert a `_TagsOntology_SubTagSets` at `index`
+        in the list of `_TagsOntology_SubTagSets`es.
+
+        The new `_TagsOntology_SubTagSets` instance is initialised
+        from the supplied `tagsets`, `match`, `unmatch` parameters.
+    '''
+    if isinstance(match, (list, tuple)):
+      assert unmatch is None
+      for match1 in match:
+        self.add_tagsets(tagsets, match1, index=index)
+    else:
+      subtagsets = _TagsOntology_SubTagSets(tagsets, match, unmatch)
+      self._subtagsetses.insert(index, subtagsets)
 
   @property
   def _default_tagsets(self):
@@ -2317,143 +2550,73 @@ class TagsOntology(SingletonMixin):
     '''
     return self._subtagsetses[-1].tagsets
 
-  def as_dict(self):
-    ''' Return a `dict` containing a mapping of entry names to their `TagSet`s.
-    '''
-    return dict(self._default_tagsets)
-
-  def __bool__(self):
-    ''' Support easy `ontology or some_default` tests,
-        since ontologies are broadly optional.
-    '''
-    return True
-
-  def _tagsets_for_type_name(self, type_name):
-    ''' Locate a `TagSet`s for use against `type_name`.
-        Return `(tagSets,subtype_name)`
-        where `tagsets` is a `TagSets` instance
-        and `subtype_name` is a variable on `type_name`
-        appropriate to the chosen `tagsets`.
-
-        This method is used to direct accesses to `type.`*type_name*
-        and `meta.`*type_name*`.`*value_key*
-        to particular `TagSets`,
-        possibly keyed by a variation on *type_name*.
-
-        For example,
-        perhaps we keep a cache of Musicbrainz data in an `SQLTags`
-        stored as `~/.cache/mbdb.sqlite`.
-        This method might recognise the type `musicbrainz.recording`
-        and return that `SQLTags` instance and the subtype `recording`.
-
-        See the `add_tagsets` method for inserting additional `TagSets`
-        and their *type_name* mapping functions.
+  def _subtagsets_for_key(self, key):
+    ''' Locate a `_TagsOntology_SubTagSets` for use with `key`,
+        a tagset name.
+        Returns the default subtagsets if no explicit match is found.
     '''
     for subtagsets in self._subtagsetses:
-      match_func = subtagsets.match_func
-      if match_func is None:
-        return subtagsets.tagsets, type_name
-      subtype_name = match_func(type_name)
-      if subtype_name:
-        return subtagsets.tagsets, subtype_name
-    raise ValueError("no TagSets for type name %r" % (type_name,))
+      if subtagsets.accepts_key(key):
+        return subtagsets
+    return self._default_tagsets()
 
-  @pfx_method(with_args=True)
-  def add_tagsets(self, tagsets, match, unmatch=None, index=0):
-    ''' Insert a `SubTagSets` at `index` in the list of `SubTagSets`es.
-        This is the list consulted by the `_tagsets_for_type_name` method.
-
-        The new `SubTagSets` instance is initialised
-        from the supplied `tagsets, match, unmatch` parameters.
-
-        Examples:
-
-            >>> from os.path import expanduser as u
-            >>> # an initial empty ontology with a default in memory mapping
-            >>> ont = TagsOntology()
-            # divert the types actor, role and series to my media ontology
-            >>> ont.add_tagsets(
-            ...     SQLTags(u('~/var/media-ontology.sqlite'),
-            ...     ['actor', 'role', 'series'])
-            # divert type "musicbrainz.recording" to mbdb.sqlite
-            # mapping to the type "recording"
-            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/mbdb.sqlite')), 'musicbrainz.')
-            # divert type "tvdb.actor" to tvdb.sqlite
-            # mapping to the type "actor"
-            >>> ont.add_tagsets(SQLTags(expanduser('~/.cache/tvdb.sqlite')), 'tvdb.')
+  def _subtagsets_for_type(self, type_name):
+    ''' Locate a `_TagsOntology_SubTagSets` for use with the type `type_name`.
+        Returns the default subtagsets if no explicit match is found.
     '''
-    subtagsets = self.SubTagSets.from_match(tagsets, match, unmatch)
-    self._subtagsetses.insert(index, subtagsets)
+    for subtagsets in self._subtagsetses:
+      if subtagsets.accepts_type(type_name):
+        return subtagsets
+    return self._default_tagsets()
 
   ##################################################################
   # Types.
 
-  def typedata(self, type_name):
+  def typedef(self, type_name):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
-    tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-    return tagsets['type.' + subtype_name]
+    subtagsets = self._subtagsets_for_type(type_name)
+    subtype_name = subtagsets.subkey(type_name)
+    return subtagsets.typedef(subtype_name)
+
+  def type_names(self):
+    ''' Return defined type names i.e. all entries starting `type.`.
+    '''
+    return set(
+        subtagsets.key(subtype_name)
+        for subtagsets in self._subtagsetses
+        for subtype_name in subtagsets.type_names()
+    )
 
   def types(self):
     ''' Generator yielding defined type names and their defining `TagSet`.
     '''
     for type_name in self.type_names():
-      yield type_name, self.typedata(type_name)
+      yield type_name, self.typedef(type_name)
 
-  def type_names(self):
-    ''' Generator yielding defined type names.
+  def by_type(self, type_name, with_tagsets=False):
+    ''' Yield keys or (key,tagset) of type `type_name`
+        i.e. all keys commencing with *type_name*`.`.
     '''
-    for subtagsets in self._subtagsetses:
-      for key in subtagsets.tagsets.keys(prefix='type.'):
-        assert key.startswith('type.')
-        subtype_name = cutprefix(key, 'type.')
-        type_name = subtagsets.type_name(subtype_name)
-        yield type_name
+    type_name_ = type_name + '.'
+    subtagsets = self._subtagsets_for_type(type_name)
+    subtype_name_ = subtagsets.subtype_name(type_name) + '.'
+    tagsets = subtagsets.tagsets
+    if with_tagsets:
+      for subkey, tags in tagsets.items(prefix=subtype_name_):
+        assert subkey.startswith(subtype_name_)
+        key = subtagsets.key(subkey)
+        assert key.startswith(type_name_)
+        yield key, tags
+    else:
+      for subkey in tagsets.keys(prefix=subtype_name_):
+        assert subkey.startswith(subtype_name_)
+        key = subtagsets.key(subkey)
+        assert key.startswith(type_name_)
+        yield key
 
   ################################################################
   # Metadata.
-
-  @ensure(lambda result: result[1].startswith('meta.'))
-  def _meta_ref(self, type_name, value, convert=None):
-    ''' Return `(tagsets,metakey)` for the metadata for `(type_name,value)`.
-    '''
-    with Pfx("%s._meta_ref(type_name=%r,value=%r)", type(self).__name__,
-             type_name, value):
-      tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-      index = 'meta.' + subtype_name
-      if value is not None:
-        if convert is None:
-          convert = self.value_to_tag_name
-        value_tag_name = convert(value)
-        assert isinstance(value_tag_name, str) and value_tag_name
-        index += '.' + value_tag_name
-    return tagsets, index
-
-  def meta_names(self, type_name=None):
-    ''' Generator yielding defined metadata names.
-
-        If `type_name` is specified, yield only the value_names
-        for that `type_name`.
-
-        For example, `meta_names('character')`
-        on an ontology with a `meta.character.marvel.black_widow`
-        would yield `'marvel.black_widow'`
-        i.e. only the suffix part for `character` metadata.
-
-        By contrast, `meta_names()`
-        on an ontology with a `meta.character.marvel.black_widow`
-        would yield `'character.marvel.black_widow'`.
-    '''
-    if type_name is None:
-      for type_name in self.type_names():
-        yield from self.meta_names(type_name)
-        return
-    tagsets, subtype_name = self._tagsets_for_type_name(type_name)
-    prefix = f'meta.{subtype_name}.'
-    for key in tagsets.keys(prefix=prefix):
-      assert key.startswith(prefix)
-      meta_suffix = cutprefix(key, prefix)
-      yield type_name + '.' + meta_suffix
 
   @staticmethod
   @pfx
@@ -2486,8 +2649,9 @@ class TagsOntology(SingletonMixin):
       return value
     raise ValueError(value)
 
+  @tag_or_tag_value
   @require(lambda type_name: isinstance(type_name, str))
-  def metadata(self, type_name, value, convert=None):
+  def metadata(self, type_name, value, *, convert=None):
     ''' Return the metadata `TagSet` for `type_name` and `value`.
         This implements the mapping between a type's value and its semantics.
 
@@ -2495,19 +2659,66 @@ class TagsOntology(SingletonMixin):
         may specify a function to use to convert `value` to a tag name component
         to be used in place of `self.value_to_tag_name` (the default).
 
-        For example,
-        if a `TagSet` had a list of characters such as:
+        For example, if a `TagSet` had a list of characters such as:
 
-            characters=["Captain America (Marvel)","Black Widow (Marvel)"]
+            character=["Captain America (Marvel)","Black Widow (Marvel)"]
 
         then these values could be converted to the dotted identifiers
-        `characters.marvel.captain_america`
-        and `characters.marvel.black_widow` respectively,
+        `character.marvel.captain_america`
+        and `character.marvel.black_widow` respectively,
         ready for lookup in the ontology
         to obtain the "metadata" `TagSet` for each specific value.
     '''
-    tagsets, key = self._meta_ref(type_name, value, convert=convert)
-    return tagsets[key]
+    md = None
+    typedef = (
+        TagSet() if type_name == 'type' else self.metadata('type', type_name)
+    )
+    primary_type_name = typedef.type_name
+    if primary_type_name:
+      type_name = primary_type_name
+    if not isinstance(value, str):
+      # strs look a lot like other sequences, sidestep the probes
+      try:
+        items = value.items
+      except AttributeError:
+        # not a mapping
+        try:
+          it = iter(value)
+        except TypeError:
+          # not iterable
+          pass
+        else:
+          md = [self.metadata(type_name, item, convert=convert) for item in it]
+      else:
+        # a mapping
+        # split the type_name on underscore to derive key and member type names
+        # otherwise fall back to {type_name}_key, {type_name}_member
+        try:
+          key_type_name, member_type_name = type_name.split('_')
+        except ValueError:
+          key_type_name = type_name + '_key'
+          member_type_name = type_name + '_member'
+        md = {
+            k: (
+                self.metadata(key_type_name, k, convert=convert),
+                self.metadata(member_type_name, v, convert=convert),
+            )
+            for k, v in items
+        }
+    if md is None:
+      # neither mapping nor iterable
+      # fetch the metadata TagSet
+      subtagsets = self._subtagsets_for_type(type_name)
+      if value is None:
+        value_key = '_'
+      else:
+        if convert is None:
+          convert = self.value_to_tag_name
+        value_key = convert(value)
+        assert isinstance(value_key, str) and value_key
+      key = type_name + '.' + value_key
+      md = subtagsets[value_key]
+    return md
 
   def basetype(self, typename):
     ''' Infer the base type name from a type name.
@@ -2650,6 +2861,23 @@ class TagFile(SingletonMixin, BaseTagSets):
   def __delitem__(self, name):
     del self.tagsets[name]
 
+  def _loadsave_signature(self):
+    ''' Compute a signature of the existing names and `TagSet` id values.
+        We use this to check for added/removed `TagSet`s at save time.
+    '''
+    return set((name, id(tags)) for name, tags in self.items() if tags)
+
+  def is_modified(self):
+    ''' Test whether this `TagSet` has been modified.
+    '''
+    tagsets = self._tagsets
+    if tagsets is None:
+      return False
+    sig = self._loadsave_signature()
+    if self._loaded_signature != sig:
+      return True
+    return any(map(lambda tagset: tagset.modified, tagsets.values()))
+
   @locked_property
   @pfx_method
   def tagsets(self):
@@ -2658,7 +2886,7 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This is loaded on demand.
     '''
-    ts = self._tagsets = {}
+    ts = {}
     loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
@@ -2666,6 +2894,9 @@ class TagFile(SingletonMixin, BaseTagSets):
       te = ts[name] = self.default_factory(name)
       te.ontology = ont
       te.update(tags)
+      te.modified = False
+    self._tagsets = ts
+    self._loaded_signature = self._loadsave_signature()
     return ts
 
   @property
@@ -2734,6 +2965,7 @@ class TagFile(SingletonMixin, BaseTagSets):
                 warning("parse error: %s", e)
                 unparsed.append((lineno, line0))
               else:
+                tags.modified = False
                 if 'name' in tags:
                   warning("discard explicit tag name=%s", tags.name)
                   tags.discard('name')
@@ -2770,6 +3002,9 @@ class TagFile(SingletonMixin, BaseTagSets):
 
         This method will create the required intermediate directories
         if missing.
+
+        This method *does not* clear the `.modified` attribute of the `TagSet`s
+        because it does not know it is saving to the `Tagset`'s primary location.
     '''
     with Pfx(filepath):
       dirpath = dirname(filepath)
@@ -2792,23 +3027,21 @@ class TagFile(SingletonMixin, BaseTagSets):
             f.write('\n')
       except OSError as e:
         error("save(%r) fails: %s", filepath, e)
-      else:
-        for _, tags in name_tags:
-          tags.modified = False
 
   def save(self, extra_types=None):
-    ''' Save the tag map to the tag file.
+    ''' Save the tag map to the tag file if modified.
     '''
     tagsets = self._tagsets
     if tagsets is None:
       # never loaded - no need to save
       return
     with self._lock:
-      if any(map(lambda tagset: tagset.modified, tagsets.values())):
+      if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
             self.filepath, tagsets, self.unparsed, extra_types=extra_types
         )
+        self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
           tagset.modified = False
 
@@ -2822,23 +3055,51 @@ class TagsOntologyCommand(BaseCommand):
   ''' A command line for working with ontology types.
   '''
 
+  @contextmanager
+  def run_context(self):
+    with self.options.ontology:
+      yield
+
   def cmd_edit(self, argv):
-    ''' Usage: {cmd} entity
-          Edit the named entity.
-          If the entity name for not start with type. or meta. then
-          meta. is prepended to the name.
+    ''' Usage: {cmd} [{{/name-regexp | entity-name}}]
+          Edit entities.
+          With no arguments, edit all the entities.
+          With an argument starting with a slash, edit the entities
+          whose names match the regexp.
+          Otherwise the argument is expected to be an entity name;
+          edit the tags of that entity.
     '''
     options = self.options
     ont = options.ontology
     if not argv:
-      raise GetoptError("missing entity")
-    entity_name = argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments after entity: %r" % (argv,))
-    if not entity_name.startswith(('type.', 'meta.')):
-      entity_name = 'meta.' + entity_name
-    tags = ont[entity_name]
-    tags.edit()
+      ont.edit()
+    else:
+      arg = argv.pop(0)
+      if argv:
+        raise GetoptError("extra arguments after argument: %r" % (argv,))
+      if arg.startswith('/'):
+        # select entities and edit them
+        regexp = re.compile(arg[1:])
+        ont.edit(select_tagset=lambda te: regexp.match(te.name))
+      else:
+        # edit a single entity's tags
+        entity_name = arg
+        tags = ont[entity_name]
+        tags.edit()
+
+  def cmd_meta(self, argv):
+    ''' Usage: {cmd} tag=value
+    '''
+    options = self.options
+    ont = options.ontology
+    if not argv:
+      raise GetoptError("missing tag=value")
+    tag_s = argv.pop(0)
+    tag = Tag.from_str(tag_s, ontology=ont)
+    print(tag)
+    md = tag.metadata()
+    for md_tag in md:
+      print(" ", md_tag)
 
   # pylint: disable=too-many-locals,too-many-branches
   def cmd_type(self, argv):
@@ -2856,7 +3117,7 @@ class TagsOntologyCommand(BaseCommand):
           {cmd} type_name ls
             List the metadata names for this type and their tags.
           {cmd} type_name + entity_name [tags...]
-            Create meta.entity_name and apply the tags.
+            Create type_name.entity_name and apply the tags.
     '''
     options = self.options
     ont = options.ontology
@@ -2868,7 +3129,7 @@ class TagsOntologyCommand(BaseCommand):
       return 0
     type_name = argv.pop(0)
     with Pfx(type_name):
-      tags = ont.typedata(type_name)
+      tags = ont.typedef(type_name)
       if not argv:
         print("Tags for type", type_name, "=", tags)
         for tag in sorted(tags):
@@ -2882,23 +3143,32 @@ class TagsOntologyCommand(BaseCommand):
             tags.edit()
           else:
             # edit the metadata of this type
-            meta_names = ont.meta_names(type_name=type_name)
-            if not meta_names:
-              error("no metadata of type %r", type_name)
-              return 1
-            selected = set()
-            for ptn in argv:
-              selected.update(fn_filter(meta_names, ptn))
-            indices = [
-                ont._meta_ref(type_name, value) for value in sorted(selected)
-            ]
-            ont.edit_indices(indices, prefix=ont._meta_ref(type_name) + '.')
+            # obtain the collection
+            type_name_ = type_name + '.'
+            tagset_map = {}
+            for key, tagset in ont.by_type(type_name, with_tagsets=True):
+              assert key.startswith(type_name_)
+              print("%r vs %r" % (key, argv))
+              if any(map(lambda ptn: fnmatchcase(key, ptn), argv)):
+                print("matched")
+                subkey = cutprefix(key, type_name_)
+                assert subkey not in tagset_map
+                tagset_map[subkey] = tagset
+            for old_subkey, new_subkey, new_tags in TagSet.edit_many(
+                tagset_map, verbose=True):
+              tags = tagset_map[old_subkey]
+              if old_subkey != new_subkey:
+                warning(
+                    "rename not implemented, skipping %r => %r", old_subkey,
+                    new_subkey
+                )
+              tags.set_from(new_tags, verbose=True)
           return 0
         if subcmd in ('list', 'ls'):
           if argv:
             raise GetoptError("extra arguments: %r" % (argv,))
-          for meta_name in sorted(ont.meta_names(type_name=type_name)):
-            print(meta_name, ont.metadata(type_name, meta_name))
+          for key, tags in sorted(ont.by_type(type_name, with_tagsets=True)):
+            print(key, tags)
           return 0
         if subcmd == '+':
           if not argv:
@@ -3066,7 +3336,7 @@ def selftest(argv):
       {
           'type.colour':
           TagSet(description="a colour, a hue", type="str"),
-          'meta.colour.blue':
+          'colour.blue':
           TagSet(
               url='https://en.wikipedia.org/wiki/Blue',
               wavelengths='450nm-495nm'
@@ -3075,13 +3345,20 @@ def selftest(argv):
   )
   print(ont)
   tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-  pprint(tags.as_dict())
+  print("tags =", tags)
+  print(tags['colour'])
+  colour = Tag('colour', 'blue')
+  print(colour)
+  print(colour.metadata(ontology=ont))
+  print("================")
   tags['aa.bb'] = 'aabb'
   tags['aa'] = 'aa'
+  pprint(tags.as_dict())
   for format_str in argv:
-    print(format_str)
+    print("FORMAT_STR = %r", format_str)
+    ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
-    print("tag.format_as() => ", formatted)
+    print("tag.format_as(%r) => %s" % (format_str, formatted))
 
 if __name__ == '__main__':
   import sys

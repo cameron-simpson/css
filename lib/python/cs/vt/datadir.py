@@ -59,6 +59,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 from icontract import require
 from cs.app.flag import DummyFlags, FlaggedMixin
+from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
 from cs.context import nullcontext
 from cs.fileutils import (
@@ -90,7 +91,7 @@ from .dir import Dir, FileDirent
 from .hash import HashCode, HashCodeUtilsMixin, MissingHashcodeError
 from .index import choose as choose_indexclass, FileDataIndexEntry
 from .parsers import scanner_from_filename
-from .util import buffer_from_pathname, createpath, openfd_read, openfd_append
+from .util import createpath, openfd_read, openfd_append
 
 DEFAULT_DATADIR_STATE_NAME = 'default'
 
@@ -833,7 +834,7 @@ class DataDir(FilesDir):
   def scanfrom(filepath, offset=0):
     ''' Scan the specified `filepath` from `offset`, yielding `DataRecord`s.
     '''
-    bfr = buffer_from_pathname(filepath, offset=offset)
+    bfr = CornuCopyBuffer.from_filename(filepath, offset=offset)
     yield from DataRecord.scan_with_offsets(bfr)
 
   @upd_proxy
@@ -904,7 +905,8 @@ class DataDir(FilesDir):
                 position=offset,
                 total=new_size,
                 units_scale=BINARY_BYTES_SCALE,
-                itemlenfunc=lambda t3: t3[2] - t3[0],
+                itemlenfunc=(
+                    lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]),
             ):
               hashcode = hashclass.from_chunk(DR.data)
               indexQ.put(

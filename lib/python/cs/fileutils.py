@@ -14,7 +14,7 @@ import errno
 from functools import partial
 import json
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
   from os import pread
 except ImportError:
@@ -44,7 +44,7 @@ from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
@@ -53,7 +53,7 @@ from cs.threads import locked
 from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210420-post'
+__version__ = '20210731-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -69,9 +69,9 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings',
+        'cs.mappings>=20210717',
         'cs.obj',
-        'cs.pfx',
+        'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.py3',
         'cs.range',
@@ -1708,6 +1708,75 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(read_from(fp), partials)
+
+# pylint: disable=redefined-builtin
+@contextmanager
+def atomic_filename(
+    filename,
+    exists_ok=False,
+    placeholder=False,
+    dir=None,
+    prefix=None,
+    suffix=None,
+    **kw
+):
+  ''' A context manager to create `filename` atomicly on completion.
+      This returns a `NamedTemporaryFile` to use to create the file contents.
+      On completion the temporary file is renamed to the target name `filename`.
+
+      Parameters:
+      * `filename`: the file name to create
+      * `exists_ok`: default `False`;
+        if true it not an error if `filename` already exists
+      * `placeholder`: create a placeholder file at `filename`
+        while the real contents are written to the temporary file
+      * `dir`: passed to `NamedTemporaryFile`, specifies the directory
+        to hold the temporary file; the default is `dirname(filename)`
+        to ensure the rename is atomic
+      * `prefix`: passed to `NamedTemporaryFile`, specifies a prefix
+        for the temporary file; the default is a dot (`'.'`) plus the prefix
+        from `splitext(basename(filename))`
+      * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
+        for the temporary file; the default is the extension obtained
+        from `splitext(basename(filename))`
+      Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
+
+      Example:
+
+          >>> from os.path import exists as existspath
+          >>> fn = 'test_atomic_filename'
+          >>> with atomic_filename(fn, mode='w') as f:
+          ...     assert not existspath(fn)
+          ...     print('foo', file=f)
+          ...     assert not existspath(fn)
+          ...
+          >>> assert existspath(fn)
+          >>> assert open(fn).read() == 'foo\n'
+  '''
+  if dir is None:
+    dir = dirname(filename)
+  fprefix, fsuffix = splitext(basename(filename))
+  if prefix is None:
+    prefix = '.' + fprefix
+  if suffix is None:
+    suffix = fsuffix
+  if existspath(filename) and not exists_ok:
+    raise ValueError("already exists: %r" % (filename,))
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
+                          **kw) as T:
+    if placeholder:
+      # create a placeholder file
+      with open(filename, 'ab' if exists_ok else 'xb'):
+        pass
+    yield T
+    if placeholder:
+      try:
+        pfx_call(shutil.copymode, filename, T.name)
+      except OSError as e:
+        warning(
+            "defaut modes not copied from from placehodler %r: %s", filename, e
+        )
+    pfx_call(rename, T.name, filename)
 
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.

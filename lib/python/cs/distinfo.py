@@ -32,6 +32,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
 from typeguard import typechecked
+from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
@@ -100,6 +101,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
@@ -119,6 +121,11 @@ class CSReleaseCommand(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
+    # colourise if stdout is a tty
+    try:
+      options.colourise = sys.stdout.isatty()
+    except AttributeError:
+      options.colourise = False
     # TODO: get from cs.logutils?
     options.verbose = sys.stderr.isatty()
     options.force = False
@@ -283,17 +290,20 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       pkg_names = argv
     else:
-      pkg_names = sorted(options.tagsets.keys())
+      pkg_names = sorted(options.pkg_tagsets.keys())
     for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
           problems = pkg.problems()
+          problem_text= ("%d problems" % (len(problems),) if problems else "ok")
+          if problems and options.colourise:
+            problem_text = colourise(problem_text, 'yellow')
           list_argv = [
               pkg_name,
               pypi_release,
-              "%d problems" % (len(problems),) if problems else "ok",
+              problem_text,
           ]
           features = pkg.features(pypi_release)
           if features:
