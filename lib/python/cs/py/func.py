@@ -37,6 +37,8 @@ def funcname(func):
     try:
       return func.__name__
     except AttributeError:
+      if isinstance(func, partial):
+        return "partial(%s)" % (funcname(func.func),)
       return str(func)
 
 def funccite(func):
