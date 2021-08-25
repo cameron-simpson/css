@@ -448,7 +448,7 @@ class BaseCommand:
     '''
 
   def apply_opt(self, opt, val):
-    ''' Handle a individual global command line option.
+    ''' Handle an individual global command line option.
     '''
     raise RuntimeError("unhandled option %r" % (opt,))
 

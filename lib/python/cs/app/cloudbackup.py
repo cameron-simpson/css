@@ -493,7 +493,7 @@ class CloudBackupCommand(BaseCommand):
     if backup_uuid is None:
       backup_record = backup.latest_backup_record()
       if backup_record is None:
-        warning("%s: no backups", backup.name)
+        warning("%s: no backups", backup_name)
         return 1
       backup_uuid = backup_record.uuid
     else:
