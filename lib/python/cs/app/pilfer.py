@@ -17,7 +17,6 @@ from subprocess import Popen, PIPE
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
-from types import SimpleNamespace as NS
 from urllib.parse import quote, unquote
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -38,9 +37,7 @@ from cs.lex import (
     get_other_chars, get_qstr
 )
 import cs.logutils
-from cs.logutils import (
-    debug, error, warning, exception, trace, D
-)
+from cs.logutils import (debug, error, warning, exception, trace, D)
 from cs.mappings import MappingChain, SeenSet
 from cs.obj import copy as obj_copy
 import cs.pfx
