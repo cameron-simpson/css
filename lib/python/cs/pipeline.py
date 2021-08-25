@@ -6,6 +6,7 @@
 from icontract import require
 from cs.later import DEFAULT_RETRY_DELAY
 from cs.logutils import debug, error
+from cs.pfx import pfx
 from cs.py.func import funcname
 from cs.queues import IterableQueue, PushQueue
 from cs.resources import MultiOpenMixin
@@ -22,6 +23,7 @@ DISTINFO = {
     'install_requires': [
         'cs.later',
         'cs.logutils',
+        'cs.pfx',
         'cs.py.func',
         'cs.queues',
         'cs.resources',
@@ -37,6 +39,7 @@ FUNC_SELECTOR = 2  # many to many, yielding item or nothing
 FUNC_MANY_TO_MANY = 3  # functor accepts all items at once
 FUNC_PIPELINE = 4  # functor is actually a pipeline, put items to it and collect asynchronously
 
+@pfx
 @require(lambda later: later.submittable)
 def pipeline(later, actions, inputs=None, outQ=None, name=None):
   ''' Construct a function pipeline to be mediated by a `Later` queue.
