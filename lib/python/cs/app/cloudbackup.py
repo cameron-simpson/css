@@ -207,15 +207,14 @@ class CloudBackupCommand(BaseCommand):
               warning("not an identifier")
               badopts = True
           with Pfx("backup_root %r", backup_root_dirpath):
-            if not isabspath(backup_root_dirpath):
-              warning("backup_root not an absolute path")
+            if not isdirpath(backup_root_dirpath):
+              warning("not a directory")
               badopts = True
-            else:
-              if not isdirpath(backup_root_dirpath):
-                warning("not a directory")
-                badopts = True
-              if use_realpath:
-                backup_root_dirpath = realpath(backup_root_dirpath)
+            elif use_realpath:
+              backup_root_dirpath = realpath(backup_root_dirpath)
+            elif not isabspath(backup_root_dirpath):
+              warning("backup_root not an absolute path and no -R option")
+              badopts = True
     subpaths = argv
     for subpath in subpaths:
       with Pfx("subpath %r", subpath):
@@ -1680,9 +1679,8 @@ class NamedBackup(SingletonMixin):
                 )
                 dirstate.add(name_backups, exists_ok=True)
 
-        if dirstate.scan_errors or (
-            dirstate.scan_length >= 64
-            and dirstate.scan_length >= 3 * len(dirstate)):
+        if dirstate.scan_errors or (dirstate.scan_length >= 64 and
+                                    dirstate.scan_length >= 3 * len(dirstate)):
           with Pfx(
               "rewrite %s: %d scan_errors, len=%d and scan_length=%d",
               dirstate,
