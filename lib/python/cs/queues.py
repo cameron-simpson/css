@@ -7,8 +7,9 @@
 ''' Queue-like items: iterable queues and channels.
 '''
 
-import sys
+from contextlib import contextmanager
 from functools import partial
+import sys
 from threading import Timer, Lock, RLock, Thread
 import time
 ##from cs.debug import Lock, RLock, Thread
@@ -244,7 +245,6 @@ class PushQueue(MultiOpenMixin):
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
     self.name = name
     self._lock = RLock()
-    MultiOpenMixin.__init__(self)
     self.functor = functor
     self.outQ = outQ
 
@@ -304,7 +304,6 @@ class NullQueue(MultiOpenMixin):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
-    pass
 
   def get(self):
     ''' Get the next value. Always raises Queue_Empty.
@@ -317,12 +316,10 @@ class NullQueue(MultiOpenMixin):
   def startup(self):
     ''' Start the queue.
     '''
-    pass
 
   def shutdown(self):
     ''' Shut down the queue.
     '''
-    pass
 
   def __iter__(self):
     return self
@@ -447,8 +444,8 @@ class TimerQueue(object):
           # function due now - run it
           try:
             retval = func()
-          except Exception:
-            exception("func %s threw exception", func)
+          except Exception as e:
+            exception("func %s raised exception: %s", func, e)
           else:
             debug("func %s returns %s", func, retval)
         else:
@@ -464,8 +461,8 @@ class TimerQueue(object):
             if Tfunc:
               try:
                 retval = Tfunc()
-              except Exception:
-                exception("func %s threw exception", Tfunc)
+              except Exception as e:
+                exception("func %s raised exception %s", Tfunc, e)
               else:
                 debug("func %s returns %s", Tfunc, retval)
 
