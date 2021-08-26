@@ -56,7 +56,9 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.x import X
 
 def main(argv=None):
-  return PilferCommand().run(argv)
+  ''' Pilfer command line function.
+  '''
+  return PilferCommand(argv).run()
 
 # parallelism of jobs
 DEFAULT_JOBS = 4
@@ -69,8 +71,6 @@ class PilferCommand(BaseCommand):
   GETOPT_SPEC = 'c:F:j:qux'
 
   USAGE_FORMAT = '''Usage: {cmd} [options...] op [args...]
-    {cmd} url URL actions...
-        URL may be "-" to read URLs from standard input.
     Options:
       -c config
           Load rc file.
@@ -86,15 +86,15 @@ class PilferCommand(BaseCommand):
       -u  Unbuffered. Flush print actions as they occur.
       -x  Trace execution.'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
+    options = self.options
     options.pilfer = Pilfer()
     options.quiet = False
     options.jobs = DEFAULT_JOBS
     options.flagnames = DEFAULT_FLAGS_CONJUNCTION
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
+    options = self.options
     badopts = False
     P = options.pilfer
     for opt, val in opts:
@@ -140,10 +140,11 @@ class PilferCommand(BaseCommand):
         argv.insert(0, 'url')
     return argv
 
-  @classmethod
-  def cmd_url(cls, argv, options):
-    ''' Usage: url start_urlurl> [pipeline-defns..]
+  def cmd_url(self, argv):
+    ''' Usage: {cmd} URL [pipeline-defns..]
+          URL may be "-" to read URLs from standard input.
     '''
+    options = self.options
     P = options.pilfer
     if not argv:
       raise GetoptError("missing URL")
