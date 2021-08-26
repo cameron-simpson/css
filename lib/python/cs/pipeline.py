@@ -84,13 +84,13 @@ def pipeline(later, actions, inputs=None, outQ=None, name=None):
     name = "pipelinePQ"
   pipeline = Pipeline(name, later, filter_funcs, outQ)
   inQ = pipeline.inQ
-  if inputs is not None:
-    later.defer_iterable(inputs, inQ)
-  else:
+  if inputs is None:
     debug(
         "pipeline: no inputs, NOT setting up %s._defer_iterable(inputs, inQ=%r)",
         later, inQ
     )
+  else:
+    later.defer_iterable(inputs, inQ)
   return pipeline
 
 class _PipelineStage(PushQueue):
