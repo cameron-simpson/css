@@ -1,3 +1,4 @@
+baseCommand autousage: make up a stub usage for subcommands with no usage
 parser for /etc/terminal-colors.d
 BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
