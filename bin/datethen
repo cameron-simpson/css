@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Recite the date then run command.
+# - Cameron Simpson <cs@cskk.id.au> 28aug2021
+#
+
+[ $# -gt 0 ] || {
+  echo "$0: missing command" >&2
+  exit 1
+}
+
+date
+exec "$@"
