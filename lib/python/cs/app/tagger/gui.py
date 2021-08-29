@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 
 from contextlib import contextmanager
-import PySimpleGUIQt as sg
+import os
+from os.path import (basename, isdir as isdirpath, join as joinpath, realpath)
+from uuid import uuid4
+
+import PySimpleGUI as sg
+##import PySimpleGUIQt as sg
+
+from cs.fileutils import shortpath
+from cs.logutils import warning
+from cs.mappings import IndexedMapping, UUIDedDict
+from cs.pfx import pfx, Pfx
 from cs.resources import MultiOpenMixin, RunState
 from .util import ispng, pngfor
 
