@@ -6,17 +6,13 @@ import sys
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
+from . import Tagger
 from .gui import TaggerGUI
 
 def main(argv=None):
   ''' Command line for the tagger.
   '''
   return TaggerCommand(argv).run()
-
-class Tagger:
-
-  def __init__(self):
-    pass
 
 class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
@@ -30,7 +26,8 @@ class TaggerCommand(BaseCommand):
     '''
     options = self.options
     with FSTags() as fstags:
-      with stackattrs(options, fstags=fstags):
+      tagger = Tagger(fstags=fstags)
+      with stackattrs(options, tagger=tagger):
         yield
 
   def cmd_gui(self, argv):
@@ -39,8 +36,7 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    self.options.tagger = tagger = Tagger()
-    with TaggerGUI(tagger, argv) as gui:
+    with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
 if __name__ == '__main__':
