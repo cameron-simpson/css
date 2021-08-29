@@ -11,9 +11,10 @@ from os.path import (
     join as joinpath,
     splitext,
 )
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from cs.buffer import CornuCopyBuffer
 from cs.lex import hexify
+from cs.logutils import warning
 from cs.pfx import pfx, pfx_call
 
 from cs.x import X
@@ -47,17 +48,20 @@ def pngfor(pathname, cached=None, force=False):
     cached = _conv_cache
   pngpath = None if False else cached['png'].get(pathname)
   if pngpath is None:
-    hashcode = SHA256.from_pathname(pathname)
-    pngbase = f'{hashcode}.png'
-    convdirpath = joinpath(CONVCACHE_ROOT, 'png')
-    if not isdirpath(convdirpath):
-      pfx_call(os.mkdir, convdirpath)
-    pngpath = joinpath(convdirpath, pngbase)
-    if force or not isfilepath(pngpath):
-      X("create %r from %r", pngpath, pathname)
+    try:
       with Image.open(pathname) as im:
-        pfx_call(im.save, pngpath, 'PNG')
-    cached['png'][pathname] = pngpath
+        hashcode = SHA256.from_pathname(pathname)
+        pngbase = f'{hashcode}.png'
+        convdirpath = joinpath(CONVCACHE_ROOT, 'png')
+        if not isdirpath(convdirpath):
+          pfx_call(os.mkdir, convdirpath)
+        pngpath = joinpath(convdirpath, pngbase)
+        if force or not isfilepath(pngpath):
+          X("create %r from %r", pngpath, pathname)
+          pfx_call(im.save, pngpath, 'PNG')
+        cached['png'][pathname] = pngpath
+    except ValueError as e:  ##UnidentifiedImageError as e:
+      warning("unhandled image: %s", e)
   return pngpath
 
 class _HashCode(bytes):
