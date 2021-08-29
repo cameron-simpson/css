@@ -5,16 +5,6 @@ import PySimpleGUIQt as sg
 from cs.resources import MultiOpenMixin, RunState
 from .util import ispng, pngfor
 
-class ImageWidget(sg.Image):
-
-  def __init__(self, pathname, **kw):
-    if ispng(pathname):
-      display_pathname = pathname
-    else:
-      display_pathname = pngfor(pathname)
-    super().__init__(filename=display_pathname, **kw)
-    self.pathname = pathname
-    self.display_pathname = display_pathname
 
 class TaggerGUI(MultiOpenMixin):
 
@@ -57,4 +47,28 @@ class TaggerGUI(MultiOpenMixin):
         # Output a message to the window
         window['-OUTPUT-'].update(
             'Hello ' + values['-INPUT-'] + "! Thanks for trying PySimpleGUI"
+
+class ImageWidget(sg.Image):
+  ''' An image widget which can show anything Pillow can read.
+  '''
+
+  @property
+  def pathname(self):
+    return self._pathname
+
+  @pathname.setter
+  def pathname(self, new_pathname):
+    if new_pathname is not None:
+      try:
+        if ispng(new_pathname):
+          display_pathname = new_pathname
+        else:
+          display_pathname = pngfor(new_pathname)
+      except (OSError, ValueError):
+        new_pathname = None
+    if new_pathname is None:
+      self.update()
+    else:
+      self.update(filename=display_pathname)
+    self._pathname = new_pathname
         )
