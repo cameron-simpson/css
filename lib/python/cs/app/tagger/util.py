@@ -4,7 +4,12 @@ from collections import defaultdict
 import hashlib
 import os
 from os.path import (
-    basename, expanduser, isfile as isfilepath, join as joinpath, splitext
+    basename,
+    expanduser,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    splitext,
 )
 from PIL import Image
 from cs.buffer import CornuCopyBuffer
@@ -44,7 +49,10 @@ def pngfor(pathname, cached=None, force=False):
   if pngpath is None:
     hashcode = SHA256.from_pathname(pathname)
     pngbase = f'{hashcode}.png'
-    pngpath = joinpath(CONVCACHE_ROOT, pngbase)
+    convdirpath = joinpath(CONVCACHE_ROOT, 'png')
+    if not isdirpath(convdirpath):
+      pfx_call(os.mkdir, convdirpath)
+    pngpath = joinpath(convdirpath, pngbase)
     if force or not isfilepath(pngpath):
       X("create %r from %r", pngpath, pathname)
       with Image.open(pathname) as im:
