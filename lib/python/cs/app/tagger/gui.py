@@ -18,12 +18,17 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     # Define the window's contents
+    self.tree = PathListWidget(self.pathnames)
+    self.preview = ImageWidget()
     layout = [
-        [ImageWidget(self.pathnames[0])], [sg.Text("What's your name?")],
-        [sg.Input(key='-INPUT-')], [sg.Text(size=(40, 1), key='-OUTPUT-')],
-        [sg.Button('Ok'), sg.Button('Quit')]
+        [self.tree, self.preview],
+        [sg.Text("What's your name?")],
+        [sg.Input(key='-INPUT-')],
+        [sg.Text(size=(40, 1), key='-OUTPUT-')],
+        [sg.Button('Ok'), sg.Button('Quit')],
     ]
-    self.window = sg.Window(str(self), layout)
+    self.window = sg.Window(str(self), layout, finalize=True)
+    self.preview.pathname = self.pathnames[0]
     print("window made")
     yield self
     print("closing")
@@ -40,13 +45,22 @@ class TaggerGUI(MultiOpenMixin):
       while not runstate.cancelled:
         print("event?")
         event, values = window.read()
-        print("event =", event)
+        print("event =", repr(event), repr(values))
         # See if user wants to quit or window was closed
         if event == sg.WINDOW_CLOSED or event == 'Quit':
-          break
-        # Output a message to the window
-        window['-OUTPUT-'].update(
-            'Hello ' + values['-INPUT-'] + "! Thanks for trying PySimpleGUI"
+          runstate.cancel()
+        elif event == self.tree.key:
+          record_key, = values[event]
+          print("record_key =", record_key)
+          try:
+            record = self.tree[record_key]
+          except KeyError as e:
+            warning("no self.tree[%r]: %s", record_key, e)
+          else:
+            print("record =", record)
+            self.preview.pathname = record.fullpath
+        else:
+          warning("unexpected event %r: %r", event, values)
 
 class ImageWidget(sg.Image):
   ''' An image widget which can show anything Pillow can read.
