@@ -158,6 +158,8 @@ class PathListWidget(sg.Tree):
             parent_node = treedata.tree_dict[record.uuid]
             for dirname in sorted(dirnames):
               with Pfx(dirname):
+                if dirname.startswith('.'):
+                  continue
                 subdir_path = joinpath(dirpath, dirname)
                 subdir_record = UUIDedDict(fullpath=subdir_path)
                 pathinfo.add(subdir_record)
@@ -170,6 +172,8 @@ class PathListWidget(sg.Tree):
                 )
             for filename in sorted(filenames):
               with Pfx(filenames):
+                if filename.startswith('.'):
+                  continue
                 filepath = joinpath(dirpath, filename)
                 file_record = UUIDedDict(fullpath=filepath)
                 pathinfo.add(file_record)
