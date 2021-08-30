@@ -60,7 +60,7 @@ def pngfor(pathname, cached=None, force=False):
           X("create %r from %r", pngpath, pathname)
           pfx_call(im.save, pngpath, 'PNG')
         cached['png'][pathname] = pngpath
-    except ValueError as e:  ##UnidentifiedImageError as e:
+    except UnidentifiedImageError as e:
       warning("unhandled image: %s", e)
   return pngpath
 
