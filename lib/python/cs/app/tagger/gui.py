@@ -2,8 +2,14 @@
 
 from contextlib import contextmanager
 import os
-from os.path import (basename, isdir as isdirpath, join as joinpath, realpath)
-from uuid import uuid4
+from os.path import (
+    basename,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    realpath,
+)
+from uuid import UUID, uuid4
 
 import PySimpleGUI as sg
 ##import PySimpleGUIQt as sg
@@ -13,6 +19,7 @@ from cs.logutils import warning
 from cs.mappings import IndexedMapping, UUIDedDict
 from cs.pfx import pfx, Pfx
 from cs.resources import MultiOpenMixin, RunState
+
 from .util import ispng, pngfor
 
 
