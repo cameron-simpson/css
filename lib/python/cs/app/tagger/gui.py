@@ -165,3 +165,16 @@ class PathListWidget(sg.Tree):
                     icon=None,
                 )
     return treedata, pathinfo
+
+class TagsView(_Widget, sg.Text):
+
+  def set_tags(self, tags):
+    self.update(value='\n'.join(map(str, tags)))
+
+class TagsView__Canvas(_Widget, sg.Canvas):
+
+  def set_tags(self, tags):
+    canvas = self.tk_canvas
+    canvas.delete(canvas.find_all())
+    for tag in tags:
+      canvas.create_text((0, 0), text=str(tag))
