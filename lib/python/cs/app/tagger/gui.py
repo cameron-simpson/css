@@ -133,7 +133,40 @@ class PathListWidget(sg.Tree):
     self.pathinfo = pathinfo
 
   def __getitem__(self, uuid):
-    return self.pathinfo.by_uuid[uuid]
+    ''' Return the path information record from a node key (`uuid`).
+    '''
+    if isinstance(uuid, UUID):
+      return self.pathinfo.by_uuid[uuid]
+    try:
+      uuid = UUID(uuid)
+    except ValueError:
+      path = uuid
+      return self.pathinfo.by_fullpath[realpath(path)]
+    else:
+      return self.pathinfo.by_uuid[uuid]
+
+  def get(self, uuid, default=None):
+    ''' Return `self[uuid]` or `default` if not present.
+    '''
+    try:
+      return self[uuid]
+    except KeyError:
+      return default
+
+  def __iter__(self):
+    ''' Iterate over the path information records in tree order.
+    '''
+    q = [self.treedata.root_node]
+    while q:
+      node = q.pop(0)
+      if node.key:
+        try:
+          record = self[node.key]
+        except KeyError:
+          warning("skip key %r", node.key)
+        else:
+          yield record
+        q.extend(node.children)
 
   @pfx
   def make_treedata(self, pathnames):
