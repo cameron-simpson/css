@@ -116,19 +116,17 @@ class PathListWidget(sg.Tree):
 
   DEFAULT_NUM_ROWS = 16
 
-  def __init__(self, pathnames, num_rows=None):
+  def __init__(self, pathnames, num_rows=None, justification='left', **kw):
     if num_rows is None:
       num_rows = self.DEFAULT_NUM_ROWS
-    key = uuid4()
     treedata, pathinfo = self.make_treedata(pathnames)
     super().__init__(
-        key=key,
         data=treedata,
         headings=['id', 'name'],
         enable_events=True,
         num_rows=num_rows,
+        **kw,
     )
-    self.key = key
     self.treedata = treedata
     self.pathinfo = pathinfo
 
