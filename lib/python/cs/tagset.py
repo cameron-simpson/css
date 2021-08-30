@@ -1030,6 +1030,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         because we subclass `namedtuple` which has no `__init__`.
     '''
 
+  __hash__ = tuple.__hash__
+
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
 
