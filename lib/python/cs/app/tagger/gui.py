@@ -28,16 +28,55 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     # Define the window's contents
-    self.tree = PathListWidget(self.pathnames)
-    self.preview = ImageWidget()
+    self.pathview = sg.Text("")
+    self.tree = PathListWidget(
+        self.pathnames,
+        key="paths",
+        fixed_size=(200, None),
+        expand_x=True,
+        expand_y=True,
+        show_expanded=True,
+        pad=(3, 3),
+    )
+    self.tagsview = TagsView(
+        key="tags",
+        fixed_size=(1920, 200),
+        background_color='blue',
+        expand_x=True,
+    )
+    ## WHERE TO DO THIS? ## sg.pin(self.tree, vertical_alignment='top')
+    self.preview = ImageWidget(
+        key="preview",
+        fixed_size=(1920, 1080),
+        background_color='grey',
+    )
     layout = [
-        [self.tree, self.preview],
-        [sg.Text("What's your name?")],
-        [sg.Input(key='-INPUT-')],
-        [sg.Text(size=(40, 1), key='-OUTPUT-')],
-        [sg.Button('Ok'), sg.Button('Quit')],
+        [self.pathview],
+        [
+            self.tree,
+            sg.Frame(
+                "frame", [
+                    [
+                        sg.Column(
+                            [
+                                [self.tagsview],
+                                [sg.HorizontalSeparator()],
+                                [self.preview],
+                            ],
+                            size=(1920, 1280),
+                        )
+                    ]
+                ]
+            ),
+        ],
+        [sg.Text("BAH")],
     ]
-    self.window = sg.Window(str(self), layout, finalize=True)
+    self.window = sg.Window(
+        str(self),
+        layout,
+        size=(2200, 1500),
+        finalize=True,
+    )
     for record in self.tree:
       if isfilepath(record.fullpath):
         self.pathname = record.fullpath
@@ -144,7 +183,8 @@ class PathListWidget(_Widget, sg.Tree):
     treedata, pathinfo = self.make_treedata(pathnames)
     super().__init__(
         data=treedata,
-        headings=['id', 'name'],
+        headings=[],
+        col_widths=[20, 20],
         enable_events=True,
         num_rows=num_rows,
         **kw,
