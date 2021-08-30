@@ -72,7 +72,23 @@ class TaggerGUI(MultiOpenMixin):
         else:
           warning("unexpected event %r: %r", event, values)
 
-class ImageWidget(sg.Image):
+class _Widget:
+
+  def __init__(self, *, key=None, fixed_size=None, **kw):
+    if key is None:
+      key = uuid4()
+    self.key = key
+    super().__init__(key=key, **kw)
+    self.__fixed_size = fixed_size
+
+  def update(self, **kw):
+    X("%s.update: kw=%r", type(self).__name__, kw)
+    super().update(**kw)
+    if self.__fixed_size:
+      X("  update: set_size(%r)", self.__fixed_size)
+      self.set_size(self.__fixed_size)
+
+class ImageWidget(_Widget, sg.Image):
   ''' An image widget which can show anything Pillow can read.
   '''
 
