@@ -38,7 +38,10 @@ class TaggerGUI(MultiOpenMixin):
         [sg.Button('Ok'), sg.Button('Quit')],
     ]
     self.window = sg.Window(str(self), layout, finalize=True)
-    self.preview.pathname = self.pathnames[0]
+    for record in self.tree:
+      if isfilepath(record.fullpath):
+        self.pathname = record.fullpath
+        break
     print("window made")
     yield self
     print("closing")
@@ -68,9 +71,28 @@ class TaggerGUI(MultiOpenMixin):
             warning("no self.tree[%r]: %s", record_key, e)
           else:
             print("record =", record)
-            self.preview.pathname = record.fullpath
+            self.pathname = record.fullpath
         else:
           warning("unexpected event %r: %r", event, values)
+
+  @property
+  def pathname(self):
+    return self.preview.pathname
+
+  @pathname.setter
+  @pfx
+  def pathname(self, new_pathname):
+    # TODO: make the tree display the associated element
+    self.pathview.update(value="Path: " + shortpath(new_pathname))
+    self.preview.pathname = new_pathname
+    self.preview.set_size(size=(1920, 1280))
+    tags = self.tagger.fstags[new_pathname].all_tags
+    self.tagsview.set_tags(tags)
+    ##self.tagsview.set_size(size=(1920, 120))
+    try:
+      pathinfo = self.tree[new_pathname]
+    except KeyError:
+      warning("path not in tree")
 
 class _Widget:
 
