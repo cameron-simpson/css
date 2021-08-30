@@ -112,7 +112,7 @@ class ImageWidget(_Widget, sg.Image):
       self.update(filename=display_pathname)
     self._pathname = new_pathname
 
-class PathListWidget(sg.Tree):
+class PathListWidget(_Widget, sg.Tree):
 
   DEFAULT_NUM_ROWS = 16
 
