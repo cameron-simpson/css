@@ -207,7 +207,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
-    options = self.option
+    options = self.options
     fstags = options.fstags
     U = options.upd
     if not argv:
@@ -1484,7 +1484,7 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     if not all_tags:
       return super().as_tags(prefix=prefix)
-    tags = self.all_tags
+    tags = self.all_tags  # pylint: disable=no-member
     if not prefix:
       return tags
     return tags.as_tags(prefix=prefix)
