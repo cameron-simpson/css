@@ -30,6 +30,18 @@ class TaggerCommand(BaseCommand):
       with stackattrs(options, tagger=tagger):
         yield
 
+  def cmd_autofile(self, argv):
+    ''' Usage: {cmd} pathnames...
+          Link pathnames to destinations based on their tags.
+    '''
+    if not argv:
+      raise GetoptError("missing pathnames")
+    tagger = self.options.tagger
+    for path in argv:
+      print("autofile", path)
+      linked_to = tagger.file_by_tags(path)
+      print("  linked to", repr(linked_to))
+
   def cmd_gui(self, argv):
     ''' Usage: {cmd} pathnames...
           Run a GUI to tag pathnames.
