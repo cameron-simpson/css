@@ -1588,6 +1588,24 @@ class TaggedPath(TagSet, HasFSTagsMixin):
             tagset.add(tag)
     return tagset
 
+  def prune_inherited(self):
+    ''' Examine the tags of this path's parent.
+        Remove any tag on this file if they are present on the parent.
+        Return a `TagSet` containing the pruned `Tag`s.
+    '''
+    pruned = TagSet()
+    parent_path = dirname(self.filepath)
+    if parent_path == self.filepath:
+      return pruned
+    parent = self.fstags[parent_path]
+    if parent is self:
+      return pruned
+    for tag in parent.as_tags(all_tags=True):
+      if tag in self:
+        pruned.add(tag)
+        self.discard(tag)
+    return pruned
+
   @fmtdoc
   def get_xattr_tagset(self, xattr_name=None):
     ''' Return a new `TagSet`
