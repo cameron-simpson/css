@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
 from contextlib import contextmanager
 from getopt import GetoptError
+from pprint import pprint
 import sys
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -41,6 +43,21 @@ class TaggerCommand(BaseCommand):
       print("autofile", path)
       linked_to = tagger.file_by_tags(path)
       print("  linked to", repr(linked_to))
+
+  def cmd_derive(self, argv):
+    ''' Usage: {cmd} dirpaths...
+          Derive an autofile mapping of tags to directory paths
+          from the directory paths suppplied.
+    '''
+    if not argv:
+      raise GetoptError("missing dirpaths")
+    tagger = self.options.tagger
+    mapping = defaultdict(list)
+    tag_names = 'abn', 'invoice', 'vendor'
+    for path in argv:
+      print("scan", path)
+      mapping = tagger.generate_auto_file_map(path, tag_names, mapping)
+    pprint(mapping)
 
   def cmd_gui(self, argv):
     ''' Usage: {cmd} pathnames...

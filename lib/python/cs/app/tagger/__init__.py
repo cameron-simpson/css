@@ -44,7 +44,7 @@ class Tagger:
     return name
 
   @pfx
-  def file_by_tags(self, path, prune_inherited=False):
+  def file_by_tags(self, path: str, prune_inherited=False):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
@@ -88,3 +88,41 @@ class Tagger:
                   self.fstags[linkpath].update(tmp)
                   linked_to.append(linkpath)
     return linked_to
+
+  @pfx
+  def generate_auto_file_map(self, dirpath: str, tag_names, mapping=None):
+    ''' Walk the file tree at `dirpath`
+        looking fordirectories whose direct tags contain tags
+        whose name is in `tag_names`.
+        Return a mapping of `Tag->[dirpaths...]`
+        mapping specific tag values to the directory paths where they occur.
+
+        Parameters:
+        * `dirpath`: the path to the directory to walk
+        * `tag_names`: an iterable of Tag names of interest
+        * `mapping`: optional preexisting mapping;
+          if provided it must behave like a `defaultdict(list)`,
+          autocreating missing entries as lists
+
+        The intent here is to derive filing locations
+        from the tree layout.
+    '''
+    print("generate...")
+    fstags = self.fstags
+    if mapping is None:
+      mapping = defaultdict(list)
+    tag_names = set(tag_names)
+    print("tag_names =", tag_names)
+    assert all(isinstance(tag_name, str) for tag_name in tag_names)
+    for path, dirnames, _ in os.walk(dirpath):
+      print("..", path)
+      with Pfx(path):
+        dirnames[:] = sorted(dirnames)
+        tagged = fstags[path]
+        for tag in tagged:
+          print("  ", tag)
+          if tag.name in tag_names:
+            bare_tag = Tag(tag.name, tag.value)
+            print(tag, "+", path)
+            mapping[bare_tag].append(tagged.filepath)
+    return mapping
