@@ -1704,13 +1704,14 @@ class CascadeRule:
   ''' A cascade rule of possible source tag names to provide a target tag.
   '''
 
-  def __init__(self, target, cascade):
+  def __init__(self, target: str, cascade):
     self.target = target
     self.cascade = cascade
 
   def __str__(self):
     return "%s(%s<=%r)" % (type(self).__name__, self.target, self.cascade)
 
+  @pfx_method
   def infer_tag(self, tagset):
     ''' Apply the rule to the `TagSet` `tagset`.
         Return a new `Tag(self.target,value)`
