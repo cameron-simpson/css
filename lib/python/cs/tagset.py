@@ -399,8 +399,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
               # handle a missing title tag
   '''
 
-  # arrange to return None for missing mapping attributes
-  # supporting tags.foo being None if there is no 'foo' tag
+  # Arrange to return None for missing mapping attributes
+  # supporting tags.foo being None if there is no 'foo' tag.
+  # Note: sometimes this has confusing effects.
   ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
@@ -439,7 +440,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  #################################################################
   # methods supporting FormattableMixin/ExtendedFormatter
+
   def get_arg_name(self, field_name):
     ''' Leading dotted identifiers represent tags or tag prefixes.
     '''
@@ -460,6 +463,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       value = attribute() if callable(attribute) else attribute
     return value, arg_name
 
+  ################################################################
+  # The magic attributes.
+
   # pylint: disable=too-many-nested-blocks,too-many-return-statements
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
@@ -467,6 +473,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         The following attribute access are supported:
 
         If `attr` is a key, return `self[attr]`.
+
+        If `self.auto_infer(attr)` does not raise `ValueError`,
+        return that value.
 
         If this `TagSet` has an ontology
         and `attr looks like *typename*`_`*fieldname*
@@ -609,6 +618,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return tags
 
   def __contains__(self, tag):
+    ''' Test for a tag being in this `TagSet`.
+
+        If the supplied `tag` is a `str` then this test
+        is for the presence of `tag` in the keys.
+
+        Otherwise,
+        for each tag `T` in the tagset
+        test `T.matches(tag)` and return `True` on success.
+        The default `Tag.matches` method compares the tag name
+        and if the same,
+        returns true if `tag.value` is `None` (basic "is the tag present" test)
+        and otherwise true if `tag.value==T.value` (basic "tag value equality" test).
+
+        Otherwise return `False`.
+    '''
     if isinstance(tag, str):
       return super().__contains__(tag)
     for mytag in self:
@@ -762,6 +786,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
             TagSetPrefixView:a.{'b': 1, 'd': 2}
+            >>> tags.subtags('a', as_tagset=True)
+            TagSet:{'b': 1, 'd': 2}
     '''
     if as_tagset:
       # prepare a standalone TagSet
@@ -837,6 +863,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       warning("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
+
+  #############################################################################
+  # Edit tags.
 
   def edit(self, editor=None, verbose=None):
     ''' Edit this `TagSet`.
