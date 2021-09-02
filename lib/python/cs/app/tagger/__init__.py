@@ -12,7 +12,7 @@ from os.path import (
 from tempfile import NamedTemporaryFile
 
 from cs.fstags import FSTags
-from cs.logutils import info, warning
+from cs.logutils import info, warning, error
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.tagset import Tag
 
@@ -44,10 +44,17 @@ class Tagger:
     return name
 
   @pfx
-  def file_by_tags(self, path: str, prune_inherited=False):
+  def file_by_tags(self, path: str, prune_inherited=False, no_link=False):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
+
+        Parameters:
+        * `path`: the source path to file
+        * `prune_inherited`: optional, default `False`:
+          prune the inherited tags from the direct tags on the target
+        * `no_link`: optional, fault `False`;
+          do not actually make the hard link, just report the target
 
         Note: if `path` is already linked to an implied location
         that location is also included in the returned list.
@@ -73,7 +80,9 @@ class Tagger:
               link_as = self.auto_name(tmp)
               assert link_as == basename(link_as)
               linkpath = joinpath(target_dir, link_as)
-              if existspath(linkpath):
+              if no_link:
+                linked_to.append(linkpath)
+              elif existspath(linkpath):
                 if samefile(srcpath, linkpath):
                   info("source %r already linked to %r", srcpath, linkpath)
                   linked_to.append(linkpath)
