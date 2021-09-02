@@ -1501,6 +1501,12 @@ class TaggedPath(TagSet, HasFSTagsMixin):
 
   def auto_infer(self, attr):
     ''' Infer a value from `attr` via the associated `FSTags.cascade_rules`.
+
+        This implementation tries the cascade rules from the configuration
+        and falls back to the superclass inference (the direct tag, if present).
+        Therefore a tagset with a rule for `.title` and also a
+        direct `.title` Tag would return the direct tag value for
+        `.title` and the rule value for `.auto.title`.
     '''
     for rule in self._fstags.config.cascade_rules:
       if rule.target == attr:

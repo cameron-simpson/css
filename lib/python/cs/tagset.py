@@ -858,6 +858,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   @pfx_method
   def auto_infer(self, attr):
     ''' The default inference implementation.
+
+        This should return a vaue if `attr` is inferrable
+        and raise `ValueError` if not.
+
+        The default implementation returns the direct tag value for `attr`
+        if present.
     '''
     if attr in self:
       warning("returning direct tag value for %r", attr)
