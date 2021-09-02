@@ -793,6 +793,47 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self['unixtime'] = new_unixtime
 
+  #############################################################################
+  # The '.auto' attribute space.
+
+  class Auto:
+
+    def __init__(self, tagset, prefix=None):
+      self._tagset = tagset
+      self._prefix = prefix
+
+    def __bool__(self):
+      ''' We return `False` so that an unresolved attribute,
+          which returns a deeper `Auto` instance,
+          looks false, enabling:
+
+              title = tags.auto.title or "default title"
+      '''
+      return False
+
+    def __getattr__(self, attr):
+      fullattr = (
+          attr if self._prefix is None else '.'.join((self._prefix, attr))
+      )
+      try:
+        return self._tagset.auto_infer(fullattr)
+      except ValueError:
+        # auto view of deeper attributes
+        return self._tagset.Auto(self._tagset, fullattr)
+
+  @property
+  def auto(self):
+    return self.Auto(self)
+
+  @pfx_method
+  def auto_infer(self, attr):
+    ''' The default inference implementation.
+    '''
+    if attr in self:
+      warning("returning direct tag value for %r", attr)
+      return self[attr]
+    raise ValueError("cannot infer value for %r" % (attr,))
+
   def edit(self, editor=None, verbose=None):
     ''' Edit this `TagSet`.
     '''
