@@ -1489,6 +1489,16 @@ class TaggedPath(TagSet, HasFSTagsMixin):
       return tags
     return tags.as_tags(prefix=prefix)
 
+  def auto_infer(self, attr):
+    ''' Infer a value from `attr` via the associated `FSTags.cascade_rules`.
+    '''
+    for rule in self._fstags.config.cascade_rules:
+      if rule.target == attr:
+        tag = rule.infer_tag(self)
+        if tag is not None:
+          return tag.value
+    return super().auto_infer(attr)
+
   def format_tagset(self, *, direct=False):
     ''' Compute a `TagSet` from this file's tags
         with additional derived tags.
