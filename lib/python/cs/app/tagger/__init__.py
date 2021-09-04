@@ -157,7 +157,10 @@ class Tagger:
       for path, dirnames, _ in os.walk(dirpath):
         with Pfx(path):
           # orderthe descent
-          dirnames[:] = sorted(dirnames)
+          dirnames[:] = sorted(
+              dirname for dirname in dirnames
+              if dirname and not dirname.startswith('.')
+          )
           tagged = fstags[path]
           if 'tagger.skip' in tagged:
             # prune this directory from the mapping
