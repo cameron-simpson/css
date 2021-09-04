@@ -135,3 +135,44 @@ class Tagger:
             print(tag, "+", path)
             mapping[bare_tag].append(tagged.filepath)
     return mapping
+
+  # TODO: group the tag names by target directories
+  # and do only one sweep per target directory.
+  #
+  # TODO: cache the mapping by `srcdirpath`.
+  @pfx
+  def file_by_mapping(self, srcdirpath):
+    ''' Examine the `tagger.file_by` tag for `srcdirpath`.
+        Return a mapping of specific tag values to filing locations
+        using `generate_auto_file_map`.
+        The file locations may be a list or a string (for convenient single locations.
+
+        For example, I might tag my downloads directory with:
+
+            tagger.file_by={"abn":"~/them/me"}
+
+        indicating that files with an `abn` tag should be filed in the `~/them/me` directory.
+        That directory is then walked looking for the tag `abn`,
+        and wherever some tag `abn=`*value*` is found on a subdirectory
+        a mapping entry for `abn=`*value*=>*subdirectory*
+        is added.
+
+        This results in a direct mapping of specific tag values to filing locations,
+        such as:
+
+            { Tag('abn','***********') => ['/path/to/them/me/abn-**-***-***-***'] }
+
+        because the target subdirectory has been tagged with `abn="***********"`.
+    '''
+    fstags = self.fstags
+    mapping = defaultdict(list)
+    file_by = fstags[srcdirpath].get('tagger.file_by') or {}
+    for tag_name, file_to in sorted(file_by.items()):
+      with Pfx("%s => %r", tag_name, file_to):
+        if isinstance(file_to, str):
+          file_to = file_to,
+        for file_to_path in file_to:
+          with Pfx(file_to_path):
+            file_to_path = expanduser(file_to_path)
+            self.generate_auto_file_map(file_to_path, (tag_name,), mapping)
+    return mapping
