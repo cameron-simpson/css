@@ -144,10 +144,11 @@ class Tagger:
         from the tree layout.
     '''
     dirpath = abspath(dirpath)
+    cache_key = dirpath, tuple(sorted(tag_names))
     try:
-      mapping = self._file_by_mappings[dirpath]
+      mapping = self._file_by_mappings[cache_key]
     except KeyError:
-      mapping = self._file_by_mappings[dirpath] = defaultdict(list)
+      mapping = self._file_by_mappings[cache_key] = defaultdict(list)
       fstags = self.fstags
       if mapping is None:
         mapping = defaultdict(list)
