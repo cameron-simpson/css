@@ -35,10 +35,7 @@ class Tagger:
     if fstags is None:
       fstags = FSTags()
     self.fstags = fstags
-    # mapping of bare tags to [dirpath]
-    self.tag_filepaths = defaultdict(list)
-    self.tag_filepaths[Tag('vendor',
-                           'crt')] = ['/Users/cameron/hg/css-tagger/for_crt']
+    self._file_by_mappings = {}
 
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
@@ -132,7 +129,7 @@ class Tagger:
     return linked_to
 
   @pfx
-  def generate_auto_file_map(self, dirpath: str, tag_names, mapping=None):
+  def auto_file_map(self, dirpath: str, tag_names):
     ''' Walk the file tree at `dirpath`
         looking for directories whose direct tags contain tags
         whose name is in `tag_names`.
@@ -142,31 +139,34 @@ class Tagger:
         Parameters:
         * `dirpath`: the path to the directory to walk
         * `tag_names`: an iterable of Tag names of interest
-        * `mapping`: optional preexisting mapping;
-          if provided it must behave like a `defaultdict(list)`,
-          autocreating missing entries as lists
 
         The intent here is to derive filing locations
         from the tree layout.
     '''
-    print("generate...")
-    fstags = self.fstags
-    if mapping is None:
-      mapping = defaultdict(list)
-    tag_names = set(tag_names)
-    print("tag_names =", tag_names)
-    assert all(isinstance(tag_name, str) for tag_name in tag_names)
-    for path, dirnames, _ in os.walk(dirpath):
-      print("..", path)
-      with Pfx(path):
-        dirnames[:] = sorted(dirnames)
-        tagged = fstags[path]
-        for tag in tagged:
-          print("  ", tag)
-          if tag.name in tag_names:
-            bare_tag = Tag(tag.name, tag.value)
-            print(tag, "+", path)
-            mapping[bare_tag].append(tagged.filepath)
+    dirpath = abspath(dirpath)
+    try:
+      mapping = self._file_by_mappings[dirpath]
+    except KeyError:
+      mapping = self._file_by_mappings[dirpath] = defaultdict(list)
+      fstags = self.fstags
+      if mapping is None:
+        mapping = defaultdict(list)
+      tag_names = set(tag_names)
+      assert all(isinstance(tag_name, str) for tag_name in tag_names)
+      for path, dirnames, _ in os.walk(dirpath):
+        with Pfx(path):
+          # orderthe descent
+          dirnames[:] = sorted(dirnames)
+          tagged = fstags[path]
+          if 'tagger.skip' in tagged:
+            # prune this directory from the mapping
+            dirnames[:] = []
+          else:
+            # look for the tags of interest
+            for tag in tagged:
+              if tag.name in tag_names:
+                bare_tag = Tag(tag.name, tag.value)
+                mapping[bare_tag].append(tagged.filepath)
     return mapping
 
   # TODO: group the tag names by target directories
@@ -177,7 +177,7 @@ class Tagger:
   def file_by_mapping(self, srcdirpath):
     ''' Examine the `tagger.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
-        using `generate_auto_file_map`.
+        derived via `auto_file_map`.
         The file locations may be a list or a string (for convenient single locations.
 
         For example, I might tag my downloads directory with:
@@ -187,8 +187,7 @@ class Tagger:
         indicating that files with an `abn` tag should be filed in the `~/them/me` directory.
         That directory is then walked looking for the tag `abn`,
         and wherever some tag `abn=`*value*` is found on a subdirectory
-        a mapping entry for `abn=`*value*=>*subdirectory*
-        is added.
+        a mapping entry for `abn=`*value*=>*subdirectory* is added.
 
         This results in a direct mapping of specific tag values to filing locations,
         such as:
@@ -198,7 +197,7 @@ class Tagger:
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
     fstags = self.fstags
-    mapping = defaultdict(list)
+    mapping = {}
     file_by = fstags[srcdirpath].get('tagger.file_by') or {}
     for tag_name, file_to in sorted(file_by.items()):
       with Pfx("%s => %r", tag_name, file_to):
@@ -208,4 +207,5 @@ class Tagger:
           with Pfx(file_to_path):
             file_to_path = expanduser(file_to_path)
             self.generate_auto_file_map(file_to_path, (tag_name,), mapping)
+            mapping.update(self.auto_file_map(file_to_path, (tag_name,)))
     return mapping
