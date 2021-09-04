@@ -198,7 +198,7 @@ class Tagger:
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
     fstags = self.fstags
-    mapping = {}
+    mapping = defaultdict(set)
     file_by = fstags[srcdirpath].get('tagger.file_by') or {}
     for tag_name, file_to in sorted(file_by.items()):
       with Pfx("%s => %r", tag_name, file_to):
@@ -212,5 +212,7 @@ class Tagger:
               else:
                 file_to_path = joinpath(srcdirpath, file_to_path)
             file_to_path = abspath(file_to_path)
-            mapping.update(self.auto_file_map(file_to_path, (tag_name,)))
+            for bare_key, dstpaths in self.auto_file_map(file_to_path,
+                                                         (tag_name,)).items():
+              mapping[bare_key].update(dstpaths)
     return mapping
