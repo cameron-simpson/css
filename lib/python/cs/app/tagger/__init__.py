@@ -36,10 +36,10 @@ class Tagger:
     self.tag_filepaths[Tag('vendor',
                            'crt')] = ['/Users/cameron/hg/css-tagger/for_crt']
 
-  def auto_name(self, tags):
-    ''' Generate a filename computed from `tags`.
+  def auto_name(self, srcpath, dstdirpath, tags):
+    ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
-    name = basename(tags.srcpath)
+    name = basename(srcpath)
     X("autoname(%s) => %r", tags, name)
     return name
 
