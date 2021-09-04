@@ -3,11 +3,13 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from getopt import GetoptError
+from os.path import dirname
 from pprint import pprint
 import sys
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
+from cs.pfx import Pfx
 from . import Tagger
 from .gui import TaggerGUI
 
@@ -40,9 +42,10 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing pathnames")
     tagger = self.options.tagger
     for path in argv:
-      print("autofile", path)
-      linked_to = tagger.file_by_tags(path)
-      print("  linked to", repr(linked_to))
+      with Pfx(path):
+        print("autofile", path)
+        linked_to = tagger.file_by_tags(path, no_link=True)
+        print("  linked to", repr(linked_to))
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
