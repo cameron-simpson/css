@@ -170,10 +170,6 @@ class Tagger:
                 mapping[bare_tag].append(tagged.filepath)
     return mapping
 
-  # TODO: group the tag names by target directories
-  # and do only one sweep per target directory.
-  #
-  # TODO: cache the mapping by `srcdirpath`.
   @pfx
   def file_by_mapping(self, srcdirpath):
     ''' Examine the `tagger.file_by` tag for `srcdirpath`.
@@ -200,19 +196,24 @@ class Tagger:
     fstags = self.fstags
     mapping = defaultdict(set)
     file_by = fstags[srcdirpath].get('tagger.file_by') or {}
-    for tag_name, file_to in sorted(file_by.items()):
-      with Pfx("%s => %r", tag_name, file_to):
-        if isinstance(file_to, str):
-          file_to = file_to,
-        for file_to_path in file_to:
-          with Pfx(file_to_path):
-            if not isabspath(file_to_path):
-              if file_to_path.startswith('~'):
-                file_to_path = expanduser(file_to_path)
-              else:
-                file_to_path = joinpath(srcdirpath, file_to_path)
-            file_to_path = abspath(file_to_path)
-            for bare_key, dstpaths in self.auto_file_map(file_to_path,
-                                                         (tag_name,)).items():
-              mapping[bare_key].update(dstpaths)
+    # group the tags by file_by target path
+    grouped = defaultdict(set)
+    for tag_name, file_to in file_by.items():
+      if isinstance(file_to, str):
+        file_to = file_to,
+      for file_to_path in file_to:
+        if not isabspath(file_to_path):
+          if file_to_path.startswith('~'):
+            file_to_path = expanduser(file_to_path)
+          else:
+            file_to_path = joinpath(srcdirpath, file_to_path)
+        file_to_path = abspath(file_to_path)
+        grouped[file_to_path].add(tag_name)
+    # walk each path for its tag_names of interest
+    for file_to_path, tag_names in sorted(grouped.items()):
+      with Pfx("%r:%r", file_to_path, tag_names):
+        # accrue destination paths by tag values
+        for bare_key, dstpaths in self.auto_file_map(file_to_path,
+                                                     tag_names).items():
+          mapping[bare_key].update(dstpaths)
     return mapping
