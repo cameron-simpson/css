@@ -41,7 +41,7 @@ class Tagger:
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
     name = basename(srcpath)
-    X("autoname(%s) => %r", tags, name)
+    ##X("autoname(%s) => %r", tags, name)
     return name
 
   @pfx
@@ -68,7 +68,6 @@ class Tagger:
     filed_from = set()
     while q:
       srcpath = q.pop(0)
-      print("file_by_tags:", srcpath)
       with Pfx(srcpath):
         srcdirpath = dirname(srcpath)
         # loop detection
@@ -148,6 +147,9 @@ class Tagger:
 
         The intent here is to derive filing locations
         from the tree layout.
+
+        We automatically skip subdirectories whose names commence with `'.'`.
+        We also skip subdirectories tagged with `tagger.skip`.
     '''
     dirpath = abspath(dirpath)
     cache_key = dirpath, tuple(sorted(tag_names))
@@ -162,14 +164,14 @@ class Tagger:
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
       for path, dirnames, _ in os.walk(dirpath):
         with Pfx(path):
-          # orderthe descent
+          # order the descent
           dirnames[:] = sorted(
               dirname for dirname in dirnames
               if dirname and not dirname.startswith('.')
           )
           tagged = fstags[path]
           if 'tagger.skip' in tagged:
-            # prune this directory from the mapping
+            # prune this directory tree from the mapping
             dirnames[:] = []
           else:
             # look for the tags of interest
