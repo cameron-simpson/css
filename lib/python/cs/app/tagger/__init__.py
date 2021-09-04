@@ -114,6 +114,8 @@ class Tagger:
         if dstpaths:
           # queue further locations, do not file here
           q.extend(dstpaths)
+          for dstpath in dstpaths:
+            fstags[dstpath].update(tags)
         else:
           # file here
           dstbase = self.auto_name(srcpath, srcdirpath, tags)
