@@ -59,43 +59,72 @@ class Tagger:
         Note: if `path` is already linked to an implied location
         that location is also included in the returned list.
     '''
+    fstags = self.fstags
+    # start the queue with the resolved `path`
+    srcpath0 = fstags[path].filepath
+    q = [srcpath0]
     linked_to = []
-    tagged = self.fstags[path]
-    srcpath = tagged.filepath
-    for tag in tagged.all_tags:
-      with Pfx(tag):
-        bare_tag = Tag(tag.name, tag.value)
-        for target_dir in self.tag_filepaths.get(bare_tag, ()):
-          with Pfx("=> %r", target_dir):
-            if not isdirpath(target_dir):
-              warning("not a directory")
+    filed_from = set()
+    while q:
+      srcpath = q.pop(0)
+      print("file_by_tags:", srcpath)
+      with Pfx(srcpath):
+        srcdirpath = dirname(srcpath)
+        # loop detection
+        if srcdirpath in filed_from:
+          continue
+        filed_from.add(srcdirpath)
+        tagged = fstags[srcpath]
+        tags = tagged.all_tags
+        # places to redirect this file
+        refile_to = set()
+        mapping = self.file_by_mapping(srcdirpath)
+        interesting_tag_names = {tag.name for tag in mapping.keys()}
+        for tag_name in sorted(interesting_tag_names):
+          with Pfx("tag_name %r", tag_name):
+            if tag_name not in tags:
               continue
-            with NamedTemporaryFile(dir=target_dir) as T:
-              tmppath = T.name
-              tmp = self.fstags[tmppath]
-              tmp.update(tagged.all_tags)
-              if prune_inherited:
-                tmp.prune_inherited()
-              tmp.add('srcpath', srcpath)
-              link_as = self.auto_name(tmp)
-              assert link_as == basename(link_as)
-              linkpath = joinpath(target_dir, link_as)
-              if no_link:
-                linked_to.append(linkpath)
-              elif existspath(linkpath):
-                if samefile(srcpath, linkpath):
-                  info("source %r already linked to %r", srcpath, linkpath)
-                  linked_to.append(linkpath)
-                else:
-                  warning("link path %r already exists", linkpath)
-              else:
-                try:
-                  pfx_call(os.link, srcpath, linkpath)
-                except OSError as e:
-                  error("link fails: %s", e)
-                else:
-                  self.fstags[linkpath].update(tmp)
-                  linked_to.append(linkpath)
+            bare_tag = Tag(tag_name, tags[tag_name])
+            try:
+              target_dirs = mapping.get(bare_tag, ())
+            except TypeError as e:
+              warning("  %s not mapped, skipping", bare_tag)
+              continue
+            if not target_dirs:
+              continue
+            # collect other filing locations
+            refile_to.update(target_dirs)
+        # ... but remove locations we have already considered
+        refile_to.difference_update(filed_from)
+        # now collate new filing locations
+        dstpaths = []
+        for dstdirpath in refile_to:
+          with Pfx("dst %r", dstdirpath):
+            if not isdirpath(dstdirpath):
+              warning("not a directory, ignoring")
+              continue
+            dstbase = self.auto_name(srcpath, dstdirpath, tags)
+            with Pfx(dstbase):
+              dstpath = joinpath(dstdirpath, dstbase)
+              if existspath(dstpath):
+                warning("already exists, skipping")
+                continue
+              dstpaths.append(dstpath)
+        if dstpaths:
+          # queue further locations, do not file here
+          q.extend(dstpaths)
+        else:
+          # file here
+          dstbase = self.auto_name(srcpath, srcdirpath, tags)
+          with Pfx(dstbase):
+            dstpath = joinpath(srcdirpath, dstbase)
+            if existspath(dstpath):
+              warning("already exists, skipping")
+              continue
+            if not no_link:
+              pfx_call(os.link, srcpath0, dstpath)
+              fstags[dstpath].update(tags)
+            linked_to.append(dstpath)
     return linked_to
 
   @pfx
