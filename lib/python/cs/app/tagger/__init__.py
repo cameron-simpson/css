@@ -3,8 +3,12 @@
 from collections import defaultdict
 import os
 from os.path import (
+    abspath,
     basename,
+    dirname,
     exists as existspath,
+    expanduser,
+    isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
     samefile,
@@ -13,7 +17,7 @@ from tempfile import NamedTemporaryFile
 
 from cs.fstags import FSTags
 from cs.logutils import info, warning, error
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call, prefix
 from cs.tagset import Tag
 
 from cs.x import X
@@ -130,7 +134,7 @@ class Tagger:
   @pfx
   def generate_auto_file_map(self, dirpath: str, tag_names, mapping=None):
     ''' Walk the file tree at `dirpath`
-        looking fordirectories whose direct tags contain tags
+        looking for directories whose direct tags contain tags
         whose name is in `tag_names`.
         Return a mapping of `Tag->[dirpaths...]`
         mapping specific tag values to the directory paths where they occur.
