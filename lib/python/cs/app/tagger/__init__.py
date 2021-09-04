@@ -206,7 +206,11 @@ class Tagger:
           file_to = file_to,
         for file_to_path in file_to:
           with Pfx(file_to_path):
-            file_to_path = expanduser(file_to_path)
-            self.generate_auto_file_map(file_to_path, (tag_name,), mapping)
+            if not isabspath(file_to_path):
+              if file_to_path.startswith('~'):
+                file_to_path = expanduser(file_to_path)
+              else:
+                file_to_path = joinpath(srcdirpath, file_to_path)
+            file_to_path = abspath(file_to_path)
             mapping.update(self.auto_file_map(file_to_path, (tag_name,)))
     return mapping
