@@ -125,6 +125,10 @@ class Tagger:
               warning("already exists, skipping")
               continue
             if not no_link:
+              if not isdirpath(srcdirpath):
+                print("%s: mkdir(%r)" % (prefix(), srcdirpath))
+                pfx_call(os.mkdir, srcdirpath)
+              print(srcpath0, '=>', dstpath)
               pfx_call(os.link, srcpath0, dstpath)
               fstags[dstpath].update(tags)
             linked_to.append(dstpath)
