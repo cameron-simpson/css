@@ -2,14 +2,21 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
-from getopt import GetoptError
-from os.path import dirname
+from getopt import GetoptError, getopt
+import os
+from os.path import (
+    exists as existspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+)
 from pprint import pprint
 import sys
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
-from cs.pfx import Pfx
+from cs.logutils import warning
+from cs.pfx import Pfx, pfxprint
 from . import Tagger
 from .gui import TaggerGUI
 
@@ -34,18 +41,79 @@ class TaggerCommand(BaseCommand):
       with stackattrs(options, tagger=tagger):
         yield
 
+  @staticmethod
+  def _autofile(path, *, no_link, tagger):
+    ''' Wrapper for `Tagger.file_by_tags` which reports actions.
+    '''
+    if not no_link and not existspath(path):
+      warning("no such path, skipped")
+      linked_to = []
+    else:
+      linked_to = tagger.file_by_tags(path, no_link=no_link)
+      if linked_to:
+        for linked in linked_to:
+          pfxprint('=>', linked)
+      else:
+        ##pfxprint('not filed')
+        pass
+    return linked_to
+
   def cmd_autofile(self, argv):
     ''' Usage: {cmd} pathnames...
           Link pathnames to destinations based on their tags.
+          -d    Treat directory pathnames like file - file the
+                directory, not its contents.
+                (TODO: we file by linking - this needs a rename.)
+          -n    No link (default). Just print filing actions.
+          -r    Recurse. Required to autofile a directory tree.
+          -y    Link: file 
     '''
+    direct = False
+    recurse = False
+    no_link = True
+    opts, argv = getopt(argv, 'dnry')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-d':
+          direct = True
+        elif opt == 'n':
+          no_link = True
+        elif opt == '-r':
+          recurse = True
+        elif opt == '-y':
+          no_link = False
+        else:
+          raise RuntimeError("unimplemented option")
     if not argv:
       raise GetoptError("missing pathnames")
     tagger = self.options.tagger
+    fstags = tagger.fstags
     for path in argv:
       with Pfx(path):
-        print("autofile", path)
-        linked_to = tagger.file_by_tags(path, no_link=True)
-        print("  linked to", repr(linked_to))
+        if direct or not isdirpath(path):
+          self._autofile(path, no_link=no_link, tagger=tagger)
+        elif not recurse:
+          pfxprint("not autofiling directory, use -r for recursion")
+        else:
+          for subpath, dirnames, filenames in os.walk(path):
+            with Pfx(subpath):
+              # order the descent
+              dirnames[:] = sorted(
+                  dname for dname in dirnames
+                  if dname and not dname.startswith('.')
+              )
+              tagged = fstags[subpath]
+              if 'tagger.skip' in tagged:
+                # prune this directory tree
+                dirnames[:] = []
+                continue
+              for filename in sorted(filenames):
+                with Pfx(filename):
+                  filepath = joinpath(subpath, filename)
+                  if not isfilepath(filepath):
+                    pfxprint("not a regular file, skipping")
+                    continue
+                  self._autofile(filepath, no_link=no_link, tagger=tagger)
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
