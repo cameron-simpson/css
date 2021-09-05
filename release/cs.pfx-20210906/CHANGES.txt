@@ -1,0 +1,4 @@
+lib/python/cs/pfx.py: cs.pfx: @pfx: use pfx_call if there is no presupplied message argument
+lib/python/cs/pfx.py: merge default ==> default
+lib/python/cs/pfx.py: cs.pfx: Pfx.prefixify_exception: catch unexpected OSError.args value and report
+lib/python/cs/pfx.py: cs.pfx: new pfxprint which calls print() with the current prefix
