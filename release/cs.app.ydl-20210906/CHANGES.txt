@@ -1,0 +1,5 @@
+lib/python/cs/app/ydl.py: cs.app.ydl: DISTINFO.install_requires: make cs.upd requirement based on the "multiline" feature
+lib/python/cs/app/ydl.py: cs.app.ydl: new -j jobs options to control parallelism, default 4
+lib/python/cs/app/ydl.py: cs.app.ydl: docstring fix
+lib/python/cs/app/ydl.py: cs.app.ydl: update DISTINFO
+lib/python/cs/app/ydl.py: cs.app.ydl: clean minor lint
