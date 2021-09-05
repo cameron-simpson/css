@@ -72,6 +72,7 @@ class Tagger:
         srcdirpath = dirname(srcpath)
         # loop detection
         if srcdirpath in filed_from:
+          print("already processed %r, skipping loop" % (srcdirpath,))
           continue
         filed_from.add(srcdirpath)
         tagged = fstags[srcpath]
@@ -83,12 +84,13 @@ class Tagger:
         for tag_name in sorted(interesting_tag_names):
           with Pfx("tag_name %r", tag_name):
             if tag_name not in tags:
+              print("  tag %r not present, skipping" % (tag_name,))
               continue
             bare_tag = Tag(tag_name, tags[tag_name])
             try:
               target_dirs = mapping.get(bare_tag, ())
             except TypeError as e:
-              warning("  %s not mapped, skipping", bare_tag)
+              warning("  %s not mapped (%s), skipping", bare_tag, e)
               continue
             if not target_dirs:
               continue
@@ -121,7 +123,8 @@ class Tagger:
           with Pfx(dstbase):
             dstpath = joinpath(srcdirpath, dstbase)
             if existspath(dstpath):
-              warning("already exists, skipping")
+              if not samefile(srcpath0, dstpath):
+                warning("already exists, skipping")
               continue
             if not no_link:
               if not isdirpath(srcdirpath):
@@ -166,8 +169,8 @@ class Tagger:
         with Pfx(path):
           # order the descent
           dirnames[:] = sorted(
-              dirname for dirname in dirnames
-              if dirname and not dirname.startswith('.')
+              dname for dname in dirnames
+              if dname and not dname.startswith('.')
           )
           tagged = fstags[path]
           if 'tagger.skip' in tagged:
