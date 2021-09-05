@@ -127,8 +127,8 @@ class TaggerCommand(BaseCommand):
     tag_names = 'abn', 'invoice', 'vendor'
     for path in argv:
       print("scan", path)
-      mapping = tagger.generate_auto_file_map(path, tag_names, mapping)
-    pprint(mapping)
+      mapping = tagger.auto_file_map(path, tag_names, mapping)
+      pprint(mapping)
 
   def cmd_gui(self, argv):
     ''' Usage: {cmd} pathnames...
