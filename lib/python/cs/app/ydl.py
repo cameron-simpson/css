@@ -121,6 +121,7 @@ class YDLCommand(BaseCommand):
             try:
               options.parallel = int(val)
             except ValueError as e:
+              # pylint: disable=raise-missing-from
               raise GetoptError("invalid integer: %s" % (e,))
             else:
               if options.parallel < 1:
