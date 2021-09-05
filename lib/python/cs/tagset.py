@@ -533,7 +533,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       try:
         return self.auto_infer(attr)
       except ValueError as e:
-        warning("auto_infer(%r): %s", attr, e)
+        # no match
+        ##warning("auto_infer(%r): %s", attr, e)
+        pass
       # support for {type}_{field} and {type}_{field}s attributes
       # these dereference through the ontology if there is one
       ont = self.ontology
