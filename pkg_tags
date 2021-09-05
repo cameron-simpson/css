@@ -26,7 +26,7 @@ cs.edit pypi.release="20191201.1" ok_revision="736d50be6beeca69109fce2cffef3f4e0
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20210731" ok_revision="444f6f27367ddbadd44a2cf01d45ddd25cd19579" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"]}
+cs.fileutils pypi.release="20210906" ok_revision="444f6f27367ddbadd44a2cf01d45ddd25cd19579" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"]}
 cs.fstags pypi.release="20210306" ok_revision=bd84d73aaf7112456c4d69b852ed52745aa84969
 cs.gimmicks ok_revision="457bbd876fb6bf7f0c45f1f588a07ff58782f7e6" pypi.release="20210306"
 cs.html pypi.release=20160828
