@@ -504,6 +504,11 @@ def prefix():
   '''
   return Pfx._state.prefix
 
+def pfxprint(*a, **kw):
+  ''' Call `print()` with the current prefix.
+  '''
+  print(prefix() + ':', *a, **kw)
+
 @contextmanager
 def PrePfx(tag, *args):
   ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
