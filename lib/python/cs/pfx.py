@@ -356,7 +356,24 @@ class Pfx(object):
         continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
-        value = (value[0], cls.prefixify(value[1]))
+        try:
+          value0, value1 = value
+        except ValueError as args_e:
+          X(
+              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
+              type(e).__name__,
+              ','.join(
+                  cls.__name__
+                  for cls in type(e).__mro__
+                  if cls is not type(e) and cls is not object
+              ),
+              e,
+              value,
+              args_e,
+          )
+          continue
+        else:
+          value = (value0, cls.prefixify(value1))
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -486,6 +503,11 @@ def prefix():
   ''' Return the current Pfx prefix.
   '''
   return Pfx._state.prefix
+
+def pfxprint(*a, **kw):
+  ''' Call `print()` with the current prefix.
+  '''
+  print(prefix() + ':', *a, **kw)
 
 @contextmanager
 def PrePfx(tag, *args):

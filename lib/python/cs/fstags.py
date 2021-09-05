@@ -207,7 +207,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     ''' Usage: {cmd} paths...
           Tag paths based on rules from the rc file.
     '''
-    options = self.option
+    options = self.options
     fstags = options.fstags
     U = options.upd
     if not argv:
@@ -530,6 +530,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           List files from paths and their tags.
           -d          Treat directories like files, do not recurse.
           --direct    List direct tags instead of all tags.
+          -l          Long format.
           -o output_format
                       Use output_format as a Python format string to lay out
                       the listing.
@@ -539,14 +540,17 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     fstags = options.fstags
     directories_like_files = False
     use_direct_tags = False
+    long_format = False
     output_format = LS_OUTPUT_FORMAT_DEFAULT
-    opts, argv = getopt(argv, 'do:', longopts=['direct'])
+    opts, argv = getopt(argv, 'dlo:', longopts=['direct'])
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-d':
           directories_like_files = True
         elif opt == '--direct':
           use_direct_tags = True
+        elif opt == '-l':
+          long_format = True
         elif opt == '-o':
           output_format = fstags.resolve_format_string(value)
         else:
@@ -558,15 +562,21 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       for filepath in ((fullpath,)
                        if directories_like_files else rfilepaths(fullpath)):
         with Pfx(filepath):
-          try:
-            listing = fstags[filepath].format_as(
-                output_format, error_sep='\n  ', direct=use_direct_tags
-            )
-          except FormatAsError as e:
-            error(str(e))
-            xit = 1
-            continue
-          print(listing)
+          tags = fstags[filepath]
+          if long_format:
+            print(filepath)
+            for tag in tags.as_tags(all_tags=not use_direct_tags):
+              print(" ", tag)
+          else:
+            try:
+              listing = tags.format_as(
+                  output_format, error_sep='\n  ', direct=use_direct_tags
+              )
+            except FormatAsError as e:
+              error(str(e))
+              xit = 1
+              continue
+            print(listing)
     return xit
 
   def cmd_cp(self, argv):
@@ -1484,10 +1494,26 @@ class TaggedPath(TagSet, HasFSTagsMixin):
     '''
     if not all_tags:
       return super().as_tags(prefix=prefix)
-    tags = self.all_tags
+    tags = self.all_tags  # pylint: disable=no-member
     if not prefix:
       return tags
     return tags.as_tags(prefix=prefix)
+
+  def auto_infer(self, attr):
+    ''' Infer a value from `attr` via the associated `FSTags.cascade_rules`.
+
+        This implementation tries the cascade rules from the configuration
+        and falls back to the superclass inference (the direct tag, if present).
+        Therefore a tagset with a rule for `.title` and also a
+        direct `.title` Tag would return the direct tag value for
+        `.title` and the rule value for `.auto.title`.
+    '''
+    for rule in self._fstags.config.cascade_rules:
+      if rule.target == attr:
+        tag = rule.infer_tag(self)
+        if tag is not None:
+          return tag.value
+    return super().auto_infer(attr)
 
   def format_tagset(self, *, direct=False):
     ''' Compute a `TagSet` from this file's tags
@@ -1588,6 +1614,24 @@ class TaggedPath(TagSet, HasFSTagsMixin):
             tagset.add(tag)
     return tagset
 
+  def prune_inherited(self):
+    ''' Examine the tags of this path's parent.
+        Remove any tag on this file if they are present on the parent.
+        Return a `TagSet` containing the pruned `Tag`s.
+    '''
+    pruned = TagSet()
+    parent_path = dirname(self.filepath)
+    if parent_path == self.filepath:
+      return pruned
+    parent = self.fstags[parent_path]
+    if parent is self:
+      return pruned
+    for tag in parent.as_tags(all_tags=True):
+      if tag in self:
+        pruned.add(tag)
+        self.discard(tag)
+    return pruned
+
   @fmtdoc
   def get_xattr_tagset(self, xattr_name=None):
     ''' Return a new `TagSet`
@@ -1666,13 +1710,14 @@ class CascadeRule:
   ''' A cascade rule of possible source tag names to provide a target tag.
   '''
 
-  def __init__(self, target, cascade):
+  def __init__(self, target: str, cascade):
     self.target = target
     self.cascade = cascade
 
   def __str__(self):
     return "%s(%s<=%r)" % (type(self).__name__, self.target, self.cascade)
 
+  @pfx_method
   def infer_tag(self, tagset):
     ''' Apply the rule to the `TagSet` `tagset`.
         Return a new `Tag(self.target,value)`
