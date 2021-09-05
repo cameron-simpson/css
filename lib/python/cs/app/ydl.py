@@ -263,7 +263,6 @@ class YDL:
         * `tick`: optional callback to indicate state change
         * `over_progress`: an `OverProgress` to which to add each new `Progress` instance
         * `sem`: a shared `Semaphore` governing download parallelism
-        * `parallel`: the number of download which may run in parallel, default {DEFAULT_PARALLEL}
         * `kw_opts`: other keyword arguments are used to initialise
           the options for the underlying `YoutubeDL` instance
     '''
