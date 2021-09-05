@@ -1235,7 +1235,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw):
+  def __init__(
+      self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw
+  ):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
