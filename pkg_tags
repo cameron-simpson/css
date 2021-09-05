@@ -34,7 +34,7 @@ cs.id3 pypi.release="20150116.2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20210306" ok_revision="30d3534ee55e6aef369c55e79c0fe63d6bc2e1e6"
 cs.later pypi.release=20191007 ok_revision="469ccac1fdc9ecf59be763712702184276caefa3"
-cs.lex pypi.release="20210717" ok_revision="1f9c3af1f457b8c7ebf9648dd7ce21688dd10aff"
+cs.lex pypi.release="20210717" ok_revision="84d3191424e9166376a8d1fadd5d949d5eb27af8"
 cs.logutils pypi.release="20210721" ok_revision="61d49c0d7989a7a83c97d9fdd1aa86a0d8b5610b" features={"20210718":["supplant_root_logger"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20210717" ok_revision=c5f6b8fc8c9012dab5e3bdab69760b039c59a162
