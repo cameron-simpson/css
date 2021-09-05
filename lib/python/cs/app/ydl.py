@@ -66,7 +66,6 @@ DISTINFO = {
         'cs.pfx',
         'cs.progress',
         'cs.result',
-        'cs.tagset',
         'cs.upd>=multiline',
         'youtube_dl',
     ],
