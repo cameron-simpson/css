@@ -9,6 +9,8 @@ import unittest
 from cs.curlytplt import curly_substitute
 
 class TestAll(unittest.TestCase):
+  ''' Test `cs.curlytplt`.
+  '''
 
   @staticmethod
   def _mapfn(x):

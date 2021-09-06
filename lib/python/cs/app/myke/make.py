@@ -3,19 +3,22 @@
 ''' Make make processes.
 '''
 
-import sys
-import os
-import os.path
+import errno
 import getopt
 import logging
+import os
+import os.path
+from os.path import dirname, realpath
 from subprocess import Popen
+import sys
 import time
 from types import SimpleNamespace as NS
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
-from cs.logutils import debug, info, error, D
+from cs.lex import get_identifier, get_white
+from cs.logutils import debug, info, error, exception, D
 from cs.pfx import Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
@@ -23,8 +26,7 @@ from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
 import cs.logutils
 import cs.pfx
-from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
-                   parseMakefile, parseMacroExpression
+from .parse import (SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError)
 
 SHELL = '/bin/sh'
 
@@ -82,15 +84,15 @@ class Maker(MultiOpenMixin):
     )
 
   def startup(self):
-    ''' Set up the `Later` work qeueu and log to `'myke.log'`.
+    ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.logTo("myke-later.log")
+    self._makeQ.open()
 
   def shutdown(self):
     ''' Shut down the make queue and wait for it.
     '''
-    self._makeQ.shutdown()
+    self._makeQ.close()
     self._makeQ.wait()
 
   def report(self, fp=None):
@@ -129,7 +131,10 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get((cs.pfx.cmd + 'rc').upper())
+      makerc_envvar = (
+          os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc'
+      ).upper()
+      makerc = os.environ.get(makerc_envvar)
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
       makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
@@ -317,7 +322,7 @@ class Maker(MultiOpenMixin):
       first_target = None
       ns = {}
       self.insert_namespace(ns)
-      for parsed_object in parseMakefile(self, makefile, parent_context):
+      for parsed_object in self.parse(makefile, parent_context):
         with Pfx(parsed_object.context):
           if isinstance(parsed_object, Exception):
             error("exception: %s", parsed_object)
@@ -338,12 +343,157 @@ class Maker(MultiOpenMixin):
             ns[parsed_object.name] = parsed_object
           else:
             raise ValueError(
-                "parseMakefile({}): unsupported parse item received: {}{!r}"
-                .format(makefile, type(parsed_object), parsed_object)
+                f"unsupported parse item received: {type(parsed_object)}{parsed_object!r}"
             )
       if first_target is not None:
         self.default_target = first_target
     return ok
+
+  def parse(self, fp, parent_context=None, missing_ok=False):
+    ''' Read a Mykefile and yield Macros and Targets.
+    '''
+    from .make import Target, Action
+    action_list = None  # not in a target
+    for context, line in readMakefileLines(self, fp, parent_context=parent_context,
+                                           missing_ok=missing_ok):
+      with Pfx(str(context)):
+        if isinstance(line, OSError):
+          e = line
+          if e.errno == errno.ENOENT or e.errno == errno.EPERM:
+            if missing_ok:
+              continue
+            e.context = context
+            yield e
+            break
+          raise e
+        try:
+          if line.startswith(':'):
+            # top level directive
+            _, doffset = get_white(line, 1)
+            word, offset = get_identifier(line, doffset)
+            if not word:
+              raise ParseError(context, doffset, "missing directive name")
+            _, offset = get_white(line, offset)
+            with Pfx(word):
+              if word == 'append':
+                if offset == len(line):
+                  raise ParseError(context, offset, "nothing to append")
+                mexpr, offset = MacroExpression.parse(context, line, offset)
+                assert offset == len(line)
+                for include_file in mexpr(context, self.namespaces).split():
+                  if include_file:
+                    if not os.path.isabs(include_file):
+                      include_file = os.path.join(
+                          realpath(dirname(fp.name)), include_file
+                      )
+                    self.add_appendfile(include_file)
+                continue
+              if word == 'import':
+                if offset == len(line):
+                  raise ParseError(context, offset, "nothing to import")
+                ok = True
+                missing_envvars = []
+                for envvar in line[offset:].split():
+                  if envvar:
+                    envvalue = os.environ.get(envvar)
+                    if envvalue is None:
+                      error("no $%s" % (envvar,))
+                      ok = False
+                      missing_envvars.append(envvar)
+                    else:
+                      yield Macro(
+                          context, envvar, (), envvalue.replace('$', '$$')
+                      )
+                if not ok:
+                  raise ValueError(
+                      "missing environment variables: %s" % (missing_envvars,)
+                  )
+                continue
+              if word == 'precious':
+                if offset == len(line):
+                  raise ParseError(
+                      context, offset, "nothing to mark as precious"
+                  )
+                mexpr, offset = MacroExpression.parse(context, line, offset)
+                self.precious.update(
+                    word for word in mexpr(context, self.namespaces).split() if word
+                )
+                continue
+              raise ParseError(context, doffset, "unrecognised directive")
+
+          if action_list is not None:
+            # currently collating a Target
+            if not line[0].isspace():
+              # new target or unindented assignment etc - fall through
+              # action_list is already attached to targets,
+              # so simply reset it to None to keep state
+              action_list = None
+            else:
+              # action line
+              _, offset = get_white(line)
+              if offset >= len(line) or line[offset] != ':':
+                # ordinary shell action
+                action_silent = False
+                if offset < len(line) and line[offset] == '@':
+                  action_silent = True
+                  offset += 1
+                A = Action(context, 'shell', line[offset:], silent=action_silent)
+                self.debug_parse("add action: %s", A)
+                action_list.append(A)
+                continue
+              # in-target directive like ":make"
+              _, offset = get_white(line, offset + 1)
+              directive, offset = get_identifier(line, offset)
+              if not directive:
+                raise ParseError(
+                    context, offset,
+                    "missing in-target directive after leading colon"
+                )
+              A = Action(context, directive, line[offset:].lstrip())
+              self.debug_parse("add action: %s", A)
+              action_list.append(A)
+              continue
+
+          try:
+            macro = Macro.from_assignment(context, line)
+          except ValueError:
+            pass
+          else:
+            yield macro
+            continue
+
+          # presumably a target definition
+          # gather up the target as a macro expression
+          target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
+          if not context.text.startswith(':', offset):
+            raise ParseError(context, offset, "no colon in target definition")
+          prereqs_mexpr, offset = MacroExpression.parse(
+              context, offset=offset + 1, stopchars=':'
+          )
+          if offset < len(context.text) and context.text[offset] == ':':
+            postprereqs_mexpr, offset = MacroExpression.parse(
+                context, offset=offset + 1
+            )
+          else:
+            postprereqs_mexpr = []
+
+          action_list = []
+          for target in target_mexpr(context, self.namespaces).split():
+            yield Target(
+                self,
+                target,
+                context,
+                prereqs=prereqs_mexpr,
+                postprereqs=postprereqs_mexpr,
+                actions=action_list
+            )
+          continue
+
+          raise ParseError(context, 0, 'unparsed line')
+        except ParseError as e:
+          exception("%s", e)
+
+    self.debug_parse("finish parse")
 
 class TargetMap(NS):
   ''' A mapping interface to the known targets.
@@ -688,7 +838,7 @@ class Action(NS):
     self.context = context
     self.variant = variant
     self.line = line
-    self.mexpr, _ = parseMacroExpression(context, line)
+    self.mexpr = MacroExpression.from_text(context, line)
     self.silent = silent
     self._lock = Lock()
 
@@ -711,12 +861,10 @@ class Action(NS):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    target.maker.defer(
-        "%s:act[%s]" % (
-            self,
-            target,
-        ), self._act, R, target
-    )
+    target.maker.defer("%s:act[%s]" % (
+        self,
+        target,
+    ), self._act, R, target)
     return R
 
   def _act(self, R, target):

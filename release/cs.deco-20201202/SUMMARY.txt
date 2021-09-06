@@ -1,0 +1,1 @@
+@decorator: tweak test for callable(da[0]) to accord with the docstring.

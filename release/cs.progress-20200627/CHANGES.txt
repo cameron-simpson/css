@@ -1,0 +1,10 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200626.
+lib/python/cs/progress.py: docstring tweaks
+lib/python/cs/progress.py: cs.progress: drop python 2 support, we use yield from; also cs.logutils seems to be Python 2 incompatible
+lib/python/cs/progress.py: cs.progress: BaseProgress: new throughput_recent abstract method to happy the linter
+lib/python/cs/progress.py: cs.progress: BaseProgress.status: handle throughput=None, some logic streamlines
+lib/python/cs/progress.py: cs.progress: clean lint
+lib/python/cs/progress.py: cs.progress: docstring tweak
+lib/python/cs/progress.py: cs.progress: progressbar: logic streamline
+lib/python/cs/progress.py: cs.progress: BaseProgress: drop count_of_total_bytes_text, superceded by format_counter (which honours the units_scale)
+lib/python/cs/progress.py: cs.progress: __main__: make the line count largers to see the 2-units-of-counter effect

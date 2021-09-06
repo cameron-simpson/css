@@ -1,0 +1,1 @@
+X: honour new $CS_X_COLOUR environment variable setting the default colour, default uncoloured.

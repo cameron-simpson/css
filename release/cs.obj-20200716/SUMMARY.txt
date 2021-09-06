@@ -1,0 +1,1 @@
+SingletonMixin: no longer require special _singleton_init method, reuse default __init__ implicitly through __new__ mechanics.

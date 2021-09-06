@@ -1,0 +1,1 @@
+SingletonMixin: correctly invoke __new__, a surprisingly fiddly task to get right.

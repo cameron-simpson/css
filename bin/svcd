@@ -1,10 +1,13 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Daemon to run and restart a command that provides a service, such
 # as an ssh port forward.
-#       - Cameron Simpson <cs@cskk.id.au> 10dec2012
+# - Cameron Simpson <cs@cskk.id.au> 10dec2012
 #
 # Converted to Python module cs.app.svcd. - cameron, may2017
 #
 
-exec python3 -m cs.app.svcd ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.svcd import main
+sys.exit(main(sys.argv))

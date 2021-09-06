@@ -10,10 +10,12 @@ from heapq import heappush, heappop
 from itertools import chain
 import sys
 from cs.buffer import CornuCopyBuffer
+from cs.deco import fmtdoc
 from cs.logutils import warning, exception
-from cs.pfx import Pfx, PfxThread
+from cs.pfx import Pfx
 from cs.queues import IterableQueue
 from cs.seq import tee
+from cs.threads import bg as bg_thread
 from .block import Block, IndirectBlock
 from .scan import scanbuf
 
@@ -60,9 +62,9 @@ def top_block_for(blocks):
   raise RuntimeError("SHOULD NEVER BE REACHED")
 
 def indirect_blocks(blocks):
-  ''' A generator that yields full IndirectBlocks from an iterable
-      source of Blocks, except for the last Block which need not
-      necessarily be bundled into an IndirectBlock.
+  ''' A generator that yields full `IndirectBlock`s from an iterable
+      source of `Block`s, except for the last `Block` which need not
+      necessarily be bundled into an `IndirectBlock`.
   '''
   subblocks = []
   subsize = 0
@@ -93,28 +95,58 @@ def indirect_blocks(blocks):
     yield block
 
 def blockify(chunks, scanner=None, min_block=None, max_block=None):
-  ''' Wrapper for blocked_chunks_of which yields Blocks from the data chunks.
+  ''' Wrapper for `blocked_chunks_of` which yields `Block`s
+      from the data from `chunks`.
   '''
   for chunk in blocked_chunks_of(chunks, scanner, min_block=min_block,
                                  max_block=max_block):
     yield Block(data=chunk)
 
+def block_from_chunks(bfr, **kw):
+  ''' Return a Block for the contents `chunks`, an iterable of `bytes`like objects
+      such as a `CornuCopyBuffer`.
+
+      Keyword arguments are passed to `blockify`.
+  '''
+  return top_block_for(blockify(bfr, **kw))
+
 def spliced_blocks(B, new_blocks):
-  ''' Splice an iterable of (offset, Block) into the data of the Block `B`.
-      Yield high level blocks.
+  ''' Splice `new_blocks` into the data of the `Block` `B`.
+      Yield high level blocks covering the result
+      i.e. all the data from `B` with `new_blocks` inserted.
+
+      The parameter `new_blocks` is an iterable of `(offset,Block)`
+      where `offset` is a position for `Block` within `B`.
+      The `Block`s in `new_blocks` must be in `offset` order.
+
+      Example:
+
+          >>> from .block import LiteralBlock as LB
+          >>> B=LB(b'xxyyzz')
+          >>> newBs=( (2,LB(b'aa')), (4,LB(b'bb')), (4,LB(b'cc')) )
+          >>> splicedBs = spliced_blocks(B,newBs)
+          >>> b''.join(map(bytes, splicedBs))
+          b'xxaayybbcczz'
   '''
   upto = 0  # data span yielded so far
   for offset, newB in new_blocks:
+    # yield high level Blocks up to offset
     if offset > upto:
       yield from B.top_blocks(upto, offset)
       upto = offset
+    elif offset < upto:
+      raise ValueError(
+          "new_blocks: offset=%d,newB=%s: this position has already been passed"
+          % (offset, newB)
+      )
+    # splice in th the new Block
     yield newB
-    upto += len(newB)
   if upto < len(B):
+    # yield high level Blocks for the data which follow
     yield from B.top_blocks(upto, len(B))
 
 class _PendingBuffer:
-  ''' Class to manage the unbound chunks accrued by blocked_chunks_of below.
+  ''' Class to manage the unbound chunks accrued by `blocked_chunks_of` below.
   '''
 
   def __init__(self, max_block, offset=0):
@@ -152,6 +184,7 @@ class _PendingBuffer:
       self.pending.append(chunk)
       self.pending_room -= len(chunk)
 
+@fmtdoc
 def blocked_chunks_of(
     chunks,
     scanner=None,
@@ -164,19 +197,19 @@ def blocked_chunks_of(
 
       Parameters:
       * `chunks`: a source iterable of data chunks, handed to `scanner`
-      * `scanner`: optional callable accepting a CornuCopyBuffer and
-        returning an iterable of ints, such as a generator. `scanner`
-        may be None, in which case only the rolling hash is used
+      * `scanner`: optional callable accepting a `CornuCopyBuffer` and
+        returning an iterable of `int`s, such as a generator. `scanner`
+        may be `None`, in which case only the rolling hash is used
         to locate boundaries.
       * `min_block`: the smallest amount of data that will be used
-        to create a Block, default MIN_BLOCKSIZE
+        to create a Block, default from `MIN_BLOCKSIZE` (`{MIN_BLOCKSIZE}`)
       * `max_block`: the largest amount of data that will be used to
-        create a Block, default MAX_BLOCKSIZE
-      * `histogram`: if not None, a defaultdict(int) to collate counts.
+        create a Block, default from `MAX_BLOCKSIZE` (`{MAX_BLOCKSIZE}`)
+      * `histogram`: if not `None`, a `defaultdict(int)` to collate counts.
         Integer indices count block sizes and string indices are used
-        for 'bytes_total' and 'bytes_hash_scanned'.
+        for `'bytes_total'` and `'bytes_hash_scanned'`.
 
-      The iterable returned from `scanner(chunks)` yields ints which are
+      The iterable returned from `scanner(chunks)` yields `int`s which are
       considered desirable block boundaries.
   '''
   # pylint: disable=too-many-nested-blocks,too-many-statements
@@ -239,7 +272,7 @@ def blocked_chunks_of(
         # end of offsets and chunks
         parseQ.close()
 
-      PfxThread(target=run_parser).run()
+      bg_thread(run_parser)
     # inbound chunks and offsets
     in_offsets = []  # heap of unprocessed edge offsets
     # prime `available_chunk` with the first data chunk, ready for get_next_chunk

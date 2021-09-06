@@ -7,7 +7,7 @@ from getopt import GetoptError
 import sys
 from cs.logutils import setup_logging, warning, error
 from .make import Maker
-from .parse import parseMacroAssignment
+from .parse import Macro
 
 default_cmd = 'myke'
 
@@ -35,8 +35,9 @@ def main(argv=None):
   # gather any macro assignments and apply
   cmd_ns = {}
   while args:
-    macro = parseMacroAssignment("command line", args[0])
-    if macro is None:
+    try:
+      macro = Macro.from_assignment("command line", args[0])
+    except ValueError:
       break
     cmd_ns[macro.name] = macro
     args.pop(0)
@@ -68,5 +69,4 @@ def main(argv=None):
   return xit
 
 if __name__ == '__main__':
-  sys.stderr.flush()
   sys.exit(main([default_cmd] + sys.argv[1:]))

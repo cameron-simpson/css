@@ -11,16 +11,20 @@ from __future__ import with_statement
 from collections import defaultdict, deque, namedtuple
 from contextlib import contextmanager
 from heapq import heappush, heappop
+from inspect import ismethod
 import sys
-from threading import Semaphore, Thread, current_thread, Lock
+from threading import Semaphore, Thread, current_thread, Lock, local as thread_local
+from cs.context import stackattrs
 from cs.deco import decorator
 from cs.excutils import logexc, transmute
 from cs.logutils import LogTime, error, warning, debug, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, prefix
 from cs.py.func import funcname, prop
 from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
+
+__version__ = '20210306-post'
 
 DISTINFO = {
     'description':
@@ -32,6 +36,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.context',
         'cs.deco',
         'cs.excutils',
         'cs.logutils',
@@ -43,6 +48,46 @@ DISTINFO = {
     ],
 }
 
+class State(thread_local):
+  ''' A `Thread` local object with attributes
+      which can be used as a context manager to stack attribute values.
+
+      Example:
+
+          from cs.threads import State
+
+          S = State(verbose=False)
+
+          with S(verbose=True) as prev_attrs:
+              if S.verbose:
+                  print("verbose! (formerly verbose=%s)" % prev_attrs['verbose'])
+  '''
+
+  def __init__(self, **kw):
+    ''' Initiale the `State`, providing the per-Thread initial values.
+    '''
+    thread_local.__init__(self)
+    for k, v in kw.items():
+      setattr(self, k, v)
+
+  def __str__(self):
+    return "%s(%s)" % (
+        type(self).__name__,
+        ','.join("%s=%r" % kv for kv in self.__dict__.items())
+    )
+
+  __repr__ = __str__
+
+  @contextmanager
+  def __call__(self, **kw):
+    ''' Calling a `State` returns a context manager which stacks some state.
+        The context manager yields the previous values
+        for the attributes which were stacked.
+    '''
+    with stackattrs(self, **kw) as prev_attrs:
+      yield prev_attrs
+
+# pylint: disable=too-many-arguments
 def bg(
     func,
     daemon=None,
@@ -60,9 +105,9 @@ def bg(
       * `daemon`: optional argument specifying the `.daemon` attribute.
       * `name`: optional argument specifying the `Thread` name,
         default: the name of `func`.
+      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `no_start`: optional argument, default `False`.
         If true, do not start the `Thread`.
-      * `no_logexc`: if false (default `False`), wrap `func` in `@logexc`.
       * `args`, `kwargs`: passed to the `Thread` constructor
   '''
   if name is None:
@@ -72,16 +117,19 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
+  thread_prefix = prefix() + ': ' + name
+
   def thread_body():
-    with Pfx(name):
+    with Pfx(thread_prefix):
       return func(*args, **kwargs)
 
-  T = Thread(name=name, target=thread_body)
+  T = Thread(name=thread_prefix, target=thread_body)
   if not no_logexc:
     func = logexc(func)
   if daemon is not None:
     T.daemon = daemon
-  no_start or T.start()
+  if not no_start:
+    T.start()
   return T
 
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
@@ -117,7 +165,6 @@ class WorkerThreadPool(MultiOpenMixin):
   def startup(self):
     ''' Start the pool.
     '''
-    pass
 
   def shutdown(self):
     ''' Shut down the pool.
@@ -216,7 +263,7 @@ class WorkerThreadPool(MultiOpenMixin):
         debug("%s: worker thread: running task...", self)
         result = func()
         debug("%s: worker thread: ran task: result = %s", self, result)
-      except Exception:
+      except Exception:  # pylint: disable=broad-except
         exc_info = sys.exc_info()
         log_func = (
             exception
@@ -333,7 +380,7 @@ class AdjustableSemaphore(object):
       self.__value = newvalue
 
 @decorator
-def locked(func, initial_timeout=2.0, lockattr='_lock'):
+def locked(func, initial_timeout=10.0, lockattr='_lock'):
   ''' A decorator for instance methods that must run within a lock.
 
       Decorator keyword arguments:
@@ -347,6 +394,7 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
         which references the lock object.
         Default `'_lock'`
   '''
+  citation = "@locked(%s)" % (funcname(func),)
 
   def lockfunc(self, *a, **kw):
     ''' Obtain the lock and then call `func`.
@@ -360,14 +408,15 @@ def locked(func, initial_timeout=2.0, lockattr='_lock'):
     else:
       if initial_timeout > 0:
         warning(
-            "timeout after %gs waiting for %s<%s>.%s, continuing to wait",
-            initial_timeout,
+            "%s: timeout after %gs waiting for %s<%s>.%s, continuing to wait",
+            citation, initial_timeout,
             type(self).__name__, self, lockattr
         )
       with lock:
         return func(self, *a, **kw)
 
-  lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
+  lockfunc.__name__ = citation
+  lockfunc.__doc__ = getattr(func, '__doc__', '')
   return lockfunc
 
 @decorator
@@ -378,15 +427,15 @@ def locked_property(
       The lock is taken if the value needs to computed.
 
       The default lock attribute is `._lock`.
-      The default attribute for the cached value is `._`funcname
-      where funcname is `func.__name__`.
+      The default attribute for the cached value is `._`*funcname*
+      where *funcname* is `func.__name__`.
       The default "unset" value for the cache is `None`.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
 
-  @transmute(AttributeError)
-  def getprop(self):
+  @transmute(exc_from=AttributeError)
+  def locked_property_getprop(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset.
     '''
@@ -395,7 +444,7 @@ def locked_property(
       try:
         lock = getattr(self, lock_name)
       except AttributeError:
-        error("no .%s attribute", lock_name)
+        error("no %s.%s attribute", type(self).__name__, lock_name)
         raise
       with lock:
         p = getattr(self, prop_name, unset_object)
@@ -411,17 +460,18 @@ def locked_property(
       pass
     return p
 
-  return prop(getprop)
+  return prop(locked_property_getprop)
 
 class LockableMixin(object):
-  ''' Trite mixin to control access to an object via its ._lock attribute.
-      Exposes the ._lock as the property .lock.
+  ''' Trite mixin to control access to an object via its `._lock` attribute.
+      Exposes the `._lock` as the property `.lock`.
       Presents a context manager interface for obtaining an object's lock.
   '''
 
   def __enter__(self):
     self._lock.acquire()
 
+  # pylint: disable=unused-argument
   def __exit(self, exc_type, exc_value, traceback):
     self._lock.release()
 
@@ -591,6 +641,34 @@ class PriorityLock(object):
       yield my_lock
     finally:
       self.release()
+
+@decorator
+def monitor(cls, attrs=None, initial_timeout=10.0, lockattr='_lock'):
+  ''' Turn a class into a monitor, all of whose public methods are `@locked`.
+
+      This is a simple approach requires class instances to have a `._lock`
+      which is an `RLock` or compatible
+      because methods may naively call each other.
+
+      Parameters:
+      * `attrs`: optional iterable of attribute names to wrap in `@locked`.
+        If omitted, all names commencing with a letter are chosen.
+      * `initial_timeout`: optional initial lock timeout, default `10.0`s.
+      * `lockattr`: optional lock attribute name, default `'_lock'`.
+
+      Only attributes satifying `inspect.ismethod` are wrapped
+      because `@locked` requires access to the instance `._lock` attribute.
+  '''
+  if attrs is None:
+    attrs = filter(lambda attr: attr and attr[0].isalpha(), dir(cls))
+  for name in attrs:
+    method = getattr(cls, name)
+    if ismethod(method):
+      setattr(
+          cls, name,
+          locked(method, initial_timeout=initial_timeout, lockattr=lockattr)
+      )
+  return cls
 
 if __name__ == '__main__':
   import cs.threads_tests

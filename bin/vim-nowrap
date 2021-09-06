@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Run vim with no line wrapping, for editing files with very long lines.
+# - Cameron Simpson <cs@cskk.id.au> 22nov2020
+#
+
+exec vim \
+    -c 'set nowrap' \
+    ${1+"$@"}

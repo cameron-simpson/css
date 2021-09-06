@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: set __version__ to '20200517-post'
+lib/python/cs/deco.py: cs.deco: tweak @OBSOLETE and @cached (obsolete name for @cachedmethod)

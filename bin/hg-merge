@@ -62,13 +62,14 @@ fi
 
 checkout=$( pwd )
 branch=$( hg branch )
+rev=$( hg identify -i -r "$branch" )
 obranch=$( incd "$ocheckout" hg branch )
-[ "x$branch" != "x$obranch" ] || {
-  echo "$cmd: local branch \"$branch\" matches remote branch from $ocheckout" >&2
-  exit 1
-}
+if [ "x$branch" = "x$obranch" ]
+then  orev=$( incd "$ocheckout" hg identify -i -r tip )
+else  orev=$obranch
+fi
 $trace hg pull "$ocheckout"
-merges=$( hg log --template '{desc|firstline}\n' -r "$obranch%$branch" )
+merges=$( $trace hg log --template '{desc|firstline}\n' -r "$orev%$rev" )
 [ -n "$merges" ] || {
   echo "$cmd: no inbound changes from $ocheckout, aborting" >&2
   exit 1
@@ -76,7 +77,7 @@ merges=$( hg log --template '{desc|firstline}\n' -r "$obranch%$branch" )
 printf '%s\n' "$merges"
 echo
 echo "from $ocheckout"
-echo "merging $obranch ==> $branch"
+echo "merging $orev ==> $branch"
 
 [ $hadmsg ] || {
   if [ -t 0 -a -t 1 ]
@@ -95,8 +96,8 @@ then
   $trace hg shelve -n "$shelf"
 fi
 
-$trace hg merge "$obranch" || {
-  echo "$cmd: merge from $obranch failed" >&2
+$trace hg merge "$orev" || {
+  echo "$cmd: merge from $orev failed" >&2
   hg resolve -l >&2
   exit 1
 }

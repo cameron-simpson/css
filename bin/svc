@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Convenience command to start disparate services based on name.
+# Convenience command to start disparate services based on name
+# using my svcd command.
 # The configuration is in $HOME/.svcrc.
 # For further convenience I define the following shell aliases and functions:
 #
@@ -19,9 +20,13 @@
 
 set -ue
 
-: ${SVC_CONFIG:=$HOME/.svcrc}
-
 cmd=$( basename "$0" )
+
+: ${SVC_CONFIG:=$HOME/.svcrc}
+: ${SVC_RUNDIR:=$HOME}
+: ${SVC_LOGDIR:=${LOGDIR:-$HOME/var/log/$cmd}}
+export SVC_CONFIG SVC_RUNDIR SVC_LOGDIR
+
 usage="Usage: $cmd [{disable|enable|ls|restart|start|stop} [name]]
   If name is omitted a numbered list of service names is recited.
   If name is numeric then the corresponding service name  is chosen
@@ -128,47 +133,81 @@ case "$op" in
 esac
 
 # normal operations: scan config file for action
-shcmd=
+start_shcmd=
+stop_shcmd=
+enable_shcmd=
+disable_shcmd=
 name=$( resolve_name "$name" ) || exit 1
+lineno=0
 while read -r rc_op rc_ptn rc_shcmd
 do
-  # skip comments, blank lines and config for other ops
+  lineno=$(( lineno + 1 ))
+  # skip comments and blank lines
   case "$rc_op" in
     \#* | '')
       continue
-      ;;
-    service | "$op")
-      ;;
-    *)continue
       ;;
   esac
   # check for a match on the name
   case "$name" in
     $rc_ptn)
-      if [ "x$rc_op" = xservice ]
-      then
-        case "$op" in
-          exec)     shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd" ;;
-          start)    shcmd="svcd -n \"\$SVC_NAME\" -- $rc_shcmd &" ;;
-          stop|enable|disable|restart)
-                    shcmd="svcd $op \"\$SVC_NAME\"" ;;
-          *)        continue ;;
-        esac
-      else
-        shcmd=$rc_shcmd
-      fi
+      case "$rc_op" in
+        start|stop|enable|disable)
+            eval "${rc_op}_shcmd=\$rc_shcmd"
+            ;;
+        service)
+            start_shcmd=$rc_shcmd
+            stop_shcmd=
+            enable_shcmd=
+            disable_shcmd=
+            ;;
+        *)  echo "$cmd: $SVC_CONFIG:$lineno: unrecognised configuration op: $rc_op" >&2
+            ;;
+      esac
       ;;
   esac
-  [ -z "$shcmd" ] || break
 done <"$SVC_CONFIG"
 
-if [ -z "$shcmd" ]
+if [ -z "$start_shcmd" ]
 then
-  echo "$cmd: $SVC_CONFIG: no rules for: $op $name" >&2
+  echo "$cmd: $SVC_CONFIG: no start command for \"$name\"" >&2
   exit 1
 fi
 
-SVC_OP=$op
-SVC_NAME=$name
-export SVC_OP SVC_NAME
-exec sh -c "$setx; $shcmd"
+cd "$SVC_RUNDIR"
+
+case "$op" in
+  start)
+    set -x
+    cd
+    if [ -n "$stop_shcmd" ]
+    then
+      [ -d "$SVC_LOGDIR" ] || set-x mkdir "$SVC_LOGDIR"
+      date | tee -a "$SVC_LOGDIR/$name.log" "$SVC_LOGDIR/$name.err"
+      exec sh -uexc "$start_shcmd" >>"$SVC_LOGDIR/$name.log" 2>>"$SVC_LOGDIR/$name.err"
+    else
+      SVC_OP=$op
+      SVC_NAME=$name
+      SVC_TMUX_SESSION=SVC_$( printf '%s\n' "$name" | tr '[a-z]-' '[A-Z]_' )
+      export SVC_OP SVC_NAME SVC_TMUX_SESSION
+      set -x
+      exec tm "$SVC_TMUX_SESSION" set-x svcd -n "$SVC_NAME" sh -uexc "$start_shcmd"
+    fi
+    ;;
+  exec)
+    exec sh -xc "$start_shcmd"
+    ;;
+  stop|enable|disable)
+    eval "shcmd=\$${op}_shcmd"
+    if [ -n "$shcmd" ]
+    then
+      exec sh -xc "$shcmd"
+    else
+      set -x
+      exec svcd "$op" "$name"
+    fi
+    ;;
+  *)echo "$cmd: unimplemented op: $op" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,33 @@
+lib/python/cs/app/mailfiler.py lib/python/cs/app/mailfiler_tests.py: sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: port main programme to cs.cmdutils.BaseCommand
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler: accept `rules_pattern` in __init__, turn .rules_pattern into ordinary attribute, improve default handling
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler: second half of previous change: rules_pattern now a normal attribute
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: small string tweaks
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: mailfiler: make "-R rules_pattern" a global option
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: tweak message, drop debug, upgrade yeild syntax
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: autoformat
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: back off warning to info
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: add Received: header, log rule matches
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Filer: fix timezone in Received header, drop privacy leaking stuff
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: tidy imports, add cs.cmdutils to DISTINFO
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler: rework the singleton index for WatchedMaildirs
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: bugfix Target_SetFlag.__str__
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: autoformat
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: whitespace tweak
+lib/python/cs/app/mailfiler.py: merge default ==> mailfiler
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: singleton returns a tuple
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: tweak logging, still needs work to have proper effect
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: default $DEBUG envar to "INFO"
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: use cs.upd to provide nicer context between messages
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: use the new cs.logutils STATUS level for status line updates
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFilerCommand.run_context: get loginfo from the options
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: cmd_monitor: access the Upd via options.loginfo
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: make Target and Condition __str__ more friendly, improves log readability
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler.monitor: drop "sweep" status message, too transitory - just irritating
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFilerCommand: move subcommand usage messages into subcommand method docstrings
+lib/python/cs/app/mailfiler.py: merge default ==> mailfiler
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFilerCommand.apply_defaults now a static method
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: main: pass log_level=logging.INFO in MailFilerCommand setup, drop setting $DEBUG in os.environ
+lib/python/cs/app/mailfiler.py: merge mailfiler ==> default: internal logging level changes
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MessageFiler: only log matched rules which contain targets other than environment settings, reduces repetitive noise
+lib/python/cs/app/mailfiler.py: merge mailfiler ==> default: cs.app.mailfiler: MessageFiler: only log matched rules which contain targets other than environment settings, reduces repetitive noise

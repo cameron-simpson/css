@@ -1,9 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Run the named port forwards indefinitely.
-#       - Cameron Simpson <cs@cskk.id.au> 08jul2008
+# - Cameron Simpson <cs@cskk.id.au> 08jul2008
 #
 # Convert to Python module cs.app.portfwd. - cameron, may2017
 #
 
-exec python3 -m cs.app.portfwd ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.portfwd import main
+sys.exit(main(sys.argv))

@@ -1,3 +1,6 @@
+cs.cdrip: discid tag is a row id, needs to be the libdiscid value
+ydl: issue alerts for completed downloads
+divert itunes cover tags to a file? they are very bulky
 moov.trak.mdia.minf.stbl.stsd.avc1 field decode
 moov.trak.mdia.minf.stbl.stsd.avc1 field decode
 mconvert: hook to rename converted media srcs to subdir, one for success, one for failure

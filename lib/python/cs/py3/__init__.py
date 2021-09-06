@@ -15,13 +15,14 @@ try:
   from configparser import ConfigParser
 except ImportError:
   from ConfigParser import SafeConfigParser as ConfigParser  # type: ignore
+from datetime import date, datetime
 import os
 try:
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
 except ImportError:
-  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty # type: ignore
+  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty  # type: ignore
   try:
-    from Queue import PriorityQueue # type: ignore
+    from Queue import PriorityQueue  # type: ignore
   except ImportError:
     pass
 try:
@@ -29,12 +30,13 @@ try:
 except ImportError:
   DEVNULL = os.open(os.devnull, os.O_RDWR)
 import sys
+from time import strptime
 try:
-  from types import StringTypes # type: ignore
+  from types import StringTypes  # type: ignore
 except ImportError:
   StringTypes = (str,)
 
-__version__ = '20200229'
+__version__ = '20200517-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -47,7 +49,7 @@ DISTINFO = {
 }
 
 try:
-  raw_input # type: ignore
+  raw_input  # type: ignore
 except NameError:
   raw_input = input
 try:
@@ -94,10 +96,12 @@ else:
   _sorted = sorted
 
   def sorted(iterable, key=None, reverse=False):
+    ''' Adaptor for Python 2 `sorted()` providing Python 3 API.
+    '''
     return _sorted(iterable, None, key, reverse)
 
   input = raw_input
-  from itertools import ifilter as filter, ifilterfalse as filterfalse # type: ignore
+  from itertools import ifilter as filter, ifilterfalse as filterfalse  # type: ignore
   from ._for2 import raise3, raise_from, exec_code, ustr, \
                         bytes, BytesFile, joinbytes, \
                         pack, unpack # type: ignore
@@ -108,6 +112,8 @@ except ImportError:
   from struct import calcsize
 
   def iter_unpack(fmt, buffer):
+    ''' Drop in for `struct.iter_unpack`.
+    '''
     chunk_size = calcsize(fmt)
     if chunk_size < 1:
       raise ValueError(
@@ -127,6 +133,10 @@ except AttributeError:
   from os import SEEK_CUR, SEEK_SET
 
   def pread(fd, size, offset):
+    ''' Positional read from file descriptor, does not adjust the offset.
+
+        This is a racy drop in for when `os.pread` is not provided.
+    '''
     offset0 = os.lseek(fd, 0, SEEK_CUR)
     os.lseek(fd, offset, SEEK_SET)
     chunks = []
@@ -140,6 +150,29 @@ except AttributeError:
     data = b''.join(chunks)
     return data
 
+try:
+  date_fromisoformat = date.fromisoformat
+except AttributeError:
+
+  def date_fromisoformat(datestr):
+    ''' Placeholder for `date.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%d')
+    return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
+
+try:
+  datetime_fromisoformat = datetime.fromisoformat
+except AttributeError:
+
+  def datetime_fromisoformat(datestr):
+    ''' Placeholder for `datetime.fromisoformat`.
+    '''
+    parsed = strptime(datestr, '%Y-%m-%dT%H:%M:%S')
+    return datetime(
+        parsed.tm_year, parsed.tm_mon, parsed.tm_mday, parsed.tm_hour,
+        parsed.tm_min, parsed.tm_sec
+    )
+
 if __name__ == '__main__':
-  import cs.py3.tests # type: ignore
+  import cs.py3.tests  # type: ignore
   cs.py3.tests.selftest(sys.argv)

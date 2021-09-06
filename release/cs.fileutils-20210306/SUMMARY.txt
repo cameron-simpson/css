@@ -1,0 +1,2 @@
+datafrom_fd: fix use-before-set of is_seekable.
+RWFileBlockCache.put: remove assert(len(data)>0), adjust logic.

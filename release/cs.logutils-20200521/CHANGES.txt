@@ -1,0 +1,3 @@
+lib/python/cs/logutils.py: Release information for cs.logutils-20200519.
+lib/python/cs/logutils.py: cs.logutils: setup_logging: include the logger in loginfo (presently always the root logger)
+lib/python/cs/logutils.py: merge media ==> default: cs.app.ydl: pass loginfo.logger to YDL

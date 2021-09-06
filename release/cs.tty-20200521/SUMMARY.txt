@@ -1,0 +1,2 @@
+New status() function dragged in from cs.logutils, which uses cs.upd for status() -- needs some refactoring to match with the other functions in cs.tty -- text vs bytes, stdout vs stderr, etc.
+Get warning() from cs.gimmicks.

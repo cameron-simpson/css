@@ -1,0 +1,3 @@
+lib/python/cs/deco.py: cs.deco: @decorator: preserve the __name__ of the wrapped function
+lib/python/cs/deco.py: cs.deco: autoformat
+lib/python/cs/deco.py: cs.deco: @decorator: cannot set .__name__ on some things

@@ -1,23 +1,25 @@
-#!/usr/bin/env python
-#
-# Acts like sendmail but intercepts messages to newsgroup@usenet and
-# dispatches then via NNTP, suitably rewritten. Addresses come on the
-# command line.
-#	- Cameron Simpson <cs@cskk.id.au> 08jun2002
+#!/usr/bin/env python3
 #
 
+''' Acts like sendmail but intercepts messages to newsgroup@usenet and
+    dispatches then via NNTP, suitably rewritten. Addresses come on the
+    command line.
+    - Cameron Simpson <cs@cskk.id.au> 08jun2002
+'''
+
+from io import StringIO
 import os
 import os.path
 import sys
 import email
 import nntplib
 import time
-from thread import allocate_lock
 from subprocess import Popen, PIPE
+from cs.seq import seq
 
 def main(argv):
-  cmd=argv[0]
-  usage='''Usage: %s [--] addresses...''' % (cmd,)
+  cmd = argv[0]
+  usage = '''Usage: %s [--] addresses...''' % (cmd,)
 
   badopts = False
   args = argv[1:]
@@ -27,11 +29,11 @@ def main(argv):
     args.pop(0)
 
   if not args:
-    print >>sys.stderr, "%s: missing addresses" % (cmd,)
+    print("%s: missing addresses" % (cmd,), file=sys.stderr)
     badopts = True
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   sys.stderr = open(os.path.join(os.environ['HOME'], 'sendmesg.out'), "a")
@@ -76,30 +78,16 @@ def main(argv):
     NN.quit()
 
   if emailaddrs:
-    P = Popen( ['set-x', os.environ.get('SENDMAIL', 'sendmail'),'-oi']+emailaddrs,
-               stdin = PIPE,
-               close_fds = True
-             )
-    P.stdin.write(msgtxt)
+    P = Popen(
+        ['set-x', os.environ.get('SENDMAIL', 'sendmail'), '-oi'] + emailaddrs,
+        stdin=PIPE,
+        close_fds=True
+    )
+    P.stdin.write(msgtxt.encode())
     P.stdin.close()
     P.wait()
 
   return 0
-
-__seq = 0
-__seqLock = allocate_lock()
-def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-      Impl from cs.seq.
-  '''
-  global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
 
 def getrefs(M):
   for hdr in M.get_all('references', ()):

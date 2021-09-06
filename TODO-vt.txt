@@ -1,4 +1,26 @@
-datadir SqliteFilemap: mappings with path=NULL, how?
+scanbuf: should it do the min/max offset limiting - should be faster, particularly in C
+blocked_chunks_of: should it run pure-extra parser (with min/max or scanbuf of big chunks) until eof or error, then pure scanbuf? should be faster
+fast version of blocked_chunks_of for no parser and hardwired min/max block sizes
+_scan.c: the # for PyArg_ParseTuple is no longer valid - maybe only when PY_SSIZE_T_CLEAN is not defined - maybe drop that half of the ifdef in an error raising way
+_scan.c: the # for PyArg_ParseTuple is no longer valid - find out what to do - or is it only PyArg_Parse which breaks?
+file merge - dig through common ancestor data revisions? fork a copy if not direct ancestor?
+IndexClasses to be singletons based on their pathname
+replace HASHCLASS_BY_ENUM and HASHCLASS_BY_NAME with HasCode.by_index([int,str])
+replace HASHCLASS_BY_ENUM with HashCode.by_enum
+replace HASHCLASS_BY_NAME with HashCode.by_name
+drop hashenum throughout, just use hashname
+cs.iso14496: a HasSubBoxes mixin for things with .boxes, provides __len__, .length, __iter__ and whatever else
+is PEP590 - vector call - applicable to _scan.c?
+HashCode in clude metaclass to autoregister subclasses, and move the registry into the superclass
+hashcodeutils pure mixin, rely on self.hashclass
+drop ALL multihashclass support - everything is given a specific hashclass on instantiation
+big refactor: ALL stores to subclass mappings eg dict or filesdir etc or the Mapping ABC - basicstore etc to become pure mixins, same for indexes
+make _all_ Stores use a single hashclass, drop options hashclass= from add et al
+move usage strings to subcommand docstrings
+make config-based Stores singletons, make datadirs singletons on the dir realpath
+completed-indirect-block index supporting efficient indirect-block completion code
+blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
+datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
 blockmap: continues running even after connection shutdown
 OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
 virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects

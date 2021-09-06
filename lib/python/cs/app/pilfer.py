@@ -765,7 +765,7 @@ class FormatMapping(object):
 
   def __init__(self, P, U=None, factory=None):
     ''' Initialise this FormatMapping from a Pilfer `P`.
-	The optional paramater `U` (default from `P._`) is the
+	The optional parameter `U` (default from `P._`) is the
 	object whose attributes are exposed for format strings,
 	though P.user_vars preempt them.
 	The optional parameter `factory` is used to promote the

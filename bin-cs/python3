@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec "${PYTHON3:-$HOME/var/venv/3/bin/python3}" ${1+"$@"}

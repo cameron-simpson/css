@@ -157,11 +157,11 @@ class EpisodeInfo(NS):
         d[attr] = value
     return d
 
-  def as_tags(self):
+  def as_tags(self, prefix=None):
     ''' Generator yielding the episode info as `Tag`s.
     '''
     for field, value in self.as_dict().items():
-      yield Tag(field, value)
+      yield Tag(field, value, prefix=prefix)
 
   def __str__(self):
     marks = []

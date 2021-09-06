@@ -1,15 +1,20 @@
 PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
-##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
-hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
+hg_repos        = sr.ht-css
+git_repos       = bitbucket-css github-css
+www_sr_ht       = https://hg.sr.ht/~cameron-simpson/css/log
 www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+www_github      = https://github.com/cameron-simpson/css
 title           = Cameron Simpson's Scripts
 
 target  = bin
 
 dev = env-dev -d $. -x
-venvdir = $./venv
+base_python = python3
+venv_dir = $./venv
 venv_requirements = $./venv-requirements.txt
+venv_pip = $(venv_python) -m pip
+venv_python = $(venv_dir)/bin/python
 
 rewrite = rewriteif -0 -v
 
@@ -59,29 +64,37 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
+rsync = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_test3             - do python 3 syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
+        @echo '_venv              - prepare local venv from $(venv_requirements)'
         @echo '_deploy            - deploy current release to /opt/css'
+        @echo '_pub               - push to upstream repos'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
-        @echo '_publish_bitbucket - deploy tip to bitbucket'
+        @echo '_publish_hg        - publish to upstream repos'
         @echo '_publish           - deploy current release to /opt/css, ezos and tip to bitbucket'
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
         @echo '_freshmeat         - announce current release to freshmeat'
         @echo '_updcss            - deploy current tip to /opt/css'
         @echo '_tarball           - make a tarball of the tip'
+        @echo '_venv              - make the Python virtual environment based off $(base_python)'
 
 _setup:
     :make _tags _venv
 
-_venv: $(venvdir)
-$(venvdir): $(venv_requirements)
-    :make $@/.
-    $(dev) pip install -U -r $(venv_requirements)
+_venv:
+    @[ -d '$(venv_dir)/' ] || set-x mkdir '$(venv_dir)'
+    [ -x '$(venv_python)' ] || { \
+      set -xue \
+      rm -rf '$(venv_dir)' \
+      $(base_python) -m venv '$(venv_dir)' \
+    }
+    $(dev) $(venv_pip) install -U wheel pip
+    $(dev) $(venv_pip) install -U -r $(venv_requirements)
 
 _tags:  tags
 tags:   $("cs/*.py cs/*/*.py cs/*/*/*.py" G)
@@ -99,9 +112,9 @@ _testhost:
           do \
             target=$$testhost:$$basedir \
             pfx "$$target/bin" set-x \\
-              rsync -iOtrl "bin/" "$$target/bin/" & \
+              $(rsync) -a "bin/" "$$target/bin/" & \
             pfx "$$target/lib/python/cs" set-x \\
-              rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
+              $(rsync) -a '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
           done \
         done \
@@ -134,36 +147,43 @@ _2to3:
 $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
+deploy_dir(targetdir, base, includes) = \
+        ( \
+          set -ue \
+          echo 'update $(targetdir)/$(base) ...' \
+          [ -d $(targetdir)/$(base) ] || ( \
+            set -x; mkdir -p $(targetdir)/$(base) \
+          ) \
+          pfx $(targetdir)/$(base) \\
+              $(rsync) -a --delete $(base)/. $(targetdir)/$(base)/. \
+        )
+
+deploy(targetdir) = \
+        ( \
+          set -ue \
+          tmpdir=$$TMPDIR/css-deploy-$$$$ \
+          mkdir "$$tmpdir" \
+          ( set -ue \
+            hg archive -t files -r tip "$$tmpdir" \
+            hg-apply-manifest-dates -r "tip" "$$tmpdir" \
+            cd "$$tmpdir" \
+            $(deploy_dir($(targetdir), bin, synonyms)) \
+            $(deploy_dir($(targetdir), bin-cs, synonyms)) \
+            $(deploy_dir($(targetdir), bin-darwin, synonyms)) \
+            $(deploy_dir($(targetdir), lib/js/cs, "")) \
+            $(deploy_dir($(targetdir), lib/perl/cs, "")) \
+            $(deploy_dir($(targetdir), lib/python/cs, "")) \
+          ) \
+          xit=$$? \
+          rm -rf "$$tmpdir" \
+          exit $$xit \
+        )
+
+_optcss:
+        @$(deploy(/opt/css))
+
 _home:
-        @echo 'update $(HOME)/bin ...' \
-        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
-        binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/CHANGELOG.txt \\
-                $$binskip \\
-                --include=synonyms/ \\
-                --exclude=squid_redirect \\
-                --exclude=/\*/ \\
-                bin/. $(HOME)/bin/.
-        :make _bin_$((bin_suffixes))
-        @echo 'update $(HOME)/lib ...' \
-        libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib hg-shelved \\
-            $(rsync) -a --delete \\
-                --include=/js \\
-                --include=/js/cs \\
-                --exclude=/js/* \\
-                --include=/perl \\
-                --include=/perl/cs \\
-                --exclude=/perl/* \\
-                --include=/python \\
-                --include=/python/cs \\
-                --exclude=/python/* \\
-                $$libskip \\
-                --exclude=/* \\
-                --exclude=testdata* \\
-                lib/. $(HOME)/lib/.
+        @$(deploy($(HOME)))
 
 bin_suffixes = cs darwin
 
@@ -193,16 +213,26 @@ _deploy:
         OPTCSS=$(PREFIX) updcss
 
 _publish _pub:
-        :make _publish_bitbucket
+        :make _publish_hg _publish_git
         #:make _publish_ezos
 
 _publish_ezos:
         :make _deploy
         syncezos
 
-_publish_bitbucket:
-        hg push --new-branch -r tip $(hg_bitbucket)
+_publish_git:
+        for repo in $(git_repos) \
+        do  pfx "$$repo" hg-gitup -a -f -x "$$repo" \
+        done
         @echo 'changes visible at $(www_bitbucket)'
+        @echo 'code visible at $(www_github)'
+
+_publish_hg:
+        for repo in $(hg_repos) \
+        do  pfx "$$repo" hg push --new-branch -r tip "$$repo" & \
+        done \
+        wait
+        @echo 'changes visible at $(www_sr_ht)'
 
 # mark the tip as a new release
 _release:

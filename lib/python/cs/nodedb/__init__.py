@@ -10,13 +10,14 @@ from .backend import Backend, Update, ExtendUpdate, ResetUpdate
 from .node import Node, NodeDB, NodeDBFromURL
 
 DISTINFO = {
-    'description': "a simple and versatile collection of nodes with attributes, accessed as direct Python objects and automatically transcribed to assorted backing stores (CSV, SQL, GDBM, etc); the CSV backend can be (loosely) shared between multiple clients",
+    'description':
+    "a simple and versatile collection of nodes with attributes, accessed as direct Python objects and automatically transcribed to assorted backing stores (CSV, SQL, GDBM, etc); the CSV backend can be (loosely) shared between multiple clients",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'install_requires': [
         'cs.csvutils',
         'cs.debug',
@@ -58,7 +59,7 @@ def main(argv):
 
     if len(argv) < 1:
       error("missing dburl")
-      badopts=True
+      badopts = True
     else:
       dburl = argv.pop(0)
 
@@ -68,10 +69,11 @@ def main(argv):
     else:
       op = argv.pop(0)
       # special commands that happen before opening the dburl
-      ops = { "create": _create,
-              "dump":   _dump,
-              "load":   _load,
-            }
+      ops = {
+          "create": _create,
+          "dump": _dump,
+          "load": _load,
+      }
       if op in ops:
         with Pfx(op):
           xit = ops[op](dburl, argv)

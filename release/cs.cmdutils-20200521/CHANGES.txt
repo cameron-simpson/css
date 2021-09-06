@@ -1,0 +1,27 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: always copy `argv` so that we can do destructive parsing
+lib/python/cs/cmdutils.py: cs.cmdutils: autoformat, drop unused import
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: support using BaseCommand subclasses as cmd_* names to make it easy to nest BaseCommands
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: set cmd=basename(argv[0]) if it comes from argv
+lib/python/cs/cmdutils.py: cs.cmdutils: fix import
+lib/python/cs/cmdutils.py: cs.cmdutils: minor docstring updates
+lib/python/cs/cmdutils.py: Automated merge with file:///Users/cameron/hg/css-fstags-ontology
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new hack_postopts_argv method called after parsing the main command line options, for inferring subcommands or the like
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: include the loginfo from setup_logging in the options, run the subcommand inside an Upd context to support tidyup
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: always set cmd, usage and loginfo on the options, and always call apply_defaults after that
+lib/python/cs/cmdutils.py: cs.cmdutils: formatting
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: bugfix cmd_foo is another BaseCommand class; handle no USAGE_FORMAT attribute
+lib/python/cs/cmdutils.py: merge fstags ==> default: cs.fstags: cp/ln/mv/rename: if the OS says ENAMETOOLONG attempt to crop the name and retry.
+lib/python/cs/cmdutils.py: cs.py3: implementation for contextlib.nullcontext for older Pythons; cd.cmdutils: get nullcontext from cs.py3
+lib/python/cs/cmdutils.py: cs.cmdutils: get a portable nullcontext from cs.context instead of cs.py3
+lib/python/cs/cmdutils.py: cs.cmdutils: tweak comment for readability
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new classmethod subcommands() returning a mapping of subcommand name to its class attribute
+lib/python/cs/cmdutils.py: cs.cmdutils: autoformat
+lib/python/cs/cmdutils.py: cs.cmdutils: lint
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: extract "Usage:" paragraphs from subcommand method docstrings to build the main usage message
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.subcommands: use dir(cls) instead of cls.__dict__.keys() because dir() follows the MRO, will be necessary for upcoming "help" subcommand
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.usage_text: do not attempt to rewrite method docstrings, even if it works doing it twice will lead to format gibberish
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new cmd_help default command
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: bugfix access to the subcommand method (access via self to get bound methods)
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: use nullcontext instead of Pfx(subcmd) if running a main function instead of a subcommand
+lib/python/cs/cmdutils.py: merge default ==> media
+lib/python/cs/cmdutils.py: cs.cmdutils: bugfix the check for subcommands - cmd_help is always supplied

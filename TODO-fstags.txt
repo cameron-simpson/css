@@ -1,0 +1,14 @@
+fstags to return TaggedEntities, TaggedPath to subclass TagSetMixin and rename to FSTagSet
+bring the jsonable hook from cs.app.beyonwiz in house for subclassing
+fstags: support sqlite SQLTags for ontology
+"fstags tagvalue [--direct] tagname" to mean "fstags ls -d -o {tagname} [--direct] ."
+module docstring: nice dotted tag name example, particularly in format strings
+module docstring: nice ontology example
+support tags files being directories, new TagDir type named after entry prefix, files named entry suffix, contents one tag per line
+maybe "ont tag ont-entry [-]tags..."
+convenient ontology editing, something like "add cast_member name detail-tags"
+fstags: accept 'single quoted string', transcribe as JSON dq string
+fstags: sqlite fast index of tag values to aid lookups
+fstags: update com.apple.metadata:_kMDItemUserTags with binary plist in xattr export
+cs.fstags: tag -f: update direct tags regardless of content of merged tags
+cs.fstags: ls,find: emit relative paths

@@ -46,7 +46,7 @@ badopts=
 #
 # =over 4
 #
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     # =item B<-B> I<bugsystems>
@@ -176,18 +176,7 @@ do
     # pass the tail of the headline to I<log-tsline> for each category.
     #
     dlog)
-      # handle FOO: headlines
-      if    dlog_cats=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
-      then  dlog_headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
-      else  dlog_cats=$categories
-            [ -n "$dlog_cats" ] || dlog_cats=`dlog-category` || dlog_cats=UNKNOWN
-            dlog_headline=$headline
-      fi
-      $trace buglog-daily "$dlog_cats: $dlog_headline"
-      for category in `printf "%s\n" "$dlog_cats" | tr , ' '`
-      do
-        $trace log-tsline -\? -d "$when" -- "$category" "$dlog_headline"
-      done
+      dlog -c "$categories" -- "$headline" <"$attachment"
       ;;
 
     # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]
@@ -217,6 +206,7 @@ do
           [ -n "${PARAM_subject:-}" ] && subj="$PARAM_subject: $subj"
 
           echo "To: $addr"
+          echo "From: ${NAME:-} <${EMAIL:-$USER}>"
           echo "Subject: $subj"
           echo "Date: `date -d "$when" '+%d %b %Y %H:%M:S %z'`"
           echo "X-Buglog-Date: $when"

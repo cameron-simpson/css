@@ -1,0 +1,1 @@
+funcname: prefer `func.__qualname__` over `func.__name__`
