@@ -66,7 +66,7 @@ class TaggerCommand(BaseCommand):
                 (TODO: we file by linking - this needs a rename.)
           -n    No link (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
-          -y    Link: file 
+          -y    Link files to destinations.
     '''
     direct = False
     recurse = False
