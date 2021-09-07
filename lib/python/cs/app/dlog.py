@@ -6,7 +6,6 @@
     This is an upgrade from my venerable shell script,
     whose logic was becoming unweildy.
 '''
-from cs.x import X
 
 from contextlib import contextmanager
 from datetime import datetime
@@ -101,10 +100,10 @@ class DLogCommand(BaseCommand):
         # CATS,...:
         m = self.CATS_RE.match(arg0)
         if m:
+          argv.pop(0)
           options.categories.update(
               cat.lower() for cat in m.group(0)[:-1].split(',') if cat
           )
-          argv.pop(0)
           continue
         # tag_name=...
         tag_name, offset = get_dotted_identifier(arg0)
