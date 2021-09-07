@@ -19,7 +19,7 @@ from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
@@ -451,6 +451,7 @@ class BaseCommand:
     '''
 
   @pfx_method
+  # pylint: disable=no-self-use
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
 
@@ -468,6 +469,7 @@ class BaseCommand:
       with Pfx(opt):
         self.apply_opt(opt, val)
 
+  # pylint: disable=no-self-use
   def apply_preargv(self, argv):
     ''' Do any preparsing of `argv` before the subcommand/main-args.
         Return the remaining arguments.
