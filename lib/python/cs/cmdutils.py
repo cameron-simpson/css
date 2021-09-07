@@ -466,7 +466,7 @@ class BaseCommand:
     ''' Apply command line options.
     '''
     for opt, val in opts:
-      with Pfx(opt):
+      with Pfx(opt if val is None else "%s %r" % (opt, val)):
         self.apply_opt(opt, val)
 
   # pylint: disable=no-self-use
