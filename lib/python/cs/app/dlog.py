@@ -21,7 +21,7 @@ from cs.context import stackattrs
 from cs.dateutils import datetime2unixtime
 from cs.fstags import FSTags
 from cs.lex import get_dotted_identifier
-from cs.logutils import warning
+from cs.logutils import warning, debug
 from cs.pfx import Pfx, pfx_call
 from cs.sqltags import SQLTags
 from cs.tagset import Tag, TagSet
@@ -113,8 +113,8 @@ class DLogCommand(BaseCommand):
           try:
             tag = Tag.from_str(arg0)
           except ValueError as e:
-            warning("invalid tag: %s", e)
-            badopts = True
+            debug("invalid tag: %s", e)
+            options.tags.add(Tag(tag_name, arg0[offset:]))
           else:
             options.tags.add(tag)
           continue
