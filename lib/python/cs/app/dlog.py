@@ -128,22 +128,24 @@ class DLogCommand(BaseCommand):
           self.cats_from_str(options.fstags['.'].get('cs.dlog', ''))
       )
     headline = ' '.join(argv)
+    tt = time.localtime(options.when)
+    print_args = [
+        '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}'.format(
+            tt.tm_year,
+            tt.tm_mon,
+            tt.tm_mday,
+            tt.tm_hour,
+            tt.tm_min,
+            tt.tm_sec,
+        )
+    ]
+    if options.categories:
+      print_args.append(','.join(options.categories).upper() + ':')
+    print_args.append(headline)
+    if options.tags:
+      print_args.append('[' + ' '.join(map(str, options.tags)) + ']')
     with pfx_call(open, options.logpath, 'a') as logf:
-      tt = time.localtime(options.when)
-      print(
-          '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d} {}: {} {}'.format(
-              tt.tm_year,
-              tt.tm_mon,
-              tt.tm_mday,
-              tt.tm_hour,
-              tt.tm_min,
-              tt.tm_sec,
-              ','.join(options.categories).upper(),
-              headline,
-              ' '.join(options.tags),
-          ),
-          file=logf
-      )
+      print(*print_args, file=logf)
     # add the headline and categories to the tags
     options.tags.add('headline', headline)
     if options.categories:
