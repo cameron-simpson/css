@@ -8,9 +8,9 @@ set -ue
 
 revision=$HG_NODE
 
-hg log -r "$revision" --template='{desc}\n' --limit 1 \
+hg log -r "$revision" --template='{branch} {desc}\n' --limit 1 \
 | \
-{ read -r headline
+{ read -r branch headline
   wdbase=$( basename "$(pwd)" )
-  buglog -- "$wdbase $headline [$revision]" </dev/null
+  dlog log "base=$wdbase" vcs.type=hg "vcs.branch=$branch" "$headline"
 }
