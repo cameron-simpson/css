@@ -281,8 +281,10 @@ class BaseCommand:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
       # we do this regardless in order to honour '--'
       opts, argv = getopt(argv, getopt_spec, '')
-      if getopt_spec:
-        self.apply_opts(opts)  # pylint: disable=no-member
+      self.apply_opts(opts)
+      # we do this regardless so that subclasses can do some presubcommand parsing
+      # after any command line options
+      argv = self.apply_preargv(argv)
 
       # now prepare:
       # * a callable `main` accepting `argv`
@@ -329,7 +331,8 @@ class BaseCommand:
         try:
           main = lambda: self.main(argv)
         except AttributeError:
-          raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
+          # pylint: disable=raise-missing-from
+          raise GetoptError("no main method and no subcommand methods")
         main_cmd = cmd
         main_context = nullcontext()
     except GetoptError as e:
@@ -447,8 +450,14 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `self.options`.
     '''
 
+  @pfx_method
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
+
+        This default implementation raises a `RuntimeError`.
+        It only fires if `getopt` actually gathered arguments
+        and would imply that a `GETOPT_SPEC` was supplied
+        without an `apply_opt` or `apply_opts` method to implement the options.
     '''
     raise RuntimeError("unhandled option %r" % (opt,))
 
@@ -458,6 +467,14 @@ class BaseCommand:
     for opt, val in opts:
       with Pfx(opt):
         self.apply_opt(opt, val)
+
+  def apply_preargv(self, argv):
+    ''' Do any preparsing of `argv` before the subcommand/main-args.
+        Return the remaining arguments.
+
+        This default implementation returns `argv` unchanged.
+    '''
+    return argv
 
   @classmethod
   def run_argv(cls, argv, **kw):
