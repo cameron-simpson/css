@@ -6,11 +6,12 @@
 
 set -ue
 
-: ${TMPDIR:=/tmp}
+tmpdir=${TMPDIR:=/tmp}
 
 tag_name=backup
 copies=a,b
 backup_area=/mnt
+backup_names=
 do_mount=1
 rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
 rsync_delete_exclude_opts='--delete-excluded'
@@ -28,6 +29,8 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
 
   Options:
     --backup-area=/path     Path to backup area, default: $backup_area
+    --backup-names=name,... Backup names to run, default collated
+                            from the fstags for the tag name.
     --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
@@ -50,6 +53,8 @@ do
   case "$1" in
     --backup-area=?*)
         backup_area=$( expr "x$1" : 'x--backup-area=\(.*\)' ) ;;
+    --backup-names=?*)
+        backup_names=$( expr "x$1" : 'x--backup-names=\(.*\)' ) ;;
     --copies=?*)
         copies=$( expr "x$1" : 'x--copies=\(.*\)' ) ;;
     --exclude=?*)
@@ -94,7 +99,7 @@ fi
 
 xit=0
 
-tmpf=$TMPDIR/$cmd.$$
+tmpf=$tmpdir/$cmd.$$
 trap 'rm -f "$tmpf"' 0 1 3 15
 
 for src_dst
@@ -114,17 +119,19 @@ do
     continue
   }
   $vecho "scan $src_path for ${tag_name}= tags"
-  backup_names=$(
+  src_backup_names=$backup_names
+  [ -n "$src_backup_names" ] || src_backup_names=$(
     $trace fstags find -o "{$tag_name}" "$src_path" "$tag_name" | grep . | sort -u
   )
-  [ -n "$backup_names" ] || {
+  [ -n "$src_backup_names" ] || {
     echo "$cmd: $src_dst: no $tag_name tags in $src_path, skipping ALL BACKUPS" >&2
     xit=1
     continue
   }
-  $vecho "$src_path: $tag_name tags =" $backup_names
+  # shellcheck disable=SC2086
+  $vecho "$src_path: $tag_name tags =" $src_backup_names
   not_archive_tags=
-  for backup_name in $backup_names
+  for backup_name in $src_backup_names
   do
     archive_tag=$tag_name=$backup_name
     not_archive_tags="$not_archive_tags -$archive_tag"

@@ -12,7 +12,7 @@ from functools import partial
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 
-__version__ = '20210717-post'
+__version__ = '20210906-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -22,6 +22,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.py3',
         'cs.x',
     ],
@@ -37,6 +38,8 @@ def funcname(func):
     try:
       return func.__name__
     except AttributeError:
+      if isinstance(func, partial):
+        return "partial(%s)" % (funcname(func.func),)
       return str(func)
 
 def funccite(func):

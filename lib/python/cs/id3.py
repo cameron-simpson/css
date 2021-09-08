@@ -2,7 +2,9 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Support for ID3 tags. Mostly a convenience wrapper for Doug Zongker's pyid3lib:
+''' Support for ID3 tags.
+    A cs.binary based parser/transcriber for ID3 tags
+    and a convenience wrapper for Doug Zongker's pyid3lib:
     http://pyid3lib.sourceforge.net/
 '''
 
@@ -12,16 +14,13 @@ from cs.binary import SimpleBinary, BinarySingleValue, UInt32BE, UInt16BE
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import info, debug, warning
 from cs.pfx import Pfx
-from cs.tagset import TagSet
+from cs.tagset import TagSet, TagsOntology
 from cs.threads import locked, locked_property
 
 DISTINFO = {
-    'description':
-    "support for ID3 tags",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
@@ -182,6 +181,9 @@ class ID3V1Frame(SimpleBinary):
       * `genre_id`: a number value from 0 to 255
   '''
 
+  # TODO: fill out the ont with the ID3V1 spec.
+  ONTOLOGY = TagsOntology()
+
   @classmethod
   def parse(cls, bfr):
     ''' Parse a 128 byte ID3V1 or ID3v1.1 record.
@@ -244,12 +246,16 @@ class ID3V1Frame(SimpleBinary):
                 genre_id=self.genre_id,
             ).items()
             if v is not None and not (isinstance(v, int) and v == 0)
-        }
+        },
+        _ontology=self.ONTOLOGY,
     )
 
 class EnhancedTagFrame(SimpleBinary):
   ''' An Enhanced Tag.
   '''
+
+  # TODO: fill out the ont with the enhanced fram spec.
+  ONTOLOGY = TagsOntology()
 
   @classmethod
   def parse(cls, bfr):
@@ -803,6 +809,9 @@ class ID3V2Frame(SimpleBinary):
   ''' An ID3v2 frame, based on the document at:
       https://web.archive.org/web/20120527211939/http://www.unixgods.org/~tilo/ID3/docs/id3v2-00.html
   '''
+
+  # TODO: fill out the ont with the MP3 spec and demo doctest
+  ONTOLOGY = TagsOntology()
 
   @classmethod
   def parse(cls, bfr):
