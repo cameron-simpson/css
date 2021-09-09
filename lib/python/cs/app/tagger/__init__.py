@@ -13,14 +13,11 @@ from os.path import (
     join as joinpath,
     samefile,
 )
-from tempfile import NamedTemporaryFile
 
 from cs.fstags import FSTags
-from cs.logutils import info, warning, error
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
 from cs.tagset import Tag
-
-from cs.x import X
 
 class Tagger:
   ''' The core logic of a tagger.

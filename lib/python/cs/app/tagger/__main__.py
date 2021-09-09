@@ -17,6 +17,7 @@ from cs.context import stackattrs
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
+from cs.tagset import Tag
 from . import Tagger
 from .gui import TaggerGUI
 
@@ -175,7 +176,7 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
-      raise GetopError("extra arguments: %r" % (argv,))
+      raise GetoptError("extra arguments: %r" % (argv,))
     tagger = self.options.tagger
     fstags = self.options.fstags
     tagged = fstags[path]
