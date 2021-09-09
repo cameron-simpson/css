@@ -168,10 +168,7 @@ class ImageWidget(_Widget, sg.Image):
     if new_pathname is not None:
       size = self.fixed_size or self.get_size()
       try:
-        if ispng(new_pathname):
-          display_pathname = new_pathname
-        else:
-          display_pathname = pngfor(new_pathname)
+        display_pathname = pngfor(new_pathname, size)
       except (OSError, ValueError):
         new_pathname = None
     if new_pathname is None:
