@@ -42,14 +42,16 @@ class TaggerCommand(BaseCommand):
         yield
 
   @staticmethod
-  def _autofile(path, *, no_link, tagger):
+  def _autofile(path, *, tagger, no_link, do_remove):
     ''' Wrapper for `Tagger.file_by_tags` which reports actions.
     '''
     if not no_link and not existspath(path):
       warning("no such path, skipped")
       linked_to = []
     else:
-      linked_to = tagger.file_by_tags(path, no_link=no_link)
+      linked_to = tagger.file_by_tags(
+          path, no_link=no_link, do_remove=do_remove
+      )
       if linked_to:
         for linked in linked_to:
           pfxprint('=>', linked)
@@ -66,20 +68,26 @@ class TaggerCommand(BaseCommand):
                 (TODO: we file by linking - this needs a rename.)
           -n    No link (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
+          -x    Remove the source file if linked successfully. Implies -y.
           -y    Link files to destinations.
     '''
     direct = False
     recurse = False
     no_link = True
-    opts, argv = getopt(argv, 'dnry')
+    do_remove = False
+    opts, argv = getopt(argv, 'dnrxy')
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-d':
           direct = True
         elif opt == 'n':
           no_link = True
+          do_remove = False
         elif opt == '-r':
           recurse = True
+        elif opt == '-x':
+          no_link = False
+          do_remove = True
         elif opt == '-y':
           no_link = False
         else:
@@ -91,7 +99,9 @@ class TaggerCommand(BaseCommand):
     for path in argv:
       with Pfx(path):
         if direct or not isdirpath(path):
-          self._autofile(path, no_link=no_link, tagger=tagger)
+          self._autofile(
+              path, tagger=tagger, no_link=no_link, do_remove=do_remove
+          )
         elif not recurse:
           pfxprint("not autofiling directory, use -r for recursion")
         else:
@@ -113,7 +123,12 @@ class TaggerCommand(BaseCommand):
                   if not isfilepath(filepath):
                     pfxprint("not a regular file, skipping")
                     continue
-                  self._autofile(filepath, no_link=no_link, tagger=tagger)
+                  self._autofile(
+                      filepath,
+                      tagger=tagger,
+                      no_link=no_link,
+                      do_remove=do_remove,
+                  )
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
