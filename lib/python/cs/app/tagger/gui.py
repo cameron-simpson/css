@@ -147,14 +147,13 @@ class _Widget:
       key = uuid4()
     self.key = key
     super().__init__(key=key, **kw)
-    self.__fixed_size = fixed_size
+    self.fixed_size = fixed_size
 
   def update(self, **kw):
     X("%s.update: kw=%r", type(self).__name__, kw)
     super().update(**kw)
-    if self.__fixed_size:
-      X("  update: set_size(%r)", self.__fixed_size)
-      self.set_size(self.__fixed_size)
+    if self.fixed_size:
+      self.set_size(self.fixed_size)
 
 class ImageWidget(_Widget, sg.Image):
   ''' An image widget which can show anything Pillow can read.
@@ -167,6 +166,7 @@ class ImageWidget(_Widget, sg.Image):
   @pathname.setter
   def pathname(self, new_pathname):
     if new_pathname is not None:
+      size = self.fixed_size or self.get_size()
       try:
         if ispng(new_pathname):
           display_pathname = new_pathname
