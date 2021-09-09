@@ -45,7 +45,9 @@ class Tagger:
     return name
 
   @pfx
-  def file_by_tags(self, path: str, prune_inherited=False, no_link=False):
+  def file_by_tags(
+      self, path: str, prune_inherited=False, no_link=False, do_remove=False
+  ):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
@@ -54,12 +56,16 @@ class Tagger:
         * `path`: the source path to file
         * `prune_inherited`: optional, default `False`:
           prune the inherited tags from the direct tags on the target
-        * `no_link`: optional, fault `False`;
+        * `no_link`: optional, default `False`;
           do not actually make the hard link, just report the target
+        * `do_remove`: optional, default `False`;
+          remove source files if successfully linked
 
         Note: if `path` is already linked to an implied location
         that location is also included in the returned list.
     '''
+    if do_remove and no_link:
+      raise ValueError("do_remove and no_link may not both be true")
     fstags = self.fstags
     # start the queue with the resolved `path`
     srcpath0 = fstags[path].filepath
@@ -134,6 +140,15 @@ class Tagger:
               pfx_call(os.link, srcpath0, dstpath)
               fstags[dstpath].update(tags)
             linked_to.append(dstpath)
+    if do_remove and linked_to:
+      S = os.stat(srcpath0)
+      if S.st_nlink < 2:
+        warning(
+            "not removing %r, unsufficient hard links (%s)", srcpath0,
+            S.st_nlink
+        )
+      else:
+        pfx_call(os.remove, srcpath0)
     return linked_to
 
   @pfx
