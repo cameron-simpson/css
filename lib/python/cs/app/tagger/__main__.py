@@ -154,5 +154,60 @@ class TaggerCommand(BaseCommand):
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
+  def cmd_suggest(self, argv):
+    ''' Usage: {cmd} pathnames...
+          Suggest tags for each pathname.
+    '''
+    if not argv:
+      raise GetoptError("missing pathnames")
+    for path in argv:
+      print(path)
+      for tag_name, values in sorted(
+          self.options.tagger.suggested_tags(path).items()):
+        print(" ", tag_name, *sorted(values))
+
+  def cmd_test(self, argv):
+    ''' Usage: {cmd} path
+          Run a test against path.
+          Current we try out the suggestions.
+    '''
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetopError("extra arguments: %r" % (argv,))
+    tagger = self.options.tagger
+    fstags = self.options.fstags
+    tagged = fstags[path]
+    changed = True
+    while True:
+      print(path, *tagged)
+      if changed:
+        suggestions = tagger.suggested_tags(path)
+        for tag_name, values in sorted(suggestions.items()):
+          print(" ", tag_name, values)
+        for file_to in tagger.file_by_tags(path, no_link=True):
+          print("=>", file_to)
+        changed = False
+      try:
+        action = input("Action? ").strip()
+      except EOFError:
+        break
+      if action:
+        with Pfx(repr(action)):
+          try:
+            if action.startswith('-'):
+              tag = Tag.from_str(action[1:].lstrip())
+              tagged.discard(tag)
+              changed = True
+            elif action.startswith('+'):
+              tag = Tag.from_str(action[1:].lstrip())
+              tagged.add(tag)
+              changed = True
+            else:
+              raise ValueError("unrecognised action")
+          except ValueError as e:
+            warning("action fails: %s", e)
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
