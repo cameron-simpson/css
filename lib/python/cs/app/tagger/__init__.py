@@ -246,3 +246,25 @@ class Tagger:
                                                      tag_names).items():
           mapping[bare_key].update(dstpaths)
     return mapping
+
+  def suggested_tags(self, path):
+    ''' Return a mapping of `tag_name=>set(tag_values)`
+        representing suggested tags
+        obtained from the autofiling configurations.
+    '''
+    tagged = self.fstags[path]
+    suggestions = defaultdict(set)
+    seen = set()
+    q = [dirname(tagged.filepath)]
+    while q:
+      dirpath = q.pop(0)
+      if dirpath in seen:
+        continue
+      seen.add(dirpath)
+      mapping = self.file_by_mapping(dirpath)
+      for bare_tag, dstpaths in mapping.items():
+        suggestions[bare_tag.name].add(bare_tag.value)
+        # following the filing chain if tagged has this particular tag
+        if bare_tag in tagged:
+          q.extend(dstpaths)
+    return suggestions
