@@ -7,5 +7,5 @@
 import os
 import sys
 sys.path[:] = [ path for path in sys.path if path ]
-from cs.app.tagger import main
+from cs.app.tagger.__main__ import main
 sys.exit(main(sys.argv))
