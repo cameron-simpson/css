@@ -38,7 +38,7 @@ class TaggerCommand(BaseCommand):
     options = self.options
     with FSTags() as fstags:
       tagger = Tagger(fstags=fstags)
-      with stackattrs(options, tagger=tagger):
+      with stackattrs(options, tagger=tagger, fstags=fstags):
         yield
 
   @staticmethod
