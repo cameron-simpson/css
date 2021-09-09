@@ -66,11 +66,11 @@ class TaggerGUI(MultiOpenMixin):
                     [
                         sg.Column(
                             [
-                                [self.tagsview],
-                                [sg.HorizontalSeparator()],
                                 [self.preview],
+                                [sg.HorizontalSeparator()],
+                                [self.tagsview],
                             ],
-                            size=(1920, 1280),
+                            size=(1920, 1600),
                         )
                     ]
                 ]
