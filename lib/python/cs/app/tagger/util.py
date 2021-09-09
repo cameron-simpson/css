@@ -13,6 +13,7 @@ from os.path import (
 )
 from PIL import Image, UnidentifiedImageError
 from cs.buffer import CornuCopyBuffer
+from cs.fstags import FSTags
 from cs.lex import hexify
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call
@@ -32,7 +33,26 @@ def ispng(pathname):
   '''
   return splitext(basename(pathname))[1].lower() == '.png'
 
+_fstags = FSTags()
 _conv_cache = defaultdict(dict)
+
+def image_size(path):
+  tagged = _fstags[path]
+  try:
+    size = tagged['pil.size']
+  except KeyError:
+    try:
+      with Image.open(path) as im:
+        tagged['pil.format'] = im.format
+        X("im:%s dir %r", im, dir(im))
+        size = tagged['pil.size'] = im.size
+        tagged['mime_type'] = 'image/' + im.format.lower()
+    except UnidentifiedImageError as e:
+      warning("unhandled image: %s", e)
+      size = tagged['pil.size'] = None
+  if size is not None:
+    size = tuple(size)
+  return size
 
 @pfx
 def pngfor(pathname, cached=None, force=False):
