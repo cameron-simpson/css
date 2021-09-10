@@ -44,7 +44,6 @@ def image_size(path):
     try:
       with Image.open(path) as im:
         tagged['pil.format'] = im.format
-        X("im:%s dir %r", im, dir(im))
         size = tagged['pil.size'] = im.size
         tagged['mime_type'] = 'image/' + im.format.lower()
     except UnidentifiedImageError as e:
@@ -102,7 +101,7 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if not isdirpath(CONVCACHE_ROOT):
     pfx_call(os.mkdir, CONVCACHE_ROOT)
   convsize = re_size or size
-  convdirpath = joinpath(CONVCACHE_ROOT, f'png/{size[0]}x{size[1]}')
+  convdirpath = joinpath(CONVCACHE_ROOT, f'png/{convsize[0]}x{convsize[1]}')
   if not isdirpath(convdirpath):
     pfx_call(os.makedirs, convdirpath)
   pngpath = joinpath(convdirpath, pngbase)
