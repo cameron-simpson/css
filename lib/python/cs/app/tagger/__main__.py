@@ -19,6 +19,7 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
+from cs.upd import print
 from . import Tagger
 
 def main(argv=None):
@@ -81,7 +82,7 @@ class TaggerCommand(BaseCommand):
       with Pfx(opt):
         if opt == '-d':
           direct = True
-        elif opt == 'n':
+        elif opt == '-n':
           no_link = True
           do_remove = False
         elif opt == '-r':
