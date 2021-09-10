@@ -20,7 +20,6 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
 from . import Tagger
-from .gui import TaggerGUI
 
 def main(argv=None):
   ''' Command line for the tagger.
@@ -191,6 +190,7 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
+    from .gui import TaggerGUI
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
