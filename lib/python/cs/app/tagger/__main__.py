@@ -184,12 +184,13 @@ class TaggerCommand(BaseCommand):
     while True:
       print(path, *tagged)
       if changed:
+        changed = False
         suggestions = tagger.suggested_tags(path)
         for tag_name, values in sorted(suggestions.items()):
           print(" ", tag_name, values)
         for file_to in tagger.file_by_tags(path, no_link=True):
           print("=>", file_to)
-        changed = False
+        print("inferred:", repr(tagger.infer(path)))
       try:
         action = input("Action? ").strip()
       except EOFError:
