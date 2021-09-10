@@ -17,7 +17,7 @@ from os.path import (
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
-from cs.tagset import Tag
+from cs.tagset import Tag, RegexpTagRule
 
 class Tagger:
   ''' The core logic of a tagger.
@@ -265,3 +265,65 @@ class Tagger:
         if bare_tag in tagged:
           q.extend(dstpaths)
     return suggestions
+
+  @pfx
+  def inference_mapping(self, dirpath):
+    r''' Scan `path`'s `tagger.filename_inference` tag,
+        a mapping of prefix=>rule specifications.
+        Return a mapping of prefix=>inference_function
+        where `inference_function(pathname)` returns a list of inferred `Tag`s.
+
+        The prefix is a tag prefix. Example:
+
+            tagger.filename_inference={
+                'cs.tv_episode':
+                    '/^(?P<series_title_lc>([^-]|-[^-])+)--s0*(?P<season_n>\d+)e0*(?P<episode_n>\d+)--(?P<episode_title_lc>([^-]|-[^-])+)--',
+            }
+
+        which would try to match a filename against my habitual naming convention,
+        and if so return a `TagSet` with tags named `series_title_lc`,
+        `season_n`, `episode_n`, `episode_title_lc`.
+    '''
+    filename_inference = self.fstags[dirpath].get(
+        'tagger.filename_inference', {}
+    )
+    mapping = defaultdict(list)
+    with Pfx("tagger.filename_inference=%r", filename_inference):
+      for prefix, rule_spec in filename_inference.items():
+        with Pfx("%r: %r", prefix, rule_spec):
+          if isinstance(rule_spec, str):
+            if rule_spec.startswith('/'):
+              rule = RegexpTagRule(rule_spec[1:])
+              mapping[prefix] = lambda path: rule.infer_tags(basename(path))
+            else:
+              warning("skipping unrecognised pattern")
+          else:
+            warning("skipping unhandled type")
+    return mapping
+
+  @pfx
+  def infer(self, path, apply=False):
+    ''' Compare the `tagger.filename_inference` rules to `path`,
+        producing a mapping of prefix=>[Tag] for each rule which infers tags.
+        Return the mapping.
+
+        If `apply` is true,
+        also apply all the inferred tags to `path`
+        with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
+    '''
+    tagged = self.fstags[path]
+    srcdirpath = dirname(tagged.filepath)
+    inference_mapping = self.inference_mapping(srcdirpath)
+    inferences = {}
+    for prefix, infer_func in inference_mapping:
+      with Pfx(prefix):
+        tag_list = infer_func(tagged.filepath)
+        if tag_list:
+          inferences[prefix] = tag_list
+    if apply:
+      with Pfx("apply"):
+        for prefix, tag_list in inferences.items():
+          for tag in tag_list:
+            tag_name = prefix + '.' + tag.name
+            tagged[tag_name] = tag.value
+    return inferences
