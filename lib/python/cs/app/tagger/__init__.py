@@ -13,14 +13,11 @@ from os.path import (
     join as joinpath,
     samefile,
 )
-from tempfile import NamedTemporaryFile
 
 from cs.fstags import FSTags
-from cs.logutils import info, warning, error
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
-from cs.tagset import Tag
-
-from cs.x import X
+from cs.tagset import Tag, RegexpTagRule
 
 class Tagger:
   ''' The core logic of a tagger.
@@ -45,7 +42,9 @@ class Tagger:
     return name
 
   @pfx
-  def file_by_tags(self, path: str, prune_inherited=False, no_link=False):
+  def file_by_tags(
+      self, path: str, prune_inherited=False, no_link=False, do_remove=False
+  ):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
@@ -54,12 +53,16 @@ class Tagger:
         * `path`: the source path to file
         * `prune_inherited`: optional, default `False`:
           prune the inherited tags from the direct tags on the target
-        * `no_link`: optional, fault `False`;
+        * `no_link`: optional, default `False`;
           do not actually make the hard link, just report the target
+        * `do_remove`: optional, default `False`;
+          remove source files if successfully linked
 
         Note: if `path` is already linked to an implied location
         that location is also included in the returned list.
     '''
+    if do_remove and no_link:
+      raise ValueError("do_remove and no_link may not both be true")
     fstags = self.fstags
     # start the queue with the resolved `path`
     srcpath0 = fstags[path].filepath
@@ -134,6 +137,15 @@ class Tagger:
               pfx_call(os.link, srcpath0, dstpath)
               fstags[dstpath].update(tags)
             linked_to.append(dstpath)
+    if do_remove and linked_to:
+      S = os.stat(srcpath0)
+      if S.st_nlink < 2:
+        warning(
+            "not removing %r, unsufficient hard links (%s)", srcpath0,
+            S.st_nlink
+        )
+      else:
+        pfx_call(os.remove, srcpath0)
     return linked_to
 
   @pfx
@@ -195,7 +207,7 @@ class Tagger:
 
             tagger.file_by={"abn":"~/them/me"}
 
-        indicating that files with an `abn` tag should be filed in the `~/them/me` directory.
+        indicating that files with an `abn` tag may be filed in the `~/them/me` directory.
         That directory is then walked looking for the tag `abn`,
         and wherever some tag `abn=`*value*` is found on a subdirectory
         a mapping entry for `abn=`*value*=>*subdirectory* is added.
@@ -231,3 +243,87 @@ class Tagger:
                                                      tag_names).items():
           mapping[bare_key].update(dstpaths)
     return mapping
+
+  def suggested_tags(self, path):
+    ''' Return a mapping of `tag_name=>set(tag_values)`
+        representing suggested tags
+        obtained from the autofiling configurations.
+    '''
+    tagged = self.fstags[path]
+    suggestions = defaultdict(set)
+    seen = set()
+    q = [dirname(tagged.filepath)]
+    while q:
+      dirpath = q.pop(0)
+      if dirpath in seen:
+        continue
+      seen.add(dirpath)
+      mapping = self.file_by_mapping(dirpath)
+      for bare_tag, dstpaths in mapping.items():
+        suggestions[bare_tag.name].add(bare_tag.value)
+        # following the filing chain if tagged has this particular tag
+        if bare_tag in tagged:
+          q.extend(dstpaths)
+    return suggestions
+
+  @pfx
+  def inference_mapping(self, dirpath):
+    r''' Scan `path`'s `tagger.filename_inference` tag,
+        a mapping of prefix=>rule specifications.
+        Return a mapping of prefix=>inference_function
+        where `inference_function(pathname)` returns a list of inferred `Tag`s.
+
+        The prefix is a tag prefix. Example:
+
+            tagger.filename_inference={
+                'cs.tv_episode':
+                    '/^(?P<series_title_lc>([^-]|-[^-])+)--s0*(?P<season_n>\d+)e0*(?P<episode_n>\d+)--(?P<episode_title_lc>([^-]|-[^-])+)--',
+            }
+
+        which would try to match a filename against my habitual naming convention,
+        and if so return a `TagSet` with tags named `series_title_lc`,
+        `season_n`, `episode_n`, `episode_title_lc`.
+    '''
+    filename_inference = self.fstags[dirpath].get(
+        'tagger.filename_inference', {}
+    )
+    mapping = defaultdict(list)
+    with Pfx("tagger.filename_inference=%r", filename_inference):
+      for prefix, rule_spec in filename_inference.items():
+        with Pfx("%r: %r", prefix, rule_spec):
+          if isinstance(rule_spec, str):
+            if rule_spec.startswith('/'):
+              rule = RegexpTagRule(rule_spec[1:])
+              mapping[prefix] = lambda path: rule.infer_tags(basename(path))
+            else:
+              warning("skipping unrecognised pattern")
+          else:
+            warning("skipping unhandled type")
+    return mapping
+
+  @pfx
+  def infer(self, path, apply=False):
+    ''' Compare the `tagger.filename_inference` rules to `path`,
+        producing a mapping of prefix=>[Tag] for each rule which infers tags.
+        Return the mapping.
+
+        If `apply` is true,
+        also apply all the inferred tags to `path`
+        with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
+    '''
+    tagged = self.fstags[path]
+    srcdirpath = dirname(tagged.filepath)
+    inference_mapping = self.inference_mapping(srcdirpath)
+    inferences = {}
+    for prefix, infer_func in inference_mapping:
+      with Pfx(prefix):
+        tag_list = infer_func(tagged.filepath)
+        if tag_list:
+          inferences[prefix] = tag_list
+    if apply:
+      with Pfx("apply"):
+        for prefix, tag_list in inferences.items():
+          for tag in tag_list:
+            tag_name = prefix + '.' + tag.name
+            tagged[tag_name] = tag.value
+    return inferences

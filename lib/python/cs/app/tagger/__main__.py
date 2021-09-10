@@ -17,6 +17,7 @@ from cs.context import stackattrs
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
+from cs.tagset import Tag
 from . import Tagger
 from .gui import TaggerGUI
 
@@ -38,18 +39,20 @@ class TaggerCommand(BaseCommand):
     options = self.options
     with FSTags() as fstags:
       tagger = Tagger(fstags=fstags)
-      with stackattrs(options, tagger=tagger):
+      with stackattrs(options, tagger=tagger, fstags=fstags):
         yield
 
   @staticmethod
-  def _autofile(path, *, no_link, tagger):
+  def _autofile(path, *, tagger, no_link, do_remove):
     ''' Wrapper for `Tagger.file_by_tags` which reports actions.
     '''
     if not no_link and not existspath(path):
       warning("no such path, skipped")
       linked_to = []
     else:
-      linked_to = tagger.file_by_tags(path, no_link=no_link)
+      linked_to = tagger.file_by_tags(
+          path, no_link=no_link, do_remove=do_remove
+      )
       if linked_to:
         for linked in linked_to:
           pfxprint('=>', linked)
@@ -66,20 +69,26 @@ class TaggerCommand(BaseCommand):
                 (TODO: we file by linking - this needs a rename.)
           -n    No link (default). Just print filing actions.
           -r    Recurse. Required to autofile a directory tree.
-          -y    Link: file 
+          -x    Remove the source file if linked successfully. Implies -y.
+          -y    Link files to destinations.
     '''
     direct = False
     recurse = False
     no_link = True
-    opts, argv = getopt(argv, 'dnry')
+    do_remove = False
+    opts, argv = getopt(argv, 'dnrxy')
     for opt, val in opts:
       with Pfx(opt):
         if opt == '-d':
           direct = True
         elif opt == 'n':
           no_link = True
+          do_remove = False
         elif opt == '-r':
           recurse = True
+        elif opt == '-x':
+          no_link = False
+          do_remove = True
         elif opt == '-y':
           no_link = False
         else:
@@ -91,7 +100,9 @@ class TaggerCommand(BaseCommand):
     for path in argv:
       with Pfx(path):
         if direct or not isdirpath(path):
-          self._autofile(path, no_link=no_link, tagger=tagger)
+          self._autofile(
+              path, tagger=tagger, no_link=no_link, do_remove=do_remove
+          )
         elif not recurse:
           pfxprint("not autofiling directory, use -r for recursion")
         else:
@@ -113,7 +124,12 @@ class TaggerCommand(BaseCommand):
                   if not isfilepath(filepath):
                     pfxprint("not a regular file, skipping")
                     continue
-                  self._autofile(filepath, no_link=no_link, tagger=tagger)
+                  self._autofile(
+                      filepath,
+                      tagger=tagger,
+                      no_link=no_link,
+                      do_remove=do_remove,
+                  )
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
@@ -138,6 +154,62 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("missing pathnames")
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
+
+  def cmd_suggest(self, argv):
+    ''' Usage: {cmd} pathnames...
+          Suggest tags for each pathname.
+    '''
+    if not argv:
+      raise GetoptError("missing pathnames")
+    for path in argv:
+      print(path)
+      for tag_name, values in sorted(
+          self.options.tagger.suggested_tags(path).items()):
+        print(" ", tag_name, *sorted(values))
+
+  def cmd_test(self, argv):
+    ''' Usage: {cmd} path
+          Run a test against path.
+          Current we try out the suggestions.
+    '''
+    if not argv:
+      raise GetoptError("missing path")
+    path = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    tagger = self.options.tagger
+    fstags = self.options.fstags
+    tagged = fstags[path]
+    changed = True
+    while True:
+      print(path, *tagged)
+      if changed:
+        changed = False
+        suggestions = tagger.suggested_tags(path)
+        for tag_name, values in sorted(suggestions.items()):
+          print(" ", tag_name, values)
+        for file_to in tagger.file_by_tags(path, no_link=True):
+          print("=>", file_to)
+        print("inferred:", repr(tagger.infer(path)))
+      try:
+        action = input("Action? ").strip()
+      except EOFError:
+        break
+      if action:
+        with Pfx(repr(action)):
+          try:
+            if action.startswith('-'):
+              tag = Tag.from_str(action[1:].lstrip())
+              tagged.discard(tag)
+              changed = True
+            elif action.startswith('+'):
+              tag = Tag.from_str(action[1:].lstrip())
+              tagged.add(tag)
+              changed = True
+            else:
+              raise ValueError("unrecognised action")
+          except ValueError as e:
+            warning("action fails: %s", e)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
