@@ -207,7 +207,7 @@ class Tagger:
 
             tagger.file_by={"abn":"~/them/me"}
 
-        indicating that files with an `abn` tag should be filed in the `~/them/me` directory.
+        indicating that files with an `abn` tag may be filed in the `~/them/me` directory.
         That directory is then walked looking for the tag `abn`,
         and wherever some tag `abn=`*value*` is found on a subdirectory
         a mapping entry for `abn=`*value*=>*subdirectory* is added.
