@@ -6,6 +6,7 @@ from getopt import GetoptError, getopt
 import os
 from os.path import (
     exists as existspath,
+    isabs as isabspath,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -145,6 +146,44 @@ class TaggerCommand(BaseCommand):
       print("scan", path)
       mapping = tagger.auto_file_map(path, tag_names, mapping)
       pprint(mapping)
+
+  def cmd_fileby(self, argv):
+    ''' Usage: {cmd} [-d dirpath] tag_name paths...
+          Add paths to the tagger.file_by mapping for the current directory.
+          -d dirpath    Adjust the mapping for a different directory.
+    '''
+    dirpath = '.'
+    opts, argv = getopt(argv, 'd:')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-d':
+          dirpath = val
+        else:
+          raise RuntimeError("unhandled option")
+    if not argv:
+      raise GetoptError("missing tag_name")
+    tag_name = argv.pop(0)
+    if not Tag.is_valid_name(tag_name):
+      raise GetoptError("invalid tag_name: %r" % (tag_name,))
+    if not argv:
+      raise GetoptError("missing paths")
+    tagged = self.options.fstags[dirpath]
+    file_by = tagged.get('tagger.file_by', {})
+    paths = file_by.get(tag_name, ())
+    if isinstance(paths, str):
+      paths = [paths]
+    paths = set(paths)
+    paths.update(argv)
+    homedir = os.environ.get('HOME')
+    if homedir and isabspath(homedir):
+      homedir_ = homedir + os.sep
+      paths = set(
+          ('~/' + path[len(homedir_):] if path.startswith(homedir_) else path)
+          for path in paths
+      )
+    file_by[tag_name] = sorted(paths)
+    tagged['tagger.file_by'] = file_by
+    print("tagger.file_by =", repr(file_by))
 
   def cmd_gui(self, argv):
     ''' Usage: {cmd} pathnames...
