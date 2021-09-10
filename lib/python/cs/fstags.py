@@ -963,7 +963,6 @@ class FSTags(MultiOpenMixin):
   '''
 
   def __init__(self, tagsfile_basename=None, ontology_filepath=None):
-    MultiOpenMixin.__init__(self)
     if tagsfile_basename is None:
       tagsfile_basename = TAGSFILE_BASENAME
     if ontology_filepath is None:
