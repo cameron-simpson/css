@@ -11,13 +11,16 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    relpath,
     samefile,
 )
 
+from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
 from cs.tagset import Tag, RegexpTagRule
+from cs.upd import Upd, print
 
 class Tagger:
   ''' The core logic of a tagger.
@@ -177,23 +180,26 @@ class Tagger:
         mapping = defaultdict(list)
       tag_names = set(tag_names)
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
-      for path, dirnames, _ in os.walk(dirpath):
-        with Pfx(path):
-          # order the descent
-          dirnames[:] = sorted(
-              dname for dname in dirnames
-              if dname and not dname.startswith('.')
-          )
-          tagged = fstags[path]
-          if 'tagger.skip' in tagged:
-            # prune this directory tree from the mapping
-            dirnames[:] = []
-          else:
-            # look for the tags of interest
-            for tag in tagged:
-              if tag.name in tag_names:
-                bare_tag = Tag(tag.name, tag.value)
-                mapping[bare_tag].append(tagged.filepath)
+      with Upd().insert(1) as proxy:
+        proxy.prefix = f'auto_file_map {shortpath(dirpath)}/'
+        for path, dirnames, _ in os.walk(dirpath):
+          with Pfx(path):
+            proxy.text = relpath(path, dirpath)
+            # order the descent
+            dirnames[:] = sorted(
+                dname for dname in dirnames
+                if dname and not dname.startswith('.')
+            )
+            tagged = fstags[path]
+            if 'tagger.skip' in tagged:
+              # prune this directory tree from the mapping
+              dirnames[:] = []
+            else:
+              # look for the tags of interest
+              for tag in tagged:
+                if tag.name in tag_names:
+                  bare_tag = Tag(tag.name, tag.value)
+                  mapping[bare_tag].append(tagged.filepath)
     return mapping
 
   @pfx
