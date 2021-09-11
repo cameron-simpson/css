@@ -1346,12 +1346,15 @@ class FormatableFormatter(Formatter):
     '''
     if subfield_text == '':
       return value
-    subfield_fmt = f'{{value{subfield_text}}}'
-    subfield_map = {'value': value}
-    with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
-      value = subfield_fmt.format_map(subfield_map)
-    if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-      value = FStr(value)
+    if subfield_text[0] in '.[':
+      subfield_fmt = f'{{value{subfield_text}}}'
+      subfield_map = {'value': value}
+      with Pfx("%r.format_map(%r)", subfield_fmt, subfield_map):
+        value = subfield_fmt.format_map(subfield_map)
+    else:
+      # use the subfield_text after the colon
+      fmt = f'{{value:{subfield_text}}}'
+      value = fmt.format(value=value)
     return value
 
   # pylint: disable=arguments-differ
