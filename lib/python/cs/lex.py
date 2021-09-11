@@ -1422,7 +1422,7 @@ class FormatableFormatter(Formatter):
 
         We actually recognise colon separated chains of formats
         and apply each format to the previously converted value.
-        `str` values are promoted to `FStr` at each step.
+        The final result is promoted to an `FStr` before return.
 
         At each step, for the current value
         we try `format(value)` first
@@ -1561,6 +1561,9 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         Return `(converted,offset)`
         being the converted value and the offset after the method name.
 
+        Note that if there is not a leading identifier on `format_spec`
+        then `value` is returned unchanged with `offset=0`.
+
         The methods/attributes are looked up in the mapping
         returned by `.format_attributes()` which represents allowed methods
         (broadly, one should not allow methods which modify any state).
@@ -1575,7 +1578,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
         (the `value` isn't suitable)
         and the `value` is not an instance of `FStr`,
         convert it to an `FStr` and try again.
-        This provides the command utility methods on other types.
+        This provides the common utility methods on other types.
 
         The motivating example was a `PurePosixPath`,
         which does not JSON transcribe;
