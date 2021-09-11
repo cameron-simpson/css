@@ -360,6 +360,9 @@ class Pfx(object):
           continue
         else:
           value = (value0, cls.prefixify(value1))
+      elif attr == 'args' and isinstance(e, LookupError):
+        # args[0] is the key, do not fiddle with it
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
