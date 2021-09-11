@@ -1390,12 +1390,14 @@ class FormatableFormatter(Formatter):
     return subspecs
 
   @classmethod
-  def format_field1(cls, value, format_subspec):
+  def _format_field1(cls, value, format_subspec):
     ''' Format a subspec of a larger colon separated `format_spec`
         as from `format_field(value,format_spec)`.
         Return the new value, which need not be a `str`;
         the outer `format_field` call does a final conversion to an `FStr`.
     '''
+    assert isinstance(format_subspec, str)
+    assert len(format_subspec) > 0
     with Pfx("value=%r, format_subspec=%r", value, format_subspec):
       # promote bare str to FStr
       if type(value) is str:  # pylint: disable=unidiomatic-typecheck
