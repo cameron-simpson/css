@@ -1429,11 +1429,28 @@ class FormatableFormatter(Formatter):
         in turn.
     '''
     # parse the format_spec into multiple subspecs
-    format_subspecs = cls.get_format_subspecs(format_spec)
-    # promote str to FStr before formatting
-    # chain the various subspecifications
-    for format_subspec in format_subspecs or ('',):
-      value = cls.format_field1(value, format_subspec)
+    format_subspecs = cls.get_format_subspecs(format_spec) or ()
+    if format_subspecs:
+      if len(format_subspecs) == 1:
+        # no subdivision, call Formatter.format_field
+        try:
+          value = Formatter.format_field(
+              f'{{:{format_spec}}}', value, format_spec
+          )
+        except ValueError as e:
+          warning(
+              "%s.format_field(%s,%r): %s", cls.__name__, r(value),
+              format_spec, e
+          )
+          value = '{{{}:{}}}'.format(str(value), format_spec)
+      else:
+        # promote str to FStr before formatting
+        if type(value) is str:
+          value = FStr(value)
+        # chain the various subspecifications
+        for format_subspec in format_subspecs:
+          if len(format_subspec):
+            value = cls._format_field1(value, format_subspec)
     return FStr(value)
 
 @has_format_attributes
