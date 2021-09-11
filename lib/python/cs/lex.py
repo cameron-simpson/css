@@ -1244,7 +1244,7 @@ class FormatableFormatter(Formatter):
 
   FORMAT_RE_LITERAL_TEXT = re.compile(r'([^{]+|{{)*')
   FORMAT_RE_IDENTIFIER_s = r'[a-z_][a-z_0-9]*'
-  FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+)'
+  FORMAT_RE_ARG_NAME_s = rf'({FORMAT_RE_IDENTIFIER_s}|\d+(\.\d+)?[a-z]+)'
   FORMAT_RE_ATTRIBUTE_NAME_s = rf'\.{FORMAT_RE_IDENTIFIER_s}'
   FORMAT_RE_ELEMENT_INDEX_s = r'[^]]*'
   FORMAT_RE_FIELD_EXPR_s = (
