@@ -450,17 +450,18 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @staticmethod
   def get_value(arg_name, a, kw):
+    assert isinstance(kw, TagSet)
     assert not a
+    value = f'{arg_name}'
     try:
-      attribute = kw.get_format_attribute(arg_name)
-    except AttributeError:
-      if isinstance(kw, TagSet):
-        # for TagSets we get the matching TagSetPrefixView
-        value = kw.subtags(arg_name)
+      value = kw[arg_name]
+    except KeyError:
+      try:
+        attribute = kw.get_format_attribute(arg_name)
+      except AttributeError:
+        pass
       else:
-        value = kw[arg_name]
-    else:
-      value = attribute() if callable(attribute) else attribute
+        value = attribute() if callable(attribute) else attribute
     return value, arg_name
 
   ################################################################
