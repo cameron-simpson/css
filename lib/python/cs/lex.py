@@ -1328,6 +1328,7 @@ class FormatableFormatter(Formatter):
       try:
         mode = self.__dict__['format_mode']
       except KeyError:
+        # pylint: disable=import-outside-toplevel
         from cs.threads import State as ThreadState
         mode = self.__dict__['format_mode'] = ThreadState(strict=False)
     return mode
