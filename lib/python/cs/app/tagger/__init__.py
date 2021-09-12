@@ -19,7 +19,7 @@ from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
-from cs.tagset import Tag, RegexpTagRule
+from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.upd import Upd, print
 
 class Tagger:
@@ -37,12 +37,26 @@ class Tagger:
     self.fstags = fstags
     self._file_by_mappings = {}
 
+  @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
-    name = basename(srcpath)
-    ##X("autoname(%s) => %r", tags, name)
-    return name
+    tagged = self.fstags[dstdirpath]
+    formats = tagged.get('tagger.auto_name', ())
+    if isinstance(formats, str):
+      formats = [formats]
+    if formats:
+      if not isinstance(tags, TagSet):
+        tags = TagSet()
+        for tag in tags:
+          tags.add(tag)
+      for fmt in formats:
+        with Pfx(repr(fmt)):
+          formatted = pfx_call(tags.format_as, fmt)
+          if formatted.endswith(os.sep):
+            formatted += basename(srcpath)
+          return formatted
+    return basename(srcpath)
 
   @pfx
   def file_by_tags(
