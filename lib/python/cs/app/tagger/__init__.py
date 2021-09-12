@@ -17,6 +17,7 @@ from os.path import (
 
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.lex import FormatAsError
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
 from cs.queues import ListQueue
@@ -54,10 +55,15 @@ class Tagger:
           tags.add(tag)
       for fmt in formats:
         with Pfx(repr(fmt)):
-          formatted = pfx_call(tags.format_as, fmt)
-          if formatted.endswith(os.sep):
-            formatted += basename(srcpath)
-          return formatted
+          try:
+            formatted = pfx_call(tags.format_as, fmt, strict=True)
+            if formatted.endswith(os.sep):
+              formatted += basename(srcpath)
+            return formatted
+          except FormatAsError as e:
+            ##warning("%s", e)
+            ##print("auto_name(%r): %r: %s", srcpath, fmt, e)
+            continue
     return basename(srcpath)
 
   @pfx
