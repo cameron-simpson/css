@@ -479,6 +479,60 @@ class TimerQueue(object):
             T.start()
       self.mainRunning = False
 
+class ListQueue:
+  ''' A simple iterable queue based on a `list`.
+  '''
+
+  def __init__(self, queued=None):
+    ''' Initialise the queue.
+        `queued` is an optional iterable of initial items for the queue.
+    '''
+    self.queued = []
+    if queued:
+      self.queued.extend(queued)
+    self._lock = Lock()
+
+  def get(self):
+    ''' Get pops from the start of the list.
+    '''
+    with self._lock:
+      try:
+        return self.queued.pop(0)
+      except IndexError:
+        raise Queue_Empty("list is empty")
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    with self._lock:
+      self.queued.append(item)
+
+  def extend(self, items):
+    ''' Convenient/performant queue-lots-of-items.
+    '''
+    with self._lock:
+      self.queued.extend(items)
+
+  def __bool__(self):
+    ''' A `ListQueue` looks a bit like a container,
+        and is false when empty.
+    '''
+    with self._lock:
+      return bool(self.queued)
+
+  def __iter__(self):
+    ''' A `ListQueue` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' Iteration gets from the queue.
+    '''
+    try:
+      return self.get()
+    except Queue_Empty:
+      raise StopIteration("list is empty")
+
 if __name__ == '__main__':
   import cs.queues_tests
   cs.queues_tests.selftest(sys.argv)

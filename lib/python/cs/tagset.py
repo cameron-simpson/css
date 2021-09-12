@@ -201,7 +201,7 @@ from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
 import re
-from threading import Lock, RLock
+from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
@@ -450,17 +450,18 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @staticmethod
   def get_value(arg_name, a, kw):
+    assert isinstance(kw, TagSet)
     assert not a
+    value = f'{arg_name}'
     try:
-      attribute = kw.get_format_attribute(arg_name)
-    except AttributeError:
-      if isinstance(kw, TagSet):
-        # for TagSets we get the matching TagSetPrefixView
-        value = kw.subtags(arg_name)
+      value = kw[arg_name]
+    except KeyError:
+      try:
+        attribute = kw.get_format_attribute(arg_name)
+      except AttributeError:
+        pass
       else:
-        value = kw[arg_name]
-    else:
-      value = attribute() if callable(attribute) else attribute
+        value = attribute() if callable(attribute) else attribute
     return value, arg_name
 
   ################################################################
@@ -861,7 +862,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def auto_infer(self, attr):
     ''' The default inference implementation.
 
-        This should return a vaue if `attr` is inferrable
+        This should return a value if `attr` is inferrable
         and raise `ValueError` if not.
 
         The default implementation returns the direct tag value for `attr`
@@ -3439,7 +3440,7 @@ def selftest(argv):
   tags['aa'] = 'aa'
   pprint(tags.as_dict())
   for format_str in argv:
-    print("FORMAT_STR = %r", format_str)
+    print("FORMAT_STR =", repr(format_str))
     ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
     print("tag.format_as(%r) => %s" % (format_str, formatted))

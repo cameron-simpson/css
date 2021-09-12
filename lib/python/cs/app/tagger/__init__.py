@@ -11,13 +11,18 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    relpath,
     samefile,
 )
 
+from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call, prefix
-from cs.tagset import Tag, RegexpTagRule
+from cs.queues import ListQueue
+from cs.seq import unrepeated
+from cs.tagset import Tag, TagSet, RegexpTagRule
+from cs.upd import Upd, print
 
 class Tagger:
   ''' The core logic of a tagger.
@@ -34,12 +39,26 @@ class Tagger:
     self.fstags = fstags
     self._file_by_mappings = {}
 
+  @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
-    name = basename(srcpath)
-    ##X("autoname(%s) => %r", tags, name)
-    return name
+    tagged = self.fstags[dstdirpath]
+    formats = tagged.get('tagger.auto_name', ())
+    if isinstance(formats, str):
+      formats = [formats]
+    if formats:
+      if not isinstance(tags, TagSet):
+        tags = TagSet()
+        for tag in tags:
+          tags.add(tag)
+      for fmt in formats:
+        with Pfx(repr(fmt)):
+          formatted = pfx_call(tags.format_as, fmt)
+          if formatted.endswith(os.sep):
+            formatted += basename(srcpath)
+          return formatted
+    return basename(srcpath)
 
   @pfx
   def file_by_tags(
@@ -66,18 +85,11 @@ class Tagger:
     fstags = self.fstags
     # start the queue with the resolved `path`
     srcpath0 = fstags[path].filepath
-    q = [srcpath0]
+    q = ListQueue([srcpath0])
     linked_to = []
-    filed_from = set()
-    while q:
-      srcpath = q.pop(0)
+    for srcpath in unrepeated(q, signature=abspath):
       with Pfx(srcpath):
         srcdirpath = dirname(srcpath)
-        # loop detection
-        if srcdirpath in filed_from:
-          print("already processed %r, skipping loop" % (srcdirpath,))
-          continue
-        filed_from.add(srcdirpath)
         tagged = fstags[srcpath]
         tags = tagged.all_tags
         # places to redirect this file
@@ -99,8 +111,6 @@ class Tagger:
               continue
             # collect other filing locations
             refile_to.update(target_dirs)
-        # ... but remove locations we have already considered
-        refile_to.difference_update(filed_from)
         # now collate new filing locations
         dstpaths = []
         for dstdirpath in refile_to:
@@ -177,23 +187,26 @@ class Tagger:
         mapping = defaultdict(list)
       tag_names = set(tag_names)
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
-      for path, dirnames, _ in os.walk(dirpath):
-        with Pfx(path):
-          # order the descent
-          dirnames[:] = sorted(
-              dname for dname in dirnames
-              if dname and not dname.startswith('.')
-          )
-          tagged = fstags[path]
-          if 'tagger.skip' in tagged:
-            # prune this directory tree from the mapping
-            dirnames[:] = []
-          else:
-            # look for the tags of interest
-            for tag in tagged:
-              if tag.name in tag_names:
-                bare_tag = Tag(tag.name, tag.value)
-                mapping[bare_tag].append(tagged.filepath)
+      with Upd().insert(1) as proxy:
+        proxy.prefix = f'auto_file_map {shortpath(dirpath)}/'
+        for path, dirnames, _ in os.walk(dirpath):
+          with Pfx(path):
+            proxy.text = relpath(path, dirpath)
+            # order the descent
+            dirnames[:] = sorted(
+                dname for dname in dirnames
+                if dname and not dname.startswith('.')
+            )
+            tagged = fstags[path]
+            if 'tagger.skip' in tagged:
+              # prune this directory tree from the mapping
+              dirnames[:] = []
+            else:
+              # look for the tags of interest
+              for tag in tagged:
+                if tag.name in tag_names:
+                  bare_tag = Tag(tag.name, tag.value)
+                  mapping[bare_tag].append(tagged.filepath)
     return mapping
 
   @pfx
@@ -251,13 +264,8 @@ class Tagger:
     '''
     tagged = self.fstags[path]
     suggestions = defaultdict(set)
-    seen = set()
-    q = [dirname(tagged.filepath)]
-    while q:
-      dirpath = q.pop(0)
-      if dirpath in seen:
-        continue
-      seen.add(dirpath)
+    q = ListQueue([dirname(tagged.filepath)])
+    for dirpath in unrepeated(q, signature=abspath):
       mapping = self.file_by_mapping(dirpath)
       for bare_tag, dstpaths in mapping.items():
         suggestions[bare_tag.name].add(bare_tag.value)
