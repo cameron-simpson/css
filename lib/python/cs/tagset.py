@@ -201,7 +201,7 @@ from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
 import re
-from threading import Lock, RLock
+from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
