@@ -488,7 +488,9 @@ class ListQueue:
         `queued` is an optional iterable of initial items for the queue.
     '''
     self.queued = []
-    if queued:
+    if queued is not None:
+      # catch a common mistake
+      assert not isinstance(queued, str)
       self.queued.extend(queued)
     self._lock = Lock()
 
