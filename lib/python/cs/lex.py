@@ -73,7 +73,7 @@ if sys.hexversion >= 0x030000:
 
 ord_space = ord(' ')
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches,redefined-outer-name
 def unctrl(s, tabsize=8):
   ''' Return the string `s` with `TAB`s expanded and control characters
       replaced with printable representations.
@@ -166,6 +166,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
           ......
           X("foo = %s", s(foo))
   '''
+  # pylint: disable=redefined-outer-name
   s = "%s:%s" % (
       type(o) if use_cls else type(o).__name__,
       repr(o) if use_repr else str(o),
@@ -191,6 +192,7 @@ def strlist(ary, sep=", "):
   '''
   return sep.join([str(a) for a in ary])
 
+# pylint: disable=redefined-outer-name
 def htmlify(s, nbsp=False):
   ''' Convert a string for safe transcription in HTML.
 
@@ -316,6 +318,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     chunks.append(chunk)
   return ''.join(chunks)
 
+# pylint: disable=redefined-outer-name
 def untexthexify(s, shiftin='[', shiftout=']'):
   ''' Decode a textual representation of binary data into binary data.
 
@@ -362,6 +365,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     chunks.append(unhexify(s))
   return joinbytes(chunks)
 
+# pylint: disable=redefined-outer-name
 def get_chars(s, offset, gochars):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return `(match,new_offset)`.
@@ -378,6 +382,7 @@ def get_chars(s, offset, gochars):
       offset += 1
   return s[ooffset:offset], offset
 
+# pylint: disable=redefined-outer-name
 def get_white(s, offset=0):
   ''' Scan the string `s` for characters in `string.whitespace`
       starting at `offset` (default `0`).
@@ -385,6 +390,7 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, offset, whitespace)
 
+# pylint: disable=redefined-outer-name
 def skipwhite(s, offset=0):
   ''' Convenience routine for skipping past whitespace;
       returns the offset of the next nonwhitespace character.
@@ -427,6 +433,7 @@ def stripped_dedent(s):
   adjusted = dedent('\n'.join(lines))
   return line1 + '\n' + adjusted
 
+# pylint: disable=redefined-outer-name
 def strip_prefix_n(s, prefix, n=None):
   ''' Strip a leading `prefix` and numeric value `n` from the start of a
       string.  Return the remaining string, or the original string if the
@@ -464,7 +471,7 @@ def strip_prefix_n(s, prefix, n=None):
     s = s.lstrip(digits)
   else:
     # evaluate the numeric part
-    s = s.lstrip('0')
+    s = s.lstrip('0')  # pylint: disable=no-member
     if not s or not s[0].isdigit():
       # all zeroes, leading value is 0
       sn = 0
@@ -481,6 +488,7 @@ def strip_prefix_n(s, prefix, n=None):
     s = s[pos:]
   return s
 
+# pylint: disable=redefined-outer-name
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in `string.whitespace`
       starting at `offset` (default `0`).
@@ -488,12 +496,14 @@ def get_nonwhite(s, offset=0):
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
+# pylint: disable=redefined-outer-name
 def get_decimal(s, offset=0):
   ''' Scan the string `s` for decimal characters starting at `offset` (default `0`).
       Return `(dec_string,new_offset)`.
   '''
   return get_chars(s, offset, digits)
 
+# pylint: disable=redefined-outer-name
 def get_decimal_value(s, offset=0):
   ''' Scan the string `s` for a decimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
@@ -503,12 +513,14 @@ def get_decimal_value(s, offset=0):
     raise ValueError("expected decimal value")
   return int(value_s), offset
 
+# pylint: disable=redefined-outer-name
 def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset` (default `0`).
       Return `(hex_string,new_offset)`.
   '''
   return get_chars(s, offset, '0123456789abcdefABCDEF')
 
+# pylint: disable=redefined-outer-name
 def get_hexadecimal_value(s, offset=0):
   ''' Scan the string `s` for a hexadecimal value starting at `offset` (default `0`).
       Return `(value,new_offset)`.
@@ -518,6 +530,7 @@ def get_hexadecimal_value(s, offset=0):
     raise ValueError("expected hexadecimal value")
   return int('0x' + value_s), offset
 
+# pylint: disable=redefined-outer-name
 def get_decimal_or_float_value(s, offset=0):
   ''' Fetch a decimal or basic float (nnn.nnn) value
       from the str `s` at `offset` (default `0`).
@@ -560,6 +573,7 @@ def get_identifier(
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
+# pylint: disable=redefined-outer-name
 def is_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier
       from position `offset` (default `0`) onward.
@@ -567,6 +581,7 @@ def is_identifier(s, offset=0, **kw):
   s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
 
+# pylint: disable=redefined-outer-name
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for `get_identifier`,
       but require the letters to be uppercase.
@@ -575,6 +590,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
       s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras
   )
 
+# pylint: disable=redefined-outer-name
 def get_dotted_identifier(s, offset=0, **kw):
   ''' Scan the string `s` for a dotted identifier (by default an
       ASCII letter or underscore followed by letters, digits or
@@ -598,12 +614,14 @@ def get_dotted_identifier(s, offset=0, **kw):
       offset = offset2
   return s[offset0:offset], offset
 
+# pylint: disable=redefined-outer-name
 def is_dotted_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
   s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
   return len(s2) > 0 and offset2 == len(s)
 
+# pylint: disable=redefined-outer-name
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
       at `offset` (default `0`).
@@ -785,6 +803,7 @@ def get_sloshed_text(
     chunks.append(s[offset0:offset])
   return u''.join(ustr(chunk) for chunk in chunks), offset
 
+# pylint: disable=redefined-outer-name
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or
       $x where "x" is a special character.
@@ -858,6 +877,7 @@ def get_qstr(
   )
   return get_sloshed_text(s, delim, offset, specials={'$': getvar})
 
+# pylint: disable=redefined-outer-name
 def get_qstr_or_identifier(s, offset):
   ''' Parse a double quoted string or an identifier.
   '''
@@ -865,6 +885,7 @@ def get_qstr_or_identifier(s, offset):
     return get_qstr(s, offset, q='"')
   return get_identifier(s, offset)
 
+# pylint: disable=redefined-outer-name
 def get_delimited(s, offset, delim):
   ''' Collect text from the string `s` from position `offset` up
       to the first occurence of delimiter `delim`; return the text
@@ -877,6 +898,7 @@ def get_delimited(s, offset, delim):
     )
   return s[offset:pos], pos + len(delim)
 
+# pylint: disable=redefined-outer-name
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied
       tokeniser functions `getters`.
@@ -905,6 +927,7 @@ def get_tokens(s, offset, getters):
       func = getter
     elif isinstance(getter, StringTypes):
 
+      # pylint: disable=redefined-outer-name
       def func(s, offset):
         ''' Wrapper for a literal string: require the string to be
             present at the current offset.
@@ -916,6 +939,7 @@ def get_tokens(s, offset, getters):
       func, args, kwargs = getter
     elif hasattr(getter, 'match'):
 
+      # pylint: disable=redefined-outer-name
       def func(s, offset):
         ''' Wrapper for a getter with a .match method, such as a regular
             expression.
@@ -930,6 +954,7 @@ def get_tokens(s, offset, getters):
     tokens.append(token)
   return tokens, offset
 
+# pylint: disable=redefined-outer-name
 def match_tokens(s, offset, getters):
   ''' Wrapper for `get_tokens` which catches `ValueError` exceptions
       and returns `(None,offset)`.
@@ -1001,6 +1026,7 @@ def as_lines(chunks, partials=None):
     if pos < len(chunk):
       partials.append(chunk[pos:])
 
+# pylint: disable=redefined-outer-name
 def cutprefix(s, prefix):
   ''' Strip a `prefix` from the front of `s`.
       Return the suffix if `s.startswith(prefix)`, else `s`.
@@ -1019,6 +1045,7 @@ def cutprefix(s, prefix):
     return s[len(prefix):]
   return s
 
+# pylint: disable=redefined-outer-name
 def cutsuffix(s, suffix):
   ''' Strip a `suffix` from the end of `s`.
       Return the prefix if `s.endswith(suffix)`, else `s`.
@@ -1065,6 +1092,7 @@ def common_suffix(*strs):
     return ''
   return strs[0][-length:]
 
+# pylint: disable=redefined-outer-name,unsubscriptable-object
 def cropped(
     s: str, max_length: int = 32, roffset: int = 1, ellipsis: str = '...'
 ):
@@ -1115,6 +1143,7 @@ def cropped_repr(o, roffset=1, max_length=32, inner_max_length=None):
     o_repr = repr(o)
   return cropped(o_repr, max_length=max_length, roffset=roffset)
 
+# pylint: disable=redefined-outer-name
 def get_ini_clausename(s, offset=0):
   ''' Parse a `[`*clausename*`]` string from `s` at `offset` (default `0`).
       Return `(clausename,new_offset)`.
@@ -1132,6 +1161,7 @@ def get_ini_clausename(s, offset=0):
     raise ValueError("missing closing ']' at position %d" % (offset,))
   return clausename, offset + 1
 
+# pylint: disable=redefined-outer-name
 def get_ini_clause_entryname(s, offset=0):
   ''' Parse a `[`*clausename*`]`*entryname* string
       from `s` at `offset` (default `0`).
@@ -1144,6 +1174,7 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+# pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
   '''
@@ -1450,11 +1481,11 @@ class FormatableFormatter(Formatter):
           value = '{{{}:{}}}'.format(str(value), format_spec)
       else:
         # promote str to FStr before formatting
-        if type(value) is str:
+        if type(value) is str:  # pylint: disable=unidiomatic-typecheck
           value = FStr(value)
         # chain the various subspecifications
         for format_subspec in format_subspecs:
-          if len(format_subspec):
+          if format_subspec:
             value = cls._format_field1(value, format_subspec)
     return FStr(value)
 
@@ -1607,7 +1638,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       else:
         converted = attribute
       return converted, offset
-    except TypeError as e:
+    except TypeError:
       if not isinstance(value, FStr):
         with Pfx("fall back to FStr(value=%s).convert_via_method_or_attr"):
           return self.convert_via_method_or_attr(FStr(value), format_spec)
