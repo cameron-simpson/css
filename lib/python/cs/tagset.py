@@ -3439,7 +3439,7 @@ def selftest(argv):
   tags['aa'] = 'aa'
   pprint(tags.as_dict())
   for format_str in argv:
-    print("FORMAT_STR = %r", format_str)
+    print("FORMAT_STR =", repr(format_str))
     ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
     print("tag.format_as(%r) => %s" % (format_str, formatted))
