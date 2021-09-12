@@ -1693,10 +1693,6 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
       format_mapping = self
     else:
       format_mapping = get_format_mapping(**control_kw)  # pylint:disable=not-callable
-    X(
-        "%s.format_as(%r,...): set format_mode.strict=%r",
-        type(self).__name__, format_s, strict
-    )
     if strict is None:
       strict = self.format_mode.strict
     with self.format_mode(strict=strict):
