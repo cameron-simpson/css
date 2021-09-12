@@ -448,18 +448,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return get_dotted_identifier(field_name)
 
-  @staticmethod
-  def get_value(arg_name, a, kw):
+  def get_value(self, arg_name, a, kw):
     assert isinstance(kw, TagSet)
     assert not a
-    value = f'{arg_name}'
     try:
       value = kw[arg_name]
     except KeyError:
       try:
         attribute = kw.get_format_attribute(arg_name)
       except AttributeError:
-        pass
+        if self.format_mode.strict:
+          raise KeyError(
+              "%s.get_value: unrecognised arg_name %r" %
+              (type(self).__name__, arg_name)
+          )
+        value = f'{{{arg_name}}}'
       else:
         value = attribute() if callable(attribute) else attribute
     return value, arg_name
