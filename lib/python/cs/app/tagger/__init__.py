@@ -45,7 +45,7 @@ class Tagger:
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
     tagged = self.fstags[dstdirpath]
-    formats = tagged.get('tagger.auto_name', ())
+    formats = tagged.all_tags.get('tagger.auto_name', ())
     if isinstance(formats, str):
       formats = [formats]
     if formats:
@@ -57,7 +57,7 @@ class Tagger:
         with Pfx(repr(fmt)):
           try:
             formatted = pfx_call(tags.format_as, fmt, strict=True)
-            if formatted.endswith(os.sep):
+            if formatted.endswith('/'):
               formatted += basename(srcpath)
             return formatted
           except FormatAsError as e:
@@ -85,23 +85,32 @@ class Tagger:
 
         Note: if `path` is already linked to an implied location
         that location is also included in the returned list.
+
+        The filing process is as follows:
+        - for each target directory, initially `dirname(path)`,
+          look for a filing map on tag `file_by_mapping`
+        - for each directory in that mapping which matches a tag from `path`,
+          queue it as an additional target directory
+        - if there were no matching directories, file `path` at the current
+          target directory under the filename returned by `Tagger.auto_name`
     '''
     if do_remove and no_link:
       raise ValueError("do_remove and no_link may not both be true")
     fstags = self.fstags
     # start the queue with the resolved `path`
-    srcpath0 = fstags[path].filepath
-    q = ListQueue([srcpath0])
+    tagged = fstags[path]
+    srcpath = tagged.filepath
+    tags = tagged.all_tags
+    # a queue of reference directories
+    q = ListQueue((dirname(srcpath),))
     linked_to = []
-    for srcpath in unrepeated(q, signature=abspath):
-      with Pfx(srcpath):
-        srcdirpath = dirname(srcpath)
-        tagged = fstags[srcpath]
-        tags = tagged.all_tags
+    for refdirpath in unrepeated(q, signature=abspath):
+      with Pfx(refdirpath):
         # places to redirect this file
-        refile_to = set()
-        mapping = self.file_by_mapping(srcdirpath)
+        mapping = self.file_by_mapping(refdirpath)
         interesting_tag_names = {tag.name for tag in mapping.keys()}
+        # locate specific filing locations in the refdirpath
+        refile_to = set()
         for tag_name in sorted(interesting_tag_names):
           with Pfx("tag_name %r", tag_name):
             if tag_name not in tags:
@@ -117,51 +126,44 @@ class Tagger:
               continue
             # collect other filing locations
             refile_to.update(target_dirs)
-        # now collate new filing locations
-        dstpaths = []
-        for dstdirpath in refile_to:
-          with Pfx("dst %r", dstdirpath):
-            if not isdirpath(dstdirpath):
-              warning("not a directory, ignoring")
-              continue
-            dstbase = self.auto_name(srcpath, dstdirpath, tags)
-            with Pfx(dstbase):
-              dstpath = joinpath(dstdirpath, dstbase)
-              if existspath(dstpath):
-                warning("already exists, skipping")
-                continue
-              dstpaths.append(dstpath)
-        if dstpaths:
-          # queue further locations, do not file here
-          q.extend(dstpaths)
-          for dstpath in dstpaths:
-            fstags[dstpath].update(tags)
-        else:
-          # file here
-          dstbase = self.auto_name(srcpath, srcdirpath, tags)
-          with Pfx(dstbase):
-            dstpath = joinpath(srcdirpath, dstbase)
-            if existspath(dstpath):
-              if not samefile(srcpath0, dstpath):
-                warning("already exists, skipping")
-              continue
-            if not no_link:
-              if not isdirpath(srcdirpath):
-                print("%s: mkdir(%r)" % (prefix(), srcdirpath))
-                pfx_call(os.mkdir, srcdirpath)
-              print(srcpath0, '=>', dstpath)
-              pfx_call(os.link, srcpath0, dstpath)
-              fstags[dstpath].update(tags)
+        if refile_to:
+          # redistribute from here
+          q.extend(refile_to)
+          continue
+        # file locally
+        dstbase = self.auto_name(srcpath, refdirpath, tags)
+        with Pfx("%s => %s", refdirpath, dstbase):
+          dstpath = dstbase if isabspath(dstbase
+                                         ) else joinpath(refdirpath, dstbase)
+          if existspath(dstpath):
+            if not samefile(srcpath, dstpath):
+              warning("already exists, skipping")
+            continue
+          if no_link:
             linked_to.append(dstpath)
-    if do_remove and linked_to:
-      S = os.stat(srcpath0)
+          else:
+            linkto_dirpath = dirname(dstpath)
+            if not isdirpath(linkto_dirpath):
+              print("mkdir", linkto_dirpath)
+              pfx_call(os.mkdir, linkto_dirpath)
+            try:
+              pfx_call(os.link, srcpath, dstpath)
+            except OSError as e:
+              warning("cannot link to %r: %s", dstpath, e)
+            else:
+              linked_to.append(dstpath)
+              fstags[dstpath].update(tags)
+              if prune_inherited:
+                fstags[dstpath].prune_inherited()
+    if linked_to and do_remove:
+      S = os.stat(srcpath)
       if S.st_nlink < 2:
         warning(
-            "not removing %r, unsufficient hard links (%s)", srcpath0,
+            "not removing %r, unsufficient hard links (%s)", srcpath,
             S.st_nlink
         )
       else:
-        pfx_call(os.remove, srcpath0)
+        pfx_call(os.remove, srcpath)
     return linked_to
 
   @pfx
