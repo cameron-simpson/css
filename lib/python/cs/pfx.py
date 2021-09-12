@@ -267,7 +267,7 @@ class Pfx(object):
         _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
-          print(
+          True or print(
               "warning: %s: %s:%s: message not prefixed" %
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
