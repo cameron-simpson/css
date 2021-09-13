@@ -17,6 +17,7 @@ from os.path import (
     samefile,
 )
 
+from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.lex import FormatAsError
 from cs.logutils import warning
@@ -25,9 +26,16 @@ from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 
+from typeguard import typechecked
+
+# the subtags containing Tagger releated values
+TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
+
 class Tagger:
   ''' The core logic of a tagger.
   '''
+
+  TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
   def __init__(self, fstags=None):
     ''' Initialise the `Tagger`.
@@ -40,12 +48,26 @@ class Tagger:
     self.fstags = fstags
     self._file_by_mappings = {}
 
+  @classmethod
+  @typechecked
+  def conf_tags(cls, tags: TagSet):
+    ''' The `Tagger` related subtags from `tags`, a `TagSet`.
+    '''
+    return tags.subtags(cls.TAG_PREFIX)
+
+  @classmethod
+  @typechecked
+  def conf_tag(cls, tags: TagSet, conf: str, default=None):
+    ''' Return the `Tagger` related subtag value for `conf`, or `default` (default `None).
+    '''
+    return cls.conf_tags(tags).get(conf, default)
+
   @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
     tagged = self.fstags[dstdirpath]
-    formats = tagged.all_tags.get('tagger.auto_name', ())
+    formats = self.conf_tag(tagged.all_tags, 'auto_name', ())
     if isinstance(formats, str):
       formats = [formats]
     if formats:
@@ -68,6 +90,7 @@ class Tagger:
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   @pfx
+  @fmtdoc
   def file_by_tags(
       self, path: str, prune_inherited=False, no_link=False, do_remove=False
   ):
@@ -93,7 +116,8 @@ class Tagger:
         - for each directory in that mapping which matches a tag from `path`,
           queue it as an additional target directory
         - if there were no matching directories, file `path` at the current
-          target directory under the filename returned by `Tagger.auto_name`
+          target directory under the filename
+          returned by `{TAGGER_TAG_PREFIX_DEFAULT}.auto_name`
     '''
     if do_remove and no_link:
       raise ValueError("do_remove and no_link may not both be true")
@@ -167,6 +191,7 @@ class Tagger:
     return linked_to
 
   @pfx
+  @fmtdoc
   def auto_file_map(self, dirpath: str, tag_names):
     ''' Walk the file tree at `dirpath`
         looking for directories whose direct tags contain tags
@@ -182,7 +207,7 @@ class Tagger:
         from the tree layout.
 
         We automatically skip subdirectories whose names commence with `'.'`.
-        We also skip subdirectories tagged with `tagger.skip`.
+        We also skip subdirectories tagged with `{TAGGER_TAG_PREFIX_DEFAULT}.skip`.
     '''
     dirpath = abspath(dirpath)
     cache_key = dirpath, tuple(sorted(tag_names))
@@ -203,8 +228,8 @@ class Tagger:
               if dname and not dname.startswith('.')
           )
           tagged = fstags[path]
-          if 'tagger.skip' in tagged:
-            # prune this directory tree from the mapping
+          if self.conf_tag(tagged, 'skip'):
+            # tagger.skip => prune this directory tree from the mapping
             dirnames[:] = []
           else:
             # look for the tags of interest
@@ -215,15 +240,16 @@ class Tagger:
     return mapping
 
   @pfx
+  @fmtdoc
   def file_by_mapping(self, srcdirpath):
-    ''' Examine the `tagger.file_by` tag for `srcdirpath`.
+    ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
         derived via `auto_file_map`.
         The file locations may be a list or a string (for convenient single locations.
 
         For example, I might tag my downloads directory with:
 
-            tagger.file_by={"abn":"~/them/me"}
+            {TAGGER_TAG_PREFIX_DEFAULT}.file_by={{"abn":"~/them/me"}}
 
         indicating that files with an `abn` tag may be filed in the `~/them/me` directory.
         That directory is then walked looking for the tag `abn`,
@@ -233,13 +259,13 @@ class Tagger:
         This results in a direct mapping of specific tag values to filing locations,
         such as:
 
-            { Tag('abn','***********') => ['/path/to/them/me/abn-**-***-***-***'] }
+            {{ Tag('abn','***********') => ['/path/to/them/me/abn-**-***-***-***'] }}
 
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
     fstags = self.fstags
     mapping = defaultdict(set)
-    file_by = fstags[srcdirpath].get('tagger.file_by') or {}
+    file_by = self.conf_tag(fstags[srcdirpath], 'file_by', {})
     # group the tags by file_by target path
     grouped = defaultdict(set)
     for tag_name, file_to in file_by.items():
@@ -280,28 +306,29 @@ class Tagger:
     return suggestions
 
   @pfx
+  @fmtdoc
   def inference_mapping(self, dirpath):
-    r''' Scan `path`'s `tagger.filename_inference` tag,
+    r'''Scan `path`'s `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` tag,
         a mapping of prefix=>rule specifications.
         Return a mapping of prefix=>inference_function
         where `inference_function(pathname)` returns a list of inferred `Tag`s.
 
         The prefix is a tag prefix. Example:
 
-            tagger.filename_inference={
+            {TAGGER_TAG_PREFIX_DEFAULT}.filename_inference={{
                 'cs.tv_episode':
                     '/^(?P<series_title_lc>([^-]|-[^-])+)--s0*(?P<season_n>\d+)e0*(?P<episode_n>\d+)--(?P<episode_title_lc>([^-]|-[^-])+)--',
-            }
+            }}
 
         which would try to match a filename against my habitual naming convention,
         and if so return a `TagSet` with tags named `series_title_lc`,
         `season_n`, `episode_n`, `episode_title_lc`.
     '''
-    filename_inference = self.fstags[dirpath].get(
-        'tagger.filename_inference', {}
+    filename_inference = self.conf_tag(
+        self.fstags[dirpath], 'filename_inference', {}
     )
     mapping = defaultdict(list)
-    with Pfx("tagger.filename_inference=%r", filename_inference):
+    with Pfx("filename_inference=%r", filename_inference):
       for prefix, rule_spec in filename_inference.items():
         with Pfx("%r: %r", prefix, rule_spec):
           if isinstance(rule_spec, str):
@@ -317,8 +344,9 @@ class Tagger:
     return mapping
 
   @pfx
+  @fmtdoc
   def infer(self, path, apply=False):
-    ''' Compare the `tagger.filename_inference` rules to `path`,
+    ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
         producing a mapping of prefix=>[Tag] for each rule which infers tags.
         Return the mapping.
 
