@@ -1503,13 +1503,13 @@ class FormatableFormatter(Formatter):
         format_subspec, = format_subspecs
         # no subdivision, call Formatter.format_field
         try:
-          value = cls._format_field1(value, format_subspec)
+          value = format(value, format_spec)
         except ValueError as e:
           warning(
               "%s.format_field(%s,%r): %s", cls.__name__, r(value),
-              format_spec, e
+              format_spec, s(e)
           )
-          value = '{{{!r}:{}}}'.format(value, format_spec)
+          value = '{{{}:{}}}'.format(r(value), format_spec)
       else:
         # promote str to FStr before formatting
         if type(value) is str:  # pylint: disable=unidiomatic-typecheck
