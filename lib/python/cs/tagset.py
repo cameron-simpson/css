@@ -536,7 +536,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     except KeyError:
       try:
         return self.auto_infer(attr)
-      except ValueError as e:
+      except ValueError:  # as e:
         # no match
         ##warning("auto_infer(%r): %s", attr, e)
         pass
@@ -1945,7 +1945,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `keys(self)`: return an iterable of names
 
       Subclasses may reasonably want to override the following:
-      * `startup_shutdown(self)`: context manager to allocate and release any 
+      * `startup_shutdown(self)`: context manager to allocate and release any
         needed resources such as database connections
 
       Subclasses may implement:
@@ -2312,6 +2312,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     return self.tagsets[subtype_name]
 
   def type_names(self):
+    ''' Return the type definition keys.
+    '''
     return map(
         lambda subkey: self.key(cutprefix(subkey, 'type.')),
         self.tagsets.keys(prefix='type.')
