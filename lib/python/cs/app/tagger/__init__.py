@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' Tagger class and `tagger` command line tool for filing files by tags.
+'''
+
 from collections import defaultdict
 import os
 from os.path import (
@@ -11,19 +14,16 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
-    relpath,
     samefile,
 )
 
-from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import FormatAsError
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_call, prefix
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
-from cs.upd import Upd, print
 
 class Tagger:
   ''' The core logic of a tagger.
@@ -60,12 +60,13 @@ class Tagger:
             if formatted.endswith('/'):
               formatted += basename(srcpath)
             return formatted
-          except FormatAsError as e:
+          except FormatAsError:
             ##warning("%s", e)
             ##print("auto_name(%r): %r: %s", srcpath, fmt, e)
             continue
     return basename(srcpath)
 
+  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   @pfx
   def file_by_tags(
       self, path: str, prune_inherited=False, no_link=False, do_remove=False
@@ -144,7 +145,6 @@ class Tagger:
           else:
             linkto_dirpath = dirname(dstpath)
             if not isdirpath(linkto_dirpath):
-              print("mkdir", linkto_dirpath)
               pfx_call(os.mkdir, linkto_dirpath)
             try:
               pfx_call(os.link, srcpath, dstpath)
@@ -195,26 +195,23 @@ class Tagger:
         mapping = defaultdict(list)
       tag_names = set(tag_names)
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
-      with Upd().insert(1) as proxy:
-        proxy.prefix = f'auto_file_map {shortpath(dirpath)}/'
-        for path, dirnames, _ in os.walk(dirpath):
-          with Pfx(path):
-            proxy.text = relpath(path, dirpath)
-            # order the descent
-            dirnames[:] = sorted(
-                dname for dname in dirnames
-                if dname and not dname.startswith('.')
-            )
-            tagged = fstags[path]
-            if 'tagger.skip' in tagged:
-              # prune this directory tree from the mapping
-              dirnames[:] = []
-            else:
-              # look for the tags of interest
-              for tag in tagged:
-                if tag.name in tag_names:
-                  bare_tag = Tag(tag.name, tag.value)
-                  mapping[bare_tag].append(tagged.filepath)
+      for path, dirnames, _ in os.walk(dirpath):
+        with Pfx(path):
+          # order the descent
+          dirnames[:] = sorted(
+              dname for dname in dirnames
+              if dname and not dname.startswith('.')
+          )
+          tagged = fstags[path]
+          if 'tagger.skip' in tagged:
+            # prune this directory tree from the mapping
+            dirnames[:] = []
+          else:
+            # look for the tags of interest
+            for tag in tagged:
+              if tag.name in tag_names:
+                bare_tag = Tag(tag.name, tag.value)
+                mapping[bare_tag].append(tagged.filepath)
     return mapping
 
   @pfx
@@ -247,7 +244,7 @@ class Tagger:
     grouped = defaultdict(set)
     for tag_name, file_to in file_by.items():
       if isinstance(file_to, str):
-        file_to = file_to,
+        file_to = (file_to,)
       for file_to_path in file_to:
         if not isabspath(file_to_path):
           if file_to_path.startswith('~'):
@@ -310,7 +307,9 @@ class Tagger:
           if isinstance(rule_spec, str):
             if rule_spec.startswith('/'):
               rule = RegexpTagRule(rule_spec[1:])
-              mapping[prefix] = lambda path: rule.infer_tags(basename(path))
+              mapping[prefix] = lambda path, rule=rule: rule.infer_tags(
+                  basename(path)
+              )
             else:
               warning("skipping unrecognised pattern")
           else:
