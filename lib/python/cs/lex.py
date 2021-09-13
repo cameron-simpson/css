@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+from cs.x import X
 r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
@@ -1500,17 +1500,16 @@ class FormatableFormatter(Formatter):
     format_subspecs = cls.get_format_subspecs(format_spec) or ()
     if format_subspecs:
       if len(format_subspecs) == 1:
+        format_subspec, = format_subspecs
         # no subdivision, call Formatter.format_field
         try:
-          value = Formatter.format_field(
-              f'{{:{format_spec}}}', value, format_spec
-          )
+          value = cls._format_field1(value, format_subspec)
         except ValueError as e:
           warning(
               "%s.format_field(%s,%r): %s", cls.__name__, r(value),
               format_spec, e
           )
-          value = '{{{}:{}}}'.format(str(value), format_spec)
+          value = '{{{!r}:{}}}'.format(value, format_spec)
       else:
         # promote str to FStr before formatting
         if type(value) is str:  # pylint: disable=unidiomatic-typecheck
