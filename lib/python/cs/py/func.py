@@ -12,7 +12,7 @@ from functools import partial
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 
-__version__ = '20210913'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
