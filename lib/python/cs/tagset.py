@@ -1555,16 +1555,30 @@ class TagSetCriterion(ABC):
 
   @classmethod
   @pfx_method
-  def from_str(cls, s):
+  def from_str(cls, s, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
-    criterion, offset = cls.from_str2(s)
+    criterion, offset = cls.from_str2(s, fallback_parse=fallback_parse)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
     return criterion
 
   @classmethod
-  def from_str2(cls, s, offset=0, delim=None):
+  @pfx_method
+  def from_arg(cls, arg, fallback_parse=None):
+    ''' Prepare a `TagSetCriterion` from the string `arg`
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg, fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
+
+  @classmethod
+  def from_str2(cls, s, offset=0, delim=None, fallback_parse=None):
     ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
@@ -3322,6 +3336,29 @@ class TagsCommandMixin:
   '''
 
   @classmethod
+  def parse_tag_addremove(cls, arg, offset=0):
+    ''' Parse `arg` as an add/remove tag specification
+        of the form [`-`]*tag_name*[`=`*value*].
+        Return `(remove,Tag)`.
+
+        Examples:
+
+            >>> parse_tag_addremove('a')
+            >>> parse_tag_addremove('-a')
+            >>> parse_tag_addremove('a=1')
+            >>> parse_tag_addremove('-a=1')
+            >>> parse_tag_addremove('-a="foo bah"')
+            >>> parse_tag_addremove('-a=foo bah')
+    '''
+    if arg.startswith('-', offset):
+      remove = True
+      offset += 1
+    else:
+      remove = False
+    tag = Tag.from_arg(arg, offset=offset)
+    return remove, tag
+
+  @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
     ''' Parse `arg` as a tag specification
         and return a `tag_based_test_class` instance
@@ -3375,7 +3412,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagSetCriterion.from_str(arg)
+          tag_choice = TagSetCriterion.from_arg(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':
