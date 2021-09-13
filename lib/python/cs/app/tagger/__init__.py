@@ -357,19 +357,10 @@ class Tagger:
         self.fstags[dirpath], 'filename_inference', {}
     )
     mapping = defaultdict(list)
-    with Pfx("filename_inference=%r", filename_inference):
-      for prefix, rule_spec in filename_inference.items():
-        with Pfx("%r: %r", prefix, rule_spec):
-          if isinstance(rule_spec, str):
-            if rule_spec.startswith('/'):
-              rule = RegexpTagRule(rule_spec[1:])
-              mapping[prefix] = lambda path, rule=rule: rule.infer_tags(
-                  basename(path)
-              )
-            else:
-              warning("skipping unrecognised pattern")
-          else:
-            warning("skipping unhandled type")
+    with Pfx("inference=%r", inference_spec):
+      for prefix, rule_spec in inference_spec.items():
+        with Pfx(prefix):
+          mapping[prefix].extend(self.inference_rules(prefix, rule_spec))
     return mapping
 
   @pfx
