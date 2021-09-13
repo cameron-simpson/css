@@ -14,19 +14,20 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    realpath,
     samefile,
 )
 
+from typeguard import typechecked
+
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.lex import FormatAsError
+from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
-
-from typeguard import typechecked
 
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
@@ -67,7 +68,7 @@ class Tagger:
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
     tagged = self.fstags[dstdirpath]
-    formats = self.conf_tag(tagged.all_tags, 'auto_name', ())
+    formats = self.conf_tag(tagged.merged_tags(), 'auto_name', ())
     if isinstance(formats, str):
       formats = [formats]
     if formats:
@@ -220,7 +221,7 @@ class Tagger:
         mapping = defaultdict(list)
       tag_names = set(tag_names)
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
-      for path, dirnames, _ in os.walk(dirpath):
+      for path, dirnames, _ in os.walk(realpath(dirpath)):
         with Pfx(path):
           # order the descent
           dirnames[:] = sorted(
@@ -305,6 +306,34 @@ class Tagger:
           q.extend(dstpaths)
     return suggestions
 
+  def inference_rules(self, prefix, rule_spec):
+    ''' Generator yielding inference functions from `rule_spec`.
+
+        Each yielded function accepts a path
+        and returns an iterable of `Tag`s or other values.
+        Because some functions are implemented as lambdas it is reasonable
+        to return an iterable conatining `None` values
+        to be discarded by the consumer of the rule.
+    '''
+    with Pfx(r(rule_spec)):
+      if isinstance(rule_spec, str):
+        if rule_spec.startswith('/'):
+          rule = RegexpTagRule(rule_spec[1:])
+          yield lambda path, rule=rule: rule.infer_tags(basename(path)
+                                                        ).as_tags()
+        else:
+          tag_name, _ = get_dotted_identifier(rule_spec)
+          if tag_name and tag_name == rule_spec:
+            # return the value of tag_name or None, as a 1-tuple
+            yield lambda path: (self.fstags[path].get(tag_name),)
+          else:
+            warning("skipping unrecognised pattern")
+      elif isinstance(rule_spec, (list, tuple)):
+        for subspec in rule_spec:
+          yield from self.inference_rules(prefix, subspec)
+      else:
+        warning("skipping unhandled type")
+
   @pfx
   @fmtdoc
   def inference_mapping(self, dirpath):
@@ -324,23 +353,12 @@ class Tagger:
         and if so return a `TagSet` with tags named `series_title_lc`,
         `season_n`, `episode_n`, `episode_title_lc`.
     '''
-    filename_inference = self.conf_tag(
-        self.fstags[dirpath], 'filename_inference', {}
-    )
+    inference_spec = self.conf_tag(self.fstags[dirpath], 'inference', {})
     mapping = defaultdict(list)
-    with Pfx("filename_inference=%r", filename_inference):
-      for prefix, rule_spec in filename_inference.items():
-        with Pfx("%r: %r", prefix, rule_spec):
-          if isinstance(rule_spec, str):
-            if rule_spec.startswith('/'):
-              rule = RegexpTagRule(rule_spec[1:])
-              mapping[prefix] = lambda path, rule=rule: rule.infer_tags(
-                  basename(path)
-              )
-            else:
-              warning("skipping unrecognised pattern")
-          else:
-            warning("skipping unhandled type")
+    with Pfx("inference=%r", inference_spec):
+      for prefix, rule_spec in inference_spec.items():
+        with Pfx(prefix):
+          mapping[prefix].extend(self.inference_rules(prefix, rule_spec))
     return mapping
 
   @pfx
@@ -355,18 +373,34 @@ class Tagger:
         with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
     '''
     tagged = self.fstags[path]
-    srcdirpath = dirname(tagged.filepath)
+    srcpath = tagged.filepath
+    srcdirpath = dirname(srcpath)
     inference_mapping = self.inference_mapping(srcdirpath)
-    inferences = {}
-    for prefix, infer_func in inference_mapping:
+    inferences = defaultdict(list)
+    for prefix, infer_funcs in inference_mapping.items():
       with Pfx(prefix):
-        tag_list = infer_func(tagged.filepath)
-        if tag_list:
-          inferences[prefix] = tag_list
+        assert isinstance(prefix, str)
+        for infer_func in infer_funcs:
+          try:
+            values = list(infer_func(path))
+          except Exception as e:  # pylint: disable=broad-except
+            warning("skip rule %s: %s", infer_func, e)
+            continue
+          bare_values = []
+          for value in values:
+            if isinstance(value, Tag):
+              tag = value
+              tag_name = prefix + '.' + tag.name if prefix else tag.name
+              inferences[tag_name] = tag.value
+            else:
+              bare_values.append(value)
+          if bare_values:
+            if len(bare_values) == 1:
+              bare_values = bare_values[0]
+            inferences[prefix] = bare_values
+          break
     if apply:
       with Pfx("apply"):
-        for prefix, tag_list in inferences.items():
-          for tag in tag_list:
-            tag_name = prefix + '.' + tag.name
-            tagged[tag_name] = tag.value
+        for tag_name, values in inferences.items():
+          tagged[tag_name] = tag.value
     return inferences
