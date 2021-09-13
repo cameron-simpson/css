@@ -68,7 +68,7 @@ class Tagger:
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
     '''
     tagged = self.fstags[dstdirpath]
-    formats = self.conf_tag(tagged.all_tags, 'auto_name', ())
+    formats = self.conf_tag(tagged.merged_tags(), 'auto_name', ())
     if isinstance(formats, str):
       formats = [formats]
     if formats:
