@@ -375,18 +375,34 @@ class Tagger:
         with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
     '''
     tagged = self.fstags[path]
-    srcdirpath = dirname(tagged.filepath)
+    srcpath = tagged.filepath
+    srcdirpath = dirname(srcpath)
     inference_mapping = self.inference_mapping(srcdirpath)
-    inferences = {}
-    for prefix, infer_func in inference_mapping:
+    inferences = defaultdict(list)
+    for prefix, infer_funcs in inference_mapping.items():
       with Pfx(prefix):
-        tag_list = infer_func(tagged.filepath)
-        if tag_list:
-          inferences[prefix] = tag_list
+        assert isinstance(prefix, str)
+        for infer_func in infer_funcs:
+          try:
+            values = list(infer_func(path))
+          except Exception as e:
+            warning("skip rule %s: %s", infer_func, e)
+            continue
+          bare_values = []
+          for value in values:
+            if isinstance(value, Tag):
+              tag = value
+              tag_name = prefix + '.' + tag.name if prefix else tag.name
+              inferences[tag_name] = tag.value
+            else:
+              bare_values.append(value)
+          if bare_values:
+            if len(bare_values) == 1:
+              bare_values = bare_values[0]
+            inferences[prefix] = bare_values
+          break
     if apply:
       with Pfx("apply"):
-        for prefix, tag_list in inferences.items():
-          for tag in tag_list:
-            tag_name = prefix + '.' + tag.name
-            tagged[tag_name] = tag.value
+        for tag_name, values in inferences.items():
+          tagged[tag_name] = tag.value
     return inferences
