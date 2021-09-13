@@ -1,0 +1,2 @@
+inference: infer from filename
+inference: infer from other tags
