@@ -306,6 +306,34 @@ class Tagger:
           q.extend(dstpaths)
     return suggestions
 
+  def inference_rules(self, prefix, rule_spec):
+    ''' Generator yielding inference functions from `rule_spec`.
+
+        Each yielded function accepts a path
+        and returns an iterable of `Tag`s or other values.
+        Because some functions are implemented as lambdas it is reasonable
+        to return an iterable conatining `None` values
+        to be discarded by the consumer of the rule.
+    '''
+    with Pfx(r(rule_spec)):
+      if isinstance(rule_spec, str):
+        if rule_spec.startswith('/'):
+          rule = RegexpTagRule(rule_spec[1:])
+          yield lambda path, rule=rule: rule.infer_tags(basename(path)
+                                                        ).as_tags()
+        else:
+          tag_name, _ = get_dotted_identifier(rule_spec)
+          if tag_name and tag_name == rule_spec:
+            # return the value of tag_name or None, as a 1-tuple
+            yield lambda path: (self.fstags[path].get(tag_name),)
+          else:
+            warning("skipping unrecognised pattern")
+      elif isinstance(rule_spec, (list, tuple)):
+        for subspec in rule_spec:
+          yield from self.inference_rules(prefix, subspec)
+      else:
+        warning("skipping unhandled type")
+
   @pfx
   @fmtdoc
   def inference_mapping(self, dirpath):
