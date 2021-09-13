@@ -95,7 +95,7 @@ from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (get_ini_clause_entryname, FormatAsError)
 from cs.logutils import error, warning, ifverbose
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     Tag,
@@ -809,7 +809,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = self.parse_tag_choices(argv)
+      tag_choices = [pfx_call(self.parse_tag_addremove, arg) for arg in argv]
     except ValueError as e:
       raise GetoptError(str(e))  # pylint: disable=raise-missing-from
     if badopts:
@@ -819,7 +819,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = [path]
     with state(verbose=True):
-      fstags.apply_tag_choices(tag_choices, paths)
+      for path in paths:
+        with Pfx(path):
+          tagged = fstags[path]
+          for remove, tag in tag_choices:
+            if remove:
+              pfx_call(tagged.remove, tag)
+            else:
+              pfx_call(tagged.add, tag)
 
   def cmd_tagfile(self, argv):
     ''' Usage: {cmd} tagfile_path [subcommand ...]
