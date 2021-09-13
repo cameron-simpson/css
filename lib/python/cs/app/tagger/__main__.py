@@ -54,6 +54,13 @@ class TaggerCommand(BaseCommand):
       warning("no such path, skipped")
       linked_to = []
     else:
+      fstags = tagger.fstags
+      # apply inferred tags if not already present
+      tagged = fstags[path]
+      all_tags = tagged.merged_tags()
+      for tag_name, tag_value in tagger.infer(path).items():
+        if tag_name not in all_tags:
+          tagged[tag_name] = tag_value
       linked_to = tagger.file_by_tags(
           path, no_link=no_link, do_remove=do_remove
       )
@@ -64,8 +71,7 @@ class TaggerCommand(BaseCommand):
             printpath = dirname(printpath) + '/'
           pfxprint('=>', shortpath(printpath))
       else:
-        ##pfxprint('not filed')
-        pass
+        pfxprint('not filed')
     return linked_to
 
   def cmd_autofile(self, argv):
