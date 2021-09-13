@@ -1,2 +1,3 @@
+gui: pan using thumbnal scrubber like Finder?
 inference: infer from filename
 inference: infer from other tags
