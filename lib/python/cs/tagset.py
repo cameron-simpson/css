@@ -1186,16 +1186,34 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return cls.JSON_ENCODER.encode(value)
 
   @classmethod
-  def from_str(cls, s, offset=0, ontology=None):
+  def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
     with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.from_str2(s, offset=offset, ontology=ontology)
+      tag, post_offset = cls.from_str2(
+          s, offset=offset, ontology=ontology, fallback_parse=fallback_parse
+      )
       if post_offset < len(s):
         raise ValueError(
             "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
         )
       return tag
+
+  @classmethod
+  def from_arg(cls, arg, offset=0, ontology=None):
+    ''' Parse a `Tag` from the string `arg` at `offset` (default `0`).
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg,
+        offset=offset,
+        ontology=ontology,
+        fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
 
   @staticmethod
   def is_valid_name(name):
@@ -1219,7 +1237,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def from_str2(cls, s, offset=0, *, ontology, extra_types=None):
+  def from_str2(
+      cls, s, offset=0, *, ontology, extra_types=None, fallback_parse=None
+  ):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
@@ -1231,7 +1251,12 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             value = None
           elif sep == '=':
             offset += 1
-            value, offset = cls.parse_value(s, offset, extra_types=extra_types)
+            value, offset = cls.parse_value(
+                s,
+                offset,
+                extra_types=extra_types,
+                fallback_parse=fallback_parse
+            )
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -1243,7 +1268,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0, extra_types=None):
+  def parse_value(cls, s, offset=0, extra_types=None, fallback_parse=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
 
@@ -1253,6 +1278,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         (expected to be an instance of `type`).
         The default comes from `cls.EXTRA_TYPES`.
         This supports storage of nonJSONable values in text form.
+
+        The optional `fallback_parse` parameter
+        specifies a parse function accepting `(s,offset)`
+        and returning `(parsed,new_offset)`
+        where `parsed` is text from `s[offset:]`
+        and `new_offset` is where the parse stopped.
+        The default is `cs.lex.get_nonwhite`
+        to gather nonwhitespace characters,
+        intended support *tag_name*`=`*bare_word*
+        in human edited tag files.
 
         The core syntax for values is JSON;
         value text commencing with any of `'"'`, `'['` or `'{'`
@@ -1275,6 +1310,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     if extra_types is None:
       extra_types = cls.EXTRA_TYPES
+    if fallback_parse is None:
+      fallback_parse = get_nonwhite
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
@@ -1289,8 +1326,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         ) from e
       offset += suboffset
     else:
-      # collect nonwhitespace, check for special forms
-      nonwhite, offset = get_nonwhite(s, offset)
+      # collect nonwhitespace (or whatever fallback_parse gathers),
+      # check for special forms
+      nonwhite, offset = fallback_parse(s, offset)
       value = None
       for _, from_str, _ in extra_types:
         try:
