@@ -51,7 +51,7 @@ cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550c
 cs.progress pypi.release="20210803" ok_revision=ce93ef8cfe318b64e0358678e469757d0f5e0359 features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release=20190101 ok_revision=d48263d393ca9e6c9e3ee698307e5a6a19696efb
 cs.py.doc pypi.release="20210306" ok_revision=fc38c09619a42f8d8b9f15edb391e598401b7c5d
-cs.py.func pypi.release="20210906" ok_revision="2123ccb4b7370161e05784a2b32601ee434b649a" features={"20210717":["trace_decorator"]}
+cs.py.func pypi.release="20210906" ok_revision="6ec098bae6531764d93ab39a080314243ca1be84" features={"20210717":["trace_decorator"]}
 cs.py.modules pypi.release="20210123" ok_revision="0cc66f44758664a5b70c3904561c946c6aa3b6aa"
 cs.py.stack pypi.release=20190812 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3c46
