@@ -1,3 +1,4 @@
+gui: drop the tree view? it is a PITA - turn it into a selector in some popup?
 gui: pan using thumbnal scrubber like Finder?
 inference: infer from filename
 inference: infer from other tags
