@@ -5,6 +5,8 @@ from contextlib import contextmanager
 from getopt import GetoptError, getopt
 import os
 from os.path import (
+    basename,
+    dirname,
     exists as existspath,
     isabs as isabspath,
     isdir as isdirpath,
@@ -15,6 +17,7 @@ from pprint import pprint
 import sys
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
@@ -56,7 +59,10 @@ class TaggerCommand(BaseCommand):
       )
       if linked_to:
         for linked in linked_to:
-          pfxprint('=>', linked)
+          printpath = linked
+          if basename(path) == basename(printpath):
+            printpath = dirname(printpath) + '/'
+          pfxprint('=>', shortpath(printpath))
       else:
         ##pfxprint('not filed')
         pass
@@ -229,7 +235,7 @@ class TaggerCommand(BaseCommand):
         for tag_name, values in sorted(suggestions.items()):
           print(" ", tag_name, values)
         for file_to in tagger.file_by_tags(path, no_link=True):
-          print("=>", file_to)
+          print("=>", shortpath(file_to))
         print("inferred:", repr(tagger.infer(path)))
       try:
         action = input("Action? ").strip()
