@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from cs.x import X
+
 r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
