@@ -19,7 +19,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20201025-post'
+__version__ = '20210913'
 
 DISTINFO = {
     'description':
