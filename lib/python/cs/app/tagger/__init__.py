@@ -14,6 +14,7 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    realpath,
     samefile,
 )
 
@@ -220,7 +221,7 @@ class Tagger:
         mapping = defaultdict(list)
       tag_names = set(tag_names)
       assert all(isinstance(tag_name, str) for tag_name in tag_names)
-      for path, dirnames, _ in os.walk(dirpath):
+      for path, dirnames, _ in os.walk(realpath(dirpath)):
         with Pfx(path):
           # order the descent
           dirnames[:] = sorted(
