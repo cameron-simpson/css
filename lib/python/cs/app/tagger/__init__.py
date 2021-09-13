@@ -18,16 +18,16 @@ from os.path import (
     samefile,
 )
 
+from typeguard import typechecked
+
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.lex import FormatAsError
+from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
-
-from typeguard import typechecked
 
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
@@ -353,9 +353,7 @@ class Tagger:
         and if so return a `TagSet` with tags named `series_title_lc`,
         `season_n`, `episode_n`, `episode_title_lc`.
     '''
-    filename_inference = self.conf_tag(
-        self.fstags[dirpath], 'filename_inference', {}
-    )
+    inference_spec = self.conf_tag(self.fstags[dirpath], 'inference', {})
     mapping = defaultdict(list)
     with Pfx("inference=%r", inference_spec):
       for prefix, rule_spec in inference_spec.items():
@@ -385,7 +383,7 @@ class Tagger:
         for infer_func in infer_funcs:
           try:
             values = list(infer_func(path))
-          except Exception as e:
+          except Exception as e:  # pylint: disable=broad-except
             warning("skip rule %s: %s", infer_func, e)
             continue
           bare_values = []
