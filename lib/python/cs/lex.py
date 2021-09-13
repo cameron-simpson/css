@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from cs.x import X
+
 r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
@@ -41,7 +41,7 @@ from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210906-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
