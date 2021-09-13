@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+from cs.x import X
 r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
@@ -41,7 +41,7 @@ from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210717-post'
+__version__ = '20210906-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1500,17 +1500,16 @@ class FormatableFormatter(Formatter):
     format_subspecs = cls.get_format_subspecs(format_spec) or ()
     if format_subspecs:
       if len(format_subspecs) == 1:
+        format_subspec, = format_subspecs
         # no subdivision, call Formatter.format_field
         try:
-          value = Formatter.format_field(
-              f'{{:{format_spec}}}', value, format_spec
-          )
+          value = format(value, format_spec)
         except ValueError as e:
           warning(
               "%s.format_field(%s,%r): %s", cls.__name__, r(value),
-              format_spec, e
+              format_spec, s(e)
           )
-          value = '{{{}:{}}}'.format(str(value), format_spec)
+          value = '{{{}:{}}}'.format(r(value), format_spec)
       else:
         # promote str to FStr before formatting
         if type(value) is str:  # pylint: disable=unidiomatic-typecheck

@@ -228,7 +228,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20210428-post'
+__version__ = '20210906-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -537,6 +537,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       try:
         return self.auto_infer(attr)
       except ValueError as e:
+        # no match
         ##warning("auto_infer(%r): %s", attr, e)
         pass
       # support for {type}_{field} and {type}_{field}s attributes

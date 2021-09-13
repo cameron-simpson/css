@@ -1235,7 +1235,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw):
+  def __init__(
+      self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw
+  ):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
@@ -1540,9 +1542,9 @@ class SQLTags(BaseTagSets):
               tag.name, to_polyvalue(tag.name, tag.value), session=session
           )
       # refresh entry from some source if there is a .refresh() method
-      refresh = te.refresh
+      refresh = getattr(type(te), 'refresh', None)
       if refresh is not None and callable(refresh):
-        refresh()
+        refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:

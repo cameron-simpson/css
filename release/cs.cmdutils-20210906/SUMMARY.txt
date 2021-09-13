@@ -1,0 +1,2 @@
+BaseCommand.cmd_help: bugfix obsolete parameter list.
+BaseCommand.SUBCOMMAND_ARGV_DEFAULT: support a single str value, turn into list.

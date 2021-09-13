@@ -1,0 +1,3 @@
+New pfxprint which calls print() with the current prefix.
+Pfx.prefixify_exception: catch unexpected OSError.args value and report.
+@pfx: use pfx_call if there is no presupplied message argument.
