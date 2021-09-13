@@ -824,7 +824,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
           tagged = fstags[path]
           for remove, tag in tag_choices:
             if remove:
-              pfx_call(tagged.remove, tag)
+              pfx_call(tagged.discard, tag)
             else:
               pfx_call(tagged.add, tag)
 
@@ -889,7 +889,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       tag_choice_s = argv.pop(0)
       with Pfx(repr(tag_choice_s)):
         try:
-          tag_choice = self.parse_tagset_criterion(tag_choice_s)
+          remove, tag = self.parse_tag_addremove(tag_choice_s)
         except ValueError as e:
           warning(e)
           badopts = True
@@ -903,6 +903,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = argv
     with state(verbose=True):
+      for path in paths:
+        with Pfx(path):
+          tagged = fstags[path]
+          if remove:
+            tagged.discard(tag)
+          else:
+            tagged.add(tag)
+
       self.options.fstags.apply_tag_choices([tag_choice], paths)
 
   def cmd_test(self, argv):
