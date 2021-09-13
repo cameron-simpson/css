@@ -61,7 +61,7 @@ cs.resources pypi.release="20210906" ok_revision="8396831fdee3e4f91f2f1abb15e013
 cs.result pypi.release="20210420" ok_revision="74ab7bb3315c4cf3df1b5507fcb9db156d92ef29"
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.seq pypi.release="20201025" ok_revision=a1509e5894e9ac366d83f56b9d97ed2e227d5f24
+cs.seq pypi.release="20201025" ok_revision=a1509e5894e9ac366d83f56b9d97ed2e227d5f24 features={"20210913":["unrepeated"]}
 cs.serialise pypi.release="20210316.2" ok_revision="3bf522faeba630b0135e21effd096b14b589142a"
 cs.sh pypi.release="20210316" ok_revision="41bb35a582f79767acefff34c2653f18dacd130c"
 cs.sharedfile pypi.release="20201228"
