@@ -283,15 +283,64 @@ class PathListWidget(_Widget, sg.Tree):
                 )
     return treedata, pathinfo
 
-class TagsView(_Widget, sg.Text):
+class TagWidget(_Widget, sg.Column):
+  ''' A Dsiplay for a `Tag`.
+  '''
+
+  def __init__(self, tag):
+    self.tag = tag
+    self.alt_values = set()
+    layout = [
+        [
+            sg.Text(tag.name),
+            sg.Combo(
+                list(self.alt_values),
+                default_value=tag.transcribe_value(tag.value),
+            )
+        ]
+    ]
+    super().__init__(layout=layout)
+
+class _TagsView(_Widget):
+
+  @typechecked
+  def __init__(self, tags: TagSet, **kw):
+    self.tags = tags
+    super().__init__(**kw)
 
   def set_tags(self, tags):
-    self.update(value='\n'.join(map(str, tags)))
+    ''' Set the tags.
+    '''
+    self.tags.clear()
+    self.tags.update(tags)
 
-class TagsView__Canvas(_Widget, sg.Canvas):
+class TagsView_Text(_TagsView, sg.Text):
 
   def set_tags(self, tags):
+    super().set_tags(tags)
+    self.update(value='\n'.join(map(str, sef.tags)))
+
+class TagsView__Canvas(_TagsView, sg.Canvas):
+
+  def set_tags(self, tags):
+    super().set_tags(tags)
     canvas = self.tk_canvas
     canvas.delete(canvas.find_all())
-    for tag in tags:
+    for tag in self.tags:
       canvas.create_text((0, 0), text=str(tag))
+
+class TagsView_Column(_TagsView, sg.Column):
+
+  def __init__(self, tags, **kw):
+    super().__init__(tags, layout=self.layout_tags(tags))
+
+  @staticmethod
+  def layout_tags(tags):
+    return [[TagWidget(tag) for tag in sorted(tags)]]
+
+  def set_tags(self, tags):
+    super().set_tags(tags)
+    self.layout(self.layout_tags(self.tags))
+
+TagsView = TagsView_Column  # TagsView_Text
+
