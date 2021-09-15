@@ -18,6 +18,7 @@ from cs.fileutils import shortpath
 from cs.logutils import warning
 from cs.mappings import IndexedMapping, UUIDedDict
 from cs.pfx import pfx, Pfx
+from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState
 
 from .util import ispng, pngfor
@@ -220,9 +221,8 @@ class PathListWidget(_Widget, sg.Tree):
   def __iter__(self):
     ''' Iterate over the path information records in tree order.
     '''
-    q = [self.treedata.root_node]
-    while q:
-      node = q.pop(0)
+    q = ListQueue([self.treedata.root_node])
+    for node in q:
       if node.key:
         try:
           record = self[node.key]
@@ -230,7 +230,7 @@ class PathListWidget(_Widget, sg.Tree):
           warning("skip key %r", node.key)
         else:
           yield record
-        q.extend(node.children)
+      q.extend(node.children)
 
   @pfx
   def make_treedata(self, pathnames):
