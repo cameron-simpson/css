@@ -344,3 +344,57 @@ class TagsView_Column(_TagsView, sg.Column):
 
 TagsView = TagsView_Column  # TagsView_Text
 
+class PathView(_Widget, sg.Frame):
+  ''' A preview of a filesystem path.
+  '''
+
+  def __init__(self, fspath=None, *, tagger):
+    self._fspath = fspath
+    self.tagger = tagger
+    self.preview = ImageWidget(
+        key="preview",
+        fixed_size=(1920, 1080),
+        background_color='grey',
+        expand_x=True,
+    )
+    self.tagsview = TagsView(
+        TagSet(),
+        key="tags",
+        fixed_size=(1920, 200),
+        background_color='blue',
+        expand_x=True,
+    )
+    layout = [
+        [
+            sg.Column(
+                [
+                    [TagWidget(Tag('tag1', 3)),
+                     TagWidget(Tag('tag2', 4))],
+                    [self.preview],
+                    [sg.HorizontalSeparator()],
+                    [self.tagsview],
+                ],
+                size=(1920, 1600),
+            )
+        ]
+    ]
+    super().__init__(fspath or "NONE", layout)
+
+  @property
+  def fspath(self):
+    ''' The current filesystem path being previewed.
+    '''
+    return self._fspath
+
+  @fspath.setter
+  @pfx
+  def fspath(self, new_fspath):
+    ''' Switch the preview to look at a new filesystem path.
+    '''
+    print("SET fspath =", repr(new_fspath))
+    self._fspath = new_fspath
+    self.update(value=shortpath(new_fspath) if new_fspath else "NONE")
+    self.preview.fspath = new_fspath
+    tags = self.tagger.fstags[new_fspath].all_tags
+    self.tagsview.set_tags(tags)
+    ##self.tagsview.set_size(size=(1920, 120))
