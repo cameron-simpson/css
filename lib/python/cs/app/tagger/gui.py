@@ -112,11 +112,11 @@ class TaggerGUI(MultiOpenMixin):
 
 class _Widget:
 
-  def __init__(self, *, key=None, fixed_size=None, **kw):
+  def __init__(self, *a, key=None, fixed_size=None, **kw):
     if key is None:
       key = uuid4()
     self.key = key
-    super().__init__(key=key, **kw)
+    super().__init__(*a, key=key, **kw)
     self.fixed_size = fixed_size
 
   def update(self, **kw):
