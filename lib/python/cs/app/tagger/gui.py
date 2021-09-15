@@ -26,9 +26,9 @@ from .util import ispng, pngfor
 
 class TaggerGUI(MultiOpenMixin):
 
-  def __init__(self, tagger, pathnames):
+  def __init__(self, tagger, fspaths):
     self.tagger = tagger
-    self.pathnames = pathnames
+    self.fspaths = fspaths
 
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
@@ -36,9 +36,8 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     # Define the window's contents
-    self.pathview = sg.Text("")
     self.tree = PathListWidget(
-        self.pathnames,
+        self.fspaths,
         key="paths",
         fixed_size=(200, None),
         expand_x=True,
@@ -46,36 +45,11 @@ class TaggerGUI(MultiOpenMixin):
         show_expanded=True,
         pad=(3, 3),
     )
-    self.tagsview = TagsView(
-        key="tags",
-        fixed_size=(1920, 200),
-        background_color='blue',
-        expand_x=True,
-    )
-    ## WHERE TO DO THIS? ## sg.pin(self.tree, vertical_alignment='top')
-    self.preview = ImageWidget(
-        key="preview",
-        fixed_size=(1920, 1080),
-        background_color='grey',
-    )
+    self.pathview = PathView(tagger=self.tagger)
     layout = [
-        [self.pathview],
         [
             self.tree,
-            sg.Frame(
-                "frame", [
-                    [
-                        sg.Column(
-                            [
-                                [self.preview],
-                                [sg.HorizontalSeparator()],
-                                [self.tagsview],
-                            ],
-                            size=(1920, 1600),
-                        )
-                    ]
-                ]
-            ),
+            self.pathview,
         ],
         [sg.Text("BAH")],
     ]
@@ -87,7 +61,7 @@ class TaggerGUI(MultiOpenMixin):
     )
     for record in self.tree:
       if isfilepath(record.fullpath):
-        self.pathname = record.fullpath
+        self.fspath = record.fullpath
         break
     print("window made")
     yield self
@@ -118,26 +92,21 @@ class TaggerGUI(MultiOpenMixin):
             warning("no self.tree[%r]: %s", record_key, e)
           else:
             print("record =", record)
-            self.pathname = record.fullpath
+            self.fspath = record.fullpath
         else:
           warning("unexpected event %r: %r", event, values)
 
   @property
-  def pathname(self):
-    return self.preview.pathname
+  def fspath(self):
+    return self.pathview.fspath
 
-  @pathname.setter
+  @fspath.setter
   @pfx
-  def pathname(self, new_pathname):
+  def fspath(self, new_fspath):
+    self.pathview.fspath = new_fspath
     # TODO: make the tree display the associated element
-    self.pathview.update(value="Path: " + shortpath(new_pathname))
-    self.preview.pathname = new_pathname
-    self.preview.set_size(size=(1920, 1280))
-    tags = self.tagger.fstags[new_pathname].all_tags
-    self.tagsview.set_tags(tags)
-    ##self.tagsview.set_size(size=(1920, 120))
     try:
-      pathinfo = self.tree[new_pathname]
+      pathinfo = self.tree[new_fspath]
     except KeyError:
       warning("path not in tree")
 
@@ -161,31 +130,33 @@ class ImageWidget(_Widget, sg.Image):
   '''
 
   @property
-  def pathname(self):
-    return self._pathname
+  def fspath(self):
+    ''' The filesystem path of the current display.
+    '''
+    return self._fspath
 
-  @pathname.setter
-  def pathname(self, new_pathname):
-    if new_pathname is not None:
+  @fspath.setter
+  def fspath(self, new_fspath):
+    if new_fspath is not None:
       size = self.fixed_size or self.get_size()
       try:
-        display_pathname = pngfor(new_pathname, size)
+        display_fspath = pngfor(new_fspath, size)
       except (OSError, ValueError):
-        new_pathname = None
-    if new_pathname is None:
+        new_fspath = None
+    if new_fspath is None:
       self.update()
     else:
-      self.update(filename=display_pathname)
-    self._pathname = new_pathname
+      self.update(filename=display_fspath)
+    self._fspath = new_fspath
 
 class PathListWidget(_Widget, sg.Tree):
 
   DEFAULT_NUM_ROWS = 16
 
-  def __init__(self, pathnames, num_rows=None, justification='left', **kw):
+  def __init__(self, fspaths, num_rows=None, justification='left', **kw):
     if num_rows is None:
       num_rows = self.DEFAULT_NUM_ROWS
-    treedata, pathinfo = self.make_treedata(pathnames)
+    treedata, pathinfo = self.make_treedata(fspaths)
     super().__init__(
         data=treedata,
         headings=[],
@@ -233,11 +204,11 @@ class PathListWidget(_Widget, sg.Tree):
       q.extend(node.children)
 
   @pfx
-  def make_treedata(self, pathnames):
+  def make_treedata(self, fspaths):
     treedata = sg.TreeData()
-    for pathname in pathnames:
-      with Pfx(pathname):
-        fullpath = realpath(pathname)
+    for fspath in fspaths:
+      with Pfx(fspath):
+        fullpath = realpath(fspath)
         pathinfo = IndexedMapping(pk='fullpath')
         top_record = UUIDedDict(fullpath=fullpath)
         pathinfo.add(top_record)
