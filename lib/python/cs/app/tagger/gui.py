@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 import PySimpleGUI as sg
 ##import PySimpleGUIQt as sg
+from typeguard import typechecked
 
 from cs.fileutils import shortpath
 from cs.logutils import warning
@@ -20,9 +21,9 @@ from cs.mappings import IndexedMapping, UUIDedDict
 from cs.pfx import pfx, Pfx
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState
+from cs.tagset import Tag, TagSet
 
 from .util import ispng, pngfor
-
 
 class TaggerGUI(MultiOpenMixin):
 
