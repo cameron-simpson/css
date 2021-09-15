@@ -63,6 +63,13 @@ class Tagger:
     '''
     return cls.conf_tags(tags).get(conf, default)
 
+  @classmethod
+  @typechecked
+  def has_conf_tag(cls, tags: TagSet, conf: str):
+    ''' Test for the presence of `conf` in he `Tagger` related subtags.
+    '''
+    return conf in cls.conf_tags(tags)
+
   @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
@@ -229,7 +236,7 @@ class Tagger:
               if dname and not dname.startswith('.')
           )
           tagged = fstags[path]
-          if self.conf_tag(tagged, 'skip'):
+          if self.has_conf_tag(tagged, 'skip'):
             # tagger.skip => prune this directory tree from the mapping
             dirnames[:] = []
           else:
