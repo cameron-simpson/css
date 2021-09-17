@@ -367,6 +367,12 @@ class PathView(_Widget, sg.Frame):
     self._fspath = new_fspath
     self.update(value=shortpath(new_fspath) if new_fspath else "NONE")
     self.preview.fspath = new_fspath
-    tags = self.tagger.fstags[new_fspath].all_tags
+    tags = self.tagged.merged_tags()
     self.tagsview.set_tags(tags)
     ##self.tagsview.set_size(size=(1920, 120))
+
+  @property
+  def tagged(self):
+    if self._fspath is None:
+      return None
+    return self.tagger.fstags[self._fspath]
