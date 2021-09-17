@@ -323,6 +323,8 @@ class PathView(_Widget, sg.Frame):
   def __init__(self, fspath=None, *, tagger):
     self._fspath = fspath
     self.tagger = tagger
+    # path->set(suggested_tags)
+    self._suggested_tags = {}
     self.preview = ImageWidget(
         key="preview",
         fixed_size=(1920, 1080),
