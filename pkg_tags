@@ -1,5 +1,6 @@
 cs.ansi_colour pypi.release="20200729"
 cs.app.beyonwiz pypi.release=20160828
+cs.app.dlog
 cs.app.ffmpeg
 cs.app.flag pypi.release="20201228" ok_revision="7edcd93a1c777caa97f8f30d60e863bceb80e3f9"
 cs.app.maildb pypi.release=20160828
