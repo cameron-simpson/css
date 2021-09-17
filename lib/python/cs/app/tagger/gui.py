@@ -372,6 +372,21 @@ class PathView(_Widget, sg.Frame):
     ##self.tagsview.set_size(size=(1920, 120))
 
   @property
+  def suggested_tags(self):
+    ''' A mapping of `tag_name`=>`set(tag_value)` for the current fspath.
+    '''
+    fspath = self._fspath
+    if fspath is None:
+      return {}
+    try:
+      suggestions = self._suggested_tags[fspath]
+    except KeyError:
+      suggestions = self._suggested_tags[fspath] = self.tagger.suggested_tags(
+          fspath
+      )
+    return suggestions
+
+  @property
   def tagged(self):
     if self._fspath is None:
       return None
