@@ -1645,7 +1645,7 @@ class NamedBackup(SingletonMixin):
                     hashcode=prevstate.hashcode
                 )
             else:
-              info("skip unsupported type st_mode=%o", stat.st_mode & S_IFMT)
+              info("skip unsupported type st_mode=%o", S_IFMT(stat.st_mode))
               ##ok = False
               continue
             dirstate.add(name_backups, exists_ok=True)
