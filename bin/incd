@@ -1,28 +1,74 @@
 #!/bin/sh
 #
-# Run command in another directory.
-#	- Cameron Simpson <cs@cskk.id.au> 05mar2003
+# Run command in another directory, possibly on another host.
+# - Cameron Simpson <cs@cskk.id.au> 05mar2003
 #
 
-cmd=$0
-usage="Usage: $cmd dir [-p] command [args...]
-	-p	May use parent directory if dir is a file."
+set -ue
 
+cmd=$0
+usage="Usage: $cmd [-L] [-P] [--] [[user@]host:]dir [command [args...]]
+  -L    After cd and before exec, set \$PWD to \$( pwd -L ).
+  -P    After cd and before exec, set \$PWD to \$( pwd -P )."
+
+trace= do_trace=
+[ -t 2 ] && trace=set-x do_trace=1
+
+fstags_latest=incd.latest
+pwd_opt=
+set_latest=1
 mayuseparent=
+hostpart=
+sshopts=
 
 badopts=
 
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -P|-L)  pwd_opt=$1; shift ;;
+    --)     shift; break ;;
+    -?*)    echo "$cmd: unrecognisedoption: $1" >&2; badopts=1 ;;
+    *)      break ;;
+  esac
+done
+
 if [ $# = 0 ]
 then
-  echo "$cmd: missing dir" >&2
-  badopts=1
-else
-  dir=$1; shift
-  [ "x$1" = x-p ] && { mayuseparent=1; shift; }
-  if [ $# = 0 ]
+  if target=$( fstags ls -d -o "{$fstags_latest}" . ) && [ -n "$target" ]
   then
-    echo "$cmd: missing command" >&2
+    set_latest=
+  else
+    echo "$cmd: missing dir and no $fstags_latest fstag" >&2
     badopts=1
+  fi
+else
+  target=$1; shift
+  [ -n "$target" ] || {
+    echo "$cmd: dir may not be empty" >&2
+    badopts=1
+  }
+fi
+
+if [ -n "$target" ]
+then
+  if hostpart=$( expr "x$target" : 'x\([a-z][-a-z0-9_@]*[a-z0-9]\):.*' )
+  then
+    dir=$(       expr "x$target" : 'x[a-z][-a-z0-9_@]*[a-z0-9]:\(.*\)' )
+    if [ $# = 0 ]
+    then
+      sshopts=-t
+      qcmd='${SHELL:-/bin/sh} --login'
+    else
+      qcmd=$( shqstr "$@" )
+    fi
+  else
+    dir=$target
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing command" >&2
+      badopts=1
+    fi
   fi
 fi
 
@@ -34,6 +80,16 @@ then
     [ -d "$parent/." ] && dir=$parent
 fi
 
-cd "$dir" || exit 1
-##[ -t 2 ] && set -x
-exec "$@"
+if [ -n "$hostpart" ]
+then
+  # update the latest tag
+  if [ $set_latest ]
+  then  $trace fstags tag . "$fstags_latest=\"$target\""
+  fi
+  qdir=$( shqstr "$dir" )
+  exec $trace ssh $sshopts "$hostpart" "cd $qdir; exec $qcmd"
+else
+  cd "$dir" || exit 1
+  [ -z "$pwd_opt" ] || { PWD=$( pwd "$pwd_opt" ); export PWD; }
+  exec $trace "$@"
+fi

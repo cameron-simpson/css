@@ -1,0 +1,1 @@
+bugfix setup_logging: apparently a LoggingProxy does not have an encoding

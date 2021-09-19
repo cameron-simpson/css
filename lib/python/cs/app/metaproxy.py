@@ -37,6 +37,7 @@ except ImportError:
 import stat
 from tempfile import mkstemp
 from threading import Thread, RLock
+from types import SimpleNamespace as NS
 try:
   from urllib.parse import urlparse
 except ImportError:
@@ -57,7 +58,6 @@ from cs.rfc2616 import read_headers, read_http_request_line, message_has_body, \
 from cs.seq import Seq
 from cs.threads import locked, locked_property
 from cs.timeutils import time_func
-from cs.obj import O
 
 USAGE = '''Usage: %s [-L address:port] [-P upstream_proxy]'''
 
@@ -380,7 +380,7 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
     info("choose_proxy: %s:%s", *proxy_addrport)
     return proxy_addrport
 
-class URI_Request(O):
+class URI_Request(NS):
 
   def __init__(self, handler, method, uri, version):
     ''' An object for tracking state of a request.
@@ -503,7 +503,7 @@ class URI_Request(O):
       fpout.write(headers.as_string().enc8())
     fpout.write(CRLFb)
 
-class MetaProxyCache(O):
+class MetaProxyCache(NS):
   ''' Access to a cache directory.
   '''
 
@@ -555,7 +555,7 @@ class MetaProxyCache(O):
                 N, N.key, RQ.req_method, RQ.req_uri, key)
     return N
 
-class CacheNode(O):
+class CacheNode(NS):
   ''' A node within a MetaProxyCache.
   '''
 

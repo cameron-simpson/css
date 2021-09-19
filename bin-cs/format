@@ -11,6 +11,7 @@ trace=
 
 flagfile=
 pymode=3
+pyformat=${CS_FORMAT_PY:-yapf}
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
@@ -120,9 +121,26 @@ do
   case "$type" in
     go) $trace gofmt -w "$srcfile" ;;
     js) $trace prettier --write "$srcfile" ;;
+    json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
     php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
-    py2)$trace py2 -m yapf -i "$srcfile" ;;
-    py3)$trace py3 -m yapf -i "$srcfile" ;;
+    py2)case $pyformat in
+          yapf)   style=$(yapf-style-for "$srcfile")
+                  $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
+          black)  $trace black -q -t py27 "$srcfile" ;;
+          *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
+                  exit 1
+                  ;;
+        esac
+        ;;
+    py3)case $pyformat in
+          yapf)   style=$(yapf-style-for "$srcfile")
+                  $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
+          black)  $trace black -q -t py38 -S "$srcfile" ;;
+          *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
+                  exit 1
+                  ;;
+        esac
+        ;;
     *)  echo "$cmd: $srcfile: no formatter (type=$type)" >&2 ;;
   esac || xit=1
 done

@@ -1,39 +1,43 @@
-#!/usr/bin/sh
+#!/usr/bin/env python3
 #
 # Python API for the lastvalue(1cs) command.
 #       - Cameron Simpson <cs@cskk.id.au> 24apr2014
 #
 
-from __future__ import print_function
-import sys
+''' A filesystem based set of named values used to track various state values.
+'''
+
 import os
 import os.path
 import errno
-from collections import MutableMapping
+from collections.abc import MutableMapping
 from cs.env import envsub
 
 DFLT_LASTVALUEDIR_SPEC = '$HOME/var/log/lastvalue'
 
 def main(argv):
+  ''' `lastvalue` main command line programme.
+  '''
   argv = list(argv)
-  cmd = argv.pop(0)
   xit = 0
   lastvaluedir = None
   LV = LastValues(lastvaluedir=lastvaluedir)
-  if len(argv) == 0:
+  if not argv:
     ks = sorted(LV.keys())
     for k in ks:
       print("%s: %s" % (k, LV[k]))
   else:
     k = argv.pop(0)
-    if argv == 0:
+    if not argv:
       print(LV.get(k, ""))
     else:
       value = argv.pop(0)
-      if len(argv) == 0:
+      if not argv:
         LV[k] = value
       else:
-        raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
+        raise ValueError(
+            "unexpected values after key value: %s" % (' '.join(argv),)
+        )
   return xit
 
 def lastvaluedirpath(path=None, environ=None):
@@ -66,7 +70,7 @@ class LastValues(MutableMapping):
     ''' Compute the pathname of the lastvalue backing file.
         Raise KeyError on invalid lastvalue names.
     '''
-    if len(k) == 0 or k.startswith('.') or os.path.sep in k:
+    if not k or k.startswith('.') or os.path.sep in k:
       raise KeyError(k)
     return os.path.join(self.dirpath, k)
 
@@ -80,14 +84,14 @@ class LastValues(MutableMapping):
         return
       raise
     for k in listing:
-      if len(k) > 0 and not k.startswith('.'):
+      if k and not k.startswith('.'):
         yield k
 
   def __len__(self):
     ''' Return the number of lastvalue files.
     '''
     n = 0
-    for k in self:
+    for _ in self:
       n += 1
     return n
 
@@ -115,7 +119,7 @@ class LastValues(MutableMapping):
     with open(lastvaluepath, "a") as lvfp:
       lvfp.write(s)
       lvfp.write('\n')
-  
+
   def __delitem__(self, k):
     lastvaluepath = self._lastvaluepath(k)
     try:

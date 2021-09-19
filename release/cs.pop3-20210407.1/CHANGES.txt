@@ -1,0 +1,1 @@
+lib/python/cs/pop3.py: cs.pop3: bump cs.cmdutils revision requirement, fix some docstring typos

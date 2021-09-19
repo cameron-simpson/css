@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Command line wrapper for cs.app.beyonwiz, runs cs.app.beyonwiz.main.
 #   - Cameron Simpson <cs@cskk.id.au> 2008
 #
 
-exec python3 -m cs.app.beyonwiz ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.beyonwiz.__main__ import main
+sys.exit(main(sys.argv))

@@ -1,0 +1,1 @@
+New "disabled" mode, triggered by default if not backend.isatty().

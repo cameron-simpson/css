@@ -1,0 +1,2 @@
+lib/python/cs/progress.py: set __version__ to '20200129.2'
+lib/python/cs/progress.py: cs.progress: rewind __version__ slightly during testing

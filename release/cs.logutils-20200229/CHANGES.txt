@@ -1,0 +1,6 @@
+lib/python/cs/logutils.py: cs.logutils: update for new Upd.without context manager
+lib/python/cs/logutils.py: cs.logutils: setup_logging: default `upd_mode` to `main_log.isatty()`, was previously False
+lib/python/cs/logutils.py: cs.logutils: modernise call to Upd, upd_for no longer required
+lib/python/cs/logutils.py: cs.logutils: drop UpdHandler.upd method, shadowed by instance attribute, never used
+lib/python/cs/logutils.py: cs.logutils: UpdHandler.emit: use Upd.nl instead of Upd.without, better behaviour
+lib/python/cs/logutils.py: cs.logutils: clean lint, autoformat

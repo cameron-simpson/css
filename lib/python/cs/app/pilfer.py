@@ -18,6 +18,7 @@ from subprocess import Popen, PIPE
 import sys
 from threading import Lock, RLock, Thread
 from time import sleep
+from types import SimpleNamespace as NS
 from urllib.parse import quote, unquote
 from urllib.error import HTTPError, URLError
 from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
@@ -41,7 +42,7 @@ from cs.logutils import (
     setup_logging, logTo, debug, error, warning, exception, trace, D
 )
 from cs.mappings import MappingChain, SeenSet
-from cs.obj import O, copy as obj_copy
+from cs.obj import copy as obj_copy
 import cs.pfx
 from cs.pfx import Pfx
 from cs.pipeline import (
@@ -410,7 +411,7 @@ def url_xml_find(U, match):
   for found in url_io(URL(U, None).xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-class Pilfer(O):
+class Pilfer(NS):
   ''' State for the pilfer app.
       Notable attribute include:
         .flush_print    Flush output after print(), default False.
@@ -436,7 +437,7 @@ class Pilfer(O):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     self.opener.add_handler(HTTPCookieProcessor())
-    O.__init__(self, **kw)
+    super().__init__(**kw)
 
   def __str__(self):
     return "%s[%s]" % (self._name, self._)
@@ -764,7 +765,7 @@ class FormatMapping(object):
 
   def __init__(self, P, U=None, factory=None):
     ''' Initialise this FormatMapping from a Pilfer `P`.
-	The optional paramater `U` (default from `P._`) is the
+	The optional parameter `U` (default from `P._`) is the
 	object whose attributes are exposed for format strings,
 	though P.user_vars preempt them.
 	The optional parameter `factory` is used to promote the
@@ -1664,7 +1665,7 @@ def retriable(func):
   retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
-class _Action(O):
+class _Action(NS):
 
   def __init__(self, srctext, sig):
     self.srctext = srctext
@@ -1963,12 +1964,12 @@ def action_pipecmd(shcmd):
 
   return function, FUNC_MANY_TO_MANY
 
-class PipeSpec(O):
+class PipeSpec(NS):
   ''' A pipeline specification: a name and list of actions.
   '''
 
   def __init__(self, name, argv):
-    O.__init__(self)
+    super().__init__()
     self.name = name
     self.argv = argv
 
@@ -2009,12 +2010,12 @@ def load_pilferrcs(pathname):
       warning("neither a file nor a directory, ignoring")
   return rcs
 
-class PilferRC(O):
+class PilferRC(NS):
 
   def __init__(self, filename):
     ''' Initialise the PilferRC instance. Load values from `filename` if not None.
     '''
-    O.__init__(self)
+    super().__init__()
     self.filename = filename
     self._lock = Lock()
     self.defaults = {}

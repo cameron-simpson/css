@@ -6,17 +6,28 @@
 
 set -ue
 
+: ${TMPDIR:=/tmp}
+
 cmd=$( basename "$0" )
-usage="Usage: $cmd [opts...] [remote:]srcpath:dstpath rsync-opts...
+usage="Usage: $cmd [opts...] [tag=value:...][remote:]srcpath:dstpath... rsync-opts...
   -i            Itemise changes.
   -x            Trace execution.
   --copy-times, --no-symlink-if-unchanged
-                Passed to histbackup."
+                Passed to histbackup.
+  tag=value     Optional fstags tags to constrain the backup.
+  remote        Ssh target for a remote source tree.
+  srcpath       Source tree path.
+  dstpath       Destination tree path.
+  rsync-opts    Options after the paths are passed to histbackup for rsync."
 
+tags=
 rsopts=
 hbopts=
 trace=
 [ -t 2 ] && { trace=set-x hbopts="$hbopts -x" rsopts="$rsopts --progress"; }
+
+tmpf=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmpf"' 0 1 3 15
 
 badopts=
 
@@ -41,6 +52,7 @@ then
   echo "$cmd: missing srcpath:dstpath" >&2
   badopts=1
 else
+  # gather up the rsync-opts after the src:dst targets
   rspart=
   for src_dst
   do
@@ -65,9 +77,19 @@ xit=0
 
 for src_dst
 do
+  # check for first rsync-opt, exit loop
   case "$src_dst" in
     -*) break ;;
   esac
+  # look for leading tag=value: parameters
+  tags=
+  while :
+  do
+    tag_spec=$( expr "x$src_dst" : 'x\([a-z][-._a-z0-9]*=[^:][^:]*\):.*' ) || break
+    # matched tag, adjust $src_dst, accumulate tag
+    src_dst=$( expr "x$src_dst" : 'x[a-z][-._a-z0-9]*=[^:][^:]*:\(.*\)' )
+    tags="$tags $tag_spec"
+  done
   src=$( expr "x$src_dst" : 'x\(.*\):..*' )
   dst=$( expr "x$src_dst" : 'x.*:\(..*\)' )
   [ -d "$dst/." ] || {
@@ -75,7 +97,13 @@ do
     xit=1
     continue
   }
-  $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
+  if [ -n "$tags" ]
+  then
+    $trace fstags find --for-rsync "$src" $tags > "$tmpf"
+    $trace histbackup $hbopts -- "$src" "$dst" $rsopts "--include-from=$tmpf" || xit=1
+  else
+    $trace histbackup $hbopts -- "$src" "$dst" $rsopts || xit=1
+  fi
 done
 
 exit $xit

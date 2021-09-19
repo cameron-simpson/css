@@ -1,0 +1,6 @@
+lib/python/cs/buffer.py: cs.buffer: docstring typo fixes
+lib/python/cs/buffer.py: cs.buffer: new CornuCopyBuffer.byte0() method consuming the next byte and returning it as an int
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new .selfcheck method
+lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.takev: bugfix for size=0, logic refactor
+lib/python/cs/buffer.py: cs.buffer: add missing docstring
+lib/python/cs/buffer.py: merge default ==> media

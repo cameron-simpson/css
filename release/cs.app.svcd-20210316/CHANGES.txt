@@ -1,0 +1,1 @@
+lib/python/cs/app/svcd.py: cs.app.svcd: serialise the Popen calls to avoid entirely hypothetical subprocess.Popen MT bug that may be making portfwd coredump

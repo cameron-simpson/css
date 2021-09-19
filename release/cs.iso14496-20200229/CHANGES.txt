@@ -1,0 +1,31 @@
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: do not catch certain programming error type exceptions
+lib/python/cs/iso14496.py: cs.iso14496: Box.__iter__: empty iteration if Box.body is None
+lib/python/cs/iso14496.py: cs.iso14496: ILST: recopynise @cpy as copyright, sfID as itunes_store_country_code
+lib/python/cs/iso14496.py: cs.iso14496: ILST: new SFID_ISO_3166_1_ALPHA_3_CODE and STIK_MEDIA_TYPES providing context data for various field values, as yet unused
+lib/python/cs/iso14496.py: cs.iso14496: make various list fields of some boxes deferred because they are expensive to parse (uses new cs.binary deferred_field)
+lib/python/cs/iso14496.py: cs.iso14496: add AssertionError to an except exception type list to let programming errors out; add a link to a docstring
+lib/python/cs/iso14496.py: cs.iso14496: clean some lint
+lib/python/cs/iso14496.py: cs.iso14496: strip debugging
+lib/python/cs/iso14496.py: cs.iso14496: remove noisy warnings
+lib/python/cs/iso14496.py: cs.iso14496: add_generic_sample_boxbody: drop __iter__, causes dumb iterators to parse the samples
+lib/python/cs/iso14496.py: cs.iso14496: CO64 boxes: defer the chunk_offsets field
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: use cs.upd.Upd to report progress
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: simplify tagging
+lib/python/cs/iso14496.py: cs.iso14496: Box: do not complain about missing Box body for "free" and "skip" boxes
+lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: provide PACKET_FIELDS type check list
+lib/python/cs/iso14496.py: cs.iso14496: TrackReferenceTypeBoxBody: accept a 'chap' (chapter?) box type
+lib/python/cs/iso14496.py: cs.iso14496: ILST: iTunes "Date" metadata seem to contain plain years or ISO8601 datestamps; improve debugging context for the parse
+lib/python/cs/iso14496.py: cs.iso14496: back off the "no schema" complaint to debug
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: better reference for TaggedPath for path
+lib/python/cs/iso14496.py: cs.iso14496: bugfix transcribe supercall
+lib/python/cs/iso14496.py: cs.iso14496: DISTINFO: add cs.upd to the required modules
+lib/python/cs/iso14496.py: cs.iso14496: mp4 autotag: add -n (no action) and -p,--prefix (set tag prefix, default 'mp4') options
+lib/python/cs/iso14496.py: cs.iso14496: mp4 autotag: make the default path to walk the full current directory instead of '.'
+lib/python/cs/iso14496.py: cs.iso14496: autoformat
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: bugfix iteration of rpaths, not returns (is_dir,path) tuples
+lib/python/cs/iso14496.py: cs.iso14496.py: TagSet and Tag now come from cs.tagset
+lib/python/cs/iso14496.py: cs.iso14496: "autotag": use "mp4." as the tag prefix
+lib/python/cs/iso14496.py: cs.iso14496: unbugfix call to rpaths, it only returns pathnames
+lib/python/cs/iso14496.py: cs.iso14496: ILSTBoxBody.parse_buffer: simply tag name generation
+lib/python/cs/iso14496.py: cs.app.beyonwiz,cs.app.plex,cs.app.osx.itunes,cs.iso14496,cs.vt: adjust usage of BaseCommand.cmd_* methods for recent API simplification
+lib/python/cs/iso14496.py: cs.iso14496: cmd_autotag: bugfix iteration of rpaths

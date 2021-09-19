@@ -1,31 +1,27 @@
 #!/usr/bin/python
 #
-# Self tests for cs.app.mailfiler.
-#       - Cameron Simpson <cs@cskk.id.au>
-#
 
-import os
+''' Self tests for cs.app.mailfiler.
+    - Cameron Simpson <cs@cskk.id.au>
+'''
+
 import sys
-from os.path import basename, dirname, join as joinpath
+from os.path import dirname, join as joinpath
+from types import SimpleNamespace as NS
 import unittest
-from cs.app.mailfiler import \
-        get_targets, get_target, \
-        Target_Assign, Target_PipeLine, Target_Substitution, Target_SetFlag, \
-        Target_Function, Target_MailAddress, Target_MailFolder, \
-        parserules
+from cs.app.mailfiler import (
+    get_targets, get_target, Target_Assign, Target_PipeLine,
+    Target_Substitution, Target_SetFlag, Target_Function, Target_MailAddress,
+    Target_MailFolder, parserules
+)
 from cs.logutils import D
-from cs.obj import O
-from cs.x import X
-
-if not os.environ.get('DEBUG', ''):
-
-  def D(*a):
-    pass
 
 testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.app.mailfiler')
 test_rules_file = joinpath(testdatadir, 'rules')
 
 class TestMailFiler(unittest.TestCase):
+  ''' Tests for `cs.app.mailfiler`.
+  '''
 
   def setUp(self):
     pass
@@ -76,7 +72,7 @@ class TestMailFiler(unittest.TestCase):
     if isinstance(rule_lines, str):
       rule_lines = (rule_lines,)
     if flags is None:
-      flags = O(alert=False, halt=False)
+      flags = NS(alert=False, halt=False)
     R, = list(parserules(rule_lines))
     D("R = %s", R)
     self.assertEqual(len(R.targets), len(target_types))
@@ -129,27 +125,27 @@ class TestMailFiler(unittest.TestCase):
     )
     self._testSingleRule(
         "=target labelstr .", (Target_MailFolder,), 'labelstr', (),
-        O(alert=False, halt=True)
+        NS(alert=False, halt=True)
     )
     self._testSingleRule(
         "+target labelstr .", (Target_MailFolder,), 'labelstr', (),
-        O(alert=False, halt=False)
+        NS(alert=False, halt=False)
     )
     self._testSingleRule(
         "!target labelstr .", (Target_MailFolder,), 'labelstr', (),
-        O(alert=True, halt=False)
+        NS(alert=True, halt=False)
     )
     self._testSingleRule(
         "=!target labelstr .", (Target_MailFolder,), 'labelstr', (),
-        O(alert=True, halt=True)
+        NS(alert=True, halt=True)
     )
     self._testSingleRule(
         "=!target labelstr .", (Target_MailFolder,), 'labelstr', (),
-        O(alert=True, halt=True)
+        NS(alert=True, halt=True)
     )
     self._testSingleRule(
         "target . foo@bar", (Target_MailFolder,), '', (
-            O(
+            NS(
                 addrkeys=('foo@bar',),
                 flags=(),
                 header_names=('to', 'cc', 'bcc')
@@ -158,7 +154,7 @@ class TestMailFiler(unittest.TestCase):
     )
     self._testSingleRule(
         "target . ! foo@bar", (Target_MailFolder,), '', (
-            O(
+            NS(
                 addrkeys=('foo@bar',),
                 flags=('invert',),
                 header_names=('to', 'cc', 'bcc')
@@ -167,20 +163,20 @@ class TestMailFiler(unittest.TestCase):
     )
     self._testSingleRule(
         "target . from:foo@bar", (Target_MailFolder,), '',
-        (O(addrkeys=('foo@bar',), header_names=('from',)),)
+        (NS(addrkeys=('foo@bar',), header_names=('from',)),)
     )
     self._testSingleRule(
         "target . to,cc:foo@bar", (Target_MailFolder,), '',
-        (O(addrkeys=('foo@bar',), header_names=('to', 'cc')),)
+        (NS(addrkeys=('foo@bar',), header_names=('to', 'cc')),)
     )
     self._testSingleRule(
         "target . to,cc:joe blogs <joe@bar>", (Target_MailFolder,), '',
-        (O(addrkeys=('joe@bar',), header_names=('to', 'cc')),)
+        (NS(addrkeys=('joe@bar',), header_names=('to', 'cc')),)
     )
     self._testSingleRule(
         "target . list-id.contains(\"<squid-users.squid-cache.org>\")",
         (Target_MailFolder,), '', (
-            O(
+            NS(
                 funcname='contains',
                 header_names=('list-id',),
                 test_string='<squid-users.squid-cache.org>'
@@ -189,9 +185,13 @@ class TestMailFiler(unittest.TestCase):
     )
 
   def testRulesParseFile(self):
-    rules = list(parserules(test_rules_file))
+    ''' Test parse.
+    '''
+    list(parserules(test_rules_file))
 
 def selftest(argv):
+  ''' Run the unittest main function.
+  '''
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':

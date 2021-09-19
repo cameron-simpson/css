@@ -40,7 +40,9 @@ usage="Usage: $cmd [-x] [-F flags,...] [--] [op [args...]]
       -         Read track specifications from standard input.
       selected  Use the currently selected iTunes tracks.
   $cmd selected
-      Report the currently selected iTunes tracks to standard output."
+      Report the currently selected iTunes tracks to standard output.
+  $cmd tell tell-commands...
+      Tell iTunes to execute the supplied AppleScript tell-commands."
 
 badopts=
 
@@ -73,70 +75,73 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+tell(){
+  ( set -ue
+    ascmds=
+    for arg
+    do
+      ascmds="$ascmds
+            $arg"
+    done
+    exec $trace \
+    reattach-to-user-namespace \
+    osascript -e "
+        tell application \"iTunes\"
+          $ascmds
+        end tell
+      "
+  )
+}
+
 selected(){
-  $trace \
-  reattach-to-user-namespace \
-  osascript -e '
-      tell application "iTunes"
-        selection
-      end tell
-    ' \
+  tell selection \
   | tr , '\012'
 }
 
 download(){
-  _dl_cmds=
-  for _dl_item
-  do
-    case "$_dl_item" in
-      selected)
-        tmpf=$TMPDIR/$cmd.$$selected
-        selected >"$tmpf"
-        while read _dl_item
-        do
-          $echo "queue selected: $_dl_item"
-          _dl_cmds="$_dl_cmds
-            download $_dl_item"
-        done <"$tmpf"
-        rm "$tmpf"
-        ;;
-      -)while read _dl_item
-        do
-          $echo "queue stdin: $_dl_item"
-          _dl_cmds="$_dl_cmds
-            download $_dl_item"
-        done
-        ;;
-      *)$echo "queue item: $_dl_item"
-        _dl_cmds="$_dl_cmds
-            download $_dl_item"
-        ;;
-    esac
-  done
-  [ -z "$flagnames" ] || {
-    $trace await flag -t $flagnames
-    $date >&2
-  }
-  $trace \
-    lock "$cmd-download" \
+  ( set -ue
+    first=1
+    for dl_item
+    do
+      [ $first ] && { set --; first=; }
+      case "$dl_item" in
+        selected)
+          tmpf=$TMPDIR/$cmd.$$selected
+          selected >"$tmpf"
+          while read dl_item
+          do
+            $echo "queue selected: $dl_item"
+            set -- ${1+"$@"} "download $dl_item"
+          done <"$tmpf"
+          rm "$tmpf"
+          ;;
+        -)while read dl_item
+          do
+            $echo "queue stdin: $dl_item"
+            set -- ${1+"$@"} "download $dl_item"
+          done
+          ;;
+        *)$echo "queue item: $dl_item"
+          set -- ${1+"$@"} "download $dl_item"
+          ;;
+      esac
+    done
+    # wait for required flag state, if any
+    [ -z "$flagnames" ] || {
+      $trace await flag -t $flagnames
+      $date >&2
+    }
+    exec
     $trace \
-    reattach-to-user-namespace \
-    osascript -e "
-      activate \"iTunes\"
-      tell application \"iTunes\"
-        $_dl_cmds
-      end tell"
+      lock "$cmd-download" \
+        "$0" tell "$@"
+  )
 }
 
 case "$op" in
   dl|download)
-    if [ $# = 0 ]
-    then
-      echo "$cmd: $op: missing download items" >&2
-      badopts=1
-    else
-      download "$@"
-    fi
+    [ $# -gt 0 ] || set selected
+    download "$@"
     ;;
   selected)
     if [ $# -gt 0 ]
@@ -145,6 +150,15 @@ case "$op" in
       badopts=1
     else
       selected
+    fi
+    ;;
+  tell)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing tell-commands" >&2
+      badopts=1
+    else
+      tell "$@"
     fi
     ;;
   *)echo "$cmd: $op: unrecognised op" >&2

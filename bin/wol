@@ -1,6 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Send a Wake On LAN (WOL) packet.
 # -Cameron Simpson <cs@cskk.id.au>
 #
-exec python -m cs.wol ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.wol import main
+sys.exit(main(sys.argv))

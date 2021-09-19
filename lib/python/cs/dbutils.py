@@ -39,7 +39,7 @@ class Params(object):
     self.values = []
 
   def __len__(self):
-    ''' The length of a Params is the number of paramaters.
+    ''' The length of a Params is the number of parameters.
     '''
     return len(self.params)
 
@@ -317,7 +317,7 @@ class Table(object):
     return rows
 
   def unique_row_where(self, **kw):
-    ''' Fetch a row uniquely identified by the keyword paramaters
+    ''' Fetch a row uniquely identified by the keyword parameters
         using a cache.
 
         This makes things like repeated graph traversal more efficient

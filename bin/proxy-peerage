@@ -1,10 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Emit configuration lines computed from my proxy peerage file.
 #   - Cameron Simpson <cs@cskk.id.au> 09sep2015
 #
 
-from __future__ import print_function
 import sys
 from collections import namedtuple
 from getopt import GetoptError
@@ -402,7 +401,7 @@ class Pattern(_Pattern):
         # IP address
         if style == 'haproxy_acl':
           return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
-                 (haquote(pattern), haquote(escape(pattern)))
+                 % (haquote(pattern), haquote(escape(pattern)))
         if style == 'proxy.pac': return 'isInNet(host, %r)' % (pattern,)
         if style == 'squid_acl': return 'dst %s' % (pattern,)
         raise ValueError('unsupported ip-prefix pattern')

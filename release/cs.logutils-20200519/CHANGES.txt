@@ -1,0 +1,2 @@
+lib/python/cs/logutils.py: Release information for cs.logutils-20200518.
+lib/python/cs/logutils.py: cs.logutils: bugfix setup_logging: apparently a LoggingProxy does not have an encoding

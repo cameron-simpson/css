@@ -1,0 +1,2 @@
+New @contextual decorator to turn a simple function into a context manager.
+@strable: mention context manager requirement and @contextual as workaround.

@@ -1,0 +1,1 @@
+Update for changed cs.obj.SingletonMixin API.

@@ -1,0 +1,1 @@
+Tweak @OBSOLETE and @cached (obsolete name for @cachedmethod).

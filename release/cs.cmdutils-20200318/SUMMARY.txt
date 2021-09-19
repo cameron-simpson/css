@@ -1,0 +1,4 @@
+BaseCommand.run: make argv optional, get additional usage keywords from self.USAGE_KEYWORDS.
+@BaseCommand.add_usage_to_docstring: honour cls.USAGE_KEYWORDS.
+BaseCommand: do not require GETOPT_SPEC for commands with no defined options.
+BaseCommand.run: call cs.logutils.setup_logging.

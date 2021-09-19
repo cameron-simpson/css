@@ -1,0 +1,2 @@
+@decorator: do not override __doc__ on the decorated function, just provide default.
+New @logging_wrapper which bumps the `stacklevel` parameter in Python 3.8 and above so that shims recite the correct caller.

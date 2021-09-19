@@ -1,0 +1,3 @@
+lib/python/cs/app/ydl.py: cs.cmdutils: BaseCommand: new __init_subclass__ method to append the subclass usage_text() to the class docstring; update related modules to match
+lib/python/cs/app/ydl.py: update module DISTINFOs for recent cs.cmdutils BaseCommand change
+lib/python/cs/app/ydl.py: cs.app.ydl: clean lint

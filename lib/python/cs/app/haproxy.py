@@ -1,80 +1,65 @@
 #!/usr/bin/python
 #
 # Convenience facilities for working with HAProxy.
-#       - Cameron Simpson <cs@cskk.id.au> 14jul2012
+# - Cameron Simpson <cs@cskk.id.au> 14jul2012
 #
 
 from __future__ import print_function
 from collections import namedtuple
+from getopt import GetoptError
 import csv
 import os.path
 import sys
+from types import SimpleNamespace
 try:
   from urllib.request import urlopen
 except ImportError:
   from urllib2 import urlopen
-from cs.logutils import setup_logging, D, warning, error
+from cs.cmdutils import BaseCommand
+from cs.logutils import warning, error
 from cs.pfx import Pfx
-from cs.obj import O
 
 USAGE = '''Usage: {cmd} stats host:port print [columns...]'''
 
-def main(argv):
-  argv = list(argv)
-  cmd = os.path.basename(argv.pop(0))
-  setup_logging(cmd)
-  usage = USAGE.format(cmd=cmd)
-  xit = 1
+def main(argv=None):
+  ''' haproxy-tool main programme.
+  '''
+  return HAProxyToolCommand(argv).run()
 
-  badopts = False
+class HAProxyToolCommand(BaseCommand):
+  ''' haproxy-tool command line implementation.
+  '''
 
-  if len(argv) == 0:
-    error("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    with Pfx(op):
-      if op == "stats":
-        xit = op_stats(argv)
-      else:
-        error("unrecognised op")
-        badopts = True
+  USAGE_FORMAT = r'''Usage: {cmd} subcmd [subcmd-args...]'''
 
-  if badopts:
-    print(usage, file=sys.stderr)
-    xit = 2
-
-  return xit
-
-def op_stats(argv):
-  argv = list(argv)
-  if len(argv) == 0:
-    error("missing host:port")
-    return 2
-
-  try:
-    host, port = argv.pop(0).rsplit(':', 1)
-    port = int(port)
-  except ValueError as e:
-    error("invalid host:port: %s" % (e,))
-    return 2
-
-  if len(argv) == 0:
-    error("missing subop")
-    return 2
-  op = argv.pop(0)
-  cols = argv
-
-  S = Stats(host, port)
-  for row in S.csvdata():
-    if cols:
-      print(*[ getattr(row, col) for col in cols ])
+  def cmd_stats(argv):
+    ''' Usage: {cmd} host:port print [columns...]
+          Fetch the statistics from the haproxy at host:port.
+    '''
+    badopts = False
+    if not argv:
+      warning("missing host:port")
+      badopts = True
     else:
-      print(*row)
+      host_port = argv.pop(0)
+      with Pfx("host:port %r", host_port):
+        try:
+          host, port = host_port.rsplit(':', 1)
+          port = int(port)
+        except ValueError as e:
+          warning("invalid: %s", e)
+          badopts = True
+    cols = argv
+    if badopts:
+      raise GetoptError("invalid arguments")
+    S = Stats(host, port)
+    for row in S.csvdata():
+      if cols:
+        print(*[ getattr(row, col) for col in cols ])
+      else:
+        print(*row)
 
-  return 0
-
-class Stats(O):
+class Stats(SimpleNamespace):
   ''' An interface to the stats report of a running HAProxy instance.
   '''
 

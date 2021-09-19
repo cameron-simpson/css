@@ -1,18 +1,21 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-from __future__ import print_function
+''' Myke main programme.
+'''
+
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info, D
-from cs.x import X
+from cs.logutils import setup_logging, warning, error
 from .make import Maker
-from .parse import parseMacroAssignment
+from .parse import Macro
 
 default_cmd = 'myke'
 
-usage="Usage: %s [options...] [macro=value...] [targets...]"
+usage = "Usage: %s [options...] [macro=value...] [targets...]"
 
 def main(argv=None):
+  ''' The main command line.
+  '''
   if argv is None:
     argv = sys.argv
 
@@ -32,8 +35,9 @@ def main(argv=None):
   # gather any macro assignments and apply
   cmd_ns = {}
   while args:
-    macro = parseMacroAssignment("command line", args[0])
-    if macro is None:
+    try:
+      macro = Macro.from_assignment("command line", args[0])
+    except ValueError:
       break
     cmd_ns[macro.name] = macro
     args.pop(0)
@@ -42,7 +46,7 @@ def main(argv=None):
   ok = M.loadMakefiles(M.makefiles)
   ok = ok and M.loadMakefiles(M.appendfiles)
   if cmd_ns:
-    M._namespaces.insert(0, cmd_ns)
+    M.insert_namespace(cmd_ns)
   if not ok:
     error("errors loading Mykefiles")
     xit = 1
@@ -65,5 +69,4 @@ def main(argv=None):
   return xit
 
 if __name__ == '__main__':
-  sys.stderr.flush()
   sys.exit(main([default_cmd] + sys.argv[1:]))

@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Pop up a desktop finder on a directory.
+# - Cameron Simpson <cs@cskk.id.au> 05feb2020
+#
+
+set -ue
+
+: ${OS:=`uname -s`}
+
+cmd=$0
+usage="Usage: $cmd dirpath"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dirpath" >&2
+  badopts=1
+else
+  dirpath=$1
+  shift
+  [ -d "$dirpath" ] || {
+    echo "$cmd: not a directory: $dirpath" >&2
+    badopts=1
+  }
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments after dirpath: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$OS" in
+  [Dd]arwin)
+    reattach-to-user-namespace open "$dirpath"
+    ;;
+  *)echo "$cmd: unsupported OS: $OS" >&2
+    exit 1
+    ;;
+esac

@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
+'''
+TVWiz (pre-T3 Beyonwiz devices) specific support.
+'''
+
 from collections import namedtuple
 import datetime
 import os
 import os.path
 import struct
 from cs.logutils import warning, error
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.threads import locked_property
 from . import _Recording, RecordingMetaData
 
@@ -73,6 +77,8 @@ def bytes0_to_str(bs0, encoding='utf8'):
   return s
 
 def unrle(data, fmt, offset=0):
+  ''' Decode a TVWiz run length encoded record. UNUSED.
+  '''
   offset0 = offset
   S = struct.Struct(fmt)
   offset2 = offset + S.size
@@ -89,7 +95,10 @@ def unrle(data, fmt, offset=0):
   return subdata, offset
 
 class TVWizMetaData(RecordingMetaData):
+  ''' Metadata for pre-T3 Beyonwiz devices.
+  '''
 
+  @pfx_method
   def __init__(self, raw):
     RecordingMetaData.__init__(self, raw)
     self.series_name = raw['evtName']
@@ -99,10 +108,14 @@ class TVWizMetaData(RecordingMetaData):
     if channel:
       self.source_name = channel
     episode = raw['episode']
-    if episode:
+    try:
       self.episodeinfo.episode = int(episode)
+    except ValueError:
+      self.episodeinfo.episode_title = episode
 
 class TVWiz(_Recording):
+  ''' A TVWiz specific _Recording for pre-T3 Beyonwiz devices.
+  '''
 
   def __init__(self, wizdir):
     _Recording.__init__(self, wizdir)
@@ -119,7 +132,7 @@ class TVWiz(_Recording):
     ]
     if extra_opts:
       tvwiz_extra_opts.extend(extra_opts)
-    super().convert(dstpath, extra_opts=tvwiz_extra_opts)
+    super().convert(dstpath, extra_opts=tvwiz_extra_opts, **kw)
 
   def _parse_path(self):
     basis, ext = os.path.splitext(self.dirpath)
@@ -132,9 +145,7 @@ class TVWiz(_Recording):
       pass
     else:
       warning("discarding %r from timetext", "+" + plustext)
-    title = title \
-            .replace('_ ', ': ') \
-            .replace('_s ', "'s ")
+    title = title.replace('_ ', ': ').replace('_s ', "'s ")
     to_parse = daytext + timetext
     dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
@@ -144,13 +155,13 @@ class TVWiz(_Recording):
     ''' Decode the data chunk from a TV or radio header chunk.
     '''
     h1, h2, h3, h4, h5, \
-    lock, mediaType, inRec, unused \
-      = TVWizFileHeader.unpack(data[offset:offset+TVWizFileHeader.size])
+    lock, mediaType, inRec, _ \
+        = TVWizFileHeader.unpack(data[offset:offset+TVWizFileHeader.size])
     # skip ahead to TSPoint information
     offset += 1024
     svcName, evtName, \
-    mjd, pad, start, last, sec, lastOff \
-      = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
+    mjd, _, start, last, sec, lastOff \
+        = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
     svcName = bytes0_to_str(svcName)
     evtName = bytes0_to_str(evtName)
     # advance to file offsets
@@ -185,13 +196,31 @@ class TVWiz(_Recording):
     )
 
   def read_header(self):
+    ''' Read and decode the header data.
+    '''
     with open(self.headerpath, "rb") as hfp:
       data = hfp.read()
     return self.parse_header_data(data)
 
   @locked_property
   def metadata(self):
-    return TVWizMetaData(self.read_header().as_dict())
+    ''' The decoded metadata.
+    '''
+    hdrs = self.read_header()
+    tags = TagSet(
+        series_name=hdrs.evtName,
+        description=hdrs.synopsis,
+        start_unixtime=(raw['mjd'] - 40587) * DAY + raw['start'],
+        course_name=hdrs.svcName,
+    )
+    episode = hdrs.episode
+    try:
+      episode_num = int(episode)
+    except ValueError:
+      tags.update(episode_title=episode)
+    else:
+      tags.update(episode=episode_num)
+    return tags
 
   @staticmethod
   def tvwiz_parse_trunc(fp):
@@ -199,7 +228,7 @@ class TVWiz(_Recording):
     '''
     while True:
       buf = fp.read(24)
-      if len(buf) == 0:
+      if not buf:
         break
       if len(buf) != 24:
         raise ValueError("short buffer: %d bytes: %r" % (len(buf), buf))
@@ -232,7 +261,7 @@ class TVWiz(_Recording):
           rsize = min(size, 8192)
           buf = fp.read(rsize)
           assert len(buf) <= rsize
-          if len(buf) == 0:
+          if not buf:
             error("%s: unexpected EOF", fp)
             break
           yield buf

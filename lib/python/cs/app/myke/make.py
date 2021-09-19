@@ -1,40 +1,39 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-from __future__ import print_function
-import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
-import os
-import os.path
+''' Make make processes.
+'''
+
 import errno
 import getopt
-from functools import partial
 import logging
+import os
+import os.path
+from os.path import dirname, realpath
 from subprocess import Popen
-from threading import Thread
+import sys
 import time
+from types import SimpleNamespace as NS
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
-from cs.logutils import debug, info, warning, error, D
-from cs.obj import O
-from cs.pfx import Pfx, XP
+from cs.lex import get_identifier, get_white
+from cs.logutils import debug, info, error, exception, D
+from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.queues import Channel, MultiOpenMixin
-from cs.result import Result, report as report_LFs, ResultState
+from cs.queues import MultiOpenMixin
+from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
-from cs.x import X
 import cs.logutils
 import cs.pfx
-from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
-                   parseMakefile, parseMacroExpression
+from .parse import (SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError)
 
 SHELL = '/bin/sh'
 
 # Later priority values
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
-PRI_MAKE   = 1
+PRI_MAKE = 1
 PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
@@ -49,19 +48,19 @@ class Maker(MultiOpenMixin):
         `parallel`: the degree of parallelism of shell actions.
     '''
     if parallel < 1:
-      raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
+      raise ValueError(
+          "expected positive integer for parallel, got: %s" % (parallel,)
+      )
     if name is None:
       name = cs.pfx.cmd
-    O.__init__(self)
     MultiOpenMixin.__init__(self)
-    self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.name = name
     self.debug = MakeDebugFlags()
-    self.debug.debug = False    # logging.DEBUG noise
-    self.debug.flags = False    # watch debug flag settings
-    self.debug.make = False     # watch make decisions
-    self.debug.parse = False    # watch Makefile parsing
+    self.debug.debug = False  # logging.DEBUG noise
+    self.debug.flags = False  # watch debug flag settings
+    self.debug.make = False  # watch make decisions
+    self.debug.parse = False  # watch Makefile parsing
     self.fail_fast = True
     self.no_action = False
     self.default_target = None
@@ -74,20 +73,31 @@ class Maker(MultiOpenMixin):
     self.precious = set()
     self.active = set()
     self._active_lock = Lock()
-    self._namespaces = [{ 'MAKE': makecmd.replace('$', '$$') }]
+    self._namespaces = [{'MAKE': makecmd.replace('$', '$$')}]
 
   def __str__(self):
-    return "<MAKER>"
+    return (
+        '%s:%s(parallel=%s,fail_fast=%s,no_action=%s,default_target=%s)' % (
+            type(self).__name__, self.name, self.parallel, self.fail_fast,
+            self.no_action, self.default_target
+        )
+    )
 
   def startup(self):
+    ''' Set up the `Later` work queue.
+    '''
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.logTo("myke-later.log")
+    self._makeQ.open()
 
   def shutdown(self):
-    self._makeQ.shutdown()
+    ''' Shut down the make queue and wait for it.
+    '''
+    self._makeQ.close()
     self._makeQ.wait()
 
   def report(self, fp=None):
+    ''' Report the make queue status.
+    '''
     D("REPORT...")
     if fp is None:
       fp = sys.stderr
@@ -106,7 +116,12 @@ class Maker(MultiOpenMixin):
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
-    return self._namespaces + [ SPECIAL_MACROS ]
+    return self._namespaces + [SPECIAL_MACROS]
+
+  def insert_namespace(self, ns):
+    ''' Insert a macro namespace in front of the existing namespaces.
+    '''
+    self._namespaces.insert(0, ns)
 
   @prop
   def makefiles(self):
@@ -116,7 +131,10 @@ class Maker(MultiOpenMixin):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get( (cs.pfx.cmd+'rc').upper() )
+      makerc_envvar = (
+          os.path.splitext(os.path.basename(cs.pfx.cmd))[0] + 'rc'
+      ).upper()
+      makerc = os.environ.get(makerc_envvar)
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
       makefile = os.path.basename(cs.pfx.cmd).title() + 'file'
@@ -154,7 +172,9 @@ class Maker(MultiOpenMixin):
   def target_inactive(self, target):
     ''' Remove this target from the set of "in progress" targets.
     '''
-    self.debug_make("note target %r as inactive (%s)", target.name, target.state)
+    self.debug_make(
+        "note target %r as inactive (%s)", target.name, target.state
+    )
     with self._active_lock:
       self.active.remove(target)
 
@@ -176,14 +196,13 @@ class Maker(MultiOpenMixin):
     return MLF
 
   def after(self, LFs, func, *a, **kw):
-    ''' Submit a function to be run after the supplied LateFunctions `LFs`, return a Result instance for collection.
+    ''' Submit a function to be run after the supplied LateFunctions `LFs`,
+        return a Result instance for collection.
     '''
     if not isinstance(LFs, list):
       LFs = list(LFs)
     self.debug_make("after %s call %s(*%r, **%r)" % (LFs, func, a, kw))
-    R = Result("Maker.after(%s):%s"
-               % (",".join(str(LF) for LF in LFs),
-                  func))
+    R = Result("Maker.after(%s):%s" % (",".join(str(LF) for LF in LFs), func))
     self._makeQ.after(LFs, R, func, *a, **kw)
     return R
 
@@ -220,21 +239,22 @@ class Maker(MultiOpenMixin):
     with Pfx("setDebug(%r, %r)", flag, value):
       if not flag.isalpha() or not hasattr(self.debug, flag):
         raise AttributeError(
-                "invalid debug flag, know: %s"
-                % (",".join( sorted( [F for F in dir(self.debug) if F.isalpha() ] ) ),))
+            "invalid debug flag, know: %s" %
+            (",".join(sorted([F for F in dir(self.debug) if F.isalpha()])),)
+        )
       if self.debug.flags:
         info("debug.%s = %s", flag, value)
       setattr(self.debug, flag, value)
       if flag == 'debug':
-       # tweak global logging level also
-       logger = logging.getLogger()
-       log_level = logger.getEffectiveLevel()
-       if value:
-         if log_level > logging.DEBUG:
-           logger.setLevel(logging.DEBUG)
-         else:
-           if log_level < logging.INFO:
-             logger.setLevel(logging.INFO)
+        # tweak global logging level also
+        logger = logging.getLogger()
+        log_level = logger.getEffectiveLevel()
+        if value:
+          if log_level > logging.DEBUG:
+            logger.setLevel(logging.DEBUG)
+          else:
+            if log_level < logging.INFO:
+              logger.setLevel(logging.INFO)
 
   def getopt(self, args, options=None):
     ''' Parse command line options.
@@ -249,7 +269,7 @@ class Maker(MultiOpenMixin):
           # debug mode
           self.setDebug('make', True)
         elif opt == '-D':
-          for flag in [ w.strip().lower() for w in value.split(',') ]:
+          for flag in [w.strip().lower() for w in value.split(',')]:
             if len(flag) == 0:
               # silently skip empty flag items
               continue
@@ -266,11 +286,17 @@ class Maker(MultiOpenMixin):
         elif opt == '-f':
           self._makefiles.append(value)
         elif opt == '-j':
-          if value < 1:
-            error("invalid -j value: %d, must be >= 1", value)
+          try:
+            value = int(value)
+          except ValueError as e:
+            error("invalid -j value: %s", e)
             badopts = True
           else:
-            self.parallel = int(value)
+            if value < 1:
+              error("invalid -j value: %d, must be >= 1", value)
+              badopts = True
+            else:
+              self.parallel = int(value)
         elif opt == '-k':
           self.fail_fast = False
         elif opt == '-n':
@@ -282,6 +308,7 @@ class Maker(MultiOpenMixin):
 
   def loadMakefiles(self, makefiles, parent_context=None):
     ''' Load the specified Makefiles; return success.
+
         Each top level Makefile named gets its own namespace prepended
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
@@ -294,15 +321,15 @@ class Maker(MultiOpenMixin):
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
       ns = {}
-      self._namespaces.insert(0, ns)
-      for O in parseMakefile(self, makefile, parent_context):
-        with Pfx(O.context):
-          if isinstance(O, Exception):
-            error("exception: %s", O)
+      self.insert_namespace(ns)
+      for parsed_object in self.parse(makefile, parent_context):
+        with Pfx(parsed_object.context):
+          if isinstance(parsed_object, Exception):
+            error("exception: %s", parsed_object)
             ok = False
-          elif isinstance(O, Target):
+          elif isinstance(parsed_object, Target):
             # record this Target in the Maker
-            T = O
+            T = parsed_object
             self.debug_parse("add target %s", T)
             if '%' in T.name:
               # record this Target as a rule
@@ -311,19 +338,164 @@ class Maker(MultiOpenMixin):
               self.targets[T.name] = T
               if first_target is None:
                 first_target = T
-          elif isinstance(O, Macro):
-            self.debug_parse("add macro %s", O)
-            ns[O.name] = O
+          elif isinstance(parsed_object, Macro):
+            self.debug_parse("add macro %s", parsed_object)
+            ns[parsed_object.name] = parsed_object
           else:
             raise ValueError(
-                    "parseMakefile({}): unsupported parse item received: {}{!r}"
-                      .format(makefile, type(O), O)
-                  )
+                f"unsupported parse item received: {type(parsed_object)}{parsed_object!r}"
+            )
       if first_target is not None:
         self.default_target = first_target
     return ok
 
-class TargetMap(O):
+  def parse(self, fp, parent_context=None, missing_ok=False):
+    ''' Read a Mykefile and yield Macros and Targets.
+    '''
+    from .make import Target, Action
+    action_list = None  # not in a target
+    for context, line in readMakefileLines(self, fp, parent_context=parent_context,
+                                           missing_ok=missing_ok):
+      with Pfx(str(context)):
+        if isinstance(line, OSError):
+          e = line
+          if e.errno == errno.ENOENT or e.errno == errno.EPERM:
+            if missing_ok:
+              continue
+            e.context = context
+            yield e
+            break
+          raise e
+        try:
+          if line.startswith(':'):
+            # top level directive
+            _, doffset = get_white(line, 1)
+            word, offset = get_identifier(line, doffset)
+            if not word:
+              raise ParseError(context, doffset, "missing directive name")
+            _, offset = get_white(line, offset)
+            with Pfx(word):
+              if word == 'append':
+                if offset == len(line):
+                  raise ParseError(context, offset, "nothing to append")
+                mexpr, offset = MacroExpression.parse(context, line, offset)
+                assert offset == len(line)
+                for include_file in mexpr(context, self.namespaces).split():
+                  if include_file:
+                    if not os.path.isabs(include_file):
+                      include_file = os.path.join(
+                          realpath(dirname(fp.name)), include_file
+                      )
+                    self.add_appendfile(include_file)
+                continue
+              if word == 'import':
+                if offset == len(line):
+                  raise ParseError(context, offset, "nothing to import")
+                ok = True
+                missing_envvars = []
+                for envvar in line[offset:].split():
+                  if envvar:
+                    envvalue = os.environ.get(envvar)
+                    if envvalue is None:
+                      error("no $%s" % (envvar,))
+                      ok = False
+                      missing_envvars.append(envvar)
+                    else:
+                      yield Macro(
+                          context, envvar, (), envvalue.replace('$', '$$')
+                      )
+                if not ok:
+                  raise ValueError(
+                      "missing environment variables: %s" % (missing_envvars,)
+                  )
+                continue
+              if word == 'precious':
+                if offset == len(line):
+                  raise ParseError(
+                      context, offset, "nothing to mark as precious"
+                  )
+                mexpr, offset = MacroExpression.parse(context, line, offset)
+                self.precious.update(
+                    word for word in mexpr(context, self.namespaces).split() if word
+                )
+                continue
+              raise ParseError(context, doffset, "unrecognised directive")
+
+          if action_list is not None:
+            # currently collating a Target
+            if not line[0].isspace():
+              # new target or unindented assignment etc - fall through
+              # action_list is already attached to targets,
+              # so simply reset it to None to keep state
+              action_list = None
+            else:
+              # action line
+              _, offset = get_white(line)
+              if offset >= len(line) or line[offset] != ':':
+                # ordinary shell action
+                action_silent = False
+                if offset < len(line) and line[offset] == '@':
+                  action_silent = True
+                  offset += 1
+                A = Action(context, 'shell', line[offset:], silent=action_silent)
+                self.debug_parse("add action: %s", A)
+                action_list.append(A)
+                continue
+              # in-target directive like ":make"
+              _, offset = get_white(line, offset + 1)
+              directive, offset = get_identifier(line, offset)
+              if not directive:
+                raise ParseError(
+                    context, offset,
+                    "missing in-target directive after leading colon"
+                )
+              A = Action(context, directive, line[offset:].lstrip())
+              self.debug_parse("add action: %s", A)
+              action_list.append(A)
+              continue
+
+          try:
+            macro = Macro.from_assignment(context, line)
+          except ValueError:
+            pass
+          else:
+            yield macro
+            continue
+
+          # presumably a target definition
+          # gather up the target as a macro expression
+          target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
+          if not context.text.startswith(':', offset):
+            raise ParseError(context, offset, "no colon in target definition")
+          prereqs_mexpr, offset = MacroExpression.parse(
+              context, offset=offset + 1, stopchars=':'
+          )
+          if offset < len(context.text) and context.text[offset] == ':':
+            postprereqs_mexpr, offset = MacroExpression.parse(
+                context, offset=offset + 1
+            )
+          else:
+            postprereqs_mexpr = []
+
+          action_list = []
+          for target in target_mexpr(context, self.namespaces).split():
+            yield Target(
+                self,
+                target,
+                context,
+                prereqs=prereqs_mexpr,
+                postprereqs=postprereqs_mexpr,
+                actions=action_list
+            )
+          continue
+
+          raise ParseError(context, 0, 'unparsed line')
+        except ParseError as e:
+          exception("%s", e)
+
+    self.debug_parse("finish parse")
+
+class TargetMap(NS):
   ''' A mapping interface to the known targets.
       Makes targets as needed if inferrable.
       Raise KeyError for missing Targets which are not inferrable.
@@ -333,7 +505,6 @@ class TargetMap(O):
     ''' Initialise the TargetMap.
         `maker` is the Maker using this TargetMap.
     '''
-    self._O_omit = ['maker', 'targets']
     self.maker = maker
     self.targets = {}
     self._lock = RLock()
@@ -357,7 +528,9 @@ class TargetMap(O):
           targets[name] = T
     return targets[name]
 
-  def _newTarget(self, maker, name, context, prereqs=(), postprereqs=(), actions=()):
+  def _newTarget(
+      self, maker, name, context, prereqs=(), postprereqs=(), actions=()
+  ):
     ''' Construct a new Target.
     '''
     return Target(maker, name, context, prereqs, postprereqs, actions)
@@ -368,15 +541,21 @@ class TargetMap(O):
         Reject duplicate names.
     '''
     if name != target.name:
-      raise ValueError("tried to record Target as %r, but target.name = %r"
-                       % (name, target.name))
+      raise ValueError(
+          "tried to record Target as %r, but target.name = %r" %
+          (name, target.name)
+      )
     with self._lock:
       if name in self.targets:
-        raise ValueError("redefinition of Target %r, previous definition from %s"
-                         % (name, self.targets[name].context))
+        raise ValueError(
+            "redefinition of Target %r, previous definition from %s" %
+            (name, self.targets[name].context)
+        )
       self.targets[name] = target
 
 class Target(Result):
+  ''' A make target.
+  '''
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
@@ -412,13 +591,15 @@ class Target(Result):
     #  then this target is marker out of date.
     #  When all prereqs have been successfully build, if this Target
     #  is out of date then it is marked as new and any actions queued.
-    #  
+    #
 
   def __str__(self):
     return "{}[{}]".format(self.name, self.state)
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
   def mdebug(self, msg, *a):
+    ''' Emit a debug message.
+    '''
     return self.maker.debug_make(msg, *a)
 
   @locked
@@ -428,7 +609,9 @@ class Target(Result):
     self.mdebug("OK")
     if self.ready:
       if not self.result:
-        raise RuntimeError("%s.succeed: already completed FAILED" % (self.name,))
+        raise RuntimeError(
+            "%s.succeed: already completed FAILED" % (self.name,)
+        )
       return
     self.failed = False
     self.result = True
@@ -452,18 +635,19 @@ class Target(Result):
     ''' The namespaces for this Target: the special per-Target macros,
         the Maker's namespaces, the Maker's macros and the special macros.
     '''
-    return ( [ { '@':     lambda c, ns: self.name,
-                 '/':     lambda c, ns: ' '.join(self.prereqs),
-                 '?':     lambda c, ns: ' '.join(self.new_prereqs),
-                 # TODO: $< et al
-               },
-             ]
-           + self.maker.namespaces
-           + [
-               self.maker.macros,
-               SPECIAL_MACROS,
-             ]
-           )
+    return (
+        [
+            {
+                '@': lambda c, ns: self.name,
+                '/': lambda c, ns: ' '.join(self.prereqs),
+                '?': lambda c, ns: ' '.join(self.new_prereqs),
+                # TODO: $< et al
+            },
+        ] + self.maker.namespaces + [
+            self.maker.macros,
+            SPECIAL_MACROS,
+        ]
+    )
 
   @prop
   def prereqs(self):
@@ -493,6 +677,8 @@ class Target(Result):
 
   @locked_property
   def mtime(self):
+    ''' Modification time of this Target, `None` if missing or inaccessable.
+    '''
     try:
       s = os.stat(self.name)
     except OSError:
@@ -500,13 +686,16 @@ class Target(Result):
     return s.st_mtime
 
   def older_than(self, other):
+    ''' Test whether we are older than another Target.
+    '''
     if self.was_missing:
       return True
     if isinstance(other, str):
       other = self.maker[other]
     if not other.ready:
-      raise RuntimeError("Target %r not ready, accessed from Target %r",
-                         other, self)
+      raise RuntimeError(
+          "Target %r not ready, accessed from Target %r", other, self
+      )
     if other.out_of_date:
       return True
     m = other.mtime
@@ -538,12 +727,14 @@ class Target(Result):
             T = self.maker[Pname]
             Ts.append(T)
             T.require()
+
             # fire fail action immediately
             def f(T):
               if T.result:
                 pass
               else:
                 self.fail("REQUIRE(%s): FAILED by prereq %s" % (self, T))
+
             T.notify(f)
           # queue the first unit of work
           if Ts:
@@ -556,7 +747,8 @@ class Target(Result):
     ''' Invoked after the initial prerequisites have been run.
         Compute out_of_date etc, then run _make_next.
     '''
-    with Pfx("%s: after prereqs (Ts=%s)", self.name, ",".join(str(T) for T in Ts)):
+    with Pfx("%s: after prereqs (Ts=%s)", self.name,
+             ",".join(str(T) for T in Ts)):
       self.out_of_date = False
       # it is possible we may have been marked as failed already
       # because that has immediate effect
@@ -629,29 +821,38 @@ class Target(Result):
         self.mdebug("no actions remaining")
 
       if Rs:
-        self.mdebug("tasks still to do, requeuing: Rs=%s", ",".join(str(_) for _ in Rs))
+        self.mdebug(
+            "tasks still to do, requeuing: Rs=%s",
+            ",".join(str(_) for _ in Rs)
+        )
         self.maker.after(Rs, self._make_next)
       else:
         # all done, record success
         self.succeed()
 
-class Action(O):
+class Action(NS):
+  ''' A make ation.
+  '''
 
   def __init__(self, context, variant, line, silent=False):
     self.context = context
     self.variant = variant
     self.line = line
-    self.mexpr, _ = parseMacroExpression(context, line)
+    self.mexpr = MacroExpression.from_text(context, line)
     self.silent = silent
     self._lock = Lock()
 
   def __str__(self):
-    return "<Action %s %s:%d>" % (self.variant, self.context.filename, self.context.lineno)
+    return "<Action %s %s:%d>" % (
+        self.variant, self.context.filename, self.context.lineno
+    )
 
   __repr__ = __str__
 
   @prop
   def prline(self):
+    ''' Printable form of this Action.
+    '''
     return self.line.rstrip().replace('\n', '\\n')
 
   def act_later(self, target):
@@ -660,7 +861,10 @@ class Action(O):
         of the action.
     '''
     R = Result(name="%s.action(%s)" % (target, self))
-    ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
+    target.maker.defer("%s:act[%s]" % (
+        self,
+        target,
+    ), self._act, R, target)
     return R
 
   def _act(self, R, target):
@@ -689,7 +893,8 @@ class Action(O):
         if v == 'make':
           subtargets = self.mexpr(self.context, target.namespaces).split()
           mdebug("targets = %s", subtargets)
-          subTs = [ M[subtarget] for subtarget in subtargets ]
+          subTs = [M[subtarget] for subtarget in subtargets]
+
           def _act_after_make():
             # analyse success of targets, update R
             ok = True
@@ -701,6 +906,7 @@ class Action(O):
                 ok = False
                 mdebug("submake \"%s\" FAIL", T)
             R.put(ok)
+
           for T in subTs:
             mdebug("submake \"%s\"", T)
             T.require()

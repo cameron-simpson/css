@@ -1,3 +1,4 @@
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 static char module_docstring[] =
@@ -29,7 +30,11 @@ PyMODINIT_FUNC PyInit__scan(void)
 static PyObject *scan_scanbuf(PyObject *self, PyObject *args) {
     unsigned long   hash_value;
     unsigned char   *buf;
+#ifdef PY_SSIZE_T_CLEAN
+    Py_ssize_t      buflen;
+#else
     int             buflen;
+#endif
 
     if (!PyArg_ParseTuple(args, "ky#", &hash_value, &buf, &buflen)) {
         return NULL;

@@ -1,0 +1,1 @@
+DISTINFO: make the cs.obj requirement more specific due to the SingletonMixin API change.

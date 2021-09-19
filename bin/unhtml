@@ -8,11 +8,13 @@ cmd=$0
 usage="Usage: $cmd [-a] [-c] [-cols] [files...]
         -a      No anchors - don't mangle HTML to show URLs.
         -c      Clean: run code through htclean.
-        -cols   Use \"cols\" columns."
+        -cols   Use \"cols\" columns.
+        -x      trace execution of filter commands."
 
 mangle=1
 cols=
 clean=
+trace=
 
 # load default options
 eval "set -- $UNHTML_OPTS "' ${1+"$@"}'
@@ -25,6 +27,7 @@ do
     +a)  mangle=1 ;;
     -c)  clean=1 ;;
     +c)  clean= ;;
+    -x)  trace=set-x ;;
     -[1-9]*) cols=`expr "x$1" : 'x-\(.*\)'` ;;
     --)  shift; break ;;
     -?*) echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -55,11 +58,11 @@ fi \
 | LC_ALL=C sed 's|</ *[Aa] *>|&|g' \
 | LC_ALL=C tr '\015' '\012' \
 | if false && [ $mangle ]
-  then set-x perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)"[^>]*>[^<]*</a>; $& [$1];gi'
+  then $trace perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)"[^>]*>[^<]*</a>; $& [$1];gi'
   else cat
   fi \
 | if flag UNHTML_USE_W3M
-  then  set-x w3m $w3cols -dump -T text/html -graph \
+  then  $trace w3m $w3cols -dump -T text/html -graph \
             -o color=TRUE \
             -o basic_color=green \
             -o anchor_color=yellow \
@@ -72,6 +75,6 @@ fi \
             -o pseudo_inlines=TRUE \
             -o tabstop=2 \
             -o graph
-  else  set-x lynx -stdin -dump
+  else  $trace lynx -stdin -dump
   fi \
-| LC_ALL=C sed 's/[     ][      ]*$//'
+  | { echo; LC_ALL=C sed 's/[     ][      ]*$//'; }

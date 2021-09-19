@@ -1,0 +1,2 @@
+lib/python/cs/context.py: cs.context: expose the push and pop parts of stackattrs() as pushattrs() and popattrs()
+lib/python/cs/context.py: cs.py3,cs.context: move the stub nullcontext from cs.py3 to cs.context

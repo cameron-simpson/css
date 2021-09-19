@@ -1,0 +1,2 @@
+lib/python/cs/fstags.py: Release information for cs.fstags-20200717.
+lib/python/cs/fstags.1.md lib/python/cs/fstags.5.md: fsatgs.1.md,fstags.5.md: MarkDown source for manual pages, well out of date though

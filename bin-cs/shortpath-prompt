@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Shorten a path (the current directory by default) using various criteria.
 #   - Cameron Simpson <cs@cskk.id.au>
@@ -8,22 +8,28 @@
 # look for SYMLINK to lower path and replace
 # while 
 
-from __future__ import print_function
 import os
 from os.path import basename, dirname, join as joinpath
 import pwd
 import stat
 import sys
 from cs.logutils import setup_logging, warning, error
-from cs.obj import O
 
-USAGE = "Usage: %s [path]"
+USAGE = "Usage: %s [-n] [path]"
 
 def main(argv):
   cmd = basename(argv.pop(0))
   setup_logging(cmd)
   usage = USAGE % (cmd,)
+  nparts = None
   badopts = False
+  # optional -n switch
+  if argv:
+    arg0 = argv[0]
+    if arg0.startswith('-') and arg0[1:].isdigit():
+      nparts = int(arg0[1:])
+      argv.pop(0)
+  # optional path if not cwd
   if argv:
     path = argv.pop(0)
   else:
@@ -34,7 +40,12 @@ def main(argv):
   if badopts:
     print(usage, file=sys.stderr)
     return 2
-  print(short_path(path))
+  shortp = short_path(path)
+  if nparts:
+    shortpv = shortp.split('/')
+    if len(shortpv) > nparts:
+      shortp = '/'.join(shortpv[len(shortpv) - nparts:])
+  print(shortp)
 
 def short_path(path, no_tilde=False, no_symlinks=False):
   # stat the path components
@@ -131,7 +142,7 @@ def statkey(S):
 pathinfo = {}
 statinfo = {}
 
-class PathInfo(O):
+class PathInfo:
   def __init__(self, path):
     global pathinfo, statinfo
     if path == '':

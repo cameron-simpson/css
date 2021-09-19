@@ -1,0 +1,10 @@
+New TaggedPath.modified property aliasing the TagSet.modified attribute.
+ls: new -d option to treat directories like files (do not recurse), aiding reporting of tags for a directory.
+find,ls subcommands: work off the realpath of the supplied top level path.
+Tag: now subclasses namedtuple.
+Rewrite rpaths() to use scandir and to also yield (is_dir,path) tuples.
+TagSet, Tag, TagChoice moved into new cs.tagset module for reuse.
+json_import: make --prefix mandatory, is "." as separator if not empty.
+Move filename regexp rules to [filename_rules] config section.
+New CascadeRule for representing a "target_tag_name = tag_name1 tag_name2..." config rules.
+autotag: include the cascade rules in the autotagging after the filename rules.

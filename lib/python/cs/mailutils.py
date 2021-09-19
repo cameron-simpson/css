@@ -25,6 +25,8 @@ from cs.py3 import StringTypes
 from cs.seq import seq
 from cs.threads import locked_property
 
+__version__ = '20210306-post'
+
 DISTINFO = {
     'description': "functions and classes to work with email",
     'keywords': ["python2", "python3"],
@@ -43,6 +45,8 @@ DISTINFO = {
     ],
 }
 
+# RFC5322 date-time format for use with datetime.strftime
+RFC5322_DATE_TIME = '%a, %d %b %Y %H:%M:%S %z'
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
 def shortpath(path, environ=None):

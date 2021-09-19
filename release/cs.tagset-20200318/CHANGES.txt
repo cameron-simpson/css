@@ -1,0 +1,27 @@
+lib/python/cs/tagset.py: cs.tagset: new Tag.prefix_name factory returning a new tag if prefix is not empty, ptherwise self; modify TagSet.update to accept an optional prefix for inserting "foreign" tags with a distinguishing name prefix
+lib/python/cs/tagset.py: cs.tagset: Tag.as_json: turn sets and tuples into lists for encoding
+lib/python/cs/tagset.py: cs.tagset: backport for Python < 3.7 (no fromisoformat functions)
+lib/python/cs/tagset.py: cs.tagset: fix misspelling of fromisoformat
+lib/python/cs/tagset.py: cs.tagset: TagSet: new as_dict method returning a dict mapping tag names to values
+lib/python/cs/tagset.py: merge media => default: new "fstags rename" feature
+lib/python/cs/tagset.py: cs.tagset: TagSet: drop unused and illplaced .titleify, .episode_title and .title methods; new .format_kwargs method to construct a kwargs dict suitable for formatting strings from this TagSet
+lib/python/cs/tagset.py: merge media ==> default: cs.fstags: improvements to "rename" subcommand and small related updates
+lib/python/cs/tagset.py: cs.tagset: TagSet: remove "defaults", unused
+lib/python/cs/tagset.py: cs.tagset: TagSet.format_kwargs: explainatory docstring
+lib/python/cs/tagset.py: cs.tagset: TagSet.get: clearify docstring
+lib/python/cs/tagset.py: cs.tagset: TagSet: new as_namespace method returning the Tags as a SimpleNamespace; refactor format_kwargs to use this
+lib/python/cs/tagset.py: cs.tagset: TagSet.as_namespace docstring: explain the choice of conflicting Tag names in the creted namespace
+lib/python/cs/tagset.py: cs.tagset: make TagSet a direct subclass of dict, adjust uses of .update etc
+lib/python/cs/tagset.py: cs.tagsset: bugfix TagSet.as_namespace
+lib/python/cs/tagset.py: merge default ==> media
+lib/python/cs/tagset.py: cs.tagset: make TagSet subclass cs.lex.FormatableMixin
+lib/python/cs/tagset.py: cs.tagset: new ExtendedNamespace class which is a SimpleNamespace with some inferred attributes and a partial mapping API (keys and __getitem__)
+lib/python/cs/tagset.py: cs.tagset: TagSet.as_namespace now returns an ExtendedNamespace, which doubles as a mapping for str.format_map; TagSet.format_kwargs is now an alias for as_namespace; dodge shadowing issue by exposing a shadowed .foo and .foo._
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: rename Tag.as_namespace() to Tag.ns() for easy of use, as it may be very common
+lib/python/cs/tagset.py: cs.tagset: Tag: new from_string classmethod to parse a str into a Tag; docstring tweak
+lib/python/cs/tagset.py: cs.tagset: Tag docstring tweak
+lib/python/cs/tagset.py: cs.fstags,cs.tagset: move TagsOntology and TypedTag sideways into cs.tagset, accepting any tag_name=>TagSet mapping
+lib/python/cs/tagset.py: cs.tagset: TypedTag.ns: small bugfix; clean some lint
+lib/python/cs/tagset.py: cs.tagset: TagsOntology: drop unused `parent` (we will rely on the mapping); TypedTag: always have a type even if None, new property `.detail` returning the ontology.value_tags(self.name,self.value) TagSet this tag
+lib/python/cs/tagset.py: cs.tagset.py: TagsOntology: now a singleton keyed on the id of the supplied mapping
+lib/python/cs/tagset.py: cs.tagset: TagsOntology.value_tags: return None for unsupported value types (i.e. not str,int,float, and I have my misgivings about float); TypedTag.detail: document possible None return value

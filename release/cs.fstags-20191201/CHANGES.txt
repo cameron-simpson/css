@@ -1,0 +1,1 @@
+lib/python/cs/fstags.py: cs.fstags: add new "edit" subcommand to rename files and edit tags

@@ -1,0 +1,8 @@
+FSTags: new tagfile_for(filepath) to obtain the TagFile for filepath.
+FSTagsCommand: new -o ontology option to supply an ontology file for the FSTags.
+FSTagsCommand.cmd_ont: drop -o/--ontology, superceded by global -o option.
+Move BaseTagFile from cs.fstags to TagFile in cs.tagset.
+FSTags.edit_dirpath: we now get (old_name,new_name,TaggedPath) back from edit_many, obviating the te_id_map.
+TaggedPath: .name property returning basename(self.filepath), .set and .discard methods rejecting use of the 'name' tag.
+FSTagsCommand: port to new cs.cmdutils API.
+Many small refactors and bugfixes.

@@ -1,0 +1,2 @@
+lib/python/cs/tagset.py: Release information for cs.tagset-20200521.
+lib/python/cs/tagset.py: cs.tagset: fix DISTINFO.install_requires, drop debug import

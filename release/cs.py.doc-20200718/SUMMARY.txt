@@ -1,0 +1,3 @@
+New is_dunder(name) function to test whether name is a dunder name.
+module_doc: new method_names parameter to report only specific attributes from a class - default is all public names and most dunder methods - things without docs are not reported.
+Assorted small changes.

@@ -1,2 +1,5 @@
-#!/bin/sh
-exec python3 -m cs.app.osx.iphoto ${1+"$@"}
+#!/usr/bin/env python3
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.osx.iphoto import main
+sys.exit(main(sys.argv))

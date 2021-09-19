@@ -1,0 +1,12 @@
+lib/python/cs/pfx.py: Release information for cs.pfx-20200517.
+lib/python/cs/pfx.py: cs.pfx: bump __version__ to 20200517-post to avoid misleading value for future unreleased changes
+lib/python/cs/pfx.py: merge default ==> vt
+lib/python/cs/pfx.py: merge default ==> vt
+lib/python/cs/pfx.py: cs.logutils,cs.pfx: exception(): plumb keyword arguments
+lib/python/cs/pfx.py: cs.pfx: XP: just shim cs.x.X as callers expect, toss dubious extra functionality
+lib/python/cs/pfx.py: cs.pfx: drop obsoloete TODO item
+lib/python/cs/pfx.py: merge default ==> sqltags
+lib/python/cs/pfx.py: merge fstags ==> sqltags
+lib/python/cs/pfx.py: cs.pfx: new unpfx() function, a crude hack to strip an applpied cs.pfx prefix from a string; new DEFAULT_SEPARATOR constant
+lib/python/cs/pfx.py: cs.pfx: @pfx: recast the generator mode using @cs.deco.contextdecorator
+lib/python/cs/pfx.py: cs.pfx: drop special purpose @gen, unused, entriely covered by @pfx

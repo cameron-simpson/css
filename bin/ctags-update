@@ -7,8 +7,6 @@
 
 set -ue
 
-wd=$( command pwd )
-
 tags=
 
 cmd=$(basename "$0")
@@ -29,6 +27,8 @@ do
   shift
 done
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 [ -n "$tags" ] || tags=$( findup tags ) || {
   echo "$cmd: cannot find tags file and no -o option" >&2
   exit 1
@@ -37,5 +37,6 @@ done
 echo "$tags"
 exec 1>&2
 
+##[ -s "$tags" ] || set --
 set -x
 exec lock -P "$tags" ctags -R -a -o "$tags" --tag-relative --links=no --extra=fq ${1+"$@"}

@@ -39,7 +39,7 @@ def main(argv):
     return 2
   xit = 0
   try:
-    for name, newname in edit_strings(names, editor=editor, errors="ignore"):
+    for name, newname in edit_strings(names, editor=editor):
       if newname != name:
         if os.path.exists(newname):
           error("%s: %s => %s: target exists", cmd, name, newname)

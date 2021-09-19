@@ -1,0 +1,10 @@
+lib/python/cs/upd.py: cs.upd: Upd._singleton_key: static method
+lib/python/cs/upd.py: cs.upd: autoformat
+lib/python/cs/upd.py: cs.upd: Upd._move_to_slot_v: small optimisation, drop redundant assignment
+lib/python/cs/upd.py: cs.upd: Upd.insert: review the logic, make cleanups
+lib/python/cs/upd.py: cs.upd: Upd.proxy(0): autocreate slot 0 if there are no slots
+lib/python/cs/upd.py: cs.upd: Upd.delete: add missing call to self._update_proxies() after removing slot
+lib/python/cs/upd.py: cs.upd: Upd: expose the shutdown code as the shutdown method, intending use via atexit()
+lib/python/cs/upd.py: cs.upd: atexit cleanup now locates instances via the _singleton_instances class method
+lib/python/cs/upd.py: cs.upd: if __main__ run a little demo programme to exercise stuff for visual checking
+lib/python/cs/upd.py: cs.upd: clean some lint

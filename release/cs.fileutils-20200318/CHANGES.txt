@@ -1,0 +1,4 @@
+lib/python/cs/fileutils.py: cs.fileutils: docstring tweaks, autoformat
+lib/python/cs/fileutils.py: cs.fileutils: rewrite_cmgr: add example to docstring
+lib/python/cs/fileutils.py: cs.fileutils: new findup(path,test) function to walk up a file tree
+lib/python/cs/fileutils.py: cs.fileutils: findup: turn into a generator, yielding all matching paths; also add optional first= parameter which causes it to always yield only the first match, or None

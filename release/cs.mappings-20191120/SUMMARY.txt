@@ -1,0 +1,1 @@
+named_row_tuple: support None in a column name, as from Excel unfilled heading row entries

@@ -22,15 +22,18 @@ from cs.logutils import warning
 from cs.mappings import named_column_tuples
 from cs.pfx import Pfx
 
+__version__ = '20201228-post'
+
 DISTINFO = {
-    'description': "CSV file related facilities",
+    'description':
+    "CSV file related facilities",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx' ],
+    'install_requires': ['cs.deco', 'cs.logutils', 'cs.mappings', 'cs.pfx'],
 }
 
 if sys.hexversion >= 0x03000000:
@@ -51,7 +54,8 @@ if sys.hexversion >= 0x03000000:
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
         default 'utf-8'.
     '''
-    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
+    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row,
+             encoding):
       return csvw.writerow(row)
 
 else:
@@ -91,7 +95,8 @@ def csv_import(
     computed=None,
     preprocess=None,
     mixin=None,
-    **kw):
+    **kw
+):
   ''' Read CSV data where the first row contains column headers.
       Returns a row namedtuple factory and an iterable of instances.
 
@@ -107,12 +112,12 @@ def csv_import(
         via __getitem__
       * `preprocess`: optional keyword parameter providing a callable
         to modify CSV rows before they are converted into the namedtuple.
-        It receives a context object an the data row. It may return
+        It receives a context object and the data row. It may return
         the row (possibly modified), or None to drop the row.
       * `mixin`: an optional mixin class for the generated namedtuple subclass
         to provide extra methods or properties
 
-      All other keyword paramaters are passed to csv_reader(). This
+      All other keyword parameters are passed to csv_reader(). This
       is a very thin shim around `cs.mappings.named_column_tuples`.
 
       Examples:
@@ -133,12 +138,10 @@ def csv_import(
       column_names=column_names,
       computed=computed,
       preprocess=preprocess,
-      mixin=mixin)
+      mixin=mixin
+  )
 
-def xl_import(
-    workbook, sheet_name,
-    skip_rows=0,
-    **kw):
+def xl_import(workbook, sheet_name=None, skip_rows=0, **kw):
   ''' Read the named `sheet_name` from the Excel XLSX file named
       `filename` as for `csv_import`.
       Returns a row namedtuple factory and an iterable of instances.
@@ -147,7 +150,9 @@ def xl_import(
       * `workbook`: Excel work book from which to load the sheet; if
         this is a str then the work book is obtained from
         openpyxl.load_workbook()
-      * `sheet_name`: the name of the work book sheet whose data should be imported
+      * `sheet_name`: optional name of the work book sheet
+        whose data should be imported;
+        the default (`None`) selects the active worksheet
 
       Other keyword parameters are as for cs.mappings.named_column_tuples.
 
@@ -159,14 +164,20 @@ def xl_import(
     with Pfx(wb_filename):
       workbook = load_workbook(filename=wb_filename, read_only=True)
       return xl_import(workbook, sheet_name, skip_rows=skip_rows, **kw)
+  if sheet_name is None:
+    worksheet = workbook.active
+    if worksheet is None:
+      worksheet = workbook[workbook.get_sheet_names()[0]]
   else:
-    return named_column_tuples(
-        (
-            [ cell.value for cell in row ]
-            for ri, row in enumerate(workbook[sheet_name])
-            if ri >= skip_rows
-        ),
-        **kw )
+    worksheet = workbook[sheet_name]
+  return named_column_tuples(
+      (
+          [cell.value
+           for cell in row]
+          for ri, row in enumerate(worksheet)
+          if ri >= skip_rows
+      ), **kw
+  )
 
 if __name__ == '__main__':
   args = sys.argv[1:]

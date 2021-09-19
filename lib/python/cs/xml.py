@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Basic XML conveniences.
 #   - Cameron Simpson <cs@cskk.id.au> 12feb2017

@@ -35,16 +35,16 @@ to identify the file contents in a compact and human readable form.
 from __future__ import print_function
 from collections import namedtuple, defaultdict
 from os.path import basename, splitext
-from pprint import pformat
 import re
 import sys
 from types import SimpleNamespace as NS
 from cs.pfx import Pfx
 from cs.py.func import prop
-from cs.x import X
+from cs.tagset import Tag
 
 DISTINFO = {
-    'description': "Simple facilities for media information",
+    'description':
+    "Simple facilities for media information",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -54,12 +54,15 @@ DISTINFO = {
     'install_requires': [
         'cs.pfx',
         'cs.py.func',
+        'cs.tagset',
     ],
 }
 
 USAGE = r'''Usage: %s media-filenames...'''
 
 def main(argv=None):
+  ''' Main command line running some test code.
+  '''
   if argv is None:
     argv = sys.argv
   argv = list(argv)
@@ -71,7 +74,7 @@ def main(argv=None):
     return 2
   for pathname in argv:
     with Pfx("%r", pathname):
-      name, ext = splitext(basename(pathname))
+      name, _ = splitext(basename(pathname))
       for part, fields in parse_name(name):
         print(" ", part, repr(fields))
       print(" ", name, pathname_info(pathname))
@@ -99,6 +102,7 @@ def part_to_title(part):
   return part.strip('- \t\r\n').replace('-', ' ').title()
 
 _EpisodeDatumDefn = namedtuple('EpisodeDatumDefn', 'name prefix re')
+
 class EpisodeDatumDefn(_EpisodeDatumDefn):
   ''' An `EpisodeInfo` marker definition.
   '''
@@ -119,8 +123,7 @@ class EpisodeDatumDefn(_EpisodeDatumDefn):
     if m:
       return int(m.group(1)), offset + m.end()
     raise ValueError(
-        '%s: unparsed episode datum: %r'
-        % (type(self).__name__, s[offset:])
+        '%s: unparsed episode datum: %r' % (type(self).__name__, s[offset:])
     )
 
 class EpisodeInfo(NS):
@@ -143,6 +146,22 @@ class EpisodeInfo(NS):
     self.episode = episode
     self.part = part
     self.scene = scene
+
+  def as_dict(self):
+    ''' Return the episode info as a `dict`.
+    '''
+    d = {}
+    for attr in 'series', 'episode', 'part', 'scene':
+      value = getattr(self, attr)
+      if value is not None:
+        d[attr] = value
+    return d
+
+  def as_tags(self, prefix=None):
+    ''' Generator yielding the episode info as `Tag`s.
+    '''
+    for field, value in self.as_dict().items():
+      yield Tag(field, value, prefix=prefix)
 
   def __str__(self):
     marks = []
@@ -218,9 +237,10 @@ class EpisodeInfo(NS):
           break
       if offset == start_offset:
         # no component info, try other things
-        if len(s) == 4 and s.isdigit() and s.startswith(('19','20')):
+        if len(s) == 4 and s.isdigit() and s.startswith(('19', '20')):
           fields['year'] = int(s)
-        elif len(s) == 6 and s[1:-1].isdigit() and s.startswith(('19','20'), 1):
+        elif len(s) == 6 and s[1:-1].isdigit() and s.startswith(
+            ('19', '20'), 1):
           fields['year'] = int(s[1:-1])
       return fields, offset
 
@@ -241,7 +261,6 @@ def parse_name(name, sep='--'):
       (the portion remaining after stripping the file extension)
       and yield `(part,fields)` for each part as delineated by `sep`.
   '''
-  unstructured_info = []
   unstructured_sections = ('series_name', 'episode_name', 'source_name')
   unstructured_index = 0
   with Pfx("parse_name(%r)", name):
@@ -262,21 +281,25 @@ def parse_name(name, sep='--'):
             fields = None
         elif offset < len(part):
           print(
-              "warning: parse_name %r: part %r: unparsed: %r"
-              % (name, part0, part[offset:]))
+              "warning: parse_name %r: part %r: unparsed: %r" %
+              (name, part0, part[offset:])
+          )
         yield part0, fields
 
 def pathname_info(pathname):
   ''' Parse information from the basename of a file pathname.
       Return a mapping of field => values in the order parsed.
   '''
-  info=defaultdict(list)
-  name, ext = splitext(basename(pathname))
-  for part, fields in parse_name(name):
+  info = defaultdict(list)
+  name, _ = splitext(basename(pathname))
+  for _, fields in parse_name(name):
     if fields:
       for field, value in fields.items():
         if field in info:
-          print("discard %r=%r: already have %r=%r" % (field,value,field,info[field]))
+          print(
+              "discard %r=%r: already have %r=%r" %
+              (field, value, field, info[field])
+          )
         else:
           info[field].append(value)
   return info

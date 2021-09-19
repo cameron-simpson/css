@@ -1,0 +1,1 @@
+Bugfix: BaseProgress.status: handle throughput=0 when total=None.

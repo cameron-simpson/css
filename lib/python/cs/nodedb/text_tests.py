@@ -11,6 +11,8 @@ from .text import totoken, fromtoken, get_commatext
 from .mappingdb import MappingBackend
 
 class TestTokeniser(unittest.TestCase):
+  ''' Tests for `cs.nodedb.text`.
+  '''
 
   def nodedb(self):
     self.backend = MappingBackend(self.mapping)

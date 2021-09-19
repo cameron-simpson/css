@@ -1,3 +1,7 @@
+mailfiler needed 2 ctrl-c to exit
+support renaming headers in a cascade, example for googlegroups dkim, shuffle From to x-from-ggroups, shuffle x-original-from to from
+make default header set tunable, eg include sender: in to/cc/bcc, would halve my ruleset
+easy match on label, supporting classify early, file later
 some kind of pass mode, probably DEFAULT=.
 translate mailfiler.1.pod and .5.pod to md
 +target adds the target but does not count as "filed" - for crossfiling

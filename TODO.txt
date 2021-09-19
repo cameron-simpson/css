@@ -1,16 +1,87 @@
+baseCommand autousage: make up a stub usage for subcommands with no usage
+parser for /etc/terminal-colors.d
+BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
+cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
+cs.upd: add pprint wrapper
+cs.app.playon: keep playon recording info as ontology, distinct from state db
+gitlog - record the branch too - maybe totally record dlog
+extended prime seive impl?
+let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
+cs.pop3: buffering for the SSL mode
+an atomic-sh make scratch dir then rename to target name decorator
+cs.units: maybe we can embed "%2.1f" in the UnitStep instead of max_width? may be faster
+pfx_method: pass printf_func arg to Pfx
+BaseCommand: do the prefix thing? unique prefix enough to invoke subcommand?
+BaseCommand usage: recognise synonyms and merge cmd as {cmd1,cmd2}
+cs.mp3: parse tags? pull names etc from cs.id3
+progress/upd: fixed with trailing units, eg %2d
+run-backups: single file: src type desthost[:dstpath?] [options...]
+cs.pfx: can we hang the prefixes on the current frame? would solve the generator issue (NO, WE CANNOT)
+cs.logutils,pilfer: drop D_mode and the D function
+cs.upd: what to do when the number of status lines exceeds the terminal height?
+try to strip out use of cs.py3.bytes
+replace @locked_property with @property @locked @cachedmethod throughout to placate linters, then @OBSOLETE @locked_property
+cs.logutils: warning et all: once=key (or key on the warning format string if True)
+general facility to do things just once, particularly warnings - then port cs.progress to it
+Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
+cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
+cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
+use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
+@OBSOLETE(PfxThread) and replace uses with cs.threads.bg
+cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
+vbox: cmd to associate the current default interface before starting vm?
+vbox merge-vdi to merge vdis made from the same import, so likely to have largely the same blocks
+does dbdigraph really need T_SEQ and friends? try to push that into cs.hier too
+securer findup: sanity check on ownership or perms to stop walk? tunable?
+BaseCommand: can we provide the expected command name instead of the class name in the docstring?
+cs.logutils: when cs.upd has an ansi_mode, colour messages even when logrec.levelno == self.upd_level
+cs.upd: ansi_mode to accept coloured message strings - requires an ansi_len function in cs.tty
+cs.upd: some kind of ANSI escape support so that we can embed ANSI sequences in strings without confusing the length counter? cs.ansi_colour to get a parser/length measurer?
+cs.progress: OverProgress: if units_scale=None, defer units_scale to render time, get from first subprogress?
+cs.progress: control over status display - units etc
+cs.upd: rate per proxy, bisect to update counter, autotune?
+incd: remote tmux session to be per target dir
+haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
+BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
+new cs.dlog module and bin-cs/dlog command doing what the shell script does now
+dlog: commit logs - tags the commit hash and branch
+dlog: accept tags (leading tag=value words)?
+rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
+can putacc be recoded to use fstags --for-rsync efficiently? PROBABLY NOT REQUIRES FULL TREE WALK unless we can target the subtrees
+ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
+treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
+pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
+cs.vcs.hg: import mercurial on instantiation, use native mercurial calls
+cs.vcs.hg: log_since etc to always return ReleaseLogEntry instances, with full desc etc - firstline convenience property etc
+cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111cda5f0>
+incd: only save target for remote targets
+incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?
+cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
+signature based @cached properties, with revision numbers as fallback mode
+replace use of sys.hexversion with sys.version.major etc
+cs.rfc2047: command line mode with filter-text and rename-filename modes
+cs.contextutils: no_recursion(identity_value[,default_return_value]) context manager for functions which might accidentally recurse
+cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
+mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
+BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
+media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
+bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
+resolve bin/maildb vs bin-cs/cs-maildb
+svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
+setup_logging: can this be a context manager pushing a handler (ideally hiding existing handlers)
+cs.py3: update cs.p3 module docstring with example code as it does not show the submodule names
+logutils: use cs.tty stuff for the status() function
+@strable: treat pathlike things like str?
+@locked: do a timedout acquire with backoff to aid deadlock debugging
+RunState flow diagram: pending->running->cancelled-stopped and triggers?
 cs.app.flags: make a FlagOSDir mapping class to implement the fs based flags, accept any mapping for the Flags class, move the normalisation the the Flags class otherwise a raw mapping impl might fail if moved to the fs
 Pfx: do not insert umark: if umark is empty, supports "" and None
-implement cs.lex cutprefix and cutsuffix, push to PyPI after testing in PM stuff
-make most cs.obj methods functions, try to drop O class
 mutt-highlight: match markers at start or end of lines
-OverProgress: Progress whose properties are the sum of other Progresses, computed at need
 readline: fix spelling, detab, apply set -ue, use read -r line as fallback
 cs.excutils_tests: special logging setup to discard error messages - the successful test suite is very noisy
-distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose
-cs-release: latest release tag comment in top of generated distinfo
 @decorator: issue warning if positional arg 0 is callable and other args supplied, at least for the interim
 @decorator: maybe support @deco(callable,*a,**kw)?
-@mapattr class decorator to map .foo to .bah.this.that... with get/set support
+@mapattr class decorator to map .foo to .bah.this.that... with get/set support (why? use case?)
 cs.deco: @decorator: does not seem to propagate __doc__ to wrapper functions from inner function - needs debugging
 man pages not included in PyPI packages, for example cs.app.mailfiler
 cs.app.megacli: after fixup, copy to megacli_legacy as py2, upgrade megacli to python 3, update module docstrings to explain and reference
@@ -21,7 +92,6 @@ rc/shell/fn-vcs: move repeated-commit check into hg() and git() functions
 replace cs.env.envsub with os.path.expandvars
 portfwd: changes to match svcd changes
 svcd: take a Service instance, which will have optional on_reap, on_spawn etc method, cutting down the ludicrous param list
-make cs.distinfo just do a Package class, split out PyPI stuff into cs.app.pypi.PyPI(PKG, base urls...)
 drop lib/python/cs/testdata/cs.mailutils/maildir, too big
 cs.mappings: support passing a named_column_tuple class to the names_columns_tuples loader
 mappings: named tuple rows: omit columns with empty names - common in spreadsheet exports and breaks namedtuples
@@ -29,7 +99,7 @@ iso14496: parser for mdat section - how to know the audio/video format?
 cs.flags: put a lock around all accesses
 SvcD to subclass RunStateMixin?
 Results to inherit from RunStateMixin?
-SvcD/Portfwd: if there some inlocked dict access or something to trigger the segfault?
+SvcD/Portfwd: is there some unlocked dict access or something to trigger the segfault?
 SvcD/Portfwd: cleanup mode polling pid files to kill former processes
 take the wait-until-idle code from cs.vt.index.LMDBIndex and turn into a general facility in cs.resources
 cs.resources: finish subopen proxy support
@@ -40,17 +110,12 @@ make Asynchrons __await__able
 port cs.fileutils.files_property to cs.deco.cached
 cs.py.func: @signatured to track state based on signature func, support poll rate, port file_property etc to this
 fvwm: move cs-fvwm-blah python code into cs.app.fvwm
-nodedb:
-  reform map: dunders update and push changes, foreign methods to
-    ingest changes, iter to watch foreign changes or all changes,
-    support multiple iterators by registering notifiers?
 cs.py.func: find out why eval causes syntax error with raise e from e2
 vcs: modernise into "vcs top", "vcs branch", "vcs new-branch", "vcs commit" etc and track git branch changes with notes via post-commit
 portfwd ARP_ADDR check for local networks
 colourise command highlighing multiple regexps and line ranges
 portfwd daemon mode to monitor active pf flags, start/stop relevant daemons
 pf activate new-pf-clause
-e: sort entries
 rename shortpath-prompt to short-path, make path breaking shortenings options (for prompt mode), make it work with relative paths and files as endpoints
 setenv: remove cs.logutils, not py2.5 compatible
 vbox: support remote device import for mkvdi

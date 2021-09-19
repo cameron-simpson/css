@@ -1,0 +1,5 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200520.
+lib/python/cs/progress.py: cs.progress: docstring tweak
+lib/python/cs/progress.py: cs.progress: move the description into the module docstring
+lib/python/cs/progress.py: cs.progress: BaseProgress and progress now accept an optional units_scale, such as cs.units.UNSCALED_SCALE, to use when expressing progress - the default remains BINARY_SCALE; new arrow(), format_counter() and text_pos_of_total() methods to produce components of the status string for tuning or external reuse
+lib/python/cs/progress.py: cs.progress: OverProgress: add support for the units_scale parameter; autoformat the code

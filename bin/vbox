@@ -1,6 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Convenience wrapper for VirtualBox command line tools.
-#   - Cameron Simpson <cs@cskk.id.au> 06may2016
+# - Cameron Simpson <cs@cskk.id.au> 06may2016
 #
-exec python -m cs.app.virtualbox ${1+"$@"}
+
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.virtualbox import main
+sys.exit(main(sys.argv))

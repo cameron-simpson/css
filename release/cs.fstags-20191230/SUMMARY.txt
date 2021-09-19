@@ -1,0 +1,5 @@
+Command line: new "find" command to search a file tree based on tags.
+Command line: new "mv" command to move a file and its tags.
+Command line: Python string formats for "find" and "ls" output.
+TaggedPath.autotag: new optional `no_save` parameter, default False, to suppress update of the associated .fstags file.
+Inital and untested "mirror tags to xattrs" support.

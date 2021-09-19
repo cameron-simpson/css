@@ -1,0 +1,4 @@
+Upd: can now be used as a context manager, clearing the line on exit.
+Upd.without is now a context manager, returning the older state, and accepting an optional inner state (default "").
+Upd is now a singleton factory, obsoleting upd_for.
+Upd.nl: use "insert line above" mode if supported.

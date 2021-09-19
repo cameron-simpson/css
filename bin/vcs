@@ -3,43 +3,78 @@
 # Do simple things with revision controlled source.
 # - Cameron Simpson <cs@cskk.id.au> 25apr2007
 #
-# Huge revsision. - cameron 11may2017
+# Huge revision. - cameron 11may2017
 #
 
 set -ue
 
 : ${TMPDIR:=/tmp}
 : ${EDITOR:=vi}
+
+: ${VCS_FORMAT_TSLOG_GIT:='%ci %ae %s'}
+: ${VCS_FORMAT_TSLOG_HG:='{date|isodate} {author|email} {desc|firstline}\n'}
+
 : ${VCS_FORMAT_GLOG_GIT:='%<(25)%ae %s%n%ci %h<-%p%d%n'}
 : ${VCS_FORMAT_GLOG_HG:='{author|email} {desc|firstline}\n{date|isodate} {rev}:{node|short}<-{ifeq(p2node|short,"000000000000",p1node|short,join(parents))}{ifeq(branch,"default",""," [{branch}]")}{ifeq(activebookmark,"","","@{activebookmark}")}{ifeq(count(tags),0,""," ({join(tags)})")}\n\n'}
 
+: ${VCS_CLONE2_CP:='.envrc'}
+: ${VCS_CLONE2_SYM:=''}
+
 cmd=$(basename "$0")
-usage="Usage: $cmd [-V vcs_type] [command [args...]]
+usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
+  -d dir        Working directory, default: .
+  -q            Quiet. Turn off tracing and a lot of command output.
+  -t topdir     Top of the VCS tree.
   -V vcs_type   Specify the VCS type to use.
+  -x            Turn on command excution tracing.
                 An empty string asks $cmd to figure this out.
   Commands:
     branch      Report current branch name.
     branches    Report all branch names.
+    clone2      Wrapper for \"$cmd sibling\" which copies some additional state:
+                  Files or directories named in \$VCS_CLONE2_CP are copied.
+                  Files or directories named in \$VCS_CLONE2_SYM are symlinked.
+                Relative paths in these variables are resolved
+                relative to the VCS top.
     diff        Run the VCS diff command.
+    dl, download Download remote changes.
+                Does not update or merge the local checkout.
     glog        Report a graphical change log.
+    get-branches [remote [remote-branch-names...]]
+                Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
+    record      Record partial changes: \"hg record\" or \"git add -p\".
+    remote      Report remote paths.
     report      (Default.) Report brief summary.
+    sibling clonedir
+                Clone the current repo to clonedir but keep the
+                upstream the same as ours.
     status      Report tree status.
     tags        Report tag names.
-    top [dir]   Report top of tree.
-    type [dir]  Report type of tree."
+    top         Report top of tree.
+    tslog       Report a timesheet suitable change log:
+                  date time zone author headline
+    type        Report type of tree."
 
+wd=.
+vcs_top=
 vcs_type=
 trace=command
-##[ -t 2 ] && trace=set-x
+[ -t 2 ] && trace=set-x
+hg_q=
+git_q=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -d) wd=$2; shift ;;
+    -q) trace=command hg_q=-q git_q=-q ;;
+    -t) vcs_top=$2; shift ;;
     -V) vcs_type=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -49,47 +84,62 @@ do
   shift
 done
 
+[ -d "$wd/" ] || { echo "$cmd: not a directory: $wd" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# enter working directory
+cd "$wd"
+
+[ -n "$vcs_top" ] || {
+  # locate VCS top
+  case "$vcs_type" in
+    hg)   findup_test='[ -e "$FINDUP_DIR/.hg" ]' ;;
+    git)  findup_test='[ -e "$FINDUP_DIR/.git" ]' ;;
+    ?*)   echo "$cmd: unsupported VCS \"$vcs_type\"" >&2; exit 1 ;;
+    *)    findup_test='[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]' ;;
+  esac
+  vcs_top=$(
+      set -ue
+      findup -d . -c "$findup_test"
+  )
+} || {
+  echo "$cmd: $wd: cannot locate VCS top" >&2
+  exit 1
+}
+
+[ -n "$vcs_type" ] || {
+  if [ -e "$vcs_top/.hg" ]
+  then  vcs_type=hg
+  else
+    if [ -e "$vcs_top/.git" ]
+    then  vcs_type=git
+    else  echo "$cmd: cannot infer VCS type from top dir $vcs_top" >&2
+          exit 1
+    fi
+  fi
+}
+
 if [ $# = 0 ]
 then    op=report
 else    op=$1; shift
 fi
 
-hg(){   $trace hg ${1+"$@"}; }
+hg(){   $trace hg -R "$vcs_top" ${1+"$@"}; }
 git(){  $trace git ${1+"$@"}; }
 
 # Compute working directory VCS type.
 # All other commands are split on type below.
 case "$op" in
   info)
-    # emit:
-    #  type=vcs_type
-    #  top=vcs_topdir
-    dir=.
-    [ $# = 0 ] || { dir=$1; shift; }
     if [ $# -gt 0 ]
     then
       echo "$cmd: $op: extra arguments after dir: $*" &2
       badopts=1
     else
-      topdir=$( set -ue
-                cd "$dir"
-                findup -d . -c '[ -e "$FINDUP_DIR/.hg" -o -e "$FINDUP_DIR/.git" ]'
-              ) || {
-        echo "$cmd: $op $dir: cannot locate VCS top" >&2
-        exit 1
-      }
-      if [ -d "$topdir/.hg" ]
-      then  type=hg
-      else
-        if [ -e "$topdir/.git" ]
-        then  type=git
-        else  echo "$cmd: $op $dir: cannot determine VCS type at topdir=$topdir" >&2
-              exit 1
-        fi
-      fi
-      branch=$("$0" -V "$type" branch)
-      printf 'top %s\ntype %s\nbranch %s\n' "$topdir" "$type" "$branch"
-      case "$type" in
+      vcs_branch=$( "$0" -V "$vcs_type" branch )
+      printf 'top %s\ntype %s\nbranch %s\n' "$vcs_top" "$vcs_type" "$vcs_branch"
+      case "$vcs_type" in
         hg)
           bookmark=$(hg bookmark | sed -n '/^ \* /!d; s///; s/ .*//; p')
           printf 'bookmark %s\n' "$bookmark"
@@ -98,48 +148,178 @@ case "$op" in
     fi
     ;;
   top)
-    "$0" info ${1+"$@"} | awk '$1 == "top" { print $2; exit; }'
+    printf '%s\n' "$vcs_top"
     ;;
   type)
-    "$0" info ${1+"$@"} | awk '$1 == "type" { print $2; exit; }'
+    printf '%s\n' "$vcs_type"
     ;;
   *)
-    # other commands need the VCS type
-    [ -n "$vcs_type" ] \
-    || { vcs_type=$("$0" type) && [ -n "$vcs_type" ]; } \
-    || {
-      echo "$cmd: cannot infer VCS type" >&2
-      exit 1
-    }
+    # variant for each of the following operations
     case "$op,$vcs_type" in
+      # report current branch
       branch,git)   git branch | sed -n 's/^\* //p' ;;
       branch,hg)    hg branch ;;
+      # report all branches
       branches,git) git branch ;;
       branches,hg)  hg branches ${1+"$@"} ;;
+      clone2,*)     exec 3>&1 1>&2
+                    clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    case "$clonedir" in
+                      */*)  clone_branch= ;;
+                      [a-z1-9]*-*)
+                            clone_branch=$clonedir
+                            br=$( "$0" branch )
+                            wd=$( pwd )
+                            base=$( basename "$wd" )
+                            case "$base" in
+                              *-"$br")  pfx=$( expr "x$base" : 'x\(.*\)-'"$br" )
+                                        clonedir=../$pfx-$clone_branch
+                                        ;;
+                              *)        clonedir=$wd-$br
+                                        ;;
+                            esac
+                            ;;
+                      *)    clone_branch= ;;
+                    esac
+                    "$0" sibling "$clonedir"
+                    for mode in cp sym
+                    do
+                      case "$mode" in
+                        cp) pathvar=VCS_CLONE2_CP  paths=$VCS_CLONE2_CP ;;
+                        sym)pathvar=VCS_CLONE2_SYM paths=$VCS_CLONE2_SYM ;;
+                        *)  echo "$cmd $op: mode=$mode: unimplemeneted mode, skipping" >&2
+                            continue
+                            ;;
+                      esac
+                      for srcpath in $paths
+                      do
+                        context="$cmd $op: \$$pathvar: $srcpath"
+                        case "$srcpath" in
+                          /*) echo "$context: ignore absolute path" >&2
+                              continue
+                              ;;
+                        esac
+                        subdir=$( dirname "$srcpath" )
+                        srcpath=$vcs_top/$srcpath
+                        [ -e "$srcpath" ] || {
+                          echo "$context: does not exist, skipping" >&2
+                          continue
+                        }
+                        [ -d "$clonedir/$subdir/" ] \
+                        || $trace mkdir -p "$clonedir/$subdir" \
+                        || {
+                          echo "$context: cannot make subdir, skipping" >&2
+                          continue
+                        }
+                        case "$mode" in
+                          cp) $trace cp -a "$srcpath" "$clonedir/$subdir/" ;;
+                          sym)$trace ln -s "$srcpath" "$clonedir/$subdir/" ;;
+                          *)  echo "$context: mode=$mode: unimplemented mode, skipping" >&2 ;;
+                        esac
+                      done
+                    done
+                    [ -z "$clone_branch" ] || {
+                      case "$vcs_type" in
+                        hg)   ask "create branch $clone_branch" \
+                              && incd "$clonedir" hg bookmark "$clone_branch"
+                              ;;
+                        git)  incd "$clonedir" git co -b "$clone_branch"
+                              ;;
+                      esac
+                    }
+                    incd "$clonedir" pwd >&3
+                    ;;
+      # current diff
       diff,git)     git diff ${1+"$@"} ;;
       diff,hg)      hg diff ${1+"$@"} ;;
+      dl,git | download,git)
+                    git fetch $git_q --all ${1+"$@"} ;;
+      dl,hg | download,hg)
+                    hg pull $hg_q ${1+"$@"} ;;
+      get-branches,git)
+                    if [ $# = 0 ]
+                    then  remote=origin
+                    else  remote=$1; shift
+                    fi
+                    if [ $# = 0 ]
+                    then
+                      git branch -r | sed "s/^  //;/^$remote\\//!d; / /d"
+                    else
+                      for rbr
+                      do  echo "$rbr"
+                      done
+                    fi \
+                    | while read -r rbr
+                      do
+                        lbr=${rbr##$remote/}
+                        if git branch | grep "^. $lbr\$" >/dev/null
+                        then
+                          echo "$cmd: $op: $rbr: local branch already exists"
+                        else
+                          git branch --track "$lbr" "$rbr" || break
+                        fi
+                      done
+                    ;;
+      # graph log
       glog,git)     git log \
-                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" \
+                      --graph "--format=tformat:$VCS_FORMAT_GLOG_GIT" --date-order \
                       ${1+"$@"}
                     ;;
       glog,hg)      hg log -G --template "$VCS_FORMAT_GLOG_HG" \
                       ${1+"$@"}
                     ;;
+      # report modified files
       modified,git) ( cd "$vcs_top"
                       git status --porcelain | awk '$1 == "M" { print $2 }'
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      # record partial changes
+      record,hg)    hg record ${1+"$@"} ;;
+      record,git)   git add -p ${1+"$@"} && git diff --staged \
+                    && msg=$( readline "commit message? " ) && [ -n "$msg" ] \
+                    && git commit -m "$msg"
+                    ;;
+      # report remote repo paths
+      remote,git)   git remote ${1+"$@"} ${1-"-v"} ;;
+      remote,hg)    hg config paths ${1+"$@"} ;;
+      # report and/or status
       report,git | status,git | st,git )
                     git status ${1+"$@"}
                     ;;
       report,hg)    hg summary
                     hg status -C ${1+"$@"} | grep '^[^?]'
                     ;;
+      sibling,hg)   clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    hg clone "$vcs_top" "$clonedir"
+                    upstream=$( hg path default )
+                    bsed \
+                      "/^ *\\[ *paths *\\]/,/^ *\\[/s^default *=.*default = $upstream" \
+                      "$clonedir/.hg/hgrc"
+                    ;;
+      sibling,git)  clonedir=$1; shift
+                    [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    git clone "$vcs_top" "$clonedir"
+                    upstream=$( git remote get-url origin )
+                    incd "$clonedir" git remote set-url origin "$upstream"
+                    ;;
       status,hg | st,hg)
-                    hg status -C ${1+"$@"} ;;
+                    hg status -C ${1+"$@"}
+                    ;;
+      # report tags
       tags,git)     [ $# -gt 0 ] || set -- -l; git tag "$@" ;;
       tags,hg)      hg tags ${1+"$@"} ;;
+      # timesheet suitable log: timestampts, author, headline
+      tslog,git)     git log \
+                      "--format=tformat:$VCS_FORMAT_TSLOG_GIT" \
+                      ${1+"$@"}
+                    ;;
+      tslog,hg)      hg log --template "$VCS_FORMAT_TSLOG_HG" \
+                      ${1+"$@"}
+                    ;;
+      # update to revision
       up,git|update,git)
                     if [ $# = 1 ]
                     then

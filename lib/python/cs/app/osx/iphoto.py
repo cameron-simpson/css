@@ -8,7 +8,8 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-from collections import namedtuple
+from os.path import isabs as isabspath
+from collections import defaultdict, namedtuple
 from fnmatch import fnmatch
 from functools import partial
 import pprint
@@ -17,22 +18,25 @@ import re
 import shlex
 import sqlite3
 from threading import RLock
+from types import SimpleNamespace as NS
 from uuid import uuid4
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
-from .plist import ingest_plist
 from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
+from cs.fstags import FSTags
 from cs.lex import get_identifier
 from cs.logutils import debug, info, warning, error, setup_logging
 from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, XP
-from cs.obj import O
 from cs.py.func import prop
 from cs.seq import the
+from cs.tagset import Tag
 from cs.threads import locked, locked_property
+from cs.upd import Upd
 from cs.x import X
+from .plist import ingest_plist
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
@@ -80,7 +84,7 @@ def main(argv=None):
   ''' Main program associated with the cs.app.osx.iphoto module.
   '''
   if argv is None:
-    argv = [ 'cs.app.osx.iphoto' ]
+    argv = ['cs.app.osx.iphoto']
   cmd0 = argv.pop(0)
   cmd = os.path.basename(cmd0)
   usage = USAGE % (cmd,)
@@ -89,7 +93,9 @@ def main(argv=None):
     if argv and argv[0].startswith('/'):
       library_path = argv.pop(0)
     else:
-      library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
+      library_path = os.environ.get(
+          'IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY)
+      )
     I = iPhoto(library_path)
     try:
       return main_iphoto(I, argv)
@@ -106,6 +112,8 @@ def main_iphoto(I, argv):
   with Pfx(op):
     if op == '-':
       xit = cmd_(I, argv)
+    elif op == 'fstags_export':
+      xit = cmd_fstags_export(I, argv)
     elif op == 'info':
       xit = cmd_info(I, argv)
     elif op == 'ls':
@@ -148,6 +156,30 @@ def cmd_(I, argv):
     xit = 2
   return xit
 
+def cmd_fstags_export(I, argv):
+  ''' Usage: fstags_export masters
+  '''
+  xit = 0
+  if not argv:
+    raise GetoptError("missing masters")
+  fstags = FSTags()
+  with Upd(sys.stderr) as U:
+    with fstags:
+      obclass = argv.pop(0)
+      with Pfx(obclass):
+        if obclass == 'masters':
+          for master in sorted(I.masters, key=lambda m: m.pathname):
+            U.out(master.pathname)
+            with Pfx(master.pathname):
+              tags = fstags[master.pathname]
+              for tag in master.tags():
+                export_tag = Tag('iphoto.' + tag.name, tag.value)
+                if export_tag not in tags:
+                  tags.set(export_tag, verbose=True)
+        else:
+          raise GetoptError("unknown class: %r" % (obclass,))
+  return xit
+
 def cmd_info(I, argv):
   ''' Usage: info masters...
   '''
@@ -164,8 +196,10 @@ def cmd_info(I, argv):
             error("no info")
             xit = 1
           else:
-            print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
-                  *[ 'kw:'+kwname for kwname in master.keyword_names ])
+            print(
+                master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
+                *['kw:' + kwname for kwname in master.keyword_names]
+            )
     else:
       raise GetoptError("unknown class: %r" % (obclass,))
   return xit
@@ -205,10 +239,10 @@ def cmd_ls(I, argv):
           for column_name in sorted(row.column_names):
             if column_name.endswith('Data'):
               obj = ingest_plist(row[column_name], recurse=True, resolve=True)
-              print(' ', column_name+':')
+              print(' ', column_name + ':')
               pprint.pprint(obj.value, width=32)
             else:
-              print(' ', column_name+':', row[column_name])
+              print(' ', column_name + ':', row[column_name])
         if obclass == 'albums':
           print("apalbumpath =", row.apalbum_path)
           apalbum = row.apalbum
@@ -248,13 +282,13 @@ def cmd_rename(I, argv):
           # TODO: select by regexp if /blah
           if arg.startswith('/'):
             regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
-            edit_lines.update(item.edit_string
-                              for item in items
-                              if regexp.search(item.name))
+            edit_lines.update(
+                item.edit_string for item in items if regexp.search(item.name)
+            )
           elif '*' in arg or '?' in arg:
-            edit_lines.update(item.edit_string
-                              for item in items
-                              if fnmatch(item.name, arg))
+            edit_lines.update(
+                item.edit_string for item in items if fnmatch(item.name, arg)
+            )
           elif arg in all_names:
             for item in items:
               if item.name == arg:
@@ -263,10 +297,10 @@ def cmd_rename(I, argv):
             raise GetoptError("unknown item name")
     else:
       edit_lines = set(item.edit_string for item in items)
-    changes = edit_strings(sorted(edit_lines,
-                                  key=lambda _: _.split(':', 1)[1]),
-                           errors=lambda msg: warning(msg + ', discarded')
-                          )
+    changes = edit_strings(
+        sorted(edit_lines, key=lambda _: _.split(':', 1)[1]),
+        errors=lambda msg: warning(msg + ', discarded')
+    )
     for old_string, new_string in changes:
       with Pfx("%s => %s", old_string, new_string):
         old_modelId, old_name = old_string.split(':', 1)
@@ -285,9 +319,9 @@ def cmd_rename(I, argv):
             if obclass in ('keywords', 'tags'):
               # TODO: merge keywords
               print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
-              otherModelId = the(item.modelId
-                                 for item in items
-                                 if item.name == new_name)
+              otherModelId = the(
+                  item.modelId for item in items if item.name == new_name
+              )
               I.replace_keywords(old_modelId, otherModelId)
               I.expunge_keyword(old_modelId)
             else:
@@ -364,17 +398,19 @@ def cmd_tag(I, argv):
           raise GetoptError("invalid empty tag")
         kw_op = arg[0]
         if kw_op not in ('+', '-'):
-          raise GetoptError("invalid tag op, requires leading '+' or '-': %r" % (kw_op,))
+          raise GetoptError(
+              "invalid tag op, requires leading '+' or '-': %r" % (kw_op,)
+          )
         kw_name = arg[1:]
         try:
           kw = I.keyword(kw_name)
-        except KeyError as e:
+        except KeyError:
           warning("unknown tag, CREATE")
           kw = I.create_keyword(kw_name)
-        except ValueError as e:
+        except ValueError:
           warning("ambiguous tag")
           continue
-        tagging.append( (kw_op == '+', kw) )
+        tagging.append((kw_op == '+', kw))
     except GetoptError as e:
       warning(e)
       badopts = True
@@ -417,7 +453,7 @@ def cmd_autotag(I, argv):
   events = I.events
   if ptn:
     X("winnow %d events", len(events))
-    events = [ E for E in events if ptn_re.search(E.name) ]
+    events = [E for E in events if ptn_re.search(E.name)]
   warned_faces = set()
   warned_kws = set()
   for event in sorted(events):
@@ -533,7 +569,7 @@ def cmd_test(I, argv):
 
 Image_Info = namedtuple('Image_Info', 'dx dy format')
 
-class iPhoto(O):
+class iPhoto(NS):
   ''' Access an iPhoto library.
       This contains multiple sqlite3 databases.
   '''
@@ -554,18 +590,23 @@ class iPhoto(O):
     # set up intertable links now that the Tables are defined
     # direct relations
     for nickname, table in sorted(self.table_by_nickname.items()):
-      for rel_name, rel_defn in sorted(table.schema.get('link_to', {}).items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_to',
+                                                        {}).items()):
         with Pfx("%s.link_to[%r]:%r", nickname, rel_name, rel_defn):
           info("LINK TO: %s.to_%ss => %r", nickname, rel_name, rel_defn)
           local_column, other_table, other_column = rel_defn
           if isinstance(other_table, str):
             other_table = self.table_by_nickname[other_table]
-          table.link_to(other_table,
-                        local_column=local_column, other_column=other_column,
-                        rel_name=rel_name)
+          table.link_to(
+              other_table,
+              local_column=local_column,
+              other_column=other_column,
+              rel_name=rel_name
+          )
     # relations via mapping tables
     for nickname, table in sorted(self.table_by_nickname.items()):
-      for rel_name, rel_defn in sorted(table.schema.get('link_via', {}).items()):
+      for rel_name, rel_defn in sorted(table.schema.get('link_via',
+                                                        {}).items()):
         with Pfx("%s.link_via[%r]:%r", nickname, rel_name, rel_defn):
           info("LINK VIA: %s.to_%ss => %r", nickname, rel_name, rel_defn)
           local_column, \
@@ -575,9 +616,14 @@ class iPhoto(O):
             other_table = self.table_by_nickname[other_table]
           if isinstance(via_table, str):
             via_table = self.table_by_nickname[via_table]
-          table.link_via(via_table, via_left_column, via_right_column,
-                         other_table, right_column=other_column,
-                         rel_name=rel_name)
+          table.link_via(
+              via_table,
+              via_left_column,
+              via_right_column,
+              other_table,
+              right_column=other_column,
+              rel_name=rel_name
+          )
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -610,7 +656,9 @@ class iPhoto(O):
               return iter(self.table_by_nickname[nickname])
           if attr.startswith('select_by_'):
             criterion_words = attr[10:].split('_')
-            class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
+            class_name = 'SelectBy' + '_'.join(
+                word.title() for word in criterion_words
+            )
             return partial(globals()[class_name], self)
           if attr.endswith('_table'):
             # *_table ==> table "*"
@@ -618,7 +666,10 @@ class iPhoto(O):
             if nickname in self.table_by_nickname:
               return self.table_by_nickname[nickname]
             else:
-              X("no table with nickname %r: nicknames=%r", nickname, sorted(self.table_by_nickname.keys()))
+              X(
+                  "no table with nickname %r: nicknames=%r", nickname,
+                  sorted(self.table_by_nickname.keys())
+              )
       except AttributeError as e:
         msg = "__getattr__ got internal AttributeError: %s" % (e,)
         raise RuntimeError(msg)
@@ -648,7 +699,7 @@ class iPhoto(O):
 
   @prop
   def folders_simple(self):
-    return [ folder for folder in self.folders if folder.is_simple_folder ]
+    return [folder for folder in self.folders if folder.is_simple_folder]
 
   def event(self, event_id):
     folder = self.folder(event_id)
@@ -658,7 +709,7 @@ class iPhoto(O):
 
   @prop
   def events(self):
-    return [ folder for folder in self.folders if folder.is_event ]
+    return [folder for folder in self.folders if folder.is_event]
 
   def match_people(self, person_name):
     ''' User convenience: match string against all person names, return Person rows.
@@ -718,7 +769,7 @@ class iPhoto(O):
     return self.masters_table[master_id]
 
   def master_pathnames(self):
-    return [ master.pathname for master in self.masters_table ]
+    return [master.pathname for master in self.masters_table]
 
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords())
@@ -759,14 +810,16 @@ class iPhoto(O):
       pfxkws = []
       for kw in kws:
         for suffix in ' (', '/':
-          if kw.name.startswith(kwname+suffix):
+          if kw.name.startswith(kwname + suffix):
             pfxkws.append(kw)
             break
       if len(pfxkws) == 1:
         return pfxkws[0]
       # multiple inexact matches
-      raise ValueError("matches multiple keywords, rejected: %r"
-                       % ([kw.name for kw in kws],))
+      raise ValueError(
+          "matches multiple keywords, rejected: %r" %
+          ([kw.name for kw in kws],)
+      )
 
   def get_keyword(self, kwname, default=None):
     try:
@@ -845,14 +898,16 @@ class iPhoto(O):
           if sel_type in ('keyword', 'kw', 'tag'):
             kwname = selection
             if not kwname:
-              selector = SelectByFunction(self,
-                                          lambda master: len(master.keywords) > 0,
-                                          invert)
+              selector = SelectByFunction(
+                  self, lambda master: len(master.keywords) > 0, invert
+              )
             else:
               try:
                 kw = self.keyword(kwname)
-              except KeyError as e:
-                warning("no match for keyword %r, using dummy selector", kwname)
+              except KeyError:
+                warning(
+                    "no match for keyword %r, using dummy selector", kwname
+                )
                 selector = SelectByKeyword_Name(self, None, invert)
               except ValueError as e:
                 raise ValueError("invalid keyword: %s" % (e,))
@@ -863,9 +918,9 @@ class iPhoto(O):
           elif sel_type in ('face', 'who'):
             person_name = selection
             if not person_name:
-              selector = SelectByFunction(self,
-                                          lambda master: len(master.faces) > 0,
-                                          invert)
+              selector = SelectByFunction(
+                  self, lambda master: len(master.faces) > 0, invert
+              )
             else:
               operson_name = person_name
               try:
@@ -889,7 +944,9 @@ class iPhoto(O):
         else:
           raise ValueError("unrecognised delimiter after %r" % (sel_type,))
       if selector is None:
-        raise RuntimeError("parse_selector(%r) did not set selector" % (selection0,))
+        raise RuntimeError(
+            "parse_selector(%r) did not set selector" % (selection0,)
+        )
       return selector
 
 class iPhotoDBs(object):
@@ -906,7 +963,7 @@ class iPhotoDBs(object):
 
   @prop
   def dbdirpath(self):
-   return self.iphoto.pathto('Database/apdb')
+    return self.iphoto.pathto('Database/apdb')
 
   def db_names(self):
     for basename in os.listdir(self.dbdirpath):
@@ -917,8 +974,8 @@ class iPhotoDBs(object):
     ''' Compute pathname of named database file.
     '''
     if db_name == 'Faces':
-      return os.path.join(self.dbdirpath, db_name+'.db')
-    return os.path.join(self.dbdirpath, db_name+'.apdb')
+      return os.path.join(self.dbdirpath, db_name + '.db')
+    return os.path.join(self.dbdirpath, db_name + '.apdb')
 
   def _load_db(self, db_name):
     db = self.dbmap[db_name] = iPhotoDB(self.iphoto, db_name)
@@ -945,7 +1002,9 @@ class iPhotoDB(TableSpace):
     self.param_style = '?'
     self.schema = SCHEMAE[db_name]
     for nickname, schema in self.schema.items():
-      self.iphoto.table_by_nickname[nickname] = iPhotoTable(self, nickname, schema)
+      self.iphoto.table_by_nickname[nickname] = iPhotoTable(
+          self, nickname, schema
+      )
 
 class iPhotoTable(Table):
 
@@ -956,9 +1015,15 @@ class iPhotoTable(Table):
     name_column = schema.get('name')
     if name_column is None and 'name' in column_names:
       name_column = 'name'
-    Table.__init__(self, db, table_name, column_names=column_names,
-                   id_column='modelId', name_column=name_column,
-                   row_class=row_class)
+    Table.__init__(
+        self,
+        db,
+        table_name,
+        column_names=column_names,
+        id_column='modelId',
+        name_column=name_column,
+        row_class=row_class
+    )
     self.nickname = nickname
     self.schema = schema
 
@@ -970,8 +1035,13 @@ class iPhotoTable(Table):
   def conn(self):
     return self.db.conn
 
-  def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
-    return self.update_columns((upd_column,), (upd_value,), '%s %s ?' % (sel_column, sel_op), sel_value)
+  def update_by_column(
+      self, upd_column, upd_value, sel_column, sel_value, sel_op='='
+  ):
+    return self.update_columns(
+        (upd_column,), (upd_value,), '%s %s ?' % (sel_column, sel_op),
+        sel_value
+    )
 
   def delete_by_column(self, sel_column, sel_value, sel_op='='):
     return self.delete('%s %s ?' % (sel_column, sel_op), sel_value)
@@ -996,7 +1066,9 @@ class Album_Mixin(iPhotoRow):
 
   @prop
   def apalbum_path(self):
-    return self.iphoto.pathto(os.path.join('Database/Albums', self.uuid+'.apalbum'))
+    return self.iphoto.pathto(
+        os.path.join('Database/Albums', self.uuid + '.apalbum')
+    )
 
   @locked_property
   def apalbum(self):
@@ -1038,27 +1110,34 @@ def FilterQuery(ifilter):
     return MultiItemQuery(ifilter)
   raise ValueError("unsupported filter query class name %r", classname)
 
-class BaseFilterQuery(O):
+class BaseFilterQuery(NS):
+
   def __init__(self, ifilter):
     ##XP("BaseFilterQuery: ifilter=%r", ifilter)
-    O.__init__(self, **ifilter)
+    super().__init__(**ifilter)
     self._ifilter = ifilter
 
 class SingleItemQuery(BaseFilterQuery):
+
   def __str__(self):
     return "SingleItemQuery(%r)" % (self._ifilter,)
+
   __repr__ = __str__
+
   def run(self):
     invert = self.queryIsEnabled
     return ()
 
 class MultiItemQuery(BaseFilterQuery):
+
   def __init__(self, ifilter):
     BaseFilterQuery.__init__(self, ifilter)
-    self.querySubqueries = [ FilterQuery(f) for f in self.querySubqueries ]
+    self.querySubqueries = [FilterQuery(f) for f in self.querySubqueries]
+
   def __str__(self):
     return "MultiItemQuery(%s)" \
            % ( ",".join(str(q) for q in self.querySubqueries), )
+
   def run(self):
     invert = self.queryIsEnabled
     conjunction = self.queryMatchType == 1
@@ -1072,7 +1151,13 @@ class Master_Mixin(iPhotoRow):
 
   @prop
   def pathname(self):
-    return os.path.join(self.iphoto.pathto('Masters'), self.imagePath)
+    imagepath = self.imagePath
+    if not isabspath(imagepath):
+      if imagepath[:4].isdigit():
+        imagepath = os.path.join(self.iphoto.pathto('Masters'), imagepath)
+      else:
+        imagepath = os.path.join('/', imagepath)
+    return imagepath
 
   @locked_property
   def versions(self):
@@ -1082,34 +1167,35 @@ class Master_Mixin(iPhotoRow):
   def latest_version(self):
     vs = self.versions
     if not vs:
-      raise RuntimeError("no versions for master %d: %r", self.modelId, self.pathname)
+      warning("no versions for master %d: %r", self.modelId, self.pathname)
+      return None
     if len(vs) == 1:
       return vs[0]
     return max(*vs, key=lambda v: v.versionNumber)
 
   @prop
   def width(self):
-    return self.latest_version.processedWidth
+    return self.latest_version and self.latest_version.processedWidth
 
   @prop
   def height(self):
-    return self.latest_version.processedHeight
+    return self.latest_version and self.latest_version.processedHeight
 
   @prop
   def detected_faces(self):
-    return self.latest_version.detected_faces
+    return self.latest_version and self.latest_version.detected_faces
 
   @prop
   def faces(self):
-    return self.latest_version.faces
+    return self.latest_version and self.latest_version.faces
 
   @prop
   def keywords(self):
-    return self.latest_version.keywords
+    return self.latest_version and self.latest_version.keywords
 
   @prop
   def keyword_names(self):
-    return self.latest_version.keyword_names
+    return self.latest_version and self.latest_version.keyword_names
 
   def Image(self):
     ''' Obtain an open Image of this master.
@@ -1143,14 +1229,55 @@ class Master_Mixin(iPhotoRow):
   def format(self):
     return self.image_info.format
 
+  def tags(self):
+    yield Tag('imagepath', self.imagePath)
+    yield Tag('dx', self.width)
+    yield Tag('dy', self.height)
+    faces = self.faces
+    if faces:
+      face_names = sorted(face.name for face in self.faces)
+      if face_names:
+        yield Tag('faces', face_names)
+    kwnames = self.keyword_names
+    if kwnames:
+      kwmap = defaultdict(list)
+      for kwname in sorted(kwnames):
+        m = re.match(r'(?P<field>[a-z]+)-0*(?P<value>\d+)$', kwname)
+        if m:
+          kwmap[m.group('field')].append(int(m.group('value')))
+          continue
+        while True:
+          m = re.match(
+              r'\s*(?P<prefix>.*\S)\s+\(\s*(?P<category>.*\S)\s*\)\s*$', kwname
+          )
+          if m:
+            kwname = m.group('category') + '.' + m.group('prefix')
+            continue
+          break
+        kwname = kwname.lower().replace(' ', '-')
+        try:
+          kwname, kwvalue = kwname.rsplit(':', 1)
+        except ValueError:
+          kwvalue = None
+        kwmap[kwname].append(kwvalue)
+      for kw, values in sorted(kwmap.items()):
+        if not values:
+          continue
+        if len(values) == 1:
+          yield Tag('kw.' + kw, values[0])
+        else:
+          yield Tag('kw.' + kw, values)
+
 class Version_Mixin(iPhotoRow):
 
   @locked_property
   def master(self):
     master = self.iphoto.master_table[self.masterId]
     if master is None:
-      raise ValueError("version %d masterId %d matches no master"
-                       % (self.modelId, self.masterId))
+      raise ValueError(
+          "version %d masterId %d matches no master" %
+          (self.modelId, self.masterId)
+      )
     return master
 
   @prop
@@ -1159,7 +1286,7 @@ class Version_Mixin(iPhotoRow):
 
   @prop
   def keyword_names(self):
-    return [ kw.name for kw in self.keywords ]
+    return [kw.name for kw in self.keywords]
 
   def add_keyword(self, kw):
     # add keyword to version
@@ -1193,7 +1320,7 @@ class Folder_Mixin(Album_Mixin):
 
   @prop
   def versions(self):
-    return [ M.latest_version for M in self.masters ]
+    return [M.latest_version for M in self.masters]
 
   @property
   def is_event(self):
@@ -1261,9 +1388,11 @@ class VFace_Mixin(iPhotoRow):
     ##cx = mdx - cx
     cy = 1.0 - cy
     face_box = (
-                 int(mdx * (cx - rx)), int(mdy * (cy - ry)),
-                 int(mdx * (cx + rx)), int(mdy * (cy + ry)),
-               )
+        int(mdx * (cx - rx)),
+        int(mdy * (cy - ry)),
+        int(mdx * (cx + rx)),
+        int(mdy * (cy + ry)),
+    )
     XP("MI.size = %r, face_box = %r", MI.size, face_box)
     face_Image = MI.crop(face_box)
     face_Image.load()
@@ -1286,6 +1415,7 @@ class _SelectMasters(object):
 class SelectByFunction(_SelectMasters):
   ''' Select by arbitrary function on a master.
   '''
+
   def __init__(self, iphoto, func, invert=False):
     self.iphoto = iphoto
     self.func = func
@@ -1302,12 +1432,12 @@ class SelectByFunction(_SelectMasters):
         yield master
 
 COMPARATORS = {
-    '<':  lambda left, right: left < right,
+    '<': lambda left, right: left < right,
     '<=': lambda left, right: left <= right,
     '==': lambda left, right: left == right,
     '!=': lambda left, right: left != right,
     '>=': lambda left, right: left >= right,
-    '>':  lambda left, right: left > right,
+    '>': lambda left, right: left > right,
 }
 
 class SelectByComparison(_SelectMasters):
@@ -1413,12 +1543,18 @@ class SelectByKeyword_Name(_SelectMasters):
     return super().select(masters)
 
   def select_from_all(self):
+    ''' Yield all matching masters.
+    '''
     if self.invert:
+      # invert requires more work
       return self.select_masters(self.iphoto.masters)
     else:
+      # no invert can use a faster method
       return self.iphoto.masters_by_keyword(self.kwname)
 
   def select_masters(self, masters):
+    ''' Yield from `masters` matching `self.kwname`.
+    '''
     kwname = self.kwname
     if self.invert:
       for master in masters:

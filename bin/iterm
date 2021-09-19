@@ -138,36 +138,40 @@ fi
 # <sequence> ST, and for all ESCs in <sequence> to be replaced with ESC ESC. It
 # only accepts ESC backslash for ST. We use TERM instead of TMUX because TERM
 # gets passed through ssh.
-function print_osc() {
+print_osc() {
   case "$TERM" in
-    screen*)  printf "\e33Ptmux;\e\e]" ;;
-    *)        printf "\e33]" ;;
+    screen*)  printf "\03333Ptmux;\033\033]" ;;
+    *)        printf "\03333]" ;;
   esac
 }
 
 # More of the tmux workaround described above.
-function print_st() {
+print_st() {
   case "$TERM" in
-    screen*)    printf "\a\e\\" ;;
+    screen*)    printf "\a\033\\" ;;
     *)          printf "\a" ;;
   esac
 }
 
-function l33t() {
-  printf "\e]1337;%s\a" "$*"
+l33t() {
+  printf "\033]1337;%s\a" "$*"
 }
 
 case "$op" in
   badge-format)
-    format64=$( printf '%s' "$*" | $base64 )
-    l33t "SetBadgeFormat=$format64"
+    [ ! -x "$base64" ] || {
+      format64=$( printf '%s' "$*" | $base64 )
+      l33t "SetBadgeFormat=$format64"
+    }
     ;;
   bgimg)
     case "$imgpath" in
       /*) ;; *) imgpath=$(pwd)/$imgpath ;;
     esac
-    imgpath64=$( printf '%s' "$imgpath" | $base64 )
-    l33t "SetBackgroundImageFile=$imgpath64"
+    [ ! -x "$base64" ] || {
+      imgpath64=$( printf '%s' "$imgpath" | $base64 )
+      l33t "SetBackgroundImageFile=$imgpath64"
+    }
     ;;
   colour | color )
     tee /dev/tty <<X | osascript -
@@ -225,13 +229,15 @@ X
   setvar)
     varname=$1
     shift
-    value64=$( printf '%s' "$*" | $base64 )
-    l33t "SetUserVar=$varname=$value64"
+    [ ! -x "$base64" ] || {
+      value64=$( printf '%s' "$*" | $base64 )
+      l33t "SetUserVar=$varname=$value64"
+    }
     ;;
 
   switch-profile)
     profilename=$*
-    printf '\e]50;SetProfile=%s\a' "$profilename" >/dev/tty
+    printf '\033]50;SetProfile=%s\a' "$profilename" >/dev/tty
     ;;
 
   *)echo "$cmd: $op: unimplemented op" >&2
