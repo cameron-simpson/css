@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from abc import ABC
 from contextlib import contextmanager
 import os
 from os.path import (
@@ -22,6 +23,8 @@ from cs.pfx import pfx, Pfx
 from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
+
+from cs.x import X
 
 from .util import ispng, pngfor
 
@@ -60,10 +63,12 @@ class TaggerGUI(MultiOpenMixin):
         size=(2200, 1500),
         finalize=True,
     )
-    for record in self.tree:
-      if isfilepath(record.fullpath):
-        self.fspath = record.fullpath
-        break
+    if False:
+      for record in self.tree:
+        if isfilepath(record.fullpath):
+          print("set self.fspath =", repr(record.fullpath))
+          self.fspath = record.fullpath
+          break
     print("window made")
     yield self
     print("closing")
@@ -111,14 +116,15 @@ class TaggerGUI(MultiOpenMixin):
     except KeyError:
       warning("path not in tree")
 
-class _Widget:
+class _Widget(ABC):
 
   def __init__(self, *a, key=None, fixed_size=None, **kw):
     if key is None:
       key = uuid4()
     self.key = key
-    super().__init__(*a, key=key, **kw)
     self.fixed_size = fixed_size
+    ##X("_Widget: call super():%s(*a=%r,**kw=%r)", super(), a, kw)
+    super().__init__(*a, key=key, **kw)
 
   def update(self, **kw):
     X("%s.update: kw=%r", type(self).__name__, kw)
@@ -259,15 +265,19 @@ class TagWidget(_Widget, sg.Column):
   ''' A Dsiplay for a `Tag`.
   '''
 
-  def __init__(self, tag):
-    self.tag = tag
-    self.alt_values = set()
+  @typechecked
+  def __init__(self, tags: TagSet, tag_name: str, alt_values=None):
+    if alt_values is None:
+      alt_values = set()
+    self.tags = tags
+    self.tag_name = tag_name
+    self.alt_values = alt_values
     layout = [
         [
-            sg.Text(tag.name),
+            sg.Text(tag_name + ("" if tag_name in tags else " (missing)")),
             sg.Combo(
                 list(self.alt_values),
-                default_value=tag.transcribe_value(tag.value),
+                default_value=tags.get(tag_name),
             )
         ]
     ]
@@ -276,9 +286,9 @@ class TagWidget(_Widget, sg.Column):
 class _TagsView(_Widget):
 
   @typechecked
-  def __init__(self, tags: TagSet, **kw):
-    self.tags = tags
-    super().__init__(**kw)
+  def __init__(self, *a, **kw):
+    self.tags = TagSet()
+    super().__init__(*a, **kw)
 
   def set_tags(self, tags):
     ''' Set the tags.
@@ -286,35 +296,96 @@ class _TagsView(_Widget):
     self.tags.clear()
     self.tags.update(tags)
 
+  def _row_of_tags(self):
+    ''' Make a row of tag widgets.
+    '''
+    X("TagsView_Frame: TAGS=%s", self.tags)
+    ##row = [self._get_tag_widget(tag) for tag in self.tags]
+    row = [sg.Text(str(tag)) for tag in self.tags]
+    X("ROW OF TAGS: %r", row)
+    return row
+
 class TagsView_Text(_TagsView, sg.Text):
 
   def set_tags(self, tags):
     super().set_tags(tags)
-    self.update(value='\n'.join(map(str, sef.tags)))
+    self.update(value='\n'.join(map(str, self.tags)))
 
-class TagsView__Canvas(_TagsView, sg.Canvas):
+class TagsView_Frame(_TagsView, sg.Frame):
+
+  def __init__(self, *, get_tag_widget=None, **kw):
+    if get_tag_widget is None:
+      get_tag_widget = TagWidget
+    self._get_tag_widget = get_tag_widget
+    self._layout = [self._row_of_tags()]
+    self._tagrow = self._layout[0]
+    super().__init__(type(self).__name__, self._layout, **kw)
 
   def set_tags(self, tags):
     super().set_tags(tags)
-    canvas = self.tk_canvas
+    self._tagrow[:] = self._row_of_tags()
+    self.layout(self._layout)
+    if self.Widget:
+      self.contents_changed()
+
+class TagsView_Canvas(_TagsView, sg.Column):
+
+  def __init__(self, *, get_tag_widget=None, **kw):
+    if get_tag_widget is None:
+      get_tag_widget = lambda tag: TagWidget(tag)
+    self.__canvas = sg.Canvas(size=(800, 300))
+    self.__layout = [[self.__canvas]]
+    self._get_tag_widget = get_tag_widget
+    super().__init__(layout=self.__layout, **kw)
+
+  def set_tags(self, tags):
+    super().set_tags(tags)
+    tag_row = self._row_of_tags()
+    self.__layout[1:] = tag_row
+    X("SET TAG 0: __layout=%r", self.__layout)
+    ##self.update()
+    ##self.contents_changed()
+    ##self.layout(self.__layout)
+    canvas = self.__canvas.tk_canvas
     canvas.delete(canvas.find_all())
     for tag in self.tags:
-      canvas.create_text((0, 0), text=str(tag))
+      for tag_item in tag_row:
+        canvas.create_window(20, 20, window=tag_item.Widget)
+    self.__layout[1:] = []
+    X("SET TAG 0: __layout=%r", self.__layout)
+    ##self.update()
+    self.contents_changed()
 
 class TagsView_Column(_TagsView, sg.Column):
 
-  def __init__(self, tags, **kw):
-    super().__init__(tags, layout=self.layout_tags(tags))
+  def __init__(self, *, get_tag_widget=None, **kw):
+    if get_tag_widget is None:
+      get_tag_widget = lambda tag: TagWidget(tag)
+    self._get_tag_widget = get_tag_widget
+    super().__init__(
+        size=(800, 400), layout=self.layout_tags(TagSet(a=1, b=2)), **kw
+    )
 
-  @staticmethod
-  def layout_tags(tags):
-    return [[TagWidget(tag) for tag in sorted(tags)]]
+  def layout_tags(self, tags):
+    ''' Create a layout for `tags`.
+    '''
+    ##layout = [[self._get_tag_widget(tag)] for tag in sorted(tags)]
+    layout = [[sg.Text(str(tag))] for tag in sorted(tags)]
+    X("%s.layout_tags => %r", type(self).__name__, layout)
+    return layout
 
   def set_tags(self, tags):
     super().set_tags(tags)
+    X("%s.set_tags: self.tags=%s", type(self).__name__, self.tags)
+    X("CALL SELF.LAYOUT(SELF.LAYOUT_TAGS)")
     self.layout(self.layout_tags(self.tags))
+    if self.Widget is not None:
+      X("CONTENTS_CHANGED")
+      self.contents_changed()
 
 TagsView = TagsView_Column  # TagsView_Text
+##TagsView = TagsView_Canvas  # TagsView_Text
+##TagsView = TagsView_Frame
 
 class PathView(_Widget, sg.Frame):
   ''' A preview of a filesystem path.
@@ -325,6 +396,8 @@ class PathView(_Widget, sg.Frame):
     self.tagger = tagger
     # path->set(suggested_tags)
     self._suggested_tags = {}
+    # tag_name->TagWidget
+    self._tag_widgets = {}
     self.preview = ImageWidget(
         key="preview",
         fixed_size=(1920, 1080),
@@ -332,21 +405,22 @@ class PathView(_Widget, sg.Frame):
         expand_x=True,
     )
     self.tagsview = TagsView(
-        TagSet(),
         key="tags",
         fixed_size=(1920, 200),
         background_color='blue',
         expand_x=True,
+        get_tag_widget=lambda tag: self._tag_widget(tag.name),
     )
     layout = [
         [
             sg.Column(
                 [
-                    [TagWidget(Tag('tag1', 3)),
-                     TagWidget(Tag('tag2', 4))],
                     [self.preview],
                     [sg.HorizontalSeparator()],
+                    [sg.Text("tags view")],
                     [self.tagsview],
+                    [sg.HorizontalSeparator()],
+                    [sg.Text("bottom")],
                 ],
                 size=(1920, 1600),
             )
@@ -367,11 +441,13 @@ class PathView(_Widget, sg.Frame):
     '''
     print("SET fspath =", repr(new_fspath))
     self._fspath = new_fspath
+    self._tag_widgets = {}
     self.update(value=shortpath(new_fspath) if new_fspath else "NONE")
     self.preview.fspath = new_fspath
     tags = self.tagged.merged_tags()
     self.tagsview.set_tags(tags)
-    ##self.tagsview.set_size(size=(1920, 120))
+    self.tagsview.set_size(size=(1920, 120))
+    print("tag suggestions =", repr(self.suggested_tags))
 
   @property
   def suggested_tags(self):
@@ -393,3 +469,33 @@ class PathView(_Widget, sg.Frame):
     if self._fspath is None:
       return None
     return self.tagger.fstags[self._fspath]
+
+  def _tag_widget(self, tag_name):
+    ''' Return the `TagWidget` representing the `Tag` named `tag_name`.
+    '''
+    try:
+      widget = self._tag_widgets[tag_name]
+    except KeyError:
+      tagged = self.tagger.fstags[self._fspath]
+      direct_tags = tagged
+      all_tags = tagged.merged_tags()
+      try:
+        value = direct_tags[tag_name]
+      except KeyError:
+        try:
+          value = all_tags[tag_name]
+        except KeyError:
+          value = None
+          missing = True
+        else:
+          missing = False
+          is_direct = False
+      else:
+        missing = False
+        is_direct = True
+      suggested_values = self.tagger.suggested_tags(tagged.filepath
+                                                    ).get(tag_name, set())
+      widget = self._tag_widgets[tag_name] = TagWidget(
+          tagged, tag_name, suggested_values
+      )
+    return widget
