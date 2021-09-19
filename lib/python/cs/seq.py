@@ -17,7 +17,7 @@ import itertools
 from threading import Lock, Condition
 from cs.gimmicks import warning
 
-__version__ = '20201025-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'description':
@@ -418,6 +418,36 @@ def splitoff(sq, *sizes):
     offset = end_offset
   parts.append(sq[offset:])
   return parts
+
+def unrepeated(it, seen=None, signature=None):
+  ''' A generator yielding items from the iterable `it` with no repetitions.
+
+      Parameters:
+      * `it`: the iterable to process
+      * `seen`: an optional setlike container supporting `in` and `.add()`
+      * `signature`: an optional signature function for items from `it`
+        which produces the value to compare to recognise repeated items;
+        its values are stored in the `seen` set
+
+      The default `signature` function is identity - items are stored and compared.
+      This requires the items to be hashable and support equality tests.
+      The same applies to whatever values the `signature` function produces.
+
+      Since `seen` accrues all the signature values for yielded items
+      generally it will grow monotonicly as iteration proceeeds.
+      If the items are complaex or large it is well worth providing a signature
+      function even it the items themselves can be used in a set.
+  '''
+  if seen is None:
+    seen = set()
+  if signature is None:
+    signature = lambda item: item
+  for item in it:
+    sig = signature(item)
+    if sig in seen:
+      continue
+    seen.add(sig)
+    yield item
 
 if __name__ == '__main__':
   import sys

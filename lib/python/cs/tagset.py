@@ -201,7 +201,7 @@ from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
 import re
-from threading import Lock, RLock
+from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
@@ -228,7 +228,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20210428-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -399,8 +399,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
               # handle a missing title tag
   '''
 
-  # arrange to return None for missing mapping attributes
-  # supporting tags.foo being None if there is no 'foo' tag
+  # Arrange to return None for missing mapping attributes
+  # supporting tags.foo being None if there is no 'foo' tag.
+  # Note: sometimes this has confusing effects.
   ATTRABLE_MAPPING_DEFAULT = None
 
   @pfx_method
@@ -439,26 +440,35 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  #################################################################
   # methods supporting FormattableMixin/ExtendedFormatter
+
   def get_arg_name(self, field_name):
     ''' Leading dotted identifiers represent tags or tag prefixes.
     '''
     return get_dotted_identifier(field_name)
 
-  @staticmethod
-  def get_value(arg_name, a, kw):
+  def get_value(self, arg_name, a, kw):
+    assert isinstance(kw, TagSet)
     assert not a
     try:
-      attribute = kw.get_format_attribute(arg_name)
-    except AttributeError:
-      if isinstance(kw, TagSet):
-        # for TagSets we get the matching TagSetPrefixView
-        value = kw.subtags(arg_name)
+      value = kw[arg_name]
+    except KeyError:
+      try:
+        attribute = kw.get_format_attribute(arg_name)
+      except AttributeError:
+        if self.format_mode.strict:
+          raise KeyError(
+              "%s.get_value: unrecognised arg_name %r" %
+              (type(self).__name__, arg_name)
+          )
+        value = f'{{{arg_name}}}'
       else:
-        value = kw[arg_name]
-    else:
-      value = attribute() if callable(attribute) else attribute
+        value = attribute() if callable(attribute) else attribute
     return value, arg_name
+
+  ################################################################
+  # The magic attributes.
 
   # pylint: disable=too-many-nested-blocks,too-many-return-statements
   def __getattr__(self, attr):
@@ -467,6 +477,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         The following attribute access are supported:
 
         If `attr` is a key, return `self[attr]`.
+
+        If `self.auto_infer(attr)` does not raise `ValueError`,
+        return that value.
 
         If this `TagSet` has an ontology
         and `attr looks like *typename*`_`*fieldname*
@@ -521,6 +534,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     try:
       return self[attr]
     except KeyError:
+      try:
+        return self.auto_infer(attr)
+      except ValueError as e:
+        # no match
+        ##warning("auto_infer(%r): %s", attr, e)
+        pass
       # support for {type}_{field} and {type}_{field}s attributes
       # these dereference through the ontology if there is one
       ont = self.ontology
@@ -605,6 +624,21 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return tags
 
   def __contains__(self, tag):
+    ''' Test for a tag being in this `TagSet`.
+
+        If the supplied `tag` is a `str` then this test
+        is for the presence of `tag` in the keys.
+
+        Otherwise,
+        for each tag `T` in the tagset
+        test `T.matches(tag)` and return `True` on success.
+        The default `Tag.matches` method compares the tag name
+        and if the same,
+        returns true if `tag.value` is `None` (basic "is the tag present" test)
+        and otherwise true if `tag.value==T.value` (basic "tag value equality" test).
+
+        Otherwise return `False`.
+    '''
     if isinstance(tag, str):
       return super().__contains__(tag)
     for mytag in self:
@@ -758,6 +792,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
             >>> tags = TagSet({'a.b':1, 'a.d':2, 'c.e':3})
             >>> tags.subtags('a')
             TagSetPrefixView:a.{'b': 1, 'd': 2}
+            >>> tags.subtags('a', as_tagset=True)
+            TagSet:{'b': 1, 'd': 2}
     '''
     if as_tagset:
       # prepare a standalone TagSet
@@ -792,6 +828,56 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     ''' Set the `unixtime`.
     '''
     self['unixtime'] = new_unixtime
+
+  #############################################################################
+  # The '.auto' attribute space.
+
+  class Auto:
+
+    def __init__(self, tagset, prefix=None):
+      self._tagset = tagset
+      self._prefix = prefix
+
+    def __bool__(self):
+      ''' We return `False` so that an unresolved attribute,
+          which returns a deeper `Auto` instance,
+          looks false, enabling:
+
+              title = tags.auto.title or "default title"
+      '''
+      return False
+
+    def __getattr__(self, attr):
+      fullattr = (
+          attr if self._prefix is None else '.'.join((self._prefix, attr))
+      )
+      try:
+        return self._tagset.auto_infer(fullattr)
+      except ValueError:
+        # auto view of deeper attributes
+        return self._tagset.Auto(self._tagset, fullattr)
+
+  @property
+  def auto(self):
+    return self.Auto(self)
+
+  @pfx_method
+  def auto_infer(self, attr):
+    ''' The default inference implementation.
+
+        This should return a value if `attr` is inferrable
+        and raise `ValueError` if not.
+
+        The default implementation returns the direct tag value for `attr`
+        if present.
+    '''
+    if attr in self:
+      warning("returning direct tag value for %r", attr)
+      return self[attr]
+    raise ValueError("cannot infer value for %r" % (attr,))
+
+  #############################################################################
+  # Edit tags.
 
   def edit(self, editor=None, verbose=None):
     ''' Edit this `TagSet`.
@@ -1029,6 +1115,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     ''' Dummy `__init__` to avoid `FormatableMixin.__init__`
         because we subclass `namedtuple` which has no `__init__`.
     '''
+
+  __hash__ = tuple.__hash__
 
   def __eq__(self, other):
     return self.name == other.name and self.value == other.value
@@ -3355,7 +3443,7 @@ def selftest(argv):
   tags['aa'] = 'aa'
   pprint(tags.as_dict())
   for format_str in argv:
-    print("FORMAT_STR = %r", format_str)
+    print("FORMAT_STR =", repr(format_str))
     ##formatted = format(tags, format_str)
     formatted = tags.format_as(format_str)
     print("tag.format_as(%r) => %s" % (format_str, formatted))

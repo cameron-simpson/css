@@ -11,6 +11,8 @@ set -ue
 rcfile=$HOME/.mntrc
 umount=
 mount_point=
+trace=
+[ -t 2 ] && trace=set-x
 
 cmd=$(basename "$0")
 usage="Usage:
@@ -145,8 +147,9 @@ do_mount(){
     set -ue
     case "$type" in
       ssh | sshfs )
-        set -x
-        tm use-session -d "MNT_${host}_${pathbase}" set-x sshfs -f -o reconnect -- "$host:$path" "$mount_point"
+        $trace tm use-session -d "MNT_${host}_${pathbase}" \
+          set-x sshfs -f -o reconnect -o ssh_command='datethen 2 set-x ssh' \
+            -- "$host:$path" "$mount_point"
         ;;
       *)echo "$cmd: $mount_point: unsupported type: $type" >&2
         exit 1
