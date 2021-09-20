@@ -203,7 +203,7 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    from .gui import TaggerGUI
+    from .gui_tk import TaggerGUI
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
