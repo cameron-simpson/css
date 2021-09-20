@@ -374,3 +374,22 @@ class PathView(_Widget, tk.LabelFrame):
           tagged, tag_name, suggested_values
       )
     return widget
+
+class ThumbNailScrubber(_PathList):
+
+  def __init__(self, parent, pathlist: List[str], *, command, **kw):
+    super().__init__(
+        parent,
+        pathlist=pathlist,
+        orient=tk.HORIZONTAL,
+        command=command,
+        make_subwidget=(
+            lambda i, path: trace(ImageButton)(
+                self,
+                path=path,
+                command=lambda: self.command(i, path),
+                fixed_size=(64, 64)
+            )
+        ),
+        **kw
+    )
