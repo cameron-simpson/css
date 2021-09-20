@@ -68,6 +68,7 @@ class TaggerGUI(MultiOpenMixin):
     )
     thumbview.grid(column=0, row=1, columnspan=2)
     pathview.fspath = self.fspaths[0]
+    app.grid()
     with stackattrs(self, app=app, pathlist=pathlist, pathview=pathview):
       yield app
 
