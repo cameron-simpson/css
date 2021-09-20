@@ -163,11 +163,67 @@ class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
+class _PathList(_Widget, tk.PanedWindow):
 
-  def __init__(self, parent, fspaths, **kw):
-    super().__init__(parent, orient=tk.VERTICAL, **kw)
-    for fspath in fspaths:
-      self.add(tk.Button(self, text=shortpath(fspath), command="button"))
+  @typechecked
+  def __init__(
+      self, parent, pathlist: List[str], *, command, make_subwidget, **kw
+  ):
+    super().__init__(parent, **kw)
+    self.command = command
+    self.make_subwidget = make_subwidget
+    self.update_pathlist(pathlist)
+
+  def update_pathlist(self, new_paths: Iterable[str]):
+    ''' Update the path list.
+    '''
+    self._pathlist = list(new_paths)
+    for child in list(self.panes()):
+      self.remove(child)
+    for i, path in enumerate(self._pathlist):
+      thumbnail = self.make_subwidget(i, path)
+      self.add(thumbnail)
+
+  @property
+  def pathlist(self):
+    ''' Return the current path list.
+    '''
+    return self._pathlist
+
+  @pathlist.setter
+  def pathlist(self, new_paths: Iterable[str]):
+    ''' Update the path list.
+    '''
+    self.updatepathlist(new_paths)
+
+class PathListWidget(_PathList):
+
+  def __init__(self, parent, pathlist: List[str], *, command, **kw):
+    super().__init__(
+        parent,
+        pathlist=pathlist,
+        orient=tk.VERTICAL,
+        command=command,
+        make_subwidget=(
+            lambda i, path: tk.Button(
+                self,
+                text=shortpath(path),
+                command=lambda: self.command(i, path)
+            )
+        ),
+        **kw
+    )
+
+  @property
+  def pathlist(self):
+    for i, path in enumerate(pathlist):
+      self.add(
+          tk.Button(
+              self,
+              text=shortpath(fspath),
+              command=lambda i=i, path=path: self.command(i, path)
+          )
+      )
 
 class TagWidget(_Widget, tk.Frame):
   ''' A Dsiplay for a `Tag`.
