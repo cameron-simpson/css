@@ -108,13 +108,13 @@ class _Widget(ABC):
     if self.fixed_size:
       self.set_size(self.fixed_size)
 
-class ImageWidget(_Widget, tk.Label):
-  ''' An image widget which can show anything Pillow can read.
-  '''
+class _ImageWidget(_Widget):
 
-  @pfx_method
-  def __init__(self, parent, **kw):
+  def __init__(self, parent, *, path, **kw):
+    ''' Initialise the image widget to display `path`.
+    '''
     super().__init__(parent, **kw)
+    self.fspath = path
 
   @property
   def fspath(self):
@@ -151,10 +151,18 @@ class ImageWidget(_Widget, tk.Label):
           height=size[1],
       )
       self.image = image
-    self.pack()
+    self.grid()
     self._fspath = new_fspath
 
 class PathListWidget(_Widget, tk.PanedWindow):
+class ImageWidget(_ImageWidget, tk.Label):
+  ''' An image widget which can show anything Pillow can read.
+  '''
+
+class ImageButton(_ImageWidget, tk.Button):
+  ''' An image button which can show anything Pillow can read.
+  '''
+
 
   def __init__(self, parent, fspaths, **kw):
     super().__init__(parent, orient=tk.VERTICAL, **kw)
