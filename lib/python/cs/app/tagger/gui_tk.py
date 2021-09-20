@@ -46,13 +46,25 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     root = tk.Tk()
-    app = tk.Frame(root)
-    app.pack()
+    app = tk.LabelFrame(root, text="APP")
+
     # Define the window's contents
-    pathlist = PathListWidget(app, self.fspaths)
-    pathlist.pack(side="left")
-    pathview = PathView(app, tagger=self.tagger)  ## , fixed_size=(1920, 1200))
-    pathview.pack(side="right")
+    @trace
+    def select_path(i, path):
+      X("SELECT_PATH: i=%r, path=%r", i, path)
+      self.pathview.fspath = path
+
+    pathlist = self.pathlist = PathListWidget(
+        app, self.fspaths, command=select_path
+    )
+    pathlist.grid(column=0, row=0, sticky=tk.N)
+    pathview = self.pathview = PathView(app, tagger=self.tagger)
+    pathview.grid(column=1, row=0, sticky=tk.N)
+
+    thumbview = self.thumbview = ThumbNailScrubber(
+        app, self.fspaths, command=select_path
+    )
+    thumbview.grid(column=0, row=1, columnspan=2)
     pathview.fspath = self.fspaths[0]
     with stackattrs(self, app=app, pathlist=pathlist, pathview=pathview):
       yield app
