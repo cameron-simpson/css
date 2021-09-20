@@ -15,6 +15,7 @@ from os.path import (
 )
 import tkinter as tk
 from tkinter import ttk
+from typing import Iterable, List, Optional
 from uuid import UUID, uuid4
 
 from PIL import Image, ImageTk
@@ -30,6 +31,7 @@ from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
 
 from cs.lex import r
+from cs.py.func import trace
 from cs.x import X
 
 from .util import ispng, pngfor
