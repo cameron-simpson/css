@@ -56,10 +56,14 @@ def image_size(path):
 @pfx
 def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   ''' Create a PNG version of the image at `path`,
+      scaled to fit within some size constraints.
       return the pathname of the PNG file.
 
       Parameters:
-      * `cached`: optional mapping of `'png'`->`path`->pngof_path
+      * `max_size`: optional `(width,height)` tuple, default `(1920,1800)`
+      * `min_size`: optional `(width,height)` tuple, default half of `max_size`
+      * `cached`: optional mapping of `(path,'png',size)`->`pngof_path`
+        where size is the chosen final size tuple
       * `force`: optional flag (default `False`)
         to force recreation of the PNG version and associated cache entry
   '''
@@ -105,17 +109,17 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if not isdirpath(convdirpath):
     pfx_call(os.makedirs, convdirpath)
   pngpath = joinpath(convdirpath, pngbase)
-  try:
-    if force or not isfilepath(pngpath):
+  if force or not isfilepath(pngpath):
+    try:
       with Image.open(path) as im:
         if re_size is None:
           pfx_call(im.save, pngpath, 'PNG')
         else:
           im2 = im.resize(re_size)
           pfx_call(im2.save, pngpath, 'PNG')
-  except UnidentifiedImageError as e:
-    warning("unhandled image: %s", e)
-    pngpath = None
+    except UnidentifiedImageError as e:
+      warning("unhandled image: %s", e)
+      pngpath = None
   cached[key] = pngpath
   return pngpath
 
