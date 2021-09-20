@@ -154,7 +154,6 @@ class _ImageWidget(_Widget):
     self.grid()
     self._fspath = new_fspath
 
-class PathListWidget(_Widget, tk.PanedWindow):
 class ImageWidget(_ImageWidget, tk.Label):
   ''' An image widget which can show anything Pillow can read.
   '''
@@ -213,17 +212,6 @@ class PathListWidget(_PathList):
         ),
         **kw
     )
-
-  @property
-  def pathlist(self):
-    for i, path in enumerate(pathlist):
-      self.add(
-          tk.Button(
-              self,
-              text=shortpath(fspath),
-              command=lambda i=i, path=path: self.command(i, path)
-          )
-      )
 
 class TagWidget(_Widget, tk.Frame):
   ''' A Dsiplay for a `Tag`.
