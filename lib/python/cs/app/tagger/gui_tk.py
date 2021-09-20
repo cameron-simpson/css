@@ -288,11 +288,12 @@ class PathView(_Widget, tk.LabelFrame):
     self._tag_widgets = {}
     self.preview = ImageWidget(
         self,
+        path=fspath,
         fixed_size=(1920, 1080),
         ##background_color='grey',
     )
     ##self.preview.grid(column=0, row=0)
-    self.preview.pack(side="left")
+    self.preview.grid(column=0, row=0)
 
     self.tagsview = TagsView(
         self,
@@ -301,7 +302,7 @@ class PathView(_Widget, tk.LabelFrame):
         ##get_tag_widget=lambda tag: self._tag_widget(tag.name),
     )
     ##self.tagsview.grid(column=0, row=0)
-    self.tagsview.pack(side="right")
+    self.tagsview.grid(column=1, row=0, sticky=tk.N)
 
   @property
   def fspath(self):
