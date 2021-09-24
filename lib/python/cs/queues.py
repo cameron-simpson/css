@@ -189,6 +189,18 @@ class Channel(object):
       return self.put(*a)
     return self.get()
 
+  def __iter__(self):
+    ''' A `Channel` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' `next(Channel)` calls `Channel.get()`.
+    '''
+    if self.closed:
+      raise StopIteration()
+    return self.get()
+
   @not_closed
   def get(self):
     ''' Read a value from the Channel.
