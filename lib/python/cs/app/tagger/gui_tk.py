@@ -154,6 +154,7 @@ class _Widget(ABC):
     if fixed_size:
       X("FIXED SIZE %s = %r", type(self).__name__, fixed_size)
       kw.update(width=fixed_size[0], height=fixed_size[1])
+    self.__parent = parent
     super().__init__(parent, *a, **kw)
     if key is None:
       key = uuid4()
@@ -166,6 +167,10 @@ class _Widget(ABC):
     super().update(**kw)
     if self.fixed_size:
       self.set_size(self.fixed_size)
+  @property
+  def parent(self):
+    return self.__parent
+
 
 # local shims for the tk and ttk widgets
 class Button(_Widget, tk.Button):
