@@ -4,6 +4,7 @@
 '''
 
 from abc import ABC
+from collections import namedtuple
 from contextlib import contextmanager
 import os
 from os.path import (
@@ -18,6 +19,7 @@ from tkinter import ttk
 from typing import Iterable, List, Optional
 from uuid import UUID, uuid4
 
+from icontract import require, ensure
 from PIL import Image, ImageTk
 from typeguard import typechecked
 
@@ -102,6 +104,48 @@ class TaggerGUI(MultiOpenMixin):
       pathinfo = self.tree[new_fspath]
     except KeyError:
       warning("path not in tree")
+
+@require(lambda x1: x1 >= 0)
+@require(lambda dx1: dx1 > 0)
+@require(lambda x2: x2 >= 0)
+@require(lambda dx2: dx2 > 0)
+@ensure(lambda result, dx1: result[1] <= dx1)
+@ensure(lambda result, dx2: result[1] <= dx2)
+def overlap1(x1, dx1, x2, dx2):
+  ''' Compute the overlap of 2 ranges,
+      return `None` for no overlap
+      or `(overlap_x,overlap_dx)` if they overlap.
+  '''
+  x1b = x1 + dx1
+  x2b = x2 + dx2
+  if x1 < x2:
+    if x1b <= x2:
+      return None
+    return x2, min(x1b, x2b) - x2
+  if x2b <= x1:
+    return None
+  return x1, min(x1b, x2b) - x1
+
+class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
+  ''' A geometry tuple and associated methods.
+  '''
+
+  def overlap(self, other):
+    ''' Compute an overlap rectangle between two `WidgetGeometry` objects.
+        Returns `None` if there is no overlap,
+        otherwise a new `WidgetGeometry` indicating the overlap.
+    '''
+    # compute the horizontal overlap
+    over = overlap1(self.x, self.dx, other.x, other.dx)
+    if over is None:
+      return None
+    over_x, over_dx = over
+    # compute the vertical overlap
+    over = overlap1(self.y, self.dy, other.y, other.dy)
+    if over is None:
+      return None
+    over_y, over_dy = over
+    return type(self)(over_x, over_y, over_dx, over_dy)
 
 class _Widget(ABC):
 
