@@ -48,7 +48,7 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     root = tk.Tk()
-    app = tk.LabelFrame(root, text="APP")
+    app = LabelFrame(root, text="APP")
 
     # Define the window's contents
     @trace
@@ -123,6 +123,28 @@ class _Widget(ABC):
     if self.fixed_size:
       self.set_size(self.fixed_size)
 
+# local shims for the tk and ttk widgets
+class Button(_Widget, tk.Button):
+  pass
+
+class Combobox(_Widget, ttk.Combobox):
+  pass
+
+class Frame(_Widget, tk.Frame):
+  pass
+
+class Label(_Widget, tk.Label):
+  pass
+
+class LabelFrame(_Widget, tk.LabelFrame):
+  pass
+
+class Listbox(_Widget, tk.Listbox):
+  pass
+
+class PanedWindow(_Widget, tk.PanedWindow):
+  pass
+
 class _ImageWidget(_Widget):
 
   def __init__(self, parent, *, path, **kw):
@@ -169,11 +191,11 @@ class _ImageWidget(_Widget):
     self.grid()
     self._fspath = new_fspath
 
-class ImageWidget(_ImageWidget, tk.Label):
+class ImageWidget(_ImageWidget, Label):
   ''' An image widget which can show anything Pillow can read.
   '''
 
-class ImageButton(_ImageWidget, tk.Button):
+class ImageButton(_ImageWidget, Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
@@ -228,7 +250,7 @@ class PathListWidget(_PathList):
         **kw
     )
 
-class TagWidget(_Widget, tk.Frame):
+class TagWidget(Frame):
   ''' A Dsiplay for a `Tag`.
   '''
 
@@ -264,7 +286,7 @@ class _TagsView(_Widget):
     self.tags.clear()
     self.tags.update(tags)
 
-class TagsView(_TagsView, tk.PanedWindow):
+class TagsView(_TagsView, PanedWindow):
 
   def __init__(self, parent, **kw):
     super().__init__(parent, orient=tk.VERTICAL, showhandle=True, **kw)
