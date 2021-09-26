@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' Tagger utlity methods.
+'''
+
 from collections import defaultdict
 import hashlib
 import os
@@ -37,6 +40,9 @@ _fstags = FSTags()
 _conv_cache = defaultdict(dict)
 
 def image_size(path):
+  ''' Return the pixel size of the image file at `path`
+      as an `(dx,dy)` tuple, or `None` if the contents cannot be parsed.
+  '''
   tagged = _fstags[path]
   try:
     size = tagged['pil.size']
@@ -82,12 +88,12 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if size[0] > max_size[0] or size[1] > max_size[1]:
     scale = min(max_size[0] / size[0], max_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    warning("too big, rescale by %s from %r to %r", scale, size, re_size)
+    ##warning("too big, rescale by %s from %r to %r", scale, size, re_size)
     key = path, 'png', re_size
   elif size[0] < min_size[0] or size[1] < min_size[1]:
     scale = min(min_size[0] / size[0], min_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    warning("too small, rescale by %s from %r to %r", scale, size, re_size)
+    ##warning("too small, rescale by %s from %r to %r", scale, size, re_size)
     key = path, 'png', re_size
   else:
     re_size = None
@@ -132,10 +138,14 @@ class _HashCode(bytes):
 
   @classmethod
   def from_data(cls, bs):
+    ''' Compute hashcode from the data `bs`.
+    '''
     return cls(cls.hashfunc(bs).digest())
 
   @classmethod
   def from_buffer(cls, bfr):
+    ''' Compute hashcode from the contents of the `CornuCopyBuffer` `bfr`.
+    '''
     h = cls.hashfunc()
     for bs in bfr:
       h.update(bs)
@@ -143,6 +153,8 @@ class _HashCode(bytes):
 
   @classmethod
   def from_pathname(cls, pathname, readsize=None, **kw):
+    ''' Compute hashcode from the contents of the file `pathname`.
+    '''
     if readsize is None:
       readsize = DEFAULT_READSIZE
     return cls.from_buffer(
@@ -150,6 +162,8 @@ class _HashCode(bytes):
     )
 
 class SHA256(_HashCode):
+  ''' SHA256 hashcode class.
+  '''
 
   __slots__ = ()
   hashfunc = hashlib.sha256
