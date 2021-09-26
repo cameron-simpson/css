@@ -310,33 +310,39 @@ class _ImageWidget(_Widget):
 
   @fspath.setter
   def fspath(self, new_fspath):
-    if new_fspath is None:
-      display_fspath = None
-    else:
-      size = self.fixed_size or (self.width, self.height)
-      try:
-        display_fspath = pngfor(new_fspath, size)
-      except (OSError, ValueError) as e:
-        warning("%r: %s", new_fspath, e)
+    self._fspath = new_fspath
+    self.config(text=new_fspath)
+
+    def idle_set_image():
+      if not self.is_visible():
+        self.after(300, idle_set_image)
+        return
+      if new_fspath is None:
         display_fspath = None
-    X("display_fspath=%r", display_fspath)
-    if display_fspath is None:
-      self.config(text=new_fspath, image=None)
-    else:
-      ##os.system("open %r" % (display_fspath,))
+      else:
+        size = self.fixed_size or (self.width, self.height)
+        try:
+          display_fspath = pngfor(expanduser(new_fspath), size)
+        except (OSError, ValueError) as e:
+          warning("%r: %s", new_fspath, e)
+          display_fspath = None
+      if display_fspath is None:
+        self.configure(image=None)
+        return
       img = Image.open(display_fspath)
       ##X("Image.open => %s : %r", img, img.size)
       image = ImageTk.PhotoImage(img)
       self.configure(
           text=basename(new_fspath),
           ##compound=tk.BOTTOM,
+          bitmap=None,
           image=image,
           width=size[0],
           height=size[1],
       )
       self.image = image
-    self.grid()
-    self._fspath = new_fspath
+
+    self.after_idle(idle_set_image)
 
 class ImageWidget(_ImageWidget, Label):
   ''' An image widget which can show anything Pillow can read.
