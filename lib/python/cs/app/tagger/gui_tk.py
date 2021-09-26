@@ -452,21 +452,23 @@ class TagWidget(Frame):
   '''
 
   @typechecked
-  def __init__(self, parent, tags: TagSet, tag_name: str, *, alt_values=None):
+  def __init__(
+      self, parent, tags: TagSet, tag_name: str, *, alt_values=None, **kw
+  ):
     if alt_values is None:
       alt_values = set()
     else:
       alt_values = set(alt_values)
-    super().__init__(parent)
+    super().__init__(parent, **kw)
     self.tags = tags
     self.tag_name = tag_name
     self.alt_values = alt_values
-    self.label = tk.Label(self, text=tag_name)
-    self.label.grid(column=0, row=0, sticky=tk.E)
-    self.choices = ttk.Combobox(self, values=sorted(self.alt_values))
+    self.label = Label(self, text=tag_name)
+    self.label.grid(column=0, sticky=tk.E)
+    self.choices = Combobox(self, values=sorted(self.alt_values))
     if tag_name in tags:
       self.choices.set(tags[tag_name])
-    self.choices.grid(column=1, row=0, sticky=tk.W)
+    self.choices.grid(column=1, sticky=tk.W)
 
 class _TagsView(_Widget):
   ''' A view of some `Tag`s.
