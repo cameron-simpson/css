@@ -614,21 +614,54 @@ class PathView(LabelFrame):
       )
     return widget
 
-class ThumbNailScrubber(_PathList):
+class ThumbNailScrubber(Frame, _FSPathsMixin):
+  ''' A row of thumbnails for a list of fielsystem paths.
+  '''
 
-  def __init__(self, parent, pathlist: List[str], *, command, **kw):
-    super().__init__(
-        parent,
-        pathlist=pathlist,
-        orient=tk.HORIZONTAL,
-        command=command,
-        make_subwidget=(
-            lambda i, path: trace(ImageButton)(
-                self,
-                path=path,
-                command=lambda: self.command(i, path),
-                fixed_size=(64, 64)
-            )
-        ),
-        **kw
+  THUMB_X = 64
+  THUMB_Y = 64
+
+  def __init__(self, parent, fspaths: List[str], *, command, **kw):
+    kw.setdefault('bg', 'yellow')
+    super().__init__(parent, **kw)
+    _FSPathsMixin.__init__(self)
+    self.index_by_abspath = {}
+    self.index_by_displaypath = {}
+    self.command = command
+    self.make_subwidget = (
+        lambda i, path: ImageButton(
+            self,
+            path=expanduser(path),
+            bg="green",
+            command=lambda: self.command(i, expanduser(path)),
+            fixed_size=(self.THUMB_X, self.THUMB_Y),
+        )
     )
+    self._fspaths = None
+    self.fspaths = fspaths
+
+  def set_fspaths(self, new_fspaths):
+    ''' Update the list of fielsystem paths.
+    '''
+    display_paths = super().set_fspaths(new_fspaths)
+    for child in list(self.grid_slaves()):
+      child.grid_remove()
+    for i, dpath in enumerate(display_paths):
+      thumbnail = self.make_subwidget(i, dpath)
+      thumbnail.grid(column=i, row=0)
+
+  @property
+  def fspaths(self):
+    ''' The list of filesystem paths.
+    '''
+    return self._fspaths
+
+  @fspaths.setter
+  def fspaths(self, new_paths):
+    ''' Set the list of filesystem paths.
+    '''
+    self.set_fspaths(new_paths)
+
+  @pfx_method
+  def show_fspath(self, fspath):
+    warning("UNIMPLEMENTED")
