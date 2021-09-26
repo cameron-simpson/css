@@ -189,16 +189,23 @@ class _Widget(ABC):
     self.fixed_size = fixed_size
     ##X("_Widget: call super():%s(*a=%r,**kw=%r)", super(), a, kw)
 
-  def update(self, **kw):
-    X("%s.update: kw=%r", type(self).__name__, kw)
-    super().update(**kw)
-    if self.fixed_size:
-      self.set_size(self.fixed_size)
   @property
   def parent(self):
     ''' The widget's parent as noted at initialisation.
     '''
     return self.__parent
+
+  @property
+  def fixed_width(self):
+    ''' The width componet of the `fixed_size`.
+    '''
+    return self.fixed_size[0]
+
+  @property
+  def fixed_height(self):
+    ''' The height componet of the `fixed_size`.
+    '''
+    return self.fixed_size[1]
 
 
 # local shims for the tk and ttk widgets
