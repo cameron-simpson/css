@@ -109,8 +109,8 @@ class TaggerGUI(MultiOpenMixin):
 @require(lambda dx1: dx1 > 0)
 @require(lambda x2: x2 >= 0)
 @require(lambda dx2: dx2 > 0)
-@ensure(lambda result, dx1: result[1] <= dx1)
-@ensure(lambda result, dx2: result[1] <= dx2)
+@ensure(lambda result, dx1: result is None or result[1] <= dx1)
+@ensure(lambda result, dx2: result is None or result[1] <= dx2)
 def overlap1(x1, dx1, x2, dx2):
   ''' Compute the overlap of 2 ranges,
       return `None` for no overlap
