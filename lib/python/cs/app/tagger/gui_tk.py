@@ -179,14 +179,18 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 class _Widget(ABC):
 
   def __init__(self, parent, *a, key=None, fixed_size=None, **kw):
-    if fixed_size:
-      kw.update(width=fixed_size[0], height=fixed_size[1])
+    if fixed_size is None:
+      fixed_size = (None, None)
     self.__parent = parent
+    self.fixed_size = fixed_size
+    if self.fixed_width is not None:
+      kw.update(width=self.fixed_width)
+    if self.fixed_height is not None:
+      kw.update(height=self.fixed_height)
     super().__init__(parent, *a, **kw)
     if key is None:
       key = uuid4()
     self.key = key
-    self.fixed_size = fixed_size
     ##X("_Widget: call super():%s(*a=%r,**kw=%r)", super(), a, kw)
 
   @property
