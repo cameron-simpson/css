@@ -509,19 +509,19 @@ class TagsView(_TagsView, PanedWindow):
     super().set_tags(tags)
     for child in list(self.panes()):
       self.remove(child)
-    self.add(tk.Label(text="pre tag ======================="))
-    self.add(self.tag_widget(Tag('dummy', 1)))
+    self.add(Label(None, text="Tags"), sticky=tk.W)
     for tag in sorted(self.tags):
-      self.add(self.tag_widget(tag))
-    self.add(tk.Label(text="post tag"))
-    self.add(tk.Label(text="pad"))
+      self.add(self.tag_widget(tag), sticky=tk.W)
+    self.add(Label(None, text="post tag"), sticky=tk.W)
+    self.add(Label(None, text="pad"), sticky=tk.W)
 
 class PathView(LabelFrame):
   ''' A preview of a filesystem path.
   '''
 
   def __init__(self, parent, fspath=None, *, tagger, **kw):
-    super().__init__(parent, text=fspath or "NONE", **kw)
+    kw.setdefault('text', fspath or 'NONE')
+    super().__init__(parent, **kw)
     self._fspath = fspath
     self.tagger = tagger
     # path->set(suggested_tags)
