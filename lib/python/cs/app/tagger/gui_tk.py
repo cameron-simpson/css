@@ -8,7 +8,9 @@ from collections import namedtuple
 from contextlib import contextmanager
 import os
 from os.path import (
+    abspath,
     basename,
+    expanduser,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -39,6 +41,8 @@ from cs.x import X
 from .util import ispng, pngfor
 
 class TaggerGUI(MultiOpenMixin):
+  ''' A GUI for a `Tagger`.
+  '''
 
   def __init__(self, tagger, fspaths):
     self.tagger = tagger
@@ -53,9 +57,7 @@ class TaggerGUI(MultiOpenMixin):
     app = LabelFrame(root, text="APP")
 
     # Define the window's contents
-    @trace
     def select_path(i, path):
-      X("SELECT_PATH: i=%r, path=%r", i, path)
       self.pathview.fspath = path
 
     pathlist = self.pathlist = PathListWidget(
@@ -150,9 +152,7 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 class _Widget(ABC):
 
   def __init__(self, parent, *a, key=None, fixed_size=None, **kw):
-    X("INIT _WIDGET %s, parent=%s %r", type(self).__name__, parent, kw)
     if fixed_size:
-      X("FIXED SIZE %s = %r", type(self).__name__, fixed_size)
       kw.update(width=fixed_size[0], height=fixed_size[1])
     self.__parent = parent
     super().__init__(parent, *a, **kw)
@@ -169,6 +169,8 @@ class _Widget(ABC):
       self.set_size(self.fixed_size)
   @property
   def parent(self):
+    ''' The widget's parent as noted at initialisation.
+    '''
     return self.__parent
 
 
@@ -255,12 +257,10 @@ class _ImageWidget(_Widget):
     else:
       ##os.system("open %r" % (display_fspath,))
       img = Image.open(display_fspath)
-      X("Image.open => %s : %r", img, img.size)
+      ##X("Image.open => %s : %r", img, img.size)
       image = ImageTk.PhotoImage(img)
       self.configure(
           text=basename(new_fspath),
-          bd=2,
-          background="black",
           ##compound=tk.BOTTOM,
           image=image,
           width=size[0],
@@ -401,6 +401,8 @@ class TagWidget(Frame):
     self.choices.grid(column=1, row=0, sticky=tk.W)
 
 class _TagsView(_Widget):
+  ''' A view of some `Tag`s.
+  '''
 
   def __init__(self, parent, *, get_tag_widget=None, **kw):
     super().__init__(parent, **kw)
@@ -416,12 +418,16 @@ class _TagsView(_Widget):
     self.tags.update(tags)
 
 class TagsView(_TagsView, PanedWindow):
+  ''' A view of some `Tag`s.
+  '''
 
   def __init__(self, parent, **kw):
-    super().__init__(parent, orient=tk.VERTICAL, showhandle=True, **kw)
+    super().__init__(parent, orient=tk.VERTICAL, **kw)
     self.set_tags(())
 
   def tag_widget(self, tag):
+    ''' Create a new `TagWidget` for the `Tag` `tag`.
+    '''
     return TagWidget(
         None,
         self.tags,
@@ -440,7 +446,7 @@ class TagsView(_TagsView, PanedWindow):
     self.add(tk.Label(text="post tag"))
     self.add(tk.Label(text="pad"))
 
-class PathView(_Widget, tk.LabelFrame):
+class PathView(LabelFrame):
   ''' A preview of a filesystem path.
   '''
 
@@ -456,18 +462,14 @@ class PathView(_Widget, tk.LabelFrame):
         self,
         path=fspath,
         fixed_size=(1920, 1080),
-        ##background_color='grey',
     )
-    ##self.preview.grid(column=0, row=0)
     self.preview.grid(column=0, row=0)
 
     self.tagsview = TagsView(
         self,
         fixed_size=(200, None),  ## 1080),
-        ##fixed_size=(200, 600),  ## 1080),
         ##get_tag_widget=lambda tag: self._tag_widget(tag.name),
     )
-    ##self.tagsview.grid(column=0, row=0)
     self.tagsview.grid(column=1, row=0, sticky=tk.N)
 
   @property
@@ -484,7 +486,7 @@ class PathView(_Widget, tk.LabelFrame):
     print("SET fspath =", repr(new_fspath))
     self._fspath = new_fspath
     self._tag_widgets = {}
-    self.config(text=new_fspath or "NONE")
+    self.config(text=shortpath(new_fspath) or "NONE")
     self.preview.fspath = new_fspath
     tags = self.tagged.merged_tags()
     ##self.tagsview.set_tags(tags)
@@ -508,6 +510,8 @@ class PathView(_Widget, tk.LabelFrame):
 
   @property
   def tagged(self):
+    ''' The `TaggedFile` for the currently displayed path.
+    '''
     if self._fspath is None:
       return None
     return self.tagger.fstags[self._fspath]
