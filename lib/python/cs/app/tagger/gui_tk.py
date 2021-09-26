@@ -352,8 +352,6 @@ class ImageButton(_ImageWidget, Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
-class _PathList(_Widget, tk.PanedWindow):
-
 class _FSPathsMixin:
   ''' A mixin with methods for maintaining a list of filesystem paths.
   '''
@@ -404,54 +402,50 @@ class _FSPathsMixin:
         index = None
     return index
 
-  @typechecked
-  def __init__(
-      self, parent, pathlist: List[str], *, command, make_subwidget, **kw
-  ):
-    super().__init__(parent, **kw)
-    self.command = command
-    self.make_subwidget = make_subwidget
-    self.update_pathlist(pathlist)
+class PathList_Listbox(Listbox, _FSPathsMixin):
 
-  def update_pathlist(self, new_paths: Iterable[str]):
-    ''' Update the path list.
+  @typechecked
+  def __init__(self, parent, pathlist: List[str], *, command, **kw):
+    super().__init__(parent, **kw)
+    _FSPathsMixin.__init__(self)
+    self.command = command
+    self.pathlist = pathlist
+
+  def set_fspaths(self, new_fspaths):
+    ''' Update the filesystem paths.
     '''
-    self._pathlist = list(new_paths)
-    for child in list(self.panes()):
-      self.remove(child)
-    for i, path in enumerate(self._pathlist):
-      thumbnail = self.make_subwidget(i, path)
-      self.add(thumbnail)
+    self.display_paths = super().set_fspaths(new_fspaths)
+    list_state = getattr(self, '_list_state', None)
+    if list_state is None:
+      list_state = self._list_state = tk.StringVar(value=self.display_paths)
+      self.config(listvariable=list_state)
+    list_state.set(self.display_paths)
+    if self.fixed_width is None:
+      self.config(width=max(map(len, self.display_paths)) + 10)
 
   @property
   def pathlist(self):
     ''' Return the current path list.
     '''
-    return self._pathlist
+    return self.items
 
   @pathlist.setter
   def pathlist(self, new_paths: Iterable[str]):
     ''' Update the path list.
     '''
-    self.updatepathlist(new_paths)
+    self.set_fspaths(new_paths)
 
-class PathListWidget(_PathList):
-
-  def __init__(self, parent, pathlist: List[str], *, command, **kw):
-    super().__init__(
-        parent,
-        pathlist=pathlist,
-        orient=tk.VERTICAL,
-        command=command,
-        make_subwidget=(
-            lambda i, path: tk.Button(
-                self,
-                text=shortpath(path),
-                command=lambda: self.command(i, path)
-            )
-        ),
-        **kw
-    )
+  @pfx_method
+  def show_fspath(self, fspath, select=False):
+    ''' Adjust the list box so that `fspath` is visible.
+    '''
+    index = self.index_by_path(fspath)
+    if index is None:
+      warning("cannot show this path")
+    else:
+      self.see(index)
+      if select:
+        self.set_selection(index)
 
 class TagWidget(Frame):
   ''' A Dsiplay for a `Tag`.
