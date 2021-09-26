@@ -94,7 +94,8 @@ class TaggerGUI(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     root = tk.Tk()
-    app = LabelFrame(root, text="APP")
+    app = Frame(root)
+    app.grid()
 
     # Define the window's contents
     def select_path(i, path):
