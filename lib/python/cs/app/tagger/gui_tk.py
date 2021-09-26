@@ -295,6 +295,10 @@ class _ImageWidget(_Widget):
   def __init__(self, parent, *, path, **kw):
     ''' Initialise the image widget to display `path`.
     '''
+    kw.setdefault('bd', 2)
+    kw.setdefault('bg', 'black')
+    kw.setdefault('bitmap', 'gray75')
+    kw.setdefault('text', shortpath(path) if path else "NONE")
     super().__init__(parent, **kw)
     self.fspath = path
 
