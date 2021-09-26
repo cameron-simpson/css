@@ -180,6 +180,16 @@ class Button(_Widget, tk.Button):
   '''
 
 # pylint: disable=too-many-ancestors
+class Canvas(_Widget, tk.Canvas):
+  ''' Canvas `_Widget` subclass.
+  '''
+
+  def scroll_bbox_x(self):
+    bbox = self.bbox("all")
+    self.configure(scrollregion=bbox)
+    self.configure(height=bbox[3])
+
+# pylint: disable=too-many-ancestors
 class Combobox(_Widget, ttk.Combobox):
   ''' Combobox `_Widget` subclass.
   '''
@@ -207,6 +217,11 @@ class Listbox(_Widget, tk.Listbox):
 # pylint: disable=too-many-ancestors
 class PanedWindow(_Widget, tk.PanedWindow):
   ''' PanedWindow `_Widget` subclass.
+  '''
+
+# pylint: disable=too-many-ancestors
+class Scrollbar(_Widget, tk.Scrollbar):
+  ''' Scrollbar `_Widget` subclass.
   '''
 
 class _ImageWidget(_Widget):
