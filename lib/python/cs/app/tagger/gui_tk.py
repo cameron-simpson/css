@@ -118,8 +118,17 @@ class TaggerGUI(MultiOpenMixin):
     thumbsscroll.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
     thumbscanvas['xscrollcommand'] = thumbsscroll.set
 
-    thumbsview = ThumbNailScrubber(thumbscanvas, (), command=select_path)
-    thumbscanvas.create_window(0, 0, anchor=tk.NW, window=thumbsview)
+    # let the geometry settle
+    app.update_idletasks()
+
+    thumbsview = ThumbNailScrubber(
+        thumbscanvas,
+        (),
+        command=select_path,
+    )
+    thumbscanvas.create_window(
+        thumbsscroll.winfo_width() / 2, 0, anchor=tk.N, window=thumbsview
+    )
 
     # attach widget references
     with stackattrs(
