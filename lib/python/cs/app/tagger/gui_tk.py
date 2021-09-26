@@ -101,21 +101,45 @@ class TaggerGUI(MultiOpenMixin):
     def select_path(i, path):
       self.pathview.fspath = path
 
-    pathlist = self.pathlist = PathListWidget(
-        app, self.fspaths, command=select_path
+    pathlist = PathList_Listbox(
+        app,
+        self.fspaths,
+        ##bg='red',
+        command=select_path,
     )
-    pathlist.grid(column=0, row=0, sticky=tk.N)
-    pathview = self.pathview = PathView(app, tagger=self.tagger)
-    pathview.grid(column=1, row=0, sticky=tk.N)
+    pathlist.grid(column=0, row=0, sticky=tk.N + tk.S, rowspan=2)
+    pathview = PathView(app, tagger=self.tagger)
+    pathview.grid(column=1, row=0, sticky=tk.N + tk.S)
 
-    thumbview = self.thumbview = ThumbNailScrubber(
-        app, self.fspaths, command=select_path
+    thumbscanvas = Canvas(app, bg='yellow')
+    thumbscanvas.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
+
+    thumbsscroll = Scrollbar(
+        app,
+        orient=tk.HORIZONTAL,
+        command=thumbscanvas.xview,
     )
-    thumbview.grid(column=0, row=1, columnspan=2)
-    pathview.fspath = self.fspaths[0]
-    app.grid()
-    with stackattrs(self, app=app, pathlist=pathlist, pathview=pathview):
-      yield app
+    thumbsscroll.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
+    thumbscanvas['xscrollcommand'] = thumbsscroll.set
+
+    thumbsview = ThumbNailScrubber(thumbscanvas, (), command=select_path)
+    thumbscanvas.create_window(0, 0, anchor=tk.NW, window=thumbsview)
+
+    # attach widget references
+    with stackattrs(
+        self,
+        app=app,
+        pathlist=pathlist,
+        pathview=pathview,
+        thumbscanvas=thumbscanvas,
+        thumbsview=thumbsview,
+    ):
+      # set fspaths with side effects to widgets
+      with stackattrs(self, fspaths=self.fspaths):
+        # set current display with side effects to widgets
+        with stackattrs(self,
+                        fspath=self.fspaths[0] if self.fspaths else None):
+          yield app
 
   def run(self, runstate=None):
     print("run...")
