@@ -173,26 +173,41 @@ class _Widget(ABC):
 
 
 # local shims for the tk and ttk widgets
+
+# pylint: disable=too-many-ancestors
 class Button(_Widget, tk.Button):
-  pass
+  ''' Button `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class Combobox(_Widget, ttk.Combobox):
-  pass
+  ''' Combobox `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class Frame(_Widget, tk.Frame):
-  pass
+  ''' Frame `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class Label(_Widget, tk.Label):
-  pass
+  ''' Label `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class LabelFrame(_Widget, tk.LabelFrame):
-  pass
+  ''' LabelFrame `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class Listbox(_Widget, tk.Listbox):
-  pass
+  ''' Listbox `_Widget` subclass.
+  '''
 
+# pylint: disable=too-many-ancestors
 class PanedWindow(_Widget, tk.PanedWindow):
-  pass
+  ''' PanedWindow `_Widget` subclass.
+  '''
 
 class _ImageWidget(_Widget):
 
