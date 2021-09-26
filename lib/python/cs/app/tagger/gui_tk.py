@@ -44,7 +44,11 @@ class TaggerGUI(MultiOpenMixin):
   ''' A GUI for a `Tagger`.
   '''
 
-  def __init__(self, tagger, fspaths):
+  def __init__(self, tagger, fspaths=None):
+    if fspaths is None:
+      fspaths = ()
+    self._fspaths = fspaths
+    self._fspath = None
     self.tagger = tagger
     self.fspaths = fspaths
 
