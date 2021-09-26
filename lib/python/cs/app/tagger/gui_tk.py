@@ -83,7 +83,7 @@ class TaggerGUI(MultiOpenMixin):
       self.pathview.fspath = new_fspath
     if self.pathlist is not None:
       # scroll to new_fspath
-      self.pathlist.show_fspath(new_fspath)
+      self.pathlist.show_fspath(new_fspath, select=True)
     if self.thumbsview is not None:
       # scroll to new_fspath
       self.thumbsview.show_fspath(new_fspath)
@@ -96,7 +96,7 @@ class TaggerGUI(MultiOpenMixin):
 
     # Define the window's contents
     def select_path(_, path):
-      self.pathview.fspath = path
+      self.fspath = path
 
     pathlist = PathList_Listbox(
         app,
@@ -426,6 +426,11 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     _FSPathsMixin.__init__(self)
     self.command = command
     self.pathlist = pathlist
+    self.bind('<Button-1>', self._clicked)
+
+  def _clicked(self, event):
+    nearest = self.nearest(event.y)
+    self.command(nearest, expanduser(self.display_paths[nearest]))
 
   def set_fspaths(self, new_fspaths):
     ''' Update the filesystem paths.
@@ -441,9 +446,9 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
 
   @property
   def pathlist(self):
-    ''' Return the current path list.
+    ''' Return the currently displayed path list.
     '''
-    return self.items
+    return self.display_paths
 
   @pathlist.setter
   def pathlist(self, new_paths: Iterable[str]):
@@ -461,7 +466,8 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     else:
       self.see(index)
       if select:
-        self.set_selection(index)
+        self.selection_clear(0, len(self.display_paths) - 1)
+        self.selection_set(index)
 
 class TagWidget(Frame):
   ''' A Dsiplay for a `Tag`.
@@ -650,7 +656,7 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
             self,
             path=expanduser(path),
             bg="green",
-            command=lambda: self.command(i, expanduser(path)),
+            command=lambda i=i, path=path: self.command(i, expanduser(path)),
             fixed_size=(self.THUMB_X, self.THUMB_Y),
         )
     )
