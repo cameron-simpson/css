@@ -51,6 +51,42 @@ class TaggerGUI(MultiOpenMixin):
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
 
+  @property
+  def fspaths(self):
+    ''' The current list of filesystem paths.
+    '''
+    return self._fspaths
+
+  @fspaths.setter
+  def fspaths(self, new_fspaths):
+    ''' Update the current list of filesystem paths.
+    '''
+    self._fspaths = list(new_fspaths)
+    if self.pathlist is not None:
+      self.pathlist.set_fspaths(self._fspaths)
+    if self.thumbsview is not None:
+      self.thumbsview.set_fspaths(self._fspaths)
+      self.thumbscanvas.after_idle(self.thumbscanvas.scroll_bbox_x)
+
+  @property
+  def fspath(self):
+    ''' The currently displayed filesystem path.
+    '''
+    return self._fspath
+
+  @fspath.setter
+  def fspath(self, new_fspath):
+    self._fspath = new_fspath
+    if self.pathview is not None:
+      # display new_fspath
+      self.pathview.fspath = new_fspath
+    if self.pathlist is not None:
+      # scroll to new_fspath
+      self.pathlist.show_fspath(new_fspath)
+    if self.thumbsview is not None:
+      # scroll to new_fspath
+      self.thumbsview.show_fspath(new_fspath)
+
   @contextmanager
   def startup_shutdown(self):
     root = tk.Tk()
@@ -92,20 +128,6 @@ class TaggerGUI(MultiOpenMixin):
       print("before mainloop")
       self.app.mainloop()
       print("after mainloop")
-
-  @property
-  def fspath(self):
-    return self.pathview.fspath
-
-  @fspath.setter
-  @pfx
-  def fspath(self, new_fspath):
-    self.pathview.fspath = new_fspath
-    # TODO: make the tree display the associated element
-    try:
-      pathinfo = self.tree[new_fspath]
-    except KeyError:
-      warning("path not in tree")
 
 @require(lambda x1: x1 >= 0)
 @require(lambda dx1: dx1 > 0)
