@@ -265,6 +265,56 @@ class ImageButton(_ImageWidget, Button):
 
 class _PathList(_Widget, tk.PanedWindow):
 
+class _FSPathsMixin:
+  ''' A mixin with methods for maintaining a list of filesystem paths.
+  '''
+
+  def __init__(self, canonical=None, display=None):
+    if canonical is None:
+      canonical = abspath
+    if display is None:
+      display = shortpath
+    self.__canonical = canonical
+    self.__display = display
+    self.__index_by_canonical = {}
+    self.__index_by_display = {}
+
+  def __clear(self):
+    self.__index_by_canonical.clear()
+    self.__index_by_display.clear()
+
+  def set_fspaths(self, new_fspaths):
+    ''' Update the canonical and display index mappings.
+        Return a list of the display paths.
+    '''
+    fspaths = list(new_fspaths)
+    display_paths = []
+    self.__clear()
+    for i, fspath in enumerate(fspaths):
+      cpath = self.__canonical(fspath)
+      dpath = self.__display(fspath)
+      display_paths.append(dpath)
+      self.__index_by_canonical[cpath] = i
+      self.__index_by_display[dpath] = i
+    return display_paths
+
+  @pfx_method
+  def index_by_path(self, path):
+    ''' Return the index for path via its display or canonical forms,
+        or `None` if no match.
+    '''
+    dpath = self.__display(path)
+    try:
+      index = self.__index_by_display[dpath]
+    except KeyError:
+      cpath = self.__canonical(path)
+      try:
+        index = self.__index_by_canonical[cpath]
+      except KeyError:
+        warning("no index found, tried display=%r, canonical=%r", dpath, cpath)
+        index = None
+    return index
+
   @typechecked
   def __init__(
       self, parent, pathlist: List[str], *, command, make_subwidget, **kw
