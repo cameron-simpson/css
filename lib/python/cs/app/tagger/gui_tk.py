@@ -6,20 +6,15 @@
 from abc import ABC
 from collections import namedtuple
 from contextlib import contextmanager
-import os
 from os.path import (
     abspath,
     basename,
     expanduser,
-    isdir as isdirpath,
-    isfile as isfilepath,
-    join as joinpath,
-    realpath,
 )
 import tkinter as tk
 from tkinter import ttk
-from typing import Iterable, List, Optional
-from uuid import UUID, uuid4
+from typing import Iterable, List
+from uuid import uuid4
 
 from icontract import require, ensure
 from PIL import Image, ImageTk
@@ -28,17 +23,14 @@ from typeguard import typechecked
 from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.logutils import warning
-from cs.mappings import IndexedMapping, UUIDedDict
-from cs.pfx import pfx, Pfx, pfx_method
-from cs.queues import ListQueue
+from cs.pfx import pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState
-from cs.tagset import Tag, TagSet
+from cs.tagset import TagSet
 
 from cs.lex import r
-from cs.py.func import trace
 from cs.x import X
 
-from .util import ispng, pngfor
+from .util import pngfor
 
 class TaggerGUI(MultiOpenMixin):
   ''' A GUI for a `Tagger`.
@@ -54,6 +46,8 @@ class TaggerGUI(MultiOpenMixin):
     self.app = None
     self.pathlist = None
     self.thumbsview = None
+    self.pathview = None
+    self.thumbscanvas = None
 
   def __str__(self):
     return "%s(%s)" % (type(self).__name__, self.tagger)
@@ -101,13 +95,12 @@ class TaggerGUI(MultiOpenMixin):
     app.grid()
 
     # Define the window's contents
-    def select_path(i, path):
+    def select_path(_, path):
       self.pathview.fspath = path
 
     pathlist = PathList_Listbox(
         app,
         self.fspaths,
-        ##bg='red',
         command=select_path,
     )
     pathlist.grid(column=0, row=0, sticky=tk.N + tk.S, rowspan=2)
@@ -145,17 +138,11 @@ class TaggerGUI(MultiOpenMixin):
           yield app
 
   def run(self, runstate=None):
+    ''' Run the GUI.
+    '''
     print("run...")
     if runstate is None:
       runstate = RunState(str(self))
-    # Display and interact with the Window using an Event Loop
-    app = self.app
-    if False:
-      for record in self.tree:
-        if isfilepath(record.fullpath):
-          print("set self.fspath =", repr(record.fullpath))
-          self.fspath = record.fullpath
-          break
     with runstate:
       print("before mainloop")
       self.app.mainloop()
@@ -218,7 +205,6 @@ class _Widget(ABC):
     if key is None:
       key = uuid4()
     self.key = key
-    ##X("_Widget: call super():%s(*a=%r,**kw=%r)", super(), a, kw)
 
   @property
   def parent(self):
@@ -278,6 +264,8 @@ class Canvas(_Widget, tk.Canvas):
   '''
 
   def scroll_bbox_x(self):
+    ''' Configure the canvas height and scrollregion for the current contents.
+    '''
     bbox = self.bbox("all")
     self.configure(scrollregion=bbox)
     self.configure(height=bbox[3])
@@ -357,7 +345,6 @@ class _ImageWidget(_Widget):
         self.configure(image=None)
         return
       img = Image.open(display_fspath)
-      ##X("Image.open => %s : %r", img, img.size)
       image = ImageTk.PhotoImage(img)
       self.configure(
           text=basename(new_fspath),
@@ -430,6 +417,8 @@ class _FSPathsMixin:
     return index
 
 class PathList_Listbox(Listbox, _FSPathsMixin):
+  ''' A `Listbox` displaying filesystem paths.
+  '''
 
   @typechecked
   def __init__(self, parent, pathlist: List[str], *, command, **kw):
@@ -565,7 +554,6 @@ class PathView(LabelFrame):
     self.tagsview = TagsView(
         self,
         fixed_size=(200, None),  ## 1080),
-        ##get_tag_widget=lambda tag: self._tag_widget(tag.name),
     )
     self.tagsview.grid(column=1, row=0, sticky=tk.N)
 
@@ -693,4 +681,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
 
   @pfx_method
   def show_fspath(self, fspath):
+    ''' TODO: bring to correspnding thumbnail into view.
+    '''
     warning("UNIMPLEMENTED")
