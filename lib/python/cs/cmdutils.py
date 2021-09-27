@@ -23,7 +23,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210927'
+__version__ = '20210927-post'
 
 DISTINFO = {
     'description':
