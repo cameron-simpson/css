@@ -276,22 +276,31 @@ class BaseCommand:
     for option, value in kw_options.items():
       setattr(options, option, value)
     # we catch GetoptError from this suite...
+    subcmd = None  # default: no subcmd specific usage available
+    short_usage = False
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
-      # we do this regardless in order to honour '--'
-      opts, argv = getopt(argv, getopt_spec, '')
-      self.apply_opts(opts)
-      # we do this regardless so that subclasses can do some presubcommand parsing
-      # after any command line options
-      argv = self.apply_preargv(argv)
+      # catch bare -h or --help if no 'h' in the getopt_spec
+      if ('h' not in getopt_spec and len(argv) == 1
+          and argv[0] in ('-h', '-help', '--help')):
+        argv = ['help']
+      else:
+        # we do this regardless in order to honour '--'
+        try:
+          opts, argv = getopt(argv, getopt_spec, '')
+        except GetoptError:
+          short_usage = True
+          raise
+        self.apply_opts(opts)
+        # we do this regardless so that subclasses can do some presubcommand parsing
+        # after any command line options
+        argv = self.apply_preargv(argv)
 
       # now prepare:
       # * a callable `main` accepting `argv`
       # * the remaining arguments `main_argv`
       # * a context manager `main_context` for use around `run_context`
       subcmds = self.subcommands()
-      subcmd = None
-      short_usage = False
       if subcmds and list(subcmds) != ['help']:
         # expect a subcommand on the command line
         if not argv:
@@ -312,7 +321,6 @@ class BaseCommand:
           main_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           # pylint: disable=raise-missing-from
-          subcmd = None  # no subcmd specific usage available
           short_usage = True
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
@@ -412,10 +420,13 @@ class BaseCommand:
           if subusage:
             subusages.append(subusage.replace('\n', '\n  '))
       if subusages:
+        subcmds_header = 'Subcommands' if subcmd is None else 'Subcommand'
+        if short:
+          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
         usage_message = '\n'.join(
             [
                 usage_message,
-                ('  Subcommands:' if subcmd is None else '  Subcommand:')
+                '  ' + subcmds_header + ':',
             ] + [
                 '    ' + subusage.replace('\n', '\n    ')
                 for subusage in subusages
@@ -625,7 +636,7 @@ class BaseCommand:
   @classmethod
   def cmd_help(cls, argv):
     ''' Usage: {cmd} [subcommand-names...]
-          Print the help for the named subcommands,
+          Print the full help for the named subcommands,
           or for all subcommands if no names are specified.
     '''
     subcmds = cls.subcommands()
@@ -636,10 +647,12 @@ class BaseCommand:
       argv = sorted(subcmds)
     xit = 0
     print("help:")
+    unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
         if subcmd not in subcmds:
           warning("unknown subcommand")
+          unknown = True
           xit = 1
           continue
         usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
@@ -651,4 +664,6 @@ class BaseCommand:
           xit = 1
           continue
         print(' ', subusage.replace('\n', '\n    '))
+    if unknown:
+      warning("I know: %s",', '.join(sorted(subcmds.keys())))
     return xit

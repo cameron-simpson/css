@@ -41,7 +41,6 @@ cs.progress: control over status display - units etc
 cs.upd: rate per proxy, bisect to update counter, autotune?
 incd: remote tmux session to be per target dir
 haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
-BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
 new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?
