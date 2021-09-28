@@ -597,27 +597,46 @@ class EditValueWidget(Frame):
     return value
 
 class TagWidget(Frame):
-  ''' A Dsiplay for a `Tag`.
+  ''' A display for a `Tag`.
   '''
 
   @typechecked
-  def __init__(
-      self, parent, tags: TagSet, tag_name: str, *, alt_values=None, **kw
-  ):
-    if alt_values is None:
-      alt_values = set()
+  def __init__(self, parent, tags: TagSet, tag: Tag, *, alt_values=None, **kw):
+    with Pfx("%s tag=%s", type(self).__name__, tag):
+      if alt_values is None:
+        alt_values = set()
+      else:
+        alt_values = set(alt_values)
+      super().__init__(parent, **kw)
+      self.tags = tags
+      self.tag = tag
+      tag_name = tag.name
+      tag_value = tag.value
+      self.alt_values = alt_values
+      self.label = Button(
+          self, text=str(tag), command=self.toggle_editmode, relief=tk.FLAT
+      )
+      self.label.grid(column=0, row=0, sticky=tk.W)
+      self.editor = None
+
+  def toggle_editmode(self):
+    tag = self.tag
+    tag_value = tag.value
+    if self.editor is None:
+      self.editor = EditValueWidget(
+          self, tag_value, alt_values=self.alt_values
+      )
+      self.editor.grid(
+          column=0, row=1, columnspan=2, sticky=tk.W + tk.E + tk.N + tk.S
+      )
+      self.editor.focus_set()
     else:
-      alt_values = set(alt_values)
-    super().__init__(parent, **kw)
-    self.tags = tags
-    self.tag_name = tag_name
-    self.alt_values = alt_values
-    self.label = Label(self, text=tag_name)
-    self.label.grid(column=0, sticky=tk.E)
-    self.choices = Combobox(self, values=sorted(self.alt_values))
-    if tag_name in tags:
-      self.choices.set(tags[tag_name])
-    self.choices.grid(column=1, sticky=tk.W)
+      new_value = self.editor.get()
+      self.editor.grid_remove()
+      self.editor = None
+      X("new_value = %s", r(new_value))
+      self.tag = Tag(self.tag.name, new_value, ontology=self.tag.ontology)
+      self.label.configure(text=str(self.tag))
 
 class _TagsView(_Widget):
   ''' A view of some `Tag`s.
