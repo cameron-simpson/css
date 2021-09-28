@@ -1050,7 +1050,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+  JSON_ENCODER_DEFAULTS = dict(separators=(',', ':'))
+  JSON_ENCODER = JSONEncoder(**JSON_ENCODER_DEFAULTS)
 
   # A JSON decoder.
   JSON_DECODER = JSONDecoder()
@@ -1147,7 +1148,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return name + '=' + value_s
 
   @classmethod
-  def transcribe_value(cls, value, extra_types=None):
+  def transcribe_value(cls, value, extra_types=None, json_options=None):
     ''' Transcribe `value` for use in `Tag` transcription.
 
         The optional `extra_types` parameter may be an iterable of
@@ -1183,7 +1184,18 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if isinstance(value, (tuple, set)):
       value = list(value)
     # fall back to JSON encoded form of value
-    return cls.JSON_ENCODER.encode(value)
+    if json_options:
+      # custom encoder
+      json_options = dict(json_options)
+      for k, v in cls.JSON_ENCODER_DEFAULTS.items():
+        json_options.setdefault(k, v)
+      encoder = JSONEncoder(**json_options)
+    else:
+      encoder = cls.JSON_ENCODER
+    from cs.x import X
+    from cs.lex import r
+    s = encoder.encode(value)
+    return s
 
   @classmethod
   def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
