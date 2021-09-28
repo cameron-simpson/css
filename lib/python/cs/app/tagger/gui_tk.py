@@ -285,6 +285,11 @@ class Combobox(_Widget, ttk.Combobox):
   '''
 
 # pylint: disable=too-many-ancestors
+class Entry(_Widget, tk.Entry):
+  ''' Entry `_Widget` subclass.
+  '''
+
+# pylint: disable=too-many-ancestors
 class Frame(_Widget, tk.Frame):
   ''' Frame `_Widget` subclass.
   '''
@@ -312,6 +317,11 @@ class PanedWindow(_Widget, tk.PanedWindow):
 # pylint: disable=too-many-ancestors
 class Scrollbar(_Widget, tk.Scrollbar):
   ''' Scrollbar `_Widget` subclass.
+  '''
+
+# pylint: disable=too-many-ancestors
+class Text(_Widget, tk.Text):
+  ''' Text `_Widget` subclass.
   '''
 
 class _ImageWidget(_Widget):
