@@ -732,8 +732,15 @@ class PathView(LabelFrame):
     self._tag_widgets = {}
     self.config(text=shortpath(new_fspath) or "NONE")
     self.preview.fspath = new_fspath
-    tags = self.tagged.merged_tags()
-    ##self.tagsview.set_tags(tags)
+    tagged = self.tagged
+    all_tags = TagSet(tagged.merged_tags())
+    suggested_tags = self.suggested_tags
+    for sg_name in suggested_tags.keys():
+      if sg_name not in all_tags:
+        all_tags[sg_name] = None
+    self.tagsview.set_tags(
+        tagged, lambda tag: suggested_tags.get(tag.name), bg_tags=all_tags
+    )
     ##self.tagsview.set_size(size=(1920, 120))
     print("tag suggestions =", repr(self.suggested_tags))
 
