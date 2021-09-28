@@ -488,6 +488,42 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
         self.selection_clear(0, len(self.display_paths) - 1)
         self.selection_set(index)
 
+class TagValueStringVar(tk.StringVar):
+  ''' A `StringVar` which holds a `Tag` value transcription.
+  '''
+
+  def __init__(self, value, **kw):
+    ''' Initialise the `TagValueStringVar` with `value`.
+        Keyword arguments are passed to `tk.StringVar.__init__`.
+    '''
+    super().__init__(master=None, value=None, **kw)
+    self.set(value)
+
+  def set(self, value):
+    ''' Set the contents to `Tag.transcribe_value(value)`.
+    '''
+    super().set(Tag.transcribe_value(value))
+
+  @pfx_method
+  def get(self):
+    ''' Return the value derived from the contents via `Tag.parse_value`.
+        An attempt is made to cope with unparsed values.
+    '''
+    s = super().get()
+    try:
+      value, offset = pfx_call(Tag.parse_value, s)
+    except ValueError as e:
+      warning(str(e))
+      value = s
+    else:
+      if offset < len(s):
+        warning("unparsed: %r", s[offset:])
+        if isinstance(value, str):
+          value += s[offset:]
+        else:
+          value = s
+    return value
+
 class TagWidget(Frame):
   ''' A Dsiplay for a `Tag`.
   '''
