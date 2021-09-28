@@ -714,7 +714,7 @@ class PathView(LabelFrame):
         self,
         fixed_size=(200, None),  ## 1080),
     )
-    self.tagsview.grid(column=1, row=0, sticky=tk.N)
+    self.tagsview.grid(column=1, row=0, sticky=tk.N + tk.S)
 
   @property
   def fspath(self):
