@@ -655,33 +655,40 @@ class _TagsView(_Widget):
     self.tags.clear()
     self.tags.update(tags)
 
-class TagsView(_TagsView, PanedWindow):
+class TagsView(_TagsView, LabelFrame):
   ''' A view of some `Tag`s.
   '''
 
   def __init__(self, parent, **kw):
-    super().__init__(parent, orient=tk.VERTICAL, **kw)
+    kw.setdefault('text', 'Tags')
+    super().__init__(parent, **kw)
     self.set_tags(())
 
-  def tag_widget(self, tag):
+  def tag_widget(self, tag, alt_values=None):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
     '''
     return TagWidget(
-        None,
+        self,
         self.tags,
-        tag.name,
-        alt_values=None if tag.value is None else (tag.value,)
+        tag,
+        alt_values=alt_values,
     )
 
-  def set_tags(self, tags):
+  def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
     super().set_tags(tags)
-    for child in list(self.panes()):
-      self.remove(child)
-    self.add(Label(None, text="Tags"), sticky=tk.W)
-    for tag in sorted(self.tags):
-      self.add(self.tag_widget(tag), sticky=tk.W)
-    self.add(Label(None, text="post tag"), sticky=tk.W)
-    self.add(Label(None, text="pad"), sticky=tk.W)
+    for child in list(self.grid_slaves()):
+      child.grid_remove()
+    tags = TagSet(self.tags)
+    if bg_tags:
+      for tag_name, tag_value in bg_tags.items():
+        if tag_name not in tags:
+          tags[tag_name] = tag_value
+    for tag in sorted(tags):
+      alt_values = (
+          None if get_suggested_tag_values is None else
+          get_suggested_tag_values(tag)
+      )
+      self.tag_widget(tag, alt_values=alt_values).grid(sticky=tk.W)
 
 class PathView(LabelFrame):
   ''' A preview of a filesystem path.
