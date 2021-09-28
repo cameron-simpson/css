@@ -524,6 +524,78 @@ class TagValueStringVar(tk.StringVar):
           value = s
     return value
 
+class EditValueWidget(Frame):
+  ''' A widget to edit a `Tag` value,
+      a `Frame` containing a value specific editing widget.
+  '''
+
+  def __init__(self, parent, value, alt_values=None, **kw):
+    super().__init__(parent, **kw)
+    if value is None:
+      value = ""
+    if alt_values and not isinstance(value, (dict, list)):
+      tv = TagValueStringVar(value)
+      edit_widget = Combobox(self, textvariable=tv, values=sorted(alt_values))
+      get_value = lambda _: tv.get()
+    elif isinstance(value, str):
+      if '\n' in value:
+        edit_widget = Text(self)
+        edit_widget.insert(tk.END, value)
+        get_value = lambda w: w.get(1.0, tk.END).rstrip('\n')
+      else:
+        tv = TagValueStringVar(value)
+        edit_widget = Entry(self, textvariable=tv)
+        get_value = lambda _: tv.get()
+    elif isinstance(value, (int, float)):
+      tv = TagValueStringVar(value)
+      edit_widget = Entry(self, textvariable=tv)
+      get_value = lambda _: tv.get()
+    else:
+      edit_text = Tag.transcribe_value(
+          value,
+          json_options=dict(indent=2, sort_keys=True, ensure_ascii=False)
+      )
+      X("edit_text = %r", edit_text)
+      edit_widget = Text(self)
+      edit_widget.insert(tk.END, edit_text)
+
+      def get_value(w):
+        ''' Obtain the new value from the widget contents.
+        '''
+        edited = w.get(1.0, tk.END).rstrip('\n')
+        try:
+          new_value, offset = pfx_call(Tag.parse_value, edited)
+        except ValueError as e:
+          warning("toggle_editmode: %s", e)
+          new_value = edited
+        else:
+          if offset < len(edited):
+            warning("unparsed: %r", edited[offset:])
+            if isinstance(new_value, str):
+              new_value += edited[offset:]
+            else:
+              new_value = edited
+        return new_value
+
+    edit_widget.grid(sticky=tk.W + tk.E + tk.N + tk.S)
+    self.get = lambda: get_value(edit_widget)
+
+  @staticmethod
+  def _parse_value(value_s):
+    try:
+      value, offset = pfx_call(Tag.parse_value, value_s)
+    except ValueError as e:
+      warning("EditValue._parse_value(%s): %s", r(value_s), e)
+      value = value_s
+    else:
+      if offset < len(value_s):
+        warning("unparsed: %r", value_s[offset:])
+        if isinstance(value, str):
+          value += value_s[offset:]
+        else:
+          value = value_s
+    return value
+
 class TagWidget(Frame):
   ''' A Dsiplay for a `Tag`.
   '''
