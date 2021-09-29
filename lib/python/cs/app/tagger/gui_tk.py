@@ -580,6 +580,11 @@ class EditValueWidget(Frame):
     edit_widget.grid(sticky=tk.W + tk.E + tk.N + tk.S)
     self.get = lambda: get_value(edit_widget)
 
+  def focus_set(self):
+    ''' Setting the focus should focus the `edit_widget`.
+    '''
+    self.edit_widget.focus_set()
+
   @staticmethod
   def _parse_value(value_s):
     try:
