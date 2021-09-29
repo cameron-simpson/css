@@ -578,6 +578,7 @@ class EditValueWidget(Frame):
         return new_value
 
     edit_widget.grid(sticky=tk.W + tk.E + tk.N + tk.S)
+    self.edit_widget = edit_widget
     self.get = lambda: get_value(edit_widget)
 
   def focus_set(self):
