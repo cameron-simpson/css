@@ -22,6 +22,7 @@ from typeguard import typechecked
 
 from cs.context import stackattrs
 from cs.fileutils import shortpath
+from cs.lex import cutprefix
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_method
 from cs.resources import MultiOpenMixin, RunState
@@ -201,7 +202,17 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
 
 class _Widget(ABC):
 
+  WIDGET_BACKGROUND = 'black'
+  WIDGET_FOREGROUND = 'white'
+
+  @pfx_method
   def __init__(self, parent, *a, key=None, fixed_size=None, **kw):
+    for attr in dir(self):
+      K = cutprefix(attr, 'WIDGET_')
+      if K is not attr:
+        v = getattr(self, attr)
+        if v is not None:
+          kw.setdefault(K.lower(), v)
     if fixed_size is None:
       fixed_size = (None, None)
     self.__parent = parent
@@ -272,6 +283,8 @@ class Canvas(_Widget, tk.Canvas):
   ''' Canvas `_Widget` subclass.
   '''
 
+  WIDGET_FOREGROUND = None
+
   def scroll_bbox_x(self):
     ''' Configure the canvas height and scrollregion for the current contents.
     '''
@@ -293,6 +306,8 @@ class Entry(_Widget, tk.Entry):
 class Frame(_Widget, tk.Frame):
   ''' Frame `_Widget` subclass.
   '''
+
+  WIDGET_FOREGROUND = None
 
 # pylint: disable=too-many-ancestors
 class Label(_Widget, tk.Label):
@@ -318,6 +333,7 @@ class PanedWindow(_Widget, tk.PanedWindow):
 class Scrollbar(_Widget, tk.Scrollbar):
   ''' Scrollbar `_Widget` subclass.
   '''
+  WIDGET_FOREGROUND = None
 
 # pylint: disable=too-many-ancestors
 class Text(_Widget, tk.Text):
@@ -329,8 +345,6 @@ class _ImageWidget(_Widget):
   def __init__(self, parent, *, path, **kw):
     ''' Initialise the image widget to display `path`.
     '''
-    kw.setdefault('bd', 2)
-    kw.setdefault('bg', 'black')
     kw.setdefault('bitmap', 'gray75')
     kw.setdefault('text', shortpath(path) if path else "NONE")
     super().__init__(parent, **kw)
@@ -811,7 +825,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
   THUMB_Y = 64
 
   def __init__(self, parent, fspaths: List[str], *, command, **kw):
-    kw.setdefault('bg', 'yellow')
     super().__init__(parent, **kw)
     _FSPathsMixin.__init__(self)
     self.index_by_abspath = {}
