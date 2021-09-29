@@ -107,7 +107,7 @@ class TaggerGUI(MultiOpenMixin):
     pathview = PathView(app, tagger=self.tagger)
     pathview.grid(column=1, row=0, sticky=tk.N + tk.S)
 
-    thumbscanvas = Canvas(app, bg='yellow')
+    thumbscanvas = Canvas(app)
     thumbscanvas.grid(column=0, columnspan=2, sticky=tk.W + tk.E)
 
     thumbsscroll = Scrollbar(
@@ -821,7 +821,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
         lambda i, path: ImageButton(
             self,
             path=expanduser(path),
-            bg="green",
             command=lambda i=i, path=path: self.command(i, expanduser(path)),
             fixed_size=(self.THUMB_X, self.THUMB_Y),
         )
