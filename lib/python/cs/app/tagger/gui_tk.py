@@ -24,9 +24,9 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState
-from cs.tagset import TagSet
+from cs.tagset import Tag, TagSet
 
 from cs.lex import r
 from cs.x import X
@@ -381,8 +381,6 @@ class _ImageWidget(_Widget):
       image = ImageTk.PhotoImage(img)
       self.configure(
           text=basename(new_fspath),
-          ##compound=tk.BOTTOM,
-          bitmap=None,
           image=image,
           width=size[0],
           height=size[1],
@@ -569,7 +567,6 @@ class EditValueWidget(Frame):
           value,
           json_options=dict(indent=2, sort_keys=True, ensure_ascii=False)
       )
-      X("edit_text = %r", edit_text)
       edit_widget = Text(self)
       edit_widget.insert(tk.END, edit_text)
 
@@ -761,7 +758,6 @@ class PathView(LabelFrame):
     self.tagsview.set_tags(
         tagged, lambda tag: suggested_tags.get(tag.name), bg_tags=all_tags
     )
-    ##self.tagsview.set_size(size=(1920, 120))
     print("tag suggestions =", repr(self.suggested_tags))
 
   @property
