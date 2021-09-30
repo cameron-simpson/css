@@ -620,23 +620,51 @@ class TagWidget(Frame):
   '''
 
   @typechecked
-  def __init__(self, parent, tags: TagSet, tag: Tag, *, alt_values=None, **kw):
-    with Pfx("%s tag=%s", type(self).__name__, tag):
-      if alt_values is None:
-        alt_values = set()
-      else:
-        alt_values = set(alt_values)
-      super().__init__(parent, **kw)
-      self.tags = tags
-      self.tag = tag
-      tag_name = tag.name
-      tag_value = tag.value
-      self.alt_values = alt_values
-      self.label = Button(
-          self, text=str(tag), command=self.toggle_editmode, relief=tk.FLAT
-      )
-      self.label.grid(column=0, row=0, sticky=tk.W)
-      self.editor = None
+  def __init__(
+      self,
+      parent,
+      tags: TagSet,
+      tag: Tag,
+      *,
+      alt_values=None,
+      foreground=None,
+      background='yellow',
+      **kw
+  ):
+    if background is None:
+      background = self.WIDGET_BACKGROUND
+    if alt_values is None:
+      alt_values = set()
+      if tag.name == 'pil.format':
+        alt_values = ('PNG', 'JPEG')
+    else:
+      alt_values = set(alt_values)
+    super().__init__(parent, background=background, **kw)
+    self.tags = tags
+    self.tag = tag
+    tag_name = tag.name
+    tag_value = tag.value
+    self.alt_values = alt_values
+    self.label = Button(
+        self,
+        text=str(tag),
+        command=self.toggle_editmode,
+        ##relief=tk.FLAT,
+        ##overrelief=tk.FLAT,
+        foreground=foreground,
+        highlightbackground='white',
+        padx=1,
+        pady=1,
+        borderwidth=0,
+    )
+    self._set_colour()
+    self.label.grid(column=0, row=0, sticky=tk.W)
+    self.editor = None
+
+  def _set_colour(self):
+    self.label.configure(
+        foreground='green' if self.tag.name in self.tags else 'gray',
+    )
 
   def toggle_editmode(self):
     tag = self.tag
@@ -653,9 +681,11 @@ class TagWidget(Frame):
       new_value = self.editor.get()
       self.editor.grid_remove()
       self.editor = None
-      X("new_value = %s", r(new_value))
       self.tag = Tag(self.tag.name, new_value, ontology=self.tag.ontology)
+      if new_value != self.tags.get(self.tag.name):
+        self.tags[self.tag.name] = new_value
       self.label.configure(text=str(self.tag))
+      self._set_colour()
 
 class _TagsView(_Widget):
   ''' A view of some `Tag`s.
@@ -683,7 +713,7 @@ class TagsView(_TagsView, LabelFrame):
     super().__init__(parent, **kw)
     self.set_tags(())
 
-  def tag_widget(self, tag, alt_values=None):
+  def tag_widget(self, tag, alt_values=None, **kw):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
     '''
     return TagWidget(
@@ -691,6 +721,7 @@ class TagsView(_TagsView, LabelFrame):
         self.tags,
         tag,
         alt_values=alt_values,
+        **kw,
     )
 
   def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
@@ -707,7 +738,10 @@ class TagsView(_TagsView, LabelFrame):
           None if get_suggested_tag_values is None else
           get_suggested_tag_values(tag)
       )
-      self.tag_widget(tag, alt_values=alt_values).grid(sticky=tk.W)
+      self.tag_widget(
+          tag,
+          alt_values=alt_values,
+      ).grid(sticky=tk.W)
 
 class PathView(LabelFrame):
   ''' A preview of a filesystem path.
