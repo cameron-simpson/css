@@ -345,7 +345,7 @@ class _ImageWidget(_Widget):
   def __init__(self, parent, *, path, **kw):
     ''' Initialise the image widget to display `path`.
     '''
-    kw.setdefault('bitmap', 'gray75')
+    kw.setdefault('bitmap', 'gray25')
     kw.setdefault('text', shortpath(path) if path else "NONE")
     super().__init__(parent, **kw)
     self.fspath = path
@@ -548,6 +548,8 @@ class EditValueWidget(Frame):
     if alt_values and not isinstance(value, (dict, list)):
       tv = TagValueStringVar(value)
       edit_widget = Combobox(self, textvariable=tv, values=sorted(alt_values))
+      if value is None or value == "":
+        edit_widget.set(sorted(alt_values)[0])
       get_value = lambda _: tv.get()
     elif isinstance(value, str):
       if '\n' in value:
