@@ -19,7 +19,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20210913-post'
+__version__ = '20210924-post'
 
 DISTINFO = {
     'description':
@@ -187,6 +187,18 @@ class Channel(object):
     '''
     if a:
       return self.put(*a)
+    return self.get()
+
+  def __iter__(self):
+    ''' A `Channel` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' `next(Channel)` calls `Channel.get()`.
+    '''
+    if self.closed:
+      raise StopIteration()
     return self.get()
 
   @not_closed

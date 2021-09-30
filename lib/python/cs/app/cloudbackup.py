@@ -26,7 +26,7 @@ from os.path import (
     relpath,
 )
 import signal
-from stat import S_ISDIR, S_ISREG, S_ISLNK
+from stat import S_IFMT, S_ISDIR, S_ISREG, S_ISLNK
 from tempfile import TemporaryDirectory
 from threading import RLock
 from types import SimpleNamespace
@@ -54,7 +54,7 @@ from cs.deco import fmtdoc, strable
 from cs.fileutils import UUIDNDJSONMapping, NamedTemporaryCopy
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
-from cs.logutils import warning, error, exception
+from cs.logutils import info, warning, error, exception
 from cs.mappings import (
     AttrableMappingMixin,
     AttrableMapping,
@@ -1645,8 +1645,8 @@ class NamedBackup(SingletonMixin):
                     hashcode=prevstate.hashcode
                 )
             else:
-              warning("unsupported type st_mode=%o", stat.st_mode)
-              ok = False
+              info("skip unsupported type st_mode=%o", S_IFMT(stat.st_mode))
+              ##ok = False
               continue
             dirstate.add(name_backups, exists_ok=True)
 
