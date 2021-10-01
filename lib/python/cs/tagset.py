@@ -1130,8 +1130,14 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r,ontology=%r)" % (
-        type(self).__name__, self.name, self.value, self.ontology
+    return (
+        (
+            "%s(name=%r,value=%r)" %
+            (type(self).__name__, self.name, self.value)
+        ) if self.ontology is None else (
+            "%s(name=%r,value=%r,ontology=%r)" %
+            (type(self).__name__, self.name, self.value, self.ontology)
+        )
     )
 
   def __str__(self):
