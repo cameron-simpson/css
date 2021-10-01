@@ -1923,7 +1923,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(sqltags.find(tag_criteria))
-    changed_tes = TagSet.edit_many(tes)  # verbose=state.verbose
+    changed_tes = TagSet.edit_tagsets(tes)  # verbose=state.verbose
     for old_name, new_name, te in changed_tes:
       print("changed", repr(te.name or te.id))
       if old_name != new_name:

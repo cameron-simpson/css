@@ -536,7 +536,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     except KeyError:
       try:
         return self.auto_infer(attr)
-      except ValueError as e:
+      except ValueError:  # as e:
         # no match
         ##warning("auto_infer(%r): %s", attr, e)
         pass
@@ -902,7 +902,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   @classmethod
   @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
-    ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
+    ''' Parse a "name-or-id tags..." line as used by `edit_tagsets()`,
         return the `TagSet`.
     '''
     name, offset = Tag.parse_value(line)
@@ -923,7 +923,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @classmethod
   @pfx_method
-  def edit_many(cls, tes, editor=None, verbose=True):
+  def edit_tagsets(cls, tes, editor=None, verbose=True):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
@@ -1050,7 +1050,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # A JSON encoder used for tag values which lack a special encoding.
   # The default here is "compact": no whitespace in delimiters.
-  JSON_ENCODER = JSONEncoder(separators=(',', ':'))
+  JSON_ENCODER_DEFAULTS = dict(separators=(',', ':'))
+  JSON_ENCODER = JSONEncoder(**JSON_ENCODER_DEFAULTS)
 
   # A JSON decoder.
   JSON_DECODER = JSONDecoder()
@@ -1129,8 +1130,14 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return self.value < other.value
 
   def __repr__(self):
-    return "%s(name=%r,value=%r,ontology=%r)" % (
-        type(self).__name__, self.name, self.value, self.ontology
+    return (
+        (
+            "%s(name=%r,value=%r)" %
+            (type(self).__name__, self.name, self.value)
+        ) if self.ontology is None else (
+            "%s(name=%r,value=%r,ontology=%r)" %
+            (type(self).__name__, self.name, self.value, self.ontology)
+        )
     )
 
   def __str__(self):
@@ -1147,7 +1154,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return name + '=' + value_s
 
   @classmethod
-  def transcribe_value(cls, value, extra_types=None):
+  def transcribe_value(cls, value, extra_types=None, json_options=None):
     ''' Transcribe `value` for use in `Tag` transcription.
 
         The optional `extra_types` parameter may be an iterable of
@@ -1183,19 +1190,48 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     if isinstance(value, (tuple, set)):
       value = list(value)
     # fall back to JSON encoded form of value
-    return cls.JSON_ENCODER.encode(value)
+    if json_options:
+      # custom encoder
+      json_options = dict(json_options)
+      for k, v in cls.JSON_ENCODER_DEFAULTS.items():
+        json_options.setdefault(k, v)
+      encoder = JSONEncoder(**json_options)
+    else:
+      encoder = cls.JSON_ENCODER
+    from cs.x import X
+    from cs.lex import r
+    s = encoder.encode(value)
+    return s
 
   @classmethod
-  def from_str(cls, s, offset=0, ontology=None):
+  def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
     ''' Parse a `Tag` definition from `s` at `offset` (default `0`).
     '''
     with Pfx("%s.from_str(%r[%d:],...)", cls.__name__, s, offset):
-      tag, post_offset = cls.from_str2(s, offset=offset, ontology=ontology)
+      tag, post_offset = cls.from_str2(
+          s, offset=offset, ontology=ontology, fallback_parse=fallback_parse
+      )
       if post_offset < len(s):
         raise ValueError(
             "unparsed text after Tag %s: %r" % (tag, s[post_offset:])
         )
       return tag
+
+  @classmethod
+  def from_arg(cls, arg, offset=0, ontology=None):
+    ''' Parse a `Tag` from the string `arg` at `offset` (default `0`).
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg,
+        offset=offset,
+        ontology=ontology,
+        fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
 
   @staticmethod
   def is_valid_name(name):
@@ -1219,7 +1255,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     return other_tag.value is None or self.value == other_tag.value
 
   @classmethod
-  def from_str2(cls, s, offset=0, *, ontology, extra_types=None):
+  def from_str2(
+      cls, s, offset=0, *, ontology, extra_types=None, fallback_parse=None
+  ):
     ''' Parse tag_name[=value], return `(Tag,offset)`.
     '''
     with Pfx("%s.from_str2(%s)", cls.__name__, cropped_repr(s[offset:])):
@@ -1231,7 +1269,12 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
             value = None
           elif sep == '=':
             offset += 1
-            value, offset = cls.parse_value(s, offset, extra_types=extra_types)
+            value, offset = cls.parse_value(
+                s,
+                offset,
+                extra_types=extra_types,
+                fallback_parse=fallback_parse
+            )
           else:
             name_end, offset = get_nonwhite(s, offset)
             name += name_end
@@ -1243,7 +1286,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
 
   # pylint: disable=too-many-branches
   @classmethod
-  def parse_value(cls, s, offset=0, extra_types=None):
+  def parse_value(cls, s, offset=0, extra_types=None, fallback_parse=None):
     ''' Parse a value from `s` at `offset` (default `0`).
         Return the value, or `None` on no data.
 
@@ -1253,6 +1296,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         (expected to be an instance of `type`).
         The default comes from `cls.EXTRA_TYPES`.
         This supports storage of nonJSONable values in text form.
+
+        The optional `fallback_parse` parameter
+        specifies a parse function accepting `(s,offset)`
+        and returning `(parsed,new_offset)`
+        where `parsed` is text from `s[offset:]`
+        and `new_offset` is where the parse stopped.
+        The default is `cs.lex.get_nonwhite`
+        to gather nonwhitespace characters,
+        intended support *tag_name*`=`*bare_word*
+        in human edited tag files.
 
         The core syntax for values is JSON;
         value text commencing with any of `'"'`, `'['` or `'{'`
@@ -1275,6 +1328,8 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
     '''
     if extra_types is None:
       extra_types = cls.EXTRA_TYPES
+    if fallback_parse is None:
+      fallback_parse = get_nonwhite
     if offset >= len(s) or s[offset].isspace():
       warning("offset %d: missing value part", offset)
       value = None
@@ -1289,8 +1344,9 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
         ) from e
       offset += suboffset
     else:
-      # collect nonwhitespace, check for special forms
-      nonwhite, offset = get_nonwhite(s, offset)
+      # collect nonwhitespace (or whatever fallback_parse gathers),
+      # check for special forms
+      nonwhite, offset = fallback_parse(s, offset)
       value = None
       for _, from_str, _ in extra_types:
         try:
@@ -1517,16 +1573,30 @@ class TagSetCriterion(ABC):
 
   @classmethod
   @pfx_method
-  def from_str(cls, s):
+  def from_str(cls, s, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
-    criterion, offset = cls.from_str2(s)
+    criterion, offset = cls.from_str2(s, fallback_parse=fallback_parse)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
     return criterion
 
   @classmethod
-  def from_str2(cls, s, offset=0, delim=None):
+  @pfx_method
+  def from_arg(cls, arg, fallback_parse=None):
+    ''' Prepare a `TagSetCriterion` from the string `arg`
+        where `arg` is known to be entirely composed of the value,
+        such as a command line argument.
+
+        This calls the `from_str` method with `fallback_parse` set
+        to gather then entire tail of the supplied string `arg`.
+    '''
+    return cls.from_str(
+        arg, fallback_parse=lambda s, offset: (s[offset:], len(s))
+    )
+
+  @classmethod
+  def from_str2(cls, s, offset=0, delim=None, fallback_parse=None):
     ''' Parse a criterion from `s` at `offset` and return `(TagSetCriterion,offset)`.
 
         This method recognises an optional leading `'!'` or `'-'`
@@ -1893,7 +1963,7 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
       * `keys(self)`: return an iterable of names
 
       Subclasses may reasonably want to override the following:
-      * `startup_shutdown(self)`: context manager to allocate and release any 
+      * `startup_shutdown(self)`: context manager to allocate and release any
         needed resources such as database connections
 
       Subclasses may implement:
@@ -2075,13 +2145,13 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         * `select_tagset`: optional callable accepting a `TagSet`
           which tests whether it should be included in the `TagSet`s
           to be edited
-        Other keyword arguments are passed to `Tag.edit_many`.
+        Other keyword arguments are passed to `Tag.edit_tagsets`.
     '''
     if select_tagset is None:
       tes = self
     else:
       tes = {name: te for name, te in self.items() if select_tagset(te)}
-    changed_tes = TagSet.edit_many(tes, **kw)
+    changed_tes = TagSet.edit_tagsets(tes, **kw)
     for old_name, new_name, te in changed_tes:
       if old_name != new_name:
         with Pfx("rename %r => %r", old_name, new_name):
@@ -2260,6 +2330,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     return self.tagsets[subtype_name]
 
   def type_names(self):
+    ''' Return the type definition keys.
+    '''
     return map(
         lambda subkey: self.key(cutprefix(subkey, 'type.')),
         self.tagsets.keys(prefix='type.')
@@ -3242,7 +3314,7 @@ class TagsOntologyCommand(BaseCommand):
                 subkey = cutprefix(key, type_name_)
                 assert subkey not in tagset_map
                 tagset_map[subkey] = tagset
-            for old_subkey, new_subkey, new_tags in TagSet.edit_many(
+            for old_subkey, new_subkey, new_tags in TagSet.edit_tagsets(
                 tagset_map, verbose=True):
               tags = tagset_map[old_subkey]
               if old_subkey != new_subkey:
@@ -3282,6 +3354,29 @@ class TagsCommandMixin:
         with an `.extend_query` method for computing an SQL JOIN
         used in searching for tagged entities.
   '''
+
+  @classmethod
+  def parse_tag_addremove(cls, arg, offset=0):
+    ''' Parse `arg` as an add/remove tag specification
+        of the form [`-`]*tag_name*[`=`*value*].
+        Return `(remove,Tag)`.
+
+        Examples:
+
+            >>> parse_tag_addremove('a')
+            >>> parse_tag_addremove('-a')
+            >>> parse_tag_addremove('a=1')
+            >>> parse_tag_addremove('-a=1')
+            >>> parse_tag_addremove('-a="foo bah"')
+            >>> parse_tag_addremove('-a=foo bah')
+    '''
+    if arg.startswith('-', offset):
+      remove = True
+      offset += 1
+    else:
+      remove = False
+    tag = Tag.from_arg(arg, offset=offset)
+    return remove, tag
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
@@ -3337,7 +3432,7 @@ class TagsCommandMixin:
     for arg in argv:
       with Pfx(arg):
         try:
-          tag_choice = TagSetCriterion.from_str(arg)
+          tag_choice = TagSetCriterion.from_arg(arg)
         except ValueError as e:
           raise ValueError("bad tag specifications: %s" % (e,)) from e
         if tag_choice.comparison != '=':

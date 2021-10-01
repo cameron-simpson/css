@@ -527,6 +527,12 @@ class ListQueue:
     with self._lock:
       self.queued.extend(items)
 
+  def insert(self, index, item):
+    ''' Insert `item` at `index` in the queue.
+    '''
+    with self._lock:
+      self.queued.insert(index, item)
+
   def __bool__(self):
     ''' A `ListQueue` looks a bit like a container,
         and is false when empty.

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' Tagger utlity methods.
+'''
+
 from collections import defaultdict
 import hashlib
 import os
@@ -37,6 +40,9 @@ _fstags = FSTags()
 _conv_cache = defaultdict(dict)
 
 def image_size(path):
+  ''' Return the pixel size of the image file at `path`
+      as an `(dx,dy)` tuple, or `None` if the contents cannot be parsed.
+  '''
   tagged = _fstags[path]
   try:
     size = tagged['pil.size']
@@ -56,10 +62,14 @@ def image_size(path):
 @pfx
 def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   ''' Create a PNG version of the image at `path`,
+      scaled to fit within some size constraints.
       return the pathname of the PNG file.
 
       Parameters:
-      * `cached`: optional mapping of `'png'`->`path`->pngof_path
+      * `max_size`: optional `(width,height)` tuple, default `(1920,1800)`
+      * `min_size`: optional `(width,height)` tuple, default half of `max_size`
+      * `cached`: optional mapping of `(path,'png',size)`->`pngof_path`
+        where size is the chosen final size tuple
       * `force`: optional flag (default `False`)
         to force recreation of the PNG version and associated cache entry
   '''
@@ -78,12 +88,12 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if size[0] > max_size[0] or size[1] > max_size[1]:
     scale = min(max_size[0] / size[0], max_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    warning("too big, rescale by %s from %r to %r", scale, size, re_size)
+    ##warning("too big, rescale by %s from %r to %r", scale, size, re_size)
     key = path, 'png', re_size
   elif size[0] < min_size[0] or size[1] < min_size[1]:
     scale = min(min_size[0] / size[0], min_size[1] / size[1])
     re_size = int(size[0] * scale), int(size[1] * scale)
-    warning("too small, rescale by %s from %r to %r", scale, size, re_size)
+    ##warning("too small, rescale by %s from %r to %r", scale, size, re_size)
     key = path, 'png', re_size
   else:
     re_size = None
@@ -105,17 +115,17 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if not isdirpath(convdirpath):
     pfx_call(os.makedirs, convdirpath)
   pngpath = joinpath(convdirpath, pngbase)
-  try:
-    if force or not isfilepath(pngpath):
+  if force or not isfilepath(pngpath):
+    try:
       with Image.open(path) as im:
         if re_size is None:
           pfx_call(im.save, pngpath, 'PNG')
         else:
           im2 = im.resize(re_size)
           pfx_call(im2.save, pngpath, 'PNG')
-  except UnidentifiedImageError as e:
-    warning("unhandled image: %s", e)
-    pngpath = None
+    except UnidentifiedImageError as e:
+      warning("unhandled image: %s", e)
+      pngpath = None
   cached[key] = pngpath
   return pngpath
 
@@ -128,10 +138,14 @@ class _HashCode(bytes):
 
   @classmethod
   def from_data(cls, bs):
+    ''' Compute hashcode from the data `bs`.
+    '''
     return cls(cls.hashfunc(bs).digest())
 
   @classmethod
   def from_buffer(cls, bfr):
+    ''' Compute hashcode from the contents of the `CornuCopyBuffer` `bfr`.
+    '''
     h = cls.hashfunc()
     for bs in bfr:
       h.update(bs)
@@ -139,6 +153,8 @@ class _HashCode(bytes):
 
   @classmethod
   def from_pathname(cls, pathname, readsize=None, **kw):
+    ''' Compute hashcode from the contents of the file `pathname`.
+    '''
     if readsize is None:
       readsize = DEFAULT_READSIZE
     return cls.from_buffer(
@@ -146,6 +162,8 @@ class _HashCode(bytes):
     )
 
 class SHA256(_HashCode):
+  ''' SHA256 hashcode class.
+  '''
 
   __slots__ = ()
   hashfunc = hashlib.sha256
