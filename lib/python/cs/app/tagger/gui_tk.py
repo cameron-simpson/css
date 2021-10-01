@@ -633,6 +633,18 @@ class TagWidget(Frame):
   ):
     if background is None:
       background = self.WIDGET_BACKGROUND
+    ''' Initialise a `TagWidget`.
+
+        Parameters:
+        * `parent`: the parent widget
+        * `tags`: the reference `TagSet`;
+          note that `tag` might not be present in `tags`
+        * `tag`: the `Tag` to render
+        * `alt_values`: optional iterable of alternate values;
+          scalar values will have these presented as prefill options
+          in edit mode
+        Other keyword arguments are passed to the `Frame` superclass initialiser.
+    '''
     if alt_values is None:
       alt_values = set()
       if tag.name == 'pil.format':
@@ -667,6 +679,12 @@ class TagWidget(Frame):
     )
 
   def toggle_editmode(self):
+    ''' Present or withdraw the edit widget.
+
+        The `Tag` if updated when the widget is withdrawn,
+        and if the new value does not match the value in `self.tags`
+        then the correponding `self.tags[tag.name]` is also updated.
+    '''
     tag = self.tag
     tag_value = tag.value
     if self.editor is None:
