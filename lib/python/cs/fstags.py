@@ -1270,10 +1270,12 @@ class FSTags(MultiOpenMixin):
   def edit_dirpath(self, dirpath, all_names=False):
     ''' Edit the filenames and tags in a directory.
 
-        If `all_names` is true, include names commencings with a dot,
+        If `all_names` is true, include names commencing with a dot,
         otherwise exclude them.
     '''
     ok = True
+    dirpath = realpath(dirpath)
+    tagged_dir = self[dirpath]
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
     names = sorted(
@@ -1284,16 +1286,20 @@ class FSTags(MultiOpenMixin):
             )
         )
     )
-    tes = []
+    # Prepare te_map, a mapping of names to TagSets.
+    # This relies on the dict insertion order.
+    dirpath_key = shortpath(dirpath)
+    assert os.sep in dirpath_key
+    te_map = {dirpath_key: tagged_dir}
     for name in names:
+      assert name not in te_map
       if not name or os.sep in name:
         warning("skip bogus name %r", name)
         continue
       path = joinpath(dirpath, name)
-      tagged_path = self[path]
-      tes.append(tagged_path)
+      te_map[name] = self[path]
     # edit entities, return modified entities
-    changed_tes = TagSet.edit_tagsets(tes)  # verbose-state.verbose
+    changed_tes = TagSet.edit_tagsets(te_map)  # verbose-state.verbose
     # now apply any file renames
     for old_name, new_name, te in changed_tes:
       if old_name == new_name:
