@@ -1293,7 +1293,7 @@ class FSTags(MultiOpenMixin):
       tagged_path = self[path]
       tes.append(tagged_path)
     # edit entities, return modified entities
-    changed_tes = TagSet.edit_many(tes)  # verbose-state.verbose
+    changed_tes = TagSet.edit_tagsets(tes)  # verbose-state.verbose
     # now apply any file renames
     for old_name, new_name, te in changed_tes:
       if old_name == new_name:

@@ -902,7 +902,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   @classmethod
   @pfx_method
   def _from_named_tags_line(cls, line, ontology=None):
-    ''' Parse a "name-or-id tags..." line as used by `edit_many()`,
+    ''' Parse a "name-or-id tags..." line as used by `edit_tagsets()`,
         return the `TagSet`.
     '''
     name, offset = Tag.parse_value(line)
@@ -923,7 +923,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   @classmethod
   @pfx_method
-  def edit_many(cls, tes, editor=None, verbose=True):
+  def edit_tagsets(cls, tes, editor=None, verbose=True):
     ''' Edit a collection of `TagSet`s.
         Return a list of `(old_name,new_name,TagSet)` for those which were modified.
 
@@ -2145,13 +2145,13 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
         * `select_tagset`: optional callable accepting a `TagSet`
           which tests whether it should be included in the `TagSet`s
           to be edited
-        Other keyword arguments are passed to `Tag.edit_many`.
+        Other keyword arguments are passed to `Tag.edit_tagsets`.
     '''
     if select_tagset is None:
       tes = self
     else:
       tes = {name: te for name, te in self.items() if select_tagset(te)}
-    changed_tes = TagSet.edit_many(tes, **kw)
+    changed_tes = TagSet.edit_tagsets(tes, **kw)
     for old_name, new_name, te in changed_tes:
       if old_name != new_name:
         with Pfx("rename %r => %r", old_name, new_name):
@@ -3314,7 +3314,7 @@ class TagsOntologyCommand(BaseCommand):
                 subkey = cutprefix(key, type_name_)
                 assert subkey not in tagset_map
                 tagset_map[subkey] = tagset
-            for old_subkey, new_subkey, new_tags in TagSet.edit_many(
+            for old_subkey, new_subkey, new_tags in TagSet.edit_tagsets(
                 tagset_map, verbose=True):
               tags = tagset_map[old_subkey]
               if old_subkey != new_subkey:
