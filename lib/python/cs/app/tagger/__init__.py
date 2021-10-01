@@ -216,7 +216,7 @@ class Tagger:
 
         Parameters:
         * `dirpath`: the path to the directory to walk
-        * `tag_names`: an iterable of Tag names of interest
+        * `tag_names`: an iterable of `Tag` names of interest
 
         The intent here is to derive filing locations
         from the tree layout.
@@ -293,7 +293,9 @@ class Tagger:
     ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
         derived via `per_tag_auto_file_map`.
-        The file locations may be a list or a string (for convenient single locations.
+
+        The file location specification in the tag may be a list or a string
+        (for convenient single locations).
 
         For example, I might tag my downloads directory with:
 
@@ -328,6 +330,7 @@ class Tagger:
           if not isabspath(file_to_path):
             if file_to_path.startswith('~'):
               file_to_path = expanduser(file_to_path)
+              assert isabspath(file_to_path)
             else:
               file_to_path = joinpath(srcdirpath, file_to_path)
           file_to_path = abspath(file_to_path)
