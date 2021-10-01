@@ -628,11 +628,8 @@ class TagWidget(Frame):
       *,
       alt_values=None,
       foreground=None,
-      background='yellow',
       **kw
   ):
-    if background is None:
-      background = self.WIDGET_BACKGROUND
     ''' Initialise a `TagWidget`.
 
         Parameters:
@@ -651,7 +648,7 @@ class TagWidget(Frame):
         alt_values = ('PNG', 'JPEG')
     else:
       alt_values = set(alt_values)
-    super().__init__(parent, background=background, **kw)
+    super().__init__(parent, **kw)
     self.tags = tags
     self.tag = tag
     tag_name = tag.name
