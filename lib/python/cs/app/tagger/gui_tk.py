@@ -33,6 +33,13 @@ from cs.x import X
 
 from .util import pngfor
 
+_app = None
+
+def _render(pause=0):
+  _app.update_idletasks()
+  if pause > 0:
+    sleep(pause)
+
 class TaggerGUI(MultiOpenMixin):
   ''' A GUI for a `Tagger`.
   '''
@@ -91,8 +98,9 @@ class TaggerGUI(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
+    global _app
     root = tk.Tk()
-    app = Frame(root)
+    _app = app = Frame(root)
     app.grid()
 
     # Define the window's contents
