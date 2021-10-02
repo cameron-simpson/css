@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' cs.app.tagger main module.
+'''
+
 from collections import defaultdict
 from contextlib import contextmanager
 from getopt import GetoptError, getopt
@@ -22,7 +25,7 @@ from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
-from cs.upd import print
+from cs.upd import print  # pylint: disable=redefined-builtin
 from . import Tagger
 
 def main(argv=None):
@@ -74,6 +77,7 @@ class TaggerCommand(BaseCommand):
         pfxprint('not filed')
     return linked_to
 
+  # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
     ''' Usage: {cmd} pathnames...
           Link pathnames to destinations based on their tags.
@@ -90,7 +94,7 @@ class TaggerCommand(BaseCommand):
     no_link = True
     do_remove = False
     opts, argv = getopt(argv, 'dnrxy')
-    for opt, val in opts:
+    for opt, _ in opts:
       with Pfx(opt):
         if opt == '-d':
           direct = True
@@ -203,7 +207,7 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    from .gui_tk import TaggerGUI
+    from .gui_tk import TaggerGUI  # pylint: disable=import-outside-toplevel
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
@@ -213,10 +217,11 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
+    tagger = self.options.tagger
     for path in argv:
+      print()
       print(path)
-      for tag_name, values in sorted(
-          self.options.tagger.suggested_tags(path).items()):
+      for tag_name, values in sorted(tagger.suggested_tags(path).items()):
         print(" ", tag_name, *sorted(values))
 
   def cmd_test(self, argv):
