@@ -353,15 +353,17 @@ class Tagger:
         obtained from the autofiling configurations.
     '''
     tagged = self.fstags[path]
+    srcdirpath = dirname(tagged.filepath)
     suggestions = defaultdict(set)
-    q = ListQueue([dirname(tagged.filepath)])
-    for dirpath in unrepeated(q, signature=abspath):
+    for bare_tag, file_to in self.file_by_mapping(srcdirpath).items():
+      if bare_tag not in tagged:
+        suggestions[bare_tag.name].add(bare_tag.value)
+    for refpath in self.file_by_tags(path, no_link=True) or [path]:
+      dirpath = dirname(refpath)
       mapping = self.file_by_mapping(dirpath)
       for bare_tag, dstpaths in mapping.items():
-        suggestions[bare_tag.name].add(bare_tag.value)
-        # following the filing chain if tagged has this particular tag
-        if bare_tag in tagged:
-          q.extend(dstpaths)
+        if bare_tag not in tagged:
+          suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
 
   def inference_rules(self, prefix, rule_spec):
