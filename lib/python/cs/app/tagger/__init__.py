@@ -143,7 +143,8 @@ class Tagger:
     # a queue of reference directories
     q = ListQueue((dirname(srcpath),))
     linked_to = []
-    for refdirpath in unrepeated(q, signature=abspath):
+    seen = set()
+    for refdirpath in unrepeated(q, signature=abspath, seen=seen):
       with Pfx(refdirpath):
         # places to redirect this file
         mapping = self.file_by_mapping(refdirpath)
@@ -153,7 +154,6 @@ class Tagger:
         for tag_name in sorted(interesting_tag_names):
           with Pfx("tag_name %r", tag_name):
             if tag_name not in tags:
-              print("  tag %r not present, skipping" % (tag_name,))
               continue
             bare_tag = Tag(tag_name, tags[tag_name])
             try:
@@ -165,11 +165,13 @@ class Tagger:
               continue
             # collect other filing locations
             refile_to.update(target_dirs)
+        # queue further locations if they are new
         if refile_to:
-          # redistribute from here
-          q.extend(refile_to)
-          continue
-        # file locally
+          new_refile_to = set(map(abspath, refile_to)) - seen
+          if new_refile_to:
+            q.extend(new_refile_to)
+            continue
+        # file locally (no new locations)
         dstbase = self.auto_name(srcpath, refdirpath, tags)
         with Pfx("%s => %s", refdirpath, dstbase):
           dstpath = dstbase if isabspath(dstbase
