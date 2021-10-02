@@ -664,7 +664,6 @@ class TagWidget(Frame):
     self.alt_values = alt_values
     self.label = Button(
         self,
-        text=str(tag),
         command=self.toggle_editmode,
         ##relief=tk.FLAT,
         ##overrelief=tk.FLAT,
@@ -675,6 +674,7 @@ class TagWidget(Frame):
         borderwidth=0,
     )
     self._set_colour()
+    self._set_text()
     self.label.grid(column=0, row=0, sticky=tk.W)
     self.editor = None
 
@@ -682,6 +682,15 @@ class TagWidget(Frame):
     self.label.configure(
         foreground='green' if self.tag.name in self.tags else 'gray',
     )
+
+  def _set_text(self, new_text=None):
+    if not new_text:
+      tag = self.tag
+      if not tag.value and self.alt_values:
+        new_text = f"{tag.name} ? {', '.join(sorted(map(str,self.alt_values)))}"
+      else:
+        new_text = str(tag)
+    self.label.configure(text=new_text)
 
   def toggle_editmode(self):
     ''' Present or withdraw the edit widget.
@@ -707,8 +716,8 @@ class TagWidget(Frame):
       self.tag = Tag(self.tag.name, new_value, ontology=self.tag.ontology)
       if new_value != self.tags.get(self.tag.name):
         self.tags[self.tag.name] = new_value
-      self.label.configure(text=str(self.tag))
-      self._set_colour()
+        self._set_colour()
+        self._set_text()
 
 class _TagsView(_Widget):
   ''' A view of some `Tag`s.
