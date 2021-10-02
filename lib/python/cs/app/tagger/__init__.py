@@ -315,6 +315,9 @@ class Tagger:
 
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
+    assert isdirpath(srcdirpath)
+    assert not srcdirpath.startswith('~')
+    assert '~' not in srcdirpath
     fstags = self.fstags
     tagged = fstags[srcdirpath]
     key = tagged.filepath
@@ -355,13 +358,13 @@ class Tagger:
     tagged = self.fstags[path]
     srcdirpath = dirname(tagged.filepath)
     suggestions = defaultdict(set)
-    for bare_tag, file_to in self.file_by_mapping(srcdirpath).items():
+    for bare_tag, _ in self.file_by_mapping(srcdirpath).items():
       if bare_tag not in tagged:
         suggestions[bare_tag.name].add(bare_tag.value)
     for refpath in self.file_by_tags(path, no_link=True) or [path]:
       dirpath = dirname(refpath)
       mapping = self.file_by_mapping(dirpath)
-      for bare_tag, dstpaths in mapping.items():
+      for bare_tag, _ in mapping.items():
         if bare_tag not in tagged:
           suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
