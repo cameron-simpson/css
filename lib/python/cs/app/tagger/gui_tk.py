@@ -914,36 +914,6 @@ class PathView(LabelFrame):
       return None
     return self.tagger.fstags[self._fspath]
 
-  def _tag_widget(self, tag_name):
-    ''' Return the `TagWidget` representing the `Tag` named `tag_name`.
-    '''
-    try:
-      widget = self._tag_widgets[tag_name]
-    except KeyError:
-      tagged = self.tagger.fstags[self._fspath]
-      direct_tags = tagged
-      all_tags = tagged.merged_tags()
-      try:
-        value = direct_tags[tag_name]
-      except KeyError:
-        try:
-          value = all_tags[tag_name]
-        except KeyError:
-          value = None
-          missing = True
-        else:
-          missing = False
-          is_direct = False
-      else:
-        missing = False
-        is_direct = True
-      suggested_values = self.tagger.suggested_tags(tagged.filepath
-                                                    ).get(tag_name, set())
-      widget = self._tag_widgets[tag_name] = TagWidget(
-          tagged, tag_name, suggested_values
-      )
-    return widget
-
 class ThumbNailScrubber(Frame, _FSPathsMixin):
   ''' A row of thumbnails for a list of fielsystem paths.
   '''
