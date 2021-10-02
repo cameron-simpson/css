@@ -814,27 +814,27 @@ class TagsView(_TagsView, LabelFrame):
     )
 
   def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
-    for child in list(self.grid_slaves()):
-      child.grid_remove()
-    tags = TagSet(self.tags)
+    old_tags = list(self.tags)
     super().set_tags(
         tags,
         get_suggested_tag_values=get_suggested_tag_values,
         bg_tags=bg_tags
     )
+    display_tags = TagSet(self.tags)
     if bg_tags:
+      # fill in background tags if not present
       for tag_name, tag_value in bg_tags.items():
         if tag_name not in tags:
-          tags[tag_name] = tag_value
-    for tag in sorted(tags):
-      alt_values = (
-          None if get_suggested_tag_values is None else
-          get_suggested_tag_values(tag)
-      )
-      w = self.tag_widget(
-          tag,
-          alt_values=alt_values,
-      )
+          display_tags[tag_name] = tag_value
+    # remove tags no longer named
+    for tag in old_tags:
+      if tag.name not in display_tags:
+        self._del_tag(tag.name)
+    # redo the displayed tags
+    # TODO: update the widgets directly instead
+    for tag in display_tags:
+      alt_values = self.get_suggested_tag_values(tag)
+      w = self.tag_widget(tag, alt_values=alt_values)
       self._add_tag(tag.name, w)
       w.grid(sticky=tk.W)
 
