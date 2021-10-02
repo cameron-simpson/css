@@ -735,6 +735,47 @@ class TagsView(_TagsView, LabelFrame):
     kw.setdefault('text', 'Tags')
     super().__init__(parent, **kw)
     self.set_tags(())
+    # mapping of tag name to widgets
+    self._tag_widgets = {}
+    # list of tag names in grid row order
+    self._tag_names = []
+
+  # TODO: general OrderedFrameMixin?
+  @require(lambda self, widget: widget.parent is self)
+  @require(lambda self: self._tag_names == sorted(self._tag_names))
+  @ensure(lambda self: self._tag_names == sorted(self._tag_names))
+  @typechecked
+  def _add_tag(self, tag_name: str, widget: _Widget):
+    w = self._tag_widgets.get(tag_name)
+    if w is not None:
+      # switch out the old widget
+      grid_info = w.grid_info()
+      w.grid_forget()
+      widget.grid(**grid_info)
+    else:
+      # insert the new widget
+      # ... by forgetting them all and appending
+      # because it looks like you can't insert into a grid
+      # or make a gap
+      # find the insertion row
+      for row, gridded_name in enumerate(self._tag_names):
+        if gridded_name > tag_name:
+          X("found later %r at row=%d", gridded_name, row)
+          break
+      else:
+        # append to the end
+        row = len(self._tag_names)
+      ws = [widget]
+      # move later rows down
+      for name in self._tag_names[row:]:
+        w = self._tag_widgets[name]
+        grid_info = w.grid_info()
+        w.grid_remove()
+        ws.append(w)
+      for grow, w in enumerate(ws, row):
+        w.grid(row=grow)
+      self._tag_names.insert(row, tag_name)
+    self._tag_widgets[tag_name] = widget
 
   def tag_widget(self, tag, alt_values=None, **kw):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
@@ -761,10 +802,12 @@ class TagsView(_TagsView, LabelFrame):
           None if get_suggested_tag_values is None else
           get_suggested_tag_values(tag)
       )
-      self.tag_widget(
+      w = self.tag_widget(
           tag,
           alt_values=alt_values,
-      ).grid(sticky=tk.W)
+      )
+      self._add_tag(tag.name, w)
+      w.grid(sticky=tk.W)
 
 class PathView(LabelFrame):
   ''' A preview of a filesystem path.
