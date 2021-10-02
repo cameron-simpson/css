@@ -716,16 +716,28 @@ class _TagsView(_Widget):
 
   def __init__(self, parent, *, get_tag_widget=None, **kw):
     super().__init__(parent, **kw)
+    # the working TagSet, distinct from those supplied
     self.tags = TagSet()
+    # a function to get Tag suggestions from a Tag name
+    self.get_suggested_tag_values = lambda tag_name: ()
+    # a reference TagSet of background Tags
+    self.bg_tags = TagSet()
     if get_tag_widget is None:
       get_tag_widget = TagWidget
     self.get_tag_widget = get_tag_widget
 
-  def set_tags(self, tags):
-    ''' Set the tags.
+  def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
+    ''' Update `self.tags` to match `tags`.
+        Optionally set `self.get_suggested_tag_values`
+        if `get_suggested_tag_values` is not `None`.
+        Optionally set `self.bg_tags` if `bg_tags` is not `None`.
     '''
     self.tags.clear()
     self.tags.update(tags)
+    if get_suggested_tag_values is not None:
+      self.get_suggested_tag_values = get_suggested_tag_values
+    if bg_tags is not None:
+      self.bg_tags = bg_tags
 
 class TagsView(_TagsView, LabelFrame):
   ''' A view of some `Tag`s.
@@ -789,10 +801,14 @@ class TagsView(_TagsView, LabelFrame):
     )
 
   def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
-    super().set_tags(tags)
     for child in list(self.grid_slaves()):
       child.grid_remove()
     tags = TagSet(self.tags)
+    super().set_tags(
+        tags,
+        get_suggested_tag_values=get_suggested_tag_values,
+        bg_tags=bg_tags
+    )
     if bg_tags:
       for tag_name, tag_value in bg_tags.items():
         if tag_name not in tags:
