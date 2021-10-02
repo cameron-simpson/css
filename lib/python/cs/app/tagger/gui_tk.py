@@ -789,6 +789,19 @@ class TagsView(_TagsView, LabelFrame):
       self._tag_names.insert(row, tag_name)
     self._tag_widgets[tag_name] = widget
 
+  @require(lambda self: self._tag_names == sorted(self._tag_names))
+  @ensure(lambda self: self._tag_names == sorted(self._tag_names))
+  @typechecked
+  def _del_tag(self, tag_name: str):
+    ''' Delete the widget for the `Tag` named `tag_name` if present.
+    '''
+    w = self._tag_widgets.get(tag_name)
+    if w is not None:
+      i = self._tag_names.index(tag_name)
+      del self._tag_names.index[i]
+      del self._tag_widgets[tag_name]
+      w.grid_remove()
+
   def tag_widget(self, tag, alt_values=None, **kw):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
     '''
