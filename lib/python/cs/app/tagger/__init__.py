@@ -25,6 +25,7 @@ from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
+from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
@@ -40,7 +41,7 @@ class Tagger:
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
-  def __init__(self, fstags=None):
+  def __init__(self, fstags=None, ont=None):
     ''' Initialise the `Tagger`.
 
         Parameters:
@@ -48,7 +49,13 @@ class Tagger:
     '''
     if fstags is None:
       fstags = FSTags()
+    if ont is None:
+      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
+                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
+    if isinstance(ont, str):
+      ont = Ont(ont)
     self.fstags = fstags
+    self.ont = ont
     self._file_by_mappings = {}
     # mapping of (dirpath,tag_name)=>tag_value=>set(subdirpaths)
     # used by per_tag_auto_file_map
@@ -101,6 +108,12 @@ class Tagger:
             ##print("auto_name(%r): %r: %s", srcpath, fmt, e)
             continue
     return basename(srcpath)
+
+  def ont_values(self, tag_name):
+    ''' Return a list of alternative values for `tag_name`
+        derived from the ontology `self.ont`.
+    '''
+    return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   @pfx
