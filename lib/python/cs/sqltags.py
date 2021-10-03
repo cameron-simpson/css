@@ -58,7 +58,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
-from cs.lex import FormatAsError, get_decimal_value, typed_repr as r
+from cs.lex import FormatAsError, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -451,6 +451,8 @@ class SQTEntityIdTest(SQTCriterion):
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.entity_ids)
 
+  # decimal parse, delim parameter not relevant
+  # pylint: disable=unused-argument
   @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse a decimal entity id from `s`.
@@ -1266,7 +1268,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def name(self, new_name):
     ''' Set the `.name`.
     '''
-    if new_name != self._name:
+    if new_name != self._name:  # pylint: disable=access-member-before-definition
       e = self._get_db_entity()
       e.name = new_name
       self._name = new_name
@@ -1450,13 +1452,15 @@ class SQLTagSet(SingletonMixin, TagSet):
       )
     return children
 
+# pylint: disable=too-many-ancestors
 class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
   @pfx_method
   def TagSetClass(self, *, name, **kw):
-    ''' Local implementation of `TagSetClass` so that we can annotate it with a `.singleton_also_by` attribute.
+    ''' Local implementation of `TagSetClass`
+        so that we can annotate it with a `.singleton_also_by` attribute.
     '''
     return super().TagSetClass(name=name, **kw)
 
@@ -1487,6 +1491,9 @@ class SQLTags(BaseTagSets):
     )
 
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
+    ''' Factory to return a suitable `TagSet` subclass instance.
+        This produces an `SQLTagSet` instance correctly associated with this `SQLTags`.
+    '''
     if _sqltags is None:
       _sqltags = self
     else:
