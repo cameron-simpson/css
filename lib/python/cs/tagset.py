@@ -209,7 +209,7 @@ from icontract import require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.lex import (
@@ -255,6 +255,10 @@ DISTINFO = {
     ],
 }
 
+# default Tag name holds a metadata entry's "value"
+DEFAULT_VALUE_TAG_NAME = 'value'
+
+# default editor command
 EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
 
 @decorator
@@ -1403,6 +1407,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       warning("%s:%r: no ontology, returning None", type(self), self)
       return None
     return ont.typedef(self.name)
+
+  def alt_values(self, value_tag_name=None):
+    ''' Return a list of alternative values for this `Tag`
+        on the premise that each has a metadata entry.
+    '''
+    ont = self.ontology
+    if not ont:
+      return []
+    return list(ont.type_values(self.name, value_tag_name=value_tag_name))
 
   @property
   @pfx_method(use_str=True)
@@ -2774,6 +2787,43 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         key = subtagsets.key(subkey)
         assert key.startswith(type_name_)
         yield key
+
+  @fmtdoc
+  def type_values(self, type_name, value_tag_name=None):
+    ''' Yield the various defined values for `type_name`.
+        This is useful for types with enumerated metadata entries.
+
+        For example, if metadata entries exist as `foo.bah` and `foo.baz`
+        for the `type_name` `'foo'`
+        then this yields `'bah'` and `'baz'`.`
+
+        Note that this looks for a `Tag` for the value,
+        falling back to the entry suffix if the tag is not present.
+        That tag is normally named `{DEFAULT_VALUE_TAG_NAME}`
+        (from DEFAULT_VALUE_TAG_NAME)
+        but may be overridden by the `value_tag_name` parameter.
+        Also note that normally it is desireable that the value
+        convert to the suffix via the `value_to_tag_name` method
+        so that the metadata entry can be located from the value.
+    '''
+    if value_tag_name is None:
+      value_tag_name = DEFAULT_VALUE_TAG_NAME
+    type_name_ = type_name + '.'
+    for name, tags in self.by_type(type_name, with_tagsets=True):
+      assert name.startswith(type_name_)
+      try:
+        value = tags[value_tag_name]
+      except KeyError:
+        value = cutprefix(name, type_name_)
+      else:
+        # sanity check the value
+        if __debug__ and type_name_ + self.value_to_tag_name(value) != name:
+          warning(
+              "type_values(%r,value_tag_name=%r): name=%r:"
+              " value=%s does not convert to name", type_name, value_tag_name,
+              name, cropped_repr(value)
+          )
+      yield value
 
   ################################################################
   # Metadata.
