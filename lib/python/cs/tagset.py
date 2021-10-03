@@ -1630,7 +1630,8 @@ class TagSetCriterion(ABC):
         try:
           params, offset = parse_method(s, offset, delim)
         except ValueError:
-          pass
+          # does not parse, try the next one
+          continue
         else:
           criterion = crit_cls(s[offset0:offset], choice, **params)
           break
