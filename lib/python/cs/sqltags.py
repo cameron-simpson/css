@@ -1646,7 +1646,8 @@ class SQLTags(BaseTagSets):
       criterion = "name"
     else:
       # anything with a name commencing with prefix
-      criterion = 'name~' + Tag.transcribe_value(prefix + '?*')
+      # note that the ~ comparitor expects a bare glob after the ~
+      criterion = 'name~' + prefix + '?*'
     return self.find(criterion)
 
   @staticmethod
