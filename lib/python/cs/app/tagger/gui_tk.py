@@ -427,7 +427,7 @@ class ImageWidget(_ImageWidget, Label):
   ''' An image widget which can show anything Pillow can read.
   '''
 
-class ImageButton(_ImageWidget, Button):
+class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
