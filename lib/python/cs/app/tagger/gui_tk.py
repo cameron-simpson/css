@@ -11,6 +11,7 @@ from os.path import (
     basename,
     expanduser,
 )
+import platform
 import tkinter as tk
 from tkinter import ttk
 from typing import Iterable, List
@@ -32,6 +33,8 @@ from cs.lex import r
 from cs.x import X
 
 from .util import pngfor
+
+is_darwin = platform.system() == "Darwin"
 
 _app = None
 
@@ -280,11 +283,32 @@ class _Widget(ABC):
     return overlap is not None
 
 # local shims for the tk and ttk widgets
+BaseButton = tk.Button
+is_tk_button = True
+if is_darwin:
+  try:
+    from tkmacosx import Button as BaseButton
+    is_tk_button = False
+  except ImportError as e:
+    warning(
+        "import tkmacosx: %s; buttons will look better with tkmacos on Darwin",
+        e
+    )
 
 # pylint: disable=too-many-ancestors
-class Button(_Widget, tk.Button):
+class Button(_Widget, BaseButton):
   ''' Button `_Widget` subclass.
   '''
+
+  def __init__(self, *a, background=None, highlightbackground=None, **kw):
+    if background is None:
+      background = self.WIDGET_BACKGROUND
+      if not is_tk_button:
+        kw.update(background=background)
+    if highlightbackground is None:
+      highlightbackground = background
+    kw.update(highlightbackground=highlightbackground)
+    super().__init__(*a, **kw)
 
 # pylint: disable=too-many-ancestors
 class Canvas(_Widget, tk.Canvas):
