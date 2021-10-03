@@ -12,6 +12,7 @@ from os.path import (
     expanduser,
 )
 import platform
+from time import sleep
 import tkinter as tk
 from tkinter import ttk
 from typing import Iterable, List
@@ -25,7 +26,7 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_method, pfx_call
+from cs.pfx import pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
 
@@ -43,6 +44,7 @@ def _render(pause=0):
   if pause > 0:
     sleep(pause)
 
+# pylint: disable=too-many-instance-attributes
 class TaggerGUI(MultiOpenMixin):
   ''' A GUI for a `Tagger`.
   '''
@@ -101,7 +103,7 @@ class TaggerGUI(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    global _app
+    global _app  # pylint: disable=global-statement
     root = tk.Tk()
     _app = app = Frame(root)
     app.grid()
@@ -489,6 +491,8 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     _FSPathsMixin.__init__(self)
     self.command = command
     self.pathlist = pathlist
+    self.display_paths = None
+    self._list_state = None
     self.bind('<Button-1>', self._clicked)
 
   def _clicked(self, event):
@@ -506,6 +510,7 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     list_state.set(self.display_paths)
     if self.fixed_width is None:
       self.config(width=max(map(len, self.display_paths)) + 10)
+    return self.display_paths
 
   @property
   def pathlist(self):
@@ -652,16 +657,7 @@ class TagWidget(Frame):
   '''
 
   @typechecked
-  def __init__(
-      self,
-      parent,
-      tags: TagSet,
-      tag: Tag,
-      *,
-      alt_values=None,
-      foreground=None,
-      **kw
-  ):
+  def __init__(self, parent, tags: TagSet, tag: Tag, *, alt_values=None, **kw):
     ''' Initialise a `TagWidget`.
 
         Parameters:
@@ -683,18 +679,16 @@ class TagWidget(Frame):
     super().__init__(parent, **kw)
     self.tags = tags
     self.tag = tag
-    tag_name = tag.name
-    tag_value = tag.value
     self.alt_values = alt_values
     self.label = Button(
         self,
         command=self.toggle_editmode,
         ##relief=tk.FLAT,
         ##overrelief=tk.FLAT,
-        foreground=foreground,
-        highlightbackground='white',
-        padx=1,
-        pady=1,
+        background='brown',
+        highlightbackground='black',
+        padx=0,
+        pady=0,
         borderwidth=0,
     )
     self._set_colour()
@@ -719,7 +713,7 @@ class TagWidget(Frame):
   def toggle_editmode(self):
     ''' Present or withdraw the edit widget.
 
-        The `Tag` if updated when the widget is withdrawn,
+        The `Tag` is updated when the widget is withdrawn,
         and if the new value does not match the value in `self.tags`
         then the correponding `self.tags[tag.name]` is also updated.
     '''
@@ -734,6 +728,7 @@ class TagWidget(Frame):
       )
       self.editor.focus_set()
     else:
+      # withdraw edit widget, update tag and label
       new_value = self.editor.get()
       self.editor.grid_remove()
       self.editor = None
@@ -791,6 +786,9 @@ class TagsView(_TagsView, LabelFrame):
   @ensure(lambda self: self._tag_names == sorted(self._tag_names))
   @typechecked
   def _add_tag(self, tag_name: str, widget: _Widget):
+    ''' Insert `widget` for the `Tag` named `tag_name`
+        at the appropriate place in the listing.
+    '''
     w = self._tag_widgets.get(tag_name)
     if w is not None:
       # switch out the old widget
@@ -805,7 +803,6 @@ class TagsView(_TagsView, LabelFrame):
       # find the insertion row
       for row, gridded_name in enumerate(self._tag_names):
         if gridded_name > tag_name:
-          X("found later %r at row=%d", gridded_name, row)
           break
       else:
         # append to the end
@@ -893,7 +890,7 @@ class PathView(LabelFrame):
 
     self.tagsview = TagsView(
         self,
-        fixed_size=(200, None),  ## 1080),
+        fixed_size=(200, None),
     )
     self.tagsview.grid(column=1, row=0, sticky=tk.N + tk.S)
 
