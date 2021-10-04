@@ -17,6 +17,7 @@ from os.path import (
     realpath,
     samefile,
 )
+from threading import RLock
 
 from typeguard import typechecked
 
@@ -28,6 +29,7 @@ from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
+from cs.threads import locked
 
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
@@ -48,6 +50,10 @@ class Tagger:
       fstags = FSTags()
     self.fstags = fstags
     self._file_by_mappings = {}
+    # mapping of (dirpath,tag_name)=>tag_value=>set(subdirpaths)
+    # used by per_tag_auto_file_map
+    self._per_tag_auto_file_mappings = defaultdict(lambda: defaultdict(set))
+    self._lock = RLock()
 
   @classmethod
   @typechecked
@@ -62,6 +68,13 @@ class Tagger:
     ''' Return the `Tagger` related subtag value for `conf`, or `default` (default `None).
     '''
     return cls.conf_tags(tags).get(conf, default)
+
+  @classmethod
+  @typechecked
+  def has_conf_tag(cls, tags: TagSet, conf: str):
+    ''' Test for the presence of `conf` in he `Tagger` related subtags.
+    '''
+    return conf in cls.conf_tags(tags)
 
   @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
@@ -191,9 +204,10 @@ class Tagger:
         pfx_call(os.remove, srcpath)
     return linked_to
 
+  @locked
   @pfx
   @fmtdoc
-  def auto_file_map(self, dirpath: str, tag_names):
+  def per_tag_auto_file_map(self, dirpath: str, tag_names):
     ''' Walk the file tree at `dirpath`
         looking for directories whose direct tags contain tags
         whose name is in `tag_names`.
@@ -202,7 +216,7 @@ class Tagger:
 
         Parameters:
         * `dirpath`: the path to the directory to walk
-        * `tag_names`: an iterable of Tag names of interest
+        * `tag_names`: an iterable of `Tag` names of interest
 
         The intent here is to derive filing locations
         from the tree layout.
@@ -210,43 +224,78 @@ class Tagger:
         We automatically skip subdirectories whose names commence with `'.'`.
         We also skip subdirectories tagged with `{TAGGER_TAG_PREFIX_DEFAULT}.skip`.
     '''
-    dirpath = abspath(dirpath)
-    cache_key = dirpath, tuple(sorted(tag_names))
-    try:
-      mapping = self._file_by_mappings[cache_key]
-    except KeyError:
-      mapping = self._file_by_mappings[cache_key] = defaultdict(list)
-      fstags = self.fstags
-      if mapping is None:
-        mapping = defaultdict(list)
-      tag_names = set(tag_names)
-      assert all(isinstance(tag_name, str) for tag_name in tag_names)
+    fstags = self.fstags
+    tagged = fstags[dirpath]
+    dirpath = tagged.filepath
+    all_tag_names = set(tag_names)
+    assert all(isinstance(tag_name, str) for tag_name in all_tag_names)
+    # collect all the per-tag_name mappings which exist for dirpath
+    # note tha mappings which do not exist
+    mappings = {}
+    missing_tag_names = set()
+    for tag_name in all_tag_names:
+      per_tag_cache_key = dirpath, tag_name
+      if per_tag_cache_key in self._per_tag_auto_file_mappings:
+        mappings[per_tag_cache_key] = self._per_tag_auto_file_mappings[
+            per_tag_cache_key]
+      else:
+        missing_tag_names.add(tag_name)
+    if missing_tag_names:
+      # walk the tree to find the missing tags
+      subdirpaths_by_tag = defaultdict(list)
       for path, dirnames, _ in os.walk(realpath(dirpath)):
-        with Pfx(path):
+        with Pfx("os.walk @ %r", path):
           # order the descent
           dirnames[:] = sorted(
               dname for dname in dirnames
               if dname and not dname.startswith('.')
           )
-          tagged = fstags[path]
-          if self.conf_tag(tagged, 'skip'):
+          tagged_subdir = fstags[path]
+          if self.has_conf_tag(tagged_subdir, 'skip'):
             # tagger.skip => prune this directory tree from the mapping
             dirnames[:] = []
           else:
             # look for the tags of interest
-            for tag in tagged:
-              if tag.name in tag_names:
-                bare_tag = Tag(tag.name, tag.value)
-                mapping[bare_tag].append(tagged.filepath)
+            for tag_name in missing_tag_names:
+              try:
+                tag_value = tagged_subdir[tag_name]
+              except KeyError:
+                pass
+              else:
+                bare_tag = Tag(tag_name, tag_value)
+                subdirpaths_by_tag[bare_tag].append(tagged_subdir.filepath)
+      # make sure each cache exists and gather them up
+      for tag_name in missing_tag_names:
+        per_tag_cache_key = dirpath, tag_name
+        assert per_tag_cache_key not in mappings
+        assert per_tag_cache_key not in self._per_tag_auto_file_mappings
+        mappings[per_tag_cache_key] = self._per_tag_auto_file_mappings[
+            per_tag_cache_key]
+      # fill in the caches
+      for bare_tag, subdirpaths in subdirpaths_by_tag.items():
+        tag_name = bare_tag.name
+        per_tag_cache_key = dirpath, tag_name
+        # get the value=>[subdirpaths] mapping
+        by_tag_name = self._per_tag_auto_file_mappings[per_tag_cache_key]
+        by_tag_name[bare_tag.value].update(subdirpaths)
+    # collate mapping
+    mapping = {}
+    for per_tag_cache_key, by_tag_value in mappings.items():
+      _, tag_name = per_tag_cache_key
+      for tag_value, subpaths in by_tag_value.items():
+        mapping[Tag(tag_name, tag_value)] = subpaths
     return mapping
 
+  @locked
   @pfx
   @fmtdoc
   def file_by_mapping(self, srcdirpath):
     ''' Examine the `{TAGGER_TAG_PREFIX_DEFAULT}.file_by` tag for `srcdirpath`.
         Return a mapping of specific tag values to filing locations
-        derived via `auto_file_map`.
-        The file locations may be a list or a string (for convenient single locations.
+        derived via `per_tag_auto_file_map`.
+
+        The file location specification in the tag may be a list or a string
+        (for convenient single locations).
 
         For example, I might tag my downloads directory with:
 
@@ -265,28 +314,35 @@ class Tagger:
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
     fstags = self.fstags
-    mapping = defaultdict(set)
-    file_by = self.conf_tag(fstags[srcdirpath], 'file_by', {})
-    # group the tags by file_by target path
-    grouped = defaultdict(set)
-    for tag_name, file_to in file_by.items():
-      if isinstance(file_to, str):
-        file_to = (file_to,)
-      for file_to_path in file_to:
-        if not isabspath(file_to_path):
-          if file_to_path.startswith('~'):
-            file_to_path = expanduser(file_to_path)
-          else:
-            file_to_path = joinpath(srcdirpath, file_to_path)
-        file_to_path = abspath(file_to_path)
-        grouped[file_to_path].add(tag_name)
-    # walk each path for its tag_names of interest
-    for file_to_path, tag_names in sorted(grouped.items()):
-      with Pfx("%r:%r", file_to_path, tag_names):
-        # accrue destination paths by tag values
-        for bare_key, dstpaths in self.auto_file_map(file_to_path,
-                                                     tag_names).items():
-          mapping[bare_key].update(dstpaths)
+    tagged = fstags[srcdirpath]
+    key = tagged.filepath
+    try:
+      mapping = self._file_by_mappings[key]
+    except KeyError:
+      mapping = defaultdict(set)
+      file_by = self.conf_tag(fstags[srcdirpath], 'file_by', {})
+      # group the tags by file_by target path
+      grouped = defaultdict(set)
+      for tag_name, file_to in file_by.items():
+        if isinstance(file_to, str):
+          file_to = (file_to,)
+        for file_to_path in file_to:
+          if not isabspath(file_to_path):
+            if file_to_path.startswith('~'):
+              file_to_path = expanduser(file_to_path)
+              assert isabspath(file_to_path)
+            else:
+              file_to_path = joinpath(srcdirpath, file_to_path)
+          file_to_path = abspath(file_to_path)
+          grouped[file_to_path].add(tag_name)
+      # walk each path for its tag_names of interest
+      for file_to_path, tag_names in sorted(grouped.items()):
+        with Pfx("%r:%r", file_to_path, tag_names):
+          # accrue destination paths by tag values
+          for bare_key, dstpaths in self.per_tag_auto_file_map(
+              file_to_path, tag_names).items():
+            mapping[bare_key].update(dstpaths)
+      self._file_by_mappings[key] = mapping
     return mapping
 
   def suggested_tags(self, path):
