@@ -674,9 +674,7 @@ class TagWidget(Frame):
     '''
     self.tagger = tagger
     if alt_values is None:
-      alt_values = set()
-      if tag.name == 'pil.format':
-        alt_values = ('PNG', 'JPEG')
+      alt_values = set(tagger.ont_values(tag.name))
     else:
       alt_values = set(alt_values)
     super().__init__(parent, **kw)
