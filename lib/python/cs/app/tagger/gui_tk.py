@@ -657,7 +657,9 @@ class TagWidget(Frame):
   '''
 
   @typechecked
-  def __init__(self, parent, tags: TagSet, tag: Tag, *, alt_values=None, **kw):
+  def __init__(
+      self, parent, tags: TagSet, tag: Tag, *, tagger, alt_values=None, **kw
+  ):
     ''' Initialise a `TagWidget`.
 
         Parameters:
@@ -670,6 +672,7 @@ class TagWidget(Frame):
           in edit mode
         Other keyword arguments are passed to the `Frame` superclass initialiser.
     '''
+    self.tagger = tagger
     if alt_values is None:
       alt_values = set()
       if tag.name == 'pil.format':
@@ -771,9 +774,10 @@ class TagsView(_TagsView, LabelFrame):
   ''' A view of some `Tag`s.
   '''
 
-  def __init__(self, parent, **kw):
+  def __init__(self, parent, *, tagger, **kw):
     kw.setdefault('text', 'Tags')
     super().__init__(parent, **kw)
+    self.tagger = tagger
     self.set_tags(())
     # mapping of tag name to widgets
     self._tag_widgets = {}
@@ -839,6 +843,7 @@ class TagsView(_TagsView, LabelFrame):
         self,
         self.tags,
         tag,
+        tagger=self.tagger,
         alt_values=alt_values,
         **kw,
     )
@@ -890,6 +895,7 @@ class PathView(LabelFrame):
 
     self.tagsview = TagsView(
         self,
+        tagger=tagger,
         fixed_size=(200, None),
     )
     self.tagsview.grid(column=1, row=0, sticky=tk.N + tk.S)
