@@ -202,6 +202,8 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
         otherwise a new `WidgetGeometry` indicating the overlap.
     '''
     # compute the horizontal overlap
+    if self.dx <= 0 or self.dy <= 0:
+      return None
     over = overlap1(self.x, self.dx, other.x, other.dx)
     if over is None:
       return None
