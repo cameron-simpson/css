@@ -87,6 +87,8 @@ class CDRipCommand(BaseCommand):
       'MBDB_PATH_DEFAULT': MBDB_PATH_DEFAULT,
   }
 
+  SUBCOMMAND_ARGV_DEFAULT = 'rip'
+
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
