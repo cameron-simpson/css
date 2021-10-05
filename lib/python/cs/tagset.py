@@ -215,7 +215,7 @@ from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, typed_repr as r
+    has_format_attributes, format_attribute, FStr, r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import (
