@@ -693,15 +693,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self.modified = True
     if verbose is None or verbose:
-      old_value = self.get(tag_name)
-      if old_value is not value and old_value != value:
-        # report different values
-        tag = Tag(tag_name, value, ontology=self.ontology)
-        msg = (
-            "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
-            (tag, old_value)
-        )
-        ifverbose(verbose, msg)
+      if tag_name in self:
+        old_value = self.get(tag_name)
+        if old_value is not value and old_value != value:
+          # report different values
+          tag = Tag(tag_name, value, ontology=self.ontology)
+          msg = (
+              "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
+              (tag, old_value)
+          )
+          ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
 
   # "set" mode
