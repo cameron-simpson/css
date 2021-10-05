@@ -344,8 +344,8 @@ class _MBTagSet(SQLTagSet):
         Returns `None` for noncompound names.
     '''
     try:
-    except ValueError:
       type_name, _ = self.name.split('.', 1)
+    except ValueError:
       return None
     return type_name
 
