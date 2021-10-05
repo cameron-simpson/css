@@ -379,16 +379,13 @@ class _MBTagSet(SQLTagSet):
 
         This method has a fair bit of entity type specific knowledge.
     '''
-    if not force:
-      onttype = self.type_name
-      if onttype in ('artist',):
-        if getattr(self, onttype + '_name', None):
-          return
-      elif onttype in ('disc', 'recording'):
-        if self.title:
-          return
+    onttype = self.mbtype
+    if onttype is None:
+      ##warning("%s: no MBTYPE, not refreshing", self)
+      return
+    if not force and self.MB_QUERY_TIME_TAG_NAME in self:
+      return
     mbkey = self.mbkey
-    onttype = self.type_name
     get_type = onttype
     id_name = 'id'
     record_key = None
@@ -403,6 +400,7 @@ class _MBTagSet(SQLTagSet):
     elif onttype == 'recording':
       includes = ['artists', 'tags']
     A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
+    self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
     # record the full response data for forensics
     self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}'] = A
     # modify A for discs
