@@ -162,9 +162,8 @@ class CDRipCommand(BaseCommand):
       raise GetoptError("missing metanames")
     for metaname in argv:
       with Pfx("metaname %r", metaname):
-        # TODO: just mbdb.ontology.metadata(mbdb[m
-        metadata = mbdb.ontology[ontkey]
-        print(' ', metadata)
+        metadata = mbdb.ontology[metaname]
+        print(' ', metaname, metadata)
 
   # pylint: disable=too-many-locals
   def cmd_rip(self, argv):
