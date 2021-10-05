@@ -58,6 +58,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
+from cs.fileutils import shortpath
 from cs.lex import FormatAsError, get_decimal_value, typed_repr as r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
@@ -1482,9 +1483,12 @@ class SQLTags(BaseTagSets):
     ## UNUSED? ## self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
-    return "%s(db_url=%r)" % (
-        type(self).__name__, getattr(self, 'db_url', None)
-    )
+    db_url = getattr(self, 'db_url', None)
+    if isinstance(db_url, str):
+      db_url_s = shortpath(db_url)
+    else:
+      db_url_s = str(db_url)
+    return "%s(%s)" % (type(self).__name__, db_url_s)
 
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
     if _sqltags is None:
