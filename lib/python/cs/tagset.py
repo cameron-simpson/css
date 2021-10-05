@@ -2157,7 +2157,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           te.name = new_name
 
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
-  ''' A view into a `BaseTagSets` for keys commencing with a prefix.
+  ''' A view into a `BaseTagSets` for keys commencing with a prefix
+      being the subdomain plus a dot (`'.'`).
   '''
 
   @classmethod
