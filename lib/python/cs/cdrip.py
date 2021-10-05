@@ -350,22 +350,14 @@ class _MBTagSet(SQLTagSet):
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    _disc, discid = self.name.split('.')
-    assert _disc == 'disc'
-    return discid
+    type_name, mbid = self.name.split('.')
+    return mbid
 
   @property
-  def type_name(self):
-    ''' The ontology type. Eg `'artist'` if `name==`meta.artist.foo`.
-        This is `None` if `self.name` is not a `meta.`*type_name*`.` name.
-    '''
-    try:
-      ontish, onttype, _ = self.name.split('.', 2)
-    except ValueError:
+  def mbtime(self):
+    if self.MB_QUERY_TIME_TAG_NAME not in self:
       return None
-    if ontish != 'meta':
-      return None
-    return onttype
+    return self[self.MB_QUERY_TIME_TAG_NAME]
 
   @property
   def ontology(self):
