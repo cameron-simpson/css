@@ -25,6 +25,7 @@ from pprint import pformat
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
+import time
 from uuid import UUID
 import discid
 import musicbrainzngs
@@ -32,9 +33,8 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
-from cs.lex import cutprefix
 from cs.logutils import error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
@@ -344,7 +344,7 @@ class _MBTagSet(SQLTagSet):
         Returns `None` for noncompound names.
     '''
     try:
-      type_name, mbid = self.name.split('.')
+      type_name, _ = self.name.split('.')
     except ValueError:
       return None
     return type_name
@@ -353,11 +353,13 @@ class _MBTagSet(SQLTagSet):
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    type_name, mbid = self.name.split('.')
+    _, mbid = self.name.split('.')
     return mbid
 
   @property
   def mbtime(self):
+    ''' The timestamp of the most recent .refresh() API call, or `None`.
+    '''
     if self.MB_QUERY_TIME_TAG_NAME not in self:
       return None
     return self[self.MB_QUERY_TIME_TAG_NAME]
@@ -478,8 +480,8 @@ class _MBTagSet(SQLTagSet):
           # list of unique tag strings
           tag_value = list(set(map(lambda tag_dict: tag_dict['name'], v)))
         else:
-          warning("SKIP unhandled A record %r", k)
-          print(pformat(v))
+          ##warning("SKIP unhandled A record %r", k)
+          ##print(pformat(v))
           continue
         self[tag_name] = tag_value
 
