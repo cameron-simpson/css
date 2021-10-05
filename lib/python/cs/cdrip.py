@@ -336,6 +336,17 @@ class _MBTagSet(SQLTagSet):
     return self.sqltags.mbdb
 
   @property
+  def mbtype(self):
+    ''' The MusicBrainz type (usually a UUID or discid).
+        Returns `None` for noncompound names.
+    '''
+    try:
+      type_name, mbid = self.name.split('.')
+    except ValueError:
+      return None
+    return type_name
+
+  @property
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
@@ -529,11 +540,11 @@ class MBDB(MultiOpenMixin):
     with sqltags:
       ont = self.ontology = TagsOntology(sqltags)
       self.artists = sqltags.subdomain('artist')
-      ont['type.artists'].update(type='list', member_type='artist')
+      ont['artists'].update(type='list', member_type='artist')
       self.discs = sqltags.subdomain('disc')
-      ont['type.discs'].update(type='list', member_type='disc')
+      ont['discs'].update(type='list', member_type='disc')
       self.recordings = sqltags.subdomain('recording')
-      ont['type.recordings'].update(type='list', member_type='recording')
+      ont['recordings'].update(type='list', member_type='recording')
 
   @contextmanager
   def startup_shutdown(self):
