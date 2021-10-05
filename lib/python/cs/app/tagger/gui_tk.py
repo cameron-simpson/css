@@ -398,17 +398,23 @@ class _ImageWidget(_Widget):
     self.config(text=new_fspath)
 
     def idle_set_image():
+      ''' Set the image once visible, fired at idle time.
+
+          It is essential that this is queued with `after_idle`.
+          If this ran directly during widget construction
+          the `wait_visibility` call would block the follow construction.
+      '''
       if not self.is_visible():
-        self.after(300, idle_set_image)
-        return
-      if new_fspath is None:
+        self.wait_visibility()
+      imgpath = self._fspath
+      if imgpath is None:
         display_fspath = None
       else:
         size = self.fixed_size or (self.width, self.height)
         try:
-          display_fspath = pngfor(expanduser(new_fspath), size)
+          display_fspath = pngfor(expanduser(imgpath), size)
         except (OSError, ValueError) as e:
-          warning("%r: %s", new_fspath, e)
+          warning("%r: %s", imgpath, e)
           display_fspath = None
       if display_fspath is None:
         self.configure(image=None)
@@ -416,7 +422,7 @@ class _ImageWidget(_Widget):
       img = Image.open(display_fspath)
       image = ImageTk.PhotoImage(img)
       self.configure(
-          text=basename(new_fspath),
+          text=basename(imgpath),
           image=image,
           width=size[0],
           height=size[1],
