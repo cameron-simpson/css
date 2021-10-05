@@ -2021,7 +2021,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
 
-  __repr__ = __str__
+  def __repr__(self):
+    return str(self)
 
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
