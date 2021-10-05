@@ -2292,8 +2292,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     self.accepts_key = accepts_key
 
   def __repr__(self):
-    return "%s(match=%r,unmatch=%r)" % (
-        type(self).__name__, self.__match, self.__unmatch
+    return "%s(match=%r,unmatch=%r,tagsets=%s)" % (
+        type(self).__name__, self.__match, self.__unmatch, self.tagsets
     )
 
   @contextmanager
