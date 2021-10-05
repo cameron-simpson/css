@@ -215,7 +215,7 @@ from cs.fileutils import shortpath
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
-    has_format_attributes, format_attribute, FStr, typed_repr as r
+    has_format_attributes, format_attribute, FStr, r
 )
 from cs.logutils import setup_logging, warning, error, ifverbose
 from cs.mappings import (
@@ -693,15 +693,16 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     self.modified = True
     if verbose is None or verbose:
-      old_value = self.get(tag_name)
-      if old_value is not value and old_value != value:
-        # report different values
-        tag = Tag(tag_name, value, ontology=self.ontology)
-        msg = (
-            "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
-            (tag, old_value)
-        )
-        ifverbose(verbose, msg)
+      if tag_name in self:
+        old_value = self.get(tag_name)
+        if old_value is not value and old_value != value:
+          # report different values
+          tag = Tag(tag_name, value, ontology=self.ontology)
+          msg = (
+              "+ %s" % (tag,) if old_value is None else "+ %s (was %s)" %
+              (tag, old_value)
+          )
+          ifverbose(verbose, msg)
     super().__setitem__(tag_name, value)
 
   # "set" mode
@@ -1198,10 +1199,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       encoder = JSONEncoder(**json_options)
     else:
       encoder = cls.JSON_ENCODER
-    from cs.x import X
-    from cs.lex import r
-    s = encoder.encode(value)
-    return s
+    return encoder.encode(value)
 
   @classmethod
   def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
@@ -2021,7 +2019,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
   def __str__(self):
     return "%s<%s>" % (type(self).__name__, id(self))
 
-  __repr__ = __str__
+  def __repr__(self):
+    return str(self)
 
   def default_factory(self, name: str):
     ''' Create a new `TagSet` named `name`.
@@ -2158,7 +2157,8 @@ class BaseTagSets(MultiOpenMixin, MutableMapping, ABC):
           te.name = new_name
 
 class TagSetsSubdomain(SingletonMixin, PrefixedMappingProxy):
-  ''' A view into a `BaseTagSets` for keys commencing with a prefix.
+  ''' A view into a `BaseTagSets` for keys commencing with a prefix
+      being the subdomain plus a dot (`'.'`).
   '''
 
   @classmethod
@@ -2292,8 +2292,8 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
     self.accepts_key = accepts_key
 
   def __repr__(self):
-    return "%s(match=%r,unmatch=%r)" % (
-        type(self).__name__, self.__match, self.__unmatch
+    return "%s(match=%r,unmatch=%r,tagsets=%s)" % (
+        type(self).__name__, self.__match, self.__unmatch, self.tagsets
     )
 
   @contextmanager
@@ -2455,7 +2455,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       tagsets[name] = tagset
 
   def __str__(self):
-    return str(self.as_dict())
+    return "%s(%s)" % (type(self).__name__, self._subtagsetses)
 
   @contextmanager
   def startup_shutdown(self):
@@ -2830,12 +2830,11 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         to obtain the "metadata" `TagSet` for each specific value.
     '''
     md = None
-    typedef = (
-        TagSet() if type_name == 'type' else self.metadata('type', type_name)
-    )
-    primary_type_name = typedef.type_name
-    if primary_type_name:
-      type_name = primary_type_name
+    typedef = self.get(type_name)
+    if typedef:
+      primary_type_name = typedef.get('type_name')
+      if primary_type_name:
+        type_name = primary_type_name
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
       try:
@@ -2877,7 +2876,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         value_key = convert(value)
         assert isinstance(value_key, str) and value_key
       key = type_name + '.' + value_key
-      md = subtagsets[value_key]
+      md = subtagsets[key]
     return md
 
   def basetype(self, typename):
