@@ -2455,7 +2455,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
       tagsets[name] = tagset
 
   def __str__(self):
-    return str(self.as_dict())
+    return "%s(%s)" % (type(self).__name__, self._subtagsetses)
 
   @contextmanager
   def startup_shutdown(self):
