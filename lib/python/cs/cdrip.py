@@ -331,6 +331,9 @@ class _MBTagSet(SQLTagSet):
 
   MB_QUERY_TIME_TAG_NAME = 'musicbrainzng.query_time'
 
+  def __repr__(self):
+    return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
+
   @property
   def mbdb(self):
     ''' The associated `MBDB`.
