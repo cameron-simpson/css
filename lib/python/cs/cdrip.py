@@ -344,8 +344,8 @@ class _MBTagSet(SQLTagSet):
         Returns `None` for noncompound names.
     '''
     try:
-      type_name, _ = self.name.split('.')
     except ValueError:
+      type_name, _ = self.name.split('.', 1)
       return None
     return type_name
 
@@ -353,7 +353,7 @@ class _MBTagSet(SQLTagSet):
   def mbkey(self):
     ''' The MusicBrainz key (usually a UUID or discid).
     '''
-    _, mbid = self.name.split('.')
+    _, mbid = self.name.split('.', 1)
     return mbid
 
   @property
