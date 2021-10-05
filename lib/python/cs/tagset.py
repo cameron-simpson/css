@@ -2830,12 +2830,11 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         to obtain the "metadata" `TagSet` for each specific value.
     '''
     md = None
-    typedef = (
-        TagSet() if type_name == 'type' else self.metadata('type', type_name)
-    )
-    primary_type_name = typedef.type_name
-    if primary_type_name:
-      type_name = primary_type_name
+    typedef = self.get(type_name)
+    if typedef:
+      primary_type_name = typedef.get('type_name')
+      if primary_type_name:
+        type_name = primary_type_name
     if not isinstance(value, str):
       # strs look a lot like other sequences, sidestep the probes
       try:
@@ -2877,7 +2876,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         value_key = convert(value)
         assert isinstance(value_key, str) and value_key
       key = type_name + '.' + value_key
-      md = subtagsets[value_key]
+      md = subtagsets[key]
     return md
 
   def basetype(self, typename):
