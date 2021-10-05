@@ -329,6 +329,8 @@ class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
 
+  MB_QUERY_TIME_TAG_NAME = 'musicbrainzng.query_time'
+
   @property
   def mbdb(self):
     ''' The associated `MBDB`.
