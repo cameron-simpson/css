@@ -506,6 +506,8 @@ class MBSQLTags(SQLTags):
   ''' Musicbrainz `SQLTags` with special `TagSetClass`.
   '''
 
+  TAGSETCLASS_DEFAULT = _MBTagSet
+
   # map 'foo' from 'foo.bah' to a particular TagSet subclass
   TAGSETCLASS_PREFIX_MAPPING = {
       'artist': MBArtist,
@@ -529,6 +531,21 @@ class MBSQLTags(SQLTags):
         mbdb_path = expanduser(MBDB_PATH_DEFAULT)
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
+
+  def default_factory(self, index):
+    ''' The default factory runs the `SQLTags` default factory and then does an MB refresh.
+    '''
+    te = super().default_factory(index)
+    te.refresh()
+    return te
+
+  def get(self, key, default=None):
+    ''' Run the default `.get()` and the do an MB refresh.
+    '''
+    te = super().get(key, default=default)
+    if te is not default:
+      te.refresh()
+    return te
 
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
