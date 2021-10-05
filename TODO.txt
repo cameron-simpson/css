@@ -1,3 +1,4 @@
+cs.cmdutils: cmd_help does not print the usage preamble, just the per command usages
 baseCommand autousage: make up a stub usage for subcommands with no usage
 parser for /etc/terminal-colors.d
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
