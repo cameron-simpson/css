@@ -219,11 +219,10 @@ class CDRipCommand(BaseCommand):
     with Pfx("discid %s", disc_id):
       disc = MB.discs[disc_id]
       print(disc.title)
-      print(", ".join(disc.artist_names()))
+      print(", ".join(disc.artist_names))
       for tracknum, recording in enumerate(disc.recordings(), 1):
         print(
-            tracknum, recording.title, '--',
-            ", ".join(recording.artist_names())
+            tracknum, recording.title, '--', ", ".join(recording.artist_names)
         )
     return 0
 
