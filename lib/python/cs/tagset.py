@@ -1198,10 +1198,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       encoder = JSONEncoder(**json_options)
     else:
       encoder = cls.JSON_ENCODER
-    from cs.x import X
-    from cs.lex import r
-    s = encoder.encode(value)
-    return s
+    return encoder.encode(value)
 
   @classmethod
   def from_str(cls, s, offset=0, ontology=None, fallback_parse=None):
