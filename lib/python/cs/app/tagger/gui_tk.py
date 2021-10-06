@@ -171,9 +171,9 @@ class TaggerGUI(MultiOpenMixin):
       self.app.mainloop()
       print("after mainloop")
 
-@require(lambda x1: x1 >= 0)
+##@require(lambda x1: x1 >= 0)
 @require(lambda dx1: dx1 > 0)
-@require(lambda x2: x2 >= 0)
+##@require(lambda x2: x2 >= 0)
 @require(lambda dx2: dx2 > 0)
 @ensure(lambda result, dx1: result is None or result[1] <= dx1)
 @ensure(lambda result, dx2: result is None or result[1] <= dx2)
@@ -182,15 +182,16 @@ def overlap1(x1, dx1, x2, dx2):
       return `None` for no overlap
       or `(overlap_x,overlap_dx)` if they overlap.
   '''
-  x1b = x1 + dx1
-  x2b = x2 + dx2
-  if x1 < x2:
-    if x1b <= x2:
-      return None
-    return x2, min(x1b, x2b) - x2
-  if x2b <= x1:
+  if dx1 <= 0 or dx2 <= 0:
+    # zero width spans cannot overlap
     return None
-  return x1, min(x1b, x2b) - x1
+  if x1 <= x2 and x1 + dx1 > x2:
+    # span 1 left of span 2 and overlapping
+    return x2, min(x1 + dx1, x2 + dx2) - x2
+  if x2 <= x1 and x2 + dx2 > x1:
+    # span 2 left of span 1 and overlapping
+    return x1, min(x1 + dx1, x2 + dx2) - x1
+  return None
 
 class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
   ''' A geometry tuple and associated methods.
