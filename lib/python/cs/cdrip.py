@@ -316,11 +316,11 @@ def rip(
       else:
         with Pfx("+ %r", argv, print=True):
           subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+      fstags[mp3_filename].conversion_command = argv
     if no_action:
       print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
     else:
       fstags[mp3_filename].update(track_fstags)
-      fstags[mp3_filename].conversion_command = argv
   if not no_action:
     os.system("eject")
 
