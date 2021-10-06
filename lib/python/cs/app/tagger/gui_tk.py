@@ -844,7 +844,7 @@ class TagsView(_TagsView, LabelFrame):
     w = self._tag_widgets.get(tag_name)
     if w is not None:
       i = self._tag_names.index(tag_name)
-      del self._tag_names.index[i]
+      del self._tag_names[i]
       del self._tag_widgets[tag_name]
       w.grid_remove()
 
