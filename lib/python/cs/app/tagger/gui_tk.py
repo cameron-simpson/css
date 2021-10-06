@@ -283,7 +283,12 @@ class _Widget(ABC):
       # no parent, assume top level and visible
       return True
     g = self.root_geometry()
-    pg = self.parent.root_geometry()
+    if g is None:
+      return False
+    p = self.parent
+    pg = WidgetGeometry(
+        0, 0, p.winfo_width(), p.winfo_height()
+    )  # self.parent.root_geometry()
     overlap = g.overlap(pg)
     return overlap is not None
 
