@@ -712,7 +712,6 @@ class TagWidget(Frame):
         command=self.toggle_editmode,
         ##relief=tk.FLAT,
         ##overrelief=tk.FLAT,
-        background='brown',
         highlightbackground='black',
         padx=0,
         pady=0,
