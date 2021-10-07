@@ -408,7 +408,7 @@ class _ImageWidget(_Widget):
     self._fspath = new_fspath
     self.configure(text=new_fspath or r(new_fspath))
 
-    def idle_set_image():
+    def ev_set_image(ev):
       ''' Set the image once visible, fired at idle time.
 
           It is essential that this is queued with `after_idle`.
@@ -418,7 +418,7 @@ class _ImageWidget(_Widget):
       if self._image_for == self._fspath:
         return
       if not self.is_visible():
-        self.wait_visibility()
+        return
       imgpath = self._fspath
       if imgpath is None:
         display_fspath = None
@@ -431,20 +431,23 @@ class _ImageWidget(_Widget):
           display_fspath = None
       if display_fspath is None:
         self._image_for = None
+        self.image = None
         self.configure(image=None)
-        return
-      img = Image.open(display_fspath)
-      image = ImageTk.PhotoImage(img)
-      self.configure(
-          text=basename(imgpath),
-          image=image,
-          width=size[0],
-          height=size[1],
-      )
-      self.image = image
+      else:
+        img = Image.open(display_fspath)
+        image = ImageTk.PhotoImage(img)
+        self.configure(
+            text=basename(imgpath),
+            image=image,
+            width=size[0],
+            height=size[1],
+        )
+        self.image = image
         self._image_for = self._fspath
 
-    self.after_idle(idle_set_image)
+    self.bind('<Configure>', ev_set_image)
+    self.bind('<Map>', ev_set_image)
+    self.bind('<Unmap>', ev_set_image)
 
 class ImageWidget(_ImageWidget, Label):
   ''' An image widget which can show anything Pillow can read.
