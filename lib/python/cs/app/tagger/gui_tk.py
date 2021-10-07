@@ -268,15 +268,6 @@ class _Widget(ABC):
     '''
     return self.fixed_size[1]
 
-  def root_geometry(self):
-    ''' The geometry of this widget in parent coordinates:
-        `(x,y,dx,dy)`.
-    '''
-    self.update_idletasks()
-    x, y = self.winfo_rootx(), self.winfo_rooty()
-    dx, dy = self.winfo_width(), self.winfo_height()
-    return WidgetGeometry(x, y, dx, dy)
-
   def is_visible(self):
     ''' Is this widget visible:
         - it and all ancestors are mapped
