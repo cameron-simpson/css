@@ -274,22 +274,27 @@ class _Widget(ABC):
         - its rectangle overlaps its parent
         - its parent is visible
     '''
-    if not self.winfo_viewable():
-      # not mapped
-      return False
-    parent = self.winfo_parent()
-    if not parent:
-      # no parent, assume top level and visible
-      return True
-    g = self.root_geometry()
-    if g is None:
-      return False
+    assert self.winfo_ismapped() is self.winfo_viewable(), (
+        "%s.winfo_ismapped()=%s but %s.winfo_viewable()=%s" %
+        (self, self.winfo_ismapped(), self, self.winfo_viewable())
+    )
+    if not self.winfo_ismapped() or not self.winfo_viewable():
+      return None
+    g = WidgetGeometry.of(self)
+    overlap = None
     p = self.parent
-    pg = WidgetGeometry(
-        0, 0, p.winfo_width(), p.winfo_height()
-    )  # self.parent.root_geometry()
-    overlap = g.overlap(pg)
-    return overlap is not None
+    while p:
+      # compare geometry
+      pg = WidgetGeometry.of(p)
+      overlap = g.overlap(pg)
+      if not overlap:
+        return False
+      try:
+        p = p.parent
+      except AttributeError as e:
+        break
+    assert hasattr(p, 'state'), "no .state on %s" % (p,)
+    return p.state() == 'normal'
 
 # local shims for the tk and ttk widgets
 BaseButton = tk.Button
