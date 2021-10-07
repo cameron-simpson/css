@@ -406,7 +406,7 @@ class _ImageWidget(_Widget):
   @fspath.setter
   def fspath(self, new_fspath):
     self._fspath = new_fspath
-    self.config(text=new_fspath)
+    self.configure(text=new_fspath or r(new_fspath))
 
     def idle_set_image():
       ''' Set the image once visible, fired at idle time.
