@@ -197,6 +197,14 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
   ''' A geometry tuple and associated methods.
   '''
 
+  @classmethod
+  def of(cls, w):
+    ''' The geometry of this widget in root coordinates.
+    '''
+    x, y = w.winfo_rootx(), w.winfo_rooty()
+    dx, dy = w.winfo_width(), w.winfo_height()
+    return cls(x, y, dx, dy)
+
   def overlap(self, other):
     ''' Compute an overlap rectangle between two `WidgetGeometry` objects.
         Returns `None` if there is no overlap,
