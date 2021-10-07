@@ -395,6 +395,7 @@ class _ImageWidget(_Widget):
     kw.setdefault('text', shortpath(path) if path else "NONE")
     super().__init__(parent, **kw)
     self.fspath = path
+    self._image_for = None
 
   @property
   def fspath(self):
@@ -414,6 +415,8 @@ class _ImageWidget(_Widget):
           If this ran directly during widget construction
           the `wait_visibility` call would block the follow construction.
       '''
+      if self._image_for == self._fspath:
+        return
       if not self.is_visible():
         self.wait_visibility()
       imgpath = self._fspath
@@ -427,6 +430,7 @@ class _ImageWidget(_Widget):
           warning("%r: %s", imgpath, e)
           display_fspath = None
       if display_fspath is None:
+        self._image_for = None
         self.configure(image=None)
         return
       img = Image.open(display_fspath)
@@ -438,6 +442,7 @@ class _ImageWidget(_Widget):
           height=size[1],
       )
       self.image = image
+        self._image_for = self._fspath
 
     self.after_idle(idle_set_image)
 
