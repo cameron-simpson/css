@@ -2286,11 +2286,13 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       assert unmatch is None
       if match.endswith(('.', '-', '_')):
         # prefixed based match and translation
+        prefixify = PrefixedMappingProxy.prefixify_subkey
+        unprefixify = PrefixedMappingProxy.unprefixify_key
         accepts_key = lambda key: key.startswith(match)
-        to_subkey = lambda key: cutprefix(key, match)
-        from_subkey = lambda subkey: match + subkey
+        to_subkey = lambda key: unprefixify(key, match)
+        from_subkey = lambda subk: prefixify(subk, match)
       else:
-        # prefixed based match, use keys unchanged
+        # prefixed based match, but use keys unchanged
         match_ = match + '.'
         accepts_key = lambda key: key.startswith(match_)
         to_subkey = lambda key: key
