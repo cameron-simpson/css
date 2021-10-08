@@ -1362,19 +1362,29 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   '''
 
   def __init__(self, mapping, prefix):
+    # precompute function references
+    unprefixify = self.unprefixy_key
+    prefixify = self.prefixy_subkey
     super().__init__(
         mapping,
-        to_subkey=self.__to_subkey,
-        from_subkey=self.__from_subkey,
+        to_subkey=lambda key: unprefixy(key, prefix),
+        from_subkey=lambda subk: prefixy(subk, prefix),
     )
     self.prefix = prefix
 
-  def __to_subkey(self, key):
-    return self.prefix + key
+  @staticmethod
+  def prefixify_subkey(subk, prefix):
+    ''' Return the external (prefixed) key from a subkey `subk`.
+    '''
+    assert not subk.startswith(prefix)
+    return prefix + subk
 
-  def __from_subkey(self, key):
-    assert key.startswith(self.prefix)
-    return cutprefix(key, self.prefix)
+  @staticmethod
+  def unprefixify_key(key, prefix):
+    ''' Return the internal subkey (unprefixed) from the external `key`.
+    '''
+    assert key.startswith(prefix)
+    return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
   def keys(self):
