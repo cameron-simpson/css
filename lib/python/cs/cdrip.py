@@ -34,7 +34,7 @@ from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.logutils import error, warning, info
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
