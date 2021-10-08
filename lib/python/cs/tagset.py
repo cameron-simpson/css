@@ -2661,7 +2661,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Fetch the entity named `name` or `default`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    return subtagsets.get(subtagsets.subkey(name), default)
+    return subtagsets.get(name, default)
 
   def __getitem__(self, name):
     ''' Fetch `tags` for the entity named `name`.
@@ -2673,14 +2673,14 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Apply `tags` to the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags = subtagsets[name]
     subtags.update(tags)
 
   def __delitem__(self, name):
     ''' Delete the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    del subtagsets[subtagsets.subkey(name)]
+    del subtagsets[name]
 
   def subtype_name(self, type_name):
     ''' Return the type name for use within `self.tagsets` from `type_name`.
@@ -2758,8 +2758,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     subtagsets = self._subtagsets_for_type(type_name)
-    subtype_name = subtagsets.subkey(type_name)
-    return subtagsets.typedef(subtype_name)
+    return subtagsets.typedef(type_name)
 
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
