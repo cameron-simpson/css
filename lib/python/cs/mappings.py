@@ -25,7 +25,7 @@ from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
@@ -1282,6 +1282,7 @@ class RemappedMappingProxy:
     self._mapped_keys = {}
     self._mapped_subkeys = {}
 
+  @pfx_method
   def subkey(self, key):
     ''' Return the internal key for `key`.
     '''
@@ -1289,11 +1290,17 @@ class RemappedMappingProxy:
       subk = self._mapped_keys[key]
     except KeyError:
       subk = self._to_subkey(key)
-      assert subk not in self._mapped_subkeys
+      if subk in self._mapped_subkeys:
+        warning(
+            "no self._mapped_keys[key=%r], but we do have self._mapped_subkeys[subk=%r] => %r",
+            key, subk, self._mapped_subkeys[subk]
+        )
+        assert self._mapped_subkeys[subk] == key
       self._mapped_keys[key] = subk
       self._mapped_subkeys[subk] = key
     return subk
 
+  @pfx_method
   def key(self, subkey):
     ''' Return the external key for `subkey`.
     '''
