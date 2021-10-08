@@ -1349,13 +1349,22 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def __init__(self, mapping, prefix):
     super().__init__(
         mapping,
-        lambda key: prefix + key,
-        lambda subkey: cutprefix(subkey, prefix),
+        to_subkey=self.__to_subkey,
+        from_subkey=self.__from_subkey,
     )
     self.prefix = prefix
+
+  def __to_subkey(self, key):
+    return self.prefix + key
+
+  def __from_subkey(self, key):
+    assert key.startswith(self.prefix)
+    return cutprefix(key, self.prefix)
 
   # pylint: disable=arguments-differ
   def keys(self):
     ''' Yield the post-prefix suffix of the keys in `self.mapping`.
     '''
-    return super().keys(lambda subkey: subkey.startswith(self.prefix))
+    return super().keys(
+        select_key=lambda subkey: subkey.startswith(self.prefix)
+    )
