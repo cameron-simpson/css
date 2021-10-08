@@ -266,7 +266,9 @@ def rip(
         track=tracknum
     )
     track_artists = ", ".join(recording.artist_names)
-    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
+    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
+        os.sep, '-'
+    )
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
     if existspath(mp3_filename):
