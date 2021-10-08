@@ -224,7 +224,9 @@ class TaggerCommand(BaseCommand):
         raise GetoptError("extra arguments: %r" % (argv,))
     print(type_name)
     for type_value in tagger.ont_values(type_name):
-      print(" ", r(type_value), tagger.ont[f"{type_name}.{type_value}"])
+      ontkey = f"{type_name}.{type_value}"
+      with Pfx("ontkey = %r", ontkey):
+        print(" ", r(type_value), tagger.ont[ontkey])
 
   def cmd_suggest(self, argv):
     ''' Usage: {cmd} pathnames...
