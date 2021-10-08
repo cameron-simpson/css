@@ -1282,6 +1282,19 @@ class RemappedMappingProxy:
     self._mapped_keys = {}
     self._mapped_subkeys = {}
 
+  def _self_check(self):
+    X("SELF CHECK")
+    assert len(self._mapped_keys) == len(self._mapped_subkeys)
+    assert set(self._mapped_keys.values()) == set(self._mapped_subkeys.keys())
+    assert set(self._mapped_keys.keys()) == set(self._mapped_subkeys.values())
+    for subk, k in self._mapped_subkeys.items():
+      with Pfx("subkey %r vs key %r", subk, k):
+        assert self._mapped_keys[k] == subk, (
+            "subkey %r => %r: self._mapped_keys[key]:%r != subkey:%r" %
+            (subk, k, self._mapped_keys[k], subk)
+        )
+    return True
+
   @pfx_method
   def subkey(self, key):
     ''' Return the internal key for `key`.
