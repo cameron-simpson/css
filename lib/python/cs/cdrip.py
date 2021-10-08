@@ -329,7 +329,8 @@ class _MBTagSet(SQLTagSet):
   ''' An `SQLTagSet` subclass for MB entities.
   '''
 
-  MB_QUERY_TIME_TAG_NAME = 'musicbrainzng.query_time'
+  MB_QUERY_PREFIX = 'musicbrainzng.api.query.'
+  MB_QUERY_TIME_TAG_NAME = MB_QUERY_PREFIX + 'time'
 
   def __repr__(self):
     return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
@@ -401,7 +402,9 @@ class _MBTagSet(SQLTagSet):
     A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
     self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
     # record the full response data for forensics
-    self[f'musicbrainzngs.{get_type}_by_{id_name}__{"_".join(includes)}'] = A
+    self[self.MB_QUERY_PREFIX + 'get_type'] = get_type
+    self[self.MB_QUERY_PREFIX + 'includes'] = includes
+    self[self.MB_QUERY_PREFIX + 'result'] = A
     # modify A for discs
     if onttype == 'disc':
       # drill down to the release and medium containing the disc id
