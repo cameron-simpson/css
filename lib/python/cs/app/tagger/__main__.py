@@ -22,6 +22,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
@@ -211,6 +212,20 @@ class TaggerCommand(BaseCommand):
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
 
+  def cmd_ont(self, argv):
+    ''' Usage: {cmd} type_name
+    '''
+    tagger = self.options.tagger
+    if not argv:
+      raise GetoptError("missing type_name")
+    type_name = argv.pop(0)
+    with Pfx("type %r", type_name):
+      if argv:
+        raise GetoptError("extra arguments: %r" % (argv,))
+    print(type_name)
+    for type_value in tagger.ont_values(type_name):
+      print(" ", r(type_value), tagger.ont[f"{type_name}.{type_value}"])
+
   def cmd_suggest(self, argv):
     ''' Usage: {cmd} pathnames...
           Suggest tags for each pathname.
@@ -229,13 +244,13 @@ class TaggerCommand(BaseCommand):
           Run a test against path.
           Current we try out the suggestions.
     '''
+    tagger = self.options.tagger
+    fstags = self.options.fstags
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    tagger = self.options.tagger
-    fstags = self.options.fstags
     tagged = fstags[path]
     changed = True
     while True:
