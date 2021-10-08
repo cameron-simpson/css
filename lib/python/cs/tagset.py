@@ -2663,6 +2663,12 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     subtagsets = self._subtagsets_for_key(name)
     return subtagsets.get(subtagsets.subkey(name), default)
 
+  def __getitem__(self, name):
+    ''' Fetch `tags` for the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets[name]
+
   def __setitem__(self, name, tags):
     ''' Apply `tags` to the entity named `name`.
     '''
