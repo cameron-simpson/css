@@ -1308,7 +1308,8 @@ class RemappedMappingProxy:
             "no self._mapped_keys[key=%r], but we do have self._mapped_subkeys[subk=%r] => %r",
             key, subk, self._mapped_subkeys[subk]
         )
-        assert self._mapped_subkeys[subk] == key
+        assert self._mapped_subkeys[subk] == key, \
+            "self._mapped_subkeys[subk=%r]:%r != key:%r" % (subk,self._mapped_subkeys[subk],key)
       self._mapped_keys[key] = subk
       self._mapped_subkeys[subk] = key
     return subk
