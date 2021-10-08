@@ -48,7 +48,7 @@
         >>> tags.add(subtopic)
         >>> # Tags have nice repr() and str()
         >>> subtopic
-        Tag(name='subtopic',value='ontologies',ontology=None)
+        Tag(name='subtopic',value='ontologies')
         >>> print(subtopic)
         subtopic=ontologies
         >>> # a TagSet also has a nice repr() and str()
@@ -1035,10 +1035,10 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           >>> ont = TagsOntology({'colour.blue': TagSet(wavelengths='450nm-495nm')})
           >>> tag0 = Tag('colour', 'blue')
           >>> tag0
-          Tag(name='colour',value='blue',ontology=None)
+          Tag(name='colour',value='blue')
           >>> tag = Tag(tag0)
           >>> tag
-          Tag(name='colour',value='blue',ontology=None)
+          Tag(name='colour',value='blue')
           >>> tag is tag0
           True
           >>> tag = Tag(tag0, ontology=ont)
@@ -1048,7 +1048,7 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           False
           >>> tag = Tag(tag0, prefix='surface')
           >>> tag
-          Tag(name='surface.colour',value='blue',ontology=None)
+          Tag(name='surface.colour',value='blue')
           >>> tag is tag0
           False
   '''
@@ -3412,6 +3412,8 @@ class TagsCommandMixin:
         used in searching for tagged entities.
   '''
 
+  TagAddRemove = namedtuple('TagAddRemove', 'remove tag')
+
   @classmethod
   def parse_tag_addremove(cls, arg, offset=0):
     ''' Parse `arg` as an add/remove tag specification
@@ -3420,12 +3422,18 @@ class TagsCommandMixin:
 
         Examples:
 
-            >>> parse_tag_addremove('a')
-            >>> parse_tag_addremove('-a')
-            >>> parse_tag_addremove('a=1')
-            >>> parse_tag_addremove('-a=1')
-            >>> parse_tag_addremove('-a="foo bah"')
-            >>> parse_tag_addremove('-a=foo bah')
+            >>> TagsCommandMixin.parse_tag_addremove('a')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('-a')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('a=1')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=1')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a="foo bah"')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=foo bah')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
     '''
     if arg.startswith('-', offset):
       remove = True
@@ -3433,7 +3441,7 @@ class TagsCommandMixin:
     else:
       remove = False
     tag = Tag.from_arg(arg, offset=offset)
-    return remove, tag
+    return cls.TagAddRemove(remove, tag)
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):
