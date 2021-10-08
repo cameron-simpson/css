@@ -1314,25 +1314,27 @@ class RemappedMappingProxy:
     return subk
 
   @pfx_method
-  def key(self, subkey):
-    ''' Return the external key for `subkey`.
+  def key(self, subk):
+    ''' Return the external key for `subk`.
     '''
     try:
-      k = self._mapped_subkeys[subkey]
+      k = self._mapped_subkeys[subk]
     except KeyError:
-      k = self._from_subkey(subkey)
+      k = self._from_subkey(subk)
       assert k not in self._mapped_keys
-      self._mapped_keys[k] = subkey
-      self._mapped_subkeys[subkey] = k
+      self._mapped_keys[k] = subk
+      self._mapped_subkeys[subk] = k
     return k
 
   def keys(self, select_key=None):
     ''' Yield the external keys.
     '''
-    key_iter = self.mapping.keys()
+    subkey_iter = self.mapping.keys()
     if select_key is not None:
-      key_iter = filter(lambda subkey: select_key(self.key(subkey)), key_iter)
-    return map(self.key, key_iter)
+      subkey_iter = filter(
+          lambda subkey: select_key(self.key(subkey)), subkey_iter
+      )
+    return map(self.key, subkey_iter)
 
   def __contains__(self, key):
     return self.subkey(key) in self.mapping
