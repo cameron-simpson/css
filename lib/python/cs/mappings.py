@@ -1364,12 +1364,12 @@ class PrefixedMappingProxy(RemappedMappingProxy):
 
   def __init__(self, mapping, prefix):
     # precompute function references
-    unprefixify = self.unprefixy_key
-    prefixify = self.prefixy_subkey
+    unprefixify = self.unprefixify_key
+    prefixify = self.prefixify_subkey
     super().__init__(
         mapping,
-        to_subkey=lambda key: unprefixy(key, prefix),
-        from_subkey=lambda subk: prefixy(subk, prefix),
+        to_subkey=lambda key: unprefixify(key, prefix),
+        from_subkey=lambda subk: prefixify(subk, prefix),
     )
     self.prefix = prefix
 
