@@ -48,7 +48,7 @@
         >>> tags.add(subtopic)
         >>> # Tags have nice repr() and str()
         >>> subtopic
-        Tag(name='subtopic',value='ontologies',ontology=None)
+        Tag(name='subtopic',value='ontologies')
         >>> print(subtopic)
         subtopic=ontologies
         >>> # a TagSet also has a nice repr() and str()
@@ -209,7 +209,7 @@ from icontract import require
 from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
-from cs.deco import decorator
+from cs.deco import decorator, fmtdoc
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
 from cs.lex import (
@@ -255,6 +255,10 @@ DISTINFO = {
     ],
 }
 
+# default Tag name holds a metadata entry's "value"
+DEFAULT_VALUE_TAG_NAME = 'value'
+
+# default editor command
 EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
 
 @decorator
@@ -348,6 +352,27 @@ def as_unixtime(tag_value):
       "requires an int, float, date or datetime, got %s:%r" %
       (type(tag_value), tag_value)
   )
+
+class _FormatStringTagProxy:
+  ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
+
+      This is for use during `TagSet` string formatting
+      because the "no format spec" falls through to `__str__`.
+  '''
+
+  def __init__(self, proxied):
+    self.__proxied = proxied
+
+  def __str__(self):
+    return str(self.__proxied.value)
+
+  def __repr__(self):
+    return "%s(%s:%s)" % (
+        type(self).__name__, type(self.__proxied).__name__, self.__proxied
+    )
+
+  def __getattr__(self, attr):
+    return getattr(self.__proxied, attr)
 
 @has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
@@ -449,7 +474,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return get_dotted_identifier(field_name)
 
   def get_value(self, arg_name, a, kw):
+    ''' Look up `arg_name`, return a value.
+
+        The value is obtained as follows:
+        * `kw[arg_name]`: the `Tag` named `arg_name` if present
+        * `kw.get_format_attribute(arg_name)`:
+          a formattedable attribute named `arg_name`
+        otherwise raise `KeyError` if `self.format_mode.strict`
+        otherwise the placeholder string `'{'+arg_name+'}'`.
+    '''
     assert isinstance(kw, TagSet)
+    assert kw is self
     assert not a
     try:
       value = kw[arg_name]
@@ -465,6 +500,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         value = f'{{{arg_name}}}'
       else:
         value = attribute() if callable(attribute) else attribute
+    else:
+      value = _FormatStringTagProxy(self.tag(arg_name))
     return value, arg_name
 
   ################################################################
@@ -648,6 +685,13 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def tag(self, tag_name, prefix=None, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
+
+        Parameters:
+        * `tag_name`: the name of the `Tag` to create
+        * `prefix`: optional prefix;
+          if supplied, prepend `prefix+'.'` to the `Tag` name
+        * `ontology`: optional ontology for the `Tag`,
+          default `self.ontology`
     '''
     try:
       value = self[tag_name]
@@ -1031,22 +1075,16 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           >>> ont = TagsOntology({'colour.blue': TagSet(wavelengths='450nm-495nm')})
           >>> tag0 = Tag('colour', 'blue')
           >>> tag0
-          Tag(name='colour',value='blue',ontology=None)
+          Tag(name='colour',value='blue')
           >>> tag = Tag(tag0)
           >>> tag
-          Tag(name='colour',value='blue',ontology=None)
-          >>> tag is tag0
-          True
+          Tag(name='colour',value='blue')
           >>> tag = Tag(tag0, ontology=ont)
           >>> tag # doctest: +ELLIPSIS
           Tag(name='colour',value='blue',ontology=...)
-          >>> tag is tag0
-          False
           >>> tag = Tag(tag0, prefix='surface')
           >>> tag
-          Tag(name='surface.colour',value='blue',ontology=None)
-          >>> tag is tag0
-          False
+          Tag(name='surface.colour',value='blue')
   '''
 
   # A JSON encoder used for tag values which lack a special encoding.
@@ -1063,10 +1101,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
+  @tag_or_tag_value
   @typechecked
   def __new__(
       cls,
-      name,
+      name: str,
       value=None,
       *,
       ontology: Optional["TagsOntology"] = None,
@@ -1402,6 +1441,15 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       return None
     return ont.typedef(self.name)
 
+  def alt_values(self, value_tag_name=None):
+    ''' Return a list of alternative values for this `Tag`
+        on the premise that each has a metadata entry.
+    '''
+    ont = self.ontology
+    if not ont:
+      return []
+    return list(ont.type_values(self.name, value_tag_name=value_tag_name))
+
   @property
   @pfx_method(use_str=True)
   def key_typedef(self):
@@ -1615,7 +1663,8 @@ class TagSetCriterion(ABC):
         try:
           params, offset = parse_method(s, offset, delim)
         except ValueError:
-          pass
+          # does not parse, try the next one
+          continue
         else:
           criterion = crit_cls(s[offset0:offset], choice, **params)
           break
@@ -2272,11 +2321,13 @@ class _TagsOntology_SubTagSets(RemappedMappingProxy, MultiOpenMixin):
       assert unmatch is None
       if match.endswith(('.', '-', '_')):
         # prefixed based match and translation
+        prefixify = PrefixedMappingProxy.prefixify_subkey
+        unprefixify = PrefixedMappingProxy.unprefixify_key
         accepts_key = lambda key: key.startswith(match)
-        to_subkey = lambda key: cutprefix(key, match)
-        from_subkey = lambda subkey: match + subkey
+        to_subkey = lambda key: unprefixify(key, match)
+        from_subkey = lambda subk: prefixify(subk, match)
       else:
-        # prefixed based match, use keys unchanged
+        # prefixed based match, but use keys unchanged
         match_ = match + '.'
         accepts_key = lambda key: key.startswith(match_)
         to_subkey = lambda key: key
@@ -2645,20 +2696,26 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Fetch the entity named `name` or `default`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    return subtagsets.get(subtagsets.subkey(name), default)
+    return subtagsets.get(name, default)
+
+  def __getitem__(self, name):
+    ''' Fetch `tags` for the entity named `name`.
+    '''
+    subtagsets = self._subtagsets_for_key(name)
+    return subtagsets[name]
 
   def __setitem__(self, name, tags):
     ''' Apply `tags` to the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    subtags = subtagsets[subtagsets.subkey(name)]
+    subtags = subtagsets[name]
     subtags.update(tags)
 
   def __delitem__(self, name):
     ''' Delete the entity named `name`.
     '''
     subtagsets = self._subtagsets_for_key(name)
-    del subtagsets[subtagsets.subkey(name)]
+    del subtagsets[name]
 
   def subtype_name(self, type_name):
     ''' Return the type name for use within `self.tagsets` from `type_name`.
@@ -2736,8 +2793,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
     ''' Return the `TagSet` defining the type named `type_name`.
     '''
     subtagsets = self._subtagsets_for_type(type_name)
-    subtype_name = subtagsets.subkey(type_name)
-    return subtagsets.typedef(subtype_name)
+    return subtagsets.typedef(type_name)
 
   def type_names(self):
     ''' Return defined type names i.e. all entries starting `type.`.
@@ -2774,6 +2830,43 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         key = subtagsets.key(subkey)
         assert key.startswith(type_name_)
         yield key
+
+  @fmtdoc
+  def type_values(self, type_name, value_tag_name=None):
+    ''' Yield the various defined values for `type_name`.
+        This is useful for types with enumerated metadata entries.
+
+        For example, if metadata entries exist as `foo.bah` and `foo.baz`
+        for the `type_name` `'foo'`
+        then this yields `'bah'` and `'baz'`.`
+
+        Note that this looks for a `Tag` for the value,
+        falling back to the entry suffix if the tag is not present.
+        That tag is normally named `{DEFAULT_VALUE_TAG_NAME}`
+        (from DEFAULT_VALUE_TAG_NAME)
+        but may be overridden by the `value_tag_name` parameter.
+        Also note that normally it is desireable that the value
+        convert to the suffix via the `value_to_tag_name` method
+        so that the metadata entry can be located from the value.
+    '''
+    if value_tag_name is None:
+      value_tag_name = DEFAULT_VALUE_TAG_NAME
+    type_name_ = type_name + '.'
+    for name, tags in self.by_type(type_name, with_tagsets=True):
+      assert name.startswith(type_name_)
+      try:
+        value = tags[value_tag_name]
+      except KeyError:
+        value = cutprefix(name, type_name_)
+      else:
+        # sanity check the value
+        if __debug__ and type_name_ + self.value_to_tag_name(value) != name:
+          warning(
+              "type_values(%r,value_tag_name=%r): name=%r:"
+              " value=%s does not convert to name", type_name, value_tag_name,
+              name, cropped_repr(value)
+          )
+      yield value
 
   ################################################################
   # Metadata.
@@ -3354,6 +3447,8 @@ class TagsCommandMixin:
         used in searching for tagged entities.
   '''
 
+  TagAddRemove = namedtuple('TagAddRemove', 'remove tag')
+
   @classmethod
   def parse_tag_addremove(cls, arg, offset=0):
     ''' Parse `arg` as an add/remove tag specification
@@ -3362,12 +3457,18 @@ class TagsCommandMixin:
 
         Examples:
 
-            >>> parse_tag_addremove('a')
-            >>> parse_tag_addremove('-a')
-            >>> parse_tag_addremove('a=1')
-            >>> parse_tag_addremove('-a=1')
-            >>> parse_tag_addremove('-a="foo bah"')
-            >>> parse_tag_addremove('-a=foo bah')
+            >>> TagsCommandMixin.parse_tag_addremove('a')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('-a')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=None))
+            >>> TagsCommandMixin.parse_tag_addremove('a=1')
+            TagAddRemove(remove=False, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=1')
+            TagAddRemove(remove=True, tag=Tag(name='a',value=1))
+            >>> TagsCommandMixin.parse_tag_addremove('-a="foo bah"')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
+            >>> TagsCommandMixin.parse_tag_addremove('-a=foo bah')
+            TagAddRemove(remove=True, tag=Tag(name='a',value='foo bah'))
     '''
     if arg.startswith('-', offset):
       remove = True
@@ -3375,7 +3476,7 @@ class TagsCommandMixin:
     else:
       remove = False
     tag = Tag.from_arg(arg, offset=offset)
-    return remove, tag
+    return cls.TagAddRemove(remove, tag)
 
   @classmethod
   def parse_tagset_criterion(cls, arg, tag_based_test_class=None):

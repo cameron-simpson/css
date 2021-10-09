@@ -25,7 +25,7 @@ from uuid import UUID, uuid4
 from cs.deco import strable
 from cs.lex import isUC_, parseUC_sAttr, cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
@@ -1282,6 +1282,20 @@ class RemappedMappingProxy:
     self._mapped_keys = {}
     self._mapped_subkeys = {}
 
+  def _self_check(self):
+    X("SELF CHECK")
+    assert len(self._mapped_keys) == len(self._mapped_subkeys)
+    assert set(self._mapped_keys.values()) == set(self._mapped_subkeys.keys())
+    assert set(self._mapped_keys.keys()) == set(self._mapped_subkeys.values())
+    for subk, k in self._mapped_subkeys.items():
+      with Pfx("subkey %r vs key %r", subk, k):
+        assert self._mapped_keys[k] == subk, (
+            "subkey %r => %r: self._mapped_keys[key]:%r != subkey:%r" %
+            (subk, k, self._mapped_keys[k], subk)
+        )
+    return True
+
+  @pfx_method
   def subkey(self, key):
     ''' Return the internal key for `key`.
     '''
@@ -1289,30 +1303,39 @@ class RemappedMappingProxy:
       subk = self._mapped_keys[key]
     except KeyError:
       subk = self._to_subkey(key)
-      assert subk not in self._mapped_subkeys
+      if subk in self._mapped_subkeys:
+        warning(
+            "no self._mapped_keys[key=%r], but we do have self._mapped_subkeys[subk=%r] => %r",
+            key, subk, self._mapped_subkeys[subk]
+        )
+        assert self._mapped_subkeys[subk] == key, \
+            "self._mapped_subkeys[subk=%r]:%r != key:%r" % (subk,self._mapped_subkeys[subk],key)
       self._mapped_keys[key] = subk
       self._mapped_subkeys[subk] = key
     return subk
 
-  def key(self, subkey):
-    ''' Return the external key for `subkey`.
+  @pfx_method
+  def key(self, subk):
+    ''' Return the external key for `subk`.
     '''
     try:
-      k = self._mapped_subkeys[subkey]
+      k = self._mapped_subkeys[subk]
     except KeyError:
-      k = self._from_subkey(subkey)
+      k = self._from_subkey(subk)
       assert k not in self._mapped_keys
-      self._mapped_keys[k] = subkey
-      self._mapped_subkeys[subkey] = k
+      self._mapped_keys[k] = subk
+      self._mapped_subkeys[subk] = k
     return k
 
   def keys(self, select_key=None):
     ''' Yield the external keys.
     '''
-    key_iter = self.mapping.keys()
+    subkey_iter = self.mapping.keys()
     if select_key is not None:
-      key_iter = filter(lambda subkey: select_key(self.key(subkey)), key_iter)
-    return map(self.key, key_iter)
+      subkey_iter = filter(
+          lambda subkey: select_key(self.key(subkey)), subkey_iter
+      )
+    return map(self.key, subkey_iter)
 
   def __contains__(self, key):
     return self.subkey(key) in self.mapping
@@ -1340,19 +1363,29 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   '''
 
   def __init__(self, mapping, prefix):
+    # precompute function references
+    unprefixify = self.unprefixy_key
+    prefixify = self.prefixy_subkey
     super().__init__(
         mapping,
-        to_subkey=self.__to_subkey,
-        from_subkey=self.__from_subkey,
+        to_subkey=lambda key: unprefixy(key, prefix),
+        from_subkey=lambda subk: prefixy(subk, prefix),
     )
     self.prefix = prefix
 
-  def __to_subkey(self, key):
-    return self.prefix + key
+  @staticmethod
+  def prefixify_subkey(subk, prefix):
+    ''' Return the external (prefixed) key from a subkey `subk`.
+    '''
+    assert not subk.startswith(prefix)
+    return prefix + subk
 
-  def __from_subkey(self, key):
-    assert key.startswith(self.prefix)
-    return cutprefix(key, self.prefix)
+  @staticmethod
+  def unprefixify_key(key, prefix):
+    ''' Return the internal subkey (unprefixed) from the external `key`.
+    '''
+    assert key.startswith(prefix)
+    return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
   def keys(self):
