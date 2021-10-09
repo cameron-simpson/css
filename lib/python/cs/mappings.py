@@ -1384,7 +1384,8 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def unprefixify_key(key, prefix):
     ''' Return the internal subkey (unprefixed) from the external `key`.
     '''
-    assert key.startswith(prefix)
+    assert key.startswith(prefix), \
+        "key:%r does not start with prefix:%r" % (key, prefix)
     return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
