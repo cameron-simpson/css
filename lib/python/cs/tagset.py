@@ -1101,10 +1101,11 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
       (datetime, datetime_fromisoformat, datetime.isoformat),
   ]
 
+  @tag_or_tag_value
   @typechecked
   def __new__(
       cls,
-      name,
+      name: str,
       value=None,
       *,
       ontology: Optional["TagsOntology"] = None,
