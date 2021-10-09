@@ -361,6 +361,7 @@ class _FormatStringTagProxy:
   '''
 
   def __init__(self, proxied):
+    assert isinstance(proxied,Tag), "proxied is not a Tag: %s" % (r(proxied),)
     self.__proxied = proxied
 
   def __str__(self):
