@@ -340,6 +340,8 @@ class Pfx(object):
         value = getattr(e, attr)
       except AttributeError:
         continue
+      if value is None:
+        continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
         try:
