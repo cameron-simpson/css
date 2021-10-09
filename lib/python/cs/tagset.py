@@ -685,6 +685,13 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def tag(self, tag_name, prefix=None, ontology=None):
     ''' Return a `Tag` for `tag_name`, or `None` if missing.
+
+        Parameters:
+        * `tag_name`: the name of the `Tag` to create
+        * `prefix`: optional prefix;
+          if supplied, prepend `prefix+'.'` to the `Tag` name
+        * `ontology`: optional ontology for the `Tag`,
+          default `self.ontology`
     '''
     try:
       value = self[tag_name]
