@@ -353,6 +353,27 @@ def as_unixtime(tag_value):
       (type(tag_value), tag_value)
   )
 
+class _FormatStringTagProxy:
+  ''' A proxy for a `Tag` where `__str__` returns `str(self.value)`.
+
+      This is for use during `TagSet` string formatting
+      because the "no format spec" falls through to `__str__`.
+  '''
+
+  def __init__(self, proxied):
+    self.__proxied = proxied
+
+  def __str__(self):
+    return str(self.__proxied.value)
+
+  def __repr__(self):
+    return "%s(%s:%s)" % (
+        type(self).__name__, type(self.__proxied).__name__, self.__proxied
+    )
+
+  def __getattr__(self, attr):
+    return getattr(self.__proxied, attr)
+
 @has_format_attributes
 class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   ''' A setlike class associating a set of tag names with values.
@@ -453,7 +474,17 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return get_dotted_identifier(field_name)
 
   def get_value(self, arg_name, a, kw):
+    ''' Look up `arg_name`, return a value.
+
+        The value is obtained as follows:
+        * `kw[arg_name]`: the `Tag` named `arg_name` if present
+        * `kw.get_format_attribute(arg_name)`:
+          a formattedable attribute named `arg_name`
+        otherwise raise `KeyError` if `self.format_mode.strict`
+        otherwise the placeholder string `'{'+arg_name+'}'`.
+    '''
     assert isinstance(kw, TagSet)
+    assert kw is self
     assert not a
     try:
       value = kw[arg_name]
@@ -469,6 +500,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         value = f'{{{arg_name}}}'
       else:
         value = attribute() if callable(attribute) else attribute
+    else:
+      value = _FormatStringTagProxy(self.tag(arg_name))
     return value, arg_name
 
   ################################################################
