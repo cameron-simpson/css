@@ -36,7 +36,7 @@ from typeguard import typechecked
 
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
@@ -1486,7 +1486,7 @@ class FormatableFormatter(Formatter):
               if isinstance(value, str):
                 value = FStr(value)
               else:
-                value = format(value, format_subspec)
+                value = pfx_call(format, value, format_subspec)
             value, offset = value.convert_via_method_or_attr(
                 value, format_subspec
             )
