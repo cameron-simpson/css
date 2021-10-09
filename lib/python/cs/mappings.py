@@ -23,7 +23,7 @@ import re
 from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
@@ -1372,6 +1372,11 @@ class PrefixedMappingProxy(RemappedMappingProxy):
         from_subkey=lambda subk: prefixify(subk, prefix),
     )
     self.prefix = prefix
+
+  def __str__(self):
+    return "%s[%r](prefix=%r,mapping=%s)" % (
+        type(self).__name__, type(self).__mro__, self.prefix, r(self.mapping)
+    )
 
   @staticmethod
   def prefixify_subkey(subk, prefix):
