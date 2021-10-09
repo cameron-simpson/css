@@ -324,6 +324,7 @@ def rip(
     else:
       fstags[mp3_filename].update(track_fstags)
   if not no_action:
+    subprocess.run(['ls', '-la', subdir])
     os.system("eject")
 
 # pylint: disable=too-many-ancestors
