@@ -1079,18 +1079,12 @@ class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
           >>> tag = Tag(tag0)
           >>> tag
           Tag(name='colour',value='blue')
-          >>> tag is tag0
-          True
           >>> tag = Tag(tag0, ontology=ont)
           >>> tag # doctest: +ELLIPSIS
           Tag(name='colour',value='blue',ontology=...)
-          >>> tag is tag0
-          False
           >>> tag = Tag(tag0, prefix='surface')
           >>> tag
           Tag(name='surface.colour',value='blue')
-          >>> tag is tag0
-          False
   '''
 
   # A JSON encoder used for tag values which lack a special encoding.
