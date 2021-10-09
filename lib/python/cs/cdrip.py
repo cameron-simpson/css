@@ -266,7 +266,9 @@ def rip(
         track=tracknum
     )
     track_artists = ", ".join(recording.artist_names)
-    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}"
+    track_base = f"{tracknum:02} - {recording.title} -- {track_artists}".replace(
+        os.sep, '-'
+    )
     wav_filename = joinpath(subdir, track_base + '.wav')
     mp3_filename = joinpath(subdir, track_base + '.mp3')
     if existspath(mp3_filename):
@@ -316,12 +318,13 @@ def rip(
       else:
         with Pfx("+ %r", argv, print=True):
           subprocess.run(argv, stdin=subprocess.DEVNULL, check=True)
+      fstags[mp3_filename].conversion_command = argv
     if no_action:
       print("fstags[%r].update(%s)" % (mp3_filename, track_fstags))
     else:
       fstags[mp3_filename].update(track_fstags)
-      fstags[mp3_filename].conversion_command = argv
   if not no_action:
+    subprocess.run(['ls', '-la', subdir])
     os.system("eject")
 
 # pylint: disable=too-many-ancestors
