@@ -1368,8 +1368,8 @@ class PrefixedMappingProxy(RemappedMappingProxy):
     prefixify = self.prefixify_subkey
     super().__init__(
         mapping,
-        to_subkey=lambda key: unprefixify(key, prefix),
-        from_subkey=lambda subk: prefixify(subk, prefix),
+        to_subkey=lambda key: prefixify(key, prefix),
+        from_subkey=lambda subk: unprefixify(subk, prefix),
     )
     self.prefix = prefix
 
