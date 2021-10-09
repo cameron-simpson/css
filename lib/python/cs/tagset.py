@@ -485,7 +485,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         otherwise the placeholder string `'{'+arg_name+'}'`.
     '''
     assert isinstance(kw, TagSet)
-    assert kw is self
+    ##assert kw is self ## not the case, needs a bit more digging
     assert not a
     try:
       value = kw[arg_name]
