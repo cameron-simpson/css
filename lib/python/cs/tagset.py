@@ -502,7 +502,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       else:
         value = attribute() if callable(attribute) else attribute
     else:
-      value = _FormatStringTagProxy(self.tag(arg_name))
+      value = _FormatStringTagProxy(Tag(arg_name,value,ontology=kw.ontology))
     return value, arg_name
 
   ################################################################
