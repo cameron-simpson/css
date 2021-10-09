@@ -25,6 +25,7 @@ from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
+from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.queues import ListQueue
 from cs.seq import unrepeated
@@ -40,7 +41,7 @@ class Tagger:
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
-  def __init__(self, fstags=None):
+  def __init__(self, fstags=None, ont=None):
     ''' Initialise the `Tagger`.
 
         Parameters:
@@ -48,7 +49,13 @@ class Tagger:
     '''
     if fstags is None:
       fstags = FSTags()
+    if ont is None:
+      ont = os.environ.get(ONTTAGS_PATH_ENVVAR
+                           ) or expanduser(ONTTAGS_PATH_DEFAULT)
+    if isinstance(ont, str):
+      ont = Ont(ont)
     self.fstags = fstags
+    self.ont = ont
     self._file_by_mappings = {}
     # mapping of (dirpath,tag_name)=>tag_value=>set(subdirpaths)
     # used by per_tag_auto_file_map
@@ -102,6 +109,12 @@ class Tagger:
             continue
     return basename(srcpath)
 
+  def ont_values(self, tag_name):
+    ''' Return a list of alternative values for `tag_name`
+        derived from the ontology `self.ont`.
+    '''
+    return list(self.ont.type_values(tag_name))
+
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   @pfx
   @fmtdoc
@@ -143,7 +156,8 @@ class Tagger:
     # a queue of reference directories
     q = ListQueue((dirname(srcpath),))
     linked_to = []
-    for refdirpath in unrepeated(q, signature=abspath):
+    seen = set()
+    for refdirpath in unrepeated(q, signature=abspath, seen=seen):
       with Pfx(refdirpath):
         # places to redirect this file
         mapping = self.file_by_mapping(refdirpath)
@@ -153,7 +167,6 @@ class Tagger:
         for tag_name in sorted(interesting_tag_names):
           with Pfx("tag_name %r", tag_name):
             if tag_name not in tags:
-              print("  tag %r not present, skipping" % (tag_name,))
               continue
             bare_tag = Tag(tag_name, tags[tag_name])
             try:
@@ -165,11 +178,13 @@ class Tagger:
               continue
             # collect other filing locations
             refile_to.update(target_dirs)
+        # queue further locations if they are new
         if refile_to:
-          # redistribute from here
-          q.extend(refile_to)
-          continue
-        # file locally
+          new_refile_to = set(map(abspath, refile_to)) - seen
+          if new_refile_to:
+            q.extend(new_refile_to)
+            continue
+        # file locally (no new locations)
         dstbase = self.auto_name(srcpath, refdirpath, tags)
         with Pfx("%s => %s", refdirpath, dstbase):
           dstpath = dstbase if isabspath(dstbase
@@ -313,6 +328,9 @@ class Tagger:
 
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
+    assert isdirpath(srcdirpath)
+    assert not srcdirpath.startswith('~')
+    assert '~' not in srcdirpath
     fstags = self.fstags
     tagged = fstags[srcdirpath]
     key = tagged.filepath
@@ -320,7 +338,7 @@ class Tagger:
       mapping = self._file_by_mappings[key]
     except KeyError:
       mapping = defaultdict(set)
-      file_by = self.conf_tag(fstags[srcdirpath], 'file_by', {})
+      file_by = self.conf_tag(fstags[srcdirpath].all_tags, 'file_by', {})
       # group the tags by file_by target path
       grouped = defaultdict(set)
       for tag_name, file_to in file_by.items():
@@ -333,7 +351,7 @@ class Tagger:
               assert isabspath(file_to_path)
             else:
               file_to_path = joinpath(srcdirpath, file_to_path)
-          file_to_path = abspath(file_to_path)
+          file_to_path = realpath(file_to_path)
           grouped[file_to_path].add(tag_name)
       # walk each path for its tag_names of interest
       for file_to_path, tag_names in sorted(grouped.items()):
@@ -351,15 +369,17 @@ class Tagger:
         obtained from the autofiling configurations.
     '''
     tagged = self.fstags[path]
+    srcdirpath = dirname(tagged.filepath)
     suggestions = defaultdict(set)
-    q = ListQueue([dirname(tagged.filepath)])
-    for dirpath in unrepeated(q, signature=abspath):
-      mapping = self.file_by_mapping(dirpath)
-      for bare_tag, dstpaths in mapping.items():
+    for bare_tag, _ in self.file_by_mapping(srcdirpath).items():
+      if bare_tag not in tagged:
         suggestions[bare_tag.name].add(bare_tag.value)
-        # following the filing chain if tagged has this particular tag
-        if bare_tag in tagged:
-          q.extend(dstpaths)
+    for refpath in self.file_by_tags(path, no_link=True) or [path]:
+      dirpath = dirname(refpath)
+      mapping = self.file_by_mapping(dirpath)
+      for bare_tag, _ in mapping.items():
+        if bare_tag not in tagged:
+          suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
 
   def inference_rules(self, prefix, rule_spec):

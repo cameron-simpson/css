@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+''' cs.app.tagger main module.
+'''
+
 from collections import defaultdict
 from contextlib import contextmanager
 from getopt import GetoptError, getopt
@@ -19,10 +22,11 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.lex import r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
-from cs.upd import print
+from cs.upd import print  # pylint: disable=redefined-builtin
 from . import Tagger
 
 def main(argv=None):
@@ -74,6 +78,7 @@ class TaggerCommand(BaseCommand):
         pfxprint('not filed')
     return linked_to
 
+  # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
     ''' Usage: {cmd} pathnames...
           Link pathnames to destinations based on their tags.
@@ -90,7 +95,7 @@ class TaggerCommand(BaseCommand):
     no_link = True
     do_remove = False
     opts, argv = getopt(argv, 'dnrxy')
-    for opt, val in opts:
+    for opt, _ in opts:
       with Pfx(opt):
         if opt == '-d':
           direct = True
@@ -156,7 +161,7 @@ class TaggerCommand(BaseCommand):
     tag_names = 'abn', 'invoice', 'vendor'
     for path in argv:
       print("scan", path)
-      mapping = tagger.per_tag_auto_file_map(path, tag_names, mapping)
+      mapping = tagger.per_tag_auto_file_map(path, tag_names)
       pprint(mapping)
 
   def cmd_fileby(self, argv):
@@ -203,9 +208,25 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
-    from .gui_tk import TaggerGUI
+    from .gui_tk import TaggerGUI  # pylint: disable=import-outside-toplevel
     with TaggerGUI(self.options.tagger, argv) as gui:
       gui.run()
+
+  def cmd_ont(self, argv):
+    ''' Usage: {cmd} type_name
+    '''
+    tagger = self.options.tagger
+    if not argv:
+      raise GetoptError("missing type_name")
+    type_name = argv.pop(0)
+    with Pfx("type %r", type_name):
+      if argv:
+        raise GetoptError("extra arguments: %r" % (argv,))
+    print(type_name)
+    for type_value in tagger.ont_values(type_name):
+      ontkey = f"{type_name}.{type_value}"
+      with Pfx("ontkey = %r", ontkey):
+        print(" ", r(type_value), tagger.ont[ontkey])
 
   def cmd_suggest(self, argv):
     ''' Usage: {cmd} pathnames...
@@ -213,10 +234,11 @@ class TaggerCommand(BaseCommand):
     '''
     if not argv:
       raise GetoptError("missing pathnames")
+    tagger = self.options.tagger
     for path in argv:
+      print()
       print(path)
-      for tag_name, values in sorted(
-          self.options.tagger.suggested_tags(path).items()):
+      for tag_name, values in sorted(tagger.suggested_tags(path).items()):
         print(" ", tag_name, *sorted(values))
 
   def cmd_test(self, argv):
@@ -224,13 +246,13 @@ class TaggerCommand(BaseCommand):
           Run a test against path.
           Current we try out the suggestions.
     '''
+    tagger = self.options.tagger
+    fstags = self.options.fstags
     if not argv:
       raise GetoptError("missing path")
     path = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    tagger = self.options.tagger
-    fstags = self.options.fstags
     tagged = fstags[path]
     changed = True
     while True:

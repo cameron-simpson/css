@@ -11,6 +11,8 @@ from os.path import (
     basename,
     expanduser,
 )
+import platform
+from time import sleep
 import tkinter as tk
 from tkinter import ttk
 from typing import Iterable, List
@@ -24,7 +26,7 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx, pfx_method, pfx_call
+from cs.pfx import pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
 
@@ -33,6 +35,16 @@ from cs.x import X
 
 from .util import pngfor
 
+is_darwin = platform.system() == "Darwin"
+
+_app = None
+
+def _render(pause=0):
+  _app.update_idletasks()
+  if pause > 0:
+    sleep(pause)
+
+# pylint: disable=too-many-instance-attributes
 class TaggerGUI(MultiOpenMixin):
   ''' A GUI for a `Tagger`.
   '''
@@ -91,8 +103,9 @@ class TaggerGUI(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
+    global _app  # pylint: disable=global-statement
     root = tk.Tk()
-    app = Frame(root)
+    _app = app = Frame(root)
     app.grid()
 
     # Define the window's contents
@@ -158,9 +171,9 @@ class TaggerGUI(MultiOpenMixin):
       self.app.mainloop()
       print("after mainloop")
 
-@require(lambda x1: x1 >= 0)
+##@require(lambda x1: x1 >= 0)
 @require(lambda dx1: dx1 > 0)
-@require(lambda x2: x2 >= 0)
+##@require(lambda x2: x2 >= 0)
 @require(lambda dx2: dx2 > 0)
 @ensure(lambda result, dx1: result is None or result[1] <= dx1)
 @ensure(lambda result, dx2: result is None or result[1] <= dx2)
@@ -169,19 +182,28 @@ def overlap1(x1, dx1, x2, dx2):
       return `None` for no overlap
       or `(overlap_x,overlap_dx)` if they overlap.
   '''
-  x1b = x1 + dx1
-  x2b = x2 + dx2
-  if x1 < x2:
-    if x1b <= x2:
-      return None
-    return x2, min(x1b, x2b) - x2
-  if x2b <= x1:
+  if dx1 <= 0 or dx2 <= 0:
+    # zero width spans cannot overlap
     return None
-  return x1, min(x1b, x2b) - x1
+  if x1 <= x2 and x1 + dx1 > x2:
+    # span 1 left of span 2 and overlapping
+    return x2, min(x1 + dx1, x2 + dx2) - x2
+  if x2 <= x1 and x2 + dx2 > x1:
+    # span 2 left of span 1 and overlapping
+    return x1, min(x1 + dx1, x2 + dx2) - x1
+  return None
 
 class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
   ''' A geometry tuple and associated methods.
   '''
+
+  @classmethod
+  def of(cls, w):
+    ''' The geometry of this widget in root coordinates.
+    '''
+    x, y = w.winfo_rootx(), w.winfo_rooty()
+    dx, dy = w.winfo_width(), w.winfo_height()
+    return cls(x, y, dx, dy)
 
   def overlap(self, other):
     ''' Compute an overlap rectangle between two `WidgetGeometry` objects.
@@ -189,6 +211,8 @@ class WidgetGeometry(namedtuple('WidgetGeometry', 'x y dx dy')):
         otherwise a new `WidgetGeometry` indicating the overlap.
     '''
     # compute the horizontal overlap
+    if self.dx <= 0 or self.dy <= 0:
+      return None
     over = overlap1(self.x, self.dx, other.x, other.dx)
     if over is None:
       return None
@@ -244,39 +268,61 @@ class _Widget(ABC):
     '''
     return self.fixed_size[1]
 
-  def root_geometry(self):
-    ''' The geometry of this widget in parent coordinates:
-        `(x,y,dx,dy)`.
-    '''
-    self.update_idletasks()
-    x, y = self.winfo_rootx(), self.winfo_rooty()
-    dx, dy = self.winfo_width(), self.winfo_height()
-    return WidgetGeometry(x, y, dx, dy)
-
   def is_visible(self):
     ''' Is this widget visible:
         - it and all ancestors are mapped
         - its rectangle overlaps its parent
         - its parent is visible
     '''
-    if not self.winfo_viewable():
-      # not mapped
-      return False
-    parent = self.winfo_parent()
-    if not parent:
-      # no parent, assume top level and visible
-      return True
-    g = self.root_geometry()
-    pg = self.parent.root_geometry()
-    overlap = g.overlap(pg)
-    return overlap is not None
+    assert self.winfo_ismapped() is self.winfo_viewable(), (
+        "%s.winfo_ismapped()=%s but %s.winfo_viewable()=%s" %
+        (self, self.winfo_ismapped(), self, self.winfo_viewable())
+    )
+    if not self.winfo_ismapped() or not self.winfo_viewable():
+      return None
+    g = WidgetGeometry.of(self)
+    overlap = None
+    p = self.parent
+    while p:
+      # compare geometry
+      pg = WidgetGeometry.of(p)
+      overlap = g.overlap(pg)
+      if not overlap:
+        return False
+      try:
+        p = p.parent
+      except AttributeError as e:
+        break
+    assert hasattr(p, 'state'), "no .state on %s" % (p,)
+    return p.state() == 'normal'
 
 # local shims for the tk and ttk widgets
+BaseButton = tk.Button
+is_tk_button = True
+if is_darwin:
+  try:
+    from tkmacosx import Button as BaseButton
+    is_tk_button = False
+  except ImportError as e:
+    warning(
+        "import tkmacosx: %s; buttons will look better with tkmacos on Darwin",
+        e
+    )
 
 # pylint: disable=too-many-ancestors
-class Button(_Widget, tk.Button):
+class Button(_Widget, BaseButton):
   ''' Button `_Widget` subclass.
   '''
+
+  def __init__(self, *a, background=None, highlightbackground=None, **kw):
+    if background is None:
+      background = self.WIDGET_BACKGROUND
+      if not is_tk_button:
+        kw.update(background=background)
+    if highlightbackground is None:
+      highlightbackground = background
+    kw.update(highlightbackground=highlightbackground)
+    super().__init__(*a, **kw)
 
 # pylint: disable=too-many-ancestors
 class Canvas(_Widget, tk.Canvas):
@@ -349,6 +395,7 @@ class _ImageWidget(_Widget):
     kw.setdefault('text', shortpath(path) if path else "NONE")
     super().__init__(parent, **kw)
     self.fspath = path
+    self._image_for = None
 
   @property
   def fspath(self):
@@ -359,41 +406,54 @@ class _ImageWidget(_Widget):
   @fspath.setter
   def fspath(self, new_fspath):
     self._fspath = new_fspath
-    self.config(text=new_fspath)
+    self.configure(text=new_fspath or r(new_fspath))
 
-    def idle_set_image():
-      if not self.is_visible():
-        self.after(300, idle_set_image)
+    def ev_set_image(ev):
+      ''' Set the image once visible, fired at idle time.
+
+          It is essential that this is queued with `after_idle`.
+          If this ran directly during widget construction
+          the `wait_visibility` call would block the follow construction.
+      '''
+      if self._image_for == self._fspath:
         return
-      if new_fspath is None:
+      if not self.is_visible():
+        return
+      imgpath = self._fspath
+      if imgpath is None:
         display_fspath = None
       else:
         size = self.fixed_size or (self.width, self.height)
         try:
-          display_fspath = pngfor(expanduser(new_fspath), size)
+          display_fspath = pngfor(expanduser(imgpath), size)
         except (OSError, ValueError) as e:
-          warning("%r: %s", new_fspath, e)
+          warning("%r: %s", imgpath, e)
           display_fspath = None
       if display_fspath is None:
+        self._image_for = None
+        self.image = None
         self.configure(image=None)
-        return
-      img = Image.open(display_fspath)
-      image = ImageTk.PhotoImage(img)
-      self.configure(
-          text=basename(new_fspath),
-          image=image,
-          width=size[0],
-          height=size[1],
-      )
-      self.image = image
+      else:
+        img = Image.open(display_fspath)
+        image = ImageTk.PhotoImage(img)
+        self.configure(
+            text=basename(imgpath),
+            image=image,
+            width=size[0],
+            height=size[1],
+        )
+        self.image = image
+        self._image_for = self._fspath
 
-    self.after_idle(idle_set_image)
+    self.bind('<Configure>', ev_set_image)
+    self.bind('<Map>', ev_set_image)
+    self.bind('<Unmap>', ev_set_image)
 
 class ImageWidget(_ImageWidget, Label):
   ''' An image widget which can show anything Pillow can read.
   '''
 
-class ImageButton(_ImageWidget, Button):
+class ImageButton(_ImageWidget, tk.Button):
   ''' An image button which can show anything Pillow can read.
   '''
 
@@ -457,6 +517,8 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     _FSPathsMixin.__init__(self)
     self.command = command
     self.pathlist = pathlist
+    self.display_paths = None
+    self._list_state = None
     self.bind('<Button-1>', self._clicked)
 
   def _clicked(self, event):
@@ -474,6 +536,7 @@ class PathList_Listbox(Listbox, _FSPathsMixin):
     list_state.set(self.display_paths)
     if self.fixed_width is None:
       self.config(width=max(map(len, self.display_paths)) + 10)
+    return self.display_paths
 
   @property
   def pathlist(self):
@@ -621,14 +684,7 @@ class TagWidget(Frame):
 
   @typechecked
   def __init__(
-      self,
-      parent,
-      tags: TagSet,
-      tag: Tag,
-      *,
-      alt_values=None,
-      foreground=None,
-      **kw
+      self, parent, tags: TagSet, tag: Tag, *, tagger, alt_values=None, **kw
   ):
     ''' Initialise a `TagWidget`.
 
@@ -642,31 +698,27 @@ class TagWidget(Frame):
           in edit mode
         Other keyword arguments are passed to the `Frame` superclass initialiser.
     '''
+    self.tagger = tagger
     if alt_values is None:
-      alt_values = set()
-      if tag.name == 'pil.format':
-        alt_values = ('PNG', 'JPEG')
+      alt_values = set(tagger.ont_values(tag.name))
     else:
       alt_values = set(alt_values)
     super().__init__(parent, **kw)
     self.tags = tags
     self.tag = tag
-    tag_name = tag.name
-    tag_value = tag.value
     self.alt_values = alt_values
     self.label = Button(
         self,
-        text=str(tag),
         command=self.toggle_editmode,
         ##relief=tk.FLAT,
         ##overrelief=tk.FLAT,
-        foreground=foreground,
-        highlightbackground='white',
-        padx=1,
-        pady=1,
+        highlightbackground='black',
+        padx=0,
+        pady=0,
         borderwidth=0,
     )
     self._set_colour()
+    self._set_text()
     self.label.grid(column=0, row=0, sticky=tk.W)
     self.editor = None
 
@@ -675,10 +727,19 @@ class TagWidget(Frame):
         foreground='green' if self.tag.name in self.tags else 'gray',
     )
 
+  def _set_text(self, new_text=None):
+    if not new_text:
+      tag = self.tag
+      if not tag.value and self.alt_values:
+        new_text = f"{tag.name} ? {', '.join(sorted(map(str,self.alt_values)))}"
+      else:
+        new_text = str(tag)
+    self.label.configure(text=new_text)
+
   def toggle_editmode(self):
     ''' Present or withdraw the edit widget.
 
-        The `Tag` if updated when the widget is withdrawn,
+        The `Tag` is updated when the widget is withdrawn,
         and if the new value does not match the value in `self.tags`
         then the correponding `self.tags[tag.name]` is also updated.
     '''
@@ -693,14 +754,15 @@ class TagWidget(Frame):
       )
       self.editor.focus_set()
     else:
+      # withdraw edit widget, update tag and label
       new_value = self.editor.get()
       self.editor.grid_remove()
       self.editor = None
       self.tag = Tag(self.tag.name, new_value, ontology=self.tag.ontology)
       if new_value != self.tags.get(self.tag.name):
         self.tags[self.tag.name] = new_value
-      self.label.configure(text=str(self.tag))
-      self._set_colour()
+        self._set_colour()
+        self._set_text()
 
 class _TagsView(_Widget):
   ''' A view of some `Tag`s.
@@ -708,25 +770,94 @@ class _TagsView(_Widget):
 
   def __init__(self, parent, *, get_tag_widget=None, **kw):
     super().__init__(parent, **kw)
+    # the working TagSet, distinct from those supplied
     self.tags = TagSet()
+    # a function to get Tag suggestions from a Tag name
+    self.get_suggested_tag_values = lambda tag_name: ()
+    # a reference TagSet of background Tags
+    self.bg_tags = TagSet()
     if get_tag_widget is None:
       get_tag_widget = TagWidget
     self.get_tag_widget = get_tag_widget
 
-  def set_tags(self, tags):
-    ''' Set the tags.
+  def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
+    ''' Update `self.tags` to match `tags`.
+        Optionally set `self.get_suggested_tag_values`
+        if `get_suggested_tag_values` is not `None`.
+        Optionally set `self.bg_tags` if `bg_tags` is not `None`.
     '''
     self.tags.clear()
     self.tags.update(tags)
+    if get_suggested_tag_values is not None:
+      self.get_suggested_tag_values = get_suggested_tag_values
+    if bg_tags is not None:
+      self.bg_tags = bg_tags
 
 class TagsView(_TagsView, LabelFrame):
   ''' A view of some `Tag`s.
   '''
 
-  def __init__(self, parent, **kw):
+  def __init__(self, parent, *, tagger, **kw):
     kw.setdefault('text', 'Tags')
     super().__init__(parent, **kw)
+    self.tagger = tagger
     self.set_tags(())
+    # mapping of tag name to widgets
+    self._tag_widgets = {}
+    # list of tag names in grid row order
+    self._tag_names = []
+
+  # TODO: general OrderedFrameMixin?
+  @require(lambda self, widget: widget.parent is self)
+  @require(lambda self: self._tag_names == sorted(self._tag_names))
+  @ensure(lambda self: self._tag_names == sorted(self._tag_names))
+  @typechecked
+  def _add_tag(self, tag_name: str, widget: _Widget):
+    ''' Insert `widget` for the `Tag` named `tag_name`
+        at the appropriate place in the listing.
+    '''
+    w = self._tag_widgets.get(tag_name)
+    if w is not None:
+      # switch out the old widget
+      grid_info = w.grid_info()
+      w.grid_forget()
+      widget.grid(**grid_info)
+    else:
+      # insert the new widget
+      # ... by forgetting them all and appending
+      # because it looks like you can't insert into a grid
+      # or make a gap
+      # find the insertion row
+      for row, gridded_name in enumerate(self._tag_names):
+        if gridded_name > tag_name:
+          break
+      else:
+        # append to the end
+        row = len(self._tag_names)
+      ws = [widget]
+      # move later rows down
+      for name in self._tag_names[row:]:
+        w = self._tag_widgets[name]
+        grid_info = w.grid_info()
+        w.grid_remove()
+        ws.append(w)
+      for grow, w in enumerate(ws, row):
+        w.grid(row=grow)
+      self._tag_names.insert(row, tag_name)
+    self._tag_widgets[tag_name] = widget
+
+  @require(lambda self: self._tag_names == sorted(self._tag_names))
+  @ensure(lambda self: self._tag_names == sorted(self._tag_names))
+  @typechecked
+  def _del_tag(self, tag_name: str):
+    ''' Delete the widget for the `Tag` named `tag_name` if present.
+    '''
+    w = self._tag_widgets.get(tag_name)
+    if w is not None:
+      i = self._tag_names.index(tag_name)
+      del self._tag_names[i]
+      del self._tag_widgets[tag_name]
+      w.grid_remove()
 
   def tag_widget(self, tag, alt_values=None, **kw):
     ''' Create a new `TagWidget` for the `Tag` `tag`.
@@ -735,28 +866,35 @@ class TagsView(_TagsView, LabelFrame):
         self,
         self.tags,
         tag,
+        tagger=self.tagger,
         alt_values=alt_values,
         **kw,
     )
 
   def set_tags(self, tags, get_suggested_tag_values=None, bg_tags=None):
-    super().set_tags(tags)
-    for child in list(self.grid_slaves()):
-      child.grid_remove()
-    tags = TagSet(self.tags)
+    old_tags = list(self.tags)
+    super().set_tags(
+        tags,
+        get_suggested_tag_values=get_suggested_tag_values,
+        bg_tags=bg_tags
+    )
+    display_tags = TagSet(self.tags)
     if bg_tags:
+      # fill in background tags if not present
       for tag_name, tag_value in bg_tags.items():
         if tag_name not in tags:
-          tags[tag_name] = tag_value
-    for tag in sorted(tags):
-      alt_values = (
-          None if get_suggested_tag_values is None else
-          get_suggested_tag_values(tag)
-      )
-      self.tag_widget(
-          tag,
-          alt_values=alt_values,
-      ).grid(sticky=tk.W)
+          display_tags[tag_name] = tag_value
+    # remove tags no longer named
+    for tag in old_tags:
+      if tag.name not in display_tags:
+        self._del_tag(tag.name)
+    # redo the displayed tags
+    # TODO: update the widgets directly instead
+    for tag in display_tags:
+      alt_values = self.get_suggested_tag_values(tag)
+      w = self.tag_widget(tag, alt_values=alt_values)
+      self._add_tag(tag.name, w)
+      w.grid(sticky=tk.W)
 
 class PathView(LabelFrame):
   ''' A preview of a filesystem path.
@@ -780,7 +918,8 @@ class PathView(LabelFrame):
 
     self.tagsview = TagsView(
         self,
-        fixed_size=(200, None),  ## 1080),
+        tagger=tagger,
+        fixed_size=(200, None),
     )
     self.tagsview.grid(column=1, row=0, sticky=tk.N + tk.S)
 
@@ -833,36 +972,6 @@ class PathView(LabelFrame):
     if self._fspath is None:
       return None
     return self.tagger.fstags[self._fspath]
-
-  def _tag_widget(self, tag_name):
-    ''' Return the `TagWidget` representing the `Tag` named `tag_name`.
-    '''
-    try:
-      widget = self._tag_widgets[tag_name]
-    except KeyError:
-      tagged = self.tagger.fstags[self._fspath]
-      direct_tags = tagged
-      all_tags = tagged.merged_tags()
-      try:
-        value = direct_tags[tag_name]
-      except KeyError:
-        try:
-          value = all_tags[tag_name]
-        except KeyError:
-          value = None
-          missing = True
-        else:
-          missing = False
-          is_direct = False
-      else:
-        missing = False
-        is_direct = True
-      suggested_values = self.tagger.suggested_tags(tagged.filepath
-                                                    ).get(tag_name, set())
-      widget = self._tag_widgets[tag_name] = TagWidget(
-          tagged, tag_name, suggested_values
-      )
-    return widget
 
 class ThumbNailScrubber(Frame, _FSPathsMixin):
   ''' A row of thumbnails for a list of fielsystem paths.
