@@ -236,6 +236,35 @@ class CDRipCommand(BaseCommand):
         )
     return 0
 
+def pick(items, as_str=None):
+  ''' Interactively pick a item from a `items`.
+  '''
+  items = list(items)
+  assert len(items) > 1
+  if as_str is None:
+    as_str = repr
+  show_items = True
+  while True:
+    if show_items:
+      for i, item in enumerate(items, 1):
+        print(i, as_str(item))
+        show_items = False
+    answer = input(
+        f"Select item from 1 to {len(items)}) (? to list items again) "
+    ).strip()
+    if answer == '?':
+      show_items = True
+    else:
+      try:
+        i = int(answer)
+      except ValueError:
+        print("Not an integer.")
+      else:
+        if i < 1 or i > len(items):
+          print(f"Out of range, expected a value from 1 to {len(items)}.")
+        else:
+          return items[i - 1]
+
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def rip(
     device,
