@@ -140,6 +140,19 @@ class CDRipCommand(BaseCommand):
                           verbose=True):
             yield
 
+  def cmd_dump(self, argv):
+    ''' Usage: {cmd} entity...
+          Dump each entity.
+    '''
+    sqltags = self.options.mbdb.sqltags
+    for name in argv:
+      with Pfx(name):
+        if name not in sqltags:
+          warning("unknown")
+          continue
+        te = sqltags[name]
+        te.dump(compact=True)
+
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
           Edit the entities specified by criteria.
