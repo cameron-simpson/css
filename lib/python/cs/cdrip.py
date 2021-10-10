@@ -479,25 +479,27 @@ class _MBTagSet(SQLTagSet):
               # matched disc
               found_medium = medium
               found_release = release
-      assert found_medium
-      A = {
-          'title':
-          found_release.get('title'),
-          'medium-count':
-          found_release['medium-count'],
-          'medium-position':
-          found_medium['position'],
-          'artist-credit':
-          found_release['artist-credit'],
-          'recordings': [
-              track['recording']['id']
-              for track in found_medium.get('track-list')
-          ],
-      }
+            else:
+              warning("A: disc['id']=%r != mbkey:%r, skip", disc['id'], mbkey)
+      if found_medium:
+        A = {
+            'title':
+            found_release.get('title'),
+            'medium-count':
+            found_release['medium-count'],
+            'medium-position':
+            found_medium['position'],
+            'artist-credit':
+            found_release['artist-credit'],
+            'recordings': [
+                track['recording']['id']
+                for track in found_medium.get('track-list')
+            ],
+        }
 
     # store salient fields
     k_tag_map = {
-        'name': onttype + '_name',
+        'name': mbtype + '_name',
         'artist-credit': 'artists',
     }
     k_tag_map_reverse = {v: k for k, v in k_tag_map.items()}
