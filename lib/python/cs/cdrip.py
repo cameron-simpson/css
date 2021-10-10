@@ -620,5 +620,96 @@ class MBDB(MultiOpenMixin):
       if value is not None:
         tags.set(name, value)
 
+  @typechecked
+  def apply_dict(self, type_name: str, id: str, d: dict, *, get_te=None):
+    ''' Apply an `'id'`-ed dict from MusicbrainzNG query result `d`
+        associated with its `type_name` and `id` value
+        to the corresponding entity obtained by `get_te(type_name,id)`.
+
+        Parameters:
+        * `type_name`: the entity type, eg `'disc'`
+        * `id`: the entity identifying value, typically a discid or a UUID
+        * `d`: the `dict` to apply to the entity
+        * `get_te`: optional entity fetch function;
+          the default calls `self.sqltags[f"{type_name}.{id}"]`
+    '''
+    if get_te is None:
+      get_te = lambda type_name, id: self.sqltags[f"{type_name}.{id}"]
+    if 'id' in d:
+      assert d['id'] == id, "id=%s but d['id']=%s" % (r(id), r(d['id']))
+    te = get_te(type_name, id)
+    counts = {}  # sanity check of foo-count against foo-list
+    # scan the mapping, recognise contents
+    for k, v in d.items():
+      with Pfx("%s=%s", k, r(v, 20)):
+        # skip the id field, already checked
+        if k == 'id':
+          continue
+        # derive tag_name and field role (None, count, list)
+        for suffix in 'count', 'list':
+          _suffix = '-' + suffix
+          tag_name = cutsuffix(k, _suffix)
+          if tag_name is not k:
+            break
+        else:
+          tag_name = k
+          suffix = None
+        tag_name = tag_name.replace('-', '_')
+        if tag_name == 'name':
+          X("tag_name %r => %r", tag_name, 'name_')
+          tag_name = 'name_'
+        # note expected counts
+        if suffix == 'count':
+          assert isinstance(v, int)
+          counts[tag_name] = v
+          continue
+        if suffix == 'list':
+          assert isinstance(v, list)
+        v = self._fold_value(tag_name, v, get_te=get_te)
+        # apply the folded value
+        te.set(tag_name, v)
+    for k, c in counts.items():
+      with Pfx("counts[%r]=%d", k, c):
+        assert len(te[k]) == c
+
+  @typechecked
+  def _fold_value(self, type_name: str, v, *, get_te=None):
+    ''' Fold `v` recursively,
+        replacing `'id'`-ed `dict`s with their identifier
+        and applying their values to the corresponding entity.
+    '''
+    if isinstance(v, dict):
+      if 'id' in v:
+        v = self._fold_id_dict(type_name, v, get_te=get_te)
+      else:
+        v = dict(v)
+        for k, subv in list(v.items()):
+          v[k] = self._fold_value(type_name, subv, get_te=get_te)
+    elif isinstance(v, list):
+      v = list(v)
+      for i, subv in enumerate(v):
+        with Pfx("[%d]=%r", i, subv):
+          v[i] = self._fold_value(type_name, subv, get_te=get_te)
+    else:
+      assert isinstance(v, (int, str, float))
+      # TODO: date => date? etc?
+    return v
+
+  ##@pfx_method
+  @typechecked
+  def _fold_id_dict(self, type_name: str, d: dict, *, get_te=None):
+    ''' Apply `d` (a `dict`) to the entity identified by `(type_name,d['id'])`,
+        return `d['id']`.
+
+        This is used to replace identified records in a MusicbrainzNG query result
+        with their identifier.
+    '''
+    id = d['id']
+    assert isinstance(id, str) and id, (
+        "expected d['id'] to be a nonempty string, got: %s" % (r(id),)
+    )
+    self.apply_dict(type_name, id, d, get_te=get_te)
+    return id
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
