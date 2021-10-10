@@ -141,16 +141,29 @@ class CDRipCommand(BaseCommand):
             yield
 
   def cmd_dump(self, argv):
-    ''' Usage: {cmd} entity...
+    ''' Usage: {cmd} [-R] [entity...]
           Dump each entity.
+          -R  Explicitly refresh the entity before dumping it.
+          If no entities are supplied, dump the entity for the disc in the CD drive.
     '''
-    sqltags = self.options.mbdb.sqltags
+    mbdb = self.options.mbdb
+    sqltags = mbdb.sqltags
+    do_refresh = False
+    if argv and argv[0] == '-R':
+      do_refresh = True
+    if not argv:
+      if mbdb.dev_info:
+        argv = ['disc.' + dev_info.id]
+      else:
+        raise GetoptError("missing entities and no CD in the drive")
     for name in argv:
       with Pfx(name):
         if name not in sqltags:
           warning("unknown")
           continue
         te = sqltags[name]
+        if force:
+          te.refresh()
         te.dump(compact=True)
 
   def cmd_edit(self, argv):
