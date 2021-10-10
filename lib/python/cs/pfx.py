@@ -344,24 +344,14 @@ class Pfx(object):
         continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
-        try:
-          value0, value1 = value
-        except ValueError as args_e:
-          X(
-              "prefixify_exception OSError.args: %s(%s) %s: args=%r: %s",
-              type(e).__name__,
-              ','.join(
-                  cls.__name__
-                  for cls in type(e).__mro__
-                  if cls is not type(e) and cls is not object
-              ),
-              e,
-              value,
-              args_e,
-          )
-          continue
-        else:
-          value = (value0, cls.prefixify(value1))
+        # prefixify the first string
+        value = list(value)
+        for i, v in enumerate(value):
+          if isinstance(v, str):
+            value = cls.prefixify(value)
+            did_prefix = True
+            break
+        value = tuple(value)
       elif attr == 'args' and isinstance(e, LookupError):
         # args[0] is the key, do not fiddle with it
         continue
