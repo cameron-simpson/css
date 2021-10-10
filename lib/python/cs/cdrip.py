@@ -128,8 +128,17 @@ class CDRipCommand(BaseCommand):
     mbdb = MBDB(mbdb_path=self.options.mbdb_path)
     with fstags:
       with mbdb:
-        with stackattrs(self.options, fstags=fstags, mbdb=mbdb, verbose=True):
-          yield
+        mbdb_attrs = {}
+        try:
+          dev_info = pfx_call(discid.read, device=self.options.device)
+        except discid.disc.DiscError as e:
+          warning("no disc information: %s", e)
+        else:
+          mbdb_attrs.update(dev_info=dev_info)
+        with stackattrs(mbdb, **mbdb_attrs):
+          with stackattrs(self.options, fstags=fstags, mbdb=mbdb,
+                          verbose=True):
+            yield
 
   def cmd_edit(self, argv):
     ''' Usage: edit criteria...
