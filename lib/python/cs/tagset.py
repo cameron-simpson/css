@@ -200,7 +200,9 @@ from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath
+from pprint import pformat
 import re
+import sys
 from threading import Lock
 import time
 from typing import Optional, Union
@@ -464,6 +466,46 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def dump(self, keys=None, *, preindent=None, file=None, **pf_kwargs):
+    ''' Dump a `TagSet` in multiline format.
+
+        Parameters:
+        * `keys`: optional iterable of `Tag` names to print
+        * `file`: optional keyword parameter specifying the output filelike 
+          object; the default is `sys.stdout`.
+        * `preindent`: optional leading indentation for the entire dump,
+          either a `str` or an `int` indicating a number of spaces
+        Other keyword arguments are passed to `pprint.pformat`.
+    '''
+    if keys is None:
+      keys = sorted(self.keys())
+    else:
+      keys = list(keys)
+    if preindent is None:
+      preindent = ''
+    elif isinstance(preindent, int):
+      preindent = ' ' * preindent
+    else:
+      assert isinstance(
+          preindent, str
+      ), ("preindent: expected int or str, got: %s" % (r(preindent),))
+    if file is None:
+      file = sys.stdout
+    print(preindent, self.name, file=file, sep='')
+    kwidth = max(map(len, keys)) + 1
+    kindent = '  '
+    ksubindent = kindent + ' ' * kwidth
+    pf_nl_replacement = '\n' + preindent + ksubindent
+    for k in keys:
+      print(
+          preindent,
+          kindent,
+          f"{k:{kwidth}}",
+          pformat(self[k], **pf_kwargs).replace('\n', '\n' + ksubindent),
+          file=file,
+          sep=''
+      )
 
   #################################################################
   # methods supporting FormattableMixin/ExtendedFormatter
