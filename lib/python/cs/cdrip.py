@@ -461,7 +461,7 @@ class _MBTagSet(SQLTagSet):
     self[self.MB_QUERY_PREFIX + 'includes'] = includes
     self[self.MB_QUERY_PREFIX + 'result'] = A
     # modify A for discs
-    if onttype == 'disc':
+    if mbtype == 'disc':
       # drill down to the release and medium containing the disc id
       # replace A with a dict with selected values
       found_medium = None
