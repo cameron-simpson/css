@@ -420,25 +420,25 @@ class _MBTagSet(SQLTagSet):
 
         This method has a fair bit of entity type specific knowledge.
     '''
-    onttype = self.mbtype
-    if onttype is None:
+    mbtype = self.mbtype
+    if mbtype is None:
       ##warning("%s: no MBTYPE, not refreshing", self)
       return
     if not force and self.MB_QUERY_TIME_TAG_NAME in self:
       return
     mbkey = self.mbkey
-    get_type = onttype
+    get_type = mbtype
     id_name = 'id'
     record_key = None
     includes = None
-    if onttype == 'artist':
+    if mbtype == 'artist':
       includes = ['annotation']
-    elif onttype == 'disc':
+    elif mbtype == 'disc':
       includes = ['artists', 'recordings']
       get_type = 'releases'
       id_name = 'discid'
       record_key = 'disc'
-    elif onttype == 'recording':
+    elif mbtype == 'recording':
       includes = ['artists', 'tags']
     A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
     self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
