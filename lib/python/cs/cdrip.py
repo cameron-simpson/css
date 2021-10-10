@@ -609,6 +609,8 @@ class MBDB(MultiOpenMixin):
   '''
 
   def __init__(self, mbdb_path=None):
+    # can be overlaid with discid.read of the current CDROM
+    self.dev_info = None
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
     sqltags.mbdb = self
     with sqltags:
