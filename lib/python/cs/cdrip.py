@@ -150,20 +150,25 @@ class CDRipCommand(BaseCommand):
     sqltags = mbdb.sqltags
     do_refresh = False
     if argv and argv[0] == '-R':
+      argv.pop(0)
       do_refresh = True
     if not argv:
       if mbdb.dev_info:
         argv = ['disc.' + dev_info.id]
       else:
         raise GetoptError("missing entities and no CD in the drive")
-    for name in argv:
+    q = ListQueue(argv)
+    for name in q:
       with Pfx(name):
+        if name.endswith('.') and is_identifier(name[:-1]):
+          q.prepend(sqltags.keys(prefix=name[:-1]))
+          continue
         if name not in sqltags:
           warning("unknown")
           continue
         te = sqltags[name]
-        if force:
-          te.refresh()
+        if do_refresh:
+          mbdb.refresh(te, force=True)
         te.dump(compact=True)
 
   def cmd_edit(self, argv):
