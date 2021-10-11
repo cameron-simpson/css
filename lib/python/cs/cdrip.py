@@ -457,125 +457,6 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
-  # pylint: disable=too-many-branches,too-many-statements
-  def refresh(self, force=False):
-    ''' Query MusicBrainz, fill in tags.
-
-        This method has a fair bit of entity type specific knowledge.
-    '''
-    mbtype = self.mbtype
-    if mbtype is None:
-      ##warning("%s: no MBTYPE, not refreshing", self)
-      return
-    if not force and self.MB_QUERY_TIME_TAG_NAME in self:
-      return
-    mbkey = self.mbkey
-    get_type = mbtype
-    id_name = 'id'
-    record_key = None
-    includes = None
-    if mbtype == 'artist':
-      includes = ['annotation']
-    elif mbtype == 'disc':
-      includes = ['artists', 'recordings']
-      get_type = 'releases'
-      id_name = 'discid'
-      record_key = 'disc'
-    elif mbtype == 'recording':
-      includes = ['artists', 'tags']
-    A = self.mbdb.query(get_type, mbkey, includes, id_name, record_key)
-    self[self.MB_QUERY_TIME_TAG_NAME] = time.time()
-    # record the full response data for forensics
-    self[self.MB_QUERY_PREFIX + 'get_type'] = get_type
-    self[self.MB_QUERY_PREFIX + 'includes'] = includes
-    self[self.MB_QUERY_PREFIX + 'result'] = A
-    # modify A for discs
-    if mbtype == 'disc':
-      # drill down to the release and medium containing the disc id
-      # replace A with a dict with selected values
-      found_medium = None
-      found_release = None
-      for release in A['release-list']:
-        if found_medium:
-          break
-        for medium in release['medium-list']:
-          if found_medium:
-            break
-          for disc in medium['disc-list']:
-            if found_medium:
-              break
-            if disc['id'] == mbkey:
-              # matched disc
-              found_medium = medium
-              found_release = release
-            else:
-              warning("A: disc['id']=%r != mbkey:%r, skip", disc['id'], mbkey)
-      if found_medium:
-        A = {
-            'title':
-            found_release.get('title'),
-            'medium-count':
-            found_release['medium-count'],
-            'medium-position':
-            found_medium['position'],
-            'artist-credit':
-            found_release['artist-credit'],
-            'recordings': [
-                track['recording']['id']
-                for track in found_medium.get('track-list')
-            ],
-        }
-
-    # store salient fields
-    k_tag_map = {
-        'name': mbtype + '_name',
-        'artist-credit': 'artists',
-    }
-    k_tag_map_reverse = {v: k for k, v in k_tag_map.items()}
-    for k, v in A.items():
-      with Pfx("%s=%r", k, v):
-        if k == 'id':
-          assert v == mbkey, "A[%r]=%r != mbkey %r" % (k, v, mbkey)
-          continue
-        if k in ('begin-area', 'life-span', 'release-count'):
-          continue
-        if k in k_tag_map_reverse:
-          warning(
-              "SKIP %r=%r, would be overridden by k_tag_map_reverse[%r]=%r", k,
-              v, k, k_tag_map_reverse[k]
-          )
-          continue
-        tag_name = k_tag_map.get(k, k.replace('-', '_'))
-        if k in ('artist-credit-phrase', 'disambiguation', 'offset-list',
-                 'medium-count', 'medium-position', 'name', 'sort-name',
-                 'recordings', 'title', 'type'):
-          tag_value = v
-        elif k in ('length', 'sectors'):
-          tag_value = int(v)
-        elif k == 'artist-credit':
-          # list of artist ids
-          tag_name = 'artists'
-          artist_uuids = []
-          for credit in v:
-            if isinstance(credit, str):
-              try:
-                uu = UUID(credit)
-              except ValueError as e:
-                warning("discarding credit %r, not a UUID: %s", credit, e)
-              else:
-                artist_uuids.append(str(uu))
-            else:
-              artist_uuids.append(credit['artist']['id'])
-          tag_value = artist_uuids
-        elif k == 'tag-list':
-          # list of unique tag strings
-          tag_value = list(set(map(lambda tag_dict: tag_dict['name'], v)))
-        else:
-          ##warning("SKIP unhandled A record %r", k)
-          ##print(pformat(v))
-          continue
-        self[tag_name] = tag_value
-
 class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
   '''
@@ -618,21 +499,6 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
-  def default_factory(self, index):
-    ''' The default factory runs the `SQLTags` default factory and then does an MB refresh.
-    '''
-    te = super().default_factory(index)
-    te.refresh()
-    return te
-
-  def get(self, key, default=None):
-    ''' Run the default `.get()` and the do an MB refresh.
-    '''
-    te = super().get(key, default=default)
-    if te is not default:
-      te.refresh()
-    return te
-
 class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
@@ -665,6 +531,13 @@ class MBDB(MultiOpenMixin):
 
   @staticmethod
   def query(typename, db_id, includes=None, id_name='id', record_key=None):
+  def __getitem__(self, index):
+    ''' Fetching via the MBDB triggers a refresh.
+    '''
+    te = self.sqltags[index]
+    te.refresh()
+    return te
+
     ''' Fetch data from the Musicbrainz API.
     '''
     getter_name = f'get_{typename}_by_{id_name}'
