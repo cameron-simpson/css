@@ -27,14 +27,19 @@ import sys
 from tempfile import NamedTemporaryFile
 import time
 from uuid import UUID
+
 import discid
 import musicbrainzngs
+from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
+from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.queues import ListQueue
 from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
@@ -703,7 +708,6 @@ class MBDB(MultiOpenMixin):
           suffix = None
         tag_name = tag_name.replace('-', '_')
         if tag_name == 'name':
-          X("tag_name %r => %r", tag_name, 'name_')
           tag_name = 'name_'
         # note expected counts
         if suffix == 'count':
@@ -738,7 +742,7 @@ class MBDB(MultiOpenMixin):
     elif isinstance(v, list):
       v = list(v)
       for i, subv in enumerate(v):
-        with Pfx("[%d]=%r", i, subv):
+        with Pfx("[%d]=%s", i, r(subv, 20)):
           v[i] = self._fold_value(type_name, subv, get_te=get_te)
     else:
       assert isinstance(v, (int, str, float))
