@@ -503,6 +503,27 @@ class MBDB(MultiOpenMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
 
+  # Mapping of Tag names whose type is not themselves.
+  # TODO: get this from the ontology type?
+  TAG_NAME_TYPES = {
+      'artist_credit': 'artist',
+      'begin_area': 'area',
+      'label_info': 'label',
+      'medium': 'disc',
+      'release_event': 'event',
+  }
+
+  # Mapping of query type names to default includes,
+  # overrides the fallback to musicbrainzngs.VALID_INCLUDES.
+  QUERY_TYPENAME_INCLUDES = {
+      ##'area': ['annotation', 'aliases'],
+      ##'artist': ['annotation', 'aliases'],
+      'releases': ['artists', 'recordings'],
+  }
+  # List of includes only available if logged in.
+  # We drop these if we're not logged in.
+  QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
+
   def __init__(self, mbdb_path=None):
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
@@ -529,8 +550,6 @@ class MBDB(MultiOpenMixin):
     '''
     return self.sqltags.find(criteria)
 
-  @staticmethod
-  def query(typename, db_id, includes=None, id_name='id', record_key=None):
   def __getitem__(self, index):
     ''' Fetching via the MBDB triggers a refresh.
     '''
@@ -538,6 +557,18 @@ class MBDB(MultiOpenMixin):
     te.refresh()
     return te
 
+  # pylint: disable=too-many-arguments
+  @pfx_method
+  def query(
+      self,
+      typename,
+      db_id,
+      id_name='id',
+      *,
+      includes=None,
+      record_key=None,
+      **getter_kw
+  ):
     ''' Fetch data from the Musicbrainz API.
     '''
     getter_name = f'get_{typename}_by_{id_name}'
@@ -571,12 +602,37 @@ class MBDB(MultiOpenMixin):
       mb_info = mb_info[record_key]
     return mb_info
 
-  def _tagif(self, tags, name, value):
-    ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
+  # pylint: disable=too-many-branches,too-many-statements
+  def refresh(self, te, force=False):
+    ''' Query MusicBrainz about the entity `te`, fill recursively.
     '''
-    with self.sqltags:
-      if value is not None:
-        tags.set(name, value)
+    mbtype = te.mbtype
+    if mbtype is None:
+      ##warning("%s: no MBTYPE, not refreshing", te)
+      return
+    if not force and te.MB_QUERY_TIME_TAG_NAME in te:
+      return
+    mbkey = te.mbkey
+    get_type = mbtype
+    id_name = 'id'
+    record_key = None
+    if mbtype == 'disc':
+      # we use get_releases_by_discid() for discs
+      get_type = 'releases'
+      id_name = 'discid'
+      record_key = 'disc'
+    try:
+      A = self.query(get_type, mbkey, id_name, record_key=record_key)
+    except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+      warning("%s: not refreshed: %s", type(e).__name__, e)
+      return
+    te[te.MB_QUERY_TIME_TAG_NAME] = time.time()
+    # record the full response data for forensics
+    te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
+    ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
+    te[te.MB_QUERY_PREFIX + 'result'] = A
+    self.apply_dict(mbtype, mbkey, A)
+    return
 
   @typechecked
   def apply_dict(self, type_name: str, id: str, d: dict, *, get_te=None):
@@ -668,6 +724,13 @@ class MBDB(MultiOpenMixin):
     )
     self.apply_dict(type_name, id, d, get_te=get_te)
     return id
+
+  def _tagif(self, tags, name, value):
+    ''' Apply a new `Tag(name,value)` to `tags` if `value` is not `None`.
+    '''
+    with self.sqltags:
+      if value is not None:
+        tags.set(name, value)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
