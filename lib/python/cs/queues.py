@@ -533,6 +533,12 @@ class ListQueue:
     with self._lock:
       self.queued.insert(index, item)
 
+  def prepend(self, items):
+    ''' Convenient/performant queue-lots-of-items at the front of the queue.
+    '''
+    with self._lock:
+      self.queued[:0] = list(items)
+
   def __bool__(self):
     ''' A `ListQueue` looks a bit like a container,
         and is false when empty.
