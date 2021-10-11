@@ -321,9 +321,7 @@ def rip(
     recordings = disc.recordings
     title = disc.title
     if not all((artist_names, title, recordings)):
-      print(disc_id)
-      for tag in disc:
-        print(tag.name, str(tag.value)[:40])
+      disc.dump()
       sys.exit(1)
     level1 = ", ".join(disc.artist_names) or "NO_ARTISTS"
     level2 = disc.title or "UNTITLED"
