@@ -493,19 +493,20 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     if file is None:
       file = sys.stdout
     print(preindent, self.name, file=file, sep='')
-    kwidth = max(map(len, keys)) + 1
-    kindent = '  '
-    ksubindent = kindent + ' ' * kwidth
-    pf_nl_replacement = '\n' + preindent + ksubindent
-    for k in keys:
-      print(
-          preindent,
-          kindent,
-          f"{k:{kwidth}}",
-          pformat(self[k], **pf_kwargs).replace('\n', '\n' + ksubindent),
-          file=file,
-          sep=''
-      )
+    if keys:
+      kwidth = max(map(len, keys)) + 1
+      kindent = '  '
+      ksubindent = kindent + ' ' * kwidth
+      pf_nl_replacement = '\n' + preindent + ksubindent
+      for k in keys:
+        print(
+            preindent,
+            kindent,
+            f"{k:{kwidth}}",
+            pformat(self[k], **pf_kwargs).replace('\n', '\n' + ksubindent),
+            file=file,
+            sep=''
+        )
 
   #################################################################
   # methods supporting FormattableMixin/ExtendedFormatter
