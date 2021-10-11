@@ -571,6 +571,7 @@ class MBDB(MultiOpenMixin):
   ):
     ''' Fetch data from the Musicbrainz API.
     '''
+    logged_in = False
     getter_name = f'get_{typename}_by_{id_name}'
     if record_key is None:
       record_key = typename
@@ -583,23 +584,55 @@ class MBDB(MultiOpenMixin):
       )
       raise
     if includes is None:
-      includes = ['tags']
       warning(
+      try:
+        includes = self.QUERY_TYPENAME_INCLUDES[typename]
+      except KeyError:
+        includes_map = (
+            musicbrainzngs.VALID_INCLUDES
+            if logged_in else musicbrainzngs.VALID_BROWSE_INCLUDES
+        )
+        include_map_key = 'release' if typename == 'releases' else typename
+        includes = list(includes_map.get(include_map_key, ()))
+        X("includes_map[%r] => %r", include_map_key, includes)
           "query(%r,..): no includes specified, using %r", typename, includes
       )
+    if not logged_in:
+      if typename.startswith('collection'):
+        warning("typename=%r: need to be logged in for collections", typename)
+        return {}
+      if any(map(lambda inc: inc in self.QUERY_INCLUDES_NEED_LOGIN, includes)):
+        warning(
+            "includes contains some of %r, dropping because not logged in",
+            self.QUERY_INCLUDES_NEED_LOGIN
+        )
+        includes = [
+            inc for inc in includes
+            if inc not in self.QUERY_INCLUDES_NEED_LOGIN
+        ]
+    if (typename == 'releases' and 'toc' not in getter_kw
+        and self.dev_info is not None and self.dev_info.id == db_id):
+      getter_kw.update(toc=self.dev_info.toc_string)
+    try:
+      mb_info = pfx_call(getter, db_id, includes=includes, **getter_kw)
+    except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+      warning("help(%s):\n%s", getter_name, getter.__doc__)
       help(getter)
-    with Pfx("%s(%r,includes=%r)", getter_name, db_id, includes, print=True):
-      try:
-        mb_info = getter(db_id, includes=includes)
-      except musicbrainzngs.InvalidIncludeError as e:
-        warning("BAD INCLUDES: %s", e)
-        warning("help(%s):\n%s", getter_name, getter.__doc__)
-        raise
-      except musicbrainzngs.ResponseError as e:
-        warning("RESPONSE ERROR: %s", e)
-        warning("help(%s):\n%s", getter_name, getter.__doc__)
-        raise
+      return {}
+    if record_key in mb_info:
+      other_keys = sorted(k for k in mb_info.keys() if k != record_key)
+      if other_keys:
+        warning(
+            "mb_info contains %r, discarding other keys: %r",
+            record_key,
+            other_keys,
+        )
       mb_info = mb_info[record_key]
+    else:
+      warning(
+          "no entry named %r, returning entire mb_info, keys=%r", record_key,
+          sorted(mb_info.keys())
+      )
     return mb_info
 
   # pylint: disable=too-many-branches,too-many-statements
@@ -679,7 +712,10 @@ class MBDB(MultiOpenMixin):
           continue
         if suffix == 'list':
           assert isinstance(v, list)
-        v = self._fold_value(tag_name, v, get_te=get_te)
+        tag_type = self.TAG_NAME_TYPES.get(
+            tag_name, cutsuffix(tag_name, '_relation')
+        )
+        v = self._fold_value(tag_type, v, get_te=get_te)
         # apply the folded value
         te.set(tag_name, v)
     for k, c in counts.items():
