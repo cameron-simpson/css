@@ -467,22 +467,25 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
   #################################################################
-  # methods supporting FormattableMixin/ExtendedFormatter
+  # methods supporting FormattableMixin
 
   def get_arg_name(self, field_name):
-    ''' Leading dotted identifiers represent tags or tag prefixes.
+    ''' Override for `FormattableMixin.get_arg_name`:
+        return the leading dotted identifier,
+        which represents a tag or tag prefix.
     '''
     return get_dotted_identifier(field_name)
 
   def get_value(self, arg_name, a, kw):
-    ''' Look up `arg_name`, return a value.
+    ''' Override for `FormattableMixin.get_value`:
+        look up `arg_name` in `kw`, return a value.
 
         The value is obtained as follows:
         * `kw[arg_name]`: the `Tag` named `arg_name` if present
         * `kw.get_format_attribute(arg_name)`:
-          a formattedable attribute named `arg_name`
+          a formattable attribute named `arg_name`
         otherwise raise `KeyError` if `self.format_mode.strict`
-        otherwise the placeholder string `'{'+arg_name+'}'`.
+        otherwise return the placeholder string `'{'+arg_name+'}'`.
     '''
     assert isinstance(kw, TagSet)
     ##assert kw is self ## not the case, needs a bit more digging
