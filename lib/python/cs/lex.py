@@ -1269,6 +1269,25 @@ _format_as = format_as  # for reuse in the format_as method below
 def format_attribute(method):
   ''' Mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
+
+      For example,
+      the `FormatableMixin.json` method is defined like this:
+
+          @format_attribute
+          def json(self):
+              return self.FORMAT_JSON_ENCODER.encode(self)
+
+      which allows a `FormatableMixin` subclass instance
+      to be used in a format string like this:
+
+          {instance:json}
+
+      to insert a JSON transcription of the instance.
+
+      It is recommended that methods marked with `@format_attribute`
+      have no side effects and do not modify state,
+      as they are intended for use in ad hoc format strings
+      supplied by an end user.
   '''
   method.is_format_attribute = True
   return method
