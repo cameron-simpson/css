@@ -269,14 +269,16 @@ class CDRipCommand(BaseCommand):
         error("disc error: %s", e)
         return 1
       disc_id = dev_info.id
-    with Pfx("discid %s", disc_id):
-      disc = MB.discs[disc_id]
-      print(disc.title)
-      print(", ".join(disc.artist_names))
-      for tracknum, recording in enumerate(disc.recordings(), 1):
-        print(
-            tracknum, recording.title, '--', ", ".join(recording.artist_names)
-        )
+    with stackattrs(MB, dev_info=dev_info):
+      with Pfx("discid %s", disc_id):
+        disc = MB.discs[disc_id]
+        print(disc.title)
+        print(", ".join(disc.artist_names))
+        for tracknum, recording in enumerate(disc.recordings(), 1):
+          print(
+              tracknum, recording.title, '--',
+              ", ".join(recording.artist_names)
+          )
     return 0
 
 def probe_disc(device, mbdb):
