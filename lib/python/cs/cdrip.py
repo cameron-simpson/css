@@ -727,6 +727,8 @@ class MBDB(MultiOpenMixin, RunStateMixin):
     '''
     q = ListQueue([te])
     for te in unrepeated(q, signature=lambda te: te.name):
+      if self.runstate.cancelled:
+        break
       with Pfx("refresh te %s", te.name, print=True):
         mbtype = te.mbtype
         if mbtype is None:
