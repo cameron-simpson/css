@@ -720,7 +720,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
   def refresh(
       self,
       te: _MBTagSet,
-      force: bool = False,
+      refetch: bool = False,
       recurse: Union[bool, int] = False,
   ):
     ''' Query MusicBrainz about the entity `te`, fill recursively.
@@ -731,31 +731,35 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         break
       with Pfx("refresh te %s", te.name, print=True):
         mbtype = te.mbtype
+        mbkey = te.mbkey
         if mbtype is None:
           warning("no MBTYPE, not refreshing")
-        elif not force and te.MB_QUERY_TIME_TAG_NAME in te:
-          info("skip - has .%s and not force", te.MB_QUERY_TIME_TAG_NAME)
         else:
-          mbkey = te.mbkey
-          get_type = mbtype
-          id_name = 'id'
-          record_key = None
-          if mbtype == 'disc':
-            # we use get_releases_by_discid() for discs
-            get_type = 'releases'
-            id_name = 'discid'
-            record_key = 'disc'
-          try:
-            A = self.query(get_type, mbkey, id_name, record_key=record_key)
-          except musicbrainzngs.musicbrainz.MusicBrainzError as e:
-            warning("%s: not refreshed: %s", type(e).__name__, e)
+          q_time_tag = te.MB_QUERY_TIME_TAG_NAME
+          if refetch or q_time_tag not in te:
+            get_type = mbtype
+            id_name = 'id'
+            record_key = None
+            if mbtype == 'disc':
+              # we use get_releases_by_discid() for discs
+              get_type = 'releases'
+              id_name = 'discid'
+              record_key = 'disc'
+            try:
+              A = self.query(get_type, mbkey, id_name, record_key=record_key)
+            except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+              warning("%s: not refreshed: %s", type(e).__name__, e)
+            else:
+              te[q_time_tag] = time.time()
+              # record the full response data for forensics
+              te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
+              ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
+              te[te.MB_QUERY_PREFIX + 'result'] = A
+              self.sqltags.flush()
           else:
-            te[te.MB_QUERY_TIME_TAG_NAME] = time.time()
-            # record the full response data for forensics
-            te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
-            ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
-            te[te.MB_QUERY_PREFIX + 'result'] = A
-            self.apply_dict(mbtype, mbkey, A, q=q)
+            A = te[te.MB_QUERY_PREFIX + 'result']
+          self.apply_dict(mbtype, mbkey, A, q=q)
+          self.sqltags.flush()
         # cap recursion
         if isinstance(recurse, bool):
           if not recurse:
