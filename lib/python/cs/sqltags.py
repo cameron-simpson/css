@@ -1525,13 +1525,19 @@ class SQLTags(BaseTagSets):
     '''
     session = self.orm.sqla_state.session
     if session is None:
-      raise RuntimeError("no default db session")
+      raise AttributeError("no default db session")
     return session
 
+  @pfx_method
   def flush(self):
     ''' Flush the current session state to the database.
     '''
-    self.default_db_session.flush()
+    try:
+      sess = self.default_db_session
+    except AttributeError as e:
+      ifverbose("no session: %s", e)
+    else:
+      sess.flush()
 
   @typechecked
   def default_factory(self, name: [str, None], *, unixtime=None, tags=None):
