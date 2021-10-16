@@ -491,6 +491,11 @@ class _MBTagSet(SQLTagSet):
   def __repr__(self):
     return "%s:%s:%r" % (type(self).__name__, self.name, self.as_dict())
 
+  def dump(self, keys=None, **kw):
+    if keys is None:
+      keys = [k for k in self.keys() if not k.startswith(self.MB_QUERY_PREFIX)]
+    return super().dump(keys=keys, **kw)
+
   @property
   def mbdb(self):
     ''' The associated `MBDB`.
