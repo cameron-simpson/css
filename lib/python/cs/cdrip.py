@@ -41,7 +41,7 @@ from cs.lex import cutsuffix, is_identifier, r
 from cs.logutils import error, warning, info
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
-from cs.resources import MultiOpenMixin
+from cs.resources import MultiOpenMixin, RunStateMixin
 from cs.sqltags import SQLTags, SQLTagSet, SQLTagsCommand
 from cs.tagset import TagSet, TagsOntology
 
@@ -132,7 +132,7 @@ class CDRipCommand(BaseCommand):
     '''
     options = self.options
     fstags = FSTags()
-    mbdb = MBDB(mbdb_path=self.options.mbdb_path)
+    mbdb = MBDB(mbdb_path=options.mbdb_path, runstate=options.runstate)
     with fstags:
       with mbdb:
         mbdb_attrs = {}
@@ -571,7 +571,7 @@ class MBSQLTags(SQLTags):
     super().__init__(db_url=mbdb_path)
     self.mbdb_path = mbdb_path
 
-class MBDB(MultiOpenMixin):
+class MBDB(MultiOpenMixin, RunStateMixin):
   ''' An interface to MusicBrainz with a local `TagsOntology(SQLTags)` cache.
   '''
 
@@ -597,7 +597,8 @@ class MBDB(MultiOpenMixin):
   # We drop these if we're not logged in.
   QUERY_INCLUDES_NEED_LOGIN = ['user-tags', 'user-ratings']
 
-  def __init__(self, mbdb_path=None):
+  def __init__(self, mbdb_path=None, runstate=None):
+    RunStateMixin.__init__(self, runstate=runstate)
     # can be overlaid with discid.read of the current CDROM
     self.dev_info = None
     sqltags = self.sqltags = MBSQLTags(mbdb_path=mbdb_path)
