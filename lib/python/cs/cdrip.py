@@ -502,6 +502,9 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.sqltags.mbdb
 
+  def refresh(self, **kw):
+    self.mbdb.refresh(self, **kw)
+
   @property
   def mbtype(self):
     ''' The MusicBrainz type (usually a UUID or discid).
