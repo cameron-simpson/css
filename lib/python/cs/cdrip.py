@@ -173,7 +173,7 @@ class CDRipCommand(BaseCommand):
           continue
         te = sqltags[name]
         if do_refresh:
-          mbdb.refresh(te, force=True)
+          mbdb.refresh(te, force=True, recurse=True)
         te.dump(compact=True)
 
   def cmd_edit(self, argv):
