@@ -537,6 +537,27 @@ class _MBTagSet(SQLTagSet):
     '''
     return self.mbdb.ontology
 
+  @typechecked
+  @require(lambda type_name: is_identifier(type_name))
+  def by_typed_id(self, type_name: str, id: str, no_check_uuid=False):
+    ''' Fetch the object `{type_name}.{id}` and refresh it.
+    '''
+    if not no_check_uuid:
+      UUID(id)
+    te_name = f"{type_name}.{id}"
+    te = self.sqltags[te_name]
+    te.refresh()
+    return te
+
+  @typechecked
+  def resolve_ids(self, type_name, ids: list, no_check_uuid=False):
+    ''' Resolve ids against a type.
+    '''
+    return [
+        self.by_typed_id(type_name, id, no_check_uuid=no_check_uuid)
+        for id in ids
+    ]
+
 class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
   '''
