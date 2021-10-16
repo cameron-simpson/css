@@ -640,6 +640,12 @@ class MBDB(MultiOpenMixin):
       )
     return mb_info
 
+  def stale(self, te):
+    ''' Scrub the query time attribute.
+    '''
+    if te.MB_QUERY_TIME_TAG_NAME in te:
+      del te[te.MB_QUERY_TIME_TAG_NAME]
+
   # pylint: disable=too-many-branches,too-many-statements
   @typechecked
   def refresh(
