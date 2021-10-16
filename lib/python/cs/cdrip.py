@@ -22,6 +22,7 @@ from os.path import (
     join as joinpath,
 )
 from pprint import pformat
+from signal import SIGINT, SIGTERM
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
@@ -33,7 +34,7 @@ import musicbrainzngs
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.context import stackattrs
+from cs.context import stackattrs, stack_signals
 from cs.deco import fmtdoc
 from cs.fstags import FSTags
 from cs.lex import cutsuffix, is_identifier, r
@@ -129,6 +130,7 @@ class CDRipCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
+    options = self.options
     fstags = FSTags()
     mbdb = MBDB(mbdb_path=self.options.mbdb_path)
     with fstags:
@@ -141,9 +143,16 @@ class CDRipCommand(BaseCommand):
         else:
           mbdb_attrs.update(dev_info=dev_info)
         with stackattrs(mbdb, **mbdb_attrs):
-          with stackattrs(self.options, fstags=fstags, mbdb=mbdb,
-                          verbose=True):
-            yield
+          with stackattrs(options, fstags=fstags, mbdb=mbdb, verbose=True):
+
+            def on_signal(sig, frame):
+              ''' Note signal and cancel the `RunState`.
+              '''
+              warning("signal %s at %s, cancelling runstate", sig, frame)
+              options.runstate.cancel()
+
+            with stack_signals([SIGINT, SIGTERM], on_signal):
+              yield
 
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-R] [entity...]
