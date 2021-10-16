@@ -641,39 +641,65 @@ class MBDB(MultiOpenMixin):
     return mb_info
 
   # pylint: disable=too-many-branches,too-many-statements
-  def refresh(self, te, force=False):
+  @typechecked
+  def refresh(
+      self,
+      te: _MBTagSet,
+      force: bool = False,
+      recurse: Union[bool, int] = False,
+  ):
     ''' Query MusicBrainz about the entity `te`, fill recursively.
     '''
-    mbtype = te.mbtype
-    if mbtype is None:
-      ##warning("%s: no MBTYPE, not refreshing", te)
-      return
-    if not force and te.MB_QUERY_TIME_TAG_NAME in te:
-      return
-    mbkey = te.mbkey
-    get_type = mbtype
-    id_name = 'id'
-    record_key = None
-    if mbtype == 'disc':
-      # we use get_releases_by_discid() for discs
-      get_type = 'releases'
-      id_name = 'discid'
-      record_key = 'disc'
-    try:
-      A = self.query(get_type, mbkey, id_name, record_key=record_key)
-    except musicbrainzngs.musicbrainz.MusicBrainzError as e:
-      warning("%s: not refreshed: %s", type(e).__name__, e)
-      return
-    te[te.MB_QUERY_TIME_TAG_NAME] = time.time()
-    # record the full response data for forensics
-    te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
-    ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
-    te[te.MB_QUERY_PREFIX + 'result'] = A
-    self.apply_dict(mbtype, mbkey, A)
-    return
+    q = ListQueue([te])
+    for te in unrepeated(q, signature=lambda te: te.name):
+      with Pfx("refresh te %s", te.name, print=True):
+        mbtype = te.mbtype
+        if mbtype is None:
+          warning("no MBTYPE, not refreshing")
+        elif not force and te.MB_QUERY_TIME_TAG_NAME in te:
+          info("skip - has .%s and not force", te.MB_QUERY_TIME_TAG_NAME)
+        else:
+          mbkey = te.mbkey
+          get_type = mbtype
+          id_name = 'id'
+          record_key = None
+          if mbtype == 'disc':
+            # we use get_releases_by_discid() for discs
+            get_type = 'releases'
+            id_name = 'discid'
+            record_key = 'disc'
+          try:
+            A = self.query(get_type, mbkey, id_name, record_key=record_key)
+          except musicbrainzngs.musicbrainz.MusicBrainzError as e:
+            warning("%s: not refreshed: %s", type(e).__name__, e)
+          else:
+            te[te.MB_QUERY_TIME_TAG_NAME] = time.time()
+            # record the full response data for forensics
+            te[te.MB_QUERY_PREFIX + 'get_type'] = get_type
+            ##te[te.MB_QUERY_PREFIX + 'includes'] = includes
+            te[te.MB_QUERY_PREFIX + 'result'] = A
+            self.apply_dict(mbtype, mbkey, A, q=q)
+        # cap recursion
+        if isinstance(recurse, bool):
+          if not recurse:
+            break
+        elif isinstance(recurse, int):
+          recurse -= 1
+          if recurse < 1:
+            break
+        else:
+          raise TypeError("wrong type for recurse %s", r(recurse))
 
   @typechecked
-  def apply_dict(self, type_name: str, id: str, d: dict, *, get_te=None):
+  def apply_dict(
+      self,
+      type_name: str,
+      id: str,
+      d: dict,
+      *,
+      get_te=None,
+      q: Optional[ListQueue] = None,
+  ):
     ''' Apply an `'id'`-ed dict from MusicbrainzNG query result `d`
         associated with its `type_name` and `id` value
         to the corresponding entity obtained by `get_te(type_name,id)`.
@@ -684,6 +710,7 @@ class MBDB(MultiOpenMixin):
         * `d`: the `dict` to apply to the entity
         * `get_te`: optional entity fetch function;
           the default calls `self.sqltags[f"{type_name}.{id}"]`
+        * `q`: optional queue onto which to put related entities
     '''
     if get_te is None:
       get_te = lambda type_name, id: self.sqltags[f"{type_name}.{id}"]
@@ -719,7 +746,7 @@ class MBDB(MultiOpenMixin):
         tag_type = self.TAG_NAME_TYPES.get(
             tag_name, cutsuffix(tag_name, '_relation')
         )
-        v = self._fold_value(tag_type, v, get_te=get_te)
+        v = self._fold_value(tag_type, v, get_te=get_te, q=q)
         # apply the folded value
         te.set(tag_name, v)
     for k, c in counts.items():
@@ -727,23 +754,23 @@ class MBDB(MultiOpenMixin):
         assert len(te[k]) == c
 
   @typechecked
-  def _fold_value(self, type_name: str, v, *, get_te=None):
+  def _fold_value(self, type_name: str, v, *, get_te=None, q=None):
     ''' Fold `v` recursively,
         replacing `'id'`-ed `dict`s with their identifier
         and applying their values to the corresponding entity.
     '''
     if isinstance(v, dict):
       if 'id' in v:
-        v = self._fold_id_dict(type_name, v, get_te=get_te)
+        v = self._fold_id_dict(type_name, v, get_te=get_te, q=q)
       else:
         v = dict(v)
         for k, subv in list(v.items()):
-          v[k] = self._fold_value(type_name, subv, get_te=get_te)
+          v[k] = self._fold_value(type_name, subv, get_te=get_te, q=q)
     elif isinstance(v, list):
       v = list(v)
       for i, subv in enumerate(v):
         with Pfx("[%d]=%s", i, r(subv, 20)):
-          v[i] = self._fold_value(type_name, subv, get_te=get_te)
+          v[i] = self._fold_value(type_name, subv, get_te=get_te, q=q)
     else:
       assert isinstance(v, (int, str, float))
       # TODO: date => date? etc?
@@ -751,18 +778,25 @@ class MBDB(MultiOpenMixin):
 
   ##@pfx_method
   @typechecked
-  def _fold_id_dict(self, type_name: str, d: dict, *, get_te=None):
+  def _fold_id_dict(self, type_name: str, d: dict, *, get_te=None, q=None):
     ''' Apply `d` (a `dict`) to the entity identified by `(type_name,d['id'])`,
         return `d['id']`.
 
         This is used to replace identified records in a MusicbrainzNG query result
         with their identifier.
+
+        If `q` is not `None`, queue `get_te(type_name, id)` for processing
+        by the enclosing `refresh()`.
     '''
     id = d['id']
     assert isinstance(id, str) and id, (
         "expected d['id'] to be a nonempty string, got: %s" % (r(id),)
     )
-    self.apply_dict(type_name, id, d, get_te=get_te)
+    if q is not None:
+      te = get_te(type_name, id)
+      q.put(get_te(type_name, id))
+    else:
+      self.apply_dict(type_name, id, d, get_te=get_te, q=q)
     return id
 
   def _tagif(self, tags, name, value):
