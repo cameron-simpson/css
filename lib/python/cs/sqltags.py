@@ -719,7 +719,7 @@ class PolyValued:
 
   @typechecked
   @require(lambda pv: pv.is_valid())
-  def set_polyvalue(self, pv: PolyValue):
+  def set_polyvalue(self, pv: "PolyValued"):
     ''' Set all the value fields.
     '''
     self.float_value = pv.float_value
@@ -981,7 +981,8 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           etag.set_polyvalue(pv)
         self._update_multivalues(name, pv.structured_value, session=session)
 
-      def discard_tag(self, name, value=None, *, session):
+      @typechecked
+      def discard_tag(self, name, pv: Optional[PolyValue] = None, *, session):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
         '''
@@ -991,7 +992,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
             session=session, entity_id=self.id, name=name
         )
         if etag is not None:
-          if tag.value is None or tag.value == etag.value:
+          if pv.value_test(None) or pv == etag.as_polyvalue():
             session.delete(etag)
         self._update_multivalues(name, (), session=session)
         return etag
