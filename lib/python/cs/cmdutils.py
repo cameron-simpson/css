@@ -665,5 +665,5 @@ class BaseCommand:
           continue
         print(' ', subusage.replace('\n', '\n    '))
     if unknown:
-      warning("I know: %s",', '.join(sorted(subcmds.keys())))
+      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
