@@ -986,7 +986,6 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
         '''
-        tag = Tag(name, value)
         tags_table = orm.tags
         etag = tags_table.lookup1(
             session=session, entity_id=self.id, name=name
