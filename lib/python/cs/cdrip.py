@@ -513,6 +513,7 @@ class MBDB(MultiOpenMixin):
   TAG_NAME_TYPES = {
       'artist_credit': 'artist',
       'begin_area': 'area',
+      'end_area': 'area',
       'label_info': 'label',
       'medium': 'disc',
       'release_event': 'event',
