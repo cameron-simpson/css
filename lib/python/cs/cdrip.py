@@ -559,10 +559,17 @@ class _MBTagSet(SQLTagSet):
   def resolve_ids(self, type_name, ids: list, no_check_uuid=False):
     ''' Resolve ids against a type.
     '''
-    return [
-        self.by_typed_id(type_name, id, no_check_uuid=no_check_uuid)
-        for id in ids
-    ]
+    resolved = []
+    for item in ids:
+      with Pfx("item=%s", r(item)):
+        if isinstance(item, dict):
+          id = item[type_name]
+        else:
+          id = item
+        resolved.append(
+            self.by_typed_id(type_name, id, no_check_uuid=no_check_uuid)
+        )
+    return resolved
 
 class MBArtist(_MBTagSet):
   ''' A Musicbrainz artist entry.
