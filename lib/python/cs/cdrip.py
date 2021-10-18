@@ -494,7 +494,12 @@ class _MBTagSet(SQLTagSet):
 
   def dump(self, keys=None, **kw):
     if keys is None:
-      keys = [k for k in self.keys() if not k.startswith(self.MB_QUERY_PREFIX)]
+      keys = [
+          k for k in self.keys() if (
+              not k.startswith(self.MB_QUERY_PREFIX)
+              and not k.endswith('_relation')
+          )
+      ]
     return super().dump(keys=keys, **kw)
 
   @property
