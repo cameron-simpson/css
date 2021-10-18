@@ -137,7 +137,7 @@ class CDRipCommand(BaseCommand):
       with mbdb:
         mbdb_attrs = {}
         try:
-          dev_info = pfx_call(discid.read, device=self.options.device)
+          dev_info = pfx_call(discid.read, device=options.device)
         except discid.disc.DiscError as e:
           warning("no disc information: %s", e)
         else:
@@ -160,7 +160,8 @@ class CDRipCommand(BaseCommand):
           -R  Explicitly refresh the entity before dumping it.
           If no entities are supplied, dump the entity for the disc in the CD drive.
     '''
-    mbdb = self.options.mbdb
+    options = self.options
+    mbdb = options.mbdb
     sqltags = mbdb.sqltags
     do_refresh = False
     if argv and argv[0] == '-R':
@@ -168,7 +169,7 @@ class CDRipCommand(BaseCommand):
       do_refresh = True
     if not argv:
       if mbdb.dev_info:
-        argv = ['disc.' + dev_info.id]
+        argv = ['disc.' + mbdb.dev_info.id]
       else:
         raise GetoptError("missing entities and no CD in the drive")
     q = ListQueue(argv)
