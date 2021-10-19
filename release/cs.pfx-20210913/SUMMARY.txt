@@ -1,0 +1,1 @@
+Pfx: do not fiddle with LookupError.args[0], it is the key.

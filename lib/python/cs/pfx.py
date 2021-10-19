@@ -55,7 +55,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20210906-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'description':
@@ -339,6 +339,8 @@ class Pfx(object):
       try:
         value = getattr(e, attr)
       except AttributeError:
+        continue
+      if value is None:
         continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):

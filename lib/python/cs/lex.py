@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from cs.x import X
+
 r'''
 Lexical analysis functions, tokenisers, transcribers:
 an arbitrary assortment of lexical and tokenisation functions useful
@@ -36,12 +36,12 @@ from typeguard import typechecked
 
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210906-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -1269,6 +1269,25 @@ _format_as = format_as  # for reuse in the format_as method below
 def format_attribute(method):
   ''' Mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
+
+      For example,
+      the `FormatableMixin.json` method is defined like this:
+
+          @format_attribute
+          def json(self):
+              return self.FORMAT_JSON_ENCODER.encode(self)
+
+      which allows a `FormatableMixin` subclass instance
+      to be used in a format string like this:
+
+          {instance:json}
+
+      to insert a JSON transcription of the instance.
+
+      It is recommended that methods marked with `@format_attribute`
+      have no side effects and do not modify state,
+      as they are intended for use in ad hoc format strings
+      supplied by an end user.
   '''
   method.is_format_attribute = True
   return method
@@ -1433,7 +1452,7 @@ class FormatableFormatter(Formatter):
   @classmethod
   def get_format_subspecs(cls, format_spec):
     ''' Parse a `format_spec` as a sequence of colon separated components,
-        return the components.
+        return a list of the components.
     '''
     subspecs = []
     offset = 0
@@ -1456,29 +1475,6 @@ class FormatableFormatter(Formatter):
     return subspecs
 
   @classmethod
-  def _format_field1(cls, value, format_subspec):
-    ''' Format a subspec of a larger colon separated `format_spec`
-        as from `format_field(value,format_spec)`.
-        Return the new value, which need not be a `str`;
-        the outer `format_field` call does a final conversion to an `FStr`.
-    '''
-    assert isinstance(format_subspec, str)
-    assert len(format_subspec) > 0
-    with Pfx("value=%r, format_subspec=%r", value, format_subspec):
-      # promote bare str to FStr
-      if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-        value = FStr(value)
-      try:
-        value.convert_via_method_or_attr
-      except AttributeError:
-        # promote to something with convert_via_method_or_attr
-        value = FStr(value)
-      value, offset = value.convert_via_method_or_attr(value, format_subspec)
-      if offset < len(format_subspec):
-        value = cls.get_subfield(value, format_subspec[offset:])
-    return value
-
-  @classmethod
   @pfx_method
   @typechecked
   def format_field(cls, value, format_spec: str):
@@ -1489,35 +1485,35 @@ class FormatableFormatter(Formatter):
         We actually recognise colon separated chains of formats
         and apply each format to the previously converted value.
         The final result is promoted to an `FStr` before return.
-
-        At each step, for the current value
-        we try `format(value)` first
-        then `FormattableMixin.convert_via_method_or_attr(value)`
-        then `FormattableMixin.convert_via_method_or_attr(FStr(value))`
-        in turn.
     '''
     # parse the format_spec into multiple subspecs
-    format_subspecs = cls.get_format_subspecs(format_spec) or ()
-    if format_subspecs:
-      if len(format_subspecs) == 1:
-        format_subspec, = format_subspecs
-        # no subdivision, call Formatter.format_field
-        try:
-          value = cls._format_field1(value, format_subspec)
-        except ValueError as e:
-          warning(
-              "%s.format_field(%s,%r): %s", cls.__name__, r(value),
-              format_spec, e
-          )
-          value = '{{{!r}:{}}}'.format(value, format_spec)
-      else:
-        # promote str to FStr before formatting
-        if type(value) is str:  # pylint: disable=unidiomatic-typecheck
-          value = FStr(value)
-        # chain the various subspecifications
-        for format_subspec in format_subspecs:
-          if format_subspec:
-            value = cls._format_field1(value, format_subspec)
+    format_subspecs = cls.get_format_subspecs(format_spec) or []
+    while format_subspecs:
+      format_subspec = format_subspecs.pop(0)
+      with Pfx("subspec %r", format_subspec):
+        assert isinstance(format_subspec, str)
+        assert len(format_subspec) > 0
+        with Pfx("value=%r, format_subspec=%r", value, format_subspec):
+          # promote bare str to FStr
+          if type(value) is str:  # pylint: disable=unidiomatic-typecheck
+            value = FStr(value)
+          if format_subspec[0].isalpha():
+            try:
+              value.convert_via_method_or_attr
+            except AttributeError:
+              # promote to something with convert_via_method_or_attr
+              if isinstance(value, str):
+                value = FStr(value)
+              else:
+                value = pfx_call(format, value, format_subspec)
+            value, offset = value.convert_via_method_or_attr(
+                value, format_subspec
+            )
+            if offset < len(format_subspec):
+              subspec_tail = format_subspec[offset:]
+              value = cls.get_subfield(value, subspec_tail)
+          else:
+            value = format(value, format_subspec)
     return FStr(value)
 
 @has_format_attributes

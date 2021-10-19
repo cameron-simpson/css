@@ -19,7 +19,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20201025-post'
+__version__ = '20210924-post'
 
 DISTINFO = {
     'description':
@@ -187,6 +187,18 @@ class Channel(object):
     '''
     if a:
       return self.put(*a)
+    return self.get()
+
+  def __iter__(self):
+    ''' A `Channel` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' `next(Channel)` calls `Channel.get()`.
+    '''
+    if self.closed:
+      raise StopIteration()
     return self.get()
 
   @not_closed
@@ -514,6 +526,12 @@ class ListQueue:
     '''
     with self._lock:
       self.queued.extend(items)
+
+  def insert(self, index, item):
+    ''' Insert `item` at `index` in the queue.
+    '''
+    with self._lock:
+      self.queued.insert(index, item)
 
   def __bool__(self):
     ''' A `ListQueue` looks a bit like a container,
