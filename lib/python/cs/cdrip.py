@@ -592,6 +592,45 @@ class MBDisc(_MBTagSet):
   ''' A Musicbrainz disc entry.
   '''
 
+  @cachedmethod
+  @pfx_method
+  def disc_info(self):
+    ''' Salient information about this disc as a `dict`.
+    '''
+    discid = self.mbkey
+    d = AttrableMapping(recordings=[], artist_names=[])
+    release_ids = self.release
+    if release_ids:
+      releases = self.resolve_ids('release', release_ids)
+      release, *_ = releases
+      release.dump()
+      print("==============")
+      artist_names = []
+      for artist in self.resolve_ids('artist', release.artist_credit):
+        artist.dump()
+        artist_names.append(artist.name_)
+      d['artist_names'] = artist_names
+      recordings = None
+      for medium in release.medium:
+        if discid in medium['disc-list']:
+          tracks = self.resolve_ids('track', medium['track-list'])
+          break
+      if recordings:
+        d['recordings'] = recordings
+      else:
+        warning("no matching medium found for discid %r", discid)
+    else:
+      warning("no .release, keys=%r", sorted(self.keys()))
+    return d
+
+  @property
+  def artist_names(self):
+    return self.disc_info().artist_names
+
+  @property
+  def recordings(self):
+    return self.disc_info().recordings
+
 class MBRecording(_MBTagSet):
   ''' A Musicbrainz recording entry.
   '''
