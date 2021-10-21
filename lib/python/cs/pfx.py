@@ -648,7 +648,7 @@ def XP(msg, *args, **kwargs):
       which prefixes the message with the current Pfx prefix.
   '''
   if args:
-    return X("%s: " + msg, prefix(), *args, **kwargs)
+    return X("%s%s" + msg, prefix(), DEFAULT_SEPARATOR, *args, **kwargs)
   return X(prefix() + DEFAULT_SEPARATOR + msg, **kwargs)
 
 def XX(prepfx, msg, *args, **kwargs):
