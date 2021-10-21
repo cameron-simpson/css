@@ -143,7 +143,8 @@ class CDRipCommand(BaseCommand):
         else:
           mbdb_attrs.update(dev_info=dev_info)
         with stackattrs(mbdb, **mbdb_attrs):
-          with stackattrs(options, fstags=fstags, mbdb=mbdb, verbose=True):
+          with stackattrs(options, fstags=fstags, mbdb=mbdb,
+                          sqltags=mbdb.sqltags, verbose=True):
 
             def on_signal(sig, frame):
               ''' Note signal and cancel the `RunState`.
@@ -153,6 +154,8 @@ class CDRipCommand(BaseCommand):
 
             with stack_signals([SIGINT, SIGTERM], on_signal):
               yield
+
+  cmd_dbshell = SQLTagsCommand.cmd_dbshell
 
   def cmd_dump(self, argv):
     ''' Usage: {cmd} [-R] [entity...]
