@@ -671,13 +671,15 @@ class MBDB(MultiOpenMixin, RunStateMixin):
 
   # Mapping of Tag names whose type is not themselves.
   # TODO: get this from the ontology type?
-  TAG_NAME_TYPES = {
-      'artist_credit': 'artist',
-      'begin_area': 'area',
-      'end_area': 'area',
-      'label_info': 'label',
+  TYPE_NAME_REMAP = {
+      'artist-credit': 'artist',
+      'begin-area': 'area',
+      'end-area': 'area',
+      'label-info': 'label',
       'medium': 'disc',
-      'release_event': 'event',
+      'release-event': 'event',
+      'release-group': 'release',
+      'track': 'recording',
   }
 
   # Mapping of query type names to default includes,
@@ -865,6 +867,26 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         else:
           raise TypeError("wrong type for recurse %s", r(recurse))
 
+  @classmethod
+  def key_type_name(cls, k):
+    ''' Derive a type name from a key name.
+        Return `(type_name,suffix)`.
+
+        A key such as `'disc-list'` will return `('disc','list')`.
+        A key such as `'recording'` will return `('recording',None)`.
+    '''
+    for suffix in 'count', 'list', 'relation-list', 'relation':
+      _suffix = '-' + suffix
+      type_name = cutsuffix(k, _suffix)
+      if type_name is not k:
+        break
+    else:
+      type_name = k
+      suffix = None
+    type_name = cls.TYPE_NAME_REMAP.get(type_name, type_name)
+    return type_name, suffix
+
+  ##@pfx_method
   @typechecked
   def apply_dict(
       self,
@@ -900,17 +922,7 @@ class MBDB(MultiOpenMixin, RunStateMixin):
         if k == 'id':
           continue
         # derive tag_name and field role (None, count, list)
-        for suffix in 'count', 'list':
-          _suffix = '-' + suffix
-          tag_name = cutsuffix(k, _suffix)
-          if tag_name is not k:
-            break
-        else:
-          tag_name = k
-          suffix = None
-        tag_name = tag_name.replace('-', '_')
-        if tag_name == 'name':
-          tag_name = 'name_'
+        type_name, suffix = self.key_type_name(k)
         # note expected counts
         if suffix == 'count':
           assert isinstance(v, int)
