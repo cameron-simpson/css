@@ -615,6 +615,19 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     try:
       return self[attr]
     except KeyError:
+
+      def supergetattr(attr):
+        ''' Function to fetch via the superclass.
+        '''
+        try:
+          sgattr = super().__getattr__
+        except AttributeError:
+          raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
+        return sgattr(attr)
+
+      if not attr.startswith('_'):
+        return supergetattr(attr)
+      # no magic for names commencing with an underscore
       try:
         return self.auto_infer(attr)
       except ValueError:  # as e:
@@ -663,11 +676,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         attr_ = attr + '.'
         if any(map(lambda k: k.startswith(attr_) and k > attr_, self.keys())):
           return self.subtags(attr)
-      try:
-        super_getattr = super().__getattr__
-      except AttributeError:
-        raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
-      return super_getattr(attr)
+      return supergetattr(attr)
 
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
