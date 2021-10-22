@@ -619,11 +619,13 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       return self[attr]
     except KeyError:
 
+      sup = super()
+
       def supergetattr(attr):
         ''' Function to fetch via the superclass.
         '''
         try:
-          sgattr = super().__getattr__
+          sgattr = sup.__getattr__
         except AttributeError:
           raise AttributeError(type(self).__name__ + '.' + attr)  # pylint: disable=raise-missing-from
         return sgattr(attr)
