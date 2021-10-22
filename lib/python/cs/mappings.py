@@ -967,8 +967,9 @@ class AttrableMappingMixin(object):
     try:
       return self[attr]
     except KeyError:
+      cls = type(self)
       try:
-        return self.ATTRABLE_MAPPING_DEFAULT
+        return cls.ATTRABLE_MAPPING_DEFAULT
       except AttributeError:
         names_msgs = []
         ks = list(self.keys())
