@@ -103,10 +103,10 @@ from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
 DISTINFO = {
-    'keywords': ["python2"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
     ],
     'entry_points': {
         'console_scripts': [
