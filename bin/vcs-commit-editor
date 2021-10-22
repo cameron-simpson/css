@@ -2,7 +2,7 @@
 #
 # Wrapper for $EDITOR for vcs commits to append the changes for inquisition
 # while composing the change report.
-#	- Cameron Simpson <cs@zip.com.au> 09mar2002
+#	- Cameron Simpson <cs@cskk.id.au> 09mar2002
 #
 
 cmd=$0

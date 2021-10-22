@@ -2,7 +2,7 @@
 #
 # Construct a .cvsignore file and commit it.
 # Should only be run when there is nothing more to add to CVS maintenance.
-#	- Cameron Simpson <cs@zip.com.au> 28dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 28dec2001
 #
 
 cvs -q diff | sed -n -e '/^? \.cvsignore$/d' -e 's:^? \([^ /][^ /]*\)$:\1:p' >>.cvsignore

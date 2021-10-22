@@ -1,2 +1,2 @@
 #!/bin/sh
-exec du -h ${1+"$@"}
+du -h ${1+"$@"} | sort -h

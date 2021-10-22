@@ -6,7 +6,7 @@
 # about what you want. Based heavily on mkinitrd and the
 #	/usr/src/linux/Documentation/ramdisk.txt
 # file.
-#	- Cameron Simpson <cs@zip.com.au> 23jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 23jul2000
 #
 
 : ${TMPDIR:=/tmp}

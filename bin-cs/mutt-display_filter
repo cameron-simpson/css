@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Mutt display filter, whose behaviour adjusts accoridng to some flags.
+#   - Cameron Simpson <cs@cskk.id.au> 29jan2017
+#
+
+if flag MUTT_ROT13
+then  tr '[A-Z][a-z]' '[N-Z][A-M][n-z][a-m]'
+else  cat
+fi \
+| if flag MUTT_UNTOPPOST
+  then  untoppost
+  else  cat
+  fi \
+| mutt-highlight

@@ -2,7 +2,7 @@
 #
 # Show all machines on mars (meaning they're not in our VMPS table, but are plugged in).
 # Incantation from Andrew Raphael.
-#	- Cameron Simpson <cs@zip.com.au> 18oct2002
+#	- Cameron Simpson <cs@cskk.id.au> 18oct2002
 #
 
 tmpf=${TMPDIR:-/tmp}/svl$$

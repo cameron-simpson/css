@@ -4,7 +4,7 @@
 # rewriting the To: header to show the target address.
 # This is really so I can filter it at GMail, which has
 # rather primitive filter rules.
-#       - Cameron Simpson <cs@zip.com.au> 24may2008
+#       - Cameron Simpson <cs@cskk.id.au> 24may2008
 #
 
 : ${TMPDIR:=/tmp}

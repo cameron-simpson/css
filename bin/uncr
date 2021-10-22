@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Translate CR into NL.
-#   - Cameron Simpson <cs@zip.com.au> 09jun2015
+#   - Cameron Simpson <cs@cskk.id.au> 09jun2015
 #
 
 if [ $# -gt 0 ]

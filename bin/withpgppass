@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run a command with $PGPPASS set (typically "ring -p" which does multiple pgp invocations).
-#	- Cameron Simpson <cs@zip.com.au> 03may2002
+#	- Cameron Simpson <cs@cskk.id.au> 03may2002
 #
 
 [ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }

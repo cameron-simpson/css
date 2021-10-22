@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Merge .orig file litter with main files using the specified merge command.
-#       - Cameron Simpson <cs@zip.com.au> 17mar2012
+#       - Cameron Simpson <cs@cskk.id.au> 17mar2012
 #
 
 cmd=`basename "$0"`

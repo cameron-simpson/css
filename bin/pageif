@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run a command, piping into a pager if stdout is a tty.
-#	- Cameron Simpson <cs@zip.com.au> 27feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 27feb2000
 #
 
 : ${PAGER:=less}

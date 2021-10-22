@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Eject the current CDROM or similar.
+#   - Cameron Simpson <cs@cskk.id.au> 31may2016
+#
+
+set -ue
+
+[ $# -gt 0 ] || set -- $(osx-cd-device)
+set -x
+exec diskutil eject "$@"

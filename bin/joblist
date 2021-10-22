@@ -3,7 +3,7 @@
 # Report the specified fields from all jobs.
 # This is really a speed thing for scripts wanting several attributes from several jobs.
 # See fvwm-menu-jobs for example use.
-#	- Cameron Simpson <cs@zip.com.au> 14jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 14jul2003
 #
 
 idset=timer

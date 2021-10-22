@@ -1,0 +1,6 @@
+  lib/python/cs/excutils.py: cs.excutils: autopep8
+  lib/python/cs/excutils.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/excutils.py: cs.excutils: a bit of a cleanup
+  lib/python/cs/excutils.py: cs.excutils: remove debug
+  lib/python/cs/excutils.py: cs.excutils: @unattributable and @safe_property decorators, used to protect properties from inner AttributeErrors
+  lib/python/cs/excutils.py: cs.excutils: bugfix @unattributable

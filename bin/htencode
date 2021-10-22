@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -f
 #
 # Turn plain text into HTML-safe plain text.
-#	- Cameron Simpson <cs@zip.com.au> 09jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 09jul2003
 #
 
 s/\&/\&amp;/g

@@ -1,0 +1,5 @@
+  lib/python/cs/clockutils.py: cs.clockutils: autopep8
+  lib/python/cs/clockutils.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/clockutils.py: merge default ==> beyonwiz
+  lib/python/cs/clockutils.py: my email address has changed - update Python code
+  lib/python/cs/clockutils.py: cs.clockutils: clean some lint, update docstrings

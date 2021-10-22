@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Test that a process exists (and may be signalled).
-#	- Cameron Simpson <cs@zip.com.au> 28mar2005
+#	- Cameron Simpson <cs@cskk.id.au> 28mar2005
 #
 
 : ${VARRUN:=$HOME/var/run}

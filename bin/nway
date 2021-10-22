@@ -13,7 +13,7 @@
 # the subcommand you need a fair amount of input before things block,
 # so the "block the expensive branch and let the others flow" isn't as
 # even as you might hope. But the "let the others flow" half should work fine.
-#	- Cameron Simpson <cs@zip.com.au> 20oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 20oct2000
 #
 
 : ${TMPDIR:=/tmp}

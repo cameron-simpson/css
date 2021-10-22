@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: cs.deco: @fmtdoc: add caveat against misuse of this decorator

@@ -2,7 +2,7 @@
 #
 # Export a CVS repository tree to Mercurial.
 # Doesn't understand branches.
-#       - Cameron Simpson <cs@zip.com.au> 20apr2007
+#       - Cameron Simpson <cs@cskk.id.au> 20apr2007
 #
 
 set -ue

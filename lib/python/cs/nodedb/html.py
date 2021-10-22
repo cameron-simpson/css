@@ -1,11 +1,10 @@
 #!/usr/bin/python
 #
 # HTML transcription, pulled and adapted from cs.nodedb.httpd.
-#       - Cameron Simpson <cs@zip.com.au> 15jan2012
+#       - Cameron Simpson <cs@cskk.id.au> 15jan2012
 #
 
 import sys
-import cherrypy
 from io import StringIO
 import cs.html
 from cs.py3 import StringTypes
@@ -27,7 +26,9 @@ def _noderef(N, prefix, label=None, ext=None):
       ext: suffix for the link URL, default '.html'.
   '''
   if not prefix.endswith('/'):
-    raise ValueError("noderef(N=%s,...): prefix does not end in a slash: %s" % (N, prefix))
+    raise ValueError(
+        "noderef(N=%s,...): prefix does not end in a slash: %s" % (N, prefix)
+    )
   if prefix == '/': raise ValueError("bad prefix: %s" % (prefix,))
   if label is None:
     label = N.name
@@ -69,7 +70,7 @@ def tag_from_value(value, CP):
   if isinstance(value, Node):
     tag = value.html(prefix=CP.nodes_prefix)
   elif type(value) in StringTypes:
-    lines = [ line.rstrip() for line in value.rstrip().split('\n') ]
+    lines = [line.rstrip() for line in value.rstrip().split('\n')]
     taglist = []
     for line in lines:
       linetags = []
@@ -93,20 +94,20 @@ def tag_from_value(value, CP):
   return tag
 
 def TABLE_from_rows(rows, CP):
-  trows = [ TR( *[ TD(tag_from_value(v, CP)) for v in row ] )
-            for row in rows
-          ]
+  trows = [TR(*[TD(tag_from_value(v, CP)) for v in row]) for row in rows]
   return ['TABLE', {'BORDER': 1}] + trows
 
 def TABLE_from_Node(node, CP):
-  return TABLE_from_rows( [ [attr, node[attr]] for attr in sorted(node.keys()) ], CP )
+  return TABLE_from_rows(
+      [[attr, node[attr]] for attr in sorted(node.keys())], CP
+  )
 
 def rows_from_Node(node):
   for attr in sorted(node.keys()):
     yield attr, node[attr]
 
 def TABLE_from_Nodes_wide(nodes, CP, leadattrs=None):
-  return TABLE_from_rows( rows_from_Nodes_wide(nodes, leadattrs=leadattrs), CP )
+  return TABLE_from_rows(rows_from_Nodes_wide(nodes, leadattrs=leadattrs), CP)
 
 def rows_from_Nodes_wide(nodes, leadattrs=None):
   ''' A generator to yield lists of values for table rows.
@@ -120,14 +121,18 @@ def rows_from_Nodes_wide(nodes, leadattrs=None):
   attrs = set()
   for N in nodes:
     attrs.update(N.keys())
-  leadattrs = [ attr for attr in leadattrs if attr == 'TYPE' or attr == 'NAME' or attr in attrs ]
+  leadattrs = [
+      attr for attr in leadattrs
+      if attr == 'TYPE' or attr == 'NAME' or attr in attrs
+  ]
   attrs.difference_update(leadattrs)
   attrs = list(leadattrs) + sorted(attrs)
 
   yield attrs
   for N in nodes:
-    yield [ ( N.type if attr == 'TYPE'
-              else N if attr == 'NAME'
-              else N.get(attr, ())
-            ) for attr in attrs
-          ]
+    yield [
+        (
+            N.type
+            if attr == 'TYPE' else N if attr == 'NAME' else N.get(attr, ())
+        ) for attr in attrs
+    ]

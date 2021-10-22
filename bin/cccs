@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Simple way to invoke cc for my code.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 csinc=$HOME/rc/include

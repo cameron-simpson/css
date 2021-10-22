@@ -1,0 +1,44 @@
+  lib/python/cs/fileutils.py: cs.fileutils: mkdirn: bugfix access to mkdir errno value
+  lib/python/cs/fileutils.py: cs.fileutils: rename maxFilenameSuffix to max_suffix
+  lib/python/cs/fileutils.py: cs.fileutils: change some variable names from "dir" to "dirpath"
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: fix typo in docstring
+  lib/python/cs/fileutils.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/fileutils.py: cs.fileutils: lockfile: invert test on exception, shuffle code to match
+  lib/python/cs/fileutils.py: cs.fileutils: lockfile: tweak TimeoutError format text
+  lib/python/cs/fileutils.py: cs.fileutils: lockfile: move post-lock actions outside get-lock loop
+  lib/python/cs/fileutils.py: cs.fileutils: pull in OpenSocket file-like socket wrapper from cs.venti.tcp
+  lib/python/cs/fileutils.py: cs.fileutils: OpenSocket: close and release the dup()ed socket file
+  lib/python/cs/fileutils.py: cs.fileutils,cs.socketutils: move cs.fileutils.OpenSocket into new module cs.socketutils
+  lib/python/cs/fileutils.py: rename cs.asynchron.Asynchron to Result
+  lib/python/cs/fileutils.py: cs.fileutils: new Tee class, for copying output to multiple files
+  lib/python/cs/README-fileutils.rst: README-fileutils.rst: mention the Tee class
+  lib/python/cs/fileutils.py: cs.fileutils: new function copy_data to copy data from one file to another; chunks_of: redo default rsize
+  lib/python/cs/fileutils.py: cs.fileutils: bugfix copy_data: count bytes down
+  lib/python/cs/fileutils.py: cs.fileutils: Tee.flush: remove unused parameter, left from cut/paste
+  lib/python/cs/fileutils.py: cs.fileutils: add UNTESTED tee() context manage to copy file output to a secondary file; docstring fix for Tee class
+  lib/python/cs/fileutils.py: cs.fileutils: NullFile class which discrads writes
+  lib/python/cs/fileutils.py: cs.fileutils: docstring grammar fix
+  lib/python/cs/fileutils.py: cs.fileutils: new class SavingFile to accrue output and move to specified pathname when complete
+  lib/python/cs/fileutils.py: Automated merge with file:///Users/cameron/hg/css
+  lib/python/cs/fileutils.py: merge default ==> metaproxy
+  lib/python/cs/fileutils.py: [metaproxy] merge abandoned branch 13167:60f0fe1f8d96
+  lib/python/cs/fileutils.py: merge default ==> metaproxy
+  lib/python/cs/fileutils.py: cs.fileutils: rewrite: collect data chunks from source file iteratively, avoids huge memory usage for large source files
+  lib/python/cs/fileutils.py: cs.fileutils: rewrite: if `do_rename`, make the temporary file in the same directory as `filepath`
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.dirname directly
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.isabs directly
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.basename directly
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.abspath directly
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.join directly as joinpath
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.isdir directly
+  lib/python/cs/fileutils.py: cs.fileutils: import os.path.exists directly as existspath
+  lib/python/cs/fileutils.py: cs.fileutils: rewrite: accept data as a list, special case it; needs rethink
+  lib/python/cs/fileutils.py: cherrypick metaproxy ==> default: cs.fileutils: pull read-n-bytes-of-data logic from copy_data into file_data function, make copy_data and read_data wrappers
+  lib/python/cs/fileutils.py: cs.fileutils: file_data: EOF; if copied == 0 do not iussue warning because immediate EOF is ok, only partial reads issue warnings
+  lib/python/cs/fileutils.py: cs.fileutils: read_data: optimise to avoid copying bytes data for 0 or 1 chunks
+  lib/python/cs/fileutils.py: cs.fileutils: non-threadsafe implementation of pread if os.pread does not exist
+  lib/python/cs/fileutils.py: cs.fileutils: new function seekable() to probe a file for seekability
+  lib/python/cs/fileutils.py: cs.fileutils: bugfix order or arguments to pread function
+  lib/python/cs/fileutils.py: cs.fileutils: SharedAppendFile: provide new .open(filemode) context manager for allowing direct file output for external users; remove ._open to ._open_fp to reduce confusion with .open and .close
+  lib/python/cs/fileutils.py: cs.fileutils: present the logic to create a lock file as makelockfile(), split out from the lockfile context manager; this is used when a context manager does not suit
+  lib/python/cs/fileutils.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

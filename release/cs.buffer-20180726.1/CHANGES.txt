@@ -1,0 +1,1 @@
+  lib/python/cs/buffer.py: cs.buffer: improve docstring for @chunky

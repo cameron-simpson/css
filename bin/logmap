@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manipulate the log map.
-#	- Cameron Simpson <cs@zip.com.au>, 21jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 21jul94
 #
 
 use strict qw(vars);

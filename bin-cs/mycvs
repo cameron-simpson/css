@@ -3,7 +3,7 @@
 # CVS mucks file permissions about. Links, too.
 # This stub preserves file permissions.
 # Also does some extra things (ls, check, ...).
-#	- Cameron Simpson <cs@zip.com.au> 08apr97
+#	- Cameron Simpson <cs@cskk.id.au> 08apr97
 #
 
 require 'flush.pl';

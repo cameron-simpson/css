@@ -1,0 +1,9 @@
+  lib/python/cs/README-excutils.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-excutils.rst: merge default ==> beyonwiz
+  lib/python/cs/README-excutils.rst: merge default ==> iphoto
+  lib/python/cs/README-excutils.rst: merge default ==> venti
+  lib/python/cs/README-excutils.rst: merge default ==> later
+  lib/python/cs/README-excutils.rst: merge later ==> pilfer
+  lib/python/cs/README-excutils.rst: merge default ==> media
+  lib/python/cs/excutils.py: cs.excutils: @logexc: handle missing func.__name__ (eg from a partial; not using cs.py/func.funcname to avoid circular import
+  lib/python/cs/excutils.py: cs.excutils: update docstrings, clean lint

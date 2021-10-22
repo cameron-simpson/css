@@ -2,7 +2,7 @@
 #
 # Report the tape label of the specified jukebox slot,
 # or the reverse.
-#       - Cameron Simpson <cs@zip.com.au> 09mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 09mar2008
 #
 
 cmd=`basename "$0"`

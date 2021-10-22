@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # A mailrc object.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse tcpdump logs and emit data suitable for use by logtally.
-#	- Cameron Simpson <cs@zip.com.au> 07may99
+#	- Cameron Simpson <cs@cskk.id.au> 07may99
 #
 
 use strict qw(vars);

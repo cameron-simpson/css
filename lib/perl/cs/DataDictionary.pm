@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Load and use data dictionaries.
-#	- Cameron Simpson <cs@zip.com.au> 11mar1997
+#	- Cameron Simpson <cs@cskk.id.au> 11mar1997
 #
 
 use strict qw(vars);

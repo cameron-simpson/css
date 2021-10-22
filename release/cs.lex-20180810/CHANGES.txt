@@ -1,0 +1,4 @@
+  lib/python/cs/lex.py: cs.lex: new functions get_decimal_value and get_hexadecimal_value returning (int, offset)
+  lib/python/cs/README-lex.rst: merge default ==> media
+  lib/python/cs/lex.py: cs.lex: new stripped_dedent function, a slightly smarter textwrap.dedent
+  lib/python/cs/lex.py: cs.lex: strip back the module docstring since I now autogenerate the function summarises

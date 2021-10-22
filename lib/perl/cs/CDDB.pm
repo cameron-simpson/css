@@ -5,7 +5,7 @@
 # discid function outsourced to a CDDB daemon (because both
 # FreeDB.pm and CDDB_get.pm appear to have subtly broken
 # algorithms).
-#       - Cameron Simpson <cs@zip.com.au> 10sep2001
+#       - Cameron Simpson <cs@cskk.id.au> 10sep2001
 #
 
 =head1 NAME
@@ -854,7 +854,7 @@ CDDB_get(3), FreeDB(3), cddiscinfo(1cs), cdtoc(1cs), cdsubmit(1cs)
 
 =head1 AUTHOR
 
-Cameron Simpson <cs@zip.com.au> 10sep2001
+Cameron Simpson <cs@cskk.id.au> 10sep2001
 
 =cut
 

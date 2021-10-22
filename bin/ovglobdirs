@@ -2,7 +2,7 @@
 #
 # Overlay specific subtrees of a directory tree onto another.
 # Useful for exporting particular subtrees to another area.
-#	- Cameron Simpson <cs@zip.com.au> 04may2005
+#	- Cameron Simpson <cs@cskk.id.au> 04may2005
 #
 
 cmd=`basename "$0"` || exit 1

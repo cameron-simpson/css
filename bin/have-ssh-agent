@@ -2,7 +2,7 @@
 #
 # Test whether we have an ssh-agent to hand.
 # 0: ok and has some keys, 1: ok but no keys, 2: no agent
-#	- Cameron Simpson <cs@zip.com.au> 03jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 03jul2004
 #
 
 set -ue

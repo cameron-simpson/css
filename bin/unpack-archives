@@ -2,7 +2,7 @@
 #
 # Subsidiary script to mailrepack, to unpack archive files present.
 # If arguments supplied, run that command after unpacking.
-#	- Cameron Simpson <cs@zip.com.au> 09jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 09jul2002
 #
 
 for f in ./*.z

@@ -2,267 +2,331 @@
 #
 # Recode of mklinks in Python, partly for the exercise and partly to
 # improve the algorithm.
-#       - Cameron Simpson <cs@zip.com.au> 21may2006
+#       - Cameron Simpson <cs@cskk.id.au> 21may2006
+#
+# 27dec2017: recode again: prefer younger files over older files, cleaner logic.
 #
 
-import sys
+r'''
+mklinks: tool for finding and hardlinking identical files
+
+Mklinks walks supplied paths looking for files with the same content,
+based on a cryptographic checksum of their content. It hardlinks
+all such files found, keeping the newest version.
+
+Unlike some rather naive tools out there, mklinks only compares
+files with other files of the same size, and is hardlink aware - a
+partially hardlinked tree is processed efficiently and correctly.
+'''
+
+from __future__ import print_function
+from collections import defaultdict
+from getopt import GetoptError
+from hashlib import sha1 as hashfunc
 import os
-import os.path
-import filecmp
+from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
-from collections import namedtuple
-import filecmp
+import sys
 from tempfile import NamedTemporaryFile
-if sys.hexversion >= 0x02050000:
-  from hashlib import md5
-else:
-  from md5 import md5
-from cs.logutils import setup_logging, Pfx, error, warn, info, debug
-from cs.py3 import StringTypes
+from cs.cmdutils import BaseCommand
+from cs.fileutils import read_from, common_path_prefix, shortpath
+from cs.logutils import status, warning, error
+from cs.progress import progressbar
+from cs.pfx import Pfx, pfx_method
+from cs.py.func import prop
+from cs.units import BINARY_BYTES_SCALE
+from cs.upd import UpdProxy, Upd, print  # pylint: disable=redefined-builtin
 
-# amount of file to read and checksum before trying whole file compare
-HASH_PREFIX_SIZE = 8192
+__version__ = '20210404-post'
 
-def main(argv, stdin=None):
-  argv = list(argv)
-  if stdin is None:
-    stdin = sys.stdin
+DISTINFO = {
+    'description':
+    "Tool for finding and hardlinking identical files.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.cmdutils>=20210404',
+        'cs.fileutils>=20200914',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.progress>=20200718.3',
+        'cs.py.func',
+        'cs.units',
+        'cs.upd>=20200914',
+    ],
+    'entry_points': {
+        'console_scripts': ['mklinks = cs.app.mklinks:main'],
+    },
+}
 
-  cmd = os.path.basename(argv.pop(0))
-  setup_logging(cmd)
+def main(argv=None):
+  ''' Main command line programme.
+  '''
+  return MKLinksCmd(argv).run()
 
-  doit = True
+class MKLinksCmd(BaseCommand):
+  ''' Main programme command line class.
+  '''
 
-  if argv and argv[0] == '-n':
-    doit = False
-    argv.pop(0)
+  USAGE_FORMAT = r'''Usage: {cmd} paths...
+          Hard link files with identical contents.
+          -n    No action. Report proposed actions.'''
 
-  if not argv:
-    argv = ['-']
+  GETOPT_SPEC = 'n'
 
-  xit = 0
-
-  FDB = FileInfoDB()
-  for arg in argv:
-    if arg == '-':
-      if not hasattr(stdin, 'isatty') or not stdin.isatty():
-        error("refusing to read filenames from a terminal")
-        return 1
-      lineno = 0
-      for line in stdin:
-        lineno += 1
-        if not line.endswith('\n'):
-          error("stdin:%d: unexpected EOF", lineno)
-          return 1
-        path = line[:-1]
-        xit |= process(path, FDB, doit)
-    else:
-      xit |= process(arg, FDB, doit)
-  return xit
-
-def process(path, FDB, doit):
-  xit = 0
-  with Pfx("process(%s)", path):
-    if os.path.isdir(path):
-      for dirpath, dirnames, filenames in os.walk(path):
-        for filename in sorted(filenames):
-          xit |= process(os.path.join(dirpath, filename), FDB, doit)
-        dirnames[:] = sorted(dirnames)
-    else:
-      fi = FDB[path]
-      if fi is None:
-        xit = 1
-      else:
-        if fi.isfile:
-          fi.resolve(doit=doit)
-        else:
-          ##info("skip, not a regular file")
-          pass
-  return xit
-
-IKey = namedtuple('IKey', 'ino dev')
-
-class FileInfoDB(dict):
-
-  def __init__(self):
-    dict.__init__(self)
-    # set of FileInfos with a given ikey
-    self._fis_by_ikey = {}
-    # set of primary FileInfos of a given size
-    self._primes_by_size = {}
-    # primary FileInfo by ikey
-    # either the primary FileInfo for that ikey,
-    # or the FileInfo to which this ikey should be hardlinked
-    self._prime_by_ikey = {}
-
-  def __getitem__(self, path):
-    if path in self:
-      fi = dict.__getitem__(self, path)
-    else:
-      fi = FileInfo(path, self)
-      try:
-        fi.lstat
-      except OSError as e:
-        error("%s: %s" % (path, e))
-        return None
-      self.learn(fi)
-    return fi
-
-  def learn(self, fi):
-    dict.__setitem__(self, fi.path, fi)
-    ikey = fi.ikey
-    _by_ikey = self._fis_by_ikey
-    if ikey not in _by_ikey:
-      _by_ikey[ikey] = set((fi,))
-    else:
-      _by_ikey[ikey].add(fi)
-
-  def relearn(self, fi):
-    oikey = fi.ikey
-    osize = fi.size
-    if oikey in self._prime_by_ikey:
-      del self._prime_by_ikey[oikey]
-    self._primes_by_size[osize].discard(fi)
-    dict.__delitem__(self, fi.path)
-    self._fis_by_ikey[oikey].remove(fi)
-    fi.reset()
-    self.learn(fi)
-    assert fi.size == osize
-
-  def __setitem__(self, k, v):
-    raise NotImplementedError("populated by __getitem__")
-
-  def __delitem__(self, k, v):
-    raise NotImplementedError("populated by __getitem__")
-
-  def find_primary(self, fi):
-    ''' Locate the primary for `fi`.
-        If there is a designated primary for `fi.ikey`, return it.
-        If not, look for an identical file. If found, designate it
-        as the primary for that ikey and return it. Otherwise
-        designate `fi` as the primary and return it.
+  def apply_defaults(self):
+    ''' Set up the default values in `options`.
     '''
-    ikey = fi.ikey
-    try:
-      prime = self._prime_by_ikey[ikey]
-      ##info("prime[ikey=%r] = %s", ikey, prime.path)
-      return prime
-    except KeyError:
-      pass
-    prime = None
-    samesize = self._primes_by_size.setdefault(fi.size, set())
-    for other in samesize:
-      oikey = other.ikey
-      assert oikey != ikey
-      if ikey.dev != oikey.dev:
-        # on another device - can't hardlink - skip it
-        continue
-      if fi == other:
-        prime = other
-        break
-    if not prime:
-      prime = fi
-      self._primes_by_size[fi.size].add(fi)
-    self._prime_by_ikey[ikey] = prime
-    return prime
+    self.options.no_action = False
+
+  def apply_opts(self, opts):
+    ''' Apply command line options.
+    '''
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '-n':
+          self.options.no_action = True
+        else:
+          raise RuntimeError("unhandled option")
+
+  def main(self, argv):
+    ''' Usage: mklinks [-n] paths...
+          Hard link files with identical contents.
+          -n    No action. Report proposed actions.
+    '''
+    if not argv:
+      raise GetoptError("missing paths")
+    options = self.options
+    linker = Linker()
+    with options.upd.insert(1) as step:
+      # scan the supplied paths
+      for path in argv:
+        step("scan " + path + ' ...')
+        with Pfx(path):
+          linker.scan(path)
+      step("merge ...")
+      linker.merge(no_action=options.no_action)
 
 class FileInfo(object):
+  ''' Information about a particular inode.
+  '''
 
-  def __init__(self, path, db):
-    self.path = path
-    self.db = db
-    self.reset()
+  # pylint: disable=too-many-arguments
+  def __init__(self, dev, ino, size, mtime, paths=()):
+    self.dev = dev
+    self.ino = ino
+    self.size = size
+    self.mtime = mtime
+    self.paths = set(paths)
+    self._checksum = None
 
-  def reset(self):
-    self._lstat = None
-    self._prefix_hash = None
+  def __str__(self):
+    return (
+        "%d:%d:size=%d:mtime=%d" % (self.dev, self.ino, self.size, self.mtime)
+    )
 
-  def __hash__(self):
-    return id(self)
+  def __repr__(self):
+    return "FileInfo(%d,%d,%d,%d,paths=%r)" \
+           % (self.dev, self.ino, self.size, self.mtime, self.paths)
 
-  def __eq__(self, other):
-    ''' Compare this FileInfo with another file for equality of file contents.
+  @staticmethod
+  def stat_key(S):
+    ''' Compute the key `(dev,ino)` from the stat object `S`.
     '''
-    if isinstance(other, StringTypes):
-      other = self.db[other]
-    if self.samefile(other):
-      return True
-    if self.size != other.size:
-      return False
-    if self.prefix_hash != other.prefix_hash:
-      return False
-    return filecmp.cmp(self.path, other.path)
+    return S.st_dev, S.st_ino
 
-  def samefile(self, other):
-    if isinstance(other, StringTypes):
-      other = self.db[other]
-    return self is other or self.ikey == other.ikey
-
-  @property
-  def lstat(self):
-    _lstat = self._lstat
-    if _lstat is None:
-      _lstat = os.lstat(self.path)
-      self._lstat = _lstat
-    return _lstat
-
-  @property
-  def isfile(self):
-    return S_ISREG(self.lstat.st_mode)
-
-  @property
-  def ikey(self):
-    S = self.lstat
-    return IKey(S.st_ino, S.st_dev)
-
-  @property
-  def size(self):
-    return self.lstat.st_size
-
-  @property
-  def prefix_hash(self):
-    _hash = self._prefix_hash
-    if _hash is None:
-      with open(self.path, "rb") as fp:
-        _hash = md5(fp.read(HASH_PREFIX_SIZE)).digest()
-      self._prefix_hash = _hash
-    return _hash
-
-  @property
-  def primary(self):
-    ''' Return the primary file that matches this one, possibly self.
-        It will be:
-          - the primary of an other inode to which this should link
-          - the primary of this inode, possibly self
+  @prop
+  def key(self):
+    ''' The key for this file: `(dev,ino)`.
     '''
-    return self.db.find_primary(self)
+    return self.dev, self.ino
 
-  def resolve(self, doit):
-    ''' Become one with our primary.
-        If we are our primary or our primary has the same inode, do nothing.
-        If another is our primary, hardlink and update maps.
-        If the hardlink fails, become our own primary.
+  @prop
+  def path(self):
+    ''' The primary path for this file, or `None` if we have no paths.
     '''
-    assert self.isfile
-    with Pfx("resolve(%s)", self.path):
-      prime = self.primary
-      if prime is self or prime.ikey == self.ikey:
+    return sorted(self.paths)[0] if self.paths else None
+
+  @prop
+  def checksum(self):
+    ''' Checksum the file contents, used as a proxy for comparing the actual content.
+    '''
+    csum = self._checksum
+    if csum is None:
+      path = self.path
+      U = Upd()
+      pathspace = U.columns - 64
+      label = "scan " + (
+          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
+      )
+      with Pfx("checksum %r", path):
+        csum = hashfunc()
+        with open(path, 'rb') as fp:
+          length = os.fstat(fp.fileno()).st_size
+          read_len = 0
+          for data in progressbar(
+              read_from(fp, rsize=1024*1024),
+              label=label,
+              total=length,
+              units_scale=BINARY_BYTES_SCALE,
+              itemlenfunc=len,
+              update_frequency=128,
+              upd=U,
+          ):
+            csum.update(data)
+            read_len += len(data)
+          assert read_len == self.size
+      csum = csum.digest()
+      self._checksum = csum
+    return csum
+
+  def same_dev(self, other):
+    ''' Test whether two FileInfos are on the same filesystem.
+    '''
+    return self.dev == other.dev
+
+  def same_file(self, other):
+    ''' Test whether two FileInfos refer to the same file.
+    '''
+    return self.key == other.key  # pylint: disable=comparison-with-callable
+
+  def assimilate(self, other, no_action=False):
+    ''' Link our primary path to all the paths from `other`. Return success.
+    '''
+    ok = True
+    path = self.path
+    opaths = other.paths
+    pathprefix = common_path_prefix(path, *opaths)
+    vpathprefix = shortpath(pathprefix)
+    pathsuffix = path[len(pathprefix):]  # pylint: disable=unsubscriptable-object
+    with UpdProxy() as proxy:
+      proxy(
+          "%s%s <= %r", vpathprefix, pathsuffix,
+          list(map(lambda opath: opath[len(pathprefix):], sorted(opaths)))
+      )
+      with Pfx(path):
+        if self is other or self.same_file(other):
+          # already assimilated
+          return ok
+        assert self.same_dev(other)
+        for opath in sorted(opaths):
+          with Pfx(opath):
+            if opath in self.paths:
+              warning("already assimilated")
+              continue
+            if vpathprefix:
+              print(
+                  "%s: %s => %s" %
+                  (vpathprefix, opath[len(pathprefix):], pathsuffix)
+              )
+            else:
+              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
+            if no_action:
+              continue
+            odir = dirname(opath)
+            with NamedTemporaryFile(dir=odir) as tfp:
+              with Pfx("unlink(%s)", tfp.name):
+                os.unlink(tfp.name)
+              with Pfx("rename(%s, %s)", opath, tfp.name):
+                os.rename(opath, tfp.name)
+              with Pfx("link(%s, %s)", path, opath):
+                try:
+                  os.link(path, opath)
+                except OSError as e:
+                  error("%s", e)
+                  ok = False
+                  # try to restore the previous file
+                  with Pfx("restore: link(%r, %r)", tfp.name, opath):
+                    os.link(tfp.name, opath)
+                else:
+                  self.paths.add(opath)
+                  opaths.remove(opath)
+    return ok
+
+class Linker(object):
+  ''' The class which links files with identical content.
+  '''
+
+  def __init__(self, min_size=512):
+    self.sizemap = defaultdict(dict)  # file_size => FileInfo.key => FileInfo
+    self.keymap = {}  # FileInfo.key => FileInfo
+    self.min_size = min_size
+
+  @pfx_method
+  def scan(self, path):
+    ''' Scan the file tree.
+    '''
+    with UpdProxy() as proxy:
+      proxy.prefix = "scan %s: " % (path)
+      if isdir(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+          proxy("sweep " + relpath(dirpath, path))
+          for filename in progressbar(
+              sorted(filenames),
+              label=relpath(dirpath, path),
+              update_frequency=32,
+          ):
+            filepath = joinpath(dirpath, filename)
+            self.addpath(filepath)
+          dirnames[:] = sorted(dirnames)
+      else:
+        self.addpath(path)
+
+  def addpath(self, path):
+    ''' Add a new path to the data structures.
+    '''
+    with Pfx("addpath(%r)", path):
+      with Pfx("lstat"):
+        S = os.lstat(path)
+      if not S_ISREG(S.st_mode):
         return
-      assert self.ikey.dev == prime.ikey.dev
-      rpath = os.path.realpath(self.path)
-      rdir = os.path.dirname(rpath)
-      print("%s => %s" % (self.path, prime.path))
-      if doit:
-        with NamedTemporaryFile(dir=rdir) as tfp:
-          with Pfx("unlink(%s)", tfp.name):
-            os.unlink(tfp.name)
-          with Pfx("rename(%s, %s)", rpath, tfp.name):
-            os.rename(rpath, tfp.name)
-          with Pfx("link(%s, %s)", prime.path, rpath):
-            os.link(prime.path, rpath)
-      self.db.relearn(self)
+      if S.st_size < self.min_size:
+        return
+      key = FileInfo.stat_key(S)
+      FI = self.keymap.get(key)
+      if FI:
+        assert FI.key == key
+        FI.paths.add(path)
+      else:
+        FI = FileInfo(S.st_dev, S.st_ino, S.st_size, S.st_mtime, (path,))
+        assert FI.key == key  # pylint: disable=comparison-with-callable
+        self.keymap[key] = FI
+        assert key not in self.sizemap[S.st_size]
+        self.sizemap[S.st_size][key] = FI
 
-# TODO: subsume: promote self to primary, eg if link limit hit
+  @pfx_method
+  def merge(self, no_action=False):
+    ''' Merge files with equivalent content.
+    '''
+    # process FileInfo groups by size, largest to smallest
+    for _, FImap in sorted(self.sizemap.items(), reverse=True):
+      # order FileInfos by mtime (newest first) and then path
+      FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
+      size = FIs[0].size
+      with UpdProxy(text="merge size %d " % (size,)):
+        for i, FI in enumerate(FIs):
+          # skip FileInfos with no paths
+          # this happens when a FileInfo has been assimilated
+          if not FI.paths:
+            ##warning("SKIP, no paths")
+            continue
+          for FI2 in FIs[i + 1:]:
+            status(FI2.path)
+            assert FI.size == FI2.size
+            assert FI.mtime >= FI2.mtime
+            assert not FI.same_file(FI2)
+            if not FI.same_dev(FI2):
+              # different filesystems, cannot link
+              continue
+            if FI.checksum != FI2.checksum:
+              # different content, skip
+              continue
+            # FI2 is the younger, keep it
+            FI.assimilate(FI2, no_action=no_action)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

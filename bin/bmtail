@@ -2,7 +2,7 @@
 #
 # Batch multitail: generate and run a multlitail to watch multiple logs
 # in multiple subwindows.
-#       - Cameron Simpson <cs@zip.com.au> 16oct2010
+#       - Cameron Simpson <cs@cskk.id.au> 16oct2010
 # 
 
 cmd=$0

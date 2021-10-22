@@ -1,0 +1,8 @@
+  lib/python/cs/py/func.py: merge default ==> beyonwiz
+  lib/python/cs/py/func.py: cs.pyfunc: new decorator @prop which works just like the builtin @property, but transmutes internal AttributeError into RuntimeError, unmasking many bugs
+  lib/python/cs/py/func.py: cs.py.func: @prop: chain RuntimeError to original Attribute error if python 3 or later
+  lib/python/cs/py/func.py: cs.py.func: @prop: adjust exec() call for python 2
+  lib/python/cs/py/func.py: cs.py.func: @prop: replace exec with eval
+  lib/python/cs/py/func.py: cs.py.func, cs.app.maildb: leave some debugging in
+  lib/python/cs/py/func.py: cs.py.func: @prop: catch exception from evalled raise; FIXME: this is raising a SyntaxError, find out why
+  lib/python/cs/py/func.py: cs.py.func: handle syntax error from eval; TODO: need to investigate properly

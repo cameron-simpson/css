@@ -2,7 +2,7 @@
 #
 # Generate a snapshot of the new files in a distribution.
 # Uses chkfiles to track state. Writes a cpio file of the new files.
-#	- Cameron Simpson <cs@zip.com.au> 01sep96
+#	- Cameron Simpson <cs@cskk.id.au> 01sep96
 #
 
 snapdir=$HOME/etc/snap

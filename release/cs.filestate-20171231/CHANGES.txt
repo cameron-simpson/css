@@ -1,0 +1,7 @@
+  lib/python/cs/filestate.py: cs.filestate: separate module to share the FileState class
+  lib/python/cs/filestate.py: cs.filestate: fix call to isinstance
+  lib/python/cs/filestate.py: cs.filestate: drop .samefile method
+  lib/python/cs/filestate.py: cs.filestate: FileState: new `missing_ok` parameter to return None if the file is missing
+  lib/python/cs/filestate.py: cs.filestate: add _FileState.__eq__ to avoid testing the stat object itself, just the relevant attributes
+  lib/python/cs/filestate.py: my email address has changed - update Python code
+  lib/python/cs/filestate.py: cs.filestate: FileState: honour missing_ok parameter

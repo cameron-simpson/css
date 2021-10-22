@@ -1,0 +1,2 @@
+progressbar,iterbar: accept optional RunState to cancel iteration.
+BaseProgress.iterbar: make update_min_size properly optional, was making update_frequency ineffective.

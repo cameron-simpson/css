@@ -1,0 +1,1 @@
+add statusline and statusline_s functions; ttysize: support BSD stty output format

@@ -2,7 +2,7 @@
 #
 # Stand in ~listsave.
 # Run output through sh to update files.
-#	- Cameron Simpson <cs@zip.com.au> 17dec97
+#	- Cameron Simpson <cs@cskk.id.au> 17dec97
 #
 
 ypcat -k aliases \

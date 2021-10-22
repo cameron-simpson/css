@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Cancel an usenet message. - Cameron Simpson <cs@zip.com.au>
+# Cancel an usenet message. - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

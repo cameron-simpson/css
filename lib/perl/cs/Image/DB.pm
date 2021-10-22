@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Package indexing images.
-#	- Cameron Simpson <cs@zip.com.au> 05sep96
+#	- Cameron Simpson <cs@cskk.id.au> 05sep96
 #
 # Complete redisgn and recode. - cameron 13apr99
 #

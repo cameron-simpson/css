@@ -3,7 +3,7 @@
 # Switch to the desktop number specified.
 # OSX recipe from:
 #   http://superuser.com/questions/368026/can-i-use-a-terminal-command-to-switch-to-a-specific-space-in-os-x-10-6
-# - Cameron Simpson <cs@zip.com.au> 24jun2015
+# - Cameron Simpson <cs@cskk.id.au> 24jun2015
 #
 
 set -ue

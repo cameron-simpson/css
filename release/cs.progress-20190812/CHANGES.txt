@@ -1,0 +1,6 @@
+lib/python/cs/progress_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/progress.py: cs.progress: make Progress.name and Progress.__str__ a little nicer
+lib/python/cs/progress.py: cs.progress: new OverProgress class which is a composite of a set of subsidiary Progress instances
+lib/python/cs/progress.py: cs.progress: autoformat, lint, minor cleanups
+lib/python/cs/progress.py: cs.progress: add .throughput_overall BaseProgress and default .throughput which just calls .thoughput_overall; modify Progress.throughput to just call .thoughput_overall or .thoughtput_recent; update lots of docstrings
+lib/python/cs/progress.py: cs.progress: fix spelling of throughput_overall; fix comment

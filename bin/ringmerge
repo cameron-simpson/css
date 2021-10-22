@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+#
+# Read ring style records (multiline record intiated by a line
+# commencing with a nonblank character), emit unique records.
+#   - Cameron Simpson <cs@cskk.id.au> 10oct2017
+#
+
+from __future__ import print_function
+import sys
+
+USAGE = '''Usage: %s [-u] files...
+  -u    Unique. Discard repeated records. The default behaviour is
+        to sort the records after the merge.'''
+
+def main(argv=None):
+  global cmd
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  usage = USAGE % (cmd,)
+  badopts = False
+  unique_only = False
+  if argv and argv[0] == '-u':
+    unique_only = False
+  if not argv:
+    warning("missing files")
+    badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+  records = set()
+  for filename in argv:
+    if filename == '-':
+      for record in records_of(sys.stdin):
+        if record in records:
+          pass
+        else:
+          records.add(record)
+          if unique_only:
+            print(record, end='')
+    else:
+      with open(filename) as fp:
+        for record in records_of(sys.stdin):
+          if record in records:
+            pass
+          else:
+            records.add(record)
+            if unique_only:
+              print(record, end='')
+  if not unique_only:
+    for record in sorted(records):
+      print(record, end='')
+  return 0
+
+def warning(msg, *a):
+  global cmd
+  if a:
+    msg = msg % a
+  print(': '.join((cmd, msg)), file=sys.stderr)
+
+def records_of(fp):
+  record = []
+  for line in fp:
+    if not line.endswith('\n'):
+      warning("missing final newline")
+      line += '\n'
+    if line and not line[0].isspace():
+      if record:
+        yield ''.join(record)
+      record = [line]
+    else:
+      record.append(line)
+  if record:
+    yield ''.join(record)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

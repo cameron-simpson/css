@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -f
 #
 # Fold slosh-extended lines.
-#       - Cameron Simpson <cs@zip.com.au> 16jan2007
+#       - Cameron Simpson <cs@cskk.id.au> 16jan2007
 #
 
 :top

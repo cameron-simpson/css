@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check if the specified key is a known job key.
-#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 30jun2003
 #
 
 [ $# = 1 ] || { echo "Usage: $0 key" >&2; exit 2; }

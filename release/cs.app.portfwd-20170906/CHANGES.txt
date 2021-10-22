@@ -1,0 +1,32 @@
+  lib/python/cs/app/portfwd.py: portfwd: now invokes cs.app.portfwd
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: catch SIGTERM etc and shutdown
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: remove target from running list after .wait
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: new -x (trace execution) option; make Portfwd instances FlaggedMixins and give them a .name attribute; minor bugfixes
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: plumb the main flags object through
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: arrange to unset the CONNECTED flag when the subprocess exits
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: fix up -A option logic
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: fix call to lowername
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: make the ssh invocation less noisy
+  lib/python/cs/app/portfwd.py: cs.app.{portfwd,svcd}: remove debug
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: bugfix -d, -e, -D, -E
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: fix up flag name construction
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: *Condition: add optional `trace` parameter to test methods
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: docstring
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: fix variable name
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: main: implement the -n (no action) option; various lintings
+  lib/python/cs/app/portfwd.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/app/portfwd.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: monitor the ssh config for a target from the SvcD, restart connection if modified
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwds: trace Portfwd setup and start/stop
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: use ssh -T (no tty) option
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: probe test conditions, missing since Python recode
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: turn off default ssh-agent probe, monitor separately maintained PORTFWD_SSH_READY flag instead
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: fix spelling of PORTFWD_SSH_READY flag, remove debug
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: Portfwds.required_targets: actually check that the auto flags are set
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: load conditions from ssh config comments
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: pass target conditions to Portfwd instance, add __str__ to condition objects
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: pass the main Flags instance to the SvcD instances
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: pass an RLock to the shared Flags instance to support use across threads
+  lib/python/cs/app/portfwd.py: my email address has changed - update Python code
+  lib/python/cs/app/portfwd.py: cs-release,iview,cs.app.portfwd: adjust import of new cs.psutils functions
+  lib/python/cs/app/portfwd.py: cs.app.portfwd: PyPI prep and lint

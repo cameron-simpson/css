@@ -2,7 +2,7 @@
 #
 # Replace whitespace with underscores.
 # Can't actually remember why I needed this... :-(
-#	- Cameron Simpson <cs@zip.com.au> 22apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 22apr2001
 #
 
 detab ${1+"$@"} | tr ' ' _

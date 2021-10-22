@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Process all messages in a maildir or MH dir against the dir's .procmailrc.
-#	- Cameron Simpson <cs@zip.com.au> 30oct2005
+#	- Cameron Simpson <cs@cskk.id.au> 30oct2005
 #
 
 : ${MAILDIR:=$HOME/mail}

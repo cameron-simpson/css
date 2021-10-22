@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to fiddle with Message-IDs.
-#	- Cameron Simpson <cs@zip.com.au>, 06sep94
+#	- Cameron Simpson <cs@cskk.id.au>, 06sep94
 #
 
 require 'cs/index.pl';

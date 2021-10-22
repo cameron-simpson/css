@@ -1,0 +1,8 @@
+lib/python/cs/app/svcd.py: cs.app.svcd: remove debug
+lib/python/cs/app/svcd.py: cs.app.svcd: SvcD.test: better Pfx context
+lib/python/cs/app/svcd.py: cs.app.{portfwd,svcd}: support alert groups
+lib/python/cs/app/svcd.py: cs.app.svcd: clean lint
+lib/python/cs/app/svcd.py: cs.app.svcd: SvcD: catch and report exceptions from the monitor signature function
+lib/python/cs/app/svcd.py: cs.app.{portfwd,svcd}: clean some lint
+lib/python/cs/app/svcd.py: cs.app.svcd: Python 2 port fix for DEVNULL, add "Topic :: Utilities" to package classifiers
+lib/python/cs/app/svcd.py: cs.app.svcd: autoformat

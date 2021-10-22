@@ -1,0 +1,13 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200613.
+lib/python/cs/progress.py: cs.progress: include spaces between the value components in the default status line output
+lib/python/cs/progress.py: cs.progress: new Progress.bar generator method iterating over an iterable whike displaying a progress bar
+lib/python/cs/progress.py: cs.progress: Progress.bar: rename lenfunc to itemlenfunc for clarity
+lib/python/cs/progress.py: cs.progress: always support a throughput window, default to DEFAULT_THROUGHPUT_WINDOW = 5s
+lib/python/cs/progress.py: cs.progress: Progress.__init__: bugfix initialisation of ._positions
+lib/python/cs/progress.py: cs.progress: BaseProgress.status(): streamline logic, include throughtput
+lib/python/cs/progress.py: cs.progress: as __main__: run the progress bar demo before the unit tests as trite integration test
+lib/python/cs/progress_tests.py: cs.progress_tests: update for new default throughput window
+lib/python/cs/progress.py: cs.progress: Progress.bar: ensure deletion of progress bar if we created it
+lib/python/cs/progress.py: cs.progress: Progress.bar: ensure deletion of progress bar if we created it
+lib/python/cs/progress.py: Backed out changeset 7bc152fdd4c6, accidental commit
+lib/python/cs/progress.py: cs.progress: new convenience function progressbar(it,...) which rolls its own Progress instance

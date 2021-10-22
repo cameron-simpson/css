@@ -1,0 +1,2 @@
+lib/python/cs/py/stack.py: cs.py.stack: stack_dump(): trim the last 2 frames from the listing by default, being the stck_dump() call and its call to frames(); fill out docstrings
+lib/python/cs/py/stack.py: cs.py/stack: autoformat

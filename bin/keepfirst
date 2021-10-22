@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Keep first instances of lines.
-# - Cameron Simpson <cs@zip.com.au>
+# - Cameron Simpson <cs@cskk.id.au>
 #
 # Converted to awk, made simple filter.
 # Accept key columns, parse with shell, invoke awk for processing.

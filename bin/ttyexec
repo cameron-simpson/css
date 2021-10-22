@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Set up the terminal then run a command.
-#	- Cameron Simpson <cs@zip.com.au> 03jan97
+#	- Cameron Simpson <cs@cskk.id.au> 03jan97
 #
 
 sane

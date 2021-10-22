@@ -1,18 +1,20 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Set the root background on per-desktop basis.
-#	- Cameron Simpson <cs@zip.com.au> 02feb2004
+#	- Cameron Simpson <cs@cskk.id.au> 02feb2004
 #
+
+set -ue
 
 : ${DESKTOPSET:=desktop}
 
 cmd=$0
 usage="Usage: $cmd [-] [-d desk] imagefiles...
-	-	Do nothing. Recite fvwm commands.
-	-d desk	Specify desk number to affect.
-		Default desk is the current desk.
-		The desk \"-\" means the global default (desk 1).
-	The imagefile \"\" means remove the per desk setting for this desk."
+    -   Do nothing. Recite fvwm commands.
+    -d desk Specify desk number to affect.
+        Default desk is the current desk.
+        The desk \"-\" means the global default (desk 1).
+    The imagefile \"\" means remove the per desk setting for this desk."
 
 desk=
 doit=1 dasharg= towm=fvwmcmd
@@ -31,12 +33,12 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-thisdesk=`currentdesk` || exit 1
+thisdesk=`currentdesk` || thisdesk=1
 
 cmdesk=
 case "$desk" in
-  ''|.)	desk=$thisdesk || exit 1 ;;
-  -)	desk=1 ;;
+  ''|.) desk=$thisdesk || exit 1 ;;
+  -)    desk=1 ;;
 esac
 
 if [ -z "$*" ]
@@ -65,15 +67,22 @@ fi || exit 1
   desktop "$desk" rootbg_src "$srcargs"
 ) &
 
-case "$OS" in
-  darwin)
-    set -x
-    osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$rootbg\""
-    ;;
-  *)
-    [ $desk != $thisdesk ] || fvwm-root -r --no-dither "$rootbg"
-    ;;
-esac
+# update the current display
+if [ $desk = $thisdesk ]
+then
+  case "$OS" in
+    darwin)
+      set -x
+      case "$rootbg" in
+        /*) ;; *) rootbg=$(pwd)/$rootbg ;;
+      esac
+      osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$rootbg\""
+      ;;
+    *)
+      fvwm-root -r --no-dither "$rootbg"
+      ;;
+  esac
+fi
 
 ##### apply new background, set desktop to use it
 ####cset=`expr 1024 + $desk` || exit 1

@@ -1,0 +1,2 @@
+New function isordered() to test ordering of a sequence.
+imerge: accept new `reverse` parameter for merging reversed iterables.

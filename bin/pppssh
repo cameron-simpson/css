@@ -2,7 +2,7 @@
 #
 # Yet another ppp-over-ssh script.
 # Calls pppssh-connect for the remote end.
-#	- Cameron Simpson <cs@zip.com.au> 05oct2003
+#	- Cameron Simpson <cs@cskk.id.au> 05oct2003
 #
 
 cmd=`basename "$0"`

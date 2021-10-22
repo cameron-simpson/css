@@ -1,0 +1,6 @@
+Support alert groups.
+ssh_argv no longer a property in order to support `bare` param.
+New method `ssh_options` to wrap ssh_argv.
+Drop sig_func, use ssh_options instead.
+Remove local UNIX domain socket forward endpoints before starting ssh tunnel.
+Improve option parse.

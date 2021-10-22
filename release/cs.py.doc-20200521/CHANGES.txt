@@ -1,0 +1,3 @@
+lib/python/cs/py/doc.py: cs.py.doc: functions to extract documentation from modules and objects
+lib/python/cs/py/doc.py: cs.py.doc: module_doc: drop @pfx wrapper, mangles the function signature
+lib/python/cs/py/doc.py: cs.py.doc: strip "# " from getcomments()

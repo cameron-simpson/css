@@ -1,0 +1,73 @@
+#!/bin/sh
+#
+# Establish an ssh master control connection.
+# - Cameron Simpson <cs@cskk.id.au> 17may2017
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-F ssh_config] target [ctrl_command]"
+
+trace=
+[ -t 2 ] && trace=set-x
+sshcfg=$HOME/.ssh/config
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -F) sshcfg=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then  ctrl_command=
+else  ctrl_command=$1; shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec </dev/null
+
+ctrl=$HOME/.sshctrl-$target
+
+set -- $trace ssh -F "$sshcfg" -o "controlpath=$ctrl"
+
+if [ -n "$ctrl_command" ]
+then
+  "$@" -o controlmaster=no -O "$ctrl_command" "$target"
+else
+  "$@" -O check -- "$target" && {
+    echo "$cmd: ssh master already running" >&2
+    exit 1
+  }
+  [ -e "$ctrl" ] && $trace rm -f "$ctrl"
+  "$@" -M -n \
+       -o exitonforwardfailure=yes \
+       -o "proxycommand=ssh-proxy '$target'" \
+       -o controlmaster=yes \
+       -o controlpersist=no \
+       "$target" "while sleep 61; do :; done; # $cmd $target from `hostname`"
+fi

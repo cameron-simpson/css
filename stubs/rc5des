@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for rc5des to work on multiple machines.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 dir=$HOME/etc/rc5des

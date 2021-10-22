@@ -1,6 +1,6 @@
 #!/bin/sh -u
 #
-# HUP my squid. - Cameron Simpson <cs@zip.com.au> 13jul2005
+# HUP my squid. - Cameron Simpson <cs@cskk.id.au> 13jul2005
 #
 
 exec killpidfile -HUP ${1+"$@"} squid.pid

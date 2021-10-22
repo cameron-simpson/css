@@ -1,0 +1,1 @@
+lib/python/cs/deco.py: merge pypi ==> default: cs.deco: @decorator: set the __module__ of the wrapper

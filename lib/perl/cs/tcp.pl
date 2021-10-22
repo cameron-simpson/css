@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Old TCP package.	- Cameron Simpson <cs@zip.com.au>
+# Old TCP package.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use Socket;

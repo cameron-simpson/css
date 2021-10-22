@@ -1,0 +1,26 @@
+  lib/python/cs/app/flag.py: cs.app.flag: python API for the flag store behind my "flag" script
+  lib/python/cs/app/flag.py: cs.app.flag: print TRUE/FALSE instead of 1/0 to match "flag" command
+  lib/python/cs/app/flag.py: cs.app.fag: remove unnecessary import of cs.obj.O
+  lib/python/cs/app/flag.py: cs.app.flag: new function flagdirpath to compute the directory to hold flags; quietly return no flags if the flagdir does no exist
+  lib/python/cs/app/flag.py: cs.app.pilfer,cs.app.flag: move polled flags into cs.app.flag as PolledFlags class
+  lib/python/cs/app/flag.py: cs.app.flag: docstrings for Flags and PolledFlags
+  lib/python/cs/app/flag.py: cs.app.flag: PolledFlags: more docstringage
+  lib/python/cs/app/flag.py: merge pilfer ==> default: new PolledFlags with cache from cs.app.flag
+  lib/python/cs/app/flag.py: cs.app.flag: fix shebang line
+  lib/python/cs/app/flag.py: merge default ==> beyonwiz
+  lib/python/cs/app/flag.py: cs.app.flag: new functions uppername and lowername (not a real reverse of uppername) for making and unmaking flag names from other strings
+  lib/python/cs/app/flag.py: cs.app.flag: new FlaggedMixin mixin class supporting .flagname_* and .flag_*
+  lib/python/cs/app/flag.py: cs.app.flag: FlaggedMixin: better AttributeError
+  lib/python/cs/app/flag.py: cs.app.flag: fix reference to errno.ENOENT
+  lib/python/cs/app/flag.py: cs.app.flag: rename FlaggedMixin.__flags to .flags
+  lib/python/cs/app/flag.py: cs.app.flag: get default flagdir from cs.env.FLAGDIR
+  lib/python/cs/app/flag.py: cs.app.flag: bugfix flag file removal; minor tweak for debugging
+  lib/python/cs/app/flag.py: cs.app.flag: new DummyFlags factory for a Flags-like object without persistent storage
+  lib/python/cs/app/flag.py: cs.app.flag: Flags now uses FlaggedMixin
+  lib/python/cs/app/flag.py: cs.app.flag: add usage message, adjust main function to match
+  lib/python/cs/app/flag.py: cs.app.flag: a FlaggedMixin with no .name implies no flag name prefix
+  lib/python/cs/app/flag.py: cs.app.flag: Flags: new debug parameter, causes flag transitions to be reported as noticed
+  lib/python/cs/app/flag.py: cs.app.flag: various lintings
+  lib/python/cs/app/flag.py: cs.app.flag: Flag: accept optional `lock` to provide MT safe behaviour
+  lib/python/cs/app/flag.py: my email address has changed - update Python code
+  lib/python/cs/app/flag.py: cs.app.flag: PyPI initial setup

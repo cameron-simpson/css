@@ -1,0 +1,2 @@
+BaseProgress, Progress and OverProgress now accept an optional units_scale, such as cs.units.UNSCALED_SCALE, to use when expressing progress - the default remains BINARY_SCALE.
+New arrow(), format_counter() and text_pos_of_total() methods to produce components of the status string for tuning or external reuse.

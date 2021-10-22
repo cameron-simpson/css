@@ -3,7 +3,7 @@
 # A class to fetch lines of data from things.
 # You can tie an array to something with
 #   tie \@array, cs::LinedSource, new-args...
-#	- Cameron Simpson <cs@zip.com.au> 15may96
+#	- Cameron Simpson <cs@cskk.id.au> 15may96
 #
 
 use strict qw(vars);

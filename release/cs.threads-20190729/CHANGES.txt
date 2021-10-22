@@ -1,0 +1,2 @@
+lib/python/cs/threads.py: cs.threads: bg: provide default `name`, run callable inside Pfx; update some docstrings
+lib/python/cs/threads.py: cs.threads: bg: set name from func if not specified, add optional no_logexc=False param preventing @logec wrapper if true, update docstring

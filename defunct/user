@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Set or report user info.
-#	- Cameron Simpson <cs@zip.com.au> 20mar97
+#	- Cameron Simpson <cs@cskk.id.au> 20mar97
 #
 
 use CISRA::DB;

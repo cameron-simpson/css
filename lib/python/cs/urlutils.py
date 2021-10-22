@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # URL related utility functions and classes.
-#       - Cameron Simpson <cs@zip.com.au> 26dec2011
+#       - Cameron Simpson <cs@cskk.id.au> 26dec2011
 #
 
 from __future__ import with_statement, print_function
@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.threads', 'cs.py3', 'cs.obj'],
+    'install_requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.rfc2616', 'cs.threads', 'cs.py3', 'cs.obj'],
 }
 
 import os
@@ -56,11 +56,12 @@ from cs.excutils import logexc
 ##safe_property
 safe_property = property
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
+from cs.logutils import debug, error, warning, exception, D
+from cs.pfx import Pfx, pfx_iter
+from cs.py3 import ustr, unicode
 from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked_property
-from cs.py3 import ustr, unicode
-from cs.obj import O
+from cs.x import X
 
 ##from http.client import HTTPConnection
 ##putheader0 = HTTPConnection.putheader

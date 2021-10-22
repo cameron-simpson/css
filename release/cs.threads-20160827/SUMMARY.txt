@@ -1,0 +1,2 @@
+Replace bare "excepts" with "except BaseException".
+Doc updates. Other minor improvements.

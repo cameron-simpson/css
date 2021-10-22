@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Regenerate my procmailrc files from my cats2procmailrc categories files.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 cd $HOME/rc/mail || exit 1

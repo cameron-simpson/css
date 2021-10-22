@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parser for HTML.
-#	- Cameron Simpson <cs@zip.com.au> 15oct94
+#	- Cameron Simpson <cs@cskk.id.au> 15oct94
 #
 # Recoded to present HTML and SGML as structures. - cameron, 26may95
 # Error recovery.				  - cameron, 11may97
@@ -1165,7 +1165,7 @@ cs::Tokenise(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

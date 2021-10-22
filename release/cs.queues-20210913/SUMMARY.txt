@@ -1,0 +1,1 @@
+New ListQueue simple iterable queue based on a list with list-like .append and .extend.

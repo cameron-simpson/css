@@ -1,0 +1,5 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx: prefixify: fix indenting of embedded newlines; fix docstring typo
+lib/python/cs/pfx.py: cs.pfx: improve exception reporting, issue error message when no attribute can be amended
+lib/python/cs/pfx.py: cs.pfx: add a note to Pfx.__init__ docstring noting lazy evaluation of `mark % args`
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: teach prefixify code to modify exception attributes which are themselves exceptions, such as URLError.reason
+lib/python/cs/pfx.py: cs.pfx: autoformat

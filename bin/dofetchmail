@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # The "run once" mode pulled from runfetchmail.
-#	- Cameron Simpson <cs@zip.com.au> 28jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 28jun2005
 #
 
 : ${LOGDIR:=$HOME/var/log}

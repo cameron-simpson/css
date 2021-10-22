@@ -2,7 +2,7 @@
 #
 # Read HTML and rewrite it nicely indented.
 # Based on htparse, the debugging script.
-#	- Cameron Simpson, cs@zip.com.au, 15jun94
+#	- Cameron Simpson <cs@cskk.id.au> 15jun94
 #
 
 use strict qw(vars);

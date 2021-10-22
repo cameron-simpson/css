@@ -1,0 +1,3 @@
+New PacketField.transcribe_value_flat convenience method to return a flat iterable of bytes-like objects.
+New PacketField.parse_buffer generator method to parse instances of the PacketField from a buffer until end of input.
+New PacketField.parse_buffer_values generator method to parse instances of the PacketField from a buffer and yield the `.value` attribute until end of input.

@@ -1,0 +1,19 @@
+lib/python/cs/progress.py: Release information for cs.progress-20200718.3.
+lib/python/cs/progress_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/progress.py: cs.progress: BaseProgress.format_counter: use a commas instead of a space, seems less confusing in a progress bar
+lib/python/cs/progress.py: cs.progress: only warn about position>total once, needs generalising
+lib/python/cs/progress.py: cs.progress: [BREAKING] rename Progress.bar to Progress.iterbar, add new Progress.bar which creates and withdraws a progress bar
+lib/python/cs/progress.py: cs.progress: fix docstring typo
+lib/python/cs/progress.py: cs.progress: new @auto_progressbar decorator to provide a progress bar and initialise progress= parameter to functions which can use a Progress for reporting
+lib/python/cs/progress.py: cs.progress: tweak docstring
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: new insert_pos parameter to position the progress bar, default still 1
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: use upd.columns if width not specified
+lib/python/cs/progress.py: cs.progress: Progress.update: emit warning if .position goes backwards - might be legal but would usually be insane
+lib/python/cs/progress.py: cs/progress: BaseProgress.bar: new deferred parameter putting off the status bar until the first update
+lib/python/cs/progress.py: cs.progress: back off warnings to debug, too noisy
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: accept new optional `proxy` parameter to use (and not delete) an existing UpdProxy for display
+lib/python/cs/progress.py: cs.progress: Progress.text_pos_of_total: new `pos_first=False` parameter, rendering the total before the position by default (less progress bar noise)
+lib/python/cs/progress.py: cs.progress: BaseProgress.status(): improve the cropping for the available width
+lib/python/cs/progress.py: cs.progress: BaseProgress.bar: do not set width from upd.columns, we rely on it being unset
+lib/python/cs/progress.py: cs.progress: clean lint
+lib/python/cs/progress.py: cs.progress: tweak lint

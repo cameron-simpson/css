@@ -1,0 +1,13 @@
+lib/python/cs/mappings.py: cs.mappings: StackableValues: .push now returns the previous value; new .update method like dict.update but returning a mapping of the preupdate values; __init__ now accepts a dict.__init__ like parameter set
+lib/python/cs/mappings.py: cs.mappings: StackableValues: .push now returns the previous value; new .update method like dict.update but returning a mapping of the preupdate values; __init__ now accepts a dict.__init__ like parameter set
+lib/python/cs/mappings.py: cs.mappings: autoformat
+lib/python/cs/mappings.py: cs.mappings: improve exception context
+lib/python/cs/mappings.py: cs.mappings: dodge some exceptions, improves comprehensibility of stack traces
+lib/python/cs/mappings.py: cs.mappings: StackableValues.__getitem__: fall through with return value, avoids early return
+lib/python/cs/mappings.py: cs.mappings: bugfix StackableValues.update(**kw) form; Stackablevalues.stack: improve docstring and make signature match .update
+lib/python/cs/mappings.py: cs.mappings: StackableValues.stack: clean implementation of save/restore
+lib/python/cs/mappings.py: merge vt ==> default: port main command line to cs.cmdutils.BaseCommand, paving the way for using it for the various more complex subcommands
+lib/python/cs/mappings.py: cs.mappings: StackableValues: avoid infinite recursion through ._fallback: .keys now returns a list of the nonempty keys, .pop removes entries when they become empty
+lib/python/cs/mappings.py: cs.mappings: StackableValues: __getitem__: provide some Pfx context around the _fallback call
+lib/python/cs/mappings.py: cs.mappings: update doctest for new StackableValues.stack signature
+lib/python/cs/mappings.py: cs.mappings: autoformat

@@ -2,7 +2,7 @@
 #
 # Use buff, chkfiles and updfiles to make a cpio file of stuff to
 # copy to a remote site.
-#	- Cameron Simpson <cs@zip.com.au> 17sep96
+#	- Cameron Simpson <cs@cskk.id.au> 17sep96
 #
 
 snapfrom=$HOME

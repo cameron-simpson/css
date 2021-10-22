@@ -1,0 +1,2 @@
+Progress: be somewhat like an int.
+New status() method returning a convenient one line progress status report.

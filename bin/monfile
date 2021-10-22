@@ -2,7 +2,7 @@
 #
 # Replace a file with stdin.
 # Output differences.
-#	- Cameron Simpson <cs@zip.com.au> 04nov98
+#	- Cameron Simpson <cs@cskk.id.au> 04nov98
 #
 
 : ${TMPDIR:=/tmp}

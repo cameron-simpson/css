@@ -1,0 +1,3 @@
+  lib/python/cs/py/modules.py: cs.py.modules: import_module_name: accept name=None, just return the module
+  lib/python/cs/py/modules.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/py/modules.py: cs.py.modules: new generator function module_files yielding pathnames if files in the module

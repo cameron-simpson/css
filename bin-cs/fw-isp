@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Monitor link upness and reconfigure the firewall when things change.
+#
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-x] link:flag..."
+
+trace=echo
+
+badopts=
+
+if [ "x$1" = x-x ]
+then
+  shift
+  trace=set-x
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing link:flag" >&2
+  badopts=1
+else
+  for linkflag
+  do
+    case "$linkflag" in
+      ?*:?*) ;;
+      *) echo "$cmd: invalid link:flag: $linkflag" >&2
+         badopts=1
+         ;;
+    esac
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sigcmd(){
+  for linkflag
+  do
+    set -- $(echo "$linkflag" | tr : ' ')
+    flag "$2" && echo "$1" || :
+  done \
+  | tr '\012' ' '
+}
+
+sig=$(sigcmd "$@")
+
+while sleep 11
+do
+  newsig=$(sigcmd "$@")
+  if [ "x$sig" != "x$newsig" ]
+  then
+    echo "`date`: $sig -> $newsig" | tee -a isp.log
+    sig=$newsig
+    if [ -n "$sig" ]
+    then
+      echo isp.sh $sig
+    fi
+  fi
+done

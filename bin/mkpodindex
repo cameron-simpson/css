@@ -2,7 +2,7 @@
 #
 # Create a simple index of every HTML file that should be made from the PODs
 # in the current directory.
-#	- Cameron Simpson <cs@zip.com.au> 01jul2003
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2003
 #
 
 indextitle="Index of `pwd`"

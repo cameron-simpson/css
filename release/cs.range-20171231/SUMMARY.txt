@@ -1,0 +1,4 @@
+Add Range.span0, returning the first Span.
+Implement __bool__ and__nonzero__.
+Accept a Span in __contains__.
+Some small bugfixes.

@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Translate em-dash into a minus sign to make trite searching easier.
+#   - Cameron Simpson <cs@cskk.id.au> 16oct2016
+#
+
+sed 's/−/-/g' ${1+"$@"}

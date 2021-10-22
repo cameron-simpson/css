@@ -2,7 +2,7 @@
 #
 # Compare two md5 indices and, for matching files, emit the matches from
 # one directory and the other.
-#	- Cameron Simpson <cs@zip.com.au> 20aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 20aug2003
 #
 
 cmd=`basname "$0"`

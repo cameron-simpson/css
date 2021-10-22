@@ -2,7 +2,7 @@
 #
 # Repair the Date: lines of mail messages.
 # Messages pulled from MailMan archives seem to use an invalid date format.
-#       - Cameron Simpson <cs@zip.com.au> 20jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 20jan2009
 #
 
 trace=  ##set-x     ##eecho

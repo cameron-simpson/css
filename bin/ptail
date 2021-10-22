@@ -2,7 +2,7 @@
 #
 # Return the last N lines of the input.
 # Stock tail commands seem to have buffer limitations.
-#	- Cameron Simpson <cs@zip.com.au> 20nov98
+#	- Cameron Simpson <cs@cskk.id.au> 20nov98
 #
 
 use strict qw(vars);

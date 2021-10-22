@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Manage an hierachical subject index.
-#	- Cameron Simpson <cs@zip.com.au>, 19jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 19jul94
 #
 
 HIER="$ENV{HOME}/etc/hsi";

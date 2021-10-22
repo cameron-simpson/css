@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Lowercase a bunch of pathnames.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 rnopts=
@@ -15,15 +15,20 @@ do
   shift
 done
 
+[ $# -gt 0 ] || {
+  echo "Usage: $0 filenames..."
+  exit 2
+}
+
 set -x
 exec frename $rnopts -- \
 	'if (m:[^/]+$:)
 	 { $lhs=$`;
-           $_=$&;
+       $_=$&;
 	   s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
 	   tr/_&A-Z/-+a-z/;
 	   s/[-\s]+/-/g;
 	   s/^-/_/;
-	   $_=$lhs.$rhs;
+	   $_=$lhs.$_;
 	 }
 	' ${1+"$@"}

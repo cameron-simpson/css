@@ -2,7 +2,7 @@
 #
 # Manage a list of identifiers and their attributes.
 # Generalised from desktop 01apr2003.
-#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 18jul2002
 #
 # Method:
 # We keep a directory of numbered subdirs.

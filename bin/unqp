@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Decode Quoted-Printable stuff and emit.
-#	- Cameron Simpson <cs@zip.com.au> 21may98
+#	- Cameron Simpson <cs@cskk.id.au> 21may98
 #
 
 use cs::MIME::QuotedPrintable;

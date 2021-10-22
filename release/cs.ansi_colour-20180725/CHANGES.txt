@@ -1,0 +1,4 @@
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: bugfix: rename second colourise function to colourise_patterns
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: bugfix: rename second colourise function to colourise_patterns
+  lib/python/cs/README-ansi_colour.rst: merge default ==> media
+  lib/python/cs/ansi_colour.py: cs.ansi_colour: make_patterns: drop unused variable

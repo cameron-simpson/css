@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parse squid logs and emit data suitable for use by logtally.
-#	- Cameron Simpson <cs@zip.com.au> 26mar99
+#	- Cameron Simpson <cs@cskk.id.au> 26mar99
 #
 
 use strict qw(vars);

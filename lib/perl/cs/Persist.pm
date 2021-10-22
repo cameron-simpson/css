@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Save/restore a hash in the filesystems.
-#	- Cameron Simpson <cs@zip.com.au> 11jun97
+#	- Cameron Simpson <cs@cskk.id.au> 11jun97
 #
 
 use strict qw(vars);

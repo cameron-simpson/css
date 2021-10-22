@@ -1,0 +1,1 @@
+New @fmtdoc decorator to format a function's doctsring against its module's globals.

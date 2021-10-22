@@ -5,7 +5,7 @@
 # Default location is tuned to my X11 setup (i.e. 103 pixels down from
 # the top of the screen).
 # The -big option is tuned to my X setup on a 1280x1024 screen.
-#	- Cameron Simpson <cs@zip.com.au> December 1991
+#	- Cameron Simpson <cs@cskk.id.au> December 1991
 #
 
 set -ue

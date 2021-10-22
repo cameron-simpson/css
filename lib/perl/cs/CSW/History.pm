@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Web::CSW::History: a history entry associated with a page
-#	- Cameron Simpson <cs@zip.com.au> 28feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 28feb2000
 #
 
 =head1 NAME
@@ -138,7 +138,7 @@ sub Back($)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.au<gt>
+Cameron Simpson E<lt>cs@cskk.id.au<gt>
 
 =cut
 

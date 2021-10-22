@@ -1,16 +1,20 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Push my account to other places.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
+set -ue
+
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [-s] [-f] [login@]hostname..."
+usage="Usage: $cmd [-f] [-n] [login@]hostname...
+  -f  Force. Override source host check.
+  -n  No action. Passed to rsync."
 
 hARCH=$ARCH
 
 force=
-async=1
+rsopts=
 
 badopts=
 
@@ -18,19 +22,18 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -f)	force=1 ;;
-    -s)	async= ;;
+    -n) rsopts="$rsopts $1" ;;
     --)	shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-	badopts=1
-	;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)	break ;;
   esac
   shift
 done
 
-[ $# = 0 ] && { echo "$cmd: missing login@hostname" >&2
-		badopts=1
-	      }
+[ $# = 0 ] && {
+  echo "$cmd: missing login@hostname" >&2
+  badopts=1
+}
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -41,7 +44,7 @@ done
   cd || exit 1
   for hostlist
   do
-    syncacc '' "$hostlist:" &
+    syncacc '' "$hostlist:" $rsopts &
   done
   wait
 )

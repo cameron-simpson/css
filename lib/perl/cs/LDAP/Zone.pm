@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Module to express stuff about an LDAP zone.
-#       - Cameron Simpson <cs@zip.com.au> ...
+#       - Cameron Simpson <cs@cskk.id.au> ...
 #
 
 use strict qw(vars);

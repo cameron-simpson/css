@@ -3,7 +3,7 @@
 # Stash a login/password for use at a web site.
 # Naturally this is mega insecure (depending on cs::HTTP::Auth, but that
 # happens to be just a cleartext file) and so not for more that trivial uses.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::HTTP::Auth;

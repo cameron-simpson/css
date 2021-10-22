@@ -6,7 +6,7 @@
 #	? is not a meta character
 #	. isn't either
 #	\ doesn't work
-# - Cameron Simpson <cs@zip.com.au> 09apr99
+# - Cameron Simpson <cs@cskk.id.au> 09apr99
 #
 
 use strict qw(vars);

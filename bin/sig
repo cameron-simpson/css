@@ -1,6 +1,10 @@
 #!/bin/sh
+#
+# Emit my mail signature.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
 
-set -uex
+set -ue
 
 : ${SIGNATURE:=$HOME/rc/mail/signature.$SYSTEMID}
 

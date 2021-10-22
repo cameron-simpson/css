@@ -1,0 +1,3 @@
+CornuCopyBuffer.skip: bugfix sanity check.
+FileIterator: do not close the supplied file, just set self.fp=None.
+Improve EOFError message text.

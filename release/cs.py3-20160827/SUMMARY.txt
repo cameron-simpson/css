@@ -1,0 +1,4 @@
+Move python 2 and 3 specific code into cs.py3_for2 and cs.py3_for3.
+Do not bother with StringIO and BytesIO, modules can get them directly from the io module.
+Redo python 2 bytes class.
+Python3 compatible versions of struct.pack and struct.unpack.

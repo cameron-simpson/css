@@ -2,7 +2,7 @@
 #
 # Read filenames from stdin.
 # Report basename and the directories in which it occurs on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 28nov97
+#	- Cameron Simpson <cs@cskk.id.au> 28nov97
 #
 
 open(STDIN,"find @ARGV -type f -print |") if @ARGV;

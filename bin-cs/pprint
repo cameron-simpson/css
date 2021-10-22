@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Pretty print the named file to standard output.
+# Used by my \pp vi macro.
+#   - Cameron Simpson <cs@cskk.id.au> 19apr2017
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd filename"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+filename=$1; shift
+
+exec <"$filename"
+case "$filename" in
+  *.json)   json-pprint ;;
+  *.xml)    xml-pprint ;;
+  *)        cat ;;
+esac

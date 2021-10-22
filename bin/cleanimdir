@@ -2,7 +2,7 @@
 #
 # Clean cruft from an image collection.
 # Ignore .* names.
-#	- Cameron Simpson <cs@zip.com.au> 27mar2003
+#	- Cameron Simpson <cs@cskk.id.au> 27mar2003
 #
 
 cmd=$0

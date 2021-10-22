@@ -3,7 +3,7 @@
 # Trim whitespace.
 # Strip leading and trailing whitespace and turn [ \t]+ into
 # a single space.
-#	- Cameron Simpson <cs@zip.com.au> 23jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 23jul2000
 #
 
 usage="Usage: $0 [-123] [files...]

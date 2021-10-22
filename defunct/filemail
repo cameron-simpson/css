@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Filemail - squirrel mail away into folders.
-#	- Cameron Simpson <cs@zip.com.au> 04jun1997
+#	- Cameron Simpson <cs@cskk.id.au> 04jun1997
 #
 
 use strict(vars);

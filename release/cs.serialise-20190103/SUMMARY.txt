@@ -1,0 +1,1 @@
+Move most code into cs.binary, leave compatibility names behind here.

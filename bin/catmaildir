@@ -2,7 +2,7 @@
 #
 # Output all the numerically named files in the named directories
 # in UNIX mail file format.
-#	- Cameron Simpson <cs@zip.com.au> 27mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 27mar2000
 #
 
 [ $# = 0 ] && set .

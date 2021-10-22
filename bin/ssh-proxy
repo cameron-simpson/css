@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Run an ssh ProxyCommand for the specified target based on ~/.ssh/proxies.
+# Falls back to netcat to the hostname from the bare ssh config.
+#   - Cameron Simpson <cs@cskk.id.au> 17may2017
+#
+# The configuration file has the format:
+#  target address port [test shell command]
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd target"
+
+cf=$HOME/.ssh/proxies
+trace=
+[ -t 2 ] && trace=set-x
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+target=$1
+shift
+
+# look for a successful clause
+exec 3<&0 0<"$cf"
+while read -r cf_target cf_addr cf_port cf_test
+do
+  case "$cf_target" in
+    '' | \#* ) continue ;;
+  esac
+  [ "x$target" = "x$cf_target" ] || continue
+  [ -z "$cf_test" ] || $trace sh -c "$cf_test" </dev/null >&2 || continue
+  exec $trace nc "$cf_addr" "$cf_port" <&3 3<&-
+done
+
+get_ssh_options(){
+  ssh -G "$target" \
+  | while read -r option value
+    do
+      case $option in
+        hostname|port|proxycommand)
+          qvalue=$( shqstr "$value" )
+          printf '%s=%s\n' "$option" "$qvalue"
+          ;;
+      esac
+    done
+}
+
+hostname=$target
+port=22
+proxycommand=
+eval "$( get_ssh_options )"
+
+if [ -n "$proxycommand" ]
+then  $trace sh -c "$proxycommand"
+else  $trace nc "$hostname" "$port"
+fi

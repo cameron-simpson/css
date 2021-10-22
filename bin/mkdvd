@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run mkcd using cdrecord-prodvd, to burn a DVD.
-#	- Cameron Simpson <cs@zip.com.au> 17jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 17jun2002
 #
 
 #cdrecord='cdrecord=cdrecord-prodvd -dao'

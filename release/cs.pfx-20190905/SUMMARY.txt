@@ -1,0 +1,2 @@
+Pfx.__exit__: simplify prefixify_exc() logic, prefixify all suitable attributes.
+New @pfx_method decorator for instance methods.

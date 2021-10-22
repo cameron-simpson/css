@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Recite procmail log in one-line form.
-#       - Cameron Simpson <cs@zip.com.au> 05nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 05nov2006
 #
 
 cmd=`basename "$0"` || exit 1

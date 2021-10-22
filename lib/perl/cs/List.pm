@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Common list operations.
-#	- Cameron Simpson <cs@zip.com.au> 12mar96
+#	- Cameron Simpson <cs@cskk.id.au> 12mar96
 #
 
 use strict qw(vars);

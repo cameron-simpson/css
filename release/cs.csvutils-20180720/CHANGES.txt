@@ -1,0 +1,14 @@
+  lib/python/cs/csvutils.py: resolve merge from default
+  lib/python/cs/csvutils.py: merge default ==> pypi
+  lib/python/cs/csvutils.py: cs.csvutils: clean some lint
+  lib/python/cs/csvutils.py: cs.csvutils: csv_reader: pass additional keyword arguments to csv.reader()
+  lib/python/cs/csvutils.py: cs.csvutils: csv-reader: also accept filenames
+  lib/python/cs/csvutils.py: cs.csvutils: new csv_import function to read CSV files with a column heading row and yield named tuples
+  lib/python/cs/csvutils.py: cs.csvutils: update PyPI requirements
+  lib/python/cs/csvutils.py: cs.csvutils: fix spelling of "csv_import", provide doctests, plumb class_name and column_names parameters
+  lib/python/cs/csvutils.py: lib/python/cs/mappings.py
+  lib/python/cs/csvutils.py: cs.csvutils: csv_import: plumb the new `computed` and `preprocess` parameters through to cs.mappings.named_column_tuples
+  lib/python/cs/csvutils.py: cs.csvutils: new xl_import function to import a sheet from an Excel work book sheet, requires openpyxl if importing with a filename; trite test mode if __main__
+  lib/python/cs/csvutils.py: cs.csvutils: csv_import,xl_import: plumb `mixin` parameter through to cs.mappings.named_column_tuples
+  lib/python/cs/csvutils.py: cs.csvutils: xl_import: correctly plumb the subcall when the workbook is a filename
+  lib/python/cs/csvutils.py: cs.csvutils: adjust csv_import and xl_import doco and tests for changed cs.amppings.named_column_tuples return values, now (cls, rows)

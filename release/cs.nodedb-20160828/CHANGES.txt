@@ -1,0 +1,29 @@
+  : cs.nodedb.node: fix comment typo
+  : cs.nodedb.node: new method Node.nextNode: allocate a new Node with the next numeric name above the existing names
+  : cs.nodedb.node: NodeDB.__init__: accept optional type_factories mapping parameter, used by ._createNode
+  : cs.nodedb.node: Node.__init__: rephrase init of .type
+  : cs.nodedb.node: drop use of str1, pointless optimisation
+  : cs.nodedb.html: get StringIO from io instead of cStringIO
+  : cs.nodedb.httpd: get StringIO from io instead of cStringIO
+  : remove bare "except:"s from code, use "except Exception:"
+  : cherrypick nodedb ==> maildb: cs.nodedb.node: NodeDB.__init__: accept optional type_factories mapping parameter, used by ._createNode
+  : merge default ==> maildb
+  : cs.nodedb.node: Node: permit initialisation with an int name, quietly turned into string
+  : merge default ==> nodedb
+  : cs.nodedb: replace CSVRow updates with cs.nodedb.backend._Update objects, and move CSV translation code into cs.nodedb.csvdb; alpha code, not sufficiently validated, other backends as yet unchanged
+  : cs.nodedb.node: Node.get, Node.__getitem__: instantiate an empty _AttrList as needed
+  : cs.nodedb.csvdb: Backend_CSVFile.import_foreign_row: define nodedb slightly earlier
+  : Automated merge with file:///Users/cameron/hg/css-nodedb
+  : merge nodedb ==> default
+  : cs.nodedb.node: _AttrList: add __setslice__
+  : cs.nodedb.node: _AttrList._scrub_local: call list.clear directly
+  : cs.nodedb.csvdb: fix warning for new update scheme
+  : cs.nodedb.node: _AttrList: workaround for no list.clear method
+  : cherrypick nodedb ==> csbug: cs.nodedb.node: new method Node.nextNode: allocate a new Node with the next numeric name above the existing names
+  : cherrypick nodedb ==> csbug: cs.nodedb.node: NodeDB.__init__: accept optional type_factories mapping parameter, used by ._createNode
+  : merge default ==> csbug
+  : cherrypick nodedb ==> csbug: cs.nodedb.node: Node: permit initialisation with an int name, quietly turned into string
+  : cs.app.csbug: _BugDB.messages: fix buried AttributeError; strip associated debugging messages
+  : cs.ndoedb.csvdb: small docstring
+  : cs.nodedb: move Update factory and decode methods into cs.nodedb.backend; export "Update" from cs.nodedb as well
+  : cs.*: use "install_requires" instead of "requires" in DISTINFO

@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 #
-#       - Cameron Simpson <cs@zip.com.au> 01may2009
+#       - Cameron Simpson <cs@cskk.id.au> 01may2009
 #
 
 from __future__ import print_function
@@ -11,7 +11,8 @@ import sys
 from collections import namedtuple
 from getopt import getopt, GetoptError
 from cs.alg import collate
-from cs.logutils import setup_logging, Pfx, warning, error
+from cs.logutils import setup_logging, warning, error
+from cs.pfx import Pfx
 from cs.psutils import stop
 
 ETC_MYCNF = '/etc/my.cnf'

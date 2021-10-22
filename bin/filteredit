@@ -2,7 +2,7 @@
 #
 # Run a file through a filter and rewrite the file.
 # Do not rewrite if error or unchanged or empty result.
-#	- Cameron Simpson <cs@zip.com.au> 16jun1999
+#	- Cameron Simpson <cs@cskk.id.au> 16jun1999
 #
 
 : ${TMPDIR:=/tmp}

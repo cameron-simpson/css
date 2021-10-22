@@ -1,0 +1,9 @@
+  lib/python/cs/README-logutils.rst: merge default ==> later
+  lib/python/cs/README-logutils.rst: merge later ==> pilfer
+  lib/python/cs/logutils.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/logutils.py: cs.logutils: setup_logging: set builtins.X to cs.x.X if $DEBUG/flags contains "X", no-op otherwise; improve docstrings; add cs.x to required modules for PyPI
+  lib/python/cs/logutils.py: cs.logutils: we can only import "builtins" in python 3, cope with that
+  lib/python/cs/README-logutils.rst: merge default ==> media
+  lib/python/cs/logutils.py: cs.logutils: do not set up dummy builtsin.X if one is already there; still conflicted about this abuse of builtins
+  lib/python/cs/logutils.py: cs.logutils: do not stuff X into builtins
+  lib/python/cs/logutils.py: cs.logutils: update docstrings, clean lint

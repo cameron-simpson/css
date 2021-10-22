@@ -1,53 +1,104 @@
 #!/bin/sh
 #
-# Set up a per-host ssh-agent in daemon mode if needed.
-#	- Cameron Simpson <cs@zip.com.au> 30jul2001
+# Ensure we have an ssh agent, setting up a per-host ssh-agent in daemon mode if needed.
+# Emit $SSH_AUTH_SOCK to stdout.
+#
+# I keep a shell function around to access the host agent:
+#
+#    gsa(){
+#      SSH_AUTH_SOCK=`rig-ssh-agent ${1+"$@"}`; export SSH_AUTH_SOCK
+#    }
+#
+# and I run this in my shell startups:
+#
+#    SSH_AUTH_SOCK=`rig-ssh-agent -L`; export SSH_AUTH_SOCK
+#
+# which attaches to my common host agent on local shells.
+# - Cameron Simpson <cs@cskk.id.au> 30jul2001
 #
 
 set -ue
 
+: ${HOST:=`hostname -s`}
+
+statefile=${SSH_AGENT_STATEFILE:-$HOME/var/run/ssh-agent-$HOST}
+ssh_connection=${SSH_CONNECTION:-''}
+
 cmd=$0
-usage="Usage: $cmd [-f] [statefile]
-    -f  Force: always start a new agent and overwrite the statefile."
+usage="Usage: $cmd [-f] [-h] [-H] [-L]
+  -f    Force the creation of a new ssh-agent, updating the state file
+        $statefile
+  -h    Get the host specific agent, starting one if necessary.
+        The default (no -f or -h) will use an existing agent if already set up.
+  -H    If we are remote (\$SSH_CONNECTION not empty) and there is a host
+        specific ssh-agent, use that.
+  -L    If we are not remote (no \$SSH_CONNECTION) and there is a host
+        specific ssh-agent, use that."
 
-trace=${DEBUG:+set-x}
 force=
-statefile=
-badopts=
+usehost=
 
+is_remote(){
+  [ -n "$ssh_connection" ]
+}
+
+has_agent(){
+  [ -n "${SSH_AUTH_SOCK:-}" ] && { ssh-add -l >/dev/null || [ $? = 1 ]; }
+}
+
+get_host_agent(){
+  [ -s "$statefile" ] \
+  && . "$statefile" >/dev/null \
+  && has_agent
+}
+
+# test get_host_agent in a subshell
+has_host_agent(){
+  ( get_host_agent )
+}
+
+badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
     -f) force=1 ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
+    -h) usehost=1 ;;
+    -H) is_remote && has_host_agent && { usehost=1 || :; } ;;
+    -L) is_remote || { has_host_agent && usehost=1 || :; } ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
   esac
   shift
 done
 
-[ $# = 0 ] || { statefile=$1; shift; }
 [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-[ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
+exec 3>&1 1>&2
 
-if [ $force ] || not $trace get-ssh-agent "$statefile"
+if [ $force ]
 then
-  # some machines don't have an ssh-agent:-(
-  if agent=`$trace which ssh-agent` && [ -x "$agent" ]
+  need_agent=1
+else
+  need_agent=
+  if [ $usehost ]
   then
-    $trace rm -f -- "$statefile"
-    export statefile
-    $trace no-ssh-agent \
-      $trace ssh-agent \
-      $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
-      </dev/null &
+    get_host_agent || need_agent=1
   else
-    echo "$cmd: no ssh-agent command, aborting" >&2
-    exit 1
+    has_agent || need_agent=1
   fi
 fi
+
+if [ $need_agent ]
+then
+  # start new agent
+  new_agent_shcmd=$(exec 3>&-; ssh-agent -s )
+  eval "$new_agent_shcmd"
+  [ $usehost ] && {
+    printf '%s\n' "$new_agent_shcmd" > "$statefile" || :
+  }
+fi
+
+exec 1>&3 3>&-
+echo "$SSH_AUTH_SOCK"

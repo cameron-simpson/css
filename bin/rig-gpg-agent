@@ -1,33 +1,31 @@
 #!/bin/sh
 #
 # Set up a gpg-agent in daemon mode, much like rig-ssh-agent.
-#	- Cameron Simpson <cs@zip.com.au> 30mar2005
+# Emit $GPG_AGENT_INFO to stdout.
+#	- Cameron Simpson <cs@cskk.id.au> 30mar2005
 #
 
-: ${LOGDIR:=$HOME/var/log}
-: ${CONSOLE:=$LOGDIR/console}
+set -ue
+exec 3>&1 1>&2
 
-cmd=$0
-usage="Usage: $cmd [-f] [statefile]"
+: ${GPG_AGENT_INFO:=''}
+: ${GNUPGHOME:=$HOME/rc/gnupg}
+: ${HOST:=`hostname -s`}
 
-statefile=
-force=1
+statefile=$HOME/var/run/gpg-agent-$HOST
 
-badopts=
+{ [ -n "$GPG_AGENT_INFO" ] && gpg-agent >/dev/null 2>&1; } \
+|| \
+{ unset GPG_AGENT_INFO
+  [ -s "$statefile" ] \
+  && . "$statefile" && export GPG_AGENT_INFO \
+  && gpg-agent >/dev/null 2>&1 \
+  || { which gpg-agent >/dev/null 2>&1 || exit 0
+       rm "$GNUPGHOME"/S.*
+       gpg-agent --daemon --sh "--homedir=$GNUPGHOME" "--write-env-file=$statefile" 3>&- \
+       && . "$statefile" \
+       && export GPG_AGENT_INFO
+     }
+}
 
-[ "x$1" = x-f ] && { force=1; shift; }
-
-[ $# = 0 ] || { statefile=$1; shift; }
-
-[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ -n "$statefile" ] || statefile=`gpg-agent-statefile` || exit 1
-
-# bail if we've already got an agent
-[ -z "$force" ] && eval `get-gpg-agent "$statefile"` && exit 0
-
-unset GPG_AGENT_INFO
-exec 2>>"$CONSOLE"
-exec gpg-agent --daemon >"$statefile"
+echo "$GPG_AGENT_INFO" >&3

@@ -1,0 +1,4 @@
+  lib/python/cs/predicate.py: merge default ==> beyonwiz
+  lib/python/cs/predicate.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/predicate.py: my email address has changed - update Python code
+  lib/python/cs/predicate.py: cs.predicate: clean small bug and lint

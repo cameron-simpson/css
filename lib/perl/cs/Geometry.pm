@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Geometric routines. 2D for the most part.
-#	- Cameron Simpson <cs@zip.com.au> 05sep96
+#	- Cameron Simpson <cs@cskk.id.au> 05sep96
 #
 
 use strict qw(vars);

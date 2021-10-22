@@ -1,0 +1,37 @@
+  lib/python/cs/buffer.py: cs.buffer: new module for working with bytes, bytearrays, memoryviews and buffers in general; initial extend() function to extend a buffer with sufficient data
+  lib/python/cs/buffer.py: cs.buffer: drop extend function, make new class CornuCopyBuffer, an automatically refilling buffer, with extend, take and skipto methods
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: add skip(skipto) method, now the core of skipto(offset)
+  lib/python/cs/buffer.py: cs.buffer: bugfix CornuCopyBuffer.skip
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: add copy_offsets init parameter and report_offsets method
+  lib/python/cs/buffer.py: cs.buffer: update opening comment
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: add iteration support, yielding input data chunks
+  lib/python/cs/buffer.py: cs.buffer: new @chunky decorator, converting a buffer based function into a data chunk based function
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: supply `copy_chunks` to initialiser instead of to various methods; new class CopyingIterator wrap an iterator, copying the result of __next__ to a callable
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: compatibility methods to support using the buffer as a file-like object - read, seek, tell
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.tell: drop bogus size parameter
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.seek: default value for `whence`=os.SEEK_SET, like the io file seek methods
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.extend: support tailing a file by returning on an empty chunk if short_ok, requires a resumable upstream iterator such as cs.fileutils.read_from(tail_mode=True)
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: bugfix variable name spelling
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new tail_extend method supporting extend against a tail-mode iterator; add sanity check to extend method
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: bugfix seek actions
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.extend: microoptimisation for short extensions
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: read: support single fetch mode; fill in some docstrings; tail_extend: rename min_size to size
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.read: add sanity check that size>=1, convert ValueError from .take into EOFError
+  lib/python/cs/buffer.py: my email address has changed - update Python code
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: improve docstrings
+  lib/python/cs/buffer.py: cs.buffer: fix docstring typo
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: raise EOFError on insufficient mandatory data
+  lib/python/cs/buffer.py: cs.buffer: new __str__ method mentioning offset and buffer size
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: take: bugfix for short extends; read: return no data at EOF
+  lib/python/cs/buffer.py: cs.buffer: backport to python 2
+  lib/python/cs/buffer.py: cs.buffer: more python2 backporting
+  lib/python/cs/buffer.py: cs.buffer: clean some lint
+  lib/python/cs/buffer.py: cs.buffer: new classes SeekableFDIterator and SeekableFileIterator with addition seek method; new CornuCopyBuffer.from_fd and .from_file factories
+  lib/python/cs/buffer.py: cs.buffer: indentation tweak
+  lib/python/cs/buffer.py: cs.{buffer,fileutils}: get pread from cs.py3
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new from_bytes factory function and new at_eof End Of File probing function; tweak a docstring
+  lib/python/cs/buffer.py: TODO: cs.buffer: CornuCopyBuffer.skipto: note a possible spinout for later remediation
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: `input_data` may be an iterable instead of an iterator; python 2 iterator support
+  lib/python/cs/buffer.py: cs.buffer: tweak some exception message text
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer: new .bounded method returning a view of the buffer with an end offset bound, supporting safe parsing of data streams where the parse must not extend past a certain point, such as the end of a data packet of known size
+  lib/python/cs/buffer.py: cs.buffer: reformat docstrings with markdown

@@ -1,0 +1,1 @@
+Bugfix rewrite_cmgr, failed to flush a file before copying its contents.

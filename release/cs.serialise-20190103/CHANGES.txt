@@ -1,0 +1,7 @@
+  lib/python/cs/serialise.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/serialise.py: cs.serialise: add cs.py3 to install_requires
+  lib/python/cs/serialise.py: merge default ==> beyonwiz
+  lib/python/cs/serialise.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/serialise.py: my email address has changed - update Python code
+  lib/python/cs/serialise.py: cs.serialise,serialise_tests: drop the read_* functions, superceded by cs.binary.BSUInt and BSData using CornuCopyBuffers' get the put_* functions from cs.binary; drop the Packet code - cs.stream now implements that directly using cs.binary
+  lib/python/cs/serialise.py: cs.serialise: now mostly a thin wrapper for cs.binary

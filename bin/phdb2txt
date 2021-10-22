@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Dump my phone DB into flat text.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 ($::cmd=$0) =~ s:.*/::;

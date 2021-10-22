@@ -2,7 +2,7 @@
 #
 # Make the root background be what it should be.
 # Pulled from enterdesk for use there and from deskbg.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 cmd=$0

@@ -1,24 +1,45 @@
 #!/bin/sh
 #
 # Write a possibly-colourised string to the alert log.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
 
+alert_to_default='log stderr'
+
 : ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert-local}
-: ${ALERT_TO:='log stderr'}
-: ${ALERT_GROUP:=''}
 
 cmd=$0
-usage="Usage: $cmd [-A alert_to] [-c colour] [-e command [args...] --] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [options...] [--] {-|echo-args...}
+  Options:
+    -A alert_to Space separated list of alert destinations.
+                Default from \$ALERT_TO, or \"$alert_to_default\".
+    -c colour   Colour messages sent to \"log\" with this colour.
+    -e command [args...] --
+                Associate this command with clicking on the alert popup, if supported.
+                End the command arguments with \"--\".
+    -g group    Alert group, default from \$ALERT_GROUP.
+    -l level    Alert level, default 1.
+    -s subtitle Alert subtitle.
+                If unspecified and the alert text begins with an
+                \"UPPERCASEWORD:\" (after possible extraction of a
+                title), pull off the UPPERCASEWORD and use it for
+		        the subtitle.
+    -t title    Alert title.
+                If unspecified and the alert text begins with an \"UPPERCASEWORD:\",
+                pull off the UPPERCASEWORD and use it for the title.
+    -           Read the alert text from standard input.
+    echo-args   The alert text, passed to the echo(1) command."
 
+alert_to=${ALERT_TO:-$alert_to_default}
 colour=
 level=1
 growl=
 tnotify=
+group=${ALERT_GROUP:-''}
 title=
 subtitle=
 execute=
@@ -37,7 +58,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -A) ALERT_TO=$2; shift ;;
+    -A) alert_to=$2; shift ;;
     -c) colour=$2; shift ;;
     -e) shift
         firstarg=1
@@ -74,6 +95,7 @@ do
         fi
         continue
         ;;
+    -g) group=$2; shift ;;
     -l) level=$2; shift ;;
     -t) title=$2; shift ;;
     -s) subtitle=$2; shift ;;
@@ -100,14 +122,14 @@ to_log=
 to_desktop=
 to_dlog=
 to_stderr=
-for alert_to in $ALERT_TO
+for alert_target in $alert_to
 do
-  case $alert_to in
+  case $alert_target in
     log)        to_log=1 ;;
     desktop)    to_desktop=1 ;;
     dlog)       to_dlog=1 ;;
     stderr)     to_stderr=1 ;;
-    *)          echo "$cmd: unsupported alert_to target ignored: $alert_to" >&2 ;;
+    *)          echo "$cmd: unsupported alert_to target ignored: $alert_target" >&2 ;;
   esac
 done
 
@@ -150,7 +172,7 @@ then
   fi >>"$ALERTLOG" || xit=1
 fi
 
-[ $to_dlog ] && dlog "ALERT: $*"
+[ $to_dlog ] && dlog log ALERT: "$*"
 
 if [ $to_desktop ]
 then
@@ -172,13 +194,13 @@ then
     done
     set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
     # message group - this message updates/replaces last message in this group
-    [ -n "$ALERT_GROUP" ] && set -- "$@" -group "$ALERT_GROUP"
+    [ -n "$group" ] && set -- "$@" -group "$group"
     # command to run when notifier clicked
     [ -n "$execute" ] && set -- "$@" -execute "$execute"
     set -- timeout 10 reattach-to-user-namespace "$@"
     # async because I've seen terminal-notifier hang, stalling my mail filer
     # timeout also to stop hanging processes filling the process table
-    "$@" >/dev/null || to_stderr=1
+    "$@" </dev/null >/dev/null &
   fi
 fi
 

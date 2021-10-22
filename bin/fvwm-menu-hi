@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Recite the named URLs map as an FVWM menu.
-#	- Cameron Simpson <cs@zip.com.au> 14feb2003
+#	- Cameron Simpson <cs@cskk.id.au> 14feb2003
 #
 
 cd $HOME/rc/hi

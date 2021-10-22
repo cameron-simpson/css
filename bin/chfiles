@@ -2,7 +2,7 @@
 #
 # Return a list of all *.[ch] files.
 # It's surprising how often I want this.
-#	- Cameron Simpson <cs@zip.com.au> 04jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 04jul2000
 #
 
 exec find ${1+"$@"} ${1-"."} -type f -name '*.[ch]' -print

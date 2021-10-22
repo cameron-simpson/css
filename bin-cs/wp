@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Select images and link into target directory for later use.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
@@ -20,6 +20,10 @@ do
         count=$1 ;;
     /*) WPDIR=$1 ;;
     --) shift; break ;;
+    -h|--help|-?)
+        echo "$usage"
+        exit 0
+        ;;
     *)  break ;;
   esac
   shift

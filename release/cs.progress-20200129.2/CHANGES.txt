@@ -1,0 +1,1 @@
+lib/python/cs/progress.py: cs.progress: turn Progress.count_of_total_bytes_text into a function (was a property)

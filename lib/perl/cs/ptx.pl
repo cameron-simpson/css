@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to support simple and hopefully space-efficient indices
-# of text.	- Cameron Simpson <cs@zip.com.au> 04jul94
+# of text.	- Cameron Simpson <cs@cskk.id.au> 04jul94
 #
 # Index format:
 #  idx	Flat file with keywords and offset to references in refs.

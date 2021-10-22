@@ -1,14 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Read XML from stdin, pretty print on stdout.
 # Directly derived from the suggestion at:
 #  http://stackoverflow.com/questions/749796/pretty-printing-xml-in-python
-# - Cameron Simpson <cs@zip.com.au> 25jul2010
+# - Cameron Simpson <cs@cskk.id.au> 25jul2010
 #
 
+from __future__ import print_function
 import sys
-import lxml.etree as etree
-
-xml = sys.stdin.read()
-XML = etree.fromstring(xml)
-print etree.tostring(XML, pretty_print = True)
+from cs.xml import pprint
+pprint(sys.stdin.read())

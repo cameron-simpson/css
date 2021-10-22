@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Elide NULs and 255s from stdin, copying to stdout.
-#	- Cameron Simpson <cs@zip.com.au>, 12aug94
+#	- Cameron Simpson <cs@cskk.id.au>, 12aug94
 #
 
 while (read(STDIN,$_,65536) > 0)

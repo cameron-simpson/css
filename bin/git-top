@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Return the top of a git working area, by default that of the current directory.
+#   - Cameron Simpson <cs@cskk.id.au> 14oct2016
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [directory]"
+
+badopts=
+
+cdto=
+
+if [ $# -gt 0 ]
+then
+  cdto=$1
+  shift
+fi
+
+[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -z "$cdto" ] || cd "$cdto"
+
+exec findup -d .git

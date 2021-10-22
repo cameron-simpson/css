@@ -1,0 +1,8 @@
+  lib/python/cs/configutils.py: merge default ==> beyonwiz
+  lib/python/cs/configutils.py: cs.*: adjust imports of cs.pfx.Pfx
+  lib/python/cs/configutils.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/configutils.py: cs.configutils: port filename attribute _config_path to new cs.deco _config__filename
+  lib/python/cs/configutils.py: my email address has changed - update Python code
+  lib/python/cs/configutils.py: cs.configutils: ConfigSectionWatcher: simplify __repr__ implementation
+  lib/python/cs/configutils.py: cs.configutils: clean some lint
+  lib/python/cs/configutils.py: cs.configutils: switch from deprecated method, small lint clean

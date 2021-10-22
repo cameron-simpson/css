@@ -2,7 +2,7 @@
 #
 # Read mail item from stdin, file in a folder.
 # Tries to be pretty fast.
-#	- Cameron Simpson <cs@zip.com.au> 20apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 20apr2001
 #
 
 : ${MAILDIR:=$HOME/mail}

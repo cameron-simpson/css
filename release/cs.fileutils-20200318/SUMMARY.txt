@@ -1,0 +1,1 @@
+New findup(path,test) generator to walk up a file tree.

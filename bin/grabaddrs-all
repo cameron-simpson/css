@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -nf
 #
 # Read a mail item on stdin, grab all addresses from headers.
-#	- Cameron Simpson <cs@zip.com.au> 11dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 11dec2005
 #
 
 /^From /d

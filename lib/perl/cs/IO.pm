@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # General routines built on Sinks and Sources.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

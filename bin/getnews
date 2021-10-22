@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Collect USENET news articles and feed to procmail.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

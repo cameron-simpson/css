@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -f
 #
 # Fix some fuckups by egroups.com's digest maker.
-#	- Cameron Simpson <cs@zip.com.au> 10jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 10jan2002
 #
 
 :top

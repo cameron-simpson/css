@@ -2,7 +2,7 @@
 #
 # Read a mailbox naively made by a procmail which doesn't stash From_ lines,
 # and add From_ lines.
-#	- Cameron Simpson <cs@zip.com.au> 08nov2002
+#	- Cameron Simpson <cs@cskk.id.au> 08nov2002
 #
 
 set -ue

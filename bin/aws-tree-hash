@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Compute an AWS SHA256 tree hash of a file for use with Amazon Glacier.
-#   - Cameron Simpson <cs@zip.com.au> 19feb2016
+#   - Cameron Simpson <cs@cskk.id.au> 19feb2016
 #
 
 from __future__ import print_function

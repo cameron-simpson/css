@@ -2,7 +2,7 @@
 #
 # Return the appropriate value of the named parameter for the specified desk.
 # Exit status: zero for a per-desk value, non-zero for the default value.
-#	- Cameron Simpson <cs@zip.com.au> 12jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 12jul2004
 #
 
 cmd=$0

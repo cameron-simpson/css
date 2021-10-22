@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Dump a MySQL table (later others, since it uses DBI) in .csv format.
-#	- Cameron Simpson <cs@zip.com.au> 30sep99
+#	- Cameron Simpson <cs@cskk.id.au> 30sep99
 #
 
 use strict qw(vars);

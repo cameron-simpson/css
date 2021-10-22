@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Regularly run setrxvtbg in the background.
-#	- Cameron Simpson <cs@zip.com.au> 31aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 31aug2000
 #
 
 cmd=`basename "$0"`

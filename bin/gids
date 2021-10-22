@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # List numeric group ids for a user by reverse "groups" list.
-#	- Cameron Simpson <cs@zip.com.au> 12jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 12jun2002
 #
 
 [ $# = 1 ] || { echo "Usage: $0 user" >&2; exit 2; }

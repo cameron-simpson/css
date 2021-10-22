@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check we're on the specified host.
-#	- Cameron Simpson <cs@zip.com.au> 02dec2002
+#	- Cameron Simpson <cs@cskk.id.au> 02dec2002
 #
 
 cmd=$0

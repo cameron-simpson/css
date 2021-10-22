@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Read image paths on stdin, update index file.
-#	- Cameron Simpson <cs@zip.com.au> 19jun2004
+#	- Cameron Simpson <cs@cskk.id.au> 19jun2004
 #
 
 use strict qw(vars);

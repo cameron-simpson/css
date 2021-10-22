@@ -1,0 +1,2 @@
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: @auto_session: improve wrapper name citation
+lib/python/cs/sqlalchemy_utils.py: cs.sqlalchemy_utils: support virtual columns mapped to a JSON column interior value: new functions find_json_field, get_json_field, set_json_field; new decorator @json_column for declaritive_base tables

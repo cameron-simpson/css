@@ -6,7 +6,7 @@
 # looks like IE presents PDFs directly and uses many partial fetches
 # to gather data progressively, resulting is insanely hit apparent
 # hit rates in analog reports.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 awk '

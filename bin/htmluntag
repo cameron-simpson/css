@@ -1,7 +1,7 @@
 #!/usr/bin/perl -p
 #
 # Remove most HTML tags from input so as to leave "plain text".
-#	- Cameron Simpson <cs@zip.com.au> 11nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 11nov2003
 #
 
 $_='' if /<script>/i../<\/script>/i;

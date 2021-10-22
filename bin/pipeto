@@ -2,7 +2,7 @@
 #
 # Attach a command to a named pipe so that other things can pipe info
 # to it with abandon.
-#	- Cameron Simpson <cs@zip.com.au> 09nov2002
+#	- Cameron Simpson <cs@cskk.id.au> 09nov2002
 #
 
 cmd=`basename "$0"` || cmd=pipeto

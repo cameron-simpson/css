@@ -1,0 +1,4 @@
+  lib/python/cs/deco.py: cs.deco: @decorator: first cut at preserving the inner function's docstring
+  lib/python/cs/deco.py: cs.deco: fix variable spelling
+  lib/python/cs/deco.py: cs.deco: another fix for earlier docstring inheritance change
+  lib/python/cs/deco.py: cs.deco: bugfix @decorator decorator, do not decorate twice

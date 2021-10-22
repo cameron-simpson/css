@@ -1,0 +1,1 @@
+@decorator: add support for positional arguments and rewrite - simpler and clearer.

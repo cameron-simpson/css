@@ -1,0 +1,332 @@
+scanbuf: should it do the min/max offset limiting - should be faster, particularly in C
+blocked_chunks_of: should it run pure-extra parser (with min/max or scanbuf of big chunks) until eof or error, then pure scanbuf? should be faster
+fast version of blocked_chunks_of for no parser and hardwired min/max block sizes
+_scan.c: the # for PyArg_ParseTuple is no longer valid - maybe only when PY_SSIZE_T_CLEAN is not defined - maybe drop that half of the ifdef in an error raising way
+_scan.c: the # for PyArg_ParseTuple is no longer valid - find out what to do - or is it only PyArg_Parse which breaks?
+file merge - dig through common ancestor data revisions? fork a copy if not direct ancestor?
+IndexClasses to be singletons based on their pathname
+replace HASHCLASS_BY_ENUM and HASHCLASS_BY_NAME with HasCode.by_index([int,str])
+replace HASHCLASS_BY_ENUM with HashCode.by_enum
+replace HASHCLASS_BY_NAME with HashCode.by_name
+drop hashenum throughout, just use hashname
+cs.iso14496: a HasSubBoxes mixin for things with .boxes, provides __len__, .length, __iter__ and whatever else
+is PEP590 - vector call - applicable to _scan.c?
+HashCode in clude metaclass to autoregister subclasses, and move the registry into the superclass
+hashcodeutils pure mixin, rely on self.hashclass
+drop ALL multihashclass support - everything is given a specific hashclass on instantiation
+big refactor: ALL stores to subclass mappings eg dict or filesdir etc or the Mapping ABC - basicstore etc to become pure mixins, same for indexes
+make _all_ Stores use a single hashclass, drop options hashclass= from add et al
+move usage strings to subcommand docstrings
+make config-based Stores singletons, make datadirs singletons on the dir realpath
+completed-indirect-block index supporting efficient indirect-block completion code
+blockmap: lower Later priority than regular Store queries, seems to be starving normal queries a bit
+datadir SqliteFilemap: mappings with path=NULL, how? del_path does this, also sets indexed_to to NULL
+blockmap: continues running even after connection shutdown
+OverLine class to uses SharedWritable to manage stderr - insert a status line above the cursor line, maintain etxt string, scrolling: withdrawn status line, scroll, restore
+virtual vtfs layer with /dir-hashref/filename, and export for files giviing that so i can mount mnt/vt and symlink reference objects
+MMappedDataDir: do not mmap the write file, just pread it
+RawDataDir: do not mmap growing datafile as a remmap voids the memoryviews
+_FilesDir: close idle _rfd entries in DataDir and PlatonicDir to avoid unbounded fds - cannot do for RawDataDir as the mmaps must persist
+DataDirIndexEntry: use cs.binary?
+VTCmd.cmd_mount: pull out into its own BaseCommand
+maybe rename closed .vtd files as foo-closed.vtd on close to support easy push-and-delete from a pool store to a remote store
+http interface: hash based URLs to return a long or infinite expiry as their content is fixed
+http interface: ETag to be the appropriate hashcode with hashtype prefix in double quotes, honour If-None-Match: "hashtype:hashcode" and return 304 not modified on match
+report lmdb use of sys.argv at import time, figure out what it is doing
+cs.vtfuse: fsyncdir: sync this Dir downward, but "unsynced" version of ancestor Dirs?
+vt.1 doc -h option and $VT_HASHCLASS
+vt.stream: AddRequest uses hashenum, HashCOdesRequest uses hashname
+stats on stream packet stuffing/flushing
+streaming Store.pushto method based on hash_of_hashcodes and streaming .add
+Hash_SHA256 or Hash_SHA512 for the exercise and for test coverage, particularly code which may assume the wrong hashclass
+store_test for SocketClientStore
+doco for [clause]archive archive references and proxystore archive paths
+archives to support NDJSON state lines, thus UUIDs and other metadata
+autocreate basic .vtrc, and put one in the vtrc manual entry and vt.1
+.stat for DirLike and FileLike, redo file monitors using DirLike.walk, make generic change reporter
+SHORTLIST:
+  mount -a
+  Store exports
+    base Store: empty exports
+    DataDir: 
+      default exports based on the datadir-*.vt files
+    ProxyStore
+      exports = name:store_spec ...
+  Stores: push foo,foo_bg implementations back to _foo,_foo_bg and put tracking etc boilerplate on the public methods
+  remove _data from hashcode blocks, always access shared hash:data mapping cache and fall back to caching Store fetch
+  xfstests
+FS:
+  file system layer on top of Dir etc
+  split out from vtfuse
+  vtfuse: no .. in top dir? check mount point .. impl
+Dir: HASCHAFF flag: variable sized random bsdata leads dirents
+fs.Ino: trim redundant transcriber methods/attrs from class if @mapping_transcriber did the job
+datadir: use flock or like instead of a .lock file because aborting a vtd leaves them lying around
+Config needs a hashclass option to supply to Store constructors
+make cs.later.Later restartable - tends to hang on the second shutdown?
+when stable and more ergonomic, move vt.transcribe to cs.transcriber
+fs: save persistent Dirents as 8 level Dir with each level being 2 bytes of the UUID, hex encoded? seems sparse and if we're sucking them all in anyway, pointless? better idea needed for heavily hardlinked trees
+vt.fs: split off the FileHandle index into a FileHandles class to look after the fhndx allocation
+DataDir: scan progress: poll all files, keep .total = total size and .position = scanned size, update on each monitor pass and as scanned - attach Progress to DataFiles?
+general purpose file tree monitor yielding (rpath, old_state, new_state), start with os.walk, switch to inotify andf fsevents later if available
+vt.fs.FileSystem: make the modes into a set, simplify the initialiser
+ShadowDir(dirpath, Dir, archive): make dirpath to be like Dir, apply updates from archive, push local changes to Dir and archive
+get rid of uses of totext/fromtext and dirent_fromtext etc
+sockets: clean up shutdown process: handlers to honour the shared runstate, not abort so much, kill shutdown_now
+Config: parser which returns pure dict of dicts, Config constructed from wired-in defaults plus config file
+streamstore: Client handler: make current Store local to it for independence
+move CancellationError into cs.resources, associate with RunState
+socket store: export = name[:storespec],... with default being "default:{defaults.S}"
+socket store: dflt socket_path = {basedir}/{clausename}.sock
+cs.vt.socket_tests: UNIX domain socket tests
+ShadowStore(shadowdir,backend): monitor real shadowdir, propagate changes to backend - inverse of PlatonicStore
+blockmap updates - use lower priority than regular I/O
+platonic updates - use lower priority than regular I/O
+readahead for CornuCopyBuffer?
+ReadMixin: some kind of optional readahead if bfr reused and emptier than some threshold at return from read
+Store.archive([name]) ==> an Archive instance for state updates for Dirs
+[clause].archives_from = glob:storespec ... to plumb archives to backend Stores, or simply other Stores, eg "*:[metadata]"
+default virtual .vtrc contents, option like ssh -G to dump config file maybe "vt config" or a -n option
+PlatonicStore:
+  keep mapping of paths => (mtime, size) to monitor changes
+  update should rescan whole file, toss old hashcode mapping for that file
+Dirent:
+  metadata st_ctime - useful for reconciliation/update?
+  S_IFWHT whiteout entries
+config:
+  Config object with singleton mapping to clauses
+  clauses to support direct [key]=value for access and update
+.vtd export format:
+  block 0 is indirect ref to top dirent contents
+
+index of hashcode to remote store refs, to support multistore cooperation and proxying
+stream protocol: error flag, json flag (implies JSON additional payload)
+stream protocol: new channel ==> recursive substream
+flat file cache - keep multiple caches, set of hashes per file,
+  upper limit, drop oldest file once set empty and >8 files
+mount -o append: accept O_TRUNC for empty/missing files
+audit fs: append only, no deletes, maybe no renames
+mount -a: live mode, tracing new .vt entries
+mount -e command...
+daemon: listen on UNIX domain socket
+  test access to socket via ssh forwarding
+ticker to regularly sync the fs
+import: import_file for existing files: efficient content comparison etc
+    prepare a CornuCopyBuffer fed from the existing vt blocks as the leading comparison process blockifier, use .take to 
+    compare a pair of CornuCopyBuffers using one as the reference blockifer source
+vt level file ops using setxattr? nasty but the only way? clone, patch, snip, assemble-archive
+    control: x-vt-control=op (set-content, splice, crop, compose, ...)
+    set: x-vt-clone=new-rpath
+    set: Dir:x-vt-archive-as:type[=name], archive available as name (or computed default)
+        tar, iso, zip(?), udf(?)
+        vtd: complete content: top block first (always an IndirectBlock), then metadata/file tree, then data blocks
+meta: user.mime_type
+"raw datafile store": point at a .vtd datafile and kick off a scanner,
+  fetch will block until scanned if missing hash
+  for use with "vt ar"
+  "file:datafile.vtd" Store scheme
+recognise .foo.ext.xxxxxx rsync temp files, infer scanner from .ext embedded extension
+scanner: if scanner is None, probe first 1kb of file content to infer type, should help with rsync etc
+"live" xattr: x-vt-blockref => block reference as text
+    causes a sync, doesn't return until ready; should be ok multithreaded
+vtfuse close file should not block, but update mtime and queue sync with callback to update Block on Dirent - wait for all same on fs sync/umount
+  start syncing appended data immediately?
+    => better file-close behaviour
+SIGINT clean shutdown of mount
+make a single NUL-filled bytes object, get literals to return memoryviews of it for various sized NUL blocks
+    NULBlock trite factory for RLEBlock(b'\0', length)
+salt entries for Dirs,
+stats in new vs existing blocks when adding blocks
+scanners:
+  mbox look for nn and rnrn
+  scanner for .vtd files, supporting efficient storage of stores
+  scanner for Dirents, for blockifying Dirs
+is ctypes.addressof any use for i/o?
+blockify
+  sniff files to infer high level syntax
+  histograms on blockify block sizes
+  scanner for .gz possible?
+  offset/chunk queue uses mutexes to store at most 1 offset or
+    chunk - in fact maybe not a queue at all - general queuelike
+    thingy with - maybe a 2 element heap with 1 element queues
+    feeding it or a pair with channels feeding it
+    problem: offset many chunks in the future?
+  blockify Dir encodings: top_block_of(Dirent-chunks-of-entries)
+vtfuse
+  store content-type in xattrs
+  FileHandle use raw file instead of stdio
+  support lseek SEEK_HOLE and SEEK_DATA T v
+File.close:
+  get a preferred scanner in from outside
+  pass the scanner to blockify
+  keep a partial_block bytes for use at the front of the filedata
+  modify the backing data part to examine the last B
+    update partial_block with it instead of yielding it if it is a partial
+decode-Dir: use copy buffer and leaf blocks
+decode binary stream: use copy buffer
+control module
+  vtftp to be an API to it
+BackedFile
+  set change-on-close flag on write/truncate etc
+  raw file with rfd and wfd for front file
+  support _only_ pread and pwrite methods for I/O
+move to SHA-3-256, check hash size etc
+  v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
+    for k in S1: S2.add[S1[k]
+    for E in S1.walk(D):
+      E2 = copy of E using S2
+      flush E2
+    think about ways to work against 2 Stores, current per thread
+      default store doesn't work here; pipe info to another thread?
+support ranges on GET requests
+URIs:
+  x-vt:[//host[:port]]/textblockref-of-Dir/path...
+vt publish pathname
+  construct and Store Dir:{basename(pathname)=>tree} and recite dirent as x-vt:/textblockref/basename/
+ftp(Dir)
+  Dir can be the basis for a mount, or from a blockref etc
+  CD path                     Change working path
+  INSPECT name                Report metadata
+  PEER other-store-name
+  GET name [local-fs-name]    Export tree/file
+  PUT local-fs-name [name]    Import tree/file
+  BIND name textdirent        Attach existing tree/file
+  PULL name   # needs peer    Fill in missing Blocks for name from peer
+  PUSH name   # needs peer    Export Blocks for name to peer
+  join/merge live mount points
+  QUIT => sync and recite top Dirref?
+vtfuse:
+  OSX Finder name of mountpoint
+  umount: drop inode_data if empty (no hard links)?
+          predrop of inodes with < 2 links?
+  open of symlink
+  do not sync unlinked files
+  include/exclude rules, like rsync?
+    * use a context when computing Dir.block etc, thus usable outside vtfuse
+    do not sync (or Store?) excluded items
+    need to promote unbacked files to backed at fs sync time based on name?
+  include/exclude mount options
+    include/exclude general syntax?
+  support multiple mount points?
+    off a single "live" antecedant Dir?
+  control:
+    control channel/cmd line?
+    link pathname to blockspec
+    merge trees
+Dir:
+  rsync -a: setgid bit not preserved? possibly fuse nosetuid mount setting
+  vtftp command which accesses a Dir
+    hook to vtfuse to run vtftp against live Dir
+datadir
+  ticker to sync gdbm index? or just on _indexQ empty?
+  report degree of gdbm batching
+  maxsize setting, to be used for caches
+  file monitoring: tail() feeding to data block scanner;
+    data block scanner to use copy buffer
+ProgressStore
+  proxy for a single subStore with various Progress attributes .progress_*
+  convenient status line:
+    {progress_add_bytes|human}:{progress_add_count} {progress_get_bytes|human} {progress_outstanding}
+S3Store
+  stores Blocks directly as texthashcode.{hashname}
+HTTPStore
+  /texthashcode.{hashname}
+HTTPDaemon
+  /h/texthashcode.sha1 block (redirect to other http? eg an S3 backed one)
+  /i/texthashcode.sha1 indirect block contents
+  /d/textblockref/... Dir
+    /d/textblockref/path/to/file content (internally retrieves content, presents with Content-Type)
+CloundFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
+SyncProcess: context manager object performing some long operation
+  .progress_{total|outstanding|done}
+  SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents
+  SyncDir(Dirent): pull in contents of dir, optionally including file contents
+blockify
+  sniff files to infer high level syntax
+  parsers:
+    blockify should cope with parsers which exception
+    should blockify dup the source chunks and verify that the
+      chunks from the parser match the chunks from the source?
+    would that imply the parsers need only consume the chunks and
+      emit offsets, and not need to emit chunks?
+      that would avoid needing verification, and possibly avoid
+        some chunk reblocking a parser might do, and also allow
+        us to cope with parsers that exception out
+      * still need to accomodate data generation with offsets, eg big
+        Dirents being emitted with Dirent boundaries
+control module
+  vtftp to be an API to it
+BackedFile to set change-on-close flag on write/truncate etc
+move to SHA-3-256, check hash size etc
+  v/transition.py: reindex Stores, transcribe one Dirent to its equivalent
+    for k in S1: S2.add[S1[k]
+    for E in S1.walk(D):
+      E2 = copy of E using S2
+      flush E2
+    think about ways to work against 2 Stores, current per thread
+      default store doesn't work here; pipe info to another thread?
+support ranges on GET requests
+URIs:
+  x-vt:[//host[:port]]/textblockref-of-Dir/path...
+vt publish pathname
+  construct and Store Dir:{basename(pathname)=>tree} and recite dirent as x-vt:/textblockref/basename/
+ftp(Dir)
+  Dir can be the basis for a mount, or from a blockref etc
+  CD path                     Change working path
+  INSPECT name                Report metadata
+  PEER other-store-name
+  GET name [local-fs-name]    Export tree/file
+  PUT local-fs-name [name]    Import tree/file
+  BIND name textdirent        Attach existing tree/file
+  PULL name   # needs peer    Fill in missing Blocks for name from peer
+  PUSH name   # needs peer    Export Blocks for name to peer
+  join/merge live mount points
+  QUIT => sync and recite top Dirref?
+file
+  start syncing appended data immediately?
+    => better file-close behaviour
+vtfuse:
+  OSX Finder name of mountpoint
+  umount: drop inode_data if empty (no hard links)?
+          predrop of inodes with < 2 links?
+  open of symlink
+  do not sync unlinked files
+  include/exclude rules, like rsync?
+    * use a context when computing Dir.block etc, thus usable outside vtfuse
+    do not sync (or Store?) excluded items
+    need to promote unbacked files to backed at fs sync time based on name?
+  include/exclude mount options
+    include/exclude general syntax?
+  support multiple mount points?
+    off a single "live" antecedant Dir?
+  control:
+    control channel/cmd line?
+    link pathname to blockspec
+    merge trees
+Dir:
+  rsync -a: setgid bit not preserved? possibly fuse nosetuid mount setting
+  vtftp command which accesses a Dir
+    hook to vtfuse to run vtftp against live Dir
+datadir
+  ticker to sync gdbm index? or just on _indexQ empty?
+  report degree of gdbm batching
+  maxsize setting, to be used for caches
+ProgressStore
+  proxy for a single subStore with various Progress attributes .progress_*
+  convenient status line:
+    {progress_add_bytes|human}:{progress_add_count} {progress_get_bytes|human} {progress_outstanding}
+S3Store
+  stores Blocks directly as texthashcode.sha1
+HTTPStore
+  /texthashcode.sha1
+HTTPDaemon
+  /h/texthashcode.sha1 block (redirect to other http? eg an S3 backed one)
+  /i/texthashcode.sha1 indirect block contents
+  /d/textblockref/... Dir
+    /d/textblockref/path/to/file content (internally retrieves content, presents with Content-Type)
+CloudFront ==> HTTPDaemon (possible to map /h/ directly to separate S3?)
+SyncProcess: context manager object performing some long operation
+  .progress_{total|outstanding|done}
+  SyncBlock(Block, local, remote): fill missing Blocks: for a Block, itself; for an IndirectBlock, also its contents
+  SyncDir(Dirent): pull in contents of dir, optionally including file contents
+how is video stored? decoder for common formats

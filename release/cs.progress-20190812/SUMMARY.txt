@@ -1,0 +1,2 @@
+New OverProgress class which is a composite of a set of subsidiary Progress instances.
+Assorted other small updates.

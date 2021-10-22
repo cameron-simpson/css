@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Log job activity and time.
-#	- Cameron Simpson <cs@zip.com.au> 30jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 30jun2003
 #
 
 cmd=$0

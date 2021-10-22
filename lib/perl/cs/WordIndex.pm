@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Maintain keyword indices.
-#	- Cameron Simpson <cs@zip.com.au> 24apr2002
+#	- Cameron Simpson <cs@cskk.id.au> 24apr2002
 #
 
 =head1 NAME
@@ -539,7 +539,7 @@ sub CollateResults
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt> 24apr2002
+Cameron Simpson E<lt>cs@cskk.id.auE<gt> 24apr2002
 
 =cut
 

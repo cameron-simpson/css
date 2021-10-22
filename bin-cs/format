@@ -1,0 +1,148 @@
+#!/bin/sh
+#
+# Reformat the named files, based off lint.
+# - Cameron Simpson <cs@cskk.id.au> 16mar2019
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+flagfile=
+pymode=3
+pyformat=${CS_FORMAT_PY:-yapf}
+
+cmd=$0
+usage="Usage: $cmd [-2] [-3] [-n] [-q] [-t flagfile] [-x] filenames...
+  -2    Use Python 2 for Python formatting.
+  -3    Use Python 3 for Python formatting.
+  (Default python mode: $pymode)
+  -n    No action. Recite format commands.
+  -q    Quiet. Do not display format commands.
+  -t flagfile
+        Locate the nearest flagfile from each file's directory and cancel the
+        format of that file if the flagfile is empty. Also cancel if no such
+        file is found.
+  -x    Trace execution. Display format commands to stderr."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -2) pymode=2 ;;
+    -3) pymode=3 ;;
+    -n) trace=echo ;;
+    -q) trace= ;;
+    -t) flagfile=$2; shift ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing filenames" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for srcfile
+do
+  type=
+  magic=
+
+  # support leading "type:" prefix to $srcfile
+  case "$srcfile" in
+    [a-z]*:*)
+      type=$( expr "x$srcfile" : 'x\([a-z][^:]*\):.*' )
+      tail=$( expr "x$srcfile" : 'x[a-z][^:]*:\(.*\)' )
+      [ -f "$tail" ] && srcfile=$tail
+      ;;
+  esac
+
+  # Require nonempty flagfile in $srcfile directory tree.
+  # Note: works from the directory of the file in order to accomodate
+  # trees symlinked in.
+  [ -z "$flagfile" ] || {
+    srcdir=$( dirname "$srcfile" )
+    case "$flagfile" in
+      ./* | /* ) ;;
+      *)  flagfile=$(
+            set -ue
+            cd "$srcdir"
+            unset PWD
+            findup "$flagfile"
+          ) || continue ;;
+    esac
+    [ -s "$flagfile" ] || continue
+  }
+
+  # try to sniff the type if unspecified
+  if [ -z "$type" ]
+  then
+    case "$srcfile" in
+      *.js | *.json | *.go | *.php | *.py )
+        type=$( expr "x$srcfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
+        ;;
+      *.pl | *.pm )
+        type=pl
+        ;;
+      *.py)
+        type=py
+        ;;
+    esac
+  fi
+  if [ -z "$type" ] && magic=$( file "$srcfile" )
+  then
+    case "$magic" in
+      *'perl script'*)          type=pl ;;
+      *[Pp]'ython script'* | *'python3 script'* )
+                                type=py ;;
+      *'POSIX shell script'*)   type=sh ;;
+    esac
+  fi
+  [ -n "$type" ] || {
+    echo "$cmd: $srcfile: skipping unknown type (magic=$magic)" >&2
+    continue
+  }
+
+  if [ "x$type" = xpy ]
+  then  type=${type}${pymode}
+  fi
+  case "$type" in
+    go) $trace gofmt -w "$srcfile" ;;
+    js) $trace prettier --write "$srcfile" ;;
+    json)$trace json-pprint < "$srcfile" | rewriteif -- "$srcfile" ;;
+    php)$trace php-cs-fixer fix -q --rules=@PSR2 "$srcfile" ;;
+    py2)case $pyformat in
+          yapf)   style=$(yapf-style-for "$srcfile")
+                  $trace python2 -m yapf --style "$style" -i "$srcfile" ;;
+          black)  $trace black -q -t py27 "$srcfile" ;;
+          *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
+                  exit 1
+                  ;;
+        esac
+        ;;
+    py3)case $pyformat in
+          yapf)   style=$(yapf-style-for "$srcfile")
+                  $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
+          black)  $trace black -q -t py38 -S "$srcfile" ;;
+          *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
+                  exit 1
+                  ;;
+        esac
+        ;;
+    *)  echo "$cmd: $srcfile: no formatter (type=$type)" >&2 ;;
+  esac || xit=1
+done
+
+exit $xit

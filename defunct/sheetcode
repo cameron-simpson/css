@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Sheet code for today (or an arbitrary number of seconds previous).
-#	- Cameron Simpson <cs@zip.com.au> 15jan97
+#	- Cameron Simpson <cs@cskk.id.au> 15jan97
 #
 
 use cs::Day;

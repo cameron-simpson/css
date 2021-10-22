@@ -1,12 +1,10 @@
-#!/usr/bin/env python
+#!/bin/sh
 #
 # Emit the arguments suitably quoted for passing via the shell.
 # NB: there is also a standalone "shqstr-sh" pure-shell version of this script.
-#	- Cameron Simpson <cs@zip.com.au> 22apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 22apr2001
 #
 # Trivial python recode; some places don't have perl. - cameron 27mar2009
 #
 
-import cs.sh
-import sys
-print ' '.join(cs.sh.quote(sys.argv[1:]))
+exec python -c 'import sys; import cs.sh; sys.exit(cs.sh.main_shqstr())' ${1+"$@"}

@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Toggle reverse video. OSX specific at present. The only way to read my laptop outside.
+# - Cameron Simpson <cs@cskk.id.au>
+# 
+
+set -ue
+
+if true
+then
+  # talk to the Preferences app
+  osascript -e '
+    tell application "System Preferences"
+      activate
+      reveal anchor "Seeing_Display" of pane id "com.apple.preference.universalaccess"
+    end tell
+    tell application "System Events" to tell process "System Preferences"
+      click the checkbox "Use grayscale" of window "Accessibility"
+      click the checkbox "Invert colors" of window "Accessibility"
+    end tell
+    tell application "System Preferences"
+      quit
+    end tell
+  '
+else
+  # fiddle defaults and restart universalaccessd
+  defaults write com.apple.universalaccess whiteOnBlack 1
+  defaults write com.apple.universalaccess grayscale 1
+  launchctl unload /System/Library/LaunchAgents/com.apple.universalaccessd.plist
+  launchctl load /System/Library/LaunchAgents/com.apple.universalaccessd.plist
+  echo Change will have effect in a few seconds...
+fi

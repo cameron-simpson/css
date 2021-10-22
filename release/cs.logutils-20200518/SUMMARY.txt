@@ -1,0 +1,10 @@
+Sweeping removal of cs.obj.O, universally supplanted by types.SimpleNamespace.
+Default to logging level TRACK if stderr is a tty instead of logging.INFO.
+New ifverbose function with leading `verbose` parameter: if None, log at INFO otherwise if true, log at TRACK, otherwise do not log.
+BREAKING: remove global logging_level and trace_level variables, put it all in the global loginfo.
+Make STATUS just below TRACK so that it is above INFO instead of below.
+New status() function for cs.upd messages.
+UpdHandler: treat status_level as special, going directly to Upd.out.
+Improved source line recitation on modern Python.
+Default level if sys.stderr.isatty() now STATUS, not TRACK.
+Some fixes for loginfo initialisation and setting cs.pfx.cmd.

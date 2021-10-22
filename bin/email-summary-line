@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Read an email message from stdin and recite a summary line.
-#	- Cameron Simpson <cs@zip.com.au> 16apr2002
+#	- Cameron Simpson <cs@cskk.id.au> 16apr2002
 #
 
 mhdrs_sh=`mhdrs -sh | sed 's/^/HDR_/'`

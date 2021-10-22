@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Store a hash table in a file.
-#	- Cameron Simpson <cs@zip.com.au> 07nov95
+#	- Cameron Simpson <cs@cskk.id.au> 07nov95
 #
 # Recoded to use CacheHash and RawFlatHash. - cameron, 23jun96
 #

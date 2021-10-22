@@ -2,7 +2,7 @@
 #
 # Set up my freenet server.
 # Current is test mode, so no advertising.
-#	- Cameron Simpson <cs@zip.com.au> 29dec2000
+#	- Cameron Simpson <cs@cskk.id.au> 29dec2000
 #
 
 needhost $HOMEHOST@home || exit 1

@@ -3,7 +3,7 @@
 # Run an ssh with a no-pass-phrase key file.
 # Naturally we supply no command as that should be hardwired
 # at the far end.
-#	- Cameron Simpson <cs@zip.com.au> 14jul2001
+#	- Cameron Simpson <cs@cskk.id.au> 14jul2001
 #
 
 [ $# -lt 2 ] && { echo "$0: missing key or ssh-arguments" >&2

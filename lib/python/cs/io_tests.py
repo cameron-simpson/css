@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Self tests for cs.io.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from io import StringIO
@@ -10,6 +10,8 @@ import unittest
 from cs.io import contlines
 
 class TestIO(unittest.TestCase):
+  ''' Test `cs.io`.
+  '''
 
   def setUp(self):
     pass
@@ -18,14 +20,16 @@ class TestIO(unittest.TestCase):
     pass
 
   def _testContlines(self, text, lines):
-    self.assertEqual( list( contlines(StringIO(text)) ), lines )
+    self.assertEqual(list(contlines(StringIO(text))), lines)
 
   def test00contlines(self):
     self._testContlines("", [])
     self._testContlines("line 1\nline 2\n", ["line 1\n", "line 2\n"])
     self._testContlines("line 1\n  line 1b\n", ["line 1\n  line 1b\n"])
-    self._testContlines("line 0\nline 1\n  line 1b\nline 2\n",
-                        ["line 0\n", "line 1\n  line 1b\n", "line 2\n"])
+    self._testContlines(
+        "line 0\nline 1\n  line 1b\nline 2\n",
+        ["line 0\n", "line 1\n  line 1b\n", "line 2\n"]
+    )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

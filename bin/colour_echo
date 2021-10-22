@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Echo in colour.       - Cameron Simpson <cs@zip.com.au>
+# Echo in colour.       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

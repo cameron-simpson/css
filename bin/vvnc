@@ -2,7 +2,7 @@
 #
 # Run a VNC showing another VNC.
 # Basicly a hack to do backing store.
-#	- Cameron Simpson <cs@zip.com.au> 05dec2001
+#	- Cameron Simpson <cs@cskk.id.au> 05dec2001
 #
 
 cmd=`basename "$0"`

@@ -1,0 +1,2 @@
+  lib/python/cs/result.py: cs.result: Result.call: report baser exceptions than BaseException
+  lib/python/cs/result.py: cs.result: drop _PendingFunction abstract class

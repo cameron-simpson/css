@@ -5,7 +5,7 @@
 # indices using a Legato controlled jukebox.
 #
 # This is based on suggestions made by Janelle Filkin <janellef@dawn.com.au>.
-#	- Cameron Simpson <cs@zip.com.au> 
+#	- Cameron Simpson <cs@cskk.id.au> 
 #
 
 : ${NSR3P_POOL:='Third Party'}

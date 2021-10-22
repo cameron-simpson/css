@@ -1,0 +1,3 @@
+Support alert groups.
+Catch and report exceptions from the monitor signature function.
+Python 2 port fix for DEVNULL.

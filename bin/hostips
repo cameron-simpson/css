@@ -2,7 +2,7 @@
 #
 # Read hostnames or ips on stdin or from command line, recite their IPs on stdout.
 # NB: doesn't complain if there are no matches.
-#	- Cameron Simpson <cs@zip.com.au> 31jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 31jul2004
 #
 
 if [ $# -gt 0 ]

@@ -1,0 +1,156 @@
+  : merge vt ==> default: PyPI release preparation. vt: new "config" and "init" subcommands. cs-release: various improvements.
+  : merge default ==> pypi
+  : cs.vt.__init__: brush off a little lint
+  : cs.vt.__main__: VTCmd: redo cmd_fsck
+  : cs.vt.__main__: clean some lint
+  : cs.vt.__main__: update usage for new cmd_fsck
+  : cs.vt.__main__: cmd_fsck: fix Pfx indenting, fix import
+  : cs.vt.hash: new @io_fail decorator to catch MissingHashcodeError, log and return False
+  : cs.vt.block: add fsck methods to some Block types
+  : cs.vt.block: LiteralBlock.datafrom: move sanity check out into contract
+  : cs.vt.dir: add fsck methods for Dir and FileDirent; drop an @logexc debugging decorator
+  : cs.vt.__main__: VTCmd.cmd_fsck: get the fsck directly from the target object
+  : cs.vt: drop fsck module, not provided as object methods on fsckable classes
+  : cs.vt.paths: drop obsolete walk function, now provided by DirLike; fix a comment
+  : cs.vt.stream: StreamStore.get: raise MissingHashcodeError instead of StoreError for unobtainable hashes
+  : cs.vt.block: more fsck method coverage, plumb `recurse` parameter
+  : cs.vt.__main__: VTCmd.cmd_fsck: call .fsck with recurse=True
+  : cs.vt.block: move some parameter checking into contracts
+  : cs.vt.block: drop verify_block, now superceded by the .fsck methods
+  : cs.vt.dir: plumb fsck(recurse) parameter; redo Dir.fsck to be saner about recursion
+  : cs.vt.hash: docstring tweak
+  : merge vt ==> default: rework the "vt fsck" command
+  : vt.1.md: manual updates
+  : vt.1.md,vt.5.md,vtrc.5.md: proofreading fixes
+  : vtrc.5.md: more proofreading
+  : cs.vt.datadir: PlatonicDir: support missing default archive file
+  : cs.vt.dir: reduce debugging noise
+  : cs.vt.datadir: tune debugging, trace scan control flag state change
+  : cs.vt.datadir: DataDir._get_write_datafile: bugfix lockpath initialisation
+  : cs.vt.block,cs.vt.dir: cancel fscks when the main runstate gets cancelled
+  : cs.vt.store: more succinct message prefixes
+  : cs.vt.dir: fix call to Dir._validname
+  : cs.vt.datafile: DataFileReader.startup: check that the file opened is a regular file - debugging occurence where it was not
+  : cs.lex,cs.vt.compose: move get_qstr_or_identifier to cs.lex
+  : cs.vt.compose,stream: move CommandStore factory into cs.vt.stream beside StreamStore
+  : cs.vt.__main__: VTCmd.cmd_mount: split out the special device parsing, support [clause]archive as a special
+  : cs.vt.archive: Archive: support [clause]archive specification, split out FilePathArchive and make a FileOutputArchive for update only use
+  : cs.vt.compose: add get_clause_spec and get_clause_archive parsers, use in get_store_spec, cleaner logic in get_params
+  : cs.vt.fs: Inode: drop transcribe_prefix, provided by decorator
+  : cs.vt.store: add get_Archive methods to relevant Stores, plumb archive access list into ProxyStore
+  : cs.vt.__init__,debug: move DebuggingLock into cs.vt.debug
+  : cs.vt.paths: drop long obsolete decode_Dirent_text, dirent_dir, dirent_file, dirent_resolve, get_dirent; replace with transcription based path_resolve function
+  : cs.vt.__main__: drop use of obsolete cs.vt.paths functions, use path_resolve instead
+  : cs.vt.__init__: drop fromtext, long obsolete
+  : cs.vt.__main__: VTCmd.cmd_mount,parse_special: minor logic fixes
+  : cs.vt.{block,dir,dir_tests}: drop obsolete textencode methods, adjust tests
+  : cs.vt.meta: new Meta.__eq__ method with special handling for mtime, a float
+  : cs.vt.block_tests: update to use Block.fsck during verification
+  : cs.vt.__init__: improve the package docstring
+  : cs.vt: tweak DISTINFO
+  : cs.vt.archive: new return type for Archive entries ArchiveEntry(Packet) for easy serialisation by StreamStores; rename _Archive to BaseArchive
+  : cs.vt.Store: StoreError: accept arbitrary keyword parameters to associate with the error, new __str__ including these
+  : cs.vt.stream: add request=rq param to StoreError instantiations
+  : cs.vt.stream: StreamStore.do: now returns just (flags,payload), raises StoreError if not ok
+  : cs.vt.store: _BasicStoreCommon: drop ancient add_archive and get_archive methods, replace with stub get_Archive method returning None
+  : cs.vt.store: _BasicStoreCommon.pushto: remove closure related bug where closure variable B was used later by replacing a set(Result) with mapping(Result=>Block)
+  : cs.vt.store: note a message repair for later
+  : cs.vt.stream: StreamStore: initial implementation of get_Archive and related protocol requests (UNTESTED)
+  : cs.vt.archive: ArchiveEntry now subclasses PacketField instead of Packet, other related fixes; drop _ARCHIVES mapping and associated singleton behaviour of Archive factory; Archive.append no longer abstract
+  : cs.vt.compose: new lexers: get_archive_path_entry and get_archive_path
+  : cs.vt.store: consistent arguments for get_Archive methods; fix plumbing for ProxyStore "archives" archive search path
+  : cs.vt.__main__: tweak usage message; plumb archive search for ProxyStore(cache,main) constructed Store; use empty archive_name for default archive; Archive.last is not an ArchiveEntry
+  : cs.vt.datadir: default archive indicated by archive_name=='' instead of None; Archive.last is now an ArchiveEntry
+  : cs.vt.datadir: SqliteFilemap: do commit/rollback for db modification SQL
+  : cs.vt.config: plumb ProxyStore archive search path
+  : cs.vt.stream: finish and bugfix Archive related protocol packets, and update code now that Archives largely work in ArchiveEntry instances
+  : vt.1.md: some addition description for the "mount" subcommand
+  : vt.1.md: Document archive references, both path.vt and [clause]name
+  : vt.5.md: document new archive protocol requests
+  : cs.vt.cache_tests: testing now covered by the ubertest in cs.vt.store_tests
+  : cs.vt.store: MappingStore: stub .init method
+  : cs.vt.cache: FileDataMappingProxy: make dirpath a keyword only parameter, add some checking, clean some lint, drop hook to tests
+  : cs.vt.datadir: clean some lint, strip some debug
+  : cs.vt.cache: FileCacheStore: break recursion between __iter__ and keys
+  : cs.vt.stream_tests: drop TestHashCodeUtilsStreamStore, now covered by TestStore; drop hashclass, now permuted by TestStore
+  : cs.vt.datadir: drop debug
+  : cs.vt.store_tests: upgrade the TestStore to do better coverage and permutation, pull in the HashUtils tests as well from hash_tests
+  : cs.vt.hash_tests: Hashutils tests moved into store_tests
+  : cs.vt.hash_tests: lint
+  : cs.vt.store_tests: lint
+  : cs.vt.store_tests: add tests for StreamStore using pipes
+  : cs.vt.stream: provide stub StreamStore.init function; provide stub FlushRequest.transcribe method; turn various parameter assertions into icontract requirements
+  : cs.vt.stream_tests: drop this, now tested by cs.vt.stream_tests
+  : cs.vt.store_tests: test setup for TCPClientStore
+  : cs.vt.hash: modify hash_of_byteses to require a `hashclass` argument; plumb this change into HashCode.hash_of_hashcodes
+  : cs.vt.hash: docstring tweaks
+  : cs.vt.store_tests: drop subperfluous subTest nesting
+  : cs.vt.store_tests: add tests for UNIXSocketClientStore
+  : cs.vt.hash: add Hash_SHA256 class: forward planning and better to test nondefault hash class
+  : cs.vt: rename Store _attrs to _str_attrs - they exist to support the __str__ method
+  : cs.vt.block: HackCodeBlock.fsck: pass hashclass to Store.hash, part of multi hashclass support
+  : cs.vt.hash: new global HASHCLASS_BY_ENUM like HASHCLASS_BY_NAME to map hash class enums to their classes
+  : cs.vt.hash: plumb hashclass parameter to support multi hashclass Stores
+  : cs.vt.hash: HashCodeUtilsMixin.hashcodes_bg: fix plumbing of hashclass parameter
+  : cs.vt.hash: clean some lint
+  : cs.vt.cache: plumb hashclass parameter to support multi hashclass Stores
+  : cs.vt.cache: clean lint
+  : cs.vt.index: LMDBIndex.keys: accept the hashclass parameter and sanity check it, but otherwise ignore it
+  : cs.vt.datadir: expose datadir init as top level init_datadir function for direct use
+  : cs.vt.datadir: DFstate.filenum,items: compute these inside the lock to avoid dict mutation
+  : cs.vt.datadir: plumb hashclass parameter - DataDirs are per hashclass views; simplify some pathname computation
+  : cs.vt.datadir: clean some lint
+  : cs.vt.pushpull: plumb hashclass parameter
+  : cs.vt.pushpull: clean some lint
+  : cs.vt.socket: strip some debugging, clean some lint
+  : cs.vt.stream: plumb hashclass through calls and requests to support multi hashclass Stores
+  : cs.vt.stream: clean some lint; drop self tests, now done by store_tests
+  : cs.vt.store: multi hashclass support for Stores
+  : cs.vt.store: clean some lint
+  : cs.vt.store_tests: multi hashclass Store test support; add a test for ProxyStore
+  : cs.vt.cache: MemoryCacheStore: hashclass param; MemoryCacheMapping: keys/iter support
+  : cs.vt.__main__: new -h option to specify preferred hashclass, default from $VT_HASHCLASS
+  : cs.vt.archive: fix base class for FileOutputArchive
+  : cs.vt.config: hashclass plumbing
+  : cs.vt.store: _PerHashclassMapping.get_Archive method; PlatonicStore hashclass plumbing; bugfix missing _PlatonicStore lock parameter
+  : cs.vt.datadir: bugfix indexbase path computation
+  : cs.vt.store_tests: add test for MemoryCacheStore
+  : merge vt ==> default: Store support for multiple hashcode types. Drop long obsolete textencode code. Archive access via Stores, including remote stream Stores. Improved test coverage.
+  : cs.vt.__main__: cmd_init: recover from individual init failures
+  : cs.vt.fs: generate OS_E* functions for all errno.E* names and dummies for known nonportable names which we use
+  : cs.vt.fs: FileSystem.getxattr: Linux port: missing attributes return ENOATTR on Darwin, ENODATA on other platforms
+  : cs.vt.store: _PerHashclassMapping.pathto proxy method; rename localpathto to pathto
+  : cs.vt.archive: bugfix some returns which were returning the old tuple instead of an ArchiveEntry
+  : cs.vt.datadir: PlatonicDir._monitor_datafiles: update the archive only on completion of a subdirectory instead of per file
+  : cs.vt.fs: strip debug
+  : cs.vt: adjust use of FlaggedMixin.flags_prefix for recent change to cs.app.flags
+  : cs.vt.store: _PlatonicStore.__init__: pass indexclass to _PerHashclassMapping but not to MappingStore
+  : cs.vt.store: more docstrings
+  : cs.vt.compose: get_token: make offset optional, default 0; fill out the docstring and include some doctests
+  : cs.vt.__main__: do not tread on imported cs.logutils.upd
+  : cs.vt.__main__: new VTCmd._parse_pushable: recognise command line object designations with .pushto methods, supporting "pushto" and "pullfrom" subcommands
+  : cs.vt.__main__: VTCmd: rip out the old status ticker, implement a new one based a new VTCmd instance .progress attribute
+  : cs.vt.__main__: VTCmd: update cmd_pushto and cmd_pullfrom to use _parse_pushable and to pass the .progress attribute to the pushto operation
+  : cs.vt.__main__: clean lint
+  : cs.vt.datafile: DataFileReader: new __len__ method to support progress reporting, initial .pushto implementation
+  : cs.vt.__main__: common code for "pushto" and "pullfrom" and better names for source and destination Stores
+  : cs.vt.__main__: drop debugging
+  : vt.1.md: document the "pullfrom" and "pushto" subcommands
+  : vt.1.md: move "pullfrom" and "pushto" subcommand documentation to the correct place, replacing the older descriptions
+  : cs.vt.store: rework .pushto method: just one Progress, separate out the push worker into the .push_blocks method
+  : cs.vt.datafile: replace old pushto method with simpler and shinier pushto_queue method
+  : cs.vt.__main__: refactor pushto and pullfrom to use new pushto_queue method
+  : cs.vt.block: _Block: replace .pushto with modern .pushto_queue
+  : cs.vt.__main__: VTCmd.push_blocks: sanity check the return from pushto_queue, should be Boolean
+  : cs.vt.block: _Block.pushto_queue: update docstring for new implementation
+  : cs.vt.dir: replace Dir.pushto and FileDirent.pushto with .pushto_queue implementations
+  : cs.vt.store: _BasicStoreCommon.push-blocks: handle nonhashed Block types, adjust a message
+  : cs.vt.store: push_blocks: accept (block, length) in the iterable to override default length for progress reporting (accomodates compressed data), streamline tests
+  : cs.vt.store: MappingStore: efficiency: make __contains__ identical to contains()
+  : cs.vt.datafile: DataFileReader.pushto_queue: pass explicit length to keep progress reporting correct
+  : cs.vt.store: drop redundant variable
+  : cs.vt: bump development status to alpha from pre-alpha
+  : cs.vt: mark as a filesystem
+  : cs.vt: move cs.vtfuse back in as cs.vt.fuse
+  : vt.1: document the llfuse requirement for the mount subcommand
+  : cs.vt.__init__: DISTINFO: require icontract, add "mount.vtfs" console_script

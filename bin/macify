@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Prepare filenames for transport to a MacOSX machine # by converting Latin-1
 # encoded filenames into UTF-8 Normal Form D encoded filenames.
@@ -24,17 +24,18 @@
 # Example:
 #       macify my-unix-music-dir my-mac-dir-for-copying
 #
-# - Cameron Simpson <cs@zip.com.au> 09may2006
+# - Cameron Simpson <cs@cskk.id.au> 09may2006
 #
 
 import os
 import os.path
 import sys
 import unicodedata
-from cs.logutils import setup_logging, warn, cmd
+from cs.logutils import setup_logging, warn
 from cs.app.osx.fs import nfd
 
-setup_logging()
+cmd = os.path.basename(sys.argv[0])
+setup_logging(cmd)
 
 SrcEncoding='iso8859-1'
 

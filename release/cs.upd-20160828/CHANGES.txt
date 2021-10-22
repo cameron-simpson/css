@@ -1,0 +1,6 @@
+  lib/python/cs/upd.py: cs.upd: Upd: add flush method, adjust some whitespace
+  lib/python/cs/upd.py: cs.upd: Upd.flush: no op if no _backend
+  lib/python/cs/upd.py: cs.upd: whitespace
+  lib/python/cs/upd.py: cs.upd: Upd.out: fix longstanding trailing text erasure bug
+  lib/python/cs/upd.py: cs.upd: Upd.nl,out: accept optional positional parameters, use with %-formatting if supplied, just like logging
+  lib/python/cs/upd.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

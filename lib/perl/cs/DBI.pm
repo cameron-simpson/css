@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Subclass of the DBI class. Supplies some handy things.
-#	- Cameron Simpson <cs@zip.com.au> 27jun1999
+#	- Cameron Simpson <cs@cskk.id.au> 27jun1999
 #
 
 =head1 NAME
@@ -1307,7 +1307,7 @@ DBI(3), cs::DBI::Table::RowObject(3)
 
 =head1 AUTHOR
 
-Cameron Simpson <cs@zip.com.au>
+Cameron Simpson <cs@cskk.id.au>
 
 =cut
 

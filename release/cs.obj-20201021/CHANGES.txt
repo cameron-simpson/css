@@ -1,0 +1,10 @@
+lib/python/cs/obj.py: Release information for cs.obj-20200716.
+lib/python/cs/obj_tests.py: cs.**.*_tests: docstrings for test suites - pytest has made their absence rather glaring
+lib/python/cs/obj.py: cs.obj: rename obj_as_dict to just as_dict, improve docstring
+lib/python/cs/obj.py: cs.obj: @OBSOLETE(obj_as_dict), recommend "as_dict()"
+lib/python/cs/obj.py: cs.obj: SingletonMixin: clarify and correct docstring
+lib/python/cs/obj.py: merge sqltags ==> default: many internal changes; common TaggedEntity based edit modes for sqltags and fstags; cs.sqltags SQLTagSets and SQLTaggedEntities are singletons; various fixes
+lib/python/cs/obj.py: cs.obj: [BREAKING] change as_dict() to accept a single optional selector instead of various mutually exclusive keywords; make obj_as_dict() raise RUntimeError
+lib/python/cs/obj.py: cs.obj: as_dict: fix variable name typo
+lib/python/cs/obj.py: cs.obj: SingletonMixin: add some TODOs for later around gaps in the factory function implementation
+lib/python/cs/obj.py: cs.obj: clean some lint

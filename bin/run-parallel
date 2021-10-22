@@ -2,7 +2,7 @@
 #
 # Read shell commands from standard input, dispatch in parallel up
 # to a limit and keep busy.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue

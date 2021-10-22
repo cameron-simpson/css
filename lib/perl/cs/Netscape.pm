@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Do things with netscape stuff.
-#	- Cameron Simpson <cs@zip.com.au> 10aug99
+#	- Cameron Simpson <cs@cskk.id.au> 10aug99
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Dump the databases from a MySQL database.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 set -u

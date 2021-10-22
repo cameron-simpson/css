@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Invoke munpack with some default options for easy invocation.
-#	- Cameron Simpson <cs@zip.com.au> 24dec96
+#	- Cameron Simpson <cs@cskk.id.au> 24dec96
 #
 
 usage="Usage: $0 [-fqt] [-i] [-C working-dir] [files...]

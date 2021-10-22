@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # "Smart" IO. Gnows about compress, pgp, gzip, etc.
-#	- Cameron Simpson <cs@zip.com.au> 29jun96
+#	- Cameron Simpson <cs@cskk.id.au> 29jun96
 #
 
 use strict qw(vars);

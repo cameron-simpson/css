@@ -1,0 +1,2 @@
+TagSet.get_value: raise KeyError in strict mode, leave placeholder otherwise.
+Other small changes.

@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Run an arbitrary command on my home machine.
+#   - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+: ${HOST:=$(hostname -s)}
+: ${HOMEHOST:=}
+
+cmd=$0
+usage="Usage: $cmd [command [args...]]"
+
+[ $# -gt 0 ] || set -- $(basename "$SHELL")
+
+if [ -z "$HOMEHOST" ] || [ "x$HOST" = "x$HOMEHOST" ]
+then
+  exec "$@"
+fi
+
+exec 3<&0
+sshto-proxy-command "$HOMEHOST" </dev/null \
+| \
+{ read target proxy_command
+  exec 0<&3 3<&-
+  rcmd=$( shqstr "$@" )
+  set -- "$target" ". \"\$HOME/.profile\"; $rcmd"
+  [ -n "$proxy_command" ] && set -- -o "proxycommand=$proxy_command" "$@"
+  [ -t 0 -a -t 1 ] && set -- -t "$@"
+  [ -t 2 ] && set -x
+  exec ssh "$@"
+}

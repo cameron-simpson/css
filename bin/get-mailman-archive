@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Download mailman archive into a UNIX mbox file.
-#       - Cameron Simpson <cs@zip.com.au> 19jan2009
+#       - Cameron Simpson <cs@cskk.id.au> 19jan2009
 #
 
 set -ue

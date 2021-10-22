@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Convenience routines for working with HTTP 1.1 (RFC2616).
-#   - Cameron Simpson <cs@zip.com.au> 28dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 28dec2014
 #
 
 import sys
@@ -11,8 +11,19 @@ from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
-from cs.logutils import X, warning
+from cs.logutils import warning
 from cs.timeutils import time_func
+from cs.x import X
+
+DISTINFO = {
+    'description': "RFC2616 (HTTP 1.1) facilities",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
+}
 
 # character classes: see RFC2616 part 2.2
 CR = '\r'

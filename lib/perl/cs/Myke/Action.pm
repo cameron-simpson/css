@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Action objects (subprocesses).
-#	- Cameron Simpson <cs@zip.com.au> 11may97
+#	- Cameron Simpson <cs@cskk.id.au> 11may97
 #
 
 use strict qw(vars);

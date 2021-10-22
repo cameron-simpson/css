@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Report the state of a CARP interface.
-#       - Cameron Simpson <cs@zip.com.au> 30dec2012
+#       - Cameron Simpson <cs@cskk.id.au> 30dec2012
 #
 
 [ $# = 1 ] || { echo "Usage: $0 carpN" >&2; exit 2; }

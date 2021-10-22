@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::DBI::Table::Hash: Treat an indexed DBI table as a hash.
-#	- Cameron Simpson <cs@zip.com.au> 25feb2000
+#	- Cameron Simpson <cs@cskk.id.au> 25feb2000
 #
 
 =head1 NAME
@@ -256,7 +256,7 @@ sub DELETE($$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.au<gt>
+Cameron Simpson E<lt>cs@cskk.id.au<gt>
 
 =cut
 

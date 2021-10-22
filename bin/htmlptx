@@ -9,7 +9,7 @@
 # UnHTML output has the form:
 #	file	left-context	keyword	right-context	line-number
 # tab separated.
-#	- Cameron Simpson <cs@zip.com.au> 11nov2003
+#	- Cameron Simpson <cs@cskk.id.au> 11nov2003
 #
 
 cmd=$0

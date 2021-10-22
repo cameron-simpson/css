@@ -7,7 +7,7 @@
 # come with only the GNU tools, one can't write a "realexpr", so one
 # must comprimise and use "gnuexpr".
 # All because the GNU people are arrogant scum.
-#	- Cameron Simpson <cs@zip.com.au> 20jun99
+#	- Cameron Simpson <cs@cskk.id.au> 20jun99
 #
 
 gnuexpr=/opt/gnu/bin/expr

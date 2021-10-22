@@ -1,0 +1,2 @@
+New BasicTableMixin and HasIdMixin classes with useful methods and a typical `id` Column respectively.
+Assorted fixes and improvements.

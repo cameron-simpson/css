@@ -6,7 +6,7 @@
 # the old .cgi name.
 # For any shell CGI, move the real .cgi to .cgi-sh and symlink cgiwrap-stub to
 # the old .cgi name.
-#	- Cameron Simpson <cs@zip.com.au> 03mar1999
+#	- Cameron Simpson <cs@cskk.id.au> 03mar1999
 #
 # Make into a single wrapper for pl and sh.	- cameron 12feb2001
 #
@@ -109,5 +109,5 @@ exit $?
 
 # =head1 AUTHOR
 #
-# Cameron Simpson <cs@zip.com.au> 30mar1999
+# Cameron Simpson <cs@cskk.id.au> 30mar1999
 #

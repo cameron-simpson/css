@@ -1,0 +1,5 @@
+Update metadata with "install_requires" instead of "requires".
+Rename Asynchron to Result.
+Pull PendingFunction and OnDemandFunction from cs.later to cs.asynchron.
+Asynchron accepts optional `result` parameter to prefill .result.
+other minor changes.

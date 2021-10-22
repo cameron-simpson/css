@@ -1,0 +1,2 @@
+Pfx: new print=False option to issue a print() or other call on entry to the with-suite eg with Pfx(....,print=verbose).
+Pfx: print= now also accepts a file-like object.

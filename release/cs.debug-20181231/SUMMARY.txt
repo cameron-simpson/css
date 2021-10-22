@@ -1,0 +1,2 @@
+New TimingOutLock for locating deadlock points, grew from debugging cs.vt.index.
+Other minor changes.

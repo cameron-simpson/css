@@ -1,0 +1,2 @@
+  lib/python/cs/timeutils.py: my email address has changed - update Python code
+  lib/python/cs/timeutils.py: cs.timeutils: define TimeoutError only if missing, clean some lint

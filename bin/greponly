@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Print all strings matching the supplied regexp.
-#	- Cameron Simpson <cs@zip.com.au> 14feb2006
+#	- Cameron Simpson <cs@cskk.id.au> 14feb2006
 #
 
 cmd=$0

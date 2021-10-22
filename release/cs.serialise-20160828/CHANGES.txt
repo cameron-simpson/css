@@ -1,0 +1,12 @@
+  lib/python/cs/serialise.py: cs.serialise: initial implementation of general purpose Packet
+  lib/python/cs/serialise.py: cs.serialise: redo entire API with saner names and regular interface, add unit tests
+  lib/python/cs/serialise.py: cs.serialise: update to work in python 2 and 3
+  lib/python/cs/serialise.py: cs.serialise_testslib/python/cs/serialise_tests.py: test02Packet: test sequential parse of adjacent serialised packets
+  lib/python/cs/serialise.py: cs.serialise: raise EOFError on short reads
+  lib/python/cs/serialise.py: cs.serialise: add write_Packet, converse of read_Packet
+  lib/python/cs/serialise.py: cs.serialise: Packet.__str__: crop the payload at 16 bytes
+  lib/python/cs/serialise.py: cs.serialise: add put_bss, get_bss, read_bss to serialise strings
+  lib/python/cs/serialise.py: cs.serialise: separate versions of write_Packet for python 2 and 3; my python 2 "bytes" objects do not support the buffer protocol
+  lib/python/cs/serialise.py: cs.serialise: remove _str2bytes and readbytes, obsoleted by use of cs.py3.BytesFile instances
+  lib/python/cs/serialise.py: cs.serialise: commented out debug statements for reuse another time
+  lib/python/cs/serialise.py: cs.serialise: mention the term "byte serialised" in docstrings, hence the "bs"

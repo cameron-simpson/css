@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # OS independant interface to stty.
-#	- Cameron Simpson, 04jul94, cs@zip.com.au
+#	- Cameron Simpson, 04jul94, cs@cskk.id.au
 #
 # stty'get(FILE) -> (speed,cols,rows)
 #	BUG: actually tests /dev/tty at present.

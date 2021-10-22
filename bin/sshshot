@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Take a screenshot of the display on the named host.
+# Requires X11 auth on the target host and GraphicsMagick.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [jpg|png] hostnames...
+  jpg, png
+    Fetch screenshots in JPEG or PNG format respectively."
+
+imgfmt=jpg
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    jpg|png)    imgfmt=$1; shift ;;
+  esac
+fi
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing hostnames" >&2
+  badopts=1
+}
+
+[ $badopts ] && {
+  echo "$usage" >&2
+  exit 2
+}
+
+(
+  set -ue
+  for host
+  do
+    shotfile=screenshot-$host-$( date +%Y%m%d%H%M%S ).jpg
+    if ssh "$host" "
+          PATH=\$HOME/bin:\$PATH:/usr/local/bin:/opt/local/bin
+          for display in :0 :1 :2 :3 :4
+          do
+            ( set -x
+              env \"DISPLAY=\$display\" gm import -window root '$imgfmt:-'
+            ) && break
+          done" >"$shotfile"
+    then
+      ls -ld "$shotfile"
+      [ -t 1 ] && open "$shotfile"
+    else
+      rm "$shotfile"
+    fi &
+  done
+  wait
+)

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for otp-md5 which places the response into the cut buffer.
-#	- Cameron Simpson <cs@zip.com.au> 10nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 10nov2000
 #
 
 otp=$HOME/bin/$ARCH/otp-md5

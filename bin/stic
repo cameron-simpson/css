@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Wrapper for the stic tools.
-#	- Cameron Simpson <cs@zip.com.au> 04jul2001
+#	- Cameron Simpson <cs@cskk.id.au> 04jul2001
 #
 # =head1 NAME
 #
@@ -138,5 +138,5 @@ exit $xit
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson E<lt>cs@zip.com.auE<gt> July 2001
+# Cameron Simpson E<lt>cs@cskk.id.auE<gt> July 2001
 #

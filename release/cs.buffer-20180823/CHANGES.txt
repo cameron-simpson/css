@@ -1,0 +1,6 @@
+  lib/python/cs/buffer.py: cs.buffer: chunky: docstring markdown fix
+  lib/python/cs/buffer.py: cs.buffer: new optional seekable init parameter and .seekable attribute throughout; treat regular file descriptors and .tell()able files as seekable by default; various docstring and lint improvements
+  lib/python/cs/buffer.py: cs.buffer: docstring improvements
+  lib/python/cs/buffer.py: merge venti ==> media: pull in the cs.binary and csbuffer updates
+  lib/python/cs/buffer.py: cs.buffer: CornuCopyBuffer.from_bytes: bugfix offset range check
+  lib/python/cs/buffer.py: merge venti ==> media

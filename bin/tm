@@ -3,35 +3,53 @@
 # Tmux convenience script, performing common higher level tasks.
 # Falls back to using screen if no tmux in some circumstances,
 # primarily when accessing remote sessions.
-#   - Cameron Simpson <cs@zip.com.au> 30oct2014
+#   - Cameron Simpson <cs@cskk.id.au> 30oct2014
 #
 
 set -ue
 
-if [ -z "${TMUX_TMPDIR:-}" ]
-then
-  if [ -d "$HOME/var/tmux/." ]
-  then
-    TMUX_TMPDIR=$HOME/var/tmux
-    export TMUX_TMPDIR
-  fi
-fi
 : ${TMUX:=''}
-: ${USER:=`id -ud`}
-: ${HOST:=`hostname`}
 : ${DEBUG:=''}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+: ${TMPDIR:=''}
+: ${TMUX_TMPDIR:=''}
+
+setup_env='
+    [ -n "$TMPDIR" -a -d "$TMPDIR" ] || \
+    if [ -d "$HOME/tmp" ]
+    then  TMPDIR=$HOME/tmp
+    else  TMPDIR=/tmp
+    fi
+    [ -n "$TMUX_TMPDIR" -a -d "$TMUX_TMPDIR" ] || \
+    if [ -d "$HOME/var/tmux" ]
+    then  TMUX_TMPDIR=$HOME/var/tmux
+    else  TMUX_TMPDIR=$TMPDIR/tmux-`id -u`
+    fi
+    export TMPDIR TMUX_TMPDIR'
+
+eval "$setup_env"
 
 trace=
 setx=:
+host=${HOST:-`hostname -s`}
 ##[ -t 2 ] && set -- -x ${1+"$@"}
 [ $DEBUG ] && set -- -x ${1+"$@"}
 xopt=
+tmux_version=$(tmux -V 2>/dev/null | sed "s/^tmux //")
+tmrc=$HOME/.tmrc
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   Options:
-    -x  Trace command execution.
+    -h host   Specify the host used for matching.
+              Default is the current host from \$HOST or \`hostname -s\`: $host
+    -x        Trace command execution.
   With no operation, list current sessions.
+
+  \$HOME/.tmrc format:
+    # comments
+    LABEL [@host,...] shell command
+
   Operations:
     number
       Join the session numbered \"number\".
@@ -56,6 +74,9 @@ usage="Usage: $cmd [options...] [op [args...]]
     pick-new-prefix-session-remote prefix remote-host
       Allocate a new session name starting with \"prefix\" on the remote host
       \"remote-host\".
+    rc [-a] [-h host]
+      List the \$HOME/.tmrc config.
+      -a  All: also list lines not matching this host ($host).
     recite-function-remote
       Print the shell function definition for the \"tm_remote\"
       convenience function, normally aliased as \"@\".
@@ -67,22 +88,27 @@ usage="Usage: $cmd [options...] [op [args...]]
     start [session-names...]
       Start the named sessions using the configuration from \$HOME/.tmrc.
       If no session-names are supplied, start everything named in the .tmrc.
+      These sessions are started from the \$HOME directory.
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name [-d] [-K keyline...] {-c shcmd | [command [args...]]}
+    use-session session-name [-d] [tmux-new-session-options...]
       Join the session named \"session-name\", creating it if necessary.
+      -d  Detached: do not attach to the session.
       If the session does not exist:
         a) run the supplied command if specified, otherwise \$SHELL.
         b) pass each keyline with a trailing carriage return.
-      If -d (detached) is supplied, to not attach to the session;
-        this is used by my rig-tm script to set up my default sessions.
+      If -d (detached) is supplied, do not attach to the session.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
 
-# Test if this system has tmux in its $PATH.
+# Test if this system has tmux; did we get a version earlier?
 have_tmux(){
-  which tmux >/dev/null 2>&1
+  [ -n "$tmux_version" ] || which tmux >/dev/null 2>&1
+}
+
+do_tmux(){
+  $trace tmux ${1+"$@"}
 }
 
 # Strip prefix from incoming strings, compute max of remaining numbers, add 1.
@@ -103,6 +129,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -h) host=$2; shift ;;
     -x) trace=set-x xopt=-x setx='set -x' ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -141,6 +168,7 @@ case "$op" in
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
+    detached=
     ;;
   up | down | left |right )
     if [ $# -gt 0 ]
@@ -171,6 +199,14 @@ case "$op" in
       echo "$cmd: $op: extra arguments after prefix: $*" >&2
       badopts=1
     fi
+    ;;
+  rc)
+    rc_all=
+    [ $# = 0 ] || { [ "x$1" = x-a ] && { rc_all=1; shift; }; }
+    [ $# = 0 ] || {
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    }
     ;;
   pick-new-prefix-session-remote)
     if [ $# = 0 ]
@@ -234,6 +270,19 @@ case "$op" in
   start)
     ;;
   use-session)
+    detached=
+    while [ $# -gt 0 ]
+    do
+      case "$1" in
+        -d) detached=1 ;;
+        --) shift; break ;;
+        -?*)echo "unsupported $op option: $1" >&2
+            badopts=1
+            ;;
+        *)  break ;;
+      esac
+      shift
+    done
     if [ $# = 0 ]
     then
       echo "$cmd: $op: missing session-name" >&2
@@ -273,38 +322,94 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+[ -d "$TMUX_TMPDIR/." ] || set-x mkdir -p "$TMUX_TMPDIR"
+
 rcmd(){
   _rcmd_rhost=$1; shift
-  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
+  case "$_rcmd_rhost" in
+    *\!*)   _rcmd_ssh=sshto ;;
+    *)      _rcmd_ssh=ssh ;;
+  esac
+  $trace $_rcmd_ssh -t "$_rcmd_rhost" "
+    $setx
+    $setup_env
+    PATH=\$HOME/bin-local:\$HOME/bin:\$PATH:/usr/local/bin:/opt/local/bin
+    export PATH
+    $*"
+}
+
+# print "LABEL shcmd" to standard output
+# omit lines qualified by @host,... if the host does not match
+tmrc(){
+  [ $# -le 1 ] || { echo "$cmd: usage: tmrc [tmrcfile]" >&2; exit 2; }
+  (
+    set -ue
+    rcfile=$tmrc
+    [ $# = 0 ] || { rcfile=$1; shift; }
+    exec <"$rcfile"
+    lineno=0
+    while read -r label shcmd
+    do
+      lineno=$(( lineno + 1 ))
+      case "$label" in
+        [A-Z]*)
+          # valid label, check for @host,...
+          case "$shcmd" in
+            @[a-z]*)
+              if hosts=$( expr "$shcmd" : '@\([a-z][-a-z0-9,]*\)  *.*' )
+              then
+                shcmd=$(  expr "$shcmd" : '@[a-z][-a-z0-9,]*  *\(.*\)' )
+              else
+                echo "$cmd: $rcfile:$lineno: bad @hosts part" >&2
+                continue
+              fi
+              case ",$hosts," in
+                *,$host,*)
+                  ;;
+                *)[ $rc_all ] || continue
+                  ;;
+              esac
+              ;;
+          esac
+          ;;
+        *)continue
+          ;;
+      esac
+      echo "$label" "$shcmd"
+    done
+  )
 }
 
 case "$op" in
-  up)    $trace tmux select-pane -U ;;
-  down)  $trace tmux select-pane -D ;;
-  left)  $trace tmux select-pane -L ;;
-  right) $trace tmux select-pane -R ;;
+  up)    do_tmux select-pane -U ;;
+  down)  do_tmux select-pane -D ;;
+  left)  do_tmux select-pane -L ;;
+  right) do_tmux select-pane -R ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
-    tmux start-server
+    do_tmux start-server
     if [ "x$1" = x-n ]
     then
       shift
-      $trace tmux list-sessions ${1+"$@"} \
+      do_tmux list-sessions ${1+"$@"} \
       | awk '{ printf("%3d %s\n", NR, $0); }'
     else
-      $trace tmux list-sessions ${1+"$@"}
+      do_tmux list-sessions ${1+"$@"}
     fi
     ;;
   pick-new-prefix-session)
-    tmux start-server
-    echo "$session_prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
+    do_tmux start-server
+    echo "$session_prefix"$(do_tmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
     ;;
   pick-new-prefix-session-remote)
     # choose a new remote session name
     # using tmux by choice, screen otherwise
-    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | tr -d '\015' | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( rcmd "$remote_host" 'if [ -n "$tmux_version" ]; then $tmux start-server; $tmux list-sessions | sed '\''s/:.*//'\''; else screen -ls | sed -n '\''s/^\t[1-9][0-9]*\.\([^\t]*\)\t.*/\1/p'\''; fi' | tr -d '\015' | next_suffix "$session_prefix" )
     echo "$session_name"
+    ;;
+  rc)
+    tmrc
     ;;
   recite-function-remote)
     # recite a shell function for accessing remote sessions,
@@ -314,7 +419,7 @@ case "$op" in
         tm_remote(){
           : ${_tm_host:=}
           : ${_tm_session:=}
-          _tm_src_prefix=_${USER}@${HOST}__
+          _tm_src_prefix=_${USER}@${host}__
           # no host[:session]? reconnect to the previously used host:session
           if [ $# = 0 ]
           then
@@ -353,9 +458,9 @@ case "$op" in
         )
         ;;
     esac
-    if $trace tmux has-session -t "$session_name"
+    if do_tmux has-session -t "$session_name"
     then
-      $trace tmux rename-session -t "$session_name" "$session_name_new"
+      do_tmux rename-session -t "$session_name" "$session_name_new"
     else
       echo "$cmd: $op: no such session: $session_name" >&2
       exit 1
@@ -364,46 +469,44 @@ case "$op" in
   start)
     # start initial screen sessions; just the named ones of names specified
     # obtains definitions from $HOME/.tmrc
-    tmrc=$HOME/.tmrc
+    cd
     if [ ! -f "$tmrc" ]
     then
       echo "$cmd: $op: no tmrc: $tmrc" >&2
       exit 1
     fi
-    [ $# -gt 0 ] || set -- $(sed -n 's/^\([A-Z][^ ]*\) .*/\1/p' "$HOME/.tmrc")
-    if [ $# = 0 ]
-    then
-      echo "$cmd: $op: no session names and nothing in \$HOME/.tmrc" >&2
-      badopts=1
-    else
-      tmux start-server
-      for session_name
+    tmrc \
+    | \
+    {
+      xit=0
+      matched=
+      while read -r session_name shcmd
       do
-        found=
-        lineno=0
-        while read -r rc_name rc_etc
-        do
-          lineno=$(( lineno + 1 ))
-          if [ "x$rc_name" = "x$session_name" ]
-          then
-            if [ $found ]
-            then
-              echo "$cmd: $op: $session_name: $tmrc:$lineno: repeated mention ignored" >&2
-              xit=1
-            else
-              found=1
-              shcmd=$( shqstr "$0" use-session "$session_name" -d )
-              $trace sh $xopt -c "$shcmd $rc_etc" </dev/null || xit=1
-            fi
-          fi
-        done <"$tmrc"
+        if [ $# -gt 0 ]
+        then
+          case " $* " in
+            *" $session_name "*)
+              ;;
+            *)continue
+              ;;
+          esac
+        fi
+        matched=1
+        do_tmux has-session -t "$session_name" 2>/dev/null \
+        || do_tmux new-session -d -s "$session_name" "set -x; $shcmd" \
+        || xit=1
       done
-    fi
+      [ $matched ] || {
+        echo "$cmd: $op: no sessions matched" >&2
+        xit=1
+      }
+      exit $xit
+    }
     ;;
   use-session)
     # no tmux? use scr
     have_tmux || exec $trace scr "$session_name"
-    tmux start-server
+    do_tmux start-server
     case "$session_name" in
       [1-9]*)
         session_name=$(
@@ -412,44 +515,37 @@ case "$op" in
         )
         ;;
     esac
-    detached=
-    if [ $# -gt 0 ] && [ "x$1" = x-d ]
-    then
-      detached=1
-      shift
-    fi
-    if not $trace tmux has-session -t "$session_name" 2>/dev/null
-    then
-      cr=$( printf '\r' )
-      keylines=
-      while [ $# -gt 0 ] && [ "x$1" = x-K ]
-      do
-        keyline=$2
-        shift; shift
-        keylines=$keylines$keyline$cr
-      done
-      if [ $# = 0 ]
-      then  set -- "$SHELL"
-      else
-        if [ "x$1" = x-c ]
-        then  set -- "$SHELL" "$@"
-        fi
-      fi
-      shcmd=$( shqstr "$@" )
-      TMUX= $trace tmux new-session -d -s "$session_name" "$shcmd"
-      [ -z "$keylines" ] || $trace tmux send-keys -l -t "$session_name" -- "$keylines"
-    fi
-    if [ -z "$detached" ]
-    then
+    do_tmux has-session -t "$session_name" 2>/dev/null \
+    || "$0" start "$session_name" 2>/dev/null \
+    || {
+      [ $# -gt 0 ] && {
+        tm_shcmd=$( shqstr "$@" )
+        set -- "exec $tm_shcmd"
+      }
+      do_tmux new-session -d -s "$session_name" "$@"
+    }
+    [ $detached ] || {
       if [ -n "$TMUX" ]
-      then  $trace tmux switch-client -t "$session_name"
-      else  $trace tmux attach-session -t "$session_name"
+      then do_tmux switch-client -t "$session_name"
+      else do_tmux attach-session -t "$session_name"
       fi
-    fi
+    }
     ;;
   use-session-remote)
     # connect to remote session, tmux by choice, screen if no tmux
-    rcmd "$remote_host" "set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name \${SHELL:-/bin/sh}; else exec screen -x $session_name || exec screen -S $session_name \${SHELL:-/bin/sh}; fi"
+    rcmd "$remote_host" '
+      set -ue
+      if tmux -V >/dev/null 2>&1
+      then
+        tmux start-server
+        if tmux has-session -t '"'$session_name'"'
+        then  tmux attach-session -t '"'$session_name'"'
+        else  exec env tmux new-session -s '"'$session_name'"' "${SHELL:-/bin/sh}"
+        fi
+      else
+        exec screen -x '"'$session_name'"' \
+        || exec screen -S '"'$session_name'"' "${SHELL:-/bin/sh}"
+      fi'
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1

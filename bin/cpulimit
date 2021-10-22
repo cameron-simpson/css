@@ -5,7 +5,7 @@
 #	0 - command exited with 0.
 #	1 - command exited with nonzero.
 #	2 - command exited because of cpu limit.
-# - Cameron Simpson <cs@zip.com.au> 15apr2004
+# - Cameron Simpson <cs@cskk.id.au> 15apr2004
 #
 
 cmd=$0

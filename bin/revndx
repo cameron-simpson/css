@@ -2,7 +2,7 @@
 #
 # Recurse down a directory tree containing event data.
 # Emit an HTML listing if the tree.
-#	- Cameron Simpson <cs@zip.com.au> 05jan98
+#	- Cameron Simpson <cs@cskk.id.au> 05jan98
 #
 
 cmd=`basename "$0"`

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Prompt for text (typically a change description).
-#	- Cameron Simpson <cs@zip.com.au> 23dec99
+#	- Cameron Simpson <cs@cskk.id.au> 23dec99
 #
 
 prompt="Enter short update description. Terminate with lone dot."

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Update changes to current dir only.
-#	- Cameron Simpson <cs@zip.com.au> 21may1997
+#	- Cameron Simpson <cs@cskk.id.au> 21may1997
 #
 
 exec cvs update -l ${1+"$@"}

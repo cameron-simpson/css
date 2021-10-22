@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Display data for performance eval.
-#	- Cameron Simpson <cs@zip.com.au> 21dec98
+#	- Cameron Simpson <cs@cskk.id.au> 21dec98
 #
 
 use strict qw(vars);

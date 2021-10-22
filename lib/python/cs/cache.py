@@ -1,68 +1,32 @@
 #!/usr/bin/python
 
-import sys
+''' A few caching facilities.
+'''
+
 from collections import deque
-from threading import Lock, RLock
-from cs.threads import locked
-from cs.logutils import X
+from threading import RLock
 
-_caches = []
-def overallHitRatio():
-  if len(_caches) == 0:
-    return None
-
-  hits = 0
-  misses = 0
-  for c in _caches:
-    (h, m) = c.hitMiss()
-    hits += h
-    misses += m
-
-  total = hits + misses
-  if total == 0:
-    return None
-
-  return float(hits) / float(total)
-
-class RingBuffer(list):
-
-  def __init__(self, size):
-    assert size > 0
-    list.__init__(None for i in range(size))
-    self.__off = 0
-
-  def __len__(self):
-    return len(self.__buf)
-
-  def __getitem__(self, i):
-    assert i >= 0, "i < 0 (%d)" % i
-    blen = len(self.__buf)
-    assert i < blen, "i >= buflen (%d >= %d)" % (i, blen)
-    i = (i + self.__off) % blen
-    return self.__buf[i]
-
-  def __setitem__(self, i, v):
-    assert i >= 0, "i < 0 (%d)" % i
-    blen = len(self.__buf)
-    assert i < blen, "i >= buflen (%d >= %d)" % (i, blen)
-    i = (i + self.__off) % blen
-    self.__buf[i] = v
-
-  def append(self, v):
-    i = self.__off
-    self.__buf[i] = v
-    i += 1
-    if i >= len(self.__buf):
-      i = 0
-    self.__off = i
+DISTINFO = {
+    'description': "caching data structures and other lossy things with capped sizes",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+}
 
 class LRU_Cache(object):
+  ''' A simple least recently used cache.
 
-  ''' Another simple least recently used cache.
+      Unlike `functools.lru_cache`
+      this provides `on_add` and `on_remove` callbacks.
   '''
 
   def __init__(self, maxsize, on_add=None, on_remove=None):
-    ''' Initialise the LRU_Cache with maximum size `max`, additon callback `on_add` and removal callback `on_remove`.
+    ''' Initialise the LRU_Cache with maximum size `max`,
+        additon callback `on_add` and removal callback `on_remove`.
     '''
     if maxsize < 1:
       raise ValueError("maxsize must be >= 1, got: %r" % (maxsize,))
@@ -116,7 +80,6 @@ class LRU_Cache(object):
         elif seq < qseq:
           raise RuntimeError("_prune: seq error")
 
-  @locked
   def _winnow(self):
     ''' Remove all obsolete entries from the stash of (seq, key).
         This is called if the stash exceeds double the current size of the
@@ -127,7 +90,7 @@ class LRU_Cache(object):
     cache_seq = self._cache_seq
     for qseq, qkey in stash:
       try:
-        seq = cache_seq[key]
+        seq = cache_seq[qkey]
       except KeyError:
         continue
       if qseq == seq:
@@ -138,12 +101,13 @@ class LRU_Cache(object):
     return self._cache[key]
 
   def get(self, key, default=None):
+    ''' Mapping method: get value for `key` or `default`.
+    '''
     try:
       return self._cache[key]
     except KeyError:
       return default
 
-  @locked
   def __setitem__(self, key, value):
     ''' Store the item in the cache. Prune if necessary.
     '''
@@ -163,7 +127,6 @@ class LRU_Cache(object):
       self._winnow()
     self._stash.append((seq, key))
 
-  @locked
   def __delitem__(self, key):
     ''' Delete the specified `key`, calling the on_remove callback.
     '''
@@ -184,9 +147,8 @@ class LRU_Cache(object):
     return self._cache == other
 
   def __ne__(self, other):
-    return not (self == other)
+    return self != other
 
-  @locked
   def flush(self):
     ''' Clear the cache.
     '''
@@ -207,8 +169,8 @@ def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
     raise ValueError("maxsize must be None if cache is not None: maxsize=%r, cache=%r"
                      % (maxsize, cache))
 
-  def caching_func(*a, **kw):
-    key = (tuple(a), tuple(kw.keys()), tuple(kw.values()))
+  def caching_func(func, *a, **kw):
+    key = (func, tuple(a), tuple(kw.keys()), tuple(kw.values()))
     try:
       value = cache[key]
     except KeyError:
@@ -216,141 +178,3 @@ def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
       cache[key] = value
     return value
   return caching_func
-
-class Cache:
-
-  def __init__(self, backend):
-    _caches.append(self)
-    self.__cache = {}
-    self.__seq = 0
-    self.__backend = backend
-    self.__hits = 0
-    self.__misses = 0
-    self.__xrefs = []
-    self.__preloaded = False
-
-  def preloaded(self, status=True):
-    self.__preloaded = status
-
-  def addCrossReference(self, xref):
-    self.__xrefs.append(xref)
-
-  def inCache(self, key):
-    if key not in self.__cache:
-      return False
-    c = self.__cache[key]
-    return c[0] == self.__seq
-
-  def hitMiss(self):
-    return (self.__hits, self.__misses)
-
-  def hitRatio(self):
-    gets = self.__hits + self.__misses
-    if gets == 0:
-      return None
-    return float(self.__hits) / float(gets)
-
-  def __getattr__(self, attr):
-    ##debug("CACHE GETATTR",repr(attr))
-    return getattr(self.__backend, attr)
-
-  def bump(self):
-    self.__seq += 1
-
-  def keys(self):
-    if self.__preloaded:
-      return self.__cache.keys()
-    return self.__backend.keys()
-
-  def getitems(self, keylist):
-    inKeys = [key for key in keylist if self.inCache(key)]
-    outKeys = [key for key in keylist if not self.inCache(key)]
-
-    items = [self.findrowByKey(key) for key in inKeys]
-    if outKeys:
-      outItems = self.__backend.getitems(outKeys)
-      for i in outItems:
-        self.store(i)
-      items.extend(outItems)
-
-    return items
-
-  def findrowByKey(self, key):
-    if self.inCache(key):
-      self.__hits += 1
-      return self.__cache[key][1]
-
-    self.__misses += 1
-    try:
-      value = self.__backend[key]
-    except IndexError as e:
-      value = None
-
-    self.store(value, key)
-    return value
-
-  def __getitem__(self, key):
-    # Note: we're looking up the backend, _not_ calling some subclass'
-    # findrowbykey()
-    row = Cache.findrowByKey(self, key)
-    if row is None:
-      raise IndexError("no entry with key " + repr(key))
-
-    return row
-
-  def store(self, value, key=None):
-    if key is not None:
-      assert type(key) in (tuple, int, long), "store" + \
-          repr(key) + "=" + repr(value)
-    else:
-      key = value[self.key()]
-
-    self.__cache[key] = (self.__seq, value)
-    if value is not None:
-      for xref in self.__xrefs:
-        xref.store(value)
-
-  def __setitem__(self, key, value):
-    self.__backend[key] = value
-    self.store(key, value)
-
-  def __delitem__(self, key):
-    del self.__backend[key]
-    if key in self.__cache:
-      # BUG: doesn't undo cross references
-      del self.__cache[key]
-
-class CrossReference:
-
-  def __init__(self):
-    self.flush()
-
-  def flush(self):
-    self.__index = {}
-
-  def __getitem__(self, key):
-    value = self.find(key)
-    if value is None:
-      raise IndexError
-    return value
-
-  def __delitem__(self, key):
-    if key in self.__index:
-      del self.__index[key]
-
-  def find(self, key):
-    if key not in self.__index:
-      try:
-        self.__index[key] = self.byKey(key)
-      except IndexError:
-        self.__index[key] = None
-
-    return self.__index[key]
-
-  def store(self, value):
-    key = self.key(value)
-    self.__index[self.key(value)] = value
-
-if __name__ == '__main__':
-  import cs.cache_tests
-  cs.cache_tests.selftest(sys.argv)

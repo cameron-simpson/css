@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Encapsulated PostScript.
-#	- Cameron Simpson <cs@zip.com.au> 21oct94
+#	- Cameron Simpson <cs@cskk.id.au> 21oct94
 #
 
 use strict qw(vars);

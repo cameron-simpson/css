@@ -3,7 +3,7 @@
 # Update a directory of symlinks.
 # Input is lines of the form:
 #	basename	symlink-target
-# - Cameron Simpson <cs@zip.com.au> 10apr2001
+# - Cameron Simpson <cs@cskk.id.au> 10apr2001
 #
 
 use strict qw(vars);

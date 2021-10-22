@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # buff - backup file finder
-#	- Cameron Simpson <cs@zip.com.au> 14sep96
+#	- Cameron Simpson <cs@cskk.id.au> 14sep96
 #
 
 use cs::Upd;

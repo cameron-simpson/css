@@ -4,7 +4,7 @@
 # Requires that their login files be readable.
 # Caveat: you're running this as _you_, so you're at the mercy of whatever
 # they might stuff into their startup.
-#	- Cameron Simpson <cs@zip.com.au> 23mar99
+#	- Cameron Simpson <cs@cskk.id.au> 23mar99
 #
 
 cmd=`basename "$0"`

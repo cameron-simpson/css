@@ -3,7 +3,7 @@
 # Read some passwd lines from stdin.
 # Construct a mapping from those lines to the uids from the NIS service.
 # Walk the specified directories adjusting uids.
-#	- Cameron Simpson <cs@zip.com.au> 30may2002
+#	- Cameron Simpson <cs@cskk.id.au> 30may2002
 #
 
 cmd=`basename "$0"`

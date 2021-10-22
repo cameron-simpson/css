@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Read lines from stdin, write line and munged line on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 06jan2005
+#	- Cameron Simpson <cs@cskk.id.au> 06jan2005
 #
 
 use strict qw(vars);

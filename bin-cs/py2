@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# Execute preferred python 2 venv instance.
-#   - Cameron Simpson <cs@zip.com.au> 10mar2015
-#
-
-exec venv 2 python ${1+"$@"}

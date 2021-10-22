@@ -1,29 +1,29 @@
 #!/bin/sh
 #
 # Construct an unbound.conf(5) file then dispatch unbound(8) via svcd.
-#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#       - Cameron Simpson <cs@cskk.id.au> 26jul2012
 #
 
 set -ue
 
-: ${VARRUN:=$HOME/var/run}
-: ${LOGDIR:=$HOME/var/log}
-: ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
-: ${TMPDIR:=/tmp}
+: "${VARRUN:=$HOME/var/run}"
+: "${LOGDIR:=$HOME/var/log}"
+: "${UNBOUND_DNS_UPSTREAM:=}"     # server set, eg: opennic
+: "${UNBOUND_INCOMING_IPS:='127.0.0.1'}"
+: "${UNBOUND_INCOMING_RANGES:='127.0.0.1'}"
+: "${TMPDIR:=/tmp}"
 
 # note current username at startup
-ousername=`id -un`
+ousername=$( id -un )
 username=$ousername
 dosudo=
 once=
 trace=set-x
-logdir=$LOGDIR/unbound
 svcdpidfile=$VARRUN/svcd-unbound.pid
 wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
-log=$logdir/unbound.log
 
-cmd=`basename "$0"`
+cmd=$( basename "$0" )
 usage="Usage: $cmd [-1] [-u username] [-S] [--] [upstream-forwards...]
   -1            Run just once; otherwise run via svcd.
   -u username   Specify username; passed to gen-unbound.conf.
@@ -57,10 +57,17 @@ fi
 # if not once, wrap in svcd
 [ $once ] || \
 { set $trace \
-        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
+        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-gateway -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
-  then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" "$@"
+  then
+    set -- $trace sudo env \
+            "HOST=$HOST" \
+            "UNBOUND_DNS_UPSTREAM=$UNBOUND_DNS_UPSTREAM" \
+            "UNBOUND_INCOMING_IPS=$UNBOUND_INCOMING_IPS" \
+            "UNBOUND_INCOMING_RANGES=$UNBOUND_INCOMING_RANGES" \
+            "TMPDIR=$TMPDIR" "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            "$@"
   fi
   exec "$@"
 }
@@ -72,7 +79,7 @@ if [ $# -gt 0 ]
 then
   $trace $as lastvalue unbound "$*"
 else
-  set -- `$as lastvalue unbound`
+  set -- $( $as lastvalue unbound )
   echo "$cmd: using lastvalue unbound: $*" >&2
 fi
 

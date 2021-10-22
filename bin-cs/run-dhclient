@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# Process to run a dhclient on a specific interface and restart it on loss of TCP connectivity.
+#
+# The use case for this script is a flakey Australian NBN satellite
+# internet. For reasons upstream of the modem, within the opaque NBN
+# ground based infrastructure, the layer 2 packet routing from the
+# modem's uplink to the internet breaks, even though the satellite
+# link is just fine (we know the latter because the modem also receives stray
+# IP traffic intended for other clients, whom one imagines themselves have
+# lost connectivity). This script makes regular probes to a target upstream
+# host and port and restarts the dhclient if connectivity is lost.
+# Why the restart? Because a successful DHCP negotiation is required
+# to reestablish connectivity.
+# - Cameron Simpson <cs@cskk.id.au> 03mar2018
+#
+
+set -ue
+
+probe_timeout=10        # timeout for probe failure
+probe_interval=11       # sleep time between probes
+kill_sig_opt=-15        # default signal SIGTERM
+
+cmd=$0
+usage="Usage: $cmd [-signum] ifname probe_ip probe_port"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[1-9]*)
+        kill_sig_opt=$1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing ifname" >&2
+  badopts=1
+else
+  ifname=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing probe_ip" >&2
+  badopts=1
+else
+  probe_ip=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing probe_port" >&2
+  badopts=1
+else
+  probe_port=$1
+  shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments after ifname: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -- dhclient -d "$ifname"
+
+( set -x; exec "$@" ) &
+dhpid=$!
+
+while sleep "$probe_interval"
+do
+  { kill -0 "$dhpid" && (
+      ( ( echo probe; sleep 1; sleep "$probe_timeout" ) \
+        | nc -w "$probe_timeout" "$probe_ip" "$probe_port" &
+      ) | read ssh_greeting
+    )
+  } || {
+    colour_echo white `date`
+    echo "RESTARTING $* .."
+    necho "kill $dhpid .."
+    while kill "$kill_sig_opt" "$dhpid" 2>/dev/null
+    do
+      necho .
+      sleep 1
+    done
+    echo
+    sleep 2
+    ( set -x; exec "$@" ) &
+    dhpid=$!
+  }
+done

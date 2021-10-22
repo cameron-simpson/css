@@ -3,7 +3,7 @@
 # Decode/edit/recode/rewriteif chain to filter things like gzipped files.
 # "decco": inverse of "codec".
 # This is faster and uses less disc space than decco-edit, but less flexible.
-#       - Cameron Simpson <cs@zip.com.au> 05nov2008
+#       - Cameron Simpson <cs@cskk.id.au> 05nov2008
 #
 
 : ${TMPDIR:=/tmp}

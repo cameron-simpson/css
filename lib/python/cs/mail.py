@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Mail related facilities.
-#   - Cameron Simpson <cs@zip.com.au>
+#   - Cameron Simpson <cs@cskk.id.au>
 #
 
 import os
@@ -17,7 +17,6 @@ from io import StringIO
 import string
 import re
 from contextlib import closing
-from cs.logutils import OBSOLETE
 from cs.seq import seq
 from cs.fileutils import saferename
 

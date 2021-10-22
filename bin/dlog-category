@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Report the default dlog category string.
+# - Cameron Simpson <cs@cskk.id.au> 15feb2020
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [CATEGORY] [path]"
+
+category=
+
+if [ $# -gt 0 ]
+then
+  case $1 in
+    [A-Z]*) category=$1; shift ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then  path=.
+else  path=$1; shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  echo "$usage" >&2
+  exit 2
+}
+
+if [ -n "$category" ]
+then
+  fstags tag . "cs.dlog=$category"
+else
+  format={cs.dlog}
+  category=$( fstags ls -d -o "$format" -- "$path" )
+  case "$category" in
+    '' | '{}' | "$format" ) ;;
+    *)  echo "$category" ;;
+  esac
+fi

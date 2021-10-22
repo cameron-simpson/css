@@ -3,7 +3,7 @@
 # Watch the FVWM Event Log and do stuff when things happen.
 # Spurred into implementation by Mozilla 0.9.3's completely fucked new window
 # placement policy.
-#	- Cameron Simpson <cs@zip.com.au> 20aug2001
+#	- Cameron Simpson <cs@cskk.id.au> 20aug2001
 #
 
 ($::cmd=$0) =~ s:.*/::;

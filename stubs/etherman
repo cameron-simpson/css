@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Etherman wrapper.	- Cameron Simpson <cs@zip.com.au>
+# Etherman wrapper.	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=`basename "$0"`

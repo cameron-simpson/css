@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Remove all Vim .*.swp files from the usual places.
-#   - Cameron Simpson <cs@zip.com.au> 12jan2015
+#   - Cameron Simpson <cs@cskk.id.au> 12jan2015
 #
 
 set -ue

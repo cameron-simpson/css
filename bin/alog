@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run command asynchronously with output to a logfile.
-#	- Cameron Simpson <cs@zip.com.au> 09feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 09feb2002
 #
 
 : ${LOGDIR:=$HOME/var/log}

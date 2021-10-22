@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+# Trite script to run a command forever with an optional sleep in between runs.
+#   - Cameron Simpson <cs@cskk.id.au> 06dec2017
+#
+
+set -ue
+
+delay=1
+trace=
+invert=
+fragile=
+flag=
+shcmd=
+
+cmd=$0
+usage="Usage: $0 [-c shcmd] [[-d] delay] [-E] [-x] [!] command [args...]
+  -c shcmd
+        Run shcmd using /bin/sh. Excludes the \"command\" part.
+  -d delay
+        Time between runs in seconds. Values from 0 to 999 accepted.
+        Default: $delay
+  -E    Exit on failure of command.
+  -x    trace execution.
+  !     Invert failure test. Implies -E."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -c) shcmd=$2; shift ;;
+    -d) delay=$2; shift ;;
+    [0-9] | [1-9][0-9] | [1-9][0-9][0-9] )
+        delay=$1 ;;
+    -E) fragile=1 ;;
+    -x) trace=set-x ;;
+    !)  invert=1 fragile=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ -n "$shcmd" ]
+then
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: -c option used, command excluded" >&2
+    badopts=1
+  else
+    set -- sh -c "$shcmd"
+  fi
+else
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing command" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+while :
+do
+  if $trace "$@"
+  then
+    [ $fragile ] && [ $invert ] && exit 1
+  else
+    xit=$?
+    [ $fragile ] && [ -z "$invert" ] && exit $xit
+  fi
+  case "$delay" in
+    0)  ;;
+    *)  $trace sleep "$delay" ;;
+  esac
+done

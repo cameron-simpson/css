@@ -1,10 +1,10 @@
 #!/bin/sh
 #
 # Set up ssh authentication.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # Attempt to latch onto existing agent from other session.
-#	- Cameron Simpson <cs@zip.com.au> 22aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 22aug2000
 #
 
 set -ue

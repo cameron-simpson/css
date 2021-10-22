@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Stash a URL for later browsing.
-#	- Cameron Simpson <cs@zip.com.au> 15nov96
+#	- Cameron Simpson <cs@cskk.id.au> 15nov96
 #
 
 urlfile=$HOME/there/$SYSTEMID/noteurl.html

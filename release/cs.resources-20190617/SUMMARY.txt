@@ -1,0 +1,1 @@
+RunState.__exit__: if an exception was raised call .canel() before calling .stop().

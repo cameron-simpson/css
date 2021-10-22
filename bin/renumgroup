@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Renumber a group.
-#	- Cameron Simpson <cs@zip.com.au> 01jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 01jul2005
 #
 
 groupfile=/etc/group

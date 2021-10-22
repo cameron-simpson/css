@@ -2,7 +2,7 @@
 #
 # Print out the list of files `use'd by a perl program for bundling
 # things up.
-#	- Cameron Simpson <cs@zip.com.au> 05mar1997
+#	- Cameron Simpson <cs@cskk.id.au> 05mar1997
 #
 
 use cs::Misc;

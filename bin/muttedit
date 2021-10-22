@@ -1,63 +1,182 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Spawn a mutt to edit a message and dispatch a reply in tmux or screen.
 # This lets you detach from an unfinished reply and finish it later.
 # My muttrc has this:
 #
-#  macro index g ":set editor=muttedit<enter><group-reply>:set editor=$EDITOR<enter>" "group reply"
-#   
-# - Cameron Simpson <cs@zip.com.au> 31mar2006
+#     macro index m "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><mail>:set editor=\$my_old_editor<enter>" "compose new message"
+#     macro index g "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><group-reply>:set editor=\$my_old_editor<enter>" "group reply"
+#     macro index L "<sync-mailbox>:set my_old_editor=\$editor<enter>:set editor=muttedit<enter><list-reply>:set editor=\$my_old_editor<enter>" "list reply"
+#
+# and I have the environment variable $MUTTEDIT_EDITOR set to
+# "vim-flowed", which invokes vim with settings which aid with composing
+# format=flowed email (see RFC3676).
+# - Cameron Simpson <cs@cskk.id.au> 31mar2006
 # 
 
 set -ue
 
+default_editor=vim-flowed
+default_composedir=$HOME/var/mutt/compose
+
+: ${TMPDIR:=/tmp}
+: ${TMUX:=''}
+wprog=${MUTTEDIT_WINDOWPROG:-}
+editor=${MUTTEDIT_EDITOR:-$default_editor}
+composedir=${MUTTEDIT_COMPOSEDIR:-"$default_composedir"}
+
 cmd=$0
 usage="Usage:
-  $cmd [-d] filename    Start a new message in mutt based on filename.
-    -d  Start session detached.
-  $cmd reopen           Open sessions for all mutt editor files sitting about."
+  $cmd [-d] [-T] [-w wprog] filename
+    Start a new message in mutt based on filename.
+    -d          Start session detached.
+    -T          Start session in split tmux pane.
+    -w wprog    Invoke the submutt in wprog asynchronously.
+                This is a command prefix such as \"xterm -e\".
+  $cmd reopen
+    Open sessions for all mutt editor files sitting about.
+
+Environment:
+  \$MUTTEDIT_COMPOSEDIR
+    Directory to hold message composition files.
+    Default: $default_composedir
+  \$MUTTEDIT_EDITOR or \$EDITOR
+    Editor for the sub mutt to invoke for composition.
+    Default: $default_editor
+  \$MUTTEDIT_WINDOWPROG
+    If not empty, implies -w mode with its value.
+
+The default mode is window mode if \$MUTTEDIT_WINDOWPROG is set,
+otherwise pane mode (-T) if $TMUX is set, otherwise inline."
+
+badopts=
 
 if [ $# -gt 0 ] && [ "x$1" = xreopen ]
 then
   shift
   xit=0
-  [ $# -gt 0 ] || set -- "$HOME"/var/mutt/mutt-*[0-9]
+  [ $# -gt 0 ] || set -- "$composedir/"mutt-*[0-9]
   for msgfile
   do  [ ! -s "$msgfile" ] || ( set -x; "$0" -d "$msgfile" ) || xit=1
   done
   exit $xit
 fi
 
-mode_screen=-m
-mode_tmux=
-if [ $# -gt 0 ] && [ "x$1" = x-d ]
-then
+# choose mode:
+# window: attach to session in window via $wprog
+# pane: attach to session in split pane
+# inline: attach to session inline
+# detach: leave session detached
+{ [ -n "$wprog" ] && mode=window; } \
+|| { [ -n "$TMUX" ] && mode=pane; } \
+|| mode=inline
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) mode=detach ;;
+    -T) mode=pane ;;
+    -w) mode=window wprog=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
   shift
-  mode_screen='-d -m'
-  mode_tmux=-d
+done
+
+if [ $# -gt 0 ]
+then
+  filename=$1
+  shift
+  [ -s "$filename" ] || {
+    echo "$cmd: expected non-empty file, got: $filename" >&2
+    badopts=1
+  }
+  else
+  echo "$cmd: missing filename" >&2
+  badopts=1
 fi
 
-[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
-filename=$1; shift
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
 
-[ -s "$filename" ] || { echo "$cmd: expected non-empty file, got: $filename" >&2; exit 2; }
+[ $badopts ] && {
+  echo "$usage" >&2
+  exit 2
+}
 
 now=$( date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]' )
 subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]/_/g; s/___*/_/g; p; q; }' <"$filename" | tr : _ )
 
 session_name=mutt-$now-$subj
 
-set -- mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+# take a copy of the composition file
+[ -d "$composedir" ] || mkdir "$composedir" || exit 1
+tmpf=$composedir/muttedit.$$
+( umask 077; cp -- "$filename" "$tmpf" ) || exit 1
+filename=$tmpf
+
+set -- \
+  rmafter "$filename" \
+    mutt -e "set editor=$editor" -e 'unset signature' -e 'set sidebar_visible=no' -H "$filename"
 
 if tmux start-server
+then  use_tmux=1
+else  use_tmux=
+fi
+
+# fallback for unachievable modes
+if [ "$mode" = window ]
+then
+  [ -n "$wprog" ] || {
+    echo "$cmd: window mode but empty wprog, falling back to pane" >&2
+    mode=pane
+  }
+fi
+if [ "$mode" = pane ]
+then
+  { [ $use_tmux ] && [ -n "$TMUX" ]; } || {
+    echo "$cmd: not in a tmux session, falling back to inline" >&2
+    mode=inline
+  }
+fi
+
+# spawn the new session
+if [ $use_tmux ]
 then
   session_name=$( printf '%s\n' "$session_name" | tr : _ )
-  shcmd=$( shqstr "$@" )
-  set -x
-  ## was "$shcmd"
-  tmux new-session $mode_tmux -s "$session_name" -- "$@"
+  ( unset TMUX
+    tmux new-session -d -s "$session_name" -- "$@"
+  )
 else
   session_name=$( printf '%s\n' "$session_name" | cut -c1-20 )
-  set -x
-  screen $mode_screen -S "$session_name" -- "$@"
+  screen -d -m -S "$session_name" -- "$@"
 fi
+
+# attach to the session according to the mode
+case "$mode" in
+  detach)
+    exit 0
+    ;;
+  inline)
+    exec tmux attach-session -t "$session_name"
+    ;;
+  pane)
+    qsession_name=$( shqstr "$session_name" )
+    tmux split-window -v -p 80 "unset TMUX; exec tmux attach-session -t $qsession_name"
+    ;;
+  window)
+    if [ $use_tmux ]
+    then  set -- tmux attach-session -t "$session_name"
+    else  set -- screen -Aax "$session_name"
+    fi
+    $wprog "$@" </dev/null >&2 &
+    ;;
+  *)echo "$0: unsupported mode: $mode" >&2
+    exit 1
+    ;;
+esac

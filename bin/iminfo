@@ -3,7 +3,7 @@
 # Trivial text-only report on an image.
 # For my mailcap file, since my mailcap parser doesn't handle embedded
 # semicolons in the command part.
-#	- Cameron Simpson <cs@zip.com.au> 03jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 03jun2003
 #
 
 [ $# = 0 ] && { echo "Usage: $0 imagefiles..." >&2; exit 2; }

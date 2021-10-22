@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Extract URLs from HTML on stdin.
-#	- Cameron Simpson <cs@zip.com.au> 24aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 24aug2000
 #
 
 use strict vars;

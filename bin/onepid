@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Fire up just one instance of a program.
-#	- Cameron Simpson <cs@zip.com.au> 26oct2002
+#	- Cameron Simpson <cs@cskk.id.au> 26oct2002
 #
 
 cmd=$0

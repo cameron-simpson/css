@@ -2,7 +2,7 @@
 #
 # Index data on keys which get broken into chains inside for storage efficiency.
 # Subclasses are expected to provide a method KeyChain() to break keys up.
-#	- Cameron Simpson <cs@zip.com.au> 06jun1997
+#	- Cameron Simpson <cs@cskk.id.au> 06jun1997
 #
 
 use strict qw(vars);

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Suck the screen X resources out into the filesystem. Called by rterm.
-#	- Cameron Simpson <cs@zip.com.au> 26nov2001
+#	- Cameron Simpson <cs@cskk.id.au> 26nov2001
 #
 
 xdflts=$HOME/.Xdefaults

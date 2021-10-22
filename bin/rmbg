@@ -2,7 +2,7 @@
 #
 # Remove a background image altogether.
 # See also nbg and bglist.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 file=`lbg -1`

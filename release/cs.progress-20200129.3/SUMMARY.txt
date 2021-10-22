@@ -1,0 +1,1 @@
+Test __version__ machinery again.

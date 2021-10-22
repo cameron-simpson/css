@@ -1,0 +1,2 @@
+@cachedmethod: bugfix cache logic.
+@strable: support generator functions.

@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Coalesce adjacent blank lines. Detab. Strip trailing whitespace.
 # Nothing that others haven't done before me. Just can't find it.
-#	- Cameron Simpson <cs@zip.com.au> 09may2002
+#	- Cameron Simpson <cs@cskk.id.au> 09may2002
 #
 # Add skipheaders and outputfilter. - cameron 15may2002
 # Python recode, strip a heap of options. - cameron 01sep2014

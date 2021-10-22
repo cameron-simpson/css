@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Object to talk about an HTML document.
-#	- Cameron Simpson <cs@zip.com.au> 15oct94
+#	- Cameron Simpson <cs@cskk.id.au> 15oct94
 #
 
 use strict qw(vars);

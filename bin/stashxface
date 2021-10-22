@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read fromaddrs and X-Face: data from stdin and save in face directory.
-#	- Cameron Simpson <cs@zip.com.au>, 14jul94
+#	- Cameron Simpson <cs@cskk.id.au>, 14jul94
 #
 
 $STASHDIR=(defined($ENV{X_FACE_DIR}) ? $ENV{X_FACE_DIR}

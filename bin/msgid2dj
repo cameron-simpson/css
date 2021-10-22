@@ -3,7 +3,7 @@
 # Convert msgids into DejaNews thread references.
 # Thanks to the Robot Wisdom Weblog
 #	http://www.robotwisdom.com/
-# - Cameron Simpson <cs@zip.com.au> 02aug99
+# - Cameron Simpson <cs@cskk.id.au> 02aug99
 #
 
 if [ $# -gt 0 ]

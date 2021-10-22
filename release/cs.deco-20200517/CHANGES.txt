@@ -1,0 +1,2 @@
+lib/python/cs/deco.py: cs.deco: get warning() from cs.gimmicks
+lib/python/cs/deco.py: cs.deco: docstring update

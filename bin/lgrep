@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Locate symbols in libraries.
-#	- Cameron Simpson <cs@zip.com.au> 10dec96
+#	- Cameron Simpson <cs@cskk.id.au> 10dec96
 #
 
 lpath=${LDPATH-$LIB:/opt/lib:/usr/lib:/lib}

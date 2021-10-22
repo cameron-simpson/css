@@ -1,0 +1,9 @@
+  lib/python/cs/README-obj.rst: merge pypi ==> default: linting and releasing, some cs-release improvements, improve @cs.deco.cached
+  lib/python/cs/README-obj.rst: merge default ==> beyonwiz
+  lib/python/cs/README-obj.rst: merge default ==> iphoto
+  lib/python/cs/README-obj.rst: merge default ==> venti
+  lib/python/cs/README-obj.rst: merge default ==> later
+  lib/python/cs/README-obj.rst: merge later ==> pilfer
+  lib/python/cs/obj.py: cs.obj: new mixin class TrackedClassMixin to track all instances of a particular class
+  lib/python/cs/README-obj.rst: merge default ==> media
+  lib/python/cs/obj.py: cs.obj: docstring updates

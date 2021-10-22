@@ -1,13 +1,11 @@
 #!/bin/sh
 #
 # Monitor the presence of a default route.
-#   - Cameron Simpson <cs@zip.com.au> 05nov2014
+#   - Cameron Simpson <cs@cskk.id.au> 05nov2014
 #
 
-svc_name=route_default
 flag_name=ROUTE_DEFAULT
 
-exec \
-  svcd -q -l -n "$svc_name" \
-    flag -w "$flag_name" \
-      -c 'gw=$(get-default-route); [ -n "$gw" ]'
+exec loop -d 7 \
+  flag -w "$flag_name" \
+    -c 'gw=$(get-default-gateway); [ -n "$gw" ]'

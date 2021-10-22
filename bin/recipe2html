@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Convert mod.recipes/alt.gourmand recipes source to HTML.
-#	- Cameron Simpson <cs@zip.com.au> 17may95
+#	- Cameron Simpson <cs@cskk.id.au> 17may95
 #
 
 $usemetric=1;	# preference

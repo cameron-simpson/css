@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Convert an mbox mail folder into a maildir folder.
-#       - Cameron Simpson <cs@zip.com.au> 08nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 08nov2006
 #
 
 : ${TMPDIR:=$HOME/tmp}

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Report free disc space in kilobytes or percent.
-#	- Cameron Simpson <cs@zip.com.au> 22jun2003
+#	- Cameron Simpson <cs@cskk.id.au> 22jun2003
 #
 
 cmd=$0

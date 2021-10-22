@@ -2,7 +2,7 @@
 #
 # Expand a host list that may contain @ng and !host and !@ng.
 # Output is sorted and unique.
-#	- Cameron Simpson <cs@zip.com.au> 12jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 12jul2004
 #
 
 : ${TMPDIR:=/tmp}

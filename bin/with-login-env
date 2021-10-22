@@ -4,7 +4,7 @@
 # Based on discussions with Martin Costabel, Peter O'Gorman,
 # Harald Hanche-Olsen and Jeremy Huddleston.
 # Uses bash instead of sh for "printf %q" and "exec -l".
-#       - Cameron Simpson <cs@zip.com.au> 23dec2008
+#       - Cameron Simpson <cs@cskk.id.au> 23dec2008
 #
 
 : ${SHELL:=/bin/sh}

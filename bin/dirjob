@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Set or report the job for the current directory.
-#	- Cameron Simpson <cs@zip.com.au> 04nov2004
+#	- Cameron Simpson <cs@cskk.id.au> 04nov2004
 #
 
 cmd=$0

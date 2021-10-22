@@ -17,7 +17,7 @@
 #  ssh -o ControlMaster=no -o "ControlPath=$SSH_MASTER_CONTROL_PATH" ssh-target ...
 #
 # in the script.
-#       - Cameron Simpson <cs@zip.com.au> 22feb2009
+#       - Cameron Simpson <cs@cskk.id.au> 22feb2009
 #
 
 sshopts=

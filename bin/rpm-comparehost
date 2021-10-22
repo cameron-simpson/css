@@ -2,7 +2,7 @@
 #
 # Compare the RPMs on this host with those on another host, checking
 # names and architecture, not versions.
-#       - Cameron Simpson <cs@zip.com.au> 26jul2011
+#       - Cameron Simpson <cs@cskk.id.au> 26jul2011
 #
 
 set -ue

@@ -131,5 +131,5 @@ $trace bsed '/^splashimage=/s/^/#/
 #
 # =head1 AUTHOR
 #
-# Cameron Simpson E<lt>cs@zip.com.auE<gt> 13sep2003
+# Cameron Simpson E<lt>cs@cskk.id.auE<gt> 13sep2003
 #

@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -f
 #
 # Transmute leading "From " line on email message, if any.
-#	- Cameron Simpson <cs@zip.com.au> 13jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 13jul2002
 #
 
 1{s/^From /From_: /}

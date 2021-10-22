@@ -1,0 +1,2 @@
+@decorator: drop unused arguments, they get used by the returned decorator.
+Rework the @cached logic.

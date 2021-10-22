@@ -2,7 +2,7 @@
 #
 # BudTool uses a csh wrapper, which has the usual stupidities.
 # Purge the PATH before invoking so it doesn't choke.
-#	- Cameron Simpson <cs@zip.com.au> 19may99
+#	- Cameron Simpson <cs@cskk.id.au> 19may99
 #
 
 PATH=/usr/budtool/bin:/usr/bin:/bin

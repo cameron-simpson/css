@@ -3,7 +3,7 @@
 # Code for autofiling RFC822 messages as distinct numbered files in folder
 # directories. Currently pipes to filemail, but one day will be inlined
 # and filemail will require this library file.
-#	- Cameron Simpson, cs@zip.com.au, 20jun94
+#	- Cameron Simpson, cs@cskk.id.au, 20jun94
 #
 
 package filemail;

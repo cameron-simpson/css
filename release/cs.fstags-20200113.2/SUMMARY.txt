@@ -1,0 +1,1 @@
+FSTagsCommand docstring tweak.

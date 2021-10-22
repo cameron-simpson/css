@@ -1,0 +1,9 @@
+  lib/python/cs/py3.py: merge default ==> beyonwiz
+  lib/python/cs/py3.py: cs.py3: implementation of struct.iter_unpack; cs.iso14496: classes TREFBox and TrackReferenceTypeBox
+  lib/python/cs/py3.py: merge default ==> media
+  lib/python/cs/py3.py: cs.py3, cs.py3_for2: make bytes.__eq__ work sith str for python 2, new name joinbytes for py2/3
+  lib/python/cs/py3.py: cs.py3,cs.py3_for2: backports for python 2.5
+  lib/python/cs/py3.py: my email address has changed - update Python code
+  lib/python/cs/py3.py: cs.py3: make into a package subsuming cs.py3_for2 and cs.py3_for3
+  : cs.py3: lint
+  lib/python/cs/README-py3.rst: cs.py3: fold obsolete README into py3 module docstring

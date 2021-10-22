@@ -1,32 +1,37 @@
 #!/usr/bin/python
 #
-# A Range in an object resembling a set but optimised for contiguous
-# ranges of int members.
-#       - Cameron Simpson <cs@zip.com.au>
-#
-# TODO: add __getitem__, __getslice__, __delitem__, __delslice__ methods.
-#
+'''
+A Range is an object resembling a set but optimised for contiguous
+ranges of int members.
+'''
 
 from __future__ import print_function
+import sys
+from bisect import bisect_left
+from collections import namedtuple
+from cs.logutils import ifdebug
+from cs.seq import first
 
 DISTINFO = {
-    'description': "a Range class implementing compact integer ranges with a set-like API, and associated functions",
+    'description':
+        "a Range class implementing compact integer ranges with a set-like API,"
+        " and associated functions",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.logutils'],
+    ],
+    'install_requires': ['cs.logutils', 'cs.seq'],
 }
 
-import sys
-from bisect import bisect_left
-from collections import namedtuple
-from cs.logutils import ifdebug, X, XP
-
 def overlap(span1, span2):
-  ''' Return a list [start, end] denoting the overlap of two spans.
+  ''' Return a list `[start,end]` denoting the overlap of two spans.
+
+      Example:
+
+          >>> overlap([1,9], [5,13])
+          [5, 9]
   '''
   # no item lower than either lows
   lo = max(span1[0], span2[0])
@@ -36,13 +41,17 @@ def overlap(span1, span2):
   return [lo, max(lo, hi)]
 
 def spans(items):
-  ''' Return an iterable of Spans for all contiguous sequences in
-      `items`. Example:
-        spans([1,2,3,7,8,11,5]) == [ [1,4], [7:9], [11:12], [5:6] ]
+  ''' Return an iterable of `Spans` for all contiguous sequences in
+      `items`.
+
+      Example:
+
+          >>> list(spans([1,2,3,7,8,11,5]))
+          [1:4, 7:9, 11:12, 5:6]
   '''
   # see if the object has a .spans() method
   try:
-    item_spans = items.spans()
+    item_spans = items.spans
   except AttributeError:
     # fall through to span locator below
     pass
@@ -66,6 +75,9 @@ def spans(items):
     yield Span(*prev)
 
 class Span(namedtuple('Span', 'start end')):
+  ''' A namedtuple with `.start` and `.end` attributes.
+  '''
+
   def __str__(self):
     return "%d:%d" % (self.start, self.end)
   __repr__ = __str__
@@ -73,27 +85,33 @@ class Span(namedtuple('Span', 'start end')):
     return self[0] == other[0] and self[1] == other[1]
   def __lt__(self, other):
     return self[0] < other[0] or (self[0] == other[0] and self[1] < other[1])
+  def __len__(self):
+    return self.end - self.start
   @property
   def size(self):
-    return self.end - self.start
+    ''' The `.size` of a `Span` is its length: `end - start`.
+    '''
+    return len(self)
 
 class Range(object):
   ''' A collection of ints that collates adjacent ints.
-      The interface is as for a set with additional methods:
-        - spans(): return an iterable of Spans, with .start
-          included in each span and .end just beyond
+
+      The interface is as for a `set` with additional methods:
+      * `spans()`: return an iterable of `Spans`, with `.start`
+        included in each `Span` and `.end` just beyond
+
       Additionally, the update/remove/etc methods have a secondary
-      calling signature: (start, end), which is the same as passing
-      in range(start, end) but much more efficient.
+      calling signature: `(start,end)`, which is the same as passing
+      in `Range(start,end)` but much more efficient.
   '''
 
   def __init__(self, start=None, end=None, debug=None):
     ''' Initialise the Range.
+
         Called with `start` and `end`, these specify the initial
-        span of the Range.
-        If called with just `start`, `start` should instead be an
-        iterable if integer values comprising the values in the
-        Range.
+        `Span` of the `Range`.
+        If called with just one argument that argument instead be an iterable
+        of integer values comprising the values in the `Range`.
     '''
     if debug is None:
       debug = ifdebug()
@@ -102,8 +120,8 @@ class Range(object):
     if start is not None:
       if end is None:
         # "start" must be an iterable of ints
-        for start, end in spans(start):
-          self.add_span(start, end)
+        for substart, subend in spans(start):
+          self.add_span(substart, subend)
       else:
         self.add_span(start, end)
 
@@ -115,7 +133,7 @@ class Range(object):
     ##return "[%s]" % (",".join(spans))
 
   def __eq__(self, other):
-    if type(other) is Range:
+    if isinstance(other, Range):
       return self._spans == other._spans
     return list(self) == list(other)
 
@@ -125,13 +143,21 @@ class Range(object):
   __hash__ = None
 
   def clear(self):
+    ''' Clear the `Range`: remove all elements.
+    '''
     self._spans = []
 
   def spans(self):
-    ''' Return an iterable of [start, end].
+    ''' Return an iterable of `Spans` covering the `Range`.
     '''
     for span in self._spans:
       yield Span(*span)
+
+  @property
+  def span0(self):
+    ''' Return the first `Span`; raises `IndexError` if there are no spans.
+    '''
+    return first(self.spans())
 
   def _check(self):
     self._check_spans()
@@ -145,18 +171,19 @@ class Range(object):
       raise TypeError("._spans should be a list")
     ospan = None
     for span in _spans:
-      if type(span) is not Span:
+      if not isinstance(span, Span):
         raise TypeError("._spans elements should be lists, found "+repr(span))
-      if len(span) != 2:
-        raise ValueError("._spans elements should have length 2, found "+repr(span))
       start, end = span
-      if type(start) is not int or type(end) is not int:
+      if not isinstance(start, int) or not isinstance(end, int):
         raise TypeError("._spans elements should be a pair of ints, found "+repr(span))
       if start >= end:
         raise ValueError("._spans elements should have low < high, found "+repr(span))
       if ospan is not None:
         if ospan[1] >= start:
-          raise ValueError("._spans elements should be strictly greater than their predecessors, found %s then %s" % (ospan, span))
+          raise ValueError(
+              "._spans elements should be strictly greater than their"
+              " predecessors, found %s then %s"
+              % (ospan, span))
       ospan = span
 
   def __iter__(self):
@@ -166,12 +193,18 @@ class Range(object):
       for x in range( *_span ):
         yield x
 
+  def __bool__(self):
+    return len(self._spans) > 0
+
+  __nonzero__ = __bool__
+
   def __len__(self):
     return sum( [ end-start for start, end in self._spans ] )
 
   @property
   def start(self):
-    ''' Return the start offset of the Range - the minimum Span .start or 0 if the Range is empty.
+    ''' Return the start offset of the `Range`,
+        the minimum `Span` .start or `0` if the `Range` is empty.
     '''
     spans = self._spans
     if len(spans) > 0:
@@ -181,7 +214,8 @@ class Range(object):
 
   @property
   def end(self):
-    ''' Return the end offset of the Range - the maximum Span .end or 0 if the Range is empty.
+    ''' Return the end offset of the `Range`,
+        the maximum `Span` .end or `0` if the `Range` is empty.
     '''
     spans = self._spans
     if len(spans) > 0:
@@ -190,26 +224,28 @@ class Range(object):
       return 0
 
   def isempty(self):
-    ''' Test if the Range is empty; it has no spans.
+    ''' Test if the Range is empty.
     '''
-    return len(self._spans) == 0
+    return not self
 
   def __contains__(self, x):
     ''' Test `x` to see if it is wholly contained in this Range.
-        `x` may be another Range, a single int or an iterable
-        yielding a pair of ints.
+
+        `x` may be another `Range`, a `Span`, or a single `int` or an iterable
+        yielding a pair of `int`s.
     '''
     if isinstance(x, Range):
       return self.issuperset(x)
-    if isinstance(x, int):
+    if isinstance(x, Span):
+      start = x.start
+      end = x.end
+    elif isinstance(x, int):
       start, end = x, x+1
     else:
       start, end = list(x)
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
-    if ndx >= len(_spans):
-      return False
-    if ndx > 0 and start < _spans[ndx].start:
+    if ndx > 0 and _spans[ndx-1].end > start:
       ndx -= 1
     elif ndx >= len(_spans):
       return False
@@ -221,14 +257,17 @@ class Range(object):
     return True
 
   def span_position(self, start, end):
-    ''' Somewhat like bisect_left, return indices (i, j) such that all spans with indices < i strictly preceed start amd all spans with indices > j strictly follow end.
+    ''' Somewhat like `bisect_left`, return indices `(i,j)`
+        such that all spans with indices < `i`
+        strictly preceed `start` amd all spans with indices > `j`
+        strictly follow `end`.
     '''
     _spans = self._spans
     i = bisect_left(_spans, Span(start, start))
     # check preceeding span
-    assert(i == 0 or _spans[i-1].end <= start)
+    assert i == 0 or _spans[i-1].end <= start
     # check current span
-    assert(i == len(_spans) or _spans[i].start >= start)
+    assert i == len(_spans) or _spans[i].start >= start
     raise RuntimeError("INCOMPLETE")
 
   def slices(self, start=None, end=None):
@@ -317,7 +356,7 @@ class Range(object):
     while i < len(_spans) and _spans[i].start <= end:
       span = _spans[i]
       # check that the spans overlap
-      assert(span.start <= end and span.end >= start)
+      assert span.start <= end and span.end >= start
       new_start = min(new_start, span.start)
       new_end = max(new_end, span.end)
       i += 1
@@ -379,7 +418,7 @@ class Range(object):
       self._check()
 
   def add(self, start, end=None):
-    ''' Like set.add but with an extended signature.
+    ''' Like `set.add` but with an extended signature.
     '''
     if end is not None:
       self.add_span(start, end)
@@ -390,7 +429,7 @@ class Range(object):
       self.add_span(start, start+1)
 
   def discard(self, start, end=None):
-    ''' Like set.discard but with an extended signature.
+    ''' Like `set.discard` but with an extended signature.
     '''
     if end is not None:
       self.discard_span(start, end)
@@ -401,7 +440,7 @@ class Range(object):
       self.discard_span(start, start+1)
 
   def remove(self, start, end=None):
-    ''' Like set.remove but with an extended signature.
+    ''' Like `set.remove` but with an extended signature.
     '''
     if end is not None:
       self.discard_span(start, end, remove_mode=True)
@@ -412,6 +451,8 @@ class Range(object):
       self.discard_span(start, start+1, remove_mode=True)
 
   def update(self, iterable):
+    ''' Update the `Range` to include the values from `iterable`.
+    '''
     start = None
     for i in iterable:
       if start is None:
@@ -431,6 +472,9 @@ class Range(object):
     return self
 
   def intersection_update(self, other):
+    ''' Update the `Range`, keeping only elements
+        found in both `self` and `other`.
+    '''
     # TODO: more efficient way to do this? probably not, actually
     R2 = self.intersection(other)
     self._spans = R2._spans
@@ -441,6 +485,8 @@ class Range(object):
     return self
 
   def union(self, other):
+    ''' Return a new `Range` containing the elements of `self` and `other`.
+    '''
     R2 = self.copy()
     R2.update(other)
     return R2
@@ -448,17 +494,19 @@ class Range(object):
   __or__ = union
 
   def intersection(self, other):
+    ''' Return a new `Range` containing elements in both `self` and `other`.
+    '''
     R2 = Range()
-    if type(other) is Range:
-      spans = other._spans
+    if isinstance(other, Range):
+      ospans = other._spans
     else:
-      spans = Range.range(other)
+      ospans = Range(other)._spans
     _spans = self._spans
-    for ostart, oend in spans:
+    for ostart, oend in ospans:
       ndx = bisect_left(_spans, [ostart, oend])
       while ndx < len(_spans):
         _span = _spans[ndx]
-        start, end = Range.overlap(_span, [start, oend])
+        start, end = overlap(_span, [ostart, oend])
         if start < end:
           R2.update(start, end)
         ostart = _span[1]
@@ -468,6 +516,8 @@ class Range(object):
   __and__ = intersection
 
   def difference(self, start, end=None):
+    ''' Subtract `start`, or `start:end`, from the `Range`.
+    '''
     R2 = self.copy()
     if end is None:
       R2.discard(start)
@@ -484,24 +534,24 @@ class Range(object):
 
   def pop(self):
     ''' Remove and return an arbitrary element.
-        Raise KeyError if the Range is empty.
+        Raise `KeyError` if the `Range` is empty.
     '''
     _spans = self._spans
-    if len(_spans) == 0:
+    if not _spans:
       raise KeyError("pop() from empty Range")
     span = _spans[-1]
-    start, end = _spans[-1]
+    start, end = span
     end -= 1
     if end > start:
       span[1] = end
     else:
-      del spans[-1]
+      del _spans[-1]
     return end
 
   def symmetric_difference(self, other):
-    ''' Return a new Range with elements in self or other but not both.
+    ''' Return a new `Range` with elements in `self` or `other` but not both.
     '''
-    if type(other) is not Range:
+    if not isinstance(other, Range):
       other = Range(other)
     R1 = self.difference(other)
     R2 = other.difference(self)
@@ -511,6 +561,9 @@ class Range(object):
   __xor__ = symmetric_difference
 
   def symmetric_difference_update(self, other):
+    ''' Update the `Range`, keeping only elements found in `self` or `other`,
+        but not in both.
+    '''
     R2 = self.symmetric_difference(other)
     self._spans = R2._spans
     R2._spans = []

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Scour a web page with htclean.
-#	- Cameron Simpson <cs@zip.com.au> 02feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 02feb2001
 #
 
 mode=once

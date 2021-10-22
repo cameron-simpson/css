@@ -1,0 +1,10 @@
+lib/python/cs/threads.py: merge default ==> vt
+lib/python/cs/threads.py: cs.threads: new PriorityLock, a priority-then-FIFO ordered mutex
+lib/python/cs/threads.py: cs.threads: PriorityLock: accept a default priority in the initialiser; make the priority level parameter to `.priority` mandatory
+lib/python/cs/threads.py: cs.threads: new PriorityLockSubLock class for PriorityLock per lock state - this prevents accidental .release of the acquired object and also allows inspection of the state
+lib/python/cs/threads.py: cs.threads: PriorityLock: distinct Seq counters for the class and its sublocks
+lib/python/cs/threads.py: cs.threads: WorkerThreadPool: allocate our own ._lock, MultiOpenMixin no longer does this
+lib/python/cs/threads.py: cs.threads: bg: accept args= and kwargs= like Thread
+lib/python/cs/threads.py: cs.threads: bg: accept args= and kwargs= like Thread
+lib/python/cs/threads.py: cs.threads: PrioritySubLock: better __str__
+lib/python/cs/threads.py lib/python/cs/threads_tests.py: cs.threads,threads_tests: PriorityLock: unit tests and resulting bugfixes

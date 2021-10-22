@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Emit a GET URL embodying the specified query.
-#	- Cameron Simpson <cs@zip.com.au> 17may97
+#	- Cameron Simpson <cs@cskk.id.au> 17may97
 #
 
 use cs::HTML;

@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Generate graphs from an RRD file made from vmstat-log data.
-#       - Cameron Simpson <cs@zip.com.au> 31aug2009
+#       - Cameron Simpson <cs@cskk.id.au> 31aug2009
 #
 
 import getopt

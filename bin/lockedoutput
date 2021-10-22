@@ -8,7 +8,7 @@
 #
 # Runs "command" and takes lock when output commences so that
 # the command outputs are not damaged through interleaving.
-#	- Cameron Simpson <cs@zip.com.au> 25jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 25jul2000
 #
 
 [ $# -gt 1 ] || { echo "Usage: $0 lockname command args..." >&2; exit 2; }

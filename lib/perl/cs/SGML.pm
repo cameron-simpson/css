@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Parser for SGML.
-#	- Cameron Simpson <cs@zip.com.au> 15oct94
+#	- Cameron Simpson <cs@cskk.id.au> 15oct94
 #
 # newtok(Input[,State]) -> new cs::Tokenise
 # Tok -> new token or undef

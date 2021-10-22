@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Run and stall a command with a configurable duty cycle.
-#       - Cameron Simpson <cs@zip.com.au> 14jul2007
+#       - Cameron Simpson <cs@cskk.id.au> 14jul2007
 #
 
 between=

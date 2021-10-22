@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # This is a front end for a Source.
-#	- Cameron Simpson <cs@zip.com.au> 23may96
+#	- Cameron Simpson <cs@cskk.id.au> 23may96
 #
 # new cs::Decode Source, \&decoder[, args-to-decoder]
 #   The decoder method takes the current new data and the

@@ -1,0 +1,2 @@
+@unattributable and @safe_property decorators, used to protect properties from inner AttributeErrors.
+Improved exception practices.

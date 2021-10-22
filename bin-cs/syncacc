@@ -2,7 +2,7 @@
 #
 # Rsync my account from one place to others.
 # Usually I use putacc to call this, but occasionally getacc.
-#	- Cameron Simpson <cs@zip.com.au> 29jun2004
+#	- Cameron Simpson <cs@cskk.id.au> 29jun2004
 #
 
 set -ue
@@ -49,16 +49,19 @@ dosync()
   shift; shift
 
   $trace \
-    mrsync -rlptOHCi --delete \
+    mrsync -rptOHCli --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
+        '--exclude=.zsh_history' \
         '--exclude=.*.swp' \
         '--exclude=*~' \
         '--exclude=*.tmp' \
         '--exclude=CVS/' \
         '--exclude=*.pyc' \
+        '--exclude=__pycache__/' \
         ${1+"$@"} \
-        "$_ds_from." "$_ds_to."
+        "$_ds_from." "$_ds_to." \
+  | fgrep -v ': skipping non-regular file "'
 }
 
 # common files

@@ -2,7 +2,7 @@
 #
 # Print selected columns with awk.
 # Accepts -Fc for field separator.
-#	- Cameron Simpson <cs@zip.com.au> 24aug99
+#	- Cameron Simpson <cs@cskk.id.au> 24aug99
 #
 
 sep=

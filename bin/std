@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Seconds since epoch to human time.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 @ARGV = time if ! @ARGV;

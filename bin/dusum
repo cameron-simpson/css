@@ -1,7 +1,7 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Produce disc usage summaries.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 # Extensions and usage.	- cameron, 21mar1999
 #
@@ -10,6 +10,7 @@ set -ue
 
 outdir=.du-a
 dir=.
+trace=set-x
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-o outputdir] [directory]"
@@ -43,14 +44,14 @@ fi
 
 cd "$dir" || exit 1
 
-[ -d "$outdir" ] || mkdir "$outdir"
+[ -d "$outdir" ] || $trace mkdir "$outdir"
 
 output=$outdir/`daycode`.gz
 [ ! -f "$output" ] || output=$outdir/`datecode`.gz
 [ ! -f "$output" ] || { echo "$cmd: output already exists: $output" >&2; exit 1; }
 
 dufs ${1+"$@"} \
-| sed 's/^\([0-9][0-9]*\)	\.\/\/*/\1	/' \
+| sed 's:^\([0-9][0-9]*\)	\.//*:\1	:' \
 | gzip -n -9 >"$output"
 
 outbase=$(basename "$output")

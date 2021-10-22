@@ -1,0 +1,2 @@
+SQLTags.__getitem__: when autocreating an entity, do it in a new session so that the entity is commited to the database before any further use.
+SQLTagsCommand: new cmd_dbshell to drop you into the database.

@@ -1,0 +1,1 @@
+lib/python/cs/result.py: cs.result: clean a little lint, fix an undefined var ref

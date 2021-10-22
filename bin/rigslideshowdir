@@ -2,7 +2,7 @@
 #
 # Make a slideshow directory - a dir full of symlinks to things to show.
 # Emits shell; pipe through "sh -x" to actually do stuff.
-#	- Cameron Simpson <cs@zip.com.au> 01aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 01aug2003
 #
 
 cmd=`basename "$0"`

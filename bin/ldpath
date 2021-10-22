@@ -2,7 +2,7 @@
 #
 # Amend the LD_LIBRARY_PATH (which should normally be empty anyway)
 # and then run some program which needs special lib loading.
-#	- Cameron Simpson <cs@zip.com.au> 04jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 04jan2001
 #
 
 cmd=$0

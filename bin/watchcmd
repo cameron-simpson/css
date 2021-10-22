@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Repeatedly run a command and pipe through vdis.
-#	- Cameron Simpson <cs@zip.com.au> 15aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 15aug2000
 #
 
 sleep=5

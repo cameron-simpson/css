@@ -1,27 +1,36 @@
 #!/bin/sh
 #
-# Convenience command to start disparate services based on name.
-# The configuration is in $HOME/rc/svc.
-# For further convenience I define the following shell aliases:
+# Convenience command to start disparate services based on name
+# using my svcd command.
+# The configuration is in $HOME/.svcrc.
+# For further convenience I define the following shell aliases and functions:
 #
 #   alias disable='svc disable'
-#   alias connected='flag -q | grep "_CONNECTED\$"'
-#   alias disabled='flag -q | grep "_DISABLE\$"'
 #   alias enable='svc enable'
-#   alias restart='svc restart'
 #   alias start='svc start'
 #   alias stop='svc stop'
+#   alias restart='svc restart'
+#   fq(){         flag -q | grep -i "${1-.}"; }
+#   connected(){  fq '_CONNECTED$'; }
+#   disabled(){   fq '_DISABLE$'; }
 #
 # This makes managing my personal service processes far more convenient.
-#   - Cameron Simpson <cs@zip.com.au> 07may2016
+#   - Cameron Simpson <cs@cskk.id.au> 07may2016
 #
 
 set -ue
 
-: ${SVC_CONFIG:=$HOME/.svcrc}
-
 cmd=$( basename "$0" )
-usage="Usage: $cmd {disable|enable|restart|start|stop} name"
+
+: ${SVC_CONFIG:=$HOME/.svcrc}
+: ${SVC_RUNDIR:=$HOME}
+: ${SVC_LOGDIR:=${LOGDIR:-$HOME/var/log/$cmd}}
+export SVC_CONFIG SVC_RUNDIR SVC_LOGDIR
+
+usage="Usage: $cmd [{disable|enable|ls|restart|start|stop} [name]]
+  If name is omitted a numbered list of service names is recited.
+  If name is numeric then the corresponding service name  is chosen
+    from the list."
 
 badopts=
 
@@ -32,65 +41,173 @@ trace=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing op" >&2
-  badopts=1
+  op=ls
 else
   op=$1
   shift
-  case "$op" in
-    disable|enable|restart|start|stop)
-        ;;
-    *)  echo "$cmd: unrecognised op: $op" >&2
-        badopts=1
-        ;;
-  esac
-  if [ $# = 0 ]
-  then
-    echo "$cmd: $op: missing name" >&2
-    badopts=1
-  else
-    name=$1
-    shift
-  fi
 fi
 
-if [ $# -gt 0 ]
-then
-  echo "$cmd: extra arguments: $*" >&2
-  badopts=1
-fi
+cmd="$cmd: $op"
+
+case "$op" in
+  disable|enable|exec|ls|restart|start|stop)
+      [ $# -gt 0 ] || op=ls
+      case "$op" in
+        ls) ;;
+        *)  name=$1
+            shift
+            if [ $# -gt 0 ]
+            then
+              echo "$cmd: extra arguments: $*" >&2
+              badopts=1
+            fi
+            ;;
+      esac
+      ;;
+  *)  echo "$cmd: unrecognised op" >&2
+      badopts=1
+      ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# process config file
-shcmd=
+service_names(){
+  awk '/^[^#]/ { print($2) }' "$SVC_CONFIG" | sort -u | awk '{ print(NR, $0)}'
+}
+
+resolve_name(){
+  [ $# = 1 ] || {
+    echo "Usage: service_from_number name-or-number" >&2
+    exit 2
+  }
+  ( name=$1
+    case "$name" in
+      [1-9]|[1-9][0-9]|[1-9][0-9][0-9])
+        new_name=$(
+          service_names | awk -v "n=$name" 'NR == n { print($2); exit; }'
+        )
+        if [ -n "$new_name" ]
+        then
+          echo "$cmd: $name => $new_name" >&2
+          name=$new_name
+        else
+          echo "$cmd: $name: no matching service name" >&2
+          return 1
+        fi
+        ;;
+    esac
+    echo "$name"
+  )
+}
+
+# special case operations: ls
+case "$op" in
+  ls)
+    xit=0
+    if [ $# = 0 ]
+    then
+      service_names
+    else
+      for name
+      do
+        name=$( resolve_name "$name" ) || { xit=1; continue; }
+        while read -r rc_op rc_ptn rc_shcmd
+        do
+          # skip comments and blank lines
+          case "$rc_op" in
+            \#* | '')
+              continue
+              ;;
+          esac
+          # check for a match on the name
+          case "$name" in
+            $rc_ptn)
+              echo "$name: $rc_op $rc_ptn $rc_shcmd"
+              ;;
+          esac
+        done <"$SVC_CONFIG"
+      done
+    fi
+    exit $xit
+    ;;
+esac
+
+# normal operations: scan config file for action
+start_shcmd=
+stop_shcmd=
+enable_shcmd=
+disable_shcmd=
+name=$( resolve_name "$name" ) || exit 1
+lineno=0
 while read -r rc_op rc_ptn rc_shcmd
 do
-  # skip comments, blank lines and config for other ops
+  lineno=$(( lineno + 1 ))
+  # skip comments and blank lines
   case "$rc_op" in
     \#* | '')
       continue
-      ;;
-    "$op")
-      ;;
-    *)continue
       ;;
   esac
   # check for a match on the name
   case "$name" in
     $rc_ptn)
-      shcmd=$rc_shcmd
+      case "$rc_op" in
+        start|stop|enable|disable)
+            eval "${rc_op}_shcmd=\$rc_shcmd"
+            ;;
+        service)
+            start_shcmd=$rc_shcmd
+            stop_shcmd=
+            enable_shcmd=
+            disable_shcmd=
+            ;;
+        *)  echo "$cmd: $SVC_CONFIG:$lineno: unrecognised configuration op: $rc_op" >&2
+            ;;
+      esac
       ;;
   esac
 done <"$SVC_CONFIG"
 
-if [ -z "$shcmd" ]
+if [ -z "$start_shcmd" ]
 then
-  echo "$cmd: $SVC_CONFIG: no rules for: $op $name" >&2
+  echo "$cmd: $SVC_CONFIG: no start command for \"$name\"" >&2
   exit 1
 fi
 
-SVC_OP=$op
-SVC_NAME=$name
-export SVC_OP SVC_NAME
-exec sh -c "$setx; $shcmd"
+cd "$SVC_RUNDIR"
+
+case "$op" in
+  start)
+    set -x
+    cd
+    if [ -n "$stop_shcmd" ]
+    then
+      [ -d "$SVC_LOGDIR" ] || set-x mkdir "$SVC_LOGDIR"
+      date | tee -a "$SVC_LOGDIR/$name.log" "$SVC_LOGDIR/$name.err"
+      exec sh -uexc "$start_shcmd" >>"$SVC_LOGDIR/$name.log" 2>>"$SVC_LOGDIR/$name.err"
+    else
+      SVC_OP=$op
+      SVC_NAME=$name
+      SVC_TMUX_SESSION=SVC_$( printf '%s\n' "$name" | tr '[a-z]-' '[A-Z]_' )
+      export SVC_OP SVC_NAME SVC_TMUX_SESSION
+      set -x
+      exec tm "$SVC_TMUX_SESSION" set-x svcd -n "$SVC_NAME" sh -uexc "$start_shcmd"
+    fi
+    ;;
+  exec)
+    exec sh -xc "$start_shcmd"
+    ;;
+  stop|enable|disable)
+    eval "shcmd=\$${op}_shcmd"
+    if [ -n "$shcmd" ]
+    then
+      exec sh -xc "$shcmd"
+    else
+      set -x
+      exec svcd "$op" "$name"
+    fi
+    ;;
+  *)echo "$cmd: unimplemented op: $op" >&2
+    exit 2
+    ;;
+esac

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Read clause form .fetchmailrc, recite mutt IMAP settings.
-#   - Cameron Simpson <cs@zip.com.au> 26sep2015
+#   - Cameron Simpson <cs@cskk.id.au> 26sep2015
 #
 
 set -ue

@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Ssh in batchmode.
+#	- Cameron Simpson <cs@cskk.id.au> 26mar2003
+#
+set -ue
+: ${SSH:=ssh}
+exec "$SSH" -T -e none -x batchmode=yes ${1+"$@"}

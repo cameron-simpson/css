@@ -1,0 +1,11 @@
+#!/bin/sh
+#
+# Locate and update the local tags file.
+# Recite "set tags=/path/to/tagsfile".
+#   - Cameron Simpson <cs@cskk.id.au> 28feb2017
+#
+
+set -ue
+
+tags=$( ctags-update -- "$@" 2>/dev/null & )
+echo "set tags=$tags"

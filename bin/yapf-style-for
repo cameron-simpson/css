@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# The preferred style for use with yapf.
+# - Cameron Simpson <cs@cskk.id.au> 30jan2020
+#
+
+set -ue
+
+yapf_file=.style.yapf
+
+[ $# = 1 ] || {
+  echo "Usage: $0 filename" >&2
+  exit 2
+}
+
+srcfile=$1
+shift
+
+if style_yapf_dir=$(
+    findup -d "$srcfile" -c "test -f \"\$FINDUP_DIR\"'/$yapf_file'"
+)
+then  style=$style_yapf_dir/$yapf_file
+else  style=pep8
+fi
+
+printf '%s\n' "$style"

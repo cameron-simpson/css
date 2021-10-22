@@ -1,15 +1,35 @@
 #!/bin/sh
 #
 # Look for a relative path in all directories from the current one upward.
-#   - Cameron Simpson <cs@zip.com.au> 04may2016
+#   - Cameron Simpson <cs@cskk.id.au> 04may2016
 # 
 
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: [-a] relpath [testcmd]"
+usage="Usage: $cmd [-a] [-d] [-t top] [-T top] {relpath|.} [{-c shcmd | testcmd [args...]}]
+  -a    Find all matches. Default is to stop after the first match.
+  -d    Print the test directory instead of the test directory plus
+        \"relpath\".
+  -t top Go no higher than the directory top.
+  -T top Go only lower than the directory top.
+  Command:
+    -c shcmd
+        Run shell command \"shcmd\" with the context environment variables set.
+    testcmd [args...]
+        Run testcmd with the context environment variables set.
+  Environment:
+        \$FINDUP_DIR is set to the test directory.
+        \$FINDUP_PATH is set to the test path (the test directory
+        with \"relpath\" appended, unless \"relpath\" is \".\" or
+        the empty string, in which case it will just be the test
+        directory)."
 
 all=
+dirmode=
+top=
+top0=
+shmode=
 
 badopts=
 
@@ -17,6 +37,9 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -a) all=1 ;;
+    -d) dirmode=1 ;;
+    -t) top=$2; shift ;;
+    -T) top0=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -35,8 +58,27 @@ else
   shift
 fi
 
-# default test: path exists
-[ $# -gt 0 ] || set -- test -e
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# -gt 0 ]
+then
+  if [ "x$1" = x-c ]
+  then
+    shmode=1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: -c: missing shcmd" >&2
+      badopts=1
+    else
+      shcmd=$1
+      shift
+      [ $# = 0 ] || { echo "$cmd: -c: extra arguments after shcmd: $*" >&2
+                      badopts=1
+                    }
+    fi
+  fi
+fi
 
 xit=1
 
@@ -44,13 +86,29 @@ odir=
 dir=$( pwd )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
-  path=$dir/$relpath
-  if "$@" "$path"
+  [ -z "$top0" ] || [ "x$dir" != "x$top0" ] || break
+  case "$relpath" in
+    '' | . )    path=$dir ;;
+    *)          path=$dir/$relpath ;;
+  esac
+  if
+    if [ $shmode ]
+    then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
+    else
+      if [ $# -gt 0 ]
+      then  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
+      else  [ -e "$path" ]
+      fi
+    fi
   then
     xit=0
-    printf '%s\n' "$path"
+    if [ $dirmode ]
+    then  printf '%s\n' "$dir"
+    else  printf '%s\n' "$path"
+    fi
     [ $all ] || break
   fi
+  [ -z "$top" ] || [ "x$dir" != "x$top" ] || break
   odir=$dir
   dir=$( dirname "$dir" )
 done

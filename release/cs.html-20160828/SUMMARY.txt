@@ -1,0 +1,2 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+_transcribe: sort the attributes of a tag to produce consistent output.

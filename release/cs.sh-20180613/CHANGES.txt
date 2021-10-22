@@ -1,0 +1,9 @@
+  lib/python/cs/README-sh.rst: merge default ==> beyonwiz
+  lib/python/cs/README-sh.rst: merge default ==> iphoto
+  lib/python/cs/sh.py: cs.sh: main_shqstr: support no argv supplied
+  lib/python/cs/README-sh.rst: merge default ==> venti
+  lib/python/cs/README-sh.rst: merge default ==> later
+  lib/python/cs/README-sh.rst: merge later ==> pilfer
+  lib/python/cs/README-sh.rst: merge default ==> media
+  lib/python/cs/sh.py: cs.sh: rework quotestr significantly to provide somewhat friendlier quoting, include "," in the SAFECHARS
+  lib/python/cs/sh.py: cs.sh: lint: add a docstring

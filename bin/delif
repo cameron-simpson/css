@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Bring down a logical interface, partner to addif.
-#	- Cameron Simpson <cs@zip.com.au> 25jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 25jun2005
 #
 
 : ${TMPDIR:=/tmp}

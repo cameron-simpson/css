@@ -1,0 +1,4 @@
+  lib/python/cs/obj.py: merge default ==> beyonwiz
+  lib/python/cs/obj.py: cs.obj: pylint
+  lib/python/cs/obj.py: my email address has changed - update Python code
+  lib/python/cs/README-obj.rst lib/python/cs/obj.py: cs.obj: move README into module docstring, clean some lint

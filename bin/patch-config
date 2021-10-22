@@ -1,24 +1,31 @@
-#!/usr/bin/env py25+
-#
-# Apply a configuration patch to a file, writing the patched config
-# to the standard output.
-# The patch file contains lines of the form:
-#       keyword value
-# - Cameron Simpson <cs@zip.com.au> 18sep2008
-#
+#!/usr/bin/env python3
 
-from __future__ import with_statement
+''' Apply a configuration patch to a file, writing the patched config to
+    the standard output.
+    The patch file contains lines of the form:
+      keyword value
+    - Cameron Simpson <cs@cskk.id.au> 18sep2008
+'''
+
+from __future__ import with_statement, print_function
 import sys
 import os.path
 import getopt
-from StringIO import StringIO
+from io import StringIO
 from cs.fileutils import rewrite
 from cs.logutils import setup_logging, error, Pfx
 
+DEFAULT_INSERT = False
+DEFAULT_COMMENT_OUT = True
+DEFAULT_CASE_SENSITIVE = True
+DEFAULT_SEP = None
+
 def main(argv):
+  ''' Main programme.
+  '''
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
-  usage = '''Usage: %s [options...] configfile [patchfile]
+  usage = f'''Usage: {cmd} [options...] configfile [patchfile]
     -#    Comment out old keyword lines (default).
     -A    Append new keywords to the end of the file (default).
     -D    Delete old keyword lines instead of commenting.
@@ -27,39 +34,35 @@ def main(argv):
     -o output
           Write output to specified file. This can be the same as configfile.
     -O    Write output back to the input configfile.
-    -/sep Keywords separated from rest of line by sep instead of whitespace.''' % (cmd,)
+    -/sep Keywords separated from rest of line by sep instead of whitespace.'''
 
   setup_logging(cmd)
 
   badopts = False
 
   settings = Settings()
-  settings.insert = False
-  settings.commentOut = True
-  settings.caseSensitive = True
-  settings.sep = None
 
   configFile = None
   outputFile = '-'
 
   try:
-    opts, args = getopt.getopt(sys.argv[1:],'#ADIio:O/:')
-  except getopt.GetoptError, e:
+    opts, args = getopt.getopt(sys.argv[1:], '#ADIio:O/:')
+  except getopt.GetoptError as e:
     error("%s", e)
     badopts = True
     args = []
   else:
     for opt, val in opts:
       if opt == '-#':
-        settings.commentOut = True
+        settings.comment_out = True
       elif opt == '-A':
         settings.insert = False
       elif opt == '-D':
-        settings.commentOut = False
+        settings.comment_out = False
       elif opt == '-I':
         settings.insert = True
       elif opt == '-i':
-        settings.caseSensitive = True
+        settings.case_sensitive = True
       elif opt == '-o':
         outputFile = val
       elif opt == '-O':
@@ -75,8 +78,8 @@ def main(argv):
     badopts = True
   else:
     configFile = args.pop(0)
-    if len(args) == 0:
-      patchFile='-'
+    if not args:
+      patchFile = '-'
     else:
       patchFile = args.pop(0)
       if args:
@@ -91,7 +94,7 @@ def main(argv):
     outputFile = configFile
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   if patchFile == '-':
@@ -119,10 +122,19 @@ def main(argv):
   return 0
 
 class Settings(object):
-  pass
+  ''' Programme modes.
+  '''
+
+  def __init__(self):
+    self.insert = DEFAULT_INSERT
+    self.comment_out = DEFAULT_COMMENT_OUT
+    self.case_sensitive = DEFAULT_CASE_SENSITIVE
+    self.sep = DEFAULT_SEP
 
 def writeConfigData(output, configFile, patchLines, keywords, settings):
-  if type(configFile) is str:
+  ''' Write out the patched config file.
+  '''
+  if isinstance(configFile, str):
     with Pfx(configFile):
       with open(configFile) as cfp:
         return writeConfigData(output, cfp, patchLines, keywords, settings)
@@ -133,15 +145,15 @@ def writeConfigData(output, configFile, patchLines, keywords, settings):
 
   for line in configFile:
     if not line.endswith('\n'):
-      raise ValueError, "unexpected EOF"
+      raise ValueError("unexpected EOF")
     words = line.strip().split(settings.sep)
-    if len(words) > 0:
+    if words:
       word1 = words[0]
-      if not settings.caseSensitive:
+      if not settings.case_sensitive:
         word1 = word1.lower()
       if word1 in keywords:
-        if settings.commentOut:
-          line='#'+line
+        if settings.comment_out:
+          line = '#' + line
         else:
           # discard line
           continue
@@ -151,25 +163,27 @@ def writeConfigData(output, configFile, patchLines, keywords, settings):
     for line in patchLines:
       output.write(line)
 
+  return None
+
 def readPatchData(fp, settings):
   ''' Read patch lines, return patchLines and keywords map.
   '''
-  if type(fp) is str:
+  if isinstance(fp, str):
     with Pfx(fp):
       with open(fp) as pfp:
         return readPatchData(pfp, settings)
 
-  patchLines=[]
-  keywords={}
+  patchLines = []
+  keywords = {}
   for line in fp:
     if not line.endswith('\n'):
-      raise ValueError, "missing EOF"
+      raise ValueError("missing EOF")
     patchLines.append(line)
     line = line.strip()
-    if len(line) == 0 or line[0] == '#':
+    if not line or line[0] == '#':
       continue
     keyword = line.split(settings.sep)[0]
-    if not settings.caseSensitive:
+    if not settings.case_sensitive:
       keyword = keyword.lower()
     keywords[keyword] = None
 

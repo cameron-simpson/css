@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Report approval status of budget summary reports.
-#	- Cameron Simpson <cs@zip.com.au> 09mar99
+#	- Cameron Simpson <cs@cskk.id.au> 09mar99
 #
 
 use strict qw(vars);

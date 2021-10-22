@@ -1,0 +1,3 @@
+BackedFile: redo implementation of .front_file to fix resource leak; add .__len__; add methods .spans, .front_spans and .back_spans to return information about front vs back data.
+seek: bugfix: seek should return the new file offset.
+BackedFile does not subclass RawIOBase, it just works like one.

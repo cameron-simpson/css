@@ -5,7 +5,7 @@
 # output to a different SubVids, much as a seek should preceed alternating
 # reads and writes in stdio. Sync and Refresh etc are fairly meaningless
 # to a SubVDis.
-#	- Cameron Simpson <cs@zip.com.au> 13oct96
+#	- Cameron Simpson <cs@cskk.id.au> 13oct96
 #
 
 use strict qw(vars);

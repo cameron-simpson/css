@@ -4,7 +4,7 @@
 # Emit filenames known in the indices as:
 #	size:md5\tfilename\tmd5index\tindex-filename
 # as for md5match.
-#	- Cameron Simpson <cs@zip.com.au> 21jun2000
+#	- Cameron Simpson <cs@cskk.id.au> 21jun2000
 #
 
 md5match ${1+"$@"} \

@@ -2,7 +2,7 @@
 #
 # Take email on stdin and deliver to the addresses specified.
 # Prune several headers to avoid bloat.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=$0

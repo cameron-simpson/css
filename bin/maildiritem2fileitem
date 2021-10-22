@@ -2,7 +2,7 @@
 #
 # Convert a single file from a directory of single item mail files to
 # something useful for storing in a UNIX format multiitem mail file.
-#	- Cameron Simpson <cs@zip.com.au> 27mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 27mar2000
 #
 
 2,$b top

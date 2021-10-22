@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Sort on line length.
-#	- Cameron Simpson <cs@zip.com.au> 12jan2001
+#	- Cameron Simpson <cs@cskk.id.au> 12jan2001
 #
 
 awk '{print length " " $0}' ${1+"$@"} | sort -n | sed 's/^[0-9][0-9]* //'

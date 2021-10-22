@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Emit KML output.
-#       - Cameron Simpson <cs@zip.com.au> 08jun2007
+#       - Cameron Simpson <cs@cskk.id.au> 08jun2007
 #
 
 cat <<X

@@ -1,0 +1,2 @@
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: simplify prefixify_exc() logic, prefixify all suitable attributes
+lib/python/cs/pfx.py: cs.pfx: new @pfx_method decorator for instance methods

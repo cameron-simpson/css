@@ -1,0 +1,10 @@
+  lib/python/cs/sh.py: cs.sh: autopep8
+  lib/python/cs/sh.py: cs.*: add empty "install_requires" for completeness
+  lib/python/cs/sh.py: cs.sh: present shqstr command logic as main_shqstr in cs.sh module; update DISTINFO to know this; update shqstr to use it
+  lib/python/cs/sh.py: merge default ==> beyonwiz
+  lib/python/cs/sh.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/sh.py: cs.sh: main function
+  lib/python/cs/sh.py: cs.sh: new function quotecmd(argv) that quotes and then assembles into a command string
+  lib/python/cs/sh.py: cs.sh: fix up name of main_shqstr
+  lib/python/cs/sh.py: my email address has changed - update Python code
+  lib/python/cs/README-sh.rst lib/python/cs/sh.py: cs.sh: move README into module docstring

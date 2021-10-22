@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Retrieve my email.	- Cameron Simpson <cs@zip.com.au> 13aug2002
+# Retrieve my email.	- Cameron Simpson <cs@cskk.id.au> 13aug2002
 #
 
 : ${MAILDIR:=$HOME/mail}

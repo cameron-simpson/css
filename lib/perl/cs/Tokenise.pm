@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Tokeniser base class.
-#	- Cameron Simpson <cs@zip.com.au> 15oct94
+#	- Cameron Simpson <cs@cskk.id.au> 15oct94
 #
 # new(Source,Match[,State])
 #	Source	Source of data.

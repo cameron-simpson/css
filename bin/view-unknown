@@ -2,7 +2,7 @@
 #
 # Generic handler for untyped data to be displayed inline (as for mailcap
 # "copiousoutput' entries).
-#	- Cameron Simpson <cs@zip.com.au> 24jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 24jul2002
 #
 
 : ${TMPDIR:=/tmp}

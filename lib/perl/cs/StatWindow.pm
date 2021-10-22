@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Control a sliding window of stats.
-#	- Cameron Simpson <cs@zip.com.au> 02sep97
+#	- Cameron Simpson <cs@cskk.id.au> 02sep97
 #
 
 use strict qw(vars);

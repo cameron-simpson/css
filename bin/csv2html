@@ -1,7 +1,7 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python
 #
 # Simple minded script to read CSV input and emit an HTML table.
-#       - Cameron Simpson <cs@zip.com.au> 10nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 10nov2006
 #
 
 import sys

@@ -1,0 +1,1 @@
+Bugfix BaseCommand.cmd_help for modern API.

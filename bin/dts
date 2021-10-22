@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # ISO date ==> UNIX time.
-#	- Cameron Simpson <cs@zip.com.au> 27oct2000
+#	- Cameron Simpson <cs@cskk.id.au> 27oct2000
 #
 
 use cs::Date;

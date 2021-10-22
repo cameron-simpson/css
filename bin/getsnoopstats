@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Gather stats for later graphing.
-#	- Cameron Simpson <cs@zip.com.au> 15jan99
+#	- Cameron Simpson <cs@cskk.id.au> 15jan99
 #
 
 usage="Usage: $0 [-o output.gz] [snoop-options...]"

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Upload a table to a MySQL database from a single table mysqldump output.
-#       - Cameron Simpson <cs@zip.com.au> 25sep2012
+#       - Cameron Simpson <cs@cskk.id.au> 25sep2012
 #
 
 set -ue

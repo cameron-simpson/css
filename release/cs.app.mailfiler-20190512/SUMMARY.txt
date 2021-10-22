@@ -1,0 +1,3 @@
+Promote $DEFAULT to a list of targets.
+Implement save-to-self "." target to support folders where filing elsewhere is an exception.
+Move the manual entries to Markdown format.

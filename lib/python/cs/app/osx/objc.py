@@ -3,7 +3,8 @@
 # MacOSX Objective C facilities.
 # Tweaks sys.path if necessary.
 # Includes some type conversion.
-#       - Cameron Simpson <cs@zip.com.au> 29jun2011
+# See also: https://pythonhosted.org/pyobjc/api/module-objc.html
+#       - Cameron Simpson <cs@cskk.id.au> 29jun2011
 #
 
 import sys

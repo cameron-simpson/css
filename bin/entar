@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Run tar create with tidier verbose mode.
-#	- Cameron Simpson <cs@zip.com.au> 27jun2000
+#	- Cameron Simpson <cs@cskk.id.au> 27jun2000
 #
 
 use strict vars;

@@ -3,7 +3,7 @@
 # Run a new shell inside a script command, logging to the file
 #	$HOME/var/log/build/pkg-arch-host-date.gz
 # Too often was I building things and losing the details.
-#	- Cameron Simpson <cs@zip.com.au> 28aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 28aug2000
 #
 
 : ${LOGDIR:=$HOME/var/log}

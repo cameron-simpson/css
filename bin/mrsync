@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Multi-rsync. Run rsyncs in parallel to multiple hosts, prefix output.
-#       - Cameron Simpson <cs@zip.com.au> 19apr2012
+#       - Cameron Simpson <cs@cskk.id.au> 19apr2012
 #
 
 set -ue
@@ -51,7 +51,7 @@ fi
 (
   for host in $(hostlist "$hostlist")
   do
-    pfx "$host" $trace rsync "$@" "$userpfx$host:$dst" &
+    pfx "$userpfx$host:$dst" $trace rsync "$@" "$userpfx$host:$dst" &
   done
   wait
 )

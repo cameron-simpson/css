@@ -1,7 +1,7 @@
 #!/usr/local/lib/perl5
 #
 # Basic browse class.
-#	- Cameron Simpson <cs@zip.com.au> 29jul96
+#	- Cameron Simpson <cs@cskk.id.au> 29jul96
 #
 
 use strict qw(vars);

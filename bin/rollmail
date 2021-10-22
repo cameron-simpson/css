@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Bundle up files in a mail spool.
-#	- Cameron Simpson <cs@zip.com.au> 11feb1998
+#	- Cameron Simpson <cs@cskk.id.au> 11feb1998
 #
 # Use catmaildir and gzip instead of tar. - cameron 27mar2000
 #

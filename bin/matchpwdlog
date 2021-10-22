@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Locate latest best match in pwdlog for use by cd alias.
-#	- Cameron Simpson <cs@zip.com.au> 18feb98
+#	- Cameron Simpson <cs@cskk.id.au> 18feb98
 #
 
 die "Usage: $0 pattern [logfiles]\n" unless @ARGV;

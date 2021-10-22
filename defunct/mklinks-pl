@@ -2,7 +2,7 @@
 #
 # Walk directories, linking identical files.
 # Now obsoleted by the python implementation.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 =head1 NAME
@@ -315,6 +315,6 @@ sub pcnt($$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut

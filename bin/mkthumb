@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Produce thumbnails for the named image files.
-#	- Cameron Simpson <cs@zip.com.au> 12sep2003
+#	- Cameron Simpson <cs@cskk.id.au> 12sep2003
 #
 
 cmd=$0

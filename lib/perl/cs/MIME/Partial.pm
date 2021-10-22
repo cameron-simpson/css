@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Save and assemble message/partial MIME objects.
-#	- Cameron Simpson <cs@zip.com.au> 24sep96
+#	- Cameron Simpson <cs@cskk.id.au> 24sep96
 #
 
 use strict qw(vars);

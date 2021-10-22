@@ -1,0 +1,1 @@
+@fmtdoc: add caveat against misuse of this decorator.

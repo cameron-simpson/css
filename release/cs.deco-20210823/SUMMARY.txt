@@ -1,0 +1,1 @@
+@decorator: preserve the __name__ of the wrapped function.

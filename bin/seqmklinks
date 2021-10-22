@@ -7,7 +7,7 @@
 #
 # This is also useful on machines with older pythons that won't run my
 # mklinks script.
-#       - Cameron Simpson <cs@zip.com.au> 17feb2007
+#       - Cameron Simpson <cs@cskk.id.au> 17feb2007
 #
 
 trace=set-x

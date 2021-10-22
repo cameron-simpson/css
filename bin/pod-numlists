@@ -2,7 +2,7 @@
 #
 # Read POD from stdin, recognise numbered lists by first =item,
 # enforce numbering.
-#	- Cameron Simpson <cs@zip.com.au> 24aug2004
+#	- Cameron Simpson <cs@cskk.id.au> 24aug2004
 #
 
 if (/^=over\b/)

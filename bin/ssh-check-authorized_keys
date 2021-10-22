@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check an ssh authorized_key file for invalid entres.
-#       - Cameron Simpson <cs@zip.com.au> 26jun2012
+#       - Cameron Simpson <cs@cskk.id.au> 26jun2012
 #
 
 set -ue

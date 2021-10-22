@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Apply the named image file as the desktop image. This requires
+# your desktop to already be set to display a static image; it seems
+# "set desktop picture" just sets the magic string for the static
+# desktop and fires the "refresh the desktop" activity; if that is
+# set to pick from a directory etc that action will fire.
+#   - Cameron Simpson <cs@cskk.id.au> 01dec2016
+#
+
+[ $# = 1 ] || { echo "Usage: $0 imgpath" >&2; exit 2; }
+img=$1
+shift
+
+[ -s "$img" ] || { echo "$0: missing file: $img" >&2; exit 1; }
+
+case "$img" in
+  /*) ;; *) img=$(pwd)/$img ;;
+esac
+
+/usr/bin/osascript <<EOF
+tell application "Finder"
+  set desktop picture to POSIX file "$img"
+end tell
+EOF

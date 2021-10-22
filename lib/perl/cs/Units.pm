@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Some simple units conversions.
-#	- Cameron Simpson <cs@zip.com.au> 17jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 17jan2002
 #
 
 =head1 NAME
@@ -165,7 +165,7 @@ sub num2human($;$)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

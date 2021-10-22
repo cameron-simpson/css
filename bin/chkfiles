@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Examine a list of files to see which have changed.
-#	- Cameron Simpson <cs@zip.com.au> 24aug96
+#	- Cameron Simpson <cs@cskk.id.au> 24aug96
 #
 
 use cs::Source;

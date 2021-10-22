@@ -5,7 +5,7 @@
 #   mailman		-> postmaster
 #   mailman-list	-> wrapper post list
 #   mailman-list-*	-> wrapper * list
-#	- Cameron Simpson <cs@zip.com.au> 16may2001
+#	- Cameron Simpson <cs@cskk.id.au> 16may2001
 #
 
 exec 2>>/var/mailman/procmail.out

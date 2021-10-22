@@ -12,7 +12,7 @@
 # Each element of the subsequent rows is the data for the field.
 #	DATA	The data for this field.
 #	
-# - Cameron Simpson <cs@zip.com.au> 11jun97
+# - Cameron Simpson <cs@cskk.id.au> 11jun97
 #
 
 use strict qw(vars);

@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+#
+# Copy times from one tree to another.
+#   - Cameron Simpson <cs@cskk.id.au> 27dec2017
+#
+
+import os
+from os.path import join as joinpath, exists as pathexists, relpath
+from stat import S_ISREG
+import sys
+from cs.logutils import setup_logging, info
+from cs.pfx import Pfx
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd, path1, path2 = argv
+  setup_logging(cmd)
+  for dirpath, dirnames, filenames in os.walk(path1):
+    dirnames[:] = sorted(dirnames)
+    rdirpath = relpath(dirpath, path1)
+    for filename in sorted(filenames):
+      ##info(filename)
+      fpath1 = joinpath(dirpath, filename)
+      S = os.lstat(fpath1)
+      if not S_ISREG(S.st_mode):
+        continue
+      fpath2 = joinpath(path2, rdirpath, filename)
+      if pathexists(fpath2):
+        copy_time(fpath1, fpath2)
+
+def copy_time(path1, path2):
+  with Pfx("lstat(%r)", path1):
+    S1 = os.lstat(path1)
+  with Pfx("lstat(%r)", path2):
+    S2 = os.lstat(path2)
+  if S1.st_mtime != S2.st_mtime:
+    info("%s => %s", path1, path2)
+    with Pfx("utime(%r)", path2):
+      os.utime(path2, (S1.st_atime, S1.st_mtime))
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

@@ -1,7 +1,7 @@
 #!/usr/local
 #
 # Edit the /etc/dumpdates file and its ilk.
-#	- Cameron Simpson <cs@zip.com.au> 06dec96
+#	- Cameron Simpson <cs@cskk.id.au> 06dec96
 #
 
 use strict qw(vars);

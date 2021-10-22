@@ -1,0 +1,3 @@
+#!/bin/sh
+set -uex
+exec ssh -F "$HOME/rc/ssh/config-pf" ${1+"$@"}

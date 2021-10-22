@@ -3,17 +3,18 @@
 # Read a mail folder.
 # Sync with remote copies first.
 # Run self remotely if no local folder.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 set -ue
 
 : ${MAILHOMEHOST:=}
-: ${MAILDIR:=$HOME/mail}
+: ${MAILDIR:="$HOME/mail"}
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
 : ${MAIL_IMAPSYNC:=}
-: ${MAILBOX:=INBOX}
-: ${SENDMESG_FCC:=spool-out}
+: ${MAILBOX:='INBOX'}
+: ${MUTTEDIT_EDITOR:='vim-flowed'}
+: ${SENDMESG_FCC:='spool-out'}
 export SENDMESG_FCC
 
 cmd=`basename "$0"`
@@ -28,6 +29,7 @@ usage="Usage: $cmd [-f] [-I imapsync] [-q] [foldername]
             empty. Curently MAILHOMEHOST=$MAILHOMEHOST
   -q        Quick imap-sync.
   -r rhost  Run remotely on rhost, overriding \$MAILHOMEHOST.
+  -T        Start a tmux session.
   foldername Default from \$MAILBOX: $MAILBOX"
 
 badopts=
@@ -38,6 +40,7 @@ runlocal=1
 [ -z "$MAILHOMEHOST" ] || runlocal=
 imapsyncopts=
 foldername=$MAILBOX
+use_tmux=
 
 while [ $# -gt 0 ]
 do
@@ -45,8 +48,9 @@ do
     -C) cdto=$2; shift; runlocal=1 ;;
     -I) MAIL_IMAPSYNC=$2; export MAIL_IMAPSYNC; shift ;;
     -l) runlocal=1 ;;
-    -r) runlocal= MAILHOMEHOST=$2 ;;
     -q) imapsyncopts="$imapsyncopts $1" ;;
+    -r) runlocal= MAILHOMEHOST=$2 ;;
+    -T) use_tmux=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -104,4 +108,13 @@ fi
 [ -n "$MAIL_IMAPSYNC" ] \
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
 
-$trace mutt -f "$maildir" -e "set header_cache='$HOME/var/mutt/header-cache+$_foldername'; fcc-hook . $maildir; save-hook . $omaildir"
+set -- mutt -f "$maildir" \
+        -e "fcc-hook . $maildir; save-hook . $omaildir"
+
+if [ $use_tmux ]
+then
+  unset TMUX
+  session=MUTT_${foldername}_$(date '+%Y-%m-%d-%H%M%S')
+  set -- tm "$session" "$@"
+fi
+$trace "$@"

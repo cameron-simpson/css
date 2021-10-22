@@ -1,0 +1,3 @@
+Add Range.start like existing Range.end.
+Use "install_requires" instead of "requires" in DISTINFO.
+Small bugfix.

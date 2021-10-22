@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Prefetch web pages so they're in the proxy cache.
-#	- Cameron Simpson <cs@zip.com.au> 19mar1999
+#	- Cameron Simpson <cs@cskk.id.au> 19mar1999
 #
 
 inline=

@@ -2,7 +2,7 @@
 #
 # Use the specified perl file and then serve HTTP requests.
 # Call doCGI($cgiObj) for each request.
-#	- Cameron Simpson <cs@zip.com.au> 30dec97
+#	- Cameron Simpson <cs@cskk.id.au> 30dec97
 #
 
 BEGIN { unshift(@INC,"/u/cameron/etc/pl"); }

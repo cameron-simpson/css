@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Convert input to PostScript.
-#	- Cameron Simpson <cs@zip.com.au> 12dec1996
+#	- Cameron Simpson <cs@cskk.id.au> 12dec1996
 #
 # Convert to MIME basis. - cameron 29apr2004
 #

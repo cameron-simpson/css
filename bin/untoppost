@@ -1,0 +1,21 @@
+#!/usr/bin/sed -nf
+#
+# Extremely simple minded script to mostly repair top posted messages
+# by moving all unquoted text to the bottom of the message.
+#   - Cameron Simpson <cs@cskk.id.au> 29jan2017
+#
+
+# copy out the header directly
+1,/^$/{ p;d; }
+
+# final line
+${
+  /^>/{ p;x;p;d; }
+  H;x;p;d
+  p;d
+}
+
+# stash unquoted text
+/^>/!{ H;d; }
+# print the rest
+p

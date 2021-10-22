@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Wrapper for python doctest module.
+# - Cameron Simpson <cs@cskk.id.au> 29jun2018
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-f] [-v] [--] test-subjects"
+
+python=python3
+doctest_opts=
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f | -v)
+        doctest_opts="$doctest_opts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing test-subjects" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for arg
+do
+  case "$arg" in
+    '' | *[^a-z_.]*)
+      $trace "$python" -m doctest $doctest_opts "$arg"
+      ;;
+    *)$trace "$python" -c "import doctest; import $arg; doctest.testmod($arg)" $doctest_opts
+      ;;
+  esac || xit=1
+done
+
+exit $xit

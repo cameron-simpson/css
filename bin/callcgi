@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Run a script locally as if it's a CGI, and display the results.
-#	- Cameron Simpson <cs@zip.com.au> 19jan2003
+#	- Cameron Simpson <cs@cskk.id.au> 19jan2003
 # 
 
 umask 077	# results should be private

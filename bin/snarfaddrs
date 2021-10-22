@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Grab addrs.new and incorporate it into addrs.all.
-#	- Cameron Simpson <cs@zip.com.au> 31jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 31jan2002
 #
 
 use strict qw(vars);

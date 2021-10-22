@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Web::CSW::Cache: a cache of fetched pages
-#	- Cameron Simpson <cs@zip.com.au> 5mar2000
+#	- Cameron Simpson <cs@cskk.id.au> 5mar2000
 #
 
 =head1 NAME
@@ -151,7 +151,7 @@ sub IsReady($)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

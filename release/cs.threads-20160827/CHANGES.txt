@@ -1,0 +1,13 @@
+  lib/python/cs/app/pilfer.py lib/python/cs/asynchron.py lib/python/cs/excutils.py lib/python/cs/fileutils.py lib/python/cs/idset.py lib/python/cs/later.py lib/python/cs/mailutils.py lib/python/cs/nodedb/tokcab.py lib/python/cs/queues.py lib/python/cs/threads.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/app/myke/make.py lib/python/cs/later.py lib/python/cs/queues.py lib/python/cs/resources.py lib/python/cs/threads.py lib/python/cs/venti/datafile.py lib/python/cs/venti/dir.py lib/python/cs/venti/store.py lib/python/cs/venti/tcp.py: cs.resources: rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate
+  lib/python/cs/threads.py lib/python/cs/venti/store.py lib/python/cs/venti/tcp.py: cs.venti.tcp, cs.venti.store, cs.threads: add required .startup method
+  lib/python/cs/queues.py lib/python/cs/threads.py: cs.threads,cs.queues: use ._lock=RLock() in MultiOpenMixins
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool: MultiOpenMixin defines ._lock for us; reorder init of .name
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool.dispatch: mention `daemon` parameter in docstring and add 2 TODOs; spawn fresh Thread if `daemon` is not None
+  lib/python/cs/threads.py: cs.threads: keep separate idle queues for daemon and nondaemon Threads
+  lib/python/cs/threads.py: cs.threads: new WTPoolEntry namedtuple for WorkerThreadPool entries, avoids magic number
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool: rename a host of internal variable for better readability
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool: add max_spares parameter, update docstring, fix race in shutdown
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool.dispatch: remove obsolete check for daemon is None
+  lib/python/cs/threads.py: cs.threads: WorkerThreadPool: do not reuse Thread if we have max_spare Threads available, (debug) do not reuse Threads at all to reduce noise in thread_dumps during current debug session; improve a variable name for readability
+  lib/python/cs/threads.py: cs.threads: add bg() convenience function to dispatch callable in a Thread

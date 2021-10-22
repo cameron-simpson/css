@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Make a tied hash which is a rekey of an existing hash.
-#	- Cameron Simpson <cs@zip.com.au> 24jun98
+#	- Cameron Simpson <cs@cskk.id.au> 24jun98
 #
 
 use strict qw(vars);

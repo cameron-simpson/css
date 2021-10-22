@@ -1,0 +1,7 @@
+  lib/python/cs/psutils.py: cs.psutils: new module, supplying stop() to kill a process and optionally wait for its exit
+  lib/python/cs/psutils.py: cs.*: adjust a lot of except clauses
+  lib/python/cs/psutils.py: cs.psutils: stop: remove use of cs.logutils.Pfx and associated import
+  lib/python/cs/psutils.py: cs.psutils: write_pidfile, remove_pidfile and pdifile context manager
+  lib/python/cs/psutils.py: cs.psutils: rename pidfile to PidFileManager
+  lib/python/cs/psutils.py: my email address has changed - update Python code
+  lib/python/cs/psutils.py: cs.psutils: PyPI prep, lint fixes

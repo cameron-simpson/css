@@ -1,0 +1,6 @@
+  lib/python/cs/py/func.py: cs.py.func: module docstring typo fix
+  lib/python/cs/py/func.py: cs.py.func: some type specific convenience wrappers for yields_type and returns_type
+  lib/python/cs/py/func.py: default ==> pilfer
+  lib/python/cs/py/func.py: merge later ==> pilfer
+  lib/python/cs/py/func.py: cs.py.func: @prop: fix nested exception raise incantation
+  lib/python/cs/py/func.py: cs.py.func: clean some lint

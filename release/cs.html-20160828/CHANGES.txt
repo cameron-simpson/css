@@ -1,0 +1,2 @@
+  lib/python/cs/html.py: cs.html: _transcribe: sort the attributes of a tag to produce consistent output
+  lib/python/cs/html.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

@@ -2,7 +2,7 @@
 #
 # Drive Cisco switches. Catalysts, really.
 # Relies on my script "askcisco".
-#	- Cameron Simpson <cs@zip.com.au> 28jan99
+#	- Cameron Simpson <cs@cskk.id.au> 28jan99
 #
 
 use strict qw(vars);

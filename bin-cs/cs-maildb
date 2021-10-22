@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/usr/bin/env python
 #
 # Operate on my maildb.
-#       - Cameron Simpson <cs@zip.com.au> 27apr2011
+# - Cameron Simpson <cs@cskk.id.au> 27apr2011
 #
 
-exec python -m cs.app.maildb ${1+"$@"}
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.maildb import main
+sys.exit(main(sys.argv))

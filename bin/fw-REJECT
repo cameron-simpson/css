@@ -2,7 +2,7 @@
 #
 # Add trailing REJECT rules to the specified chains.
 # First yanks any existing wildcard REJECTs.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 cmd=$0

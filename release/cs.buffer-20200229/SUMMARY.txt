@@ -1,0 +1,3 @@
+New CornuCopyBuffer.byte0() method consuming the next byte and returning it as an int.
+CornuCopyBuffer.takev: bugfix for size=0, logic refactor.
+CornuCopyBuffer: new .selfcheck method.

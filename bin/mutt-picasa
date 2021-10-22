@@ -3,7 +3,7 @@
 # Take the almost-URL handed out by Picasa and hand to mutt.
 # Install:
 #	ln -s /opt/css/bin/mutt-picasa /opt/picasa/bin/picasa-hook-email.sh
-# - Cameron Simpson <cs@zip.com.au> 28may2006
+# - Cameron Simpson <cs@cskk.id.au> 28may2006
 #
 
 : ${TMPDIR:=/tmp}

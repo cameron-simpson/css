@@ -3,7 +3,7 @@
 # Construct a wallpaper image by resizing a source image and padding.
 # Pulled from rootbg and updated to use GraphicsMagick.
 # Writes new image to a persistent cache in PNG format and prints the pathname.
-#	- Cameron Simpson <cs@zip.com.au> 11sep2003
+#	- Cameron Simpson <cs@cskk.id.au> 11sep2003
 #
 
 : ${BG:=black}

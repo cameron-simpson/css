@@ -1,7 +1,7 @@
-#!/usr/bin/env py27+
+#!/usr/bin/env python
 #
 # Monitor log files.
-#       - Cameron Simpson <cs@zip.com.au> 18jul2008
+#       - Cameron Simpson <cs@cskk.id.au> 18jul2008
 #
 
 from __future__ import with_statement
@@ -15,7 +15,9 @@ from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import tail
-from cs.logutils import cmd, setup_logging
+from cs.logutils import setup_logging
+
+cmd = None
 
 USAGE = "Usage: %s configuration-file"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::BudTool: a module for working with the BudTool backup system.
-#	- Cameron Simpson <cs@zip.com.au> 07nov2000
+#	- Cameron Simpson <cs@cskk.id.au> 07nov2000
 #
 
 =head1 NAME
@@ -96,7 +96,7 @@ cs::BudTool::Tape
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

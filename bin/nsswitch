@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Hack the /etc/nsswitch.conf file.
-#	- Cameron Simpson <cs@zip.com.au> 25dec2005
+#	- Cameron Simpson <cs@cskk.id.au> 25dec2005
 #
 
 : ${NSSWITCH_CONF:=/etc/nsswitch.conf}

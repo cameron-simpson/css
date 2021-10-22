@@ -2,7 +2,7 @@
 #
 # Script to require UNIX NIS login for a CGI script.
 # If the CGI envvar $REMOTE_USER is already set, just echo it and get out.
-#	- Cameron Simpson <cs@zip.com.au> 12feb2001
+#	- Cameron Simpson <cs@cskk.id.au> 12feb2001
 #
 # Exit status: 0 for a match, with userid on stdout.
 #              1 for failure, with 401 response on stdout.

@@ -23,53 +23,15 @@ case "$OS,$DISPLAY" in
     ;;
 esac
 
-for fv in \
-        $HOME/bin-local/fvwm \
-        $FVWM_PREFIX \
-	2.5.21-fc6 \
-	2.5.17-fc4 \
-	2.5.15-fc4 \
-	cvs-20050815-fc4 \
-	2.5.12-fc3 \
-	2.5.11-rh9 \
-	cvs-20040711 \
-	2003-07-24 \
-	2003-05-24 \
-	2003-04-16 \
-	2.5.6 \
-	2.5.4 \
-	2.5.4cvs \
-	2.5.3 \
-	2.5.1 \
-	2.4.4 \
-	fvwm \
-	2.3.23 \
-	/opt/fvwm \
-	/usr/local \
-	/opt \
-	/usr/X11R6 \
-	/nowhere
-do
-  case $fv in
-    /*)		;;
-    fvwm-*)	fv=/opt/$fv ;;
-    *)		fv=/opt/fvwm-$fv ;;
-  esac
-  if [ -f "$fv" ]
-  then  fvwm=$fv
-  else  fvwm=$fv/bin/fvwm
-  fi
-  [ -f "$fvwm" ] && break
-done
-
-[ -f "$fvwm" ] || { echo "$0: no fvwm!" >&2; exit 1; }
-
 PATH=$PATH:$fv/bin
 PYTHONPATH=$PYTHONPATH:$HOME/rc/python/Fvwmpy
 export PATH PYTHONPATH
 
 set -x
-exec "$fvwm" -cmd "PipeRead cs-fvwmrc" ${1+"$@"}
+case ${VVNC_DEFAULT:-} in
+  ?*)   exec twm ;;
+  *)    exec fvwm -cmd "PipeRead cs-fvwmrc" ;;  ## ${1+"$@"}
+esac
 
 ### set up FVWM log/fifo vars
 ##eval `rigfvwmvars`

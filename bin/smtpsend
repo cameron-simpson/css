@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Dispatch email with SMTP.
-#	- Cameron Simpson <cs@zip.com.au> 4aug2000
+#	- Cameron Simpson <cs@cskk.id.au> 4aug2000
 #
 
 BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__);

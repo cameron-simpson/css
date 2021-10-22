@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Multi-I/O: play games with select() to handle multiple input/output streams
-# efficiently.	- Cameron Simpson <cs@zip.com.au>, 29aug94
+# efficiently.	- Cameron Simpson <cs@cskk.id.au>, 29aug94
 #
 # A stream is essentially a buffer with a method to add data and retrieve
 # data. The buffer may be either a flat character buffer, in which case

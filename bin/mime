@@ -2,7 +2,7 @@
 #
 # Parse MIME messages.
 # Currently a debugging tool.
-#	- Cameron Simpson <cs@zip.com.au> 04jun98
+#	- Cameron Simpson <cs@cskk.id.au> 04jun98
 #
 
 use cs::MIME;

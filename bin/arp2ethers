@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read arp -a output and emit /etc/ethers format.
-#	- Cameron Simpson <cs@zip.com.au> 01sep1995
+#	- Cameron Simpson <cs@cskk.id.au> 01sep1995
 #
 
 ($cmd=$0) =~ s:.*/::;

@@ -1,0 +1,2 @@
+bugfix MultiOpenMixin finalise logic and other small logic fixes and checs
+new class RunState for tracking or controlling a running task

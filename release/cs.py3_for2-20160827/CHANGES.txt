@@ -1,0 +1,6 @@
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.{py3,py3_for2,py3_for3}: distinct source files for python 2/3 syntax differences
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3: add exec_code for py3 exec() function with implementations in cs.py3for_2 and cs.py3_for3
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3: move python 2 bytes class into cs.py3_for2, no longer subclasses list; add BytesFile - identity in python3, wrapper for binary files with bytes-flavoured methods in python2
+  lib/python/cs/py3_for2.py: cs.py3_for2: bytes: add .join static method
+  lib/python/cs/py3_for2.py: cs.py3_for2: definitions for pack and unpack wrapping stdlib versions from struct module
+  lib/python/cs/py3.py lib/python/cs/py3_for2.py lib/python/cs/py3_for3.py: cs.py3,py3_for2,py3_for3: connect the dots for PyPI release

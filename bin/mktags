@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Usage: mktags [-v] files... | sort -u > vi-tags
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::Source;

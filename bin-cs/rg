@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Recursive "g".
-#	- Cameron Simpson <cs@zip.com.au> 07aug2001
+#	- Cameron Simpson <cs@cskk.id.au> 07aug2001
 #
 
 cmd=$0

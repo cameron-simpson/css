@@ -1,0 +1,21 @@
+  lib/python/cs/progress.py: cs.progress: Progress: a progress tracking class on which progress meters etc may be built
+  lib/python/cs/progress.py: cs.progress: Progress: new CheckPoint namedtuple for progress points, bugfix progress point initialisation
+  lib/python/cs/progress.py: cs.progress: Progress: bugfix initialisation of .start; invoke unit tests if __main__
+  lib/python/cs/progress.py: cs.progress: Progress: add ._flush method to discard old CheckPoints, ._flushed flag which is cleared by .update, and cause .throughput to call ._flush if the flag is false
+  lib/python/cs/progress.py: cs.progress: Progress: accept optional `name` parameter
+  lib/python/cs/progress.py: cs.progress: Progress: assorted bugfixes, warning removed
+  lib/python/cs/progress.py: cs.progress: Progress: use a list instead of a deque, improve efficiency of ._flush, redo throughput computation
+  lib/python/cs/progress.py: cs.progress: Progress: return 0 for throughput edge cases instead of None - that way the value is always numeric
+  lib/python/cs/progress.py: cs.progress: Progress: a progress tracking class on which progress meters etc may be built
+  lib/python/cs/progress.py: cs.progress: Progress: new .advance method to add to the existing position, a relative version of .update
+  lib/python/cs/progress.py: cs.progress: new class ProgressWriter: proxy for a file that updates a Progress as writes are done
+  lib/python/cs/progress.py: merge default ==> metaproxy
+  lib/python/cs/progress.py: merge default ==> metaproxy
+  lib/python/cs/progress.py: cs.progress: ProgressWriter: fix subclassing; make ProgressWriter.write return the value from fp.write and advance the Progress by that value if not None, otherwise by len(data); update docstrings
+  lib/python/cs/progress.py: cs.progress: Progress: support += and also assignment to .position
+  lib/python/cs/progress.py: merge default ==> beyonwiz
+  lib/python/cs/progress.py: cs.*: import X from cs.x instead of cs.logutils
+  lib/python/cs/progress.py: my email address has changed - update Python code
+  lib/python/cs/progress.py: cs.progress,cs.app.metaproxy: move ProgressWriter to cs.app.metaproxy, might never be used elsewhere or better served as a mixin
+  lib/python/cs/progress.py: cs.progress: Progress: add .latest property, add .notify_update set of notify(Porgress,CheckPoint) callables, clean lint
+  lib/python/cs/progress.py: cs.progress: PyPI rep, simple doctest, __str__ and __repr__

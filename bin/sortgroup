@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Read UNIX group file, emit in gid order with group members sorted.
-#	- Cameron Simpson <cs@zip.com.au> 12dec97
+#	- Cameron Simpson <cs@cskk.id.au> 12dec97
 #
 
 while (<>)

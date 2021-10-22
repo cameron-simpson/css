@@ -1,0 +1,1 @@
+@cachedmethod: tighten up the "is the value changed" try/except.

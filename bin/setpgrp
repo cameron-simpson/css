@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Run a command as process group leader.
 # This is handy for sginalling it and its descendants as a group.
-#       - Cameron Simpson <cs@zip.com.au> 25jul2013
+#       - Cameron Simpson <cs@cskk.id.au> 25jul2013
 #
 
 import os

@@ -5,7 +5,7 @@
 #	- setgid dirs
 #	- optionally, group rights to user rights
 #       - optionally, other rights minus write permission
-# - Cameron Simpson <cs@zip.com.au> 27sep2000
+# - Cameron Simpson <cs@cskk.id.au> 27sep2000
 #
 
 set -ue

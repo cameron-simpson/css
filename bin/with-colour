@@ -1,8 +1,10 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Perform command with output in particular colour.
-#       - Cameron Simpson <cs@zip.com.au> 08jul2007
+# - Cameron Simpson <cs@cskk.id.au> 08jul2007
 #
+
+set -ue
 
 : ${WITH_COLOUR_ON:=''}
 
@@ -28,41 +30,33 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+exec 3>&2 2>/dev/null
 on= off=
 case $colour in
-  normal)
-    on= off= ;;
-  reverse|standout|bold)
-    on=`tput smso` && off=`tput rmso` ;;
-  it|italic)
-    on=`tput sitm` && off=`tput ritm` ;;
+  normal)   on= ;;
+  bold)     on=`tput bold`&& off=`tput sgr0` ;;
+  reverse)  on=`tput rev` && off=`tput sgr0` ;;
+  standout) on=`tput smso` && off=`tput rmso` ;;
+  it|italic)on=`tput sitm` && off=`tput ritm` ;;
   ul|underline)
-    on=`tput smul` && off=`tput rmul` ;;
-  sl|status)
-    on=`tput tsl` && off=`tput fsl` ;;
-  black)
-    on=`tput setaf 0 || tput setf 0` && off=`tput op` ;;
-  red)
-    on=`tput setaf 1 || tput setf 4` && off=`tput op` ;;
-  green)
-    on=`tput setaf 2 || tput setf 2` && off=`tput op` ;;
-  yellow)
-    on=`tput setaf 3 || tput setf 6` && off=`tput op` ;;
-  blue)
-    on=`tput setaf 4 || tput setf 1` && off=`tput op` ;;
-  magenta)
-    on=`tput setaf 5 || tput setf 5` && off=`tput op` ;;
-  cyan)
-    on=`tput setaf 6 || tput setf 3` && off=`tput op` ;;
-  white)
-    on=`tput setaf 7 || tput setf 7` && off=`tput op` ;;
-  *)
-    echo "$cmd: unsupported colour \"$colour\"" >&2
-    ;;
-esac
+            on=`tput smul` && off=`tput rmul` ;;
+  sl|status)on=`tput tsl` && off=`tput fsl` ;;
+  black)    on=`tput setaf 0 || tput setaf 0 0 0 || tput setf 0` ;;
+  red)      on=`tput setaf 1 || tput setaf 1 0 0 || tput setf 4` ;;
+  green)    on=`tput setaf 2 || tput setaf 2 0 0 || tput setf 2` ;;
+  yellow)   on=`tput setaf 3 || tput setaf 3 0 0 || tput setf 6` ;;
+  blue)     on=`tput setaf 4 || tput setaf 4 0 0 || tput setf 1` ;;
+  magenta)  on=`tput setaf 5 || tput setaf 5 0 0 || tput setf 5` ;;
+  cyan)     on=`tput setaf 6 || tput setaf 6 0 0 || tput setf 3` ;;
+  white)    on=`tput setaf 7 || tput setaf 7 0 0 || tput setf 7` ;;
+  *)        echo "$cmd: warning: unsupported colour: $colour" >&2 ;;
+esac || on=
+exec 2>&3 3>&-
 
-# no sequence? just run the command
+# no "on" sequence? just run the command
 [ -n "$on" ] || exec "$@"
+# no "off"? restore original colour pair
+[ -n "$off" ] || off=`tput op`
 
 xit=0
 printf "%s" "$on"

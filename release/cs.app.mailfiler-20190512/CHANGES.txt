@@ -1,0 +1,11 @@
+lib/python/cs/app/mailfiler_tests.py: cs.**_tests: autoformat with yapf
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: WatchedMaildir.__str__: handle early call when _rules is None
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: module docstring improvements, add "Topic :: Communications :: Email :: Filters" classifier
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: autoformat
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: a little formatting, add a missing docstring
+lib/python/cs/app/mailfiler.1.md lib/python/cs/app/mailfiler.5.md: cs/app/mailfiler.{1,5}.md: copied from .pod manuals as markdown prototypes, as yet untranslated
+lib/python/cs/app/mailfiler.1.md lib/python/cs/app/mailfiler.5.md: mailfiler.1.md,mailfiler.5.md: translate POD to Markdown
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler; initial implementation of support for keeping a filed message in the source folder, untested
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: fix some lint, add some docstrings
+lib/python/cs/app/mailfiler.5.md: mailfiler.5.md: document a target of "." as though to file in the current folder, special mode to not move the message
+lib/python/cs/app/mailfiler.py: cs.app.mailfiler: promote $DEFAULT to a list of targets, fix up implementation of save-to-self "." target

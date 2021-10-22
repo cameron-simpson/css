@@ -1,0 +1,143 @@
+#!/bin/sh
+#
+# Lint the named files.
+# - Cameron Simpson <cs@cskk.id.au> 22apr2017
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+quick=
+pymode=3
+pyflakes2=pyflakes-2.7
+pyflakes3='python3 -m pyflakes'
+pylint2=pylint-2.7
+pylint3='python3 -m pylint'
+pyiclint=pyicontract-lint
+pycodestyle_ignore=E111,E114,E124,E125,E126,E129,E201,E202,E127,E221,E226,E227,E265,E266,E301,E302,E305,E501,E731,W503,W504
+pylint_disable=bad-whitespace,bad-indentation,bad-continuation,invalid-name,useless-object-inheritance
+pylintrc=$( findup .pylintrc || echo "$HOME/.pylintrc" )
+shellcheck_exclusions=SC1007,SC2244,SC2250
+
+cmd=$0
+usage="Usage: $cmd [-2] [-3] filenames...
+  -2    Use Python 2 for Python linting.
+  -3    Use Python 3 for Python linting.
+  -q    Quick. Skip the more expensive lints."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -2) pymode=2 ;;
+    -3) pymode=3 ;;
+    -q) quick=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing filenames" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case $pymode in
+  2)    python=python2 pycodestyle=pycodestyle pyflakes=$pyflakes2 pylint=$pylint2 ;;
+  3)    python=python3 pycodestyle=pycodestyle pyflakes=$pyflakes3 pylint=$pylint3 ;;
+  *)    echo "$cmd: unsupported \$pymode \"$pymode\"" >&2
+        exit 1
+        ;;
+esac
+
+xit=0
+
+for lintfile
+do
+  type=
+  magic=
+  case "$lintfile" in
+    [a-z]*:*)
+      type=$( expr "x$lintfile" : 'x\([a-z][^:]*\):.*' )
+      tail=$( expr "x$lintfile" : 'x[a-z][^:]*:\(.*\)' )
+      [ -f "$tail" ] && lintfile=$tail
+      ;;
+  esac
+  if [ -z "$type" ]
+  then
+    case "$lintfile" in
+      *.js | *.json | *.go | *.php | *.py | *.pl )
+        type=$( expr "x$lintfile" : 'x.*\.\([a-z][a-z0-9]*\)' )
+        ;;
+      *.pm )
+        type=pl
+        ;;
+    esac
+  fi
+  if [ -z "$type" ] && magic=$( file "$lintfile" )
+  then
+    case "$magic" in
+      *'perl script'*)
+            type=pl ;;
+      *[Pp]'ython script'* | *'python3 script'* )
+            type=py ;;
+      *'POSIX shell script'* | *'Bourne-Again shell script'* )
+            type=sh ;;
+    esac
+  fi
+  [ -n "$type" ] || {
+    echo "$cmd: $lintfile: skipping unknown type (magic=$magic)" >&2
+    continue
+  }
+
+  case "$type" in
+    json)
+      $trace json-pprint <"$lintfile" >/dev/null 2>&1 || xit=1
+      ;;
+    go)
+      $trace go tool vet -all -shadowstrict "$lintfile" || xit=1
+      ;;
+    php)
+      { $trace php -l "$lintfile" \
+        && $trace phpcs --standard=PSR2 --report=emacs "$lintfile"
+      } || xit=1
+      ;;
+    py)
+      if $trace $python -We:invalid -m py_compile "$lintfile"
+      then
+        $trace $pyflakes "$lintfile" || xit=1
+        [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
+        [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        [ $quick ] || $trace $pyiclint "$lintfile" || xit=1
+      else
+        xit=1
+      fi
+      ;;
+    py2)
+      if $trace python2 -m py_compile "$lintfile"
+      then
+        $trace $pyflakes2 "$lintfile" || xit=1
+        [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
+        [ $quick ] || $trace $pylint2 "--disable=$pylint_disable" "$lintfile" || xit=1
+      else
+        xit=1
+      fi
+      ;;
+    sh)
+      $trace shellcheck -o all "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
+      ;;
+    *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
+      ;;
+  esac
+done
+
+exit $xit

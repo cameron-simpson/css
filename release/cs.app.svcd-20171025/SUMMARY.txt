@@ -1,0 +1,1 @@
+New "-F flag,..." option for svcd. Improve stop logic. Other small fixes.

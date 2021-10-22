@@ -2,7 +2,7 @@
 #
 # Fire up port forwarding ssh on demand.
 # To be run as handler for tcpio to forward traffic as needed.
-#	- Cameron Simpson <cs@zip.com.au> 16jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 16jul2005
 #
 
 : ${HOSTNAME:=`hostname`}

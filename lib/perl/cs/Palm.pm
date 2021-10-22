@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # cs::Palm: general Palm Pilot stuff
-#	- Cameron Simpson <cs@zip.com.au> 16may2000
+#	- Cameron Simpson <cs@cskk.id.au> 16may2000
 #
 
 =head1 NAME
@@ -163,7 +163,7 @@ cs::Date(3), cs::Palm::PDB(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

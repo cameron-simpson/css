@@ -1,2 +1,12 @@
 #!/bin/sh
-exec netstat -an ${1+"$@"}
+#
+# Shortcut for "netstat -an" with optional grepping.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+if [ $# = 0 ]
+then
+  netstat -an ${1+"$@"} | hostsify
+else
+  nan | grepall -H -H -- "$@"
+fi

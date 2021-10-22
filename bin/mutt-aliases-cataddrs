@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Emit all the addresses for a particular category.
-#       - Cameron Simpson <cs@zip.com.au> 18mar2007
+#       - Cameron Simpson <cs@cskk.id.au> 18mar2007
 #
 
 [ $# = 0 ] && { echo "Usage: $0 categories..." >&2; exit 2; }

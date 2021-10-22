@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Queue a fetch with ydl. If there's a ydld running, use it, otherwise
+# run ydl directly.
+# - Cameron Simpson <cs@cskk.id.au> 15jun2020
+#
+
+set -ue
+
+dldir=${DL:-$HOME/dl}/v
+[ -d "$dldir" ] || set-x mkdir "$dldir"
+cd "$dldir"
+
+if ifpid "$PWD/.ydld.pid"
+then
+    for url
+    do
+        printf '%s\n' "$url" >> .ydld-queue
+    done
+else
+    set -x
+    exec ydl ${1+"$@"}
+fi

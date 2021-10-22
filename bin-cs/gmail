@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Open Gmail composition window with subject and addresses.
-#   - Cameron Simpson <cs@zip.com.au> 03dec2014
+#   - Cameron Simpson <cs@cskk.id.au> 03dec2014
 #
 
 set -ue

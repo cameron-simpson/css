@@ -2,7 +2,7 @@
 #
 # Convert a maildir into a compressed mbox file.
 # Intended for archived email.
-#       - Cameron Simpson <cs@zip.com.au> 04nov2006
+#       - Cameron Simpson <cs@cskk.id.au> 04nov2006
 #
 
 : ${TMPDIR:=$HOME/tmp}

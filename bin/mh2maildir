@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Convert an MH folder into a Maildir folder.
-#	- Cameron Simpson <cs@zip.com.au> 07jul2004
+#	- Cameron Simpson <cs@cskk.id.au> 07jul2004
 #
 
 : ${TMPDIR:=/tmp}

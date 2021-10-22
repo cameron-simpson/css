@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Kill the process holding a lock.
-#	- Cameron Simpson <cs@zip.com.au> 13jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 13jul2000
 # -f: remove the lock anyway.
 #
 

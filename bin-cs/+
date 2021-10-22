@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Open a mail folder on my home machine.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+exec @home mailfolder -T ${1+"$@"}

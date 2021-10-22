@@ -1,26 +1,31 @@
 #!/bin/sh
 #
 # Add new email addresses from a mail message.
-#       - Cameron Simpson <cs@zip.com.au> 26apr2008
+#       - Cameron Simpson <cs@cskk.id.au> 26apr2008
 #
 
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-tmux] category <message"
+usage="Usage: $cmd [-tmux] [-quick] category <message"
 
 : ${TMPDIR:=/tmp}
 
 set -x
 tmuxbg=
+quick=
 
 badopts=
 
-if [ $# -gt 0 ] && [ "x$1" = x-tmux ]
-then
-  tmuxbg=1
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -tmux)  tmuxbg=1 ;;
+    -quick) quick=1 ;;
+    *)      break ;;
+  esac
   shift
-fi
+done
 
 if [ $# = 0 ]
 then
@@ -50,8 +55,14 @@ fi
 : ${MAILDB:=$HOME/rc/mail/db.csv}
 export MAILDB
 
-set -x
-maildb -m "$MAILDB" learn-addresses --ungrouped "$category"
-( maildb -m "$MAILDB" list-groups -AG
-  maildb -m "$MAILDB" list-abbreviations -A
-) | rewriteif -d "$HOME/rc/mutt/aliases-auto"
+if [ $quick ]
+then
+  set -x
+  cs-maildb-add-email-quick "$category"
+else
+  set -x
+  maildb -m "$MAILDB" learn-addresses --ungrouped "$category"
+  ( maildb -m "$MAILDB" list-groups -AG
+    maildb -m "$MAILDB" list-abbreviations -A
+  ) | rewriteif -d "$HOME/rc/mutt/aliases-auto"
+fi

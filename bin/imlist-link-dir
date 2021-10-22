@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Populate a directory with symlinks to images chosen with imlist-pick.
-#   - Cameron Simpson <cs@zip.com.au> 13oct2015
+#   - Cameron Simpson <cs@cskk.id.au> 13oct2015
 #
 
 set -ue

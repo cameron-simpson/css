@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Pop up a Python PEP.
-#       - Cameron Simpson <cs@zip.com.au> 16feb2009
+#       - Cameron Simpson <cs@cskk.id.au> 16feb2009
 #
 
 [ $# = 0 ] && { echo "Usage: $0 keys..." >&2; exit 2; }

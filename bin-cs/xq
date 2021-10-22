@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Query or hack the live X resource db.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 : ${TMPDIR:=/tmp}

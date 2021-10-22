@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Core facilities for browsing web pages.
-#	- Cameron Simpson <cs@zip.com.au> 20oct99
+#	- Cameron Simpson <cs@cskk.id.au> 20oct99
 #
 
 use strict qw(vars);

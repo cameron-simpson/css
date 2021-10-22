@@ -1,0 +1,1 @@
+New Result.bg(func, *a, **kw) method to dispatch function in separate Thread to compute the Result value.

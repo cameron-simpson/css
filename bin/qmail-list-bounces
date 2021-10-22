@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # List qmail message numbers of queued bounces.
-#       - Cameron Simpson <cs@zip.com.au> 19may2008
+#       - Cameron Simpson <cs@cskk.id.au> 19may2008
 #
 
 qmail-qread \

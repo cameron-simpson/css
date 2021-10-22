@@ -1,0 +1,4 @@
+  lib/python/cs/x.py: cs.x: my X() debugging function and associated globals X_logger and X_via_tty, pulled from cs.logutils
+  lib/python/cs/x.py: cs.x: X(): tighter implementation of file= parameter, document the modes in the docstring
+  lib/python/cs/x.py: cs.x: handler for no /dev/tty, falls back to sys.stderr
+  lib/python/cs/x.py: cs.x: DISTINFO for release

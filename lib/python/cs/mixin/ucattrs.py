@@ -9,6 +9,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'install_requires': [],
 }
 
 class WithUC_Attrs(object):

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Locate mail files not starting with "From ". Used after a crash.
-#	- Cameron Simpson <cs@zip.com.au> 15jan98
+#	- Cameron Simpson <cs@cskk.id.au> 15jan98
 #
 
 mspool=/var/spool/mail

@@ -10,7 +10,7 @@
 #	command args...
 # with the environment variable $CONTEXTVAR set to path-to-module.
 # Which is useful more often that you might think.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 # 
 
 cmd=$0

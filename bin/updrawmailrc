@@ -1,7 +1,7 @@
 #!/opt/bin/perl
 #
 # Update mailrc.rawdb.
-#	- Cameron Simpson <cs@zip.com.au> 22may98
+#	- Cameron Simpson <cs@cskk.id.au> 22may98
 #
 
 use strict qw(vars);

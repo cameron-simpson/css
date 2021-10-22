@@ -2,6 +2,6 @@
 #
 # An idset based on UUIDs. Initially to decide mount options for
 # removable media.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 exec idset -i uuids ${1+"$@"}

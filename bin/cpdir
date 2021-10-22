@@ -2,17 +2,22 @@
 #
 # Copy a directory tree - refuse if target exists as safety measure.
 # Faster, safer, more accurate and more informative than "cp -rp".
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
-cmd=`basename "$0"` || exit 1
+cmd=$( basename "$0" ) || exit 1
 
-bsize=20
+trace=
+[ -t 2 ] && trace=set-x
+
+bsize=2048      # 1MB=2048x512, was 20
 [ $# -gt 0 ] && [ "x$1" = x-b ] && { bsize=$2; shift; shift; }
 
+bsize_bs=$( expr 512 \* "$bsize" )
+
 [ $# = 2 ] || { echo "Usage: $cmd [-b bsize] fromdir todir" >&2
-		exit 2
-	      }
+        exit 2
+          }
 from=$1
 to=$2
 
@@ -21,19 +26,20 @@ to=$2
 
 case $ARCH in
     *.*.domainos) # preserve ACLs
-	exec /com/cpt "$from" "$to" -pdt -sacl -ld
-	;;
-    *)	( cd "$from/." || exit 1
+        exec /com/cpt "$from" "$to" -pdt -sacl -ld
+        ;;
+    *)  ( cd "$from/." || exit 1
           case $ARCH in
             *.linux)
-              exec tar -c -B -b "$bsize" -f - .
+              exec $trace tar -c -B -b "$bsize" -f - .
               ;;
-            *)exec tar cBbf "$bsize" - .
+            *)exec $trace tar cBbf "$bsize" - .
               ;;
           esac
-	) \
-	| ( mkdir "$to" && cd "$to" && untar -b "$bsize" )
-	;;
+    ) \
+    | $trace prcat -b "$bsize_bs" \
+    | ( $trace mkdir "$to" && cd "$to" && $trace untar -b "$bsize" )
+    ;;
 esac
 
 sync &

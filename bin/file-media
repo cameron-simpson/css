@@ -1,8 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # File media files according to metadata, used to maintain the home
 # media library incrementally.
-#   - Cameron Simpson <cs@zip.com.au> 04sep2015
+#   - Cameron Simpson <cs@cskk.id.au> 04sep2015
 #
 
 from __future__ import print_function

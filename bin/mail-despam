@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Spam filter every item in an MH or maildir folder.
-#	- Cameron Simpson <cs@zip.com.au> 26mar2004
+#	- Cameron Simpson <cs@cskk.id.au> 26mar2004
 # 
 
 : ${MAILDIR:=$HOME/mail}

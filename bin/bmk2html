@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Transcribe my bookmarks to HTML.
-#	- Cameron Simpson <cs@zip.com.au> 16jun2005
+#	- Cameron Simpson <cs@cskk.id.au> 16jun2005
 #
 
 : ${BMK_DIR:=$HOME/rc/bmk}

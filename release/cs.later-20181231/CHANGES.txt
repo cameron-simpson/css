@@ -1,0 +1,17 @@
+  lib/python/cs/later.py: cs.later: docstring tweaks
+  lib/python/cs/later.py: cs.later: new SubLater class to provide a grouping for deferred functions and an iteration to collect them as they complete.
+  lib/python/cs/later.py: cs.later: LatePool: docstring reformat
+  lib/python/cs/later.py: cs.later: drop WorkerThreadPool (leaks idle Threads, brings little benefit); tweak LateFunction.__str__
+  lib/python/cs/later.py: cs.later: Later.compete: update docstring
+  lib/python/cs/later.py: cs.later: Later: note a TODO to drop the dispatch Thread for a submit/complete poll of pending functions; tweak a docstring
+  lib/python/cs/later.py: cs.later: modify a bunch of docstrings and record some TODOs, make default LateFunction name more compact
+  lib/python/cs/later.py: cs.later: LateFunction: _dispatch: replace code with trite call to Result.bg
+  lib/python/cs/later.py: cs.later: SubLater: fix some references to self._later
+  lib/python/cs/later.py: cs.later: SubLater: new method .reaper: dispatch a thread to collect completed LateFunctions, optionally passing each to a handler
+  lib/python/cs/later.py: cs.later: Later: drop worker queue thread and semaphore, just try a dispatch on submit or complete; also drop tracking code, detab, tweak some docstrings
+  lib/python/cs/later.py: cs.later: drop capacity context manager, never used
+  lib/python/cs/later.py: cs.later: clean some lint
+  lib/python/cs/later.py: cs.later: Later: tweak debug message and docstring
+  lib/python/cs/later.py: cs.later: LateFunction._complete: use error(...,exc_info=) instead of exception()
+  lib/python/cs/later.py: cs.later: Later._try_dispatch: debug logging for dispatch and for no dispatch because of capacity
+  lib/python/cs/later.py: merge default ==> pypi

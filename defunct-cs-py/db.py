@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Assorted database routines and classes.
-#       - Cameron Simpson <cs@zip.com.au> 23dec2005
+#       - Cameron Simpson <cs@cskk.id.au> 23dec2005
 #
 # OBSOLETE: I pretty much use SQLalchemy for all this these days.
 #

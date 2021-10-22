@@ -2,20 +2,20 @@
 #
 # Trivial convenience wrapper for the essential iview-python tool:
 #  https://github.com/vadmium/python-iview
-# Cameron Simpson <cs@zip.com.au>
+# Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import print_function, absolute_import
-import os
-import sys
-import datetime
-import json
-import re
-import subprocess
-from io import TextIOWrapper
 from collections import namedtuple
-from cs.cmdutils import run, pipefrom
-from cs.logutils import setup_logging, error, warning, info, Pfx, X
+import datetime
+import errno
+import json
+import os
+import os.path
+import re
+import sys
+from cs.psutils import run, pipefrom
+from cs.logutils import setup_logging, error, warning, info, Pfx
 
 USAGE = '''Usage:
   %s {download|dl} {file|/regexp/}...
@@ -25,6 +25,73 @@ USAGE = '''Usage:
   %s meta [/regexp/]
                 Print metadata about selected programmes.
   %s programme  Return the full output of iview-cli --programme.'''
+
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+  cmd = os.path.basename(argv.pop(0))
+  usage = USAGE % (cmd, cmd, cmd, cmd)
+  setup_logging(cmd)
+  badopts = False
+  if not argv:
+    op = 'programme'
+  elif argv[0].startswith('/'):
+    op = 'ls'
+  else:
+    op = argv.pop(0)
+  xit = 0
+  if not badopts:
+    with Pfx(op):
+      if op == 'ls':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for iinfo in matches:
+          iinfo.print()
+      elif op == 'meta':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for iinfo in matches:
+          meta = {}
+          for attr in iinfo._fields:
+            meta[attr] = getattr(iinfo, attr)
+          for attr in 'series_number', 'episode_number', 'date':
+            value = getattr(iinfo, attr)
+            if value is None:
+              continue
+            if isinstance(value, datetime.date):
+              value = value.strftime('%Y-%m-%d')
+            meta[attr] = value
+          filename = os.path.basename(iinfo.url)
+          print(filename, json.dumps(meta, sort_keys=True), sep='\t')
+      elif op == 'programme':
+        if argv:
+          warning('extra arguments: %r', argv)
+          badopts = True
+        else:
+          xit = run(['iview-cli', '--programme'], logger=True)
+      elif op == 'download' or op == 'dl':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        xit = 0
+        for iinfo in matches:
+          with Pfx(iinfo):
+            if iinfo.fetch(overwrite=False, make_mp4=True) != 0:
+              error('fetch fails')
+              xit = 1
+      else:
+        warning('unrecognised operator')
+        badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    xit = 2
+  return xit
+
 
 _IViewInfo = namedtuple('IViewInfo', 'title episode url')
 
@@ -53,9 +120,9 @@ class IViewInfo(_IViewInfo):
         return int(ss)
     ep_words = self.episode.lower().split()
     if ( len(ep_words) >= 4
-     and ep_words[0] == 'series'
-     and ep_words[1].isdigit()
-       ):
+        and ep_words[0] == 'series'
+        and ep_words[1].isdigit()
+    ):
       return int(ep_words[1])
 
   @property
@@ -69,11 +136,11 @@ class IViewInfo(_IViewInfo):
         return int(ep)
     ep_words = self.episode.lower().split()
     if ( len(ep_words) >= 4
-     and ep_words[0] == 'series'
-     and ep_words[1].isdigit()
-     and ep_words[2] == 'episode'
-     and ep_words[3].isdigit()
-       ):
+        and ep_words[0] == 'series'
+        and ep_words[1].isdigit()
+        and ep_words[2] == 'episode'
+        and ep_words[3].isdigit()
+    ):
       return int(ep_words[3])
 
   @property
@@ -108,14 +175,14 @@ class IViewInfo(_IViewInfo):
           xit = 0
         else:
           argv = ['iview-cli', '-d', url]
-          xit = run(argv, trace=True)
+          xit = run(argv, logger=True)
           if xit != 0:
             error("nonzero exit from %r: %d", argv, xit)
             with Pfx('remove %r', output_flv):
               try:
                 os.remove(output_flv)
               except OSError as e:
-                if e.errno != ENOENT:
+                if e.errno != errno.ENOENT:
                   error('%s', e)
               else:
                 info('removed')
@@ -126,14 +193,14 @@ class IViewInfo(_IViewInfo):
               warning('MP4 output exists, skipping conversion')
             else:
               argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
-              xit = run(argv, trace=True)
+              xit = run(argv, logger=True)
               if xit != 0:
                 error("nonzero exit from %r: %d", argv, xit)
                 with Pfx('remove %r', output_mp4):
                   try:
                     os.remove(output_mp4)
                   except OSError as e:
-                    if e.errno != ENOENT:
+                    if e.errno != errno.ENOENT:
                       error('%s', e)
                       xit = 1
                   else:
@@ -196,77 +263,11 @@ def iview_matches(matches):
     else:
       Rs.append(regexp_s)
   if Rs:
-    all_info = list(iview_info())
-    for info in all_info:
+    all_iinfo = list(iview_info())
+    for iinfo in all_iinfo:
       for R in Rs:
-        if info.match_re(R):
-          yield info
+        if iinfo.match_re(R):
+          yield iinfo
           break
-
-def main(argv):
-  cmd = argv.pop(0)
-  usage = USAGE % (cmd, cmd, cmd, cmd)
-  setup_logging(cmd)
-  badopts = False
-  if not argv:
-    op = 'programme'
-  elif argv[0].startswith('/'):
-    op = 'ls'
-  else:
-    op = argv.pop(0)
-
-  xit = 0
-  if not badopts:
-    with Pfx(op):
-      if op == 'ls':
-        if argv:
-          matches = iview_matches(argv)
-        else:
-          matches = iview_info()
-        for info in matches:
-          info.print()
-      elif op == 'meta':
-        if argv:
-          matches = iview_matches(argv)
-        else:
-          matches = iview_info()
-        for info in matches:
-          meta = {}
-          for attr in info._fields:
-            meta[attr] = getattr(info, attr)
-          for attr in 'series_number', 'episode_number', 'date':
-            value = getattr(info, attr)
-            if value is None:
-              continue
-            if isinstance(value, datetime.date):
-              value = value.strftime('%Y-%m-%d')
-            meta[attr] = value
-          filename = os.path.basename(info.url)
-          print(filename, json.dumps(meta, sort_keys=True), sep='\t')
-      elif op == 'programme':
-        if argv:
-          warning('extra arguments: %r', argv)
-          badopts = True
-        else:
-          xit = run(['iview-cli', '--programme'], trace=True)
-      elif op == 'download' or op == 'dl':
-        if argv:
-          matches = iview_matches(argv)
-        else:
-          matches = iview_info()
-        xit = 0
-        for info in matches:
-          with Pfx(info):
-            if info.fetch(overwrite=False, make_mp4=True) != 0:
-              error('fetch fails')
-              xit = 1
-      else:
-        warning('unrecognised operator')
-        badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    xit = 2
-  return xit
-
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

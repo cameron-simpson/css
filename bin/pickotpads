@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Pick some random pads from those available on the net.
-#	- Cameron Simpson <cs@zip.com.au> 24jul2000
+#	- Cameron Simpson <cs@cskk.id.au> 24jul2000
 #
 
 n=5

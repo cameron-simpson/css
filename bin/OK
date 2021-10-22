@@ -4,7 +4,7 @@
 # Report OK or FAIL on stdout.
 # If --count-regexp specified, count and strip matching lines and report
 #   {OK|FAIL} <count> words...
-# - Cameron Simpson <cs@zip.com.au> 24nov2010
+# - Cameron Simpson <cs@cskk.id.au> 24nov2010
 #
 
 set -ue

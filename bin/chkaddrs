@@ -2,7 +2,7 @@
 #
 # Check the IP addresses on a group of machines.
 # Report addresses on more than one machine.
-#       - Cameron Simpson <cs@zip.com.au> 14oct2006
+#       - Cameron Simpson <cs@cskk.id.au> 14oct2006
 #
 
 for host

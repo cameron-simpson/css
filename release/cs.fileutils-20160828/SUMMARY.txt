@@ -1,0 +1,14 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Rename maxFilenameSuffix to max_suffix.
+Pull in OpenSocket file-like socket wrapper from cs.venti.tcp.
+Update for cs.asynchron changes.
+... then move cs.fileutils.OpenSocket into new module cs.socketutils.
+New Tee class, for copying output to multiple files.
+NullFile class which discards writes (==> no-op for Tee).
+New class SavingFile to accrue output and move to specified pathname when complete.
+Memory usage improvements.
+Polyfill non-threadsafe implementation of pread if os.pread does not exist.
+New function seekable() to probe a file for seekability.
+SharedAppendFile: provide new .open(filemode) context manager for allowing direct file output for external users.
+New function makelockfile() presenting the logic to create a lock file separately from the lockfile context manager.
+Assorted bugfixes and improvements.

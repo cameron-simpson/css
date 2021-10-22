@@ -2,7 +2,7 @@
 #
 # Tidy up Subject: lines.
 # Strip multiple Re: stuff and [list] tags.
-#	- Cameron Simpson <cs@zip.com.au> 14feb2002
+#	- Cameron Simpson <cs@cskk.id.au> 14feb2002
 #
 
 :top

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Tests for cs.socketutils.
-#   - Cameron Simpson <cs@zip.com.au> 01nov2015
+#   - Cameron Simpson <cs@cskk.id.au> 01nov2015
 #
 
 import sys
@@ -11,6 +11,8 @@ import unittest
 from cs.socketutils import OpenSocket, bind_next_port
 
 class _TestOpenSocket(object):
+  ''' Base class for socket tests.
+  '''
 
   def setUp(self):
     self._setUp_sock12()
@@ -74,21 +76,27 @@ class _TestOpenSocket(object):
     self.fp1_w.close()
 
 class TestOpenSocket_socketpair(_TestOpenSocket, unittest.TestCase):
+  ''' Tests for a socket pair.
+  '''
 
   def _setUp_sock12(self):
     self.sock1, self.sock2 = socket.socketpair()
 
 class TestOpenSocket_TCP(_TestOpenSocket, unittest.TestCase):
+  ''' Tests for TCP sockets.
+  '''
 
   def _setUp_sock12(self):
     self.sock0 = socket.socket()
     self.sock0_port = bind_next_port(self.sock0, '127.0.0.1', 10000)
-    T = Thread(name='%s:server:listen(%d)' % (self._testMethodName, self.sock0_port),
-               target = self.accept_once)
+    T = Thread(
+        name='%s:server:listen(%d)' % (self._testMethodName, self.sock0_port),
+        target=self.accept_once
+    )
     self.sock0.listen(1)
     T.start()
     self.sock1 = socket.socket()
-    self.sock1.connect( ('127.0.0.1', self.sock0_port) )
+    self.sock1.connect(('127.0.0.1', self.sock0_port))
     T.join()
 
   def tearDown(self):

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Make/attach a logged screened root session on a host.
-#	- Cameron Simpson <cs@zip.com.au> 20may2002
+#	- Cameron Simpson <cs@cskk.id.au> 20may2002
 #
 
 cmd=$0

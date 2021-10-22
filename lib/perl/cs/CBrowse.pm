@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Curses-based browser, expects to be sub-classed.
-#	- Cameron Simpson <cs@zip.com.au> 20sep96
+#	- Cameron Simpson <cs@cskk.id.au> 20sep96
 #
 
 use strict qw(vars);

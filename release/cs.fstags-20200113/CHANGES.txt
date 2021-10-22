@@ -1,0 +1,5 @@
+lib/python/cs/fstags.py: cs.fstags: use the extended attribute "user.cs.fstags" to honour Linux namespace requirements ("user.")
+lib/python/cs/fstags.py: cs.fstags: getxattr: handle ENODATA
+lib/python/cs/fstags.py: cs.fstags: autoformat
+lib/python/cs/fstags.py: cs.fstags: add "filesize" to available tag string format (-o option)
+lib/python/cs/fstags.py: cs.fstags: TagSet.save: fix XATTR_CREATE vs XATTR_REPLACE logic - only CREATE if there was no old xattr (versus an empty one)

@@ -1,0 +1,15 @@
+cs.cdrip: discid tag is a row id, needs to be the libdiscid value
+ydl: issue alerts for completed downloads
+divert itunes cover tags to a file? they are very bulky
+moov.trak.mdia.minf.stbl.stsd.avc1 field decode
+moov.trak.mdia.minf.stbl.stsd.avc1 field decode
+mconvert: hook to rename converted media srcs to subdir, one for success, one for failure
+basic patch function post file parse, initially use to patch major_branch in mp4s from ffmpeg
+CornuCopyBuffer.bound context manager wrapping .bounded
+beyonwiz mconvert to accept -D to move done source files to new subdir named after result file
+cs.buffer: mmap mode
+cs.buffer: a mode to store consumed bytes to storage eg after a failed parse
+add Container box and mandatory checks to Box.self_check
+CornuCopyBuffer.skipto: accept Ellipsis for the end_offset, skip to end of input - may need special casing for tail-like iterators
+BoxList subclass of list, checks additions are Boxes
+iso14496: patch mode for Boxes: Box.patch(fp, new_box)

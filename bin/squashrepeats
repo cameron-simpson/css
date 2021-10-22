@@ -1,7 +1,7 @@
 #!/usr/bin/awk -f
 #
 # Collapse repeated messages much as syslog does.
-#       - Cameron Simpson <cs@zip.com.au> 22mar2008
+#       - Cameron Simpson <cs@cskk.id.au> 22mar2008
 #
 
                 { if ($0 == lastline) {

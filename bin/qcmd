@@ -8,7 +8,7 @@
 #
 # Example:
 #	qcmd -1 ssh xo:fnt -o foo -t host command 'arg with spaces'
-#	- Cameron Simpson <cs@zip.com.au> 22apr2001
+#	- Cameron Simpson <cs@cskk.id.au> 22apr2001
 #
 
 use strict qw(vars);

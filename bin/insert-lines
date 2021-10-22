@@ -2,7 +2,7 @@
 #
 # Insert lines from stdin into a file after a marker line identified by a
 # regexp.
-#	- Cameron Simpson <cs@zip.com.au> 01aug2004
+#	- Cameron Simpson <cs@cskk.id.au> 01aug2004
 #
 
 : ${TMPDIR:=/tmp}

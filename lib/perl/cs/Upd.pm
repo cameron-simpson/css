@@ -3,7 +3,7 @@
 # Simple line update routine; assumes \r and \b
 # do carriage return and non-destructive backspace.
 # Assumes 8 character tabs.
-#	- Cameron Simpson, cs@zip.com.au, DoD#743
+#	- Cameron Simpson, cs@cskk.id.au, DoD#743
 #
 # Added tput code and \r optimisation. - Cameron, 08dec93
 # Made into a module.		       - Cameron, 15may96
@@ -492,7 +492,7 @@ sub die { err(@_); }
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

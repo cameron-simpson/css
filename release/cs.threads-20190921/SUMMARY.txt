@@ -1,0 +1,1 @@
+New PriorityLock class for a mutex which releases in (priority,fifo) order.

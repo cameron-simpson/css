@@ -2,7 +2,7 @@
 #
 # Make 640x480 14 colour gzipped XPM image from a JPEG for use as grub splash
 # backdrop.
-#	- Cameron Simpson <cs@zip.com.au> 15jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 15jul2002
 #
 # See also:
 #	http://ruslug.rutgers.edu/~mcgrof/grub-images/

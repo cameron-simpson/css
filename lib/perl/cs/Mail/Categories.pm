@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Miscellaneous mail things.
-#	- Cameron Simpson <cs@zip.com.au> 24jun99
+#	- Cameron Simpson <cs@cskk.id.au> 24jun99
 #
 
 use strict qw(vars);

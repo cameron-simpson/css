@@ -3,7 +3,7 @@
 # Offer a list of files.
 # The common code from the bglist command, extracted to do generic selection
 # to support picking audio files.
-#	- Cameron Simpson <cs@zip.com.au> 01jun2002
+#	- Cameron Simpson <cs@cskk.id.au> 01jun2002
 #
 
 random=

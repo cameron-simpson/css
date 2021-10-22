@@ -20,7 +20,7 @@
 # Accordingly, since the Perl people can get this right (POD converts handily
 # to all sorts of stuff), here is info2pod, which can be piped to pod2man
 # to make manual entries.
-#	- Cameron Simpson <cs@zip.com.au> 14nov1999
+#	- Cameron Simpson <cs@cskk.id.au> 14nov1999
 #
 # Request from Hamish Macintyre <h.macintyre@ic.ac.uk> for this.
 # Real coding begins.	- 20sep2000

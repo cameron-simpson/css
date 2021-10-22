@@ -1,0 +1,2 @@
+  lib/python/cs/binary.py: cs.binary: indent example/doctest to mark markdown treat it as code
+  lib/python/cs/binary.py: cs.binary: BytesesField.from_buffer: make use of the buffer's skipto method if discard_data is true, clean up some of the logic

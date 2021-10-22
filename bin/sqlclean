@@ -1,7 +1,7 @@
 #!/usr/bin/perl -pe
 #
 # Embed newlines in MySQL database dumps, for diffing.
-#	- Cameron Simpson <cs@zip.com.au> 24nov99
+#	- Cameron Simpson <cs@cskk.id.au> 24nov99
 #
 
 s//\),\(/),\n(/g;

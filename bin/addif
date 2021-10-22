@@ -2,7 +2,7 @@
 #
 # Add a logical interface with the specified address.
 # Allocates a fresh logical interface on the fly.
-#	- Cameron Simpson <cs@zip.com.au> 12may2005
+#	- Cameron Simpson <cs@cskk.id.au> 12may2005
 #
 
 set -ue
@@ -87,6 +87,7 @@ if [ -z "$netmask" ]
 then
   netmask=`ifconfig "$baseif" | sed -n 's/.* Mask:\([^ ]*\).*/\1/p' | sed 1q`
   [ -n "$netmask" ] || netmask=`ifconfig "$baseif" | sed -n 's/.* netmask \(0x[0-9a-f]*\).*/\1/p' | sed 1q`
+  [ -n "$netmask" ] || netmask=`ifconfig "$baseif" | sed -n 's/.* netmask \([1-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | sed 1q`
   [ -n "$netmask" ] || { echo "$cmd: can't deduce netmask for $baseif" >&2
 			 exit 1
 		       }

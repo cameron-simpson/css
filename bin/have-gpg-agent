@@ -1,9 +1,0 @@
-#!/bin/sh
-#
-# Test whether we have a gpg-agent to hand.
-#	- Cameron Simpson <cs@zip.com.au> 30mar2005
-#
-
-[ -n "$GPG_AGENT_INFO" ] || exit 1
-pid=`echo "$GPG_AGENT_INFO" | cut -d: -f2` || exit 1
-exec kill -0 "$pid" 2>/dev/null

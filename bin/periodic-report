@@ -1,8 +1,8 @@
-#!/usr/bin/env py26+
+#!/usr/bin/env python
 #
 # Read lines from the standard input. On a periodic basis, pipe them to
 # a subsidiary command.
-#       - Cameron Simpson <cs@zip.com.au> 26oct2008
+#       - Cameron Simpson <cs@cskk.id.au> 26oct2008
 #
 
 from __future__ import with_statement

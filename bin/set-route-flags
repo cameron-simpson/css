@@ -1,0 +1,63 @@
+#!/bin/sh
+#
+# Probe "netstat -rn" routes, set flags accordingly.
+#   - Cameron Simpson <cs@cskk.id.au> 02feb2015
+#
+
+set -ue
+
+trace=
+do_monitor=
+interval=7
+
+cmd=$0
+usage="Usage: $cmd [--monitor [interval]]"
+
+badopts=
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    -x) trace=set-x
+        ;;
+    --monitor)
+        shift
+        do_monitor=1
+        if [ $# -gt 0 ]
+        then
+          case "$1" in
+            [1-9]|[1-9]*[0-9])
+                interval=$1
+                shift
+                ;;
+            *)  echo "$cmd: invalid interval: $1" >&2
+                badopts=1
+                ;;
+          esac
+        fi
+        ;;
+    *)  echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $do_monitor ] && exec $trace loop -d "$interval" $trace "$0"
+
+set -- $( get-default-gateway )
+
+if [ $# = 0 ]
+then  flag ROUTE_DEFAULT && $trace flag ROUTE_DEFAULT 0
+else  flag ROUTE_DEFAULT || $trace flag ROUTE_DEFAULT 1
+fi
+
+for gw
+do
+  echo "$gw"
+done | tr . _  | flagset ROUTE_GW set-all
+
+netstat -rn \
+| sed -n '/^Internet:/,/^$/{ /^[1-9][^ ]* /!d; s/ .*//; y/./_/; s|/|__|; p; }' \
+| flagset ROUTE_TO set-all

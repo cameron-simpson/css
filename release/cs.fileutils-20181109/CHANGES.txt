@@ -1,0 +1,36 @@
+  lib/python/cs/fileutils.py: cs.*: update @contextmanager formalism to use try/finally for the cleanup phase
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile.file_data: fix reference to undefined variable; BackedFile_TestMethods: mention that these test self.backed_fp
+  lib/python/cs/fileutils.py: cs.fileutils: file_data: bugfix for nbytes is None case
+  lib/python/cs/fileutils.py: cs.fileutils: file_data: try to use the file's .read1 method if available, otherwise .read; update docstring and tweak signature
+  lib/python/cs/fileutils.py: cs.fileutils: ReadMixin: replace .read with superior method adapted from cs.vt.file.File.read, bugfix and improve; provide a new default .datafrom(offset) generator method which subclasses should consider overriding; drop read_natural, replaced by use of .datafrom
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile: drop .file_data method, provide .datafrom method for use by the ReadMixin
+  lib/python/cs/fileutils.py: cs.fileutils: drop fdreader, add datafrom(f, offset, readsize) accepting a file or a file descriptor, expose datafrom_fd; ReadMixin.datafrom now mandatory, with a requirement to not change the file offset, add ReadMixin.bufferfrom
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: by default, perform an initial read to align all subsequent reads with the readsize
+  lib/python/cs/fileutils.py: cs.fileutils: ReadMixin.read: streamline the logic, use an existing buffer as the current read offset, avoid spurious data copies for simple longreads
+  lib/python/cs/fileutils.py: cs.fileutils: backport to python 2
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: accept optional `runstate` parameter supporting cancellation of the lock attempt
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: run acquisition inside Pfx, simplify logging
+  lib/python/cs/fileutils.py: cs.fileutils: lockfile context manager: plumb `runstate` parameter, add Pfx around os.remove
+  lib/python/cs/fileutils.py: cs.fileutils: clean some lint
+  lib/python/cs/fileutils.py: cs.{buffer,fileutils}: get pread from cs.py3
+  lib/python/cs/fileutils.py: cs.fileutils: RWFileBlockCache: just use one file descriptor
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: remove debug
+  lib/python/cs/fileutils.py: merge default ==> venti
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom: open named files with mode="rb", improve docstring
+  lib/python/cs/fileutils.py: cs.fileutils: improve some docstrings
+  lib/python/cs/fileutils.py: cs.fileutils: ReadMixin: tweak docstring and debug message
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom: handle file objects of OS opens like OS file descrptiors, improve docstring; BackedFile.datafrom: fall back on cs.fileutils.datafrom for objects without their own datafrom attributes
+  lib/python/cs/fileutils.py: cs.fileutils: docstring format tweaks
+  lib/python/cs/fileutils.py: cs.fileutils: ReadMixin.read: back off a debug message a little
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: handle immediate abort from cancelled runstate, where start is None
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: fixup previous fix
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: improve warning message
+  lib/python/cs/fileutils.py: cs.fileutils: makelockfile: docstring reformat, clarify that there will be immediate failure if the RunState is cancelled on entry, clarify that a timeout=0 means the lock must be obtained on the first attempt
+  lib/python/cs/fileutils.py: cs.fileutils: bugfix BackedFile.datafrom: fetch chunks from that start of each span, not the original offset of the datafrom request
+  lib/python/cs/fileutils.py: cs.fileutils: docstring tweaks; convert an X() debug into an info() call
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom: open an OS file descriptor instead of a Python file if handed a string
+  lib/python/cs/fileutils.py: cs.fileutils: datafrom_fd: new optional maxlength parameter limiting the amount of data returned
+  lib/python/cs/fileutils.py: cs.fileutils: BackedFile.seek: simplify endpos computation
+  lib/python/cs/fileutils.py: cs.fileutils: some addition runtime sanity checks; tweak a unit test
+  lib/python/cs/fileutils.py: cs.fileutils: clean some lint
+  lib/python/cs/fileutils.py: cs.fileutils: fix up DISTINFO install_requires; various markdown changes to docstrings

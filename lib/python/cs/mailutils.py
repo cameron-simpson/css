@@ -1,27 +1,14 @@
 #!/usr/bin/python
 #
 # Convenience functions and classes to work with email.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 from __future__ import absolute_import
-
-DISTINFO = {
-    'description': "functions and classes to work with email",
-    'keywords': ["python2", "python3"],
-    'classifiers': [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 3",
-        ],
-    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
-}
-
 import email.message
 import email.parser
 from email.utils import getaddresses
 from io import StringIO
-from itertools import chain
 import mailbox
 import os
 import os.path
@@ -32,11 +19,34 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, exception, debug, D, X
-from cs.threads import locked_property
-from cs.seq import seq
+from cs.logutils import info, warning, exception, debug
+from cs.pfx import Pfx
 from cs.py3 import StringTypes
+from cs.seq import seq
+from cs.threads import locked_property
 
+__version__ = '20210306-post'
+
+DISTINFO = {
+    'description': "functions and classes to work with email",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.fileutils',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py3',
+        'cs.seq',
+        'cs.threads',
+    ],
+}
+
+# RFC5322 date-time format for use with datetime.strftime
+RFC5322_DATE_TIME = '%a, %d %b %Y %H:%M:%S %z'
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
 def shortpath(path, environ=None):
@@ -63,9 +73,10 @@ def message_addresses(M, header_names):
     hdrs = M.get_all(header_name, ())
     for hdr in hdrs:
       for realname, address in getaddresses( (hdr,) ):
-        if len(address) == 0:
-          debug("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
-                  header_names, header_name, hdr, realname, address)
+        if not address:
+          debug(
+              "message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
+              header_names, header_name, hdr, realname, address)
         else:
           yield realname, address
 
@@ -86,7 +97,7 @@ def modify_header(M, hdr, new_values, always=False):
     modified = True
     old_hdr = 'X-Old-' + hdr
     for old_value in old_values:
-      M.add_header("X-Old-" + hdr, old_value)
+      M.add_header(old_hdr, old_value)
     del M[hdr]
     for new_value in new_values:
       M.add_header(hdr, new_value)
@@ -101,7 +112,7 @@ def ismaildir(path):
   ''' Test if `path` points at a Maildir directory.
   '''
   for subdir in ('new', 'cur', 'tmp'):
-    if not os.path.isdir(os.path.join(path,subdir)):
+    if not os.path.isdir(os.path.join(path, subdir)):
       return False
   return True
 
@@ -133,8 +144,8 @@ def make_maildir(path):
     try:
       os.mkdir(subdirpath)
     except OSError:
-      for dir in reversed(made):
-        os.rmdir(dir)
+      for dirpath in reversed(made):
+        os.rmdir(dirpath)
       raise
     made.append(subdirpath)
 
@@ -143,12 +154,13 @@ class Maildir(mailbox.Maildir):
       Trust os.listdir, don't fsync, etc.
   '''
 
-  def __init__(self, dir, create=False):
-    if not ismaildir(dir):
+  def __init__(self, path, create=False):
+    mailbox.Maildir.__init__(self, path)
+    if not ismaildir(path):
       if not create:
-        raise ValueError("not a Maildir: %s" % (dir,))
-      make_maildir(dir)
-    self.dir = Pathname(dir)
+        raise ValueError("not a Maildir: %s" % (path,))
+      make_maildir(path)
+    self.path = Pathname(path)
     self._msgmap = None
     self._pid = None
     self._hostpart = None
@@ -156,11 +168,11 @@ class Maildir(mailbox.Maildir):
     self.flush()
 
   def __str__(self):
-    return "<%s %s>" % (self.__class__.__name__, self.dir)
+    return "<%s %s>" % (self.__class__.__name__, self.path)
 
   @property
   def shortname(self):
-    return shortpath(self.dir)
+    return shortpath(self.path)
 
   def flush(self):
     ''' Forget state.
@@ -179,45 +191,45 @@ class Maildir(mailbox.Maildir):
   def msgmap(self):
     ''' Scan the maildir, return key->message-info mapping.
     '''
-    debug("compute msgmap for %s", self.dir)
+    debug("compute msgmap for %s", self.path)
     msgmap = {}
     for subdir in 'new', 'cur':
-      subdirpath = os.path.join(self.dir, subdir)
+      subdirpath = os.path.join(self.path, subdir)
       for msgbase in os.listdir(subdirpath):
         if msgbase.startswith('.'):
           continue
         try:
-          key, info = msgbase.split(':', 1)
+          key, _ = msgbase.split(':', 1)
         except ValueError:
-          key, info = msgbase, ''
+          key = msgbase
         msgmap[key] = (subdir, msgbase)
     return msgmap
 
   def list_folders(self):
-    for fbase in os.listdir(self.dir):
+    for fbase in os.listdir(self.path):
       if fbase.startswith('.'):
         if fbase != '.' and fbase != '..' \
-           and ismaildir(os.path.join(self.dir, fbase)):
+           and ismaildir(os.path.join(self.path, fbase)):
           return fbase[1:]
 
-  def get_folder(folder):
-    folderdir = os.path.join(self.dir, folder)
+  def get_folder(self, folder):
+    folderdir = os.path.join(self.path, folder)
     if folder != '.' and ismaildir(folderdir):
       return Maildir(folderdir)
     raise mailbox.NoSuchMailboxError(folderdir)
 
-  def add_folder(folder):
-    folderdir = os.path.join(self.dir, folder)
+  def add_folder(self, folder):
+    folderdir = os.path.join(self.path, folder)
     make_maildir(folderdir)
-    return get_folder(folder)
+    return self.get_folder(folder)
 
   def remove_folder(self, folder):
     F = self.get_folder(folder)
     for key in F.keys():
       raise mailbox.NotEmptyError("not an empty Maildir")
-    folderpath = os.path.join(self.dir, folder)
+    folderpath = os.path.join(self.path, folder)
     for subdir in 'tmp', 'new', 'cur':
-      os.rmdir(os.path.join(folderdir, subdir))
+      os.rmdir(os.path.join(folderpath, subdir))
     os.rmdir(folderpath)
 
   def newkey(self):
@@ -230,11 +242,14 @@ class Maildir(mailbox.Maildir):
     assert self.validkey(key), "invalid new key: %s" % (key,)
     return key
 
-  def validkey(self, key):
-    return len(key) > 0 \
-       and not key.startswith('.') \
-       and ':' not in key \
-       and '/' not in key
+  @staticmethod
+  def validkey(key):
+    return (
+        len(key) > 0
+        and not key.startswith('.')
+        and ':' not in key
+        and '/' not in key
+    )
 
   def save_filepath(self, filepath, key=None, nolink=False, flags=''):
     ''' Save the file specified by `filepath` into the Maildir.
@@ -249,9 +264,9 @@ class Maildir(mailbox.Maildir):
         debug("new key = %s", key)
       elif not self.validkey(key):
         raise ValueError("invalid key: %s" % (key,))
-        if key in self.msgmap:
-          raise ValueError("key already in Maildir: %s" % (key,))
-      tmppath = os.path.join(self.dir, 'tmp', key)
+      elif key in self.msgmap:
+        raise ValueError("key already in Maildir: %s" % (key,))
+      tmppath = os.path.join(self.path, 'tmp', key)
       if os.path.exists(tmppath):
         raise ValueError("temp file already in Maildir: %s" % (tmppath,))
       if not nolink:
@@ -267,7 +282,7 @@ class Maildir(mailbox.Maildir):
       newbase = key
       if flags:
         newbase += ':2,' + ''.join(sorted(flags))
-      newpath = os.path.join(self.dir, 'new', newbase)
+      newpath = os.path.join(self.path, 'new', newbase)
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
@@ -282,7 +297,7 @@ class Maildir(mailbox.Maildir):
     ''' Save the contents of the file-like object `fp` into the Maildir.
         Return the key for the saved message.
     '''
-    with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
+    with NamedTemporaryFile('w', dir=os.path.join(self.path, 'tmp')) as T:
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
       T.flush()
@@ -295,25 +310,27 @@ class Maildir(mailbox.Maildir):
     return self.save_file(StringIO(str(M)), key=key, flags=flags)
 
   def keypath(self, key):
+    ''' Return the path to the message with maildir key `key`.
+    '''
     subdir, msgbase = self.msgmap[key]
-    return Pathname(os.path.join(self.dir, subdir, msgbase))
+    return Pathname(os.path.join(self.path, subdir, msgbase))
 
   def open(self, key, mode='r'):
     ''' Open the file storing the message specified by `key`.
     '''
     return open(self.keypath(key), mode=mode)
 
-  def get_file(key):
+  def get_file(self, key):
     return self.open(key, mode='rb')
 
   def add(self, message, key=None):
     ''' Add a message to the Maildir.
         `message` may be an email.message.Message instance or a path to a file.
     '''
-    if type(message) in (str, unicode):
+    if isinstance(message, StringTypes):
       return self.save_filepath(message, key=key)
     if isinstance(message, email.message.Message):
-      with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
+      with NamedTemporaryFile('w', dir=os.path.join(self.path, 'tmp')) as T:
         T.write(message.as_string())
         T.flush()
         key = self.save_filepath(T.name, key=key)
@@ -322,7 +339,7 @@ class Maildir(mailbox.Maildir):
 
   def remove(self, key):
     subdir, msgbase = self.msgmap[key]
-    msgpath = os.path.join(self.dir, subdir, msgbase)
+    msgpath = os.path.join(self.path, subdir, msgbase)
     debug("%s: remove key %s: %s", self, key, msgpath)
     try:
       os.remove(msgpath)
@@ -347,7 +364,7 @@ class Maildir(mailbox.Maildir):
     try:
       message = self[key]
     except KeyError:
-      if len(args) > 0:
+      if args:
         return args[0]
       raise
     del self[key]
@@ -368,8 +385,8 @@ class Maildir(mailbox.Maildir):
 
   def __getitem__(self, key):
     ''' Return a mailbox.Message loaded from the message with key `key`.
-	The Message's .pathname property contains .keypath(key),
-	the pathname to the message file.
+            The Message's .pathname property contains .keypath(key),
+            the pathname to the message file.
     '''
     return Message(self.keypath(key))
   get_message = __getitem__
@@ -390,7 +407,7 @@ class Maildir(mailbox.Maildir):
       return default
 
   def __setitem__(self, key, message):
-    remove(key)
+    self.remove(key)
     self.add(message, key=key)
 
   def iterkeys(self):

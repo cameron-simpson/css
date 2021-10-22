@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Fetch the last n lines from both proxy logs and collate.
-#	- Cameron Simpson <cs@zip.com.au> 20nov98
+#	- Cameron Simpson <cs@cskk.id.au> 20nov98
 #
 
 : ${TMPDIR:=/tmp}

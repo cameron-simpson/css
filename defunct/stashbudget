@@ -2,7 +2,7 @@
 #
 # Expect Megan's budget TSF file on stdin,
 # stash data in db/timesheets/projects.
-#	- Cameron Simpson <cs@zip.com.au> 09oct98
+#	- Cameron Simpson <cs@cskk.id.au> 09oct98
 #
 
 use cs::Misc;

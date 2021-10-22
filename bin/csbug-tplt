@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Construct a new bug based on a template bug.
-#	- Cameron Simpson <cs@zip.com.au> 02jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 02jul2005
 #
 
 : ${CSBUG_ROOT:=$HOME/var/bugs}

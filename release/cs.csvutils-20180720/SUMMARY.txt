@@ -1,0 +1,1 @@
+csv_import and xl_import function to load spreadsheet exports via cs.mappings.named_column_tuples.

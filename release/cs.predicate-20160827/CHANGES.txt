@@ -1,0 +1,2 @@
+  lib/python/cs/predicate.py: cs.predicate: new module with facilities for testing predicates; initially the "post_condition" context manager
+  lib/python/cs/predicate.py: cs.predicate: add DISTINFO for PyPI

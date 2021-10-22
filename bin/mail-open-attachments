@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Unpack the MIME message named (or on stdin) in a temp direct and open.
-#   - Cameron Simpson <cs@zip.com.au> 16nov2015
+#   - Cameron Simpson <cs@cskk.id.au> 16nov2015
 #
 
 set -uex

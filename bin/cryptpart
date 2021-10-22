@@ -1,0 +1,191 @@
+#!/bin/sh
+#
+# Wrapper for cryptsetup to do common partition crypto tasks.
+# - Cameron Simpson <cs@cskk.id.au> 
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage:
+  $cmd partition init name
+  $cmd partition dump
+  $cmd partition add [-f] slotnum <passphrase 3<newpassphrase
+  $cmd partition mount name mountpoint <passphrase
+  $cmd partition umount name mountpoint"
+
+partition=
+op=
+trace=
+fstype=xfs
+##[ -t 2 ] && trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing partition" >&2
+  badopts=1
+else
+  partition=$1
+  shift
+  if [ -b "$partition" ]
+  then
+    mounted=$( mount | awk -v "partition=$partition" '$1 == partition { print $3 }' )
+    if [ -n "$mounted" ]
+    then
+      echo "$cmd: partition $partition: already mounted on $mounted" >&2
+      badopts=1
+    fi
+  else
+    echo "$cmd: not a block special device: $partition" >&2
+    badopts=1
+  fi
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing operation" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case $op in
+    init)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing name" >&2
+        badopts=1
+      else
+        name=$1
+        shift
+        case "$name" in
+          '' | */* | .* )
+            echo "$cmd: $op: invalid name: $name" >&2
+            badopts=1
+            ;;
+        esac
+      fi
+      ;;
+    dump)
+      ;;
+    add)
+      if [ "x$1" = x-f ]
+      then  shift; force=1
+      else  force=
+      fi
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing slotnum" >&2
+        badopts=1
+      else
+        slotnum=$1
+        shift
+        case "$slotnum" in
+          [1-7]) ;;
+          *)echo "$cmd: $op: invalid slotnum: $slotnum" >&2
+            badopts=1
+            ;;
+        esac
+      fi
+      ;;
+    mount | umount)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing name" >&2
+        badopts=1
+      else
+        name=$1
+        shift
+        case "$name" in
+          '' | */* | .* )
+            echo "$cmd: $op: invalid name: $name" >&2
+            badopts=1
+            ;;
+        esac
+      fi
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing mountpoint" >&2
+        badopts=1
+      else
+        mountpoint=$1
+        shift
+      fi
+      ;;
+    *)echo "$cmd: invalid operation: $op" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: $op: extra arguments: $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+umask 077
+
+case "$op" in
+  init)
+    mapdev=/dev/mapper/$name
+    keyfile0=keyfile0.dat
+    [ ! -e "$keyfile0" ] || {
+      echo "$cmd: $op: keyfile already exists: $keyfile0" >&2
+      exit 1
+    }
+    $trace dd if=/dev/random "of=$keyfile0" bs=1 count=64 || :
+    { set -ue
+      $trace cryptsetup luksFormat --key-file "$keyfile0" "$partition" </dev/null
+      "$0" "$partition" dump
+      $trace cryptsetup luksOpen --key-file "$keyfile0" "$partition" "$name"
+      $trace dd if=/dev/zero "of=$mapdev"
+      $trace "mkfs.$fstype" -L "$name" "$mapdev"
+      $trace cryptsetup luksClose "$name"
+    } || { xit=$?; rm -f "$keyfile0"; exit $xit; }
+    ;;
+  dump)
+    $trace cryptsetup luksDump "$partition"
+    ;;
+  add)
+    keyfile0=.tmp0.$$
+    cat >"$keyfile0"
+    [ -s "$keyfile0" ] || {
+      echo "$cmd: $op: no passphrase data on standard input"
+      rm -f "$keyfile0"
+      exit 1
+    }
+    keyfile2=.tmp2.$$
+    cat >"$keyfile2" <&3
+    [ -s "$keyfile2" ] || {
+      echo "$cmd: $op: no passphrase data on fd 3"
+      exit 1
+    }
+    cat >"$keyfile2"
+    set -- $( "$0" "$partition" dump | sed -n 's/^Key Slot \([0-7]\): DISABLED$/\1/p' )
+    case " $* " in
+      *" $slotnum "*) ;;
+      *)    echo "$cmd: $op: slot not available: $slotnum" >&2
+            "$0" "$partition" dump | grep '^Key Slot \([0-7]\):' >&2
+            ;;
+    esac
+    $trace cryptsetup luksAddKey --key-file "$keyfile0" "$partition" <"$keyfile2"
+    xit=$?
+    rm -f "$keyfile0" "$keyfile2"
+    exit $xit
+    ;;
+  mount)
+    mapdev=/dev/mapper/$name
+    $trace cryptsetup luksOpen --key-file - "$partition" "$name"
+    $trace mount -t "$fstype" "$mapdev" "$mountpoint"
+    ;;
+  umount)
+    $trace umount "$mountpoint"
+    $trace cryptsetup luksClose "$name"
+    ;;
+  *)echo "$cmd: op: UNIMPLEMENTED" >&2
+    exit 1
+    ;;
+esac

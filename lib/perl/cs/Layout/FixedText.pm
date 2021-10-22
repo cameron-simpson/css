@@ -3,7 +3,7 @@
 # Layout rules for fixed text (1 char == 1 pixel).
 # Actually, we return a ProportionalText object and make a FixedText
 # object which acts as a simple font for the ProportionalText.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use strict qw(vars);

@@ -1,0 +1,22 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200517.
+lib/python/cs/upd.py: cs.upd: bump __version__ to 20200517-post to avoid misleading value for future unreleased changes
+lib/python/cs/upd.py: cs.upd: new UpdProxy.__call__ which sets the .text property in the manner of logging calls, with (msg,*a)
+lib/python/cs/upd.py: cs.upd: new Upd.normalise static method exposing the text normalisation `unctrl(text.rstrip())`
+lib/python/cs/upd.py: cs.upd: UpdProxy: new .prefix attribute with a fixed prefix for status updates; `prefix+text` is left cropped for display purposes when updated
+lib/python/cs/upd.py: cs.upd: UpdProxy.__str__: accomodate .index being None, which happens when the proxy is deleted from its Upd
+lib/python/cs/upd.py: cs.upd: UpdProxy: new .width property computing the space available after the prefix, useful for sizing things like progress bars
+lib/python/cs/upd.py: cs.upd: make UpdProxy a context manager which self deletes one exit
+lib/python/cs/upd.py: cs.upd: Upd: make default backend=sys.stderr, eases to common case
+lib/python/cs/upd.py: cs.upd: UpdProxy.__exit__: supply missing parameters
+lib/python/cs/upd.py: cs.upd: fix definition of Upd.adjust_text
+lib/python/cs/upd.py: cs.upd: Upd.delete: bugfix call to Upd.redraw_line_v
+lib/python/cs/upd.py: cs.upd: new Upd.__str__ method
+lib/python/cs/upd.py: cs.upd: UpdProxy.text.setter: fix race around setting the text
+lib/python/cs/upd.py: cs.upd: new Upd.selfcheck method for use when debugging
+lib/python/cs/upd.py: merge default ==> sqltags
+lib/python/cs/upd.py: merge sqltags ==> default: "sqltags": make "-f db_url" optional; "sqltags log": new -D strptime option; only call define_scehma if the db doesn't yet exist; new "sqltags init" command to do so explicitly; new "sqltags import" to import "sqltags export" formatted CSV data
+lib/python/cs/upd.py: cs.upd: Upd: new Upd.above() context manager to support interleaving another stream with the output, as when stdout (for print) is using the same terminal as stderr (for Upd)
+lib/python/cs/upd.py: cs.upd: new out() top level function for convenience use with the default Upd()
+lib/python/cs/upd.py: cs.upd: new print() function wrapping the builtin print; callers can use "from cs.upd import print" to easily interleave print() with cs.upd use
+lib/python/cs/upd.py: cs.upd: new nl() function for writing a line stderr
+lib/python/cs/upd.py: cs.upd: improve module docstring with multiline example

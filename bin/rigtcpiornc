@@ -6,7 +6,7 @@
 # which sets up a "tcpio -a" to listening on the interface "localaddr"
 # on port "localport", using rnc to forward connections via ssh to "remotesite"
 # and thence via nc to the host "remotehost", port "remoteport".
-#	- Cameron Simpson <cs@zip.com.au> 03may2005
+#	- Cameron Simpson <cs@cskk.id.au> 03may2005
 #
 
 user=

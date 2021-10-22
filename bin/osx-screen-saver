@@ -1,0 +1,9 @@
+#!/usr/bin/osascript
+#
+# Start the MacOS screen saver.
+#   - Cameron Simpson <cs@cskk.id.au> 10nov2016
+#
+
+tell application "System Events" 
+    start current screen saver
+end tell

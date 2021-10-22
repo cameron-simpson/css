@@ -1,0 +1,3 @@
+New generator function module_files yielding pathnames.
+import_module_name: accept name=None, just return the module.
+Add empty "install_requires" for DISTINFO completeness.

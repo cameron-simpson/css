@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Take a here!there!... path emit the last host and, if needed, the
+# ProxyCommand to use to tunnel to where it will be used.
+# For example, the path foo!bah!zot will emit something like:
+#  zot ssh foo ssh bah nc %h %p
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+: ${SSHTO_OPTCSS:=/opt/css}
+
+needoptcss=
+pfxstderr=
+dotrace=
+trace=
+##if [ -t 2 ]
+##then
+##  needoptcss=1
+##  pfxstderr=1
+##  dotrace=1
+##  trace=set-x
+##fi
+
+cmd=$0
+usage="Usage: $cmd host1\!host2... [ssh-options...]"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+
+bangpath=$1
+shift
+
+proxy_command=
+case "$bangpath" in
+  *\!*)
+    previous=
+    for hop in $( printf "%s\n" "$bangpath" | tr '!' ' ' )
+    do
+      if [ -n "$previous" ]
+      then
+        proxy_command="${proxy_command} ssh -A -T -x -e none -o batchmode=yes -o compression=no $previous"
+        if [ $needoptcss ]; then proxy_command="${proxy_command} $SSHTO_OPTCSS/bin/with-opt-css"; fi
+        if [ $pfxstderr ];  then proxy_command="${proxy_command} tag_fd 2 $hop"; fi
+        if [ $dotrace ];    then proxy_command="${proxy_command} $trace"; fi
+      fi
+      previous=$hop
+    done
+    proxy_command="$proxy_command nc %h %p"
+    target=$previous
+    ;;
+  *)target=$bangpath
+    ;;
+esac
+
+printf "%s %s\n" "$target" "$proxy_command"

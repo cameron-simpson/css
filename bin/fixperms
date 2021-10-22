@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Walk a tree applying a permissions/ownership template.
-#       - Cameron Simpson <cs@zip.com.au> 21jun2008
+#       - Cameron Simpson <cs@cskk.id.au> 21jun2008
 #
 
 config=

@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Return a search URL for the supplied engine and query.
-#	- Cameron Simpson <cs@zip.com.au> 05aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 05aug2003
 #
 # Transmute into shell. - cameron 25jun2005
 #

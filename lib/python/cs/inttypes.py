@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Various utility int subtypes.
-#       - Cameron Simpson <cs@zip.com.au>
+#       - Cameron Simpson <cs@cskk.id.au>
 #
 
 DISTINFO = {
@@ -11,7 +11,8 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
+    'install_requires': [],
 }
 
 def _bitvalues(bitnames):
@@ -77,7 +78,7 @@ def BitMask(*bitnames):
 
     def __setattr__(self, attr, value):
       if attr in self._bitnames:
-        raise AttributeError("you may not set .%s", attr)
+        raise AttributeError("you may not set .%s" % (attr,))
       int.__setattr__(self, attr, value)
 
   return BitMaskClass
@@ -104,7 +105,7 @@ def Flags(*flagnames):
       self.value = value
 
     def __str__(self):
-      names, i = _bitnames(self.value, self._flagnames)
+      names, _ = _bitnames(self.value, self._flagnames)
       return ','.join(names) if names else "0"
 
     def __int__(self):
@@ -133,6 +134,8 @@ def Flags(*flagnames):
   return FlagsClass
 
 def Enum(*names):
+  ''' And int enum type with friendly str and repr.
+  '''
 
   class E(int):
     ''' An int with human friendly str() and repr() for an enum counting from 0.

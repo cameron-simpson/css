@@ -1,0 +1,3 @@
+lib/python/cs/deco.py: cs.deco: fix some lint, tweak some docstrings
+lib/python/cs/deco.py: cs.deco: rename @cached to @cachedmethod; cs.app.mailfiler,cs.metadb: adjust use of @cachedmethod
+lib/python/cs/deco.py: cs.deco: @cached compatibility decorator which warns then calls @cachedmethod

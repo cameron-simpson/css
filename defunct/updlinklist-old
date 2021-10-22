@@ -2,7 +2,7 @@
 #
 # Read URLs and titles from stdin and update a state file.
 # Emit new URLs and titles on stdout.
-#	- Cameron Simpson <cs@zip.com.au> 25sep2000
+#	- Cameron Simpson <cs@cskk.id.au> 25sep2000
 #
 
 use strict vars;

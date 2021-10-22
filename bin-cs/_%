@@ -2,7 +2,7 @@
 #
 # Turn URL-escaped %xx markers into characters and then whitespace into
 # underscores.
-#       - Cameron Simpson <cs@zip.com.au> 28nov2012
+#       - Cameron Simpson <cs@cskk.id.au> 28nov2012
 #
 
 [ $# -gt 0 ] || set -- *'%'*

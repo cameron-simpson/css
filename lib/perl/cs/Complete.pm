@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Do completion on a string.
-#	- Cameron Simpson <cs@zip.com.au> 18may98
+#	- Cameron Simpson <cs@cskk.id.au> 18may98
 #
 
 use strict qw(vars);

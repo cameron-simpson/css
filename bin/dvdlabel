@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Emit a DVD or CD label as PostScript.
-#	- Cameron Simpson <cs@zip.com.au> 17nov97
+#	- Cameron Simpson <cs@cskk.id.au> 17nov97
 #
 
 font_title=Times-Roman

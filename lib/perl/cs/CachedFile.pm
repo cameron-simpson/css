@@ -2,7 +2,7 @@
 #
 # Monitor a file (well, anything stat()able really) and call a
 # reload routine if it gets updated.
-#	- Cameron Simpson <cs@zip.com.au> 22oct98
+#	- Cameron Simpson <cs@cskk.id.au> 22oct98
 #
 
 use strict qw(vars);

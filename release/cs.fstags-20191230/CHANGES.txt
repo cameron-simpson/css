@@ -1,0 +1,35 @@
+lib/python/cs/fstags.py: cs.fstags: tweak module docstring
+lib/python/cs/fstags.py: cs.fstags: new "find" command line mode and FSTags.find method
+lib/python/cs/fstags.py: cs.fstags: support -tag=value in tag choices for value specific rejections
+lib/python/cs/fstags.py: cs.fstags: autotag: do not add tags already present on an ancestor; refactor and rename various classes
+lib/python/cs/fstags.py: cs.fstags: further refactors
+lib/python/cs/fstags.py: cs.fstags: initial mirror tags to xattr:x-fstags, poorly tested and still needs the load phase
+lib/python/cs/fstags.py: cs.fstags: make XATTR=None if getxattr or setxattr are missing; bugfix Tag.matches for other being a tag
+lib/python/cs/fstags.py: cs.fstags: new "mv" subcommand to move paths and their tags
+lib/python/cs/fstags.py: cs.fstags: bugfix "tagpaths" subcommand handling of the "tag" argument
+lib/python/cs/fstags.py: cs.fstags: TagFile.save: handle tags for missing paths
+lib/python/cs/fstags.py: cs.fstags: find: add --for-rsync option to emit a pattern list suitable for rsync(1)'s --include-from option, using this for selective backup
+lib/python/cs/fstags.py: cs.fstags: ls: new --direct option to print just the direct tags of listed items
+lib/python/cs/fstags.py: cs.fstags: edit: omit items with tag entries but which are not in the directory listing
+lib/python/cs/fstags.py: cs.fstags: autoformat, clean lint, tweak docstring
+lib/python/cs/fstags.py: cs.fstags: TagSet: new __str__ being the text transcription; simplify TaggedPath.__str__ using this
+lib/python/cs/fstags.py: cs.fstags: edit: move edit function out into FSTags.edit_dirpath method
+lib/python/cs/fstags.py: cs.fstags: move Tag choice parse to TagChoice.parse classmethod
+lib/python/cs/fstags.py: cs.fstags: TagSet: add .__getitem__ and .get for accessing tag values
+lib/python/cs/fstags.py: cs.fstags: ls: add -o option for format output; improve usage message
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.all_tags: now a @locked_property
+lib/python/cs/fstags.py: cs.fstags: new TagSet.update method accepting a dict (raw tagmap) or an iterable of taggy things; fix "ls" output by making the tags a TagSet
+lib/python/cs/fstags.py: cs.fstags: setxattr support, refactor of various parsing internals
+lib/python/cs/fstags.py: cs.fstags: assorted small bugfixes
+lib/python/cs/fstags.py: cs.fstags: find: new --direct option to test only the direct tags on paths
+lib/python/cs/fstags.py: cs.fstags: TagSet.set_xattr_value: only update the xattr if missing or different
+lib/python/cs/fstags.py: cs.fstags: expose the autotag inference stuff for reuse: new TaggedPath.autotag method, new infer_tags(name,rules) function
+lib/python/cs/fstags.py: cs.fstags: rename FSTagCommand to FSTagsCommand to match command name
+lib/python/cs/fstags.py: cs.fstags: provide a default file path for loadrc (expanduser(RCFILE)), make `rules` lagely optional and loaded if omitted
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.autotag: new optional `no_save` parameter, default False, to suppress update of the associated .fstags file
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.all_tags: split out the tag merge into its own method to allow bypassing the cache
+lib/python/cs/fstags.py: cs.fstags: TagSet: new titleify method to produce a "title"-like string from some tag, inferring it from the _lc flavour if the primary is missing; new .title and .episode_title properties based on this
+lib/python/cs/fstags.py: cs.fstags: always make RegexpTagRule from a str, prefer earlier tag matches over later when inferring tags
+lib/python/cs/fstags.py: cs.fstags: bugfix accidental TagSet->dict conversion in edit mode, associated minor cleanups
+lib/python/cs/fstags.py: cs.fstags: TagSet: accept optional `default` parameter providing a mapping for default tag values; cmd_ls: -o output_format: use a `TagSet(defaults=defaultdict(str))` with the format string to accomodate optional tags
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.format_kwargs method returning kwargs suitable for str.format; add -o output_format to "find" subcommand

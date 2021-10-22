@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Recite the source RPMs for everything in the named directories.
-#	- Cameron Simpson <cs@zip.com.au> 17sep2002
+#	- Cameron Simpson <cs@cskk.id.au> 17sep2002
 #
 
 tmpf=${TMPDIR:-/tmp}/rpmof$$

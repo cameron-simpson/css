@@ -1,7 +1,7 @@
 #!/bin/sh -u
 #
 # Simple wrapper for scanimage.
-#	- Cameron Simpson <cs@zip.com.au> 20may2006
+#	- Cameron Simpson <cs@cskk.id.au> 20may2006
 #
 
 : ${SCANOPTS=''}

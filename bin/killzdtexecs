@@ -2,7 +2,7 @@
 #
 # CDE under Solaris 8 leaks dtexec processes.
 # This script tidies up.
-#	- Cameron Simpson <cs@zip.com.au> 17oct2001
+#	- Cameron Simpson <cs@cskk.id.au> 17oct2001
 #
 
 ps -ef \

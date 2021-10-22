@@ -1,0 +1,1 @@
+New decorator @prop which works just like the builtin @property, but transmutes internal AttributeError into RuntimeError, unmasking many bugs.

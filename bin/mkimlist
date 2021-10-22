@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Generate a list of images with their sizes.
-#	- Cameron Simpson <cs@zip.com.au> 09jan2002
+#	- Cameron Simpson <cs@cskk.id.au> 09jan2002
 #
 
 justprint=

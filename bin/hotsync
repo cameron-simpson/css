@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Backup my current hotsync and then sync from my palm.
-#	- Cameron Simpson <cs@zip.com.au> 03apr2000
+#	- Cameron Simpson <cs@cskk.id.au> 03apr2000
 #
 
 : ${PILOTPORT:=/dev/pilot}

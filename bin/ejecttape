@@ -1,7 +1,7 @@
 #!/bin/sh -ue
 #
 # Eject a tape and move its index into the EXPORTED subdirectory.
-#       - Cameron Simpson <cs@zip.com.au> 
+#       - Cameron Simpson <cs@cskk.id.au> 
 #
 
 set -ue

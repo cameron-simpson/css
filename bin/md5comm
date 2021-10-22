@@ -7,7 +7,7 @@
 #	files present and the same in both, column 3 is the name in the first
 #					    index and 4 is the name in the
 #					    second
-# - Cameron Simpson <cs@zip.com.au> 20jun2000
+# - Cameron Simpson <cs@cskk.id.au> 20jun2000
 #
 
 use cs::Misc;

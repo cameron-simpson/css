@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Build and emit a cross reference of HREFs.
-#	- Cameron Simpson <cs@zip.com.au> 06jul97
+#	- Cameron Simpson <cs@cskk.id.au> 06jul97
 #
 
 use strict qw(vars);

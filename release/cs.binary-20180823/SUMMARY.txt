@@ -1,0 +1,5 @@
+Some bugfixes.
+Define PacketField.__eq__.
+BSUInt, BSData and BSString classes implementing the serialisations from cs.serialise.
+New PacketField.value_from_bytes class method.
+New PacketField.value_from_buffer method.

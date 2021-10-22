@@ -3,7 +3,7 @@
 # Recursively list tar files.
 # Coded up for Loren Hobbs <loren.hobbs@philips.com>.
 # Returns my "mkdirn" and "t" scripts (and "x", a symlink to "t").
-#	- Cameron Simpson <cs@zip.com.au> 30mar2001
+#	- Cameron Simpson <cs@cskk.id.au> 30mar2001
 #
 
 : ${TMPDIR:=/tmp}

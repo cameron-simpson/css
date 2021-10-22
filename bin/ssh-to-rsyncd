@@ -4,7 +4,7 @@
 # We expect to put:
 #   command="ssh-to-rsyncd target:port"
 # in a special purpose authorized_keys file line.
-#       - Cameron Simpson <cs@zip.com.au> 14nov2011
+#       - Cameron Simpson <cs@cskk.id.au> 14nov2011
 #
 
 set -ue

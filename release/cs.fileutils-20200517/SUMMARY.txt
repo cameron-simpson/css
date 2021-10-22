@@ -1,0 +1,2 @@
+New crop_name() function to crop a file basename to fit within a specific length.
+New find() function complimenting findup (UNTESTED).

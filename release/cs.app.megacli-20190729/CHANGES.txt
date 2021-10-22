@@ -1,0 +1,6 @@
+lib/python/cs/app/megacli.py: my email address has changed - update Python code
+lib/python/cs/app/megacli.py: cs.app.megacli: move README into module docstring
+lib/python/cs/app/megacli.py: cs.app.megacli: update docstring, clean some lint
+lib/python/cs/app/megacli.py: cs.app.megacli: a little more report line parsing flexibility
+lib/python/cs/app/megacli.py: cs.app.megacli: _parse: slight logic cleanup
+lib/python/cs/app/megacli.py: cs.app.megacli: improve report output

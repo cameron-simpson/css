@@ -2,7 +2,7 @@
 #
 # Recode of Larry Wall's rename script.
 # See also convenience scripts "lc", "__" and "_%".
-#	- Cameron Simpson <cs@zip.com.au> 20aug2003
+#	- Cameron Simpson <cs@cskk.id.au> 20aug2003
 #
 
 use File::Basename;
@@ -11,7 +11,11 @@ use File::Path;
 use Getopt::Std;
 
 ($::cmd=$0) =~ s:.*/::;
-$::Usage="Usage: $::cmd [-qvn] perlop files...\n";
+$::Usage="Usage: $::cmd [-nqv] perlop files...
+  -F    Full path; do no restrict rename to the file basename.
+  -n    No action. Recite planned actions.
+  -q    Quiet.
+  -v    Verbose.\n";
 
 my $verbose=0;
 if (-t 1) { $verbose=1; }
@@ -21,11 +25,12 @@ my $doit=1;
 my $badopts=0;
 
 my %opt;
-if (! getopts("nqv",\%opt))
+if (! getopts("Fnqv",\%opt))
 { warn "$::cmd: bad options\n";
   $badopts=1;
 }
 
+$fullpath=1 if $opt{'F'};
 $doit=0 if $opt{'n'};
 $verbose=0 if $opt{'q'};
 $verbose=1 if $opt{'v'};
@@ -53,24 +58,24 @@ for my $path (@ARGV)
 {
   -e $path || next PATH;
   my $base = basename($path);
-  $_=$base;
+  $_ = ($fullpath ? $path : basename($path));
   eval $perlop;
   die $@ if $@;
-  if ($_ ne $base)
+  my $npath = ($fullpath ? $_ : dirname($path).'/'.$_);
+  if ($npath ne $path)
   {
-    my $npath = dirname($path).'/'.$_;
+    warn "path => $npath\n";
     my $ndir = dirname($npath);
     -d "$ndir/." || mkpath($ndir);
     if (-e $npath)
-    {
-      if (compare($path,$npath) == 0)
-      { print "$path -> $npath: identical, unlinking $path\n"
-	  if $verbose;
-	unlink($path) || warn "$::cmd: unlink($path): $!";
-      }
-      else
-      { warn "$path -> $npath: existing file differs\n";
-      }
+    { warn "$path -> $npath: already exists\n";
+    ##if (compare($path,$npath) == 0)
+    ##{ print "$path -> $npath: identical, unlinking $path\n" if $verbose;
+    ##unlink($path) || warn "$::cmd: unlink($path): $!";
+    ##}
+    ##else
+    ##{ warn "$path -> $npath: existing file differs\n";
+    ##}
     }
     else
     { print "$path -> $npath\n" if $verbose;

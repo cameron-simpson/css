@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Monitor netstat for ESTABLISHED connections and sort on oldest.
-#	- Cameron Simpson <cs@zip.com.au> 30aug99
+#	- Cameron Simpson <cs@cskk.id.au> 30aug99
 #
 
 require 'flush.pl';

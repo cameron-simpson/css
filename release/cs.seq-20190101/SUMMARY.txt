@@ -1,0 +1,2 @@
+New and UNTESTED class StatefulIterator to associate some externally visible state with an iterator.
+Seq: accept optional `lock` parameter.

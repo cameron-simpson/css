@@ -2,7 +2,7 @@
 #
 # Manage named desktops for a session.
 # Allocate (or reuse) a named desk, returning its number.
-#	- Cameron Simpson <cs@zip.com.au> 18jul2002
+#	- Cameron Simpson <cs@cskk.id.au> 18jul2002
 #
 : ${DESKTOPSET:=desktop}
 exec idset -i "$DESKTOPSET" ${1+"$@"}

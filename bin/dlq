@@ -1,11 +1,11 @@
 #!/bin/sh
 #
 # Pull matching lines from dlog.
-#	- Cameron Simpson <cs@zip.com.au> 06sep2004
+#	- Cameron Simpson <cs@cskk.id.au> 06sep2004
 #
 
 : ${LOGDIR:=$HOME/var/log}
-dlog=$LOGDIR/dlog
+dlog=$LOGDIR/dlog-quick
 
 cmd=`basename "$0"`
 usage="Usage: $cmd regexp"

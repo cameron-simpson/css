@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Run a remote histbackup.
+# - Cameron Simpson <cs@cskk.id.au> 23feb2020
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd localdir:remote:remotedir[:remote-ssh-name]...
+  For each argument back up localdir to a histbackup at remote:remotedir.
+  Since histbackup must run at the remote end as:
+    histbackup srchost:localdir remotedir
+  it is necessary to define srchost, which is specified by remote-ssh-name
+  above. The default comes from the first word in \$SSH_CONNECTION,
+  the source address of the inbound ssh connection."
+
+[ $# -gt 0 ] || {
+  echo "$usage" >&2
+  exit 2
+}
+
+xit=0
+
+for spec
+do
+  (
+    oIFS=$IFS
+    IFS=:
+    set -- $spec
+    IFS=$oIFS
+    echo "$# $*"
+    case $# in
+      3)  localdir=$1 remotes=$2 remotedir=$3 remotessh='$ssh_connection_srcip' ;;
+      4)  localdir=$1 remotes=$2 remotedir=$3 remotessh=$( shqstr "$4" ) ;;
+      -)  echo "$cmd: invalid spec, should have 3 or 4 components: $spec" >&2
+          exit 2
+          ;;
+    esac
+    case "$localdir" in
+      /*)   ;;
+      *)    localdir=$(pwd)/$localdir ;;
+    esac
+    qlocaldir=$( shqstr "$localdir" )
+    qqlocaldir=$( shqstr "$qlocaldir" )
+    qremotedir=$( shqstr "$remotedir" )
+    xit=0
+    for remote in $( echo "$remotes" | tr , ' ' )
+    do
+      set-x envssh -o controlpath=none "$remote" \
+        "set -ue; set -- \$SSH_CONNECTION; ssh_connection_srcip=\$1; cd $qremotedir; pwd; set -x; histbackup -i -x $remotessh:$qqlocaldir . --outbuf=line" \
+        || xit=1
+    done
+    exit $xit
+  ) || xit=1
+done

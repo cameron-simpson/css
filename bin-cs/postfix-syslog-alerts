@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Tail the system postfix mail log and issue alerts.
-#   - Cameron Simpson <cs@zip.com.au> 03dec2015
+#   - Cameron Simpson <cs@cskk.id.au> 03dec2015
 #
 
 # OSX mail log

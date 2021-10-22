@@ -1,7 +1,7 @@
 #!/usr/bin/env sed -f
 #
 # Turn bogus ctime Date:s into nice RFC822, a lie but at least syntacticly ok.
-#	- Cameron Simpson <cs@zip.com.au> 26may2004
+#	- Cameron Simpson <cs@cskk.id.au> 26may2004
 #
 
 1,/^$/{

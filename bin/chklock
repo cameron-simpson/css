@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Check currency of a lock. Presumes the lock is local (the pid is checked).
-#	- Cameron Simpson <cs@zip.com.au> 15jul2005
+#	- Cameron Simpson <cs@cskk.id.au> 15jul2005
 #
 
 : ${LOCKDIR:=$HOME/var/locks}

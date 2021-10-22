@@ -2,7 +2,7 @@
 #
 # Parse the anchors in the cleaned netscape history dump
 # and write plain HTML.
-#	- Cameron Simpson <cs@zip.com.au> 13mar98
+#	- Cameron Simpson <cs@cskk.id.au> 13mar98
 #
 
 use strict qw(vars);

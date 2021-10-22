@@ -1,17 +1,21 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
-from __future__ import print_function
+''' Myke main programme.
+'''
+
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info, D, X
+from cs.logutils import setup_logging, warning, error
 from .make import Maker
-from .parse import parseMacroAssignment
+from .parse import Macro
 
 default_cmd = 'myke'
 
-usage="Usage: %s [options...] [macro=value...] [targets...]"
+usage = "Usage: %s [options...] [macro=value...] [targets...]"
 
 def main(argv=None):
+  ''' The main command line.
+  '''
   if argv is None:
     argv = sys.argv
 
@@ -29,39 +33,40 @@ def main(argv=None):
     return 2
 
   # gather any macro assignments and apply
-  ns = None
+  cmd_ns = {}
   while args:
-    macro = parseMacroAssignment("command line", args[0])
-    if macro is None:
+    try:
+      macro = Macro.from_assignment("command line", args[0])
+    except ValueError:
       break
-    if ns is None:
-      ns = {}
-      M._namespaces.insert(0, ns)
-    ns[macro.name] = macro
+    cmd_ns[macro.name] = macro
     args.pop(0)
 
   # defer __enter__ until after option parsing
-  M.loadMakefiles(M.makefiles)
-  M.loadMakefiles(M.appendfiles)
-
-  if args:
-    targets = args
-  else:
-    target = M.default_target
-    if target is None:
-      targets = ()
-    else:
-      targets = (M.default_target.name,)
-
-  if not targets:
-    error("no default target")
+  ok = M.loadMakefiles(M.makefiles)
+  ok = ok and M.loadMakefiles(M.appendfiles)
+  if cmd_ns:
+    M.insert_namespace(cmd_ns)
+  if not ok:
+    error("errors loading Mykefiles")
     xit = 1
   else:
-    with M:
-      xit = 0 if M.make(targets) else 1
+    if args:
+      targets = args
+    else:
+      target = M.default_target
+      if target is None:
+        targets = ()
+      else:
+        targets = (M.default_target.name,)
+    if not targets:
+      error("no default target")
+      xit = 1
+    else:
+      with M:
+        xit = 0 if M.make(targets) else 1
 
   return xit
 
 if __name__ == '__main__':
-  sys.stderr.flush()
   sys.exit(main([default_cmd] + sys.argv[1:]))

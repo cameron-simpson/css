@@ -1,0 +1,10 @@
+  lib/python/cs/py/modules.py: merge default ==> beyonwiz
+  lib/python/cs/py/modules.py: cs.app.beyonwiz: merge from default
+  lib/python/cs/py/modules.py: cs.py.modules: tidy imports
+  lib/python/cs/py/modules.py: cs.py.modules: remove debug
+  lib/python/cs/py/modules.py: resolve merge from default
+  lib/python/cs/py/modules.py: my email address has changed - update Python code
+  lib/python/cs/py/modules.py: merge default ==> pypi
+  lib/python/cs/py/modules.py: cs.py.modules: new function module_names, yielding the names from themodule which were defined by the module
+  lib/python/cs/py/modules.py: cs.py.modules: new module_attributes function yielding (attr, value) for attributes defined in the module; make module_names a thin wrapper around this
+  lib/python/cs/py/modules.py: cs.py.modules: lint and docstrings

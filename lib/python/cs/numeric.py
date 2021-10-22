@@ -1,8 +1,11 @@
 #!/usr/bin/python
 #
 # Ad hoc assortment of numeric functions.
-#   - Cameron Simpson <cs@zip.com.au> 10mar2015
+#   - Cameron Simpson <cs@cskk.id.au> 10mar2015
 #
+
+''' A few ad hoc numeric alogrithms: `factors` and `primes`.
+'''
 
 DISTINFO = {
     'description': "some numeric functions; currently primes() and factors()",
@@ -13,6 +16,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
 }
 
 def primes():

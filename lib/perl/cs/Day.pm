@@ -7,7 +7,7 @@
 #	Code([emitlocaltime[,iso]]) -> yyyymmdd (or yyyy-mm-dd)
 #	Prev([n]) -> new cs::Day (n days earlier)
 #	Next([n]) -> new cs::Day (n days later)
-# - Cameron Simpson <cs@zip.com.au> 04aug98
+# - Cameron Simpson <cs@cskk.id.au> 04aug98
 #
 
 use strict qw(vars);

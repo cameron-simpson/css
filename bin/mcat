@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Output the contents of a MIME file, decoded.
-#	- Cameron Simpson <cs@zip.com.au>
+#	- Cameron Simpson <cs@cskk.id.au>
 #
 
 use cs::MIME;

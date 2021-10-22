@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # USENET news via NNTP connection.
-#	- Cameron Simpson <cs@zip.com.au> 09jun98
+#	- Cameron Simpson <cs@cskk.id.au> 09jun98
 #
 
 use strict qw(vars);

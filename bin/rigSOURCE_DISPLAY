@@ -4,7 +4,7 @@
 # This is basicly because Solaris at least short-circuits "localhost:" to
 # go via the UNIX domain socket as though it were "unix:", which is
 # naughty, breaking some stuff.
-#	- Cameron Simpson <cs@zip.com.au> 22mar2001
+#	- Cameron Simpson <cs@cskk.id.au> 22mar2001
 #
 
 SOURCE_HOST=${SOURCE_HOST:-$HOST}

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Make a virgin mysql data dir.
-#	- Cameron Simpson <cs@zip.com.au> 03jul99
+#	- Cameron Simpson <cs@cskk.id.au> 03jul99
 #
 
 : ${TMPDIR:=/tmp}

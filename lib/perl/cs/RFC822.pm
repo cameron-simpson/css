@@ -2,7 +2,7 @@
 #
 # Code to support RFC822-style message headers.
 # Recoded in Perl5.
-#	- Cameron Simpson <cs@zip.com.au> 16oct94
+#	- Cameron Simpson <cs@cskk.id.au> 16oct94
 #
 # Cleaner parseaddrs().	- cameron, 17mar97
 #
@@ -1097,7 +1097,7 @@ cs::Source(3), cs::Sink(3), cs::MIME(3)
 
 =head1 AUTHOR
 
-Cameron Simpson E<lt>cs@zip.com.auE<gt>
+Cameron Simpson E<lt>cs@cskk.id.auE<gt>
 
 =cut
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Cache file or fetchable object by md5 sum and type.
-#	- Cameron Simpson <cs@zip.com.au> 18may2005
+#	- Cameron Simpson <cs@cskk.id.au> 18may2005
 #
 
 : ${TMPDIR:=/tmp}

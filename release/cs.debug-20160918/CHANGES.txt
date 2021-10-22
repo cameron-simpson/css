@@ -1,0 +1,2 @@
+  lib/python/cs/debug.py: cs.debug: selftest(): fix parameter ordering to match unittest
+  lib/python/cs/debug.py: merge default ==> venti

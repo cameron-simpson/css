@@ -1,0 +1,7 @@
+lib/python/cs/py/modules.py: cs.py.modules: docstring tweaks
+lib/python/cs/py/modules.py: cs.py.modules: new import_module_from_file function to import a Python file as a module instance
+lib/python/cs/py/modules.py: cs.py.modules: autoformat
+lib/python/cs/py/modules.py: cs.py.modules: DISTINFO: drop "description", comes from module docstring
+lib/python/cs/py/modules.py: merge default ==> pypi
+lib/python/cs/py/modules.py: cs.py.modules: new direct_imports(src_filename,module_name=None) returning the set of directly imports module names
+lib/python/cs/py/modules.py: cs.py.modules: direct_imports: make the simple minded parse a bit more conservative

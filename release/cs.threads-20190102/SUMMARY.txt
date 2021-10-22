@@ -1,0 +1,2 @@
+Drop some unused classes.
+New LockableMixin, presenting a context manager and a .lock property.

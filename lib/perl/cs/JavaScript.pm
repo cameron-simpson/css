@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # Code to do JavaScript things (mostly output).
-#	- Cameron Simpson <cs@zip.com.au> 17apr98
+#	- Cameron Simpson <cs@cskk.id.au> 17apr98
 #
 
 use strict qw(vars);

@@ -111,7 +111,7 @@ esac
 # setduplexmode and settumble
 sed 's/^	//' <<HEADER
 	%!PS-Adobe-1.0
-	%%Creator: Cameron Simpson <cs@zip.com.au>
+	%%Creator: Cameron Simpson <cs@cskk.id.au>
 	%%Title: Duplexmode and tumblemode.
 	%%CreationDate: Thursday January  9 13:00:00 1992
 	%%Pages: 0

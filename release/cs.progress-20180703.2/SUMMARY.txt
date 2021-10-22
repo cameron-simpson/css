@@ -1,0 +1,1 @@
+Progress: make .total into a property in order to fire the update notifications.
