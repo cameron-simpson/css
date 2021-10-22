@@ -8,10 +8,10 @@ set -ue
 
 tmpdir=${TMPDIR:=/tmp}
 
-tag_name=backup
-copies=a,b
-backup_area=/mnt
-backup_names=
+tag_name=${TAGGED_BACKUP_TAG_NAME:-backup}
+copies=${TAGGED_BACKUP_COPIES:-a,b}
+backup_area=${TAGGED_BACKUP_AREA:-/mnt}
+backup_names=${TAGGED_BACKUP_TAG_VALUES:-''}
 do_mount=1
 rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
 rsync_delete_exclude_opts='--delete-excluded'
@@ -29,17 +29,29 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
 
   Options:
     --backup-area=/path     Path to backup area, default: $backup_area
-    --backup-names=name,... Backup names to run, default collated
-                            from the fstags for the tag name.
+                            or from \$TAGGED_BACKUP_AREA.
+    --backup-names=name,... Backup names to run, default from \$TAGGED_BACKUP_TAG_VALUES
+                            or collated from the fstags for the tag name.
                             (The default tag name is \"$tag_name\".)
     --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
+                            or from \$TAGGED_BACKUP_COPIES.
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
     --progress              Passed to rsync via histbackup.
     --tag-name=tagname      Tag name, default: $tag_name
+                            or from \$TAGGED_BACKUP_TAG_NAME.
     -q                      Quiet.
     -x                      Trace execution.
+
+  Environment:
+    TAGGED_BACKUP_AREA        The mount area for backups: backup_area
+    TAGGED_BACKUP_COPIES      The backup copies to make: $copies
+    TAGGED_BACKUP_TAG_NAME    The default tag name: $tag_name
+    TAGGED_BACKUP_TAG_VALUES  The backup tag values to run; if not
+                              provided or specified by --backup-names
+                              the src_path is scanned for existing
+                              tag values.
 
   The defaults use the backup tag \"$tag_name\", makes backup copies
   for each of \"$copies\", and uses the backup area $backup_area.
