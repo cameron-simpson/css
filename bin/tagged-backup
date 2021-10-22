@@ -31,6 +31,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     --backup-area=/path     Path to backup area, default: $backup_area
     --backup-names=name,... Backup names to run, default collated
                             from the fstags for the tag name.
+                            (The default tag name is \"$tag_name\".)
     --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
@@ -38,7 +39,21 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
     --progress              Passed to rsync via histbackup.
     --tag-name=tagname      Tag name, default: $tag_name
     -q                      Quiet.
-    -x                      Trace execution."
+    -x                      Trace execution.
+
+  The defaults use the backup tag \"$tag_name\", makes backup copies
+  for each of \"$copies\", and uses the backup area $backup_area.
+  My media archive presently has tag values \"archive1\" and
+  \"archive2\".
+
+  So when it backs up /export/video its process is to mount each
+  of /mnt/archive1a, /mnt/archive1b, /mnt/archive2a and /mnt/archive2b
+  and runs a histbackup from /exports/video to /mnt/archive1a/video,
+  /mnt/archive1b/video and so forth.  By having matching entries
+  for the mount in /etc/fstab with the \"user\" option associated
+  with the filesystem labels of the removeable backup drives this
+  works fairly seamlessly.
+"
 
 trace=
 [ -t 2 ] && {
@@ -131,7 +146,7 @@ do
   # shellcheck disable=SC2086
   $vecho "$src_path: $tag_name tags =" $src_backup_names
   not_archive_tags=
-  for backup_name in $src_backup_names
+  for backup_name in $( printf '%s\n' "$src_backup_names" | tr , ' ' )
   do
     archive_tag=$tag_name=$backup_name
     not_archive_tags="$not_archive_tags -$archive_tag"
