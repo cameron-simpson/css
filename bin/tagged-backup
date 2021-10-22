@@ -188,13 +188,16 @@ do
       fi
     done
   done
+
+  $vecho "scanning $src_path for files not covered by the backup tag values $src_backup_names ..."
   skipped_bytes=$( fstags find -o '{filesize}' "$src_path" $not_archive_tags | colsum 1 )
+
   [ "$skipped_bytes" = 0 ] || {
     echo "$cmd: $src_dst: $skipped_bytes bytes NOT ARCHIVED" >&2
     xit=1
     [ $quiet ] || {
       ( cd "$src_path"
-        echo "unbacked up series/seasons:"
+        echo "unbacked up grouped by series/seasons:"
         fstags find . -backup \
         | egrep '/(series|season)' \
         | sed 's|/[^/]*$||' \
