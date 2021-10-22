@@ -69,7 +69,7 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
 
 trace=
 [ -t 2 ] && {
-  ##trace=set-x
+  trace=set-x
   rsync_extra_opts="$rsync_extra_opts --progress"
 }
 
