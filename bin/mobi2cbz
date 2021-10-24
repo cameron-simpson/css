@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+#
+
+from getopt import GetoptError
+from glob import glob
+import os
+from os.path import basename, exists as existspath, join as joinpath, splitext
+import shutil
+import sys
+from zipfile import ZipFile, ZIP_STORED
+
+from cs.cmdutils import BaseCommand
+from cs.pfx import pfx_call
+
+import mobi
+
+class Mobi2CBZCommand(BaseCommand):
+
+  USAGE_FORMAT = r'''Usage: {cmd} mobipath
+    Unpack a MOBI file and construct a CBZ file.'''
+
+  def main(self, argv):
+    if not argv:
+      raise GetoptError("missing mobipath")
+    mobipath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after mobipath: %r" % (argv,))
+    if not existspath(mobipath):
+      raise GetoptError("mobipath does not exist: %r" % (mobipath,))
+    mobibase, mobiext = splitext(basename(mobipath))
+    cbzpath = mobibase + '.cbz'
+    tmpdirpath = None
+    try:
+      tmpdirpath, filepath = mobi.extract(mobipath)
+      os.system("ls -laR " + tmpdirpath)
+      if existspath(cbzpath):
+        raise GetoptError("CBZ already exists: %r" % (cbzpath,))
+      try:
+        with pfx_call(ZipFile, cbzpath, 'w', compression=ZIP_STORED) as cbz:
+          for imagepath in glob(joinpath(tmpdirpath,'mobi8/OEBPS/Images/*.*')):
+            pfx_call(cbz.write, imagepath, arcname=basename(imagepath))
+      except Exception:
+        if existspath(cbzpath):
+          pfx_call(os.unlink, cbzpath)
+    finally:
+      if tmpdirpath is not None:
+        pfx_call(shutil.rmtree, tmpdirpath)
+    print(cbzpath)
+
+sys.exit(Mobi2CBZCommand(sys.argv).run())
