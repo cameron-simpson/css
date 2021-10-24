@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 #
 
+''' Extract the images from a Mobi formatted ebook into a CBZ file on the premise that the ebook is a comic.
+'''
+
 from getopt import GetoptError
 from glob import glob
 import os
@@ -10,6 +13,7 @@ import sys
 from zipfile import ZipFile, ZIP_STORED
 
 from cs.cmdutils import BaseCommand
+from cs.logutils import info, error
 from cs.pfx import pfx_call
 
 import mobi
@@ -23,22 +27,28 @@ class Mobi2CBZCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing mobipath")
     mobipath = argv.pop(0)
+    mobibase, mobiext = splitext(basename(mobipath))
+    cbzpath = mobibase + '.cbz'
     if argv:
       raise GetoptError("extra arguments after mobipath: %r" % (argv,))
     if not existspath(mobipath):
       raise GetoptError("mobipath does not exist: %r" % (mobipath,))
-    mobibase, mobiext = splitext(basename(mobipath))
-    cbzpath = mobibase + '.cbz'
+    if existspath(cbzpath):
+      raise GetoptError("CBZ already exists: %r" % (cbzpath,))
     tmpdirpath = None
     try:
+      info("extract %s" % (mobipath,))
       tmpdirpath, filepath = mobi.extract(mobipath)
-      os.system("ls -laR " + tmpdirpath)
-      if existspath(cbzpath):
-        raise GetoptError("CBZ already exists: %r" % (cbzpath,))
+      ##os.system("ls -laR " + tmpdirpath)
+      info("write %s", cbzpath)
       try:
-        with pfx_call(ZipFile, cbzpath, 'w', compression=ZIP_STORED) as cbz:
-          for imagepath in glob(joinpath(tmpdirpath,'mobi8/OEBPS/Images/*.*')):
+        with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
+          for imagepath in sorted(glob(joinpath(tmpdirpath,
+                                                'mobi8/OEBPS/Images/*.*'))):
             pfx_call(cbz.write, imagepath, arcname=basename(imagepath))
+      except FileExistsError as e:
+        error("CBZ already eixsts: %r: %s", cbzpath, e)
+        return 1
       except Exception:
         if existspath(cbzpath):
           pfx_call(os.unlink, cbzpath)
