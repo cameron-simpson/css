@@ -19,11 +19,16 @@ from cs.pfx import pfx_call
 import mobi
 
 class Mobi2CBZCommand(BaseCommand):
+  ''' Command line implemenetation for `mobi2cbz`.
+  '''
 
   USAGE_FORMAT = r'''Usage: {cmd} mobipath
-    Unpack a MOBI file and construct a CBZ file.'''
+    Unpack a MOBI file and construct a CBZ file.
+    Prints the path of the CBZ file to the output.'''
 
   def main(self, argv):
+    ''' `mobi2cbz` command line implementation.
+    '''
     if not argv:
       raise GetoptError("missing mobipath")
     mobipath = argv.pop(0)
@@ -39,12 +44,11 @@ class Mobi2CBZCommand(BaseCommand):
     try:
       info("extract %s" % (mobipath,))
       tmpdirpath, filepath = mobi.extract(mobipath)
-      ##os.system("ls -laR " + tmpdirpath)
+      imagepaths = sorted(glob(joinpath(tmpdirpath, 'mobi8/OEBPS/Images/*.*')))
       info("write %s", cbzpath)
       try:
         with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
-          for imagepath in sorted(glob(joinpath(tmpdirpath,
-                                                'mobi8/OEBPS/Images/*.*'))):
+          for imagepath in imagepaths:
             pfx_call(cbz.write, imagepath, arcname=basename(imagepath))
       except FileExistsError as e:
         error("CBZ already eixsts: %r: %s", cbzpath, e)
@@ -54,6 +58,7 @@ class Mobi2CBZCommand(BaseCommand):
           pfx_call(os.unlink, cbzpath)
     finally:
       if tmpdirpath is not None:
+        info("remove %s", tmpdirpath)
         pfx_call(shutil.rmtree, tmpdirpath)
     print(cbzpath)
 
