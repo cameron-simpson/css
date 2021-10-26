@@ -47,3 +47,4 @@ esac
 
 cbz=$( $trace mobi2cbz "$mobipath" )
 $trace calibredb add_format "--library-path=$calibre_library" "$dbid" "$cbz"
+printf '%s\n' "$cbz"

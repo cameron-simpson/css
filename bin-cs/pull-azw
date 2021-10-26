@@ -123,7 +123,7 @@ fi \
       }
       if [ $make_cbz ]
       then
-        $trace add-cbz -C "$calibre_library" "$azw3" "$dbid"
+        cbz=$( $trace add-cbz -C "$calibre_library" "$azw3" "$dbid" )
         [ -z "$output_dirpath" ] || {
           $trace ln "$cbz" "$output_dirpath/" || $trace cp "$cbz" "$output_dirpath/"
         }
