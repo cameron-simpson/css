@@ -352,7 +352,9 @@ class MegaRAID(NS):
         info = ''
       heading = heading.rstrip()
       info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
+      attr = heading.lower().replace(' ', '_').replace('.', '').replace(
+          "'", ''
+      ).replace('/', '_')
       try:
         n = int(info)
       except ValueError:
