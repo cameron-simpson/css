@@ -365,7 +365,6 @@ class MegaRAID(NS):
     ''' Generic parser for megacli output.
         Update 
     '''
-    cmd_append("megacli " + " ".join(megacli_args))
     M = NS(adapters={})
     A = None
     V = None
@@ -373,7 +372,7 @@ class MegaRAID(NS):
     DG = None
     DRV = None
     o = None
-    for mlineno, line in enumerate(self.readcmd(*megacli_args), 1):
+    for mlineno, line in enumerate(fp, 1):
       if not line.endswith('\n'):
         raise ValueError("%d: missing newline" % (mlineno,))
       line = line.rstrip()
