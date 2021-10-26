@@ -123,8 +123,7 @@ fi \
       }
       if [ $make_cbz ]
       then
-        cbz=$( $trace mobi2cbz "$azw3" | tail -1 )
-        $trace calibredb add_format "--library-path=$calibre_library" "$dbid" "$cbz"
+        $trace add-cbz -C "$calibre_library" "$azw3" "$dbid"
         [ -z "$output_dirpath" ] || {
           $trace ln "$cbz" "$output_dirpath/" || $trace cp "$cbz" "$output_dirpath/"
         }
