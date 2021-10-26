@@ -271,6 +271,8 @@ def main(argv=None):
 
 class MegaRAID(NS):
 
+  FW_STATES_AVAILABLE = ('Unconfigured(good), Spun Up', 'Online, Spun Up')
+
   def __init__(self, megacli=None):
     if megacli is None:
       megacli = os.environ.get('MEGACLI', MEGACLI)
@@ -560,10 +562,11 @@ class MegaRAID(NS):
           error("unknown disk")
           ok = False
         else:
-          if DRV.firmware_state != 'Unconfigured(good), Spun Up':
+          if DRV.firmware_state not in self.FW_STATES_AVAILABLE:
             error(
-                "rejecting drive, firmware state not unconfigured good: %s",
-                DRV.firmware_state
+                "rejecting drive, firmware state (%s) not unconfigured good: %r",
+                DRV.firmware_state,
+                self.FW_STATES_AVAILABLE,
             )
             ok = False
           else:
