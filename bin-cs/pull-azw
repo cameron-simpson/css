@@ -111,7 +111,7 @@ else
   rm -f "$new_tsfile"
 fi \
 | tee /dev/fd/2 \
-| sed '/^Added book ids: /!d; s/^Added book ids: *//; s/, /\n/g' \
+| sed '/^Added book ids: /!d; s/^Added book ids: *//; s/ *, */ /g' | tr ' ' '\012' \
 | while read dbid
   do
     set -- "$calibre_library"/*/*" ($dbid)"/*.azw3
