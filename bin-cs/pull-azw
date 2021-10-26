@@ -105,7 +105,7 @@ fi
 if $trace calibredb add "--library-path=$calibre_library" $cal_add_opts -- "$@"
 then
   # advance timestamp
-  [ -e "$new_tsfile" ] && mv "$new_tsfile" "$ts_file"
+  [ -e "$new_tsfile" ] && mv "$new_tsfile" "$tsfile"
 else
   # discard new timestamp if any
   rm -f "$new_tsfile"
