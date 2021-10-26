@@ -41,7 +41,6 @@ esac
     echo "$cmd: cannot infer dbid from mobipath: $mobipath" >&2
     echo "  expcted */* (dbid)/* style path" >&2
     badopts=1
-    ;;
   }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
