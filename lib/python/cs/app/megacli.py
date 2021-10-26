@@ -102,6 +102,7 @@ import sys
 from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
+from cs.x import X
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -312,13 +313,13 @@ class MegaRAID(NS):
       for DRVid, DRV in A.physical_disks.items():
         cmd_append(str(DRVid))
         if DRVid in disks:
-          D("%s: merge PDlist DRV with Mconfigured DRV", DRVid)
+          ##X("%s: merge PDlist DRV with Mconfigured DRV", DRVid)
           merge_attrs(disks[DRVid], **DRV.__dict__)
         else:
-          D("%s: add new DRV to Mconfigured", DRVid)
+          ##X("%s: add new DRV to Mconfigured", DRVid)
           disks[DRVid] = DRV
         cmd_pop()
-      D("Mphysical merged")
+      X("Mphysical merged")
     cmd_pop()
 
     return Mconfigured
@@ -512,7 +513,7 @@ class MegaRAID(NS):
       if mode == mode_PDLIST:
         if DRV is not None:
           DRVid = DRV.id
-          D("PDLIST: note physical drive %s", DRVid)
+          X("PDLIST: note physical drive %s", DRVid)
           cmd_append("final merge previous DRV %s", DRVid)
           if DRVid in A.physical_disks:
             merge_attrs(A.physical_disks[DRV.id], **DRV.__dict__)
@@ -572,7 +573,7 @@ class MegaRAID(NS):
             )
             ok = False
           else:
-            D("acceptable drive: %s", DRV.firmware_state)
+            X("acceptable drive: %s", DRV.firmware_state)
         cmd_pop()
     cmd_pop()
     if not ok:
@@ -586,7 +587,7 @@ class MegaRAID(NS):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    D("+ %r", cmdargs)
+    X("+ %r", cmdargs)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True, encoding='ascii')
     for line in P.stdout:
       yield line
@@ -599,7 +600,7 @@ class MegaRAID(NS):
         Return True if the exit code is 0, False otherwise.
     '''
     cmdargs = [self.megacli] + list(args)
-    D("%r", cmdargs)
+    print("#", quotecmd(cmdargs))
     ## return call(cmdargs) == 0
     return True
 
@@ -689,7 +690,7 @@ def cmd_pop():
 def merge_attrs(o, **kw):
   for attr, value in kw.items():
     if not len(attr) or not attr[0].isalpha():
-      D(".%s: ignoring, does not start with a letter", attr)
+      X(".%s: ignoring, does not start with a letter", attr)
       continue
     try:
       ovalue = getattr(o, attr)
@@ -698,7 +699,7 @@ def merge_attrs(o, **kw):
       setattr(o, attr, value)
     else:
       if ovalue != value:
-        D("%s: %s: %r => %r", o, attr, ovalue, value)
+        X("%s: %s: %r => %r", o, attr, ovalue, value)
 
 debug = os.environ.get('DEBUG')
 if debug:
