@@ -15,13 +15,17 @@ kindle_library=${KINDLE_LIBRARY:-$HOME/KINDLE}
 
 force=
 cal_add_opts=
-make_cbz=
+make_cbz=1
 output_dirpath=${PULL_AZW_OUTPUTDIR:-''}
+tsbase=.timestamp-$cmd
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz] [book-files...]
   -C calibre_library
         Specify calibre library location, default from \$CALIBRE_LIBRARY: $calibre_library
+  -cbz  Do not bother to construct a CBZ file from each book-file.
+  +cbz  Also construct a CBZ file from each book-file and add it is a format.
+        This is the default.
   -f    Force: pass -d (duplicates: add even if present) to \"calibredb add\".
   -K kindle_library
         Specify kindle library location, default from \$KINDLE_LIBRARY: $kindle_library
@@ -29,8 +33,7 @@ usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz
   -o output_dirpath
         Also link the resulting AZW3 and optional CBZ files into output_dirpath.
         Default from \$PULL_AZW_OUTPUTDIR
-  -x    Trace execution.
-  +cbz  Also construct a CBZ file from each book-file and add it is a format."
+  -x    Trace execution."
 
 badopts=
 
@@ -38,12 +41,13 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -C) calibre_library=$2; shift ;;
+    -cbz) make_cbz= ;;
+    +cbz) make_cbz=1 ;;
     -f) force=1 ;;
     -K) kindle_library=$2; shift ;;
     -n) trace=eecho ;;
     -o) output_dirpath=$2; shift ;;
     -x) trace=set-x ;;
-    +cbz) make_cbz=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -85,7 +89,7 @@ then
 fi
 
 # timestamp reference file
-tsfile=$calibre_library/.timestamp-$cmd
+tsfile=$calibre_library/$tsbase
 new_tsfile=$tsfile-$$
 
 if [ $# = 0 ]
