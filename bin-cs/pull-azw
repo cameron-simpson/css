@@ -125,7 +125,7 @@ fi \
     do
       ls -d "$azw3" || continue
       [ -z "$output_dirpath" ] || {
-        $trace ln "$azw3" "$output_dirpath/" || $trace cp "$azw3" "$output_dirpath/"
+        ln "$azw3" "$output_dirpath/" 2>/dev/null || cp "$azw3" "$output_dirpath/"
       }
       if [ $make_cbz ]
       then
