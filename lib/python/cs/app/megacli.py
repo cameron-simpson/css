@@ -102,6 +102,10 @@ import sys
 from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
+from cs.logutils import warning, error
+from cs.pfx import Pfx, pfx
+from cs.sh import quotecmd
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -131,7 +135,7 @@ MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
 mode_CFGDSPLY = 0  # -CfgDsply mode
 mode_PDLIST = 1  # -PDlist mode
 
-re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
+re_SPEED = re.compile(r'^(\d+(\.\d+)?)\s*(\S+)$')
 
 def main(argv=None):
   global cmd_old
@@ -271,6 +275,8 @@ def main(argv=None):
 
 class MegaRAID(NS):
 
+  FW_STATES_AVAILABLE = ('Unconfigured(good), Spun Up', 'Online, Spun Up')
+
   def __init__(self, megacli=None):
     if megacli is None:
       megacli = os.environ.get('MEGACLI', MEGACLI)
@@ -288,8 +294,10 @@ class MegaRAID(NS):
         data structure with the adpater information.
     '''
     cmd_append("megacli -CfgDsply -aAll")
-    ##Mconfigured = self._parse(self.readcmd(['-CfgDsply', '-aAll']), mode_CFGDSPLY)
-    Mconfigured = self._parse(open('CfgDsply.txt'), mode_CFGDSPLY)
+    Mconfigured = self._parse(
+        self.readcmd('-CfgDsply', '-aAll'), mode_CFGDSPLY
+    )
+    ##Mconfigured = self._parse(open('CfgDsply.txt'), mode_CFGDSPLY)
     # record physical drives by id (NB: _not_ enclosure/slot)
     for A in Mconfigured.adapters.values():
       for V in A.virtual_drives.values():
@@ -301,20 +309,17 @@ class MegaRAID(NS):
     cmd_pop()
 
     cmd_append("megacli -PDlist -aAll")
-    ##Mphysical = self._parse(self.readmcd(['-PDlist', '-aAll']), mode_PDLIST)
-    Mphysical = self._parse(open('PDList.txt'), mode_PDLIST)
+    Mphysical = self._parse(self.readcmd('-PDlist', '-aAll'), mode_PDLIST)
+    ##Mphysical = self._parse(open('PDList.txt'), mode_PDLIST)
     for A in Mphysical.adapters.values():
       disks = Mconfigured.adapters[A.number].physical_disks
       for DRVid, DRV in A.physical_disks.items():
         cmd_append(str(DRVid))
         if DRVid in disks:
-          D("%s: merge PDlist DRV with Mconfigured DRV", DRVid)
           merge_attrs(disks[DRVid], **DRV.__dict__)
         else:
-          D("%s: add new DRV to Mconfigured", DRVid)
           disks[DRVid] = DRV
         cmd_pop()
-      D("Mphysical merged")
     cmd_pop()
 
     return Mconfigured
@@ -337,6 +342,8 @@ class MegaRAID(NS):
       attr = None
       if ': ' in line:
         heading, info = line.split(': ', 1)
+      elif ' #' in line:
+        heading, info = line.split(' #', 1)
       elif ' :' in line:
         heading, info = line.split(' :', 1)
       elif line.endswith(':'):
@@ -347,7 +354,9 @@ class MegaRAID(NS):
         info = ''
       heading = heading.rstrip()
       info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
+      attr = heading.lower().replace(' ', '_').replace('.', '').replace(
+          "'", ''
+      ).replace('/', '_')
       try:
         n = int(info)
       except ValueError:
@@ -360,7 +369,6 @@ class MegaRAID(NS):
     ''' Generic parser for megacli output.
         Update 
     '''
-    cmd_append("megacli " + " ".join(megacli_args))
     M = NS(adapters={})
     A = None
     V = None
@@ -368,66 +376,23 @@ class MegaRAID(NS):
     DG = None
     DRV = None
     o = None
-    for mlineno, line in enumerate(self.readcmd(*megacli_args), 1):
-      if not line.endswith('\n'):
-        raise ValueError("%d: missing newline" % (mlineno,))
-      line = line.rstrip()
-      if not line:
-        continue
-      if line.startswith('======='):
-        continue
-      if (line == 'Virtual Drive Information:'
-          or line == 'Physical Disk Information:'):
-        o = None
-        continue
-      if line.startswith('Adapter #'):
-        An = int(line[9:])
-        A = Adapter(number=An, physical_disks={})
-        M.adapters[An] = A
+    for mlineno, line, heading, info, attr in self._preparse(fp):
+      if heading == 'Adapter':
+        An = info
+        A = M.adapters[info] = Adapter(
+            number=An, disk_groups={}, physical_disks={}, virtual_drives={}
+        )
         o = A
         continue
-      if ': ' in line:
-        heading, info = line.split(': ', 1)
-      elif ' :' in line:
-        heading, info = line.split(' :', 1)
-      elif line.endswith(':'):
-        heading = line[:-1]
-        info = ''
-      elif ':' in line:
-        heading, info = line.split(':', 1)
-      else:
-        warning("unparsed line: %s", line)
-        continue
-      heading = heading.rstrip()
-      info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.', '').replace(
-          "'", ''
-      ).replace('/', '_')
-      try:
-        n = int(info)
-      except ValueError:
-        pass
-      else:
-        info = n
       if mode == mode_CFGDSPLY:
-        if heading == 'Adapter':
-          An = info
-          ##D("new adapter %d", An)
-          A = M.adapters[info] = Adapter(
-              number=An, disk_groups={}, physical_disks={}, virtual_drives={}
-          )
-          o = A
-          continue
         if heading == 'DISK GROUP':
           DGn = info
-          ##D("new disk_group %d", DGn)
           A.disk_groups[DGn] = Disk_Group(adapter=A, number=DGn, spans={})
           DG = A.disk_groups[DGn]
           o = DG
           continue
         if heading == 'SPAN':
           SPn = info
-          ##D("new span %d", SPn)
           DG.spans[SPn] = Span(disk_group=DG, number=SPn, arms={})
           SP = DG.spans[SPn]
           o = SP
@@ -436,7 +401,6 @@ class MegaRAID(NS):
           Vn, Tn = info.split(' (Target Id: ', 1)
           Vn = int(Vn)
           Tn = int(Tn[:-1])
-          ##D("new virtual drive %d (target id %d)", Vn, Tn)
           V = A.virtual_drives[Vn] = Virtual_Drive(
               adapter=A, number=Vn, physical_disks={}
           )
@@ -444,7 +408,6 @@ class MegaRAID(NS):
           continue
         if heading == 'Physical Disk':
           DRVn = info
-          ##D("new physical disk %d", DRVn)
           DRV = Physical_Disk(virtual_drive=V, number=DRVn, adapter=A)
           V.physical_disks[DRVn] = DRV
           DRV.virtual_drive = V
@@ -497,7 +460,6 @@ class MegaRAID(NS):
         info = True
       elif info == 'No':
         info = False
-      ##D("%s.%s = %s", o.__class__.__name__, attr, info)
       if o is None:
         error("o is None, not setting .%s to %r", attr, info)
       else:
@@ -508,7 +470,6 @@ class MegaRAID(NS):
       if mode == mode_PDLIST:
         if DRV is not None:
           DRVid = DRV.id
-          D("PDLIST: note physical drive %s", DRVid)
           cmd_append("final merge previous DRV %s", DRVid)
           if DRVid in A.physical_disks:
             merge_attrs(A.physical_disks[DRV.id], **DRV.__dict__)
@@ -560,14 +521,15 @@ class MegaRAID(NS):
           error("unknown disk")
           ok = False
         else:
-          if DRV.firmware_state != 'Unconfigured(good), Spun Up':
+          if DRV.firmware_state not in self.FW_STATES_AVAILABLE:
             error(
-                "rejecting drive, firmware state not unconfigured good: %s",
-                DRV.firmware_state
+                "rejecting drive, firmware state (%s) not unconfigured good: %r",
+                DRV.firmware_state,
+                self.FW_STATES_AVAILABLE,
             )
             ok = False
-          else:
-            D("acceptable drive: %s", DRV.firmware_state)
+          ##else:
+          ##  X("acceptable drive: %s", DRV.firmware_state)
         cmd_pop()
     cmd_pop()
     if not ok:
@@ -581,7 +543,7 @@ class MegaRAID(NS):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    D("+ %r", cmdargs)
+    print("+", quotecmd(cmdargs), file=sys.stderr)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True, encoding='ascii')
     for line in P.stdout:
       yield line
@@ -594,7 +556,7 @@ class MegaRAID(NS):
         Return True if the exit code is 0, False otherwise.
     '''
     cmdargs = [self.megacli] + list(args)
-    D("%r", cmdargs)
+    print("#", quotecmd(cmdargs))
     ## return call(cmdargs) == 0
     return True
 
@@ -681,41 +643,21 @@ def cmd_pop():
   global cmd, cmd_old
   cmd = cmd_old.pop()
 
+@pfx
 def merge_attrs(o, **kw):
   for attr, value in kw.items():
-    if not len(attr) or not attr[0].isalpha():
-      D(".%s: ignoring, does not start with a letter", attr)
-      continue
-    try:
-      ovalue = getattr(o, attr)
-    except AttributeError:
-      # new attribute
-      setattr(o, attr, value)
-    else:
-      if ovalue != value:
-        D("%s: %s: %r => %r", o, attr, ovalue, value)
-
-debug = os.environ.get('DEBUG')
-if debug:
-
-  def D(msg, *a):
-    message(msg, sys.stderr, "debug", *a)
-else:
-
-  def D(msg, *a):
-    pass
-
-def warning(msg, *a):
-  message(msg, sys.stderr, "warning", *a)
-
-def error(msg, *a):
-  message(msg, sys.stderr, "error", *a)
-
-def message(msg, fp, prefix, *a):
-  global cmd
-  if a:
-    msg = msg % a
-  print(cmd + ":", prefix + ":", msg, file=fp)
+    with Pfx("%s=%r", attr, value):
+      if not len(attr) or not attr[0].isalpha():
+        warning(".%s: ignoring, does not start with a letter", attr)
+        continue
+      try:
+        ovalue = getattr(o, attr)
+      except AttributeError:
+        # new attribute
+        setattr(o, attr, value)
+      else:
+        if ovalue != value:
+          warning("value %r => %r", ovalue, value)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
