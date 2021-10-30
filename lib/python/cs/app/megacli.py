@@ -375,47 +375,9 @@ class MegaRAID(NS):
     DG = None
     DRV = None
     o = None
-    for mlineno, line in enumerate(fp, 1):
-      if not line.endswith('\n'):
-        raise ValueError("%d: missing newline" % (mlineno,))
-      line = line.rstrip()
-      if not line:
-        continue
-      if line.startswith('======='):
-        continue
-      if (line == 'Virtual Drive Information:'
-          or line == 'Physical Disk Information:'):
-        o = None
-        continue
-      if line.startswith('Adapter #'):
-        An = int(line[9:])
-        A = Adapter(number=An, physical_disks={})
-        M.adapters[An] = A
+    for mlineno, line, heading, info, attr in self._preparse(fp):
         o = A
         continue
-      if ': ' in line:
-        heading, info = line.split(': ', 1)
-      elif ' :' in line:
-        heading, info = line.split(' :', 1)
-      elif line.endswith(':'):
-        heading = line[:-1]
-        info = ''
-      elif ':' in line:
-        heading, info = line.split(':', 1)
-      else:
-        warning("unparsed line: %s", line)
-        continue
-      heading = heading.rstrip()
-      info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.', '').replace(
-          "'", ''
-      ).replace('/', '_')
-      try:
-        n = int(info)
-      except ValueError:
-        pass
-      else:
-        info = n
       if mode == mode_CFGDSPLY:
         if heading == 'Adapter':
           An = info
