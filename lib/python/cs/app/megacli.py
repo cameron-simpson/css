@@ -112,6 +112,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': ['cs.logutils', 'cs.pfx', 'cs.sh'],
     'entry_points': {
         'console_scripts': [
             'mcli = cs.app.megacli:main',
