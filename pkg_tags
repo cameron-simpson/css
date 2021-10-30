@@ -5,7 +5,7 @@ cs.app.ffmpeg
 cs.app.flag pypi.release="20201228" ok_revision="7edcd93a1c777caa97f8f30d60e863bceb80e3f9"
 cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
-cs.app.megacli pypi.release=20160310
+cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20210404" ok_revision="9f7cac4e2461bf0dc4851ae4d4714d9c4e56f55f"
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
@@ -45,7 +45,7 @@ cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210717" ok_revision="385fe0965d7874d9f861ad9943a6e6d27827e692" features={"20210717":["SingletonMixin_key_is_none"]}
 cs.packetstream pypi.release="20210306" ok_revision="5288dfe60e38aed5a428228c9f309381e13a609e"
-cs.pfx pypi.release="20210913" ok_revision="8cdfad1232b706ac46eb460523d899ef2e63cca5" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"]}
+cs.pfx pypi.release="20211031" ok_revision="0da93aa4a25c75f2e547a3ecd3351a762828e5a2" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"]}
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="86e03391b63b3b26367f2d00e3d828311cb12c5b" pypi.release="20210407.2"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b

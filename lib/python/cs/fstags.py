@@ -902,6 +902,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
+    fstags = self.options.fstags
     with state(verbose=True):
       for path in paths:
         with Pfx(path):
@@ -910,8 +911,6 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
             tagged.discard(tag)
           else:
             tagged.add(tag)
-
-      self.options.fstags.apply_tag_choices([tag_choice], paths)
 
   def cmd_test(self, argv):
     ''' Usage: {cmd} [--direct] path {{tag[=value]|-tag}}...

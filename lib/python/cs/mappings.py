@@ -23,7 +23,7 @@ import re
 from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
@@ -1364,14 +1364,19 @@ class PrefixedMappingProxy(RemappedMappingProxy):
 
   def __init__(self, mapping, prefix):
     # precompute function references
-    unprefixify = self.unprefixy_key
-    prefixify = self.prefixy_subkey
+    unprefixify = self.unprefixify_key
+    prefixify = self.prefixify_subkey
     super().__init__(
         mapping,
-        to_subkey=lambda key: unprefixy(key, prefix),
-        from_subkey=lambda subk: prefixy(subk, prefix),
+        to_subkey=lambda key: prefixify(key, prefix),
+        from_subkey=lambda subk: unprefixify(subk, prefix),
     )
     self.prefix = prefix
+
+  def __str__(self):
+    return "%s[%r](prefix=%r,mapping=%s)" % (
+        type(self).__name__, type(self).__mro__, self.prefix, r(self.mapping)
+    )
 
   @staticmethod
   def prefixify_subkey(subk, prefix):
@@ -1384,7 +1389,8 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   def unprefixify_key(key, prefix):
     ''' Return the internal subkey (unprefixed) from the external `key`.
     '''
-    assert key.startswith(prefix)
+    assert key.startswith(prefix), \
+        "key:%r does not start with prefix:%r" % (key, prefix)
     return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
