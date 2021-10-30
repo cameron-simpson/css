@@ -103,8 +103,8 @@ from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
 from cs.logutils import warning, error
+from cs.pfx import Pfx, pfx
 from cs.sh import quotecmd
-from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -316,13 +316,10 @@ class MegaRAID(NS):
       for DRVid, DRV in A.physical_disks.items():
         cmd_append(str(DRVid))
         if DRVid in disks:
-          ##X("%s: merge PDlist DRV with Mconfigured DRV", DRVid)
           merge_attrs(disks[DRVid], **DRV.__dict__)
         else:
-          ##X("%s: add new DRV to Mconfigured", DRVid)
           disks[DRVid] = DRV
         cmd_pop()
-      X("Mphysical merged")
     cmd_pop()
 
     return Mconfigured
@@ -390,14 +387,12 @@ class MegaRAID(NS):
       if mode == mode_CFGDSPLY:
         if heading == 'DISK GROUP':
           DGn = info
-          ##D("new disk_group %d", DGn)
           A.disk_groups[DGn] = Disk_Group(adapter=A, number=DGn, spans={})
           DG = A.disk_groups[DGn]
           o = DG
           continue
         if heading == 'SPAN':
           SPn = info
-          ##D("new span %d", SPn)
           DG.spans[SPn] = Span(disk_group=DG, number=SPn, arms={})
           SP = DG.spans[SPn]
           o = SP
@@ -406,7 +401,6 @@ class MegaRAID(NS):
           Vn, Tn = info.split(' (Target Id: ', 1)
           Vn = int(Vn)
           Tn = int(Tn[:-1])
-          ##D("new virtual drive %d (target id %d)", Vn, Tn)
           V = A.virtual_drives[Vn] = Virtual_Drive(
               adapter=A, number=Vn, physical_disks={}
           )
@@ -414,7 +408,6 @@ class MegaRAID(NS):
           continue
         if heading == 'Physical Disk':
           DRVn = info
-          ##D("new physical disk %d", DRVn)
           DRV = Physical_Disk(virtual_drive=V, number=DRVn, adapter=A)
           V.physical_disks[DRVn] = DRV
           DRV.virtual_drive = V
@@ -467,7 +460,6 @@ class MegaRAID(NS):
         info = True
       elif info == 'No':
         info = False
-      ##D("%s.%s = %s", o.__class__.__name__, attr, info)
       if o is None:
         error("o is None, not setting .%s to %r", attr, info)
       else:
@@ -478,7 +470,6 @@ class MegaRAID(NS):
       if mode == mode_PDLIST:
         if DRV is not None:
           DRVid = DRV.id
-          X("PDLIST: note physical drive %s", DRVid)
           cmd_append("final merge previous DRV %s", DRVid)
           if DRVid in A.physical_disks:
             merge_attrs(A.physical_disks[DRV.id], **DRV.__dict__)
@@ -537,8 +528,8 @@ class MegaRAID(NS):
                 self.FW_STATES_AVAILABLE,
             )
             ok = False
-          else:
-            X("acceptable drive: %s", DRV.firmware_state)
+          ##else:
+          ##  X("acceptable drive: %s", DRV.firmware_state)
         cmd_pop()
     cmd_pop()
     if not ok:
@@ -552,7 +543,7 @@ class MegaRAID(NS):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    X("+ %r", cmdargs)
+    print("+", quotecmd(cmdargs), file=sys.stderr)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True, encoding='ascii')
     for line in P.stdout:
       yield line
@@ -652,19 +643,21 @@ def cmd_pop():
   global cmd, cmd_old
   cmd = cmd_old.pop()
 
+@pfx
 def merge_attrs(o, **kw):
   for attr, value in kw.items():
-    if not len(attr) or not attr[0].isalpha():
-      X(".%s: ignoring, does not start with a letter", attr)
-      continue
-    try:
-      ovalue = getattr(o, attr)
-    except AttributeError:
-      # new attribute
-      setattr(o, attr, value)
-    else:
-      if ovalue != value:
-        X("%s: %s: %r => %r", o, attr, ovalue, value)
+    with Pfx("%s=%r", attr, value):
+      if not len(attr) or not attr[0].isalpha():
+        warning(".%s: ignoring, does not start with a letter", attr)
+        continue
+      try:
+        ovalue = getattr(o, attr)
+      except AttributeError:
+        # new attribute
+        setattr(o, attr, value)
+      else:
+        if ovalue != value:
+          warning("value %r => %r", ovalue, value)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
