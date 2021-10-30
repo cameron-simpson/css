@@ -133,7 +133,7 @@ MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
 mode_CFGDSPLY = 0  # -CfgDsply mode
 mode_PDLIST = 1  # -PDlist mode
 
-re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
+re_SPEED = re.compile(r'^(\d+(\.\d+)?)\s*(\S+)$')
 
 def main(argv=None):
   global cmd_old
