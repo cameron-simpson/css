@@ -376,17 +376,14 @@ class MegaRAID(NS):
     DRV = None
     o = None
     for mlineno, line, heading, info, attr in self._preparse(fp):
+      if heading == 'Adapter':
+        An = info
+        A = M.adapters[info] = Adapter(
+            number=An, disk_groups={}, physical_disks={}, virtual_drives={}
+        )
         o = A
         continue
       if mode == mode_CFGDSPLY:
-        if heading == 'Adapter':
-          An = info
-          ##D("new adapter %d", An)
-          A = M.adapters[info] = Adapter(
-              number=An, disk_groups={}, physical_disks={}, virtual_drives={}
-          )
-          o = A
-          continue
         if heading == 'DISK GROUP':
           DGn = info
           ##D("new disk_group %d", DGn)
