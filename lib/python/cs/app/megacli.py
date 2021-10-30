@@ -102,6 +102,7 @@ import sys
 from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
+from cs.logutils import warning, error
 from cs.x import X
 DISTINFO = {
     'keywords': ["python3"],
@@ -701,28 +702,6 @@ def merge_attrs(o, **kw):
     else:
       if ovalue != value:
         X("%s: %s: %r => %r", o, attr, ovalue, value)
-
-debug = os.environ.get('DEBUG')
-if debug:
-
-  def D(msg, *a):
-    message(msg, sys.stderr, "debug", *a)
-else:
-
-  def D(msg, *a):
-    pass
-
-def warning(msg, *a):
-  message(msg, sys.stderr, "warning", *a)
-
-def error(msg, *a):
-  message(msg, sys.stderr, "error", *a)
-
-def message(msg, fp, prefix, *a):
-  global cmd
-  if a:
-    msg = msg % a
-  print(cmd + ":", prefix + ":", msg, file=fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
