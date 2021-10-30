@@ -19,7 +19,7 @@ from cs.pfx import pfx_method
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-__version__ = '20210731-post'
+__version__ = '20210906-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -164,9 +164,19 @@ class MultiOpenMixin(object):
   def startup_shutdown(self):
     ''' Default context manager form of startup/shutdown - just calls them.
     '''
-    self.startup()
+    try:
+      startup = self.startup
+    except AttributeError:
+      pass
+    else:
+      startup()
     yield
-    self.shutdown()
+    try:
+      shutdown = self.shutdown
+    except AttributeError:
+      pass
+    else:
+      shutdown()
 
   def open(self, caller_frame=None):
     ''' Increment the open count.

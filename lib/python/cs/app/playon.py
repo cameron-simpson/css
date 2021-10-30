@@ -378,8 +378,8 @@ class _RequestsNoAuth(requests.auth.AuthBase):
 
 # pylint: disable=too-many-ancestors
 @has_format_attributes
-class PlayOnSQLTagSet(SQLTagSet):
-  ''' An `SQLTagSet` with some special methods.
+class Recording(SQLTagSet):
+  ''' An `SQLTagSet` with knowledge about PlayOn recordings.
   '''
 
   # recording data stale after 10 minutes
@@ -495,7 +495,10 @@ class PlayOnSQLTags(SQLTags):
 
   STATEDBPATH = '~/var/playon.sqlite'
 
-  TagSetClass = PlayOnSQLTagSet
+  # map 'foo' from 'foo.bah' to a particular TagSet subclass
+  TAGSETCLASS_PREFIX_MAPPING = {
+      'recording': Recording,
+  }
 
   def __init__(self, dbpath=None):
     if dbpath is None:

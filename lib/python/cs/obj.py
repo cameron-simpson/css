@@ -328,7 +328,7 @@ class SingletonMixin:
   ''' A mixin turning a subclass into a singleton factory.
 
       *Note*: this mixin overrides `object.__new__`
-      and may not play well with other classes which oeverride `__new__`.
+      and may not play well with other classes which override `__new__`.
 
       *Warning*: because of the mechanics of `__new__`,
       the instance's `__init__` method will always be called
