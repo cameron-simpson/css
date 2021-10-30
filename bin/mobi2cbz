@@ -21,7 +21,7 @@ from cs.pfx import pfx_call
 import mobi
 
 class Mobi2CBZCommand(BaseCommand):
-  ''' Command line implemenetation for `mobi2cbz`.
+  ''' Command line implementation for `mobi2cbz`.
   '''
 
   USAGE_FORMAT = r'''Usage: {cmd} mobipath

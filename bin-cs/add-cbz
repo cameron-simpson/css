@@ -20,7 +20,7 @@ badopts=
 [ $# -gt 0 ] && [ "x$1" = x-C ] && { calibre_library=$2; shift; shift; }
 
 [ -d "$calibre_library/" ] || {
-  echo "$cmd: calibre library not a directory: $calibre_library" >&2
+  echo "$cmd: calibre library is not a directory: $calibre_library" >&2
   badopts=1
 }
 
@@ -39,7 +39,7 @@ esac
   && [ -n "$dbid" ] \
   || {
     echo "$cmd: cannot infer dbid from mobipath: $mobipath" >&2
-    echo "  expcted */* (dbid)/* style path" >&2
+    echo "  expected \"*/* (dbid)/*\" style path" >&2
     badopts=1
   }
 
