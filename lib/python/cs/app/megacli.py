@@ -103,7 +103,9 @@ from subprocess import call, Popen, PIPE
 from types import SimpleNamespace as NS
 
 from cs.logutils import warning, error
+from cs.sh import quotecmd
 from cs.x import X
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
