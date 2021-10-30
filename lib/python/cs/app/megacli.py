@@ -343,6 +343,8 @@ class MegaRAID(NS):
       attr = None
       if ': ' in line:
         heading, info = line.split(': ', 1)
+      elif ' #' in line:
+        heading, info = line.split(' #', 1)
       elif ' :' in line:
         heading, info = line.split(' :', 1)
       elif line.endswith(':'):
