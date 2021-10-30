@@ -106,7 +106,7 @@ from cs.logutils import warning, error
 from cs.pfx import Pfx, pfx
 from cs.sh import quotecmd
 
-__version__ = '20211031'
+__version__ = '20211031-post'
 
 DISTINFO = {
     'keywords': ["python3"],
