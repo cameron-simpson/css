@@ -998,7 +998,7 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
     self.fspaths = fspaths
 
   def set_fspaths(self, new_fspaths):
-    ''' Update the list of fielsystem paths.
+    ''' Update the list of filesystem paths.
     '''
     display_paths = super().set_fspaths(new_fspaths)
     for child in list(self.grid_slaves()):
@@ -1023,4 +1023,4 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
   def show_fspath(self, fspath):
     ''' TODO: bring to correspnding thumbnail into view.
     '''
-    warning("UNIMPLEMENTED")
+    warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
