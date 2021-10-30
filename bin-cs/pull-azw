@@ -92,9 +92,11 @@ fi
 tsfile=$calibre_library/$tsbase
 new_tsfile=$tsfile-$$
 
+time-based=
 if [ $# = 0 ]
 then
   # automatic mode, based on timestamp file
+  time_based=1
   cd "$kindle_library"
   touch "$new_tsfile"
   if [ -e "$tsfile" ]
@@ -109,10 +111,10 @@ fi
 if $trace calibredb add "--library-path=$calibre_library" $cal_add_opts -- "$@"
 then
   # advance timestamp
-  [ -e "$new_tsfile" ] && mv "$new_tsfile" "$tsfile"
+  [ $time_based ] && mv "$new_tsfile" "$tsfile"
 else
   # discard new timestamp if any
-  rm -f "$new_tsfile"
+  [ $time_based ] && rm -f "$new_tsfile"
 fi \
 | tee /dev/fd/2 \
 | sed '/^Added book ids: /!d; s/^Added book ids: *//; s/ *, */ /g' | tr ' ' '\012' \
