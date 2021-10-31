@@ -143,7 +143,6 @@ class VTCmd(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
-    options.verbose = True
     options.config_path = os.environ.get(
         'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
     )
