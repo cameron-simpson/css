@@ -45,7 +45,12 @@ HASHCLASS_NAMES = tuple(
 INDEXCLASS_NAMES = tuple(
     os.environ.get(INDEXCLASS_NAMES_ENVVAR, '').split() or get_index_names()
 )
-STORECLASS_NAMES = tuple(os.environ.get(STORECLASS_NAMES_ENVVAR, '').split())
+STORECLASS_NAMES = tuple(
+    os.environ.get(STORECLASS_NAMES_ENVVAR, '').split() or (
+        'MappingStore', 'MemoryCacheStore', 'DataDirStore', 'FileCacheStore',
+        'StreamStore', 'TCPClientStoreUNIXSocketClientStore', 'ProxyStore'
+    )
+)
 
 def get_test_stores(prefix):
   ''' Generator of test Stores for various combinations.
