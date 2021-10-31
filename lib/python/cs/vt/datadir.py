@@ -740,22 +740,21 @@ class SqliteFilemap:
         Return its `DataFileState`.
     '''
     info("new path %r", shortpath(new_path))
-    with Pfx("add_path(%r,indexed_to=%d)", new_path, indexed_to):
-      with self._lock:
-        c = self._modify(
-            'INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)',
-            (new_path, 0),
-            return_cursor=True
-        )
-        if c:
-          filenum = c.lastrowid
-          self._map(new_path, filenum, indexed_to=indexed_to)
-          c.close()
-        else:
-          # TODO: look up the path=>(filenum,indexed_to) as fallback
-          error("FAILED")
-          return None
-      return self.n_to_DFstate[filenum]
+    with self._lock:
+      c = self._modify(
+          'INSERT INTO filemap(`path`, `indexed_to`) VALUES (?, ?)',
+          (new_path, 0),
+          return_cursor=True
+      )
+      if c:
+        filenum = c.lastrowid
+        self._map(new_path, filenum, indexed_to=indexed_to)
+        c.close()
+        DFstate = self.n_to_DFstate[filenum]
+      else:
+        # already mapped
+        DFState = self.path_to_DFstate[new_path]
+    return DFstate
 
   def del_path(self, old_path):
     ''' Forget the information for `old_path`.
