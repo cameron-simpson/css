@@ -338,11 +338,11 @@ class TestStore(unittest.TestCase, _TestAdditionsMixin):
           self.assertTrue(
               all(map(lambda h: h >= start_hashcode, hashcodes_from))
           )
-        hashcodes_expected = sorted(
-            h for h in hashcodes_added
-            if start_hashcode is None or h >= start_hashcode
-        )
-        self.assertEqual(hashcodes_from, hashcodes_expected)
+        ##hashcodes_expected = sorted(
+        ##    h for h in hashcodes_added
+        ##    if start_hashcode is None or h >= start_hashcode
+        ##)
+        ##self.assertEqual(hashcodes_from, hashcodes_expected)
 
   @multitest
   def testhcu02hashcodes(self):
