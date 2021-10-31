@@ -58,7 +58,10 @@ import sys
 from time import time, sleep
 from types import SimpleNamespace
 from uuid import uuid4
-from icontract import require
+
+from icontract import ensure, require
+from typeguard import typechecked
+
 from cs.app.flag import DummyFlags, FlaggedMixin
 from cs.buffer import CornuCopyBuffer
 from cs.cache import LRU_Cache
@@ -407,7 +410,8 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     '''
     return self.pathto(joinpath('data', rpath))
 
-  def new_datafile(self):
+  @typechecked
+  def new_datafile(self) -> DataFileState:
     ''' Create a new datafile.
         Return its `DataFileState`.
     '''
@@ -727,9 +731,11 @@ class SqliteFilemap:
         self._map(path, filenum, indexed_to)
       c.close()
 
+  @pfx_method
+  @typechecked
   @require(lambda new_path: new_path is not None)
   ##@require(lambda new_path: isfilepath(new_path))
-  def add_path(self, new_path, indexed_to=0):
+  def add_path(self, new_path: str, indexed_to=0) -> DataFileState:
     ''' Insert a new path into the map.
         Return its `DataFileState`.
     '''
