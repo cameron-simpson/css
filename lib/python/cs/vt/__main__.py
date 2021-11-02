@@ -1002,20 +1002,22 @@ class VTCmd(BaseCommand):
     with Pfx("%s => %s", srcS.name, dstS.name):
       runstate = options.runstate
       Q, T = srcS.pushto(dstS, progress=options.progress)
-      for pushable in pushables:
-        if runstate.cancelled:
-          xit = 1
-          break
-        with Pfx(str(pushable)):
-          pushed_ok = pushable.pushto_queue(
-              Q, runstate=runstate, progress=options.progress
-          )
-          assert isinstance(pushed_ok, bool)
-          if not pushed_ok:
-            error("push failed")
+      try:
+        for pushable in pushables:
+          if runstate.cancelled:
             xit = 1
-      Q.close()
-      T.join()
+            break
+          with Pfx(str(pushable)):
+            pushed_ok = pushable.pushto_queue(
+                Q, runstate=runstate, progress=options.progress
+            )
+            assert isinstance(pushed_ok, bool)
+            if not pushed_ok:
+              error("push failed")
+              xit = 1
+      finally:
+        Q.close()
+        T.join()
       return xit
 
   def cmd_pullfrom(self, argv):
