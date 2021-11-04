@@ -1,3 +1,4 @@
+cs.deco: use @functools.wraps to gather up __doc__ etc
 fstags ls in / wigs out
 pfx_method no longer honours with_args, flip with_args to True and reimpl args?
 cs.cmdutils: cmd_help does not print the usage preamble, just the per command usages
