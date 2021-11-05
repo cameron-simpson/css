@@ -618,6 +618,9 @@ class CloudBackupCommand(BaseCommand):
     return xit
 
   def cmd_status(self, argv):
+    ''' Usage: {cmd} status
+          Report the backup configuration.
+    '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
