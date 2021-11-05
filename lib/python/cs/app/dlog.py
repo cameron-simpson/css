@@ -132,7 +132,7 @@ class DLogCommand(BaseCommand):
       raise GetoptError("no headline")
     if not options.categories:
       options.categories.update(
-          self.cats_from_str(options.fstags['.'].get('cs.dlog', ''))
+          self.cats_from_str(options.fstags['.'].all_tags.get('cs.dlog', ''))
       )
     headline = ' '.join(argv)
     dlog(

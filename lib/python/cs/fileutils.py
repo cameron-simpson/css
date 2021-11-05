@@ -1774,7 +1774,7 @@ def atomic_filename(
         pfx_call(shutil.copymode, filename, T.name)
       except OSError as e:
         warning(
-            "defaut modes not copied from from placehodler %r: %s", filename, e
+            "defaut modes not copied from from placeholder %r: %s", filename, e
         )
     pfx_call(rename, T.name, filename)
 

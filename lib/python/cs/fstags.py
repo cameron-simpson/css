@@ -95,7 +95,7 @@ from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
 from cs.lex import (get_ini_clause_entryname, FormatAsError)
 from cs.logutils import error, warning, ifverbose
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.tagset import (
     Tag,
@@ -809,7 +809,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     if not argv:
       raise GetoptError("missing tags")
     try:
-      tag_choices = self.parse_tag_choices(argv)
+      tag_choices = [pfx_call(self.parse_tag_addremove, arg) for arg in argv]
     except ValueError as e:
       raise GetoptError(str(e))  # pylint: disable=raise-missing-from
     if badopts:
@@ -819,7 +819,14 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
     else:
       paths = [path]
     with state(verbose=True):
-      fstags.apply_tag_choices(tag_choices, paths)
+      for path in paths:
+        with Pfx(path):
+          tagged = fstags[path]
+          for remove, tag in tag_choices:
+            if remove:
+              pfx_call(tagged.discard, tag)
+            else:
+              pfx_call(tagged.add, tag)
 
   def cmd_tagfile(self, argv):
     ''' Usage: {cmd} tagfile_path [subcommand ...]
@@ -882,7 +889,7 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       tag_choice_s = argv.pop(0)
       with Pfx(repr(tag_choice_s)):
         try:
-          tag_choice = self.parse_tagset_criterion(tag_choice_s)
+          remove, tag = self.parse_tag_addremove(tag_choice_s)
         except ValueError as e:
           warning(e)
           badopts = True
@@ -895,8 +902,15 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
       paths = [line.rstrip('\n') for line in sys.stdin]
     else:
       paths = argv
+    fstags = self.options.fstags
     with state(verbose=True):
-      self.options.fstags.apply_tag_choices([tag_choice], paths)
+      for path in paths:
+        with Pfx(path):
+          tagged = fstags[path]
+          if remove:
+            tagged.discard(tag)
+          else:
+            tagged.add(tag)
 
   def cmd_test(self, argv):
     ''' Usage: {cmd} [--direct] path {{tag[=value]|-tag}}...
@@ -1255,10 +1269,12 @@ class FSTags(MultiOpenMixin):
   def edit_dirpath(self, dirpath, all_names=False):
     ''' Edit the filenames and tags in a directory.
 
-        If `all_names` is true, include names commencings with a dot,
+        If `all_names` is true, include names commencing with a dot,
         otherwise exclude them.
     '''
     ok = True
+    dirpath = realpath(dirpath)
+    tagged_dir = self[dirpath]
     tagfile = self.dir_tagfile(dirpath)
     tagsets = tagfile.tagsets
     names = sorted(
@@ -1269,16 +1285,20 @@ class FSTags(MultiOpenMixin):
             )
         )
     )
-    tes = []
+    # Prepare te_map, a mapping of names to TagSets.
+    # This relies on the dict insertion order.
+    dirpath_key = shortpath(dirpath)
+    assert os.sep in dirpath_key
+    te_map = {dirpath_key: tagged_dir}
     for name in names:
+      assert name not in te_map
       if not name or os.sep in name:
         warning("skip bogus name %r", name)
         continue
       path = joinpath(dirpath, name)
-      tagged_path = self[path]
-      tes.append(tagged_path)
+      te_map[name] = self[path]
     # edit entities, return modified entities
-    changed_tes = TagSet.edit_many(tes)  # verbose-state.verbose
+    changed_tes = TagSet.edit_tagsets(te_map)  # verbose-state.verbose
     # now apply any file renames
     for old_name, new_name, te in changed_tes:
       if old_name == new_name:

@@ -36,7 +36,7 @@ from typeguard import typechecked
 
 from cs.deco import fmtdoc, decorator
 from cs.gimmicks import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
@@ -1269,6 +1269,25 @@ _format_as = format_as  # for reuse in the format_as method below
 def format_attribute(method):
   ''' Mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
+
+      For example,
+      the `FormatableMixin.json` method is defined like this:
+
+          @format_attribute
+          def json(self):
+              return self.FORMAT_JSON_ENCODER.encode(self)
+
+      which allows a `FormatableMixin` subclass instance
+      to be used in a format string like this:
+
+          {instance:json}
+
+      to insert a JSON transcription of the instance.
+
+      It is recommended that methods marked with `@format_attribute`
+      have no side effects and do not modify state,
+      as they are intended for use in ad hoc format strings
+      supplied by an end user.
   '''
   method.is_format_attribute = True
   return method
@@ -1486,7 +1505,7 @@ class FormatableFormatter(Formatter):
               if isinstance(value, str):
                 value = FStr(value)
               else:
-                value = format(value, format_subspec)
+                value = pfx_call(format, value, format_subspec)
             value, offset = value.convert_via_method_or_attr(
                 value, format_subspec
             )
