@@ -439,11 +439,12 @@ class CloudBackupCommand(BaseCommand):
           Restore files from the named backup.
           Options:
             -o outputdir    Output directory to create to hold the
-                            restored files.
+                            restored files. It may not already exist.
             -U backup_uuid  The backup UUID from which to restore.
+          See the "ls" subcommand for lists of backup names and the
+          UUIDs of the available backup revisions.
     '''
     # TODO: move the core logic into a CloudBackup method
-    # TODO: list backup names if no backup_name
     # TODO: restore file to stdout?
     # TODO: restore files as tarball to stdout or filename
     # TODO: rsync-like include/exclude or files-from options?
@@ -469,7 +470,10 @@ class CloudBackupCommand(BaseCommand):
           warning("already exists")
           badopts = True
     if not argv:
-      warning("missing backup_name")
+      warning(
+          "missing backup_name, I know: " +
+          ', '.join(options.cloud_backup.keys())
+      )
       badopts = True
     else:
       backup_name = argv.pop(0)
