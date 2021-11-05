@@ -98,7 +98,7 @@ class CloudBackupCommand(BaseCommand):
   # TODO: rekey -K oldkey backup_name [subpaths...]: add per-file keys for new key
   # TODO: openssl-like -passin option for passphrase
 
-  SUBCOMMAND_ARGV_DEFAULT = ('ls',)
+  SUBCOMMAND_ARGV_DEFAULT = ('status',)
 
   # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
@@ -616,6 +616,18 @@ class CloudBackupCommand(BaseCommand):
                 )
                 print(pathname, "???", repr(name_details))
     return xit
+
+  def cmd_status(self, argv):
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    cloud_area = options.cloud_area
+    print("State dir:", options.state_dirpath)
+    print("Cloud area:", cloud_area.cloudpath)
+    print("Backups:", ', '.join(options.cloud_backup.keys()))
+    print("Environment:")
+    for envvar in 'CLOUDBACKUP_AREA', 'CLOUDBACKUP_KEYNAME':
+      print("  $" + envvar, os.environ.get(envvar, ''))
 
 class HashCode(bytes):
   ''' The base class for various flavours of hashcodes.
