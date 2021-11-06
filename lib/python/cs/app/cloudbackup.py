@@ -1773,10 +1773,10 @@ class NamedBackup(SingletonMixin):
               return hashcode, fstat
             # compute hashcode from file contents
             hashcode = DEFAULT_HASHCLASS.digester()
-            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
-            if runstate.cancelled:
-              return None, None
-            hasher.update(mm)
+            with mmap(fd, fstat.st_size, prot=PROT_READ) as mm:
+              if runstate.cancelled:
+                return None, None
+              hasher.update(mm)
             hashcode = DEFAULT_HASHCLASS(hasher.digest())
         except OSError as e:
           warning("checksum: %s", e)
@@ -1850,26 +1850,26 @@ class NamedBackup(SingletonMixin):
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
-            mm = mmap(fd2, 0, prot=PROT_READ)
-            hasher = DEFAULT_HASHCLASS.digester()
-            if runstate.cancelled:
-              return None, None
-            hasher.update(mm)
-            hashcode = DEFAULT_HASHCLASS(hasher.digest())
-            # upload the content if not already uploaded
-            # TODO: shared by hashcode set of locks
-            if runstate.cancelled:
-              return None, None
-            P = Progress(name="crypt upload " + subpath, total=len(mm))
-            backup_run.upload_progress.add(P)
-            with P.bar(proxy=proxy, label=''):
-              self.upload_hashcode_content(
-                  backup_record,
-                  mm,
-                  hashcode,
-                  upload_progress=P,
-                  length=len(mm)
-              )
+            with mmap(fd2, 0, prot=PROT_READ) as mm:
+              hasher = DEFAULT_HASHCLASS.digester()
+              if runstate.cancelled:
+                return None, None
+              hasher.update(mm)
+              hashcode = DEFAULT_HASHCLASS(hasher.digest())
+              # upload the content if not already uploaded
+              # TODO: shared by hashcode set of locks
+              if runstate.cancelled:
+                return None, None
+              P = Progress(name="crypt upload " + subpath, total=len(mm))
+              backup_run.upload_progress.add(P)
+              with P.bar(proxy=proxy, label=''):
+                self.upload_hashcode_content(
+                    backup_record,
+                    mm,
+                    hashcode,
+                    upload_progress=P,
+                    length=len(mm)
+                )
             backup_run.upload_progress.remove(P, accrue=True)
         return hashcode, fstat
 
