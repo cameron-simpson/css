@@ -1841,11 +1841,14 @@ class NamedBackup(SingletonMixin):
         if runstate.cancelled:
           return None, None
         proxy("prepare upload")
+        subpath_tmpname_part = subpath.replace(os.sep, '_')
+        if len(subpath_tmpname_part) > 64:
+          subpath_tmpname_part = '...' + subpath_tmpname_part[-61:]
         with NamedTemporaryCopy(
             filename,
             progress=65536,
             progress_label="snapshot " + filename,
-            prefix='backup_filename__' + subpath.replace(os.sep, '_') + '__',
+            prefix='backup_filename__' + subpath_tmpname_part + '__',
         ) as T:
           if runstate.cancelled:
             return None, None
