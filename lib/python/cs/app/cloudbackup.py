@@ -1870,6 +1870,11 @@ class NamedBackup(SingletonMixin):
                     upload_progress=P,
                     length=len(mm)
                 )
+              proxy.text = (
+                  P.format_counter(P.position) + ' in ' + transcribe(
+                      P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+                  )
+              )
             backup_run.upload_progress.remove(P, accrue=True)
         return hashcode, fstat
 
