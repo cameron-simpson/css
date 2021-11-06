@@ -1051,7 +1051,7 @@ class BackupRun(RunStateMixin):
     '''
     RunStateMixin.__init__(
         self, "%s.runstate(%s,%s)" %
-        (type(self).__name__, self.cloud_area, self.public_key_name)
+        (type(self).__name__, cloud_area, public_key_name)
     )
     if folder_parallel is None:
       folder_parallel = 4
@@ -1065,7 +1065,6 @@ class BackupRun(RunStateMixin):
     self.public_key_name = public_key_name
     self.folder_parallel = folder_parallel
     self.file_parallel = file_parallel
-    self.runstate = None
     self.content_path = cloud_area.subarea('content').cloudpath
     # mention resources here for lint
     self.backup_record = None
