@@ -1907,6 +1907,10 @@ class NamedBackup(SingletonMixin):
         public_key_name=backup_record.public_key_name,
         upload_progress=upload_progress,
     )
+    # I suspect that the B2 upload function, at least, does not
+    # necessarily report the completion point.
+    if upload_progress is not None:
+      upload_progress.position = length
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
 
