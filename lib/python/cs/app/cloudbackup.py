@@ -63,7 +63,7 @@ from cs.mappings import (
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress, OverProgress, progressbar
-from cs.resources import RunState, RunStateMixin
+from cs.resources import RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
@@ -1049,6 +1049,10 @@ class BackupRun(RunStateMixin):
           allowing for the latency of the cloud upload process;
           default from `DEFAULT_JOB_MAX`: `{DEFAULT_JOB_MAX}`
     '''
+    RunStateMixin.__init__(
+        self, "%s.runstate(%s,%s)" %
+        (type(self).__name__, self.cloud_area, self.public_key_name)
+    )
     if folder_parallel is None:
       folder_parallel = 4
     if file_parallel is None:
@@ -1102,16 +1106,11 @@ class BackupRun(RunStateMixin):
     )
     status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
-    runstate = RunState(
-        "%s.runstate(%s,%s)" %
-        (type(self).__name__, self.cloud_area, self.public_key_name)
-    )
-
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
       warning("received signal %s", signum)
-      runstate.cancel()
+      self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
@@ -1123,7 +1122,6 @@ class BackupRun(RunStateMixin):
     self._stacked.append(
         pushattrs(
             self,
-            runstate=runstate,
             backup_record=backup_record,
             backup_uuid=backup_record.uuid,
             status_proxy=status_proxy,
@@ -1137,7 +1135,7 @@ class BackupRun(RunStateMixin):
         )
     )
     backup_record.start()
-    runstate.start()
+    self.runstate.start()
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
