@@ -1572,6 +1572,7 @@ class NamedBackup(SingletonMixin):
           if runstate.cancelled:
             break
           with Pfx(name):
+            changed = False
             pathname = joinpath(dirpath, name)
             if name in names:
               warning("repeated")
