@@ -68,7 +68,7 @@ from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.tty import modify_termios
-from cs.units import BINARY_BYTES_SCALE, transcribe
+from cs.units import transcribe, BINARY_BYTES_SCALE, TIME_SCALE
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DEFAULT_JOB_MAX = 16
@@ -1177,7 +1177,7 @@ class BackupRun(RunStateMixin):
         self.folder_proxies.add(proxy)
 
   @contextmanager
-  def file_proxy(self):
+  def file_proxy(self, no_reset=False):
     ''' Allocate and return a file `UpdProxy` for use by a file scan.
     '''
     with self._lock:
@@ -1185,7 +1185,8 @@ class BackupRun(RunStateMixin):
     try:
       yield proxy
     finally:
-      proxy.reset()
+      if not no_reset:
+        proxy.reset()
       with self._lock:
         self.file_proxies.add(proxy)
 
@@ -1740,7 +1741,7 @@ class NamedBackup(SingletonMixin):
       return None, None
     filename = joinpath(backup_root_dirpath, subpath)
     with Pfx("backup_filename(%r)", filename):
-      with backup_run.file_proxy() as proxy:
+      with backup_run.file_proxy(no_reset=True) as proxy:
         proxy.prefix = subpath + ': '
         proxy("check against previous backup")
         backup_record = backup_run.backup_record
@@ -1871,7 +1872,7 @@ class NamedBackup(SingletonMixin):
                     length=len(mm)
                 )
               proxy.text = (
-                  P.format_counter(P.position) + ' in ' + transcribe(
+                  P.format_counter(len(mm)) + ' in ' + transcribe(
                       P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
                   )
               )
