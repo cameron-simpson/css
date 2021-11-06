@@ -1519,7 +1519,7 @@ class FormatableFormatter(Formatter):
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
-      - a `__format__ method which parses the `format_spec` string
+      - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
         with a suitable mapping derived from the instance
@@ -1604,7 +1604,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   ##@staticmethod
   def convert_field(self, value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
+    ''' The default converter for fields calls `Formatter.convert_field`.
     '''
     if conversion == '':
       warning(
