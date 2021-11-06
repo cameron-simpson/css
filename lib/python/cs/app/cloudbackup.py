@@ -63,7 +63,7 @@ from cs.mappings import (
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx
 from cs.progress import Progress, OverProgress, progressbar
-from cs.resources import RunState, RunStateMixin
+from cs.resources import RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
@@ -98,7 +98,7 @@ class CloudBackupCommand(BaseCommand):
   # TODO: rekey -K oldkey backup_name [subpaths...]: add per-file keys for new key
   # TODO: openssl-like -passin option for passphrase
 
-  SUBCOMMAND_ARGV_DEFAULT = ('ls',)
+  SUBCOMMAND_ARGV_DEFAULT = ('status',)
 
   # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
@@ -439,11 +439,12 @@ class CloudBackupCommand(BaseCommand):
           Restore files from the named backup.
           Options:
             -o outputdir    Output directory to create to hold the
-                            restored files.
+                            restored files. It may not already exist.
             -U backup_uuid  The backup UUID from which to restore.
+          See the "ls" subcommand for lists of backup names and the
+          UUIDs of the available backup revisions.
     '''
     # TODO: move the core logic into a CloudBackup method
-    # TODO: list backup names if no backup_name
     # TODO: restore file to stdout?
     # TODO: restore files as tarball to stdout or filename
     # TODO: rsync-like include/exclude or files-from options?
@@ -469,7 +470,10 @@ class CloudBackupCommand(BaseCommand):
           warning("already exists")
           badopts = True
     if not argv:
-      warning("missing backup_name")
+      warning(
+          "missing backup_name, I know: " +
+          ', '.join(options.cloud_backup.keys())
+      )
       badopts = True
     else:
       backup_name = argv.pop(0)
@@ -612,6 +616,21 @@ class CloudBackupCommand(BaseCommand):
                 )
                 print(pathname, "???", repr(name_details))
     return xit
+
+  def cmd_status(self, argv):
+    ''' Usage: {cmd} status
+          Report the backup configuration.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    cloud_area = options.cloud_area
+    print("State dir:", options.state_dirpath)
+    print("Cloud area:", cloud_area.cloudpath)
+    print("Backups:", ', '.join(options.cloud_backup.keys()))
+    print("Environment:")
+    for envvar in 'CLOUDBACKUP_AREA', 'CLOUDBACKUP_KEYNAME':
+      print("  $" + envvar, os.environ.get(envvar, ''))
 
 class HashCode(bytes):
   ''' The base class for various flavours of hashcodes.
@@ -1030,6 +1049,10 @@ class BackupRun(RunStateMixin):
           allowing for the latency of the cloud upload process;
           default from `DEFAULT_JOB_MAX`: `{DEFAULT_JOB_MAX}`
     '''
+    RunStateMixin.__init__(
+        self, "%s.runstate(%s,%s)" %
+        (type(self).__name__, cloud_area, public_key_name)
+    )
     if folder_parallel is None:
       folder_parallel = 4
     if file_parallel is None:
@@ -1042,7 +1065,6 @@ class BackupRun(RunStateMixin):
     self.public_key_name = public_key_name
     self.folder_parallel = folder_parallel
     self.file_parallel = file_parallel
-    self.runstate = None
     self.content_path = cloud_area.subarea('content').cloudpath
     # mention resources here for lint
     self.backup_record = None
@@ -1083,16 +1105,11 @@ class BackupRun(RunStateMixin):
     )
     status_proxy.prefix = "backup %s: " % (backup_record.uuid)
 
-    runstate = RunState(
-        "%s.runstate(%s,%s)" %
-        (type(self).__name__, self.cloud_area, self.public_key_name)
-    )
-
     def cancel_runstate(signum, frame):
       ''' Receive signal, cancel the `RunState`.
       '''
       warning("received signal %s", signum)
-      runstate.cancel()
+      self.runstate.cancel()
       ##if previous_interrupt not in (signal.SIG_IGN, signal.SIG_DFL, None):
       ##  previous_interrupt(signum, frame)
 
@@ -1104,7 +1121,6 @@ class BackupRun(RunStateMixin):
     self._stacked.append(
         pushattrs(
             self,
-            runstate=runstate,
             backup_record=backup_record,
             backup_uuid=backup_record.uuid,
             status_proxy=status_proxy,
@@ -1118,7 +1134,7 @@ class BackupRun(RunStateMixin):
         )
     )
     backup_record.start()
-    runstate.start()
+    self.runstate.start()
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -1525,7 +1541,7 @@ class NamedBackup(SingletonMixin):
     dirpath = joinpath(backup_root_dirpath, subpath)
     with Pfx("backup_single_directory(%r)", dirpath):
       with backup_run.folder_proxy() as proxy:
-        proxy.prefix = subpath + ': '
+        proxy.prefix = (subpath or '.') + ': '
         with Pfx("scandir"):
           proxy("scandir")
           try:
@@ -1556,6 +1572,7 @@ class NamedBackup(SingletonMixin):
           if runstate.cancelled:
             break
           with Pfx(name):
+            changed = False
             pathname = joinpath(dirpath, name)
             if name in names:
               warning("repeated")
@@ -1756,10 +1773,10 @@ class NamedBackup(SingletonMixin):
               return hashcode, fstat
             # compute hashcode from file contents
             hashcode = DEFAULT_HASHCLASS.digester()
-            mm = mmap(fd, fstat.st_size, prot=PROT_READ)
-            if runstate.cancelled:
-              return None, None
-            hasher.update(mm)
+            with mmap(fd, fstat.st_size, prot=PROT_READ) as mm:
+              if runstate.cancelled:
+                return None, None
+              hasher.update(mm)
             hashcode = DEFAULT_HASHCLASS(hasher.digest())
         except OSError as e:
           warning("checksum: %s", e)
@@ -1833,26 +1850,26 @@ class NamedBackup(SingletonMixin):
             return None, None
           with open(T.name, 'rb') as f2:
             fd2 = f2.fileno()
-            mm = mmap(fd2, 0, prot=PROT_READ)
-            hasher = DEFAULT_HASHCLASS.digester()
-            if runstate.cancelled:
-              return None, None
-            hasher.update(mm)
-            hashcode = DEFAULT_HASHCLASS(hasher.digest())
-            # upload the content if not already uploaded
-            # TODO: shared by hashcode set of locks
-            if runstate.cancelled:
-              return None, None
-            P = Progress(name="crypt upload " + subpath, total=len(mm))
-            backup_run.upload_progress.add(P)
-            with P.bar(proxy=proxy, label=''):
-              self.upload_hashcode_content(
-                  backup_record,
-                  mm,
-                  hashcode,
-                  upload_progress=P,
-                  length=len(mm)
-              )
+            with mmap(fd2, 0, prot=PROT_READ) as mm:
+              hasher = DEFAULT_HASHCLASS.digester()
+              if runstate.cancelled:
+                return None, None
+              hasher.update(mm)
+              hashcode = DEFAULT_HASHCLASS(hasher.digest())
+              # upload the content if not already uploaded
+              # TODO: shared by hashcode set of locks
+              if runstate.cancelled:
+                return None, None
+              P = Progress(name="crypt upload " + subpath, total=len(mm))
+              backup_run.upload_progress.add(P)
+              with P.bar(proxy=proxy, label=''):
+                self.upload_hashcode_content(
+                    backup_record,
+                    mm,
+                    hashcode,
+                    upload_progress=P,
+                    length=len(mm)
+                )
             backup_run.upload_progress.remove(P, accrue=True)
         return hashcode, fstat
 
