@@ -166,7 +166,8 @@ common = NS(
     progress=_progress,
     over_progress=_over_progress,
     runstate=RunState("cs.vt.common.runstate"),
-    config=None
+    config=None,
+    S=None,
 )
 
 del _progress
@@ -190,7 +191,6 @@ class _Defaults(ThreadState):
     self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
-    self.Ss = []
 
   @property
   def config(self):
@@ -220,29 +220,11 @@ class _Defaults(ThreadState):
   def S(self):
     ''' The topmost Store.
     '''
-    Ss = self.Ss
-    if Ss:
-      return self.Ss[-1]
-    _Ss = self._Ss
-    if _Ss:
-      return self._Ss[-1]
-    raise AttributeError('S')
-
-  @S.setter
-  def S(self, newS):
-    ''' Set the topmost Store.
-        Sets the topmost global Store
-        if there's no current perThread Store stack.
-    '''
-    Ss = self.Ss
-    if Ss:
-      Ss[-1] = newS
-    else:
-      _Ss = self._Ss
-      if _Ss:
-        _Ss[-1] = newS
-      else:
-        _Ss.append(newS)
+    try:
+      S = self.S
+    except AttributeError:
+      S = common.S
+    return S
 
   def pushStore(self, newS):
     ''' Push a new Store onto the per-Thread stack.
