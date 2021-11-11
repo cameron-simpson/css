@@ -41,7 +41,6 @@
 
 import os
 import tempfile
-import threading
 from types import SimpleNamespace as NS
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
@@ -49,6 +48,7 @@ from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
+from cs.threads import State as ThreadState
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -172,7 +172,7 @@ common = NS(
 del _progress
 del _over_progress
 
-class _Defaults(threading.local):
+class _Defaults(ThreadState):
   ''' Per-thread default context stack.
 
       A Store's __enter__/__exit__ methods push/pop that store
@@ -185,7 +185,7 @@ class _Defaults(threading.local):
   _Ss = []
 
   def __init__(self):
-    threading.local.__init__(self)
+    super().__init__()
     self.progress = common.progress
     self.runstate = common.runstate
     self.fs = None
