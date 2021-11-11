@@ -322,9 +322,11 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           short_usage = True
+          bad_subcmd = subcmd
+          subcmd = None
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
-                  subcmd,
+                  bad_subcmd,
                   ', '.join(sorted(subcmds.keys())),
               )
           )
@@ -665,5 +667,5 @@ class BaseCommand:
           continue
         print(' ', subusage.replace('\n', '\n    '))
     if unknown:
-      warning("I know: %s",', '.join(sorted(subcmds.keys())))
+      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit

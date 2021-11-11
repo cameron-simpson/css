@@ -117,7 +117,8 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
-  thread_prefix = prefix() + ': ' + name
+  ##thread_prefix = prefix() + ': ' + name
+  thread_prefix = name
 
   def thread_body():
     with Pfx(thread_prefix):
