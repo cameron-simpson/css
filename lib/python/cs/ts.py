@@ -21,6 +21,7 @@ def main(argv=None):
   return TSCommand(argv).run()
 
 MAX_GAP_S = 1200
+ROUND_UP = 900
 
 class LogEntry:
   ''' A log entry.
@@ -123,13 +124,22 @@ class LogSpan:
     if span is not None:
       yield span
 
-  def report(self, *, indent="", file=None):
+  def report(self, *, indent="", round_up=ROUND_UP, file=None):
     ''' Recite this span as a multiline report.
     '''
     start = arrow.get(self.start_unixtime)
+    end = arrow.get(self.last_unixtime)
     elapsed = self.elapsed
-    hours = round(elapsed / 3600, 2)
-    print(indent + start.format("hh:mm"), hours, file=file)
+    if elapsed > 0:
+      hours = round(
+          ((elapsed + round_up - 1) // round_up) * round_up / 3600, 2
+      )
+      print(
+          indent + f'{hours} {start.format("hh:mm")}-{end.format("hh:mm")}',
+          file=file
+      )
+    else:
+      print(indent + f'{start.format("hh:mm")}-', file=file)
     for entry in self.entries:
       etime = arrow.get(entry.unixtime)
       print(
