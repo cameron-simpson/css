@@ -85,6 +85,7 @@ DISTINFO = {
         'cs.seq',
         'cs.socketutils',
         'cs.threads',
+        'cs.testutils',
         'cs.tty',
         'cs.units',
         'cs.upd',
