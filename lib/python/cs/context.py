@@ -315,7 +315,7 @@ def twostep(cmgr):
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
-      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead)::
+      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)
@@ -390,6 +390,8 @@ def setup_cmgr(cmgr):
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
       to run the `__enter__` phase of `cmgr` and save its value as `o.`*attr*`.
+      Return the result of the `__enter__` phase.
+
       The `__exit__` phase is run by `pop_cmgr(o,attr)`,
       returning the return value of the exit phase.
 
@@ -402,6 +404,10 @@ def push_cmgr(o, attr, cmgr):
               def tearDown(self):
                   # clean up the temporary directory, discard self.dirpath
                   pop_cmgr(self, 'dirpath')
+
+      The `cs.testutils` `SetupTeardownMixin` class does this
+      allowing the provision of a single `setupTeardown()` context manager method
+      for test case setUp/tearDown.
 
       Doc test:
 
