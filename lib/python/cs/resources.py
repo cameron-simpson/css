@@ -169,13 +169,15 @@ class MultiOpenMixin(ContextManagerMixin):
       pass
     else:
       startup()
-    yield
     try:
-      shutdown = self.shutdown
-    except AttributeError:
-      pass
-    else:
-      shutdown()
+      yield
+    finally:
+      try:
+        shutdown = self.shutdown
+      except AttributeError:
+        pass
+      else:
+        shutdown()
 
   def open(self, caller_frame=None):
     ''' Increment the open count.
