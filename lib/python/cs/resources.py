@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
-from cs.context import setup_cmgr
+from cs.context import setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_method
@@ -73,7 +73,7 @@ class _mom_state(object):
     self._finalise = None
 
 ## debug: TrackedClassMixin
-class MultiOpenMixin(object):
+class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
       and to call `.startup` on the first `.open`
       and to call `.shutdown` on the last `.close`.
@@ -152,13 +152,12 @@ class MultiOpenMixin(object):
     state = self.__mo_getstate()
     return {'opened': state.opened, 'opens': state._opens}
 
-  def __enter__(self):
+  def enter_exit(self):
     self.open(caller_frame=caller())
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close(caller_frame=caller())
-    return False
+    try:
+      yield
+    finally:
+      self.close(caller_frame=caller())
 
   @contextmanager
   def startup_shutdown(self):
@@ -170,13 +169,15 @@ class MultiOpenMixin(object):
       pass
     else:
       startup()
-    yield
     try:
-      shutdown = self.shutdown
-    except AttributeError:
-      pass
-    else:
-      shutdown()
+      yield
+    finally:
+      try:
+        shutdown = self.shutdown
+      except AttributeError:
+        pass
+      else:
+        shutdown()
 
   def open(self, caller_frame=None):
     ''' Increment the open count.

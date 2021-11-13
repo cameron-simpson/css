@@ -50,7 +50,13 @@ import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
 from .archive import Archive, FileOutputArchive, CopyModes
-from .blockify import blocked_chunks_of, block_from_chunks, top_block_for, blockify
+from .blockify import (
+    blocked_chunks_of,
+    blocked_chunks_of2,
+    block_from_chunks,
+    top_block_for,
+    blockify,
+)
 from .compose import get_store_spec
 from .config import Config, Store
 from .convert import expand_path
@@ -62,7 +68,15 @@ from .index import LMDBIndex
 from .merge import merge
 from .parsers import scanner_from_filename
 from .paths import OSDir, OSFile, path_resolve
-from .scan import scanbuf
+from .scan import (
+    MIN_BLOCKSIZE,
+    MAX_BLOCKSIZE,
+    scanbuf,
+    py_scanbuf,
+    scanbuf2,
+    py_scanbuf2,
+    scan,
+)
 from .server import serve_tcp, serve_socket
 from .store import ProxyStore, DataDirStore
 from .transcribe import parse
@@ -129,7 +143,6 @@ class VTCmd(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
-    options.verbose = True
     options.config_path = os.environ.get(
         'VT_CONFIG', expanduser(DEFAULT_CONFIG_PATH)
     )
@@ -255,7 +268,6 @@ class VTCmd(BaseCommand):
               raise GetoptError(
                   "unusable Store specification: %s" % (options.store_spec,)
               )
-            defaults.push_Ss(S)
             if options.cache_store_spec is None:
               cacheS = None
             else:
@@ -280,9 +292,9 @@ class VTCmd(BaseCommand):
                     archives=((S, '*'),),
                 )
                 S.config = options.config
-            defaults.push_Ss(S)
-            with S:
-              yield
+            with default.common_S(S):
+              with S:
+                yield
             if cacheS:
               cacheS.backend = None
     runstate.cancel()
@@ -315,14 +327,17 @@ class VTCmd(BaseCommand):
     return xit
 
   def cmd_benchmark(self, argv):
-    ''' Usage: {cmd} mode [args...]
+    ''' Usage: {cmd} mode [args...] < data
           Modes:
-            blocked_chunks < data
-              Scan the data into edge aligned chunks without a parser.
-            read < data
-              Read from data.
-            scan < data
-              Run the raw data scan.
+            blocked_chunks  Scan the data into edge aligned chunks without a parser.
+            blocked_chunks2 Scan the data into edge aligned chunks without a parser.
+            blockify        Scan the data into edge aligned Blocks without a parser.
+            py_scanbuf      Run the old pure Python scanbuf against the data.
+            py_scanbuf2     Run the new pure Python scanbuf against the data.
+            read            Read from data.
+            scan            Run the new scan function against the data.
+            scanbuf         Run the old C scanbuf against the data.
+            scanbuf2        Run the new C scanbuf2 against the data.
     '''
     runstate = self.options.runstate
     if not argv:
@@ -344,7 +359,8 @@ class VTCmd(BaseCommand):
         for chunk in progressbar(
             blocked_chunks_of(inbfr),
             label=mode,
-            update_min_size=65536,
+            ##update_min_size=65536,
+            update_frequency=256,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -352,6 +368,70 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           pass
+      elif mode == 'blocked_chunks2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            blocked_chunks_of2(inbfr),
+            label=mode,
+            ##update_min_size=65536,
+            update_frequency=256,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          pass
+      elif mode == 'blockify':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        last_offset = 0
+        for offset in progressbar(
+            blockify(inbfr),
+            label=mode,
+            update_frequency=256,
+            ##update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          last_offset = offset
+      elif mode == 'py_scanbuf':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = py_scanbuf(hash_value, chunk)
+      elif mode == 'py_scanbuf2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            update_min_size=65536,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = py_scanbuf2(
+              chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+          )
       elif mode == 'read':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
@@ -369,11 +449,28 @@ class VTCmd(BaseCommand):
       elif mode == 'scan':
         if argv:
           raise GetoptError("extra arguments: %r", argv)
+        last_offset = 0
+        for offset in progressbar(
+            scan(inbfr),
+            label=mode,
+            update_frequency=256,
+            ##update_min_size=65536,
+            itemlenfunc=lambda offset: offset - last_offset,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          last_offset = offset
+      elif mode == 'scanbuf':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
         hash_value = 0
         for chunk in progressbar(
             inbfr,
             label=mode,
-            update_min_size=65536,
+            ##update_min_size=65536,
+            update_frequency=128,
             itemlenfunc=len,
             total=length,
             units_scale=BINARY_BYTES_SCALE,
@@ -381,6 +478,24 @@ class VTCmd(BaseCommand):
             report_print=True,
         ):
           hash_value, chunk_scan_offsets = scanbuf(hash_value, chunk)
+      elif mode == 'scanbuf2':
+        if argv:
+          raise GetoptError("extra arguments: %r", argv)
+        hash_value = 0
+        for chunk in progressbar(
+            inbfr,
+            label=mode,
+            ##update_min_size=65536,
+            update_frequency=128,
+            itemlenfunc=len,
+            total=length,
+            units_scale=BINARY_BYTES_SCALE,
+            runstate=runstate,
+            report_print=True,
+        ):
+          hash_value, chunk_scan_offsets = scanbuf2(
+              chunk, hash_value, 0, MIN_BLOCKSIZE, MAX_BLOCKSIZE
+          )
       else:
         raise GetoptError("unknown mode")
     return 0
@@ -886,20 +1001,22 @@ class VTCmd(BaseCommand):
     with Pfx("%s => %s", srcS.name, dstS.name):
       runstate = options.runstate
       Q, T = srcS.pushto(dstS, progress=options.progress)
-      for pushable in pushables:
-        if runstate.cancelled:
-          xit = 1
-          break
-        with Pfx(str(pushable)):
-          pushed_ok = pushable.pushto_queue(
-              Q, runstate=runstate, progress=options.progress
-          )
-          assert isinstance(pushed_ok, bool)
-          if not pushed_ok:
-            error("push failed")
+      try:
+        for pushable in pushables:
+          if runstate.cancelled:
             xit = 1
-      Q.close()
-      T.join()
+            break
+          with Pfx(str(pushable)):
+            pushed_ok = pushable.pushto_queue(
+                Q, runstate=runstate, progress=options.progress
+            )
+            assert isinstance(pushed_ok, bool)
+            if not pushed_ok:
+              error("push failed")
+              xit = 1
+      finally:
+        Q.close()
+        T.join()
       return xit
 
   def cmd_pullfrom(self, argv):
@@ -1126,7 +1243,7 @@ class VTCmd(BaseCommand):
           scanner = scanner_from_filename(filename)
           size_counts = defaultdict(int)
           with open(filename, 'rb') as fp:
-            for chunk in blocked_chunks_of(file_data(fp, None), scanner):
+            for chunk in blocked_chunks_of2(file_data(fp, None), scanner):
               print(len(chunk), str(chunk[:16]))
               size_counts[len(chunk)] += 1
           for size, count in sorted(size_counts.items()):

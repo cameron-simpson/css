@@ -101,13 +101,13 @@ class HashCode(bytes, Transcriber, HasDotHashclassMixin):
   def new_class(
       cls, hashname: str, hashenum: int, *, hashfunc: callable, hashlen: int
   ):
-    ''' Factory t create, register and return a new `HashCode` subclass.
+    ''' Factory to create, register and return a new `HashCode` subclass.
     '''
 
     class hashclass(HashCode):
       ''' `HashCode` subclass.
       '''
-      __slotes__ = ()
+      __slots__ = ()
       HASHNAME = hashname
       HASHFUNC = hashfunc
       HASHLEN = hashlen
