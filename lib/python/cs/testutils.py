@@ -50,6 +50,10 @@ def product_test(test_method, **params):
 
       whose test suite then just decorates each method with `@multitest`:
 
+          @multitest
+          def test000IndexEntry(self):
+              ....
+
       Note that because there must be setup and teardown for each product,
       the TestCase class may well have empty `setUp` and `tearDown` methods
       and instead is expected to provide:
