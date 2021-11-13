@@ -201,41 +201,10 @@ class _Defaults(ThreadState):
       cfg = Config()
     return cfg
 
-  def _fallback(self, key):
-    ''' Fallback function for empty stack.
-    '''
-    if key == 'S':
-      warning("no per-Thread Store stack, using the global stack")
-      stack_dump(indent=2)
-      Ss = self._Ss
-      if Ss:
-        return Ss[-1]
-      error(
-          "%s: no per-Thread defaults.S and no global stack, returning None",
-          self
-      )
-      return None
-    raise ValueError("no fallback for %r" % (key,))
-
-  @property
-  def S(self):
-    ''' The topmost Store.
-    '''
-    try:
-      S = self.S
-    except AttributeError:
-      S = common.S
-    return S
-
-  def pushStore(self, newS):
-    ''' Push a new Store onto the per-Thread stack.
-    '''
-    self.Ss.append(newS)
-
-  def popStore(self):
-    ''' Pop and return the topmost Store from the per-Thread stack.
-    '''
-    return self.Ss.pop()
+  def __getattr__(self, attr):
+    if attr == 'S':
+      return common.S
+    raise AttributeError(attr)
 
   def push_Ss(self, newS):
     ''' Push a new Store onto the global stack.
