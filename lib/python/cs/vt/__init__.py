@@ -39,6 +39,7 @@
     which is also a system based on variable sized blocks.
 '''
 
+from contextlib import contextmanager
 import os
 import tempfile
 from types import SimpleNamespace as NS
@@ -206,15 +207,12 @@ class _Defaults(ThreadState):
       return common.S
     raise AttributeError(attr)
 
-  def push_Ss(self, newS):
-    ''' Push a new Store onto the global stack.
+  @contextmanager
+  def common_S(S):
+    ''' Context manager to push a Store onto `common.S`.
     '''
-    self._Ss.append(newS)
-
-  def pop_Ss(self):
-    ''' Pop and return the topmost Store from the global stack.
-    '''
-    return self._Ss.pop()
+    with stackattrs(common, S=S):
+      yield
 
 defaults = _Defaults()
 

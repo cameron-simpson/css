@@ -268,7 +268,6 @@ class VTCmd(BaseCommand):
               raise GetoptError(
                   "unusable Store specification: %s" % (options.store_spec,)
               )
-            defaults.push_Ss(S)
             if options.cache_store_spec is None:
               cacheS = None
             else:
@@ -293,9 +292,9 @@ class VTCmd(BaseCommand):
                     archives=((S, '*'),),
                 )
                 S.config = options.config
-            defaults.push_Ss(S)
-            with S:
-              yield
+            with default.common_S(S):
+              with S:
+                yield
             if cacheS:
               cacheS.backend = None
     runstate.cancel()
