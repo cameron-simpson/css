@@ -35,7 +35,6 @@ class Test_VTFuse(SetupTeardownMixin, unittest.TestCase):
     self.store_dict = {}
     self.S = MappingStore(testname, self.store_dict)
     with self.S:
-      defaults.pushStore(self.S)
       self.tmpdir = TemporaryDirectory(prefix=testname + '-', dir='.')
       self.testdirpath = self.tmpdir.name
       self.E = Dir(self.testdirpath)
