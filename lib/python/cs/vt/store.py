@@ -14,6 +14,7 @@ from functools import partial
 import sys
 from threading import Semaphore
 from icontract import require
+from cs.context import ContextManagerMixin
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
@@ -214,18 +215,12 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
 
-  ###########################
-  ## Context manager methods.
+  ###################################################
+  ## Context manager methods via ContextManagerMixin.
   ##
-
-  def __enter__(self):
-    MultiOpenMixin.__enter__(self)
-    defaults.pushStore(self)
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    defaults.popStore()
-    return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
+  def enter_exit(self):
+    with defaults(S=self):
+      yield self
 
   ##########################
   ## MultiOpenMixin methods.
