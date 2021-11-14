@@ -40,7 +40,7 @@ import cs.logutils
 from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, progressbar
 from cs.threads import bg as bg_thread
 from cs.tty import ttysize
@@ -954,6 +954,7 @@ class VTCmd(BaseCommand):
         os.remove(ospath)
     return 0
 
+  @pfx_method
   def _parse_pushable(self, s):
     ''' Parse an object specification and return the object.
     '''
