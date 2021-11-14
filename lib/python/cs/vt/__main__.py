@@ -1033,13 +1033,18 @@ class VTCmd(BaseCommand):
       argv = (srcSspec,)
     dstS = defaults.S
     pushables = []
+    ok = True
     for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
         except ValueError as e:
-          raise GetoptError("unparsed: %s" % (e,)) from e
-        pushables.append(obj)
+          warning("unrecognised pushable: %s", e)
+          ok = False
+        else:
+          pushables.append(obj)
+    if not ok:
+      raise GetoptError("unrecognised pushables")
     return self._push(self.options, srcS, dstS, pushables)
 
   def cmd_pushto(self, argv):
@@ -1056,13 +1061,18 @@ class VTCmd(BaseCommand):
     with Pfx("other_store %r", dstSspec):
       dstS = Store(dstSspec, self.options.config)
     pushables = []
+    ok = True
     for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
         except ValueError as e:
-          raise GetoptError("unparsed: %s" % (e,)) from e
-        pushables.append(obj)
+          warning("unrecognised pushable: %s", e)
+          ok = False
+        else:
+          pushables.append(obj)
+    if not ok:
+      raise GetoptError("unrecognised pushables")
     return self._push(srcS, dstS, pushables)
 
   def cmd_save(self, argv):
