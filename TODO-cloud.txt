@@ -1,2 +1,1 @@
-file upload slot: leave summary of completed upload behind, not blank line
 some kind of include/exclude after the fashion of rsync - utilising the .hbinclude would be handy
