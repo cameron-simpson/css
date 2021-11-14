@@ -455,15 +455,16 @@ class ContextManagerMixin:
       then `self` is returned from `__enter__`.
       As with `@contextmanager`,
       if there was an exception in the managed suite
-      then that exception is raises on return from the `yield`.
+      then that exception is raised on return from the `yield`.
 
       *However*, and _unlike_ an `@contextmanager` method,
-      the `__enter_exit__` generator _may_ `yield` a true/false value to use as the result
+      the `__enter_exit__` generator _may_ also `yield`
+      an additional true/false value to use as the result
       of the `__exit__` method, to indicate whether the exception was handled.
-      This extra `yield` is _optional_ and if it omitted the `__exit__` result
+      This extra `yield` is _optional_ and if it is omitted the `__exit__` result
       will be `False` indicating that an exception was not handled.
 
-      Here is a sketch of a method which can handle a `SomeException`:
+      Here is a sketch of a method which can handle a `SomeException` specially:
 
           class CMgr(ContextManagerMixin):
               def __enter_exit__(self):
