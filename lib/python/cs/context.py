@@ -439,16 +439,16 @@ def pop_cmgr(o, attr):
 
 class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
-      running the first and second steps of a single `enter_exit` generator method.
+      running the first and second steps of a single `__enter_exit__` generator method.
 
-      This makes it easy to use context managers inside `enter_exit`
+      This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:
 
-          def enter_exit(self):
+          def __enter_exit__(self):
               with open(self.datafile, 'r') as f:
                   yield f
 
-      The `enter_exit` method is _not_ a context manager, but a short generator method.
+      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
       If `None` is `yield`ed (as from a bare `yield`)
@@ -458,7 +458,7 @@ class ContextManagerMixin:
       then that exception is raises on return from the `yield`.
 
       *However*, and _unlike_ an `@contextmanager` method,
-      the `enter_exit` generator _may_ `yield` a true/false value to use as the result
+      the `__enter_exit__` generator _may_ `yield` a true/false value to use as the result
       of the `__exit__` method, to indicate whether the exception was handled.
       This extra `yield` is _optional_ and if it omitted the `__exit__` result
       will be `False` indicating that an exception was not handled.
@@ -466,7 +466,7 @@ class ContextManagerMixin:
       Here is a sketch of a method which can handle a `SomeException`:
 
           class CMgr(ContextManagerMixin):
-              def enter_exit(self):
+              def __enter_exit__(self):
                   ... do some setup here ...
                   # Returning self is common, but might be any relevant value.
                   # Note that ifyou want `self`, you can just use a bare yield
@@ -485,7 +485,7 @@ class ContextManagerMixin:
 
   def __enter__(self):
     ''' Run `super().__enter__` (if any)
-        then the `__enter__` phase of `self.enter_exit()`.
+        then the `__enter__` phase of `self.__enter_exit__()`.
     '''
     try:
       super_enter = super().__enter__
@@ -493,7 +493,7 @@ class ContextManagerMixin:
       pass
     else:
       super_enter()
-    eegen = self.enter_exit()
+    eegen = self.__enter_exit__()
     enter_value = next(eegen)
     if enter_value is None:
       enter_value = self
@@ -502,7 +502,7 @@ class ContextManagerMixin:
     return enter_value
 
   def __exit__(self, exc_type, exc_value, traceback):
-    ''' Run the `__exit__` step of `self.enter_exit()`,
+    ''' Run the `__exit__` step of `self.__enter_exit__()`,
         then `super().__exit__` (if any).
     '''
     # get generator, restore attributes
