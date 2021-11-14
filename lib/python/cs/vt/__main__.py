@@ -292,7 +292,7 @@ class VTCmd(BaseCommand):
                     archives=((S, '*'),),
                 )
                 S.config = options.config
-            with default.common_S(S):
+            with defaults.common_S(S):
               with S:
                 yield
             if cacheS:
