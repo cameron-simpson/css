@@ -297,7 +297,9 @@ class CSReleaseCommand(BaseCommand):
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
           problems = pkg.problems()
-          problem_text= ("%d problems" % (len(problems),) if problems else "ok")
+          problem_text = (
+              "%d problems" % (len(problems),) if problems else "ok"
+          )
           if problems and options.colourise:
             problem_text = colourise(problem_text, 'yellow')
           list_argv = [

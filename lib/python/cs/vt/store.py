@@ -14,6 +14,8 @@ from functools import partial
 import sys
 from threading import Semaphore
 from icontract import require
+from cs.context import ContextManagerMixin
+from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import warning, error, info
@@ -89,6 +91,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
 
   _seq = Seq()
 
+  @fmtdoc
   def __init__(self, name, capacity=None, hashclass=None, runstate=None):
     ''' Initialise the Store.
 
@@ -96,9 +99,9 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
         * `name`: a name for this Store;
           if None, a sequential name based on the Store class name
           is generated
-        * `capacity`: a capacity for the internal Later queue, default 4
+        * `capacity`: a capacity for the internal `Later` queue, default 4
         * `hashclass`: the hash class to use for this Store,
-          default: `DEFAULT_HASHCLASS`
+          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`)
         * `runstate`: a `cs.resources.RunState` for external control;
           if not supplied one is allocated
     '''
@@ -212,18 +215,12 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
     if h != h2:
       raise ValueError("h:%s != hash(data):%s" % (h, h2))
 
-  ###########################
-  ## Context manager methods.
+  ###################################################
+  ## Context manager methods via ContextManagerMixin.
   ##
-
-  def __enter__(self):
-    MultiOpenMixin.__enter__(self)
-    defaults.pushStore(self)
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    defaults.popStore()
-    return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
+  def __enter_exit__(self):
+    with defaults(S=self):
+      yield self
 
   ##########################
   ## MultiOpenMixin methods.
@@ -905,6 +902,7 @@ class DataDirStore(MappingStore):
   ''' A `MappingStore` using a `DataDir` or `RawDataDir` as its backend.
   '''
 
+  @fmtdoc
   def __init__(
       self,
       name,
@@ -922,7 +920,8 @@ class DataDirStore(MappingStore):
         Parameters:
         * `name`: Store name.
         * `topdirpath`: top directory path.
-        * `hashclass`: hash class, default: `DEFAULT_HASHCLASS`.
+        * `hashclass`: hash class,
+          default: `DEFAULT_HASHCLASS` (`{DEFAULT_HASHCLASS.__name__}`).
         * `indexclass`: passed to the data dir.
         * `rollover`: passed to the data dir.
         * `lock`: passed to the mapping.
@@ -996,7 +995,7 @@ def PlatonicStore(name, topdirpath, *a, meta_store=None, hashclass=None, **kw):
   return S
 
 class _PlatonicStore(MappingStore):
-  ''' A MappingStore using a PlatonicDir as its backend.
+  ''' A `MappingStore` using a `PlatonicDir` as its backend.
   '''
 
   def __init__(
