@@ -6,6 +6,8 @@
 
 set -ue
 
+cmd=$( basename "$0" )
+
 trace=
 [ -t 2 ] && trace=set-x
 ##trace=eecho
@@ -19,7 +21,6 @@ make_cbz=1
 output_dirpath=${PULL_AZW_OUTPUTDIR:-''}
 tsbase=.timestamp-$cmd
 
-cmd=$( basename "$0" )
 usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz] [book-files...]
   -C calibre_library
         Specify calibre library location, default from \$CALIBRE_LIBRARY: $calibre_library
@@ -92,7 +93,7 @@ fi
 tsfile=$calibre_library/$tsbase
 new_tsfile=$tsfile-$$
 
-time-based=
+time_based=
 if [ $# = 0 ]
 then
   # automatic mode, based on timestamp file

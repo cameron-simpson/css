@@ -218,7 +218,7 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ###################################################
   ## Context manager methods via ContextManagerMixin.
   ##
-  def enter_exit(self):
+  def __enter_exit__(self):
     with defaults(S=self):
       yield self
 

@@ -152,7 +152,7 @@ class MultiOpenMixin(ContextManagerMixin):
     state = self.__mo_getstate()
     return {'opened': state.opened, 'opens': state._opens}
 
-  def enter_exit(self):
+  def __enter_exit__(self):
     self.open(caller_frame=caller())
     try:
       yield
