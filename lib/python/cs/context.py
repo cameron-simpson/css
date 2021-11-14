@@ -441,6 +441,13 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `enter_exit` generator method.
 
+      This makes it easy to use context managers inside `enter_exit`
+      as the setup/teardown process, for example:
+
+          def enter_exit(self):
+              with open(self.datafile, 'r') as f:
+                  yield f
+
       The `enter_exit` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
