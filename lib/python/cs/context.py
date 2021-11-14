@@ -444,6 +444,8 @@ class ContextManagerMixin:
       The `enter_exit` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
+      If `None` is `yield`ed (as from a bare `yield`)
+      then `self` is returned from `__enter__`.
       As with `@contextmanager`,
       if there was an exception in the managed suite
       then that exception is raises on return from the `yield`.
@@ -459,7 +461,9 @@ class ContextManagerMixin:
           class CMgr(ContextManagerMixin):
               def enter_exit(self):
                   ... do some setup here ...
-                  # returning self is common, but might be any relevant value
+                  # Returning self is common, but might be any relevant value.
+                  # Note that ifyou want `self`, you can just use a bare yield
+                  # and ContextManagerMixin will provide `self` as the default.
                   enter_result = self
                   exit_result = False
                   try:
@@ -484,6 +488,8 @@ class ContextManagerMixin:
       super_enter()
     eegen = self.enter_exit()
     enter_value = next(eegen)
+    if enter_value is None:
+      enter_value = self
     pushed = {}
     pushed.update(pushattrs(self, _ContextManagerMixin__state=(eegen, pushed)))
     return enter_value
