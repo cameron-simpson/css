@@ -176,7 +176,7 @@ do
     # pass the tail of the headline to I<log-tsline> for each category.
     #
     dlog)
-      dlog -c "$categories" -- "$headline" <"$attachment"
+      dlog log -c "$categories" -- "$headline" <"$attachment"
       ;;
 
     # =item B<mailto:>I<email-address>[B<?subject=>I<prefix>]

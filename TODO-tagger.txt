@@ -1,0 +1,6 @@
+gui: column of tag widgets on the right
+gui: tag widget: single tag_name:value view with a dropdown for alternatives? on-hover erase button to the left?
+gui: drop the tree view? it is a PITA - turn it into a selector in some popup?
+gui: pan using thumbnal scrubber like Finder?
+inference: infer from filename
+inference: infer from other tags

@@ -101,6 +101,9 @@ class Ont(TagsOntology):
       X("add %r => %s", prefix_, subtagsets)
       self.add_tagsets(subtagsets, prefix_)
 
+  def __str__(self):
+    return "%s(%r)" % (type(self).__name__, self.ont_path)
+
   @classmethod
   @typechecked
   def tagsetses_from_path(cls, ont_path: str):

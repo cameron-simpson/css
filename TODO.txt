@@ -1,6 +1,12 @@
+rip out all cs.daetutils and friends, use the arrow module
+unhostsify leaves temp files around, probably if interrupted
+cs.cmdutils: subcommands with no usage docstring are not listed in the usage output, need placeholder
+cs.deco: use @functools.wraps to gather up __doc__ etc
+fstags ls in / wigs out
+pfx_method no longer honours with_args, flip with_args to True and reimpl args?
+cs.cmdutils: cmd_help does not print the usage preamble, just the per command usages
 baseCommand autousage: make up a stub usage for subcommands with no usage
 parser for /etc/terminal-colors.d
-BaseCommand: if getopterror from subcommand, show only the help for that subcommand instead of whole usage
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
 cs.upd: add pprint wrapper
 cs.app.playon: keep playon recording info as ontology, distinct from state db
@@ -42,7 +48,6 @@ cs.progress: control over status display - units etc
 cs.upd: rate per proxy, bisect to update counter, autotune?
 incd: remote tmux session to be per target dir
 haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
-BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
 new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?

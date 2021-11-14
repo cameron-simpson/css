@@ -17,6 +17,7 @@ default_etc_hosts=/etc/hosts
 default_listen=127.0.0.1:3128
 
 default_basic_settings='
+max_filedesc 8192
 acl nobannerport myport 8080
 acl alwaysdirect myport 3127
 redirector_access allow nobannerport

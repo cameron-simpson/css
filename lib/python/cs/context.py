@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20210727-post'
+__version__ = '20211115.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -315,7 +315,7 @@ def twostep(cmgr):
           next(cmgr_iter)   # set up
           next(cmgr_iter)   # tear down
 
-      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead)::
+      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)
@@ -390,6 +390,8 @@ def setup_cmgr(cmgr):
 def push_cmgr(o, attr, cmgr):
   ''' A convenience wrapper for `twostep(cmgr)`
       to run the `__enter__` phase of `cmgr` and save its value as `o.`*attr*`.
+      Return the result of the `__enter__` phase.
+
       The `__exit__` phase is run by `pop_cmgr(o,attr)`,
       returning the return value of the exit phase.
 
@@ -402,6 +404,10 @@ def push_cmgr(o, attr, cmgr):
               def tearDown(self):
                   # clean up the temporary directory, discard self.dirpath
                   pop_cmgr(self, 'dirpath')
+
+      The `cs.testutils` `SetupTeardownMixin` class does this
+      allowing the provision of a single `setupTeardown()` context manager method
+      for test case setUp/tearDown.
 
       Doc test:
 
@@ -430,3 +436,98 @@ def pop_cmgr(o, attr):
   '''
   pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
   return pop_func()
+
+class ContextManagerMixin:
+  ''' A mixin to provide context manager `__enter__` and `__exit__` methods
+      running the first and second steps of a single `__enter_exit__` generator method.
+
+      This makes it easy to use context managers inside `__enter_exit__`
+      as the setup/teardown process, for example:
+
+          def __enter_exit__(self):
+              with open(self.datafile, 'r') as f:
+                  yield f
+
+      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
+      Like a context manager created via `@contextmanager`
+      it performs the setup phase and then `yield`s the value for the `with` statement.
+      If `None` is `yield`ed (as from a bare `yield`)
+      then `self` is returned from `__enter__`.
+      As with `@contextmanager`,
+      if there was an exception in the managed suite
+      then that exception is raised on return from the `yield`.
+
+      *However*, and _unlike_ an `@contextmanager` method,
+      the `__enter_exit__` generator _may_ also `yield`
+      an additional true/false value to use as the result
+      of the `__exit__` method, to indicate whether the exception was handled.
+      This extra `yield` is _optional_ and if it is omitted the `__exit__` result
+      will be `False` indicating that an exception was not handled.
+
+      Here is a sketch of a method which can handle a `SomeException` specially:
+
+          class CMgr(ContextManagerMixin):
+              def __enter_exit__(self):
+                  ... do some setup here ...
+                  # Returning self is common, but might be any relevant value.
+                  # Note that ifyou want `self`, you can just use a bare yield
+                  # and ContextManagerMixin will provide `self` as the default.
+                  enter_result = self
+                  exit_result = False
+                  try:
+                      yield enter_result
+                  except SomeException as e:
+                      ... handle e ...
+                      exit_result = True
+                  finally:
+                      ... do tear down here ...
+                  yield exit_result
+  '''
+
+  def __enter__(self):
+    ''' Run `super().__enter__` (if any)
+        then the `__enter__` phase of `self.__enter_exit__()`.
+    '''
+    try:
+      super_enter = super().__enter__
+    except AttributeError:
+      pass
+    else:
+      super_enter()
+    eegen = self.__enter_exit__()
+    enter_value = next(eegen)
+    if enter_value is None:
+      enter_value = self
+    pushed = {}
+    pushed.update(pushattrs(self, _ContextManagerMixin__state=(eegen, pushed)))
+    return enter_value
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    ''' Run the `__exit__` step of `self.__enter_exit__()`,
+        then `super().__exit__` (if any).
+    '''
+    # get generator, restore attributes
+    eegen, pushed = self._ContextManagerMixin__state
+    popattrs(self, ('_ContextManagerMixin__state',), pushed)
+    # return to the generator to run the __exit__ phase
+    try:
+      if exc_type:
+        exit_result = eegen.throw(exc_type, exc_value, traceback)
+      else:
+        exit_result = next(eegen)
+    except StopIteration:
+      # there was no optional extra yield
+      exit_result = None
+    else:
+      if exit_result:
+        # exception handled, conceal it from the super method
+        exc_type, exc_value, traceback = None, None, None
+    try:
+      super_exit = super().__exit__
+    except AttributeError:
+      # no super __exit__, skip
+      pass
+    else:
+      if super_exit(exc_type, exc_value, traceback):
+        exit_result = True
+    return exit_result

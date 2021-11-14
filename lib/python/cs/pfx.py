@@ -51,11 +51,11 @@ import sys
 import threading
 import traceback
 from cs.deco import decorator, contextdecorator, fmtdoc, logging_wrapper
-from cs.py.func import funcname
+from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20210906-post'
+__version__ = '20211031-post'
 
 DISTINFO = {
     'description':
@@ -68,7 +68,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.deco',
-        'cs.py.func',
+        'cs.py.func>=func_a_kw_fmt',
         'cs.py3',
         'cs.x',
     ],
@@ -105,20 +105,6 @@ def pfx_iter(tag, iterable):
         break
     yield i
 
-def _func_a_kw_fmt(func, *a, **kw):
-  ''' Prepare a format string and associated argument list
-      describing a call to `func(*a,**kw)`.
-      Return `format,args`.
-
-  '''
-  av = [getattr(func, '__name__', str(func))]
-  afv = ['%r'] * len(a)
-  av.extend(a)
-  afv.extend(['%s=%r'] * len(kw))
-  for kv in kw.items():
-    av.extend(kv)
-  return '%s(' + ','.join(afv) + ')', av
-
 def pfx_call(func, *a, **kw):
   ''' Call `func(*a,**kw)` within an enclosing `Pfx` context manager
       reciting the function name and arguments.
@@ -128,7 +114,7 @@ def pfx_call(func, *a, **kw):
           >>> import os
           >>> pfx_call(os.rename, "oldname", "newname")
   '''
-  pfxf, pfxav = _func_a_kw_fmt(func, *a, **kw)
+  pfxf, pfxav = func_a_kw_fmt(func, *a, **kw)
   with Pfx(pfxf, *pfxav):
     return func(*a, **kw)
 
@@ -281,7 +267,7 @@ class Pfx(object):
         _state.raise_needs_prefix = False
         # now hack the exception attributes
         if not self.prefixify_exception(exc_value):
-          print(
+          True or print(
               "warning: %s: %s:%s: message not prefixed" %
               (self._state.prefix, type(exc_value).__name__, exc_value),
               file=sys.stderr
@@ -354,6 +340,8 @@ class Pfx(object):
         value = getattr(e, attr)
       except AttributeError:
         continue
+      if value is None:
+        continue
       # special case various known exception type attributes
       if attr == 'args' and isinstance(e, OSError):
         try:
@@ -374,6 +362,9 @@ class Pfx(object):
           continue
         else:
           value = (value0, cls.prefixify(value1))
+      elif attr == 'args' and isinstance(e, LookupError):
+        # args[0] is the key, do not fiddle with it
+        continue
       elif isinstance(value, StringTypes):
         value = cls.prefixify(value)
       elif isinstance(value, Exception):
@@ -654,7 +645,7 @@ def pfx_method(method, use_str=False, with_args=False):
     ''' Prefix messages with "type_name.method_name" or "str(self).method_name".
     '''
     classref = self if use_str else type(self).__name__
-    pfxfmt, pfxargs = _func_a_kw_fmt(method, *a, **kw)
+    pfxfmt, pfxargs = func_a_kw_fmt(method, *a, **kw)
     with Pfx("%s." + pfxfmt, classref, *pfxargs):
       return method(self, *a, **kw)
 

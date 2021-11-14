@@ -5,6 +5,7 @@ enum34
 icontract
 lmdb
 lxml
+mobi
 mypy
 musicbrainzngs
 pycodestyle
@@ -14,6 +15,7 @@ pylint
 pytest
 requests
 sqlalchemy
+tkmacosx
 twine
 typeguard
 watchdog
