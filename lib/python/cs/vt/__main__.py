@@ -973,7 +973,7 @@ class VTCmd(BaseCommand):
     else:
       # try a Store specification
       try:
-        obj = Store(s, self.config)
+        obj = Store(s, self.options.config)
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
