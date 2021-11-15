@@ -1734,6 +1734,8 @@ class NamedBackup(SingletonMixin):
         Otherwise upload the file contents against the hashcode
         and return the stat and hashcode.
     '''
+    if backup_run.cancelled:
+      raise CancellationError("CANCELLED backup of %r" % (subpath,))
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
     runstate = backup_run.runstate
