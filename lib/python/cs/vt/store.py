@@ -220,7 +220,20 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ##
   def __enter_exit__(self):
     with defaults(S=self):
-      yield self
+      try:
+        super_eeg = super().__enter_exit__
+      except AttributeError:
+
+        def super_eeg():
+          yield
+
+      eeg = super_eeg()
+      next(eeg)
+      yield
+      try:
+        next(eeg)
+      except StopIteration:
+        pass
 
   ##########################
   ## MultiOpenMixin methods.
