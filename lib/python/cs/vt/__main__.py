@@ -8,7 +8,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
@@ -28,7 +28,6 @@ import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 from stat import S_ISREG
 import sys
-from time import sleep
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
@@ -41,11 +40,10 @@ from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
 from cs.pfx import Pfx, pfx_method
-from cs.progress import Progress, progressbar
-from cs.threads import bg as bg_thread
+from cs.progress import progressbar
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print
+from cs.upd import print
 import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
@@ -53,7 +51,6 @@ from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
     blocked_chunks_of2,
-    block_from_chunks,
     top_block_for,
     blockify,
 )
@@ -104,7 +101,7 @@ class VTCmd(BaseCommand):
   DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
-  GETOPT_SPEC = 'C:S:f:h:qv'
+  GETOPT_SPEC = 'C:S:f:h:Pqv'
 
   USAGE_KEYWORDS = {
       'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
@@ -132,6 +129,7 @@ class VTCmd(BaseCommand):
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
               otherwise {DEFAULT_HASHCLASS_NAME}
+    -P        Progress: show a progress bar of top level Store activity.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
@@ -154,8 +152,7 @@ class VTCmd(BaseCommand):
     options.hashname = os.environ.get(
         self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
     )
-    options.progress = None
-    options.ticker = None
+    options.store_progress = False
     options.status_label = self.cmd
 
   def apply_opts(self, opts):
@@ -175,6 +172,8 @@ class VTCmd(BaseCommand):
         options.config_path = val
       elif opt == '-h':
         options.hashname = val
+      elif opt == '-P':
+        options.store_progress = True
       elif opt == '-q':
         # quiet: not verbose
         options.verbose = False
@@ -206,9 +205,7 @@ class VTCmd(BaseCommand):
     cmd = self.cmd
     config = options.config
     runstate = options.runstate
-    progress = options.progress
-    if progress is None:
-      progress = Progress(total=0)
+    store_progress = options.store_progress
 
     # catch signals, flag termination
     def sig_handler(sig, frame):
@@ -224,83 +221,73 @@ class VTCmd(BaseCommand):
     old_sighup = signal(SIGHUP, sig_handler)
     old_sigint = signal(SIGINT, sig_handler)
     old_sigquit = signal(SIGQUIT, sig_handler)
-
-    ticker = options.ticker
-    if ticker is None and sys.stderr.isatty():
-      ticker_proxy = Upd().insert(1)
-
-      def ticker():
-        while not runstate.cancelled:
-          ticker_proxy.text = progress.status(
-              options.status_label, ticker_proxy.width
-          )
-          sleep(0.25)
-
-      ticker = bg_thread(ticker, name='status-line', daemon=True)
-    with stackattrs(options, progress=progress, ticker=ticker):
-      with stackattrs(common, runstate=runstate, progress=progress,
-                      config=config):
-        # redo these because defaults is already initialised
-        with stackattrs(defaults, runstate=runstate, progress=progress):
-          if cmd in ("config", "dump", "init", "profile", "scan", "test"):
-            yield
+    with stackattrs(common, runstate=runstate, config=config):
+      # redo these because defaults is already initialised
+      with stackattrs(defaults, runstate=runstate):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+          yield
+        else:
+          # open the default Store
+          if options.store_spec is None:
+            if cmd == "serve":
+              store_spec = '[server]'
+            else:
+              store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
+            options.store_spec = store_spec
+          try:
+            # set up the primary Store using the main programme RunState for control
+            S = Store(options.store_spec, options.config)
+          except (KeyError, ValueError) as e:
+            raise GetoptError(
+                "unusable Store specification: %s: %s" %
+                (options.store_spec, e)
+            )
+          except Exception as e:
+            exception(
+                "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                options.store_spec, e
+            )
+            raise GetoptError(
+                "unusable Store specification: %s" % (options.store_spec,)
+            )
+          if options.cache_store_spec is None:
+            cacheS = None
           else:
-            # open the default Store
-            if options.store_spec is None:
-              if cmd == "serve":
-                store_spec = '[server]'
-              else:
-                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
-              options.store_spec = store_spec
             try:
-              # set up the primary Store using the main programme RunState for control
-              S = Store(options.store_spec, options.config)
-            except (KeyError, ValueError) as e:
-              raise GetoptError(
-                  "unusable Store specification: %s: %s" %
-                  (options.store_spec, e)
-              )
+              cacheS = Store(options.cache_store_spec, options.config)
             except Exception as e:
               exception(
-                  "UNEXPECTED EXCEPTION: can't open store %r: %s",
-                  options.store_spec, e
+                  "can't open cache store %r: %s", options.cache_store_spec, e
               )
               raise GetoptError(
-                  "unusable Store specification: %s" % (options.store_spec,)
+                  "unusable Store specification: %s" %
+                  (options.cache_store_spec,)
               )
-            if options.cache_store_spec is None:
-              cacheS = None
             else:
-              try:
-                cacheS = Store(options.cache_store_spec, options.config)
-              except Exception as e:
-                exception(
-                    "can't open cache store %r: %s", options.cache_store_spec,
-                    e
-                )
-                raise GetoptError(
-                    "unusable Store specification: %s" %
-                    (options.cache_store_spec,)
-                )
-              else:
-                S = ProxyStore(
-                    "%s:%s" % (cacheS.name, S.name),
-                    read=(cacheS,),
-                    read2=(S,),
-                    copy2=(cacheS,),
-                    save=(cacheS, S),
-                    archives=((S, '*'),),
-                )
-                S.config = options.config
+              S = ProxyStore(
+                  "%s:%s" % (cacheS.name, S.name),
+                  read=(cacheS,),
+                  read2=(S,),
+                  copy2=(cacheS,),
+                  save=(cacheS, S),
+                  archives=((S, '*'),),
+              )
+              S.config = options.config
+          if store_progress:
             S = ProgressStore(S)
-            with defaults.common_S(S):
-              with S:
-                yield
-            if cacheS:
-              cacheS.backend = None
+            add_bar_cmgr = S.progress_add.bar("ADD")
+            get_bar_cmgr = S.progress_get.bar("GET")
+          else:
+            add_bar_cmgr = nullcontext()
+            get_bar_cmgr = nullcontext()
+          with defaults.common_S(S):
+            with S:
+              with add_bar_cmgr:
+                with get_bar_cmgr:
+                  yield
+          if cacheS:
+            cacheS.backend = None
     runstate.cancel()
-    if ticker:
-      ticker.join()
     signal(SIGHUP, old_sighup)
     signal(SIGINT, old_sigint)
     signal(SIGQUIT, old_sigquit)
