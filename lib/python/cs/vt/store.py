@@ -18,7 +18,6 @@ from icontract import require
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
-from cs.lex import r
 from cs.logutils import warning, error, info
 from cs.pfx import Pfx
 from cs.progress import Progress
@@ -1082,10 +1081,10 @@ class ProgressStore(BasicStoreSync):
     '''
     super().__init__(f"{type(self).__name__}({S})", **kw)
     self.S = S
-    self.pg_add = Progress(
+    self.progress_add = Progress(
         name=f"add_bytes:{self.name}", throughput_window=4, total=0
     )
-    self.pg_get = Progress(
+    self.progress_get = Progress(
         name=f"get_bytes:{self.name}", throughput_window=4, total=0
     )
 
@@ -1101,50 +1100,50 @@ class ProgressStore(BasicStoreSync):
         yield
 
   def add(self, data):
-    ''' Advance the pg_add total, and the position on completion.
+    ''' Advance the progress_add total, and the position on completion.
     '''
-    pg_add = self.pg_add
+    progress_add = self.progress_add
     data_len = len(data)
-    pg_add.total += data_len
+    progress_add.total += data_len
     result = self.S.add(data)
-    pg_add.position += data_len
+    progress_add.position += data_len
     return result
 
   def add_bg(self, data):
-    ''' Advance the pg_add total, and the position on completion.
+    ''' Advance the progress_add total, and the position on completion.
     '''
-    pg_add = self.pg_add
+    progress_add = self.progress_add
     data_len = len(data)
-    pg_add.total += data_len
+    progress_add.total += data_len
     LF = self.S.add_bg(data)
     del data
 
     def notifier(LF):
       _, exc = LF.join()
       if exc is None:
-        pg_add.position += data_len
+        progress_add.position += data_len
 
     LF.notify(notifier)
     return LF
 
   def get(self, h):
     ''' Request the data for the hashcode `h`,
-        advance `self.pg_get.position` by its length on return,
+        advance `self.progress_get.position` by its length on return,
         and return the data.
     '''
     data = self.S.get(h)
-    self.pg_get.position += len(data)
+    self.progress_get.position += len(data)
     return data
 
   def get_bg(self, data):
-    ''' Advance the pg_add total, and the position on completion.
+    ''' Advance the progress_add total, and the position on completion.
     '''
     LF = self.S.add_bg(data)
 
     def notifier(LF):
       data, exc = LF.join()
       if exc is None:
-        self.pg_get.position += len(data)
+        self.progress_get.position += len(data)
 
     LF.notify(notifier)
     return LF
