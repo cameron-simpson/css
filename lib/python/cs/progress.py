@@ -16,6 +16,7 @@ import functools
 import sys
 from threading import RLock
 import time
+from typing import Optional
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
@@ -30,6 +31,8 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
+from typeguard import typechecked
+
 __version__ = '20210803-post'
 
 DISTINFO = {
@@ -38,8 +41,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.deco', 'cs.logutils', 'cs.py.func', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires': [
+        'cs.deco',
+        'cs.logutils',
+        'cs.py.func',
+        'cs.seq',
+        'cs.units',
+        'cs.upd',
+        'typeguard',
+    ],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -621,14 +631,16 @@ class Progress(BaseProgress):
   '''
 
   # pylint: disable=too-many-arguments
+  @typechecked
   def __init__(
       self,
-      position=None,
-      name=None,
-      start=None,
-      start_time=None,
-      throughput_window=None,
-      total=None,
+      name: Optional[str] = None,
+      *,
+      position: Optional[int] = None,
+      start: Optional[int] = None,
+      start_time: Optional[float] = None,
+      throughput_window: Optional[int] = None,
+      total: Optional[int] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.
