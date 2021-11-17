@@ -78,7 +78,7 @@ from .scan import (
     scan,
 )
 from .server import serve_tcp, serve_socket
-from .store import ProxyStore, DataDirStore
+from .store import ProxyStore, DataDirStore, ProgressStore
 from .transcribe import parse
 
 def main(argv=None):
@@ -292,6 +292,7 @@ class VTCmd(BaseCommand):
                     archives=((S, '*'),),
                 )
                 S.config = options.config
+            S = ProgressStore(S)
             with defaults.common_S(S):
               with S:
                 yield
