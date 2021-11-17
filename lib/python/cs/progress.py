@@ -365,6 +365,7 @@ class BaseProgress(object):
   def bar(
       self,
       label=None,
+      *,
       upd=None,
       proxy=None,
       statusfunc=None,
