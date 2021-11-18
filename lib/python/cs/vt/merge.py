@@ -5,17 +5,17 @@
 '''
 
 from os.path import basename, dirname
-from icontract import require
+
+from typeguard import typechecked
+
 from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.resources import RunState
 from .dir import Dir, FileDirent
 from .paths import DirLike
 
-@require(lambda target_root: isinstance(target_root, DirLike))
-@require(lambda source_root: isinstance(source_root, DirLike))
-@require(lambda runstate: isinstance(runstate, RunState))
-def merge(target_root, source_root, runstate):
+@typechecked
+def merge(target_root: DirLike, source_root: DirLike, runstate: RunState):
   ''' Merge contents of the DirLike `source_root`
       into the DirLike `target_root`.
 
