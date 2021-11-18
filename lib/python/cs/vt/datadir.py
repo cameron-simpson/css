@@ -40,7 +40,7 @@
 
 from collections import namedtuple
 from collections.abc import Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import errno
 import os
 from os import (
@@ -84,7 +84,7 @@ from cs.seq import imerge
 from cs.threads import locked, bg as bg_thread
 from cs.units import transcribe_bytes_geek, BINARY_BYTES_SCALE
 from cs.upd import Upd, upd_proxy, state as upd_state, print
-from . import MAX_FILE_SIZE, Lock, RLock
+from . import MAX_FILE_SIZE, Lock, RLock, defaults
 from .archive import Archive
 from .block import Block
 from .blockify import (
@@ -359,13 +359,17 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
     # data onto the data queue, and returns.
     # The data queue worker saves the data to backing files and
     # updates the indices.
-    with upd_state.upd.insert(1) as data_proxy:
+    self._data_progress = Progress(
+        name=str(self) + " data queue ",
+        total=0,
+        units_scale=BINARY_BYTES_SCALE,
+    )
+    if defaults.show_progress:
+      proxy_cmgr = upd_state.upd.insert(1)
+    else:
+      proxy_cmgr = nullcontext()
+    with proxy_cmgr as data_proxy:
       self._data_proxy = data_proxy
-      self._data_progress = Progress(
-          name=str(self) + " data queue ",
-          total=0,
-          units_scale=BINARY_BYTES_SCALE,
-      )
       self._dataQ = IterableQueue(65536)
       self._data_Thread = bg_thread(
           self._data_queue,
@@ -462,11 +466,14 @@ class FilesDir(SingletonMixin, HashCodeUtilsMixin, MultiOpenMixin,
         yield data_batch
         data_batch = None
 
-    for data_batch in progress.iterbar(
-        data_batches(dataQ, batch_size),
-        itemlenfunc=lambda batch: sum(map(len, batch)),
-        proxy=self._data_proxy,
-    ):
+    batches = data_batches(dataQ, batch_size)
+    if defaults.show_progress:
+      batches = progress.iterbar(
+          batches,
+          itemlenfunc=lambda batch: sum(map(len, batch)),
+          proxy=self._data_proxy
+      )
+    for data_batch in batches:
       batch_length = len(data_batch)
       ##print("data batch of", batch_length)
       # FileDataIndexEntry by hashcode for batch update of index after flush
@@ -898,16 +905,21 @@ class DataDir(FilesDir):
           if new_size > DFstate.scanned_to:
             offset = DFstate.scanned_to
             hashclass = self.hashclass
-            for pre_offset, DR, post_offset in progressbar(
-                DFstate.scanfrom(offset=offset),
-                "%s: scan %s" % (self, relpath(datadirpath, DFstate.filename)),
-                position=offset,
-                total=new_size,
-                itemlenfunc=(
-                    lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]),
-                units_scale=BINARY_BYTES_SCALE,
-                update_frequency=64,
-            ):
+            scanner = DFstate.scanfrom(offset=offset)
+            if defaults.show_progress:
+              scanner = progressbar(
+                  scanner,
+                  "%s: scan %s" %
+                  (self, relpath(datadirpath, DFstate.filename)),
+                  position=offset,
+                  total=new_size,
+                  itemlenfunc=(
+                      lambda pre_dr_post: pre_dr_post[2] - pre_dr_post[0]
+                  ),
+                  units_scale=BINARY_BYTES_SCALE,
+                  update_frequency=64,
+              )
+            for pre_offset, DR, post_offset in scanner:
               hashcode = hashclass.from_chunk(DR.data)
               entry = FileDataIndexEntry(
                   filenum=filenum,
@@ -1275,15 +1287,18 @@ class PlatonicDir(FilesDir):
                           )
                         scan_from = DFstate.scanned_to
                         scan_start = time()
-                        for pre_offset, data, post_offset in progressbar(
-                            DFstate.scanfrom(offset=DFstate.scanned_to),
-                            "scan " + rfilepath,
-                            position=DFstate.scanned_to,
-                            total=new_size,
-                            units_scale=BINARY_BYTES_SCALE,
-                            itemlenfunc=lambda t3: t3[2] - t3[0],
-                            update_frequency=128,
-                        ):
+                        scanner = DFstate.scanfrom(offset=DFstate.scanned_to)
+                        if defaults.show_progress:
+                          scanner = progressbar(
+                              DFstate.scanfrom(offset=DFstate.scanned_to),
+                              "scan " + rfilepath,
+                              position=DFstate.scanned_to,
+                              total=new_size,
+                              units_scale=BINARY_BYTES_SCALE,
+                              itemlenfunc=lambda t3: t3[2] - t3[0],
+                              update_frequency=128,
+                          )
+                        for pre_offset, data, post_offset in scanner:
                           hashcode = self.hashclass.from_chunk(data)
                           entry = FileDataIndexEntry(
                               filenum=DFstate.filenum,
