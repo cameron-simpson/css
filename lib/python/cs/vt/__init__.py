@@ -194,6 +194,7 @@ class _Defaults(ThreadState):
     self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
+    self.show_progress = False
 
   @property
   def config(self):
