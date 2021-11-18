@@ -1085,10 +1085,10 @@ class VTCmd(BaseCommand):
         if ospath == '-':
           chunks = CornuCopyBuffer.from_fd(0)
           try:
-            S = os.fstat(0)
+            st = os.fstat(0)
           except OSError as e:
             warning("fstat(0): %s", e)
-            S = None
+            st = None
         elif not existspath(ospath):
           error("missing")
           xit = 1
@@ -1101,10 +1101,10 @@ class VTCmd(BaseCommand):
           continue
         else:
           try:
-            S = os.stat(ospath)
+            st = os.stat(ospath)
           except OSError as e:
             warning("stat(%r): %s", ospath, e)
-            S = None
+            st = None
           chunks = CornuCopyBuffer.from_filename(ospath, readsize=1024 * 1024)
         block = top_block_for(
             progressbar(
@@ -1115,7 +1115,8 @@ class VTCmd(BaseCommand):
                 runstate=runstate,
                 update_frequency=64,
                 total=(
-                    S.st_size if S is not None and S_ISREG(S.st_mode) else None
+                    st.st_size
+                    if st is not None and S_ISREG(st.st_mode) else None
                 ),
             )
         )
