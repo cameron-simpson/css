@@ -152,7 +152,7 @@ class VTCmd(BaseCommand):
     options.hashname = os.environ.get(
         self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
     )
-    options.store_progress = False
+    options.show_progress = False
     options.status_label = self.cmd
 
   def apply_opts(self, opts):
@@ -173,7 +173,7 @@ class VTCmd(BaseCommand):
       elif opt == '-h':
         options.hashname = val
       elif opt == '-P':
-        options.store_progress = True
+        options.show_progress = True
       elif opt == '-q':
         # quiet: not verbose
         options.verbose = False
@@ -205,7 +205,7 @@ class VTCmd(BaseCommand):
     cmd = self.cmd
     config = options.config
     runstate = options.runstate
-    store_progress = options.store_progress
+    show_progress = options.show_progress
 
     # catch signals, flag termination
     def sig_handler(sig, frame):
@@ -223,7 +223,8 @@ class VTCmd(BaseCommand):
     old_sigquit = signal(SIGQUIT, sig_handler)
     with stackattrs(common, runstate=runstate, config=config):
       # redo these because defaults is already initialised
-      with stackattrs(defaults, runstate=runstate):
+      with stackattrs(defaults, runstate=runstate,
+                      show_progress=show_progress):
         if cmd in ("config", "dump", "init", "profile", "scan", "test"):
           yield
         else:
@@ -273,7 +274,7 @@ class VTCmd(BaseCommand):
                   archives=((S, '*'),),
               )
               S.config = options.config
-          if store_progress:
+          if show_progress:
             S = ProgressStore(S)
             add_bar_cmgr = S.progress_add.bar("ADD")
             get_bar_cmgr = S.progress_get.bar("GET")
