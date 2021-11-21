@@ -62,26 +62,6 @@ class App(MultiOpenMixin):
     self.viewpoint = viewpoint
     self.lightpoint = lightpoint
 
-  @staticmethod
-  def distance(p1, p2):
-    x1, y1, z1 = p1
-    x2, y2, z2 = p2
-    return sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
-
-  def attach(self, obj, *, parent=None, scene_manager=None):
-    ''' Attach `obj` (en entity or camera) to a scene,
-        return the `SceneNode` containing it.
-    '''
-    if parent is None:
-      # default parent node is the root SceneNode
-      if scene_manager is None:
-        # default SceneManager is the one set up an init
-        scene_manager = self.scene_manager
-      parent = scene_manager.getRootSceneNode()
-    node = parent.createChildSceneNode()
-    node.attachObject(obj)
-    return node
-
   @contextmanager
   def startup_shutdown(self):
     ctx = self.ctx = Ogre.Bites.ApplicationContext(self.name)
@@ -104,17 +84,17 @@ class App(MultiOpenMixin):
     scn_mgr.setAmbientLight(self.ambient_light)
 
     light = scn_mgr.createLight("MainLight")
-    lightnode = self.attach(light)
-    lightnode.setPosition(*self.lightpoint)
+    light_node = self.attach(light)
+    light_node.setPosition(*self.lightpoint)
 
     # create the camera
     cam = scn_mgr.createCamera("MainCamera")
     cam.setNearClipDistance(5)
     cam.setAutoAspectRatio(True)
-    camnode = self.attach(cam)
+    cam_node = self.attach(cam)
 
     # set up the default camera at the same distance as the default light source
-    camman = Ogre.Bites.CameraMan(camnode)
+    camman = Ogre.Bites.CameraMan(cam_node)
     camman.setStyle(Ogre.Bites.CS_ORBIT)
     camman.setYawPitchDist(0, 0.3, self.distance(self.lightpoint, (0, 0, 0)))
 
@@ -132,6 +112,33 @@ class App(MultiOpenMixin):
   def run(self):
     self.root.startRendering()  # blocks until queueEndRendering is called
 
+  @staticmethod
+  def distance(p1, p2):
+    ''' Compute the distance between 2 points (3-tuples).
+    '''
+    x1, y1, z1 = p1
+    x2, y2, z2 = p2
+    return sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+  def root_node(self, scene_manager=None):
+    ''' Return the root `SceneNode` from `scene_manager`
+        (default `self.scene_manager`).
+    '''
+    if scene_manager is None:
+        # default SceneManager is the one set up an init
+        scene_manager = self.scene_manager
+    return scene_manager.getRootSceneNode()
+
+  def attach(self, obj, *, parent=None, scene_manager=None):
+    ''' Attach `obj` (en entity or camera) to a scene,
+        return the `SceneNode` containing it.
+    '''
+    if parent is None:
+      parent=self.root_node(scene_manager)
+    node = parent.createChildSceneNode()
+    node.attachObject(obj)
+    return node
+
   def new_entity(self, *a, parent=None, scene_manager=None):
     ''' Add a new entity to the scene,
         return the `SceneNode` containing the new entity.
@@ -143,6 +150,8 @@ class App(MultiOpenMixin):
       scene_manager = self.scene_manager
     ent = scene_manager.createEntity(*a)
     return self.attach(ent, parent=parent, scene_manager=scene_manager)
+
+  def add_camera(
 
 if __name__ == "__main__":
   with App(__file__) as app:
