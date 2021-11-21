@@ -68,7 +68,6 @@ class App(MultiOpenMixin):
   @contextmanager
   def startup_shutdown(self):
     ctx = self.ctx = Ogre.Bites.ApplicationContext(self.name)
-    ctx = self.ctx
     ctx.initApp()
 
     # register for input events
@@ -76,15 +75,15 @@ class App(MultiOpenMixin):
     ctx.addInputListener(self.klistener)
 
     self.root = ctx.getRoot()
-    scn_mgr = self.scene_manager = self.root.createSceneManager()
+    scene_manager = self.scene_manager = self.root.createSceneManager()
 
     shadergen = Ogre.RTShader.ShaderGenerator.getSingleton()
     shadergen.addSceneManager(
-        scn_mgr
+        scene_manager
     )  # must be done before we do anything with the scene
 
     # without light we would just get a black screen
-    scn_mgr.setAmbientLight(self.ambient_light)
+    scene_manager.setAmbientLight(self.ambient_light)
 
     # create a default light
     self.add_light(position=self.lightpoint)
@@ -131,8 +130,8 @@ class App(MultiOpenMixin):
         (default `self.scene_manager`).
     '''
     if scene_manager is None:
-        # default SceneManager is the one set up an init
-        scene_manager = self.scene_manager
+      # default SceneManager is the one set up an init
+      scene_manager = self.scene_manager
     return scene_manager.getRootSceneNode()
 
   def attach(self, obj, *, parent=None, scene_manager=None):
@@ -140,7 +139,7 @@ class App(MultiOpenMixin):
         return the `SceneNode` containing it.
     '''
     if parent is None:
-      parent=self.root_node(scene_manager)
+      parent = self.root_node(scene_manager)
     node = parent.createChildSceneNode()
     node.attachObject(obj)
     return node
