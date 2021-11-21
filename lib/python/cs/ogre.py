@@ -86,26 +86,22 @@ class App(MultiOpenMixin):
     # without light we would just get a black screen
     scn_mgr.setAmbientLight(self.ambient_light)
 
-    light = scn_mgr.createLight("MainLight")
-    light_node = self.attach(light)
-    light_node.setPosition(*self.lightpoint)
+    # create a default light
+    self.add_light(position=self.lightpoint)
 
-    # create the camera
-    cam = scn_mgr.createCamera("MainCamera")
-    cam.setNearClipDistance(5)
-    cam.setAutoAspectRatio(True)
-    cam_node = self.attach(cam)
-
-    # set up the default camera at the same distance as the default light source
-    camman = Ogre.Bites.CameraMan(cam_node)
-    camman.setStyle(Ogre.Bites.CS_ORBIT)
-    camman.setYawPitchDist(0, 0.3, self.distance(self.lightpoint, (0, 0, 0)))
+    # create a default camera and manager
+    camera, camera_node = self.add_camera()
+    camera_manager = self.camera_manager = Ogre.Bites.CameraMan(camera_node)
+    camera_manager.setStyle(Ogre.Bites.CS_ORBIT)
+    camera_manager.setYawPitchDist(
+        0, 0.3, self.distance(self.lightpoint, (0, 0, 0))
+    )
 
     # map input events to camera controls
-    ctx.addInputListener(camman)
+    ctx.addInputListener(camera_manager)
 
     # and tell it to render into the main window
-    vp = ctx.getRenderWindow().addViewport(cam)
+    vp = ctx.getRenderWindow().addViewport(camera)
     vp.setBackgroundColour(self.background_colour)
 
     yield
@@ -122,6 +118,13 @@ class App(MultiOpenMixin):
     x1, y1, z1 = p1
     x2, y2, z2 = p2
     return sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+  @typechecked
+  def auto_name(self, flavour: str):
+    ''' Allocated a name for an object of the given `flavour`
+        (eg "camera").
+    '''
+    return f"{self.name}-{flavour}-{next(self.seqs[flavour])}"
 
   def root_node(self, scene_manager=None):
     ''' Return the root `SceneNode` from `scene_manager`
@@ -154,7 +157,45 @@ class App(MultiOpenMixin):
     ent = scene_manager.createEntity(*a)
     return self.attach(ent, parent=parent, scene_manager=scene_manager)
 
+  @typechecked
+  def add_light(
+      self,
+      name=None,
+      *,
+      position: Tuple[float, float, float],
+      scene_manager=None,
+  ):
+    ''' Add a light, return the light and the `SceneNode` enclosing it.
+    '''
+    if name is None:
+      name = self.auto_name('light')
+      name = f"{self.name}-light-{next(self.seqs['light'])}"
+    if scene_manager is None:
+      scene_manager = self.scene_manager
+    light = scene_manager.createLight(name)
+    light_node = self.attach(light)
+    light_node.setPosition(*position)
+    return light, light_node
+
   def add_camera(
+      self,
+      name=None,
+      *,
+      near_clip_distance=1,  # arbitrary number
+      auto_aspect_ratio=True,
+      scene_manager=None,
+  ):
+    ''' Add a camera, return the camera and the `SceneNode` enclosing it.
+    '''
+    # create a default camera and manager
+    if name is None:
+      name = self.auto_name('camera')
+    if scene_manager is None:
+      scene_manager = self.scene_manager
+    camera = scene_manager.createCamera(name)
+    camera.setNearClipDistance(near_clip_distance)
+    camera.setAutoAspectRatio(auto_aspect_ratio)
+    return camera, self.attach(camera)
 
 if __name__ == "__main__":
   with App(__file__) as app:
