@@ -8,7 +8,7 @@
 '''
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime
 import errno
 from getopt import getopt, GetoptError
@@ -28,7 +28,6 @@ import shutil
 from signal import signal, SIGINT, SIGHUP, SIGQUIT
 from stat import S_ISREG
 import sys
-from time import sleep
 from typeguard import typechecked
 from cs.buffer import CornuCopyBuffer
 from cs.cmdutils import BaseCommand
@@ -40,12 +39,11 @@ import cs.logutils
 from cs.logutils import (
     exception, error, warning, track, info, upd, debug, logTo
 )
-from cs.pfx import Pfx
-from cs.progress import Progress, progressbar
-from cs.threads import bg as bg_thread
+from cs.pfx import Pfx, pfx_method
+from cs.progress import progressbar
 from cs.tty import ttysize
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print
+from cs.upd import print
 import cs.x
 from cs.x import X
 from . import common, defaults, DEFAULT_CONFIG_PATH, DEFAULT_CONFIG_ENVVAR
@@ -53,7 +51,6 @@ from .archive import Archive, FileOutputArchive, CopyModes
 from .blockify import (
     blocked_chunks_of,
     blocked_chunks_of2,
-    block_from_chunks,
     top_block_for,
     blockify,
 )
@@ -78,7 +75,7 @@ from .scan import (
     scan,
 )
 from .server import serve_tcp, serve_socket
-from .store import ProxyStore, DataDirStore
+from .store import ProxyStore, DataDirStore, ProgressStore
 from .transcribe import parse
 
 def main(argv=None):
@@ -104,7 +101,7 @@ class VTCmd(BaseCommand):
   DEFAULT_HASHCLASS_ENVVAR = 'VT_HASHCLASS'
   VT_LOGFILE_ENVVAR = 'VT_LOGFILE'
 
-  GETOPT_SPEC = 'C:S:f:h:qv'
+  GETOPT_SPEC = 'C:S:f:h:Pqv'
 
   USAGE_KEYWORDS = {
       'VT_STORE_ENVVAR': VT_STORE_ENVVAR,
@@ -132,6 +129,7 @@ class VTCmd(BaseCommand):
               otherwise {DEFAULT_CONFIG_PATH}
     -h hashclass Hashclass for Stores. Default from ${DEFAULT_HASHCLASS_ENVVAR},
               otherwise {DEFAULT_HASHCLASS_NAME}
+    -P        Progress: show a progress bar of top level Store activity.
     -q        Quiet; not verbose. Default if stderr is not a tty.
     -v        Verbose; not quiet. Default if stderr is a tty.
 '''
@@ -154,8 +152,7 @@ class VTCmd(BaseCommand):
     options.hashname = os.environ.get(
         self.DEFAULT_HASHCLASS_ENVVAR, DEFAULT_HASHCLASS.HASHNAME
     )
-    options.progress = None
-    options.ticker = None
+    options.show_progress = False
     options.status_label = self.cmd
 
   def apply_opts(self, opts):
@@ -175,6 +172,8 @@ class VTCmd(BaseCommand):
         options.config_path = val
       elif opt == '-h':
         options.hashname = val
+      elif opt == '-P':
+        options.show_progress = True
       elif opt == '-q':
         # quiet: not verbose
         options.verbose = False
@@ -206,9 +205,7 @@ class VTCmd(BaseCommand):
     cmd = self.cmd
     config = options.config
     runstate = options.runstate
-    progress = options.progress
-    if progress is None:
-      progress = Progress(total=0)
+    show_progress = options.show_progress
 
     # catch signals, flag termination
     def sig_handler(sig, frame):
@@ -224,82 +221,74 @@ class VTCmd(BaseCommand):
     old_sighup = signal(SIGHUP, sig_handler)
     old_sigint = signal(SIGINT, sig_handler)
     old_sigquit = signal(SIGQUIT, sig_handler)
-
-    ticker = options.ticker
-    if ticker is None and sys.stderr.isatty():
-      ticker_proxy = Upd().insert(1)
-
-      def ticker():
-        while not runstate.cancelled:
-          ticker_proxy.text = progress.status(
-              options.status_label, ticker_proxy.width
-          )
-          sleep(0.25)
-
-      ticker = bg_thread(ticker, name='status-line', daemon=True)
-    with stackattrs(options, progress=progress, ticker=ticker):
-      with stackattrs(common, runstate=runstate, progress=progress,
-                      config=config):
-        # redo these because defaults is already initialised
-        with stackattrs(defaults, runstate=runstate, progress=progress):
-          if cmd in ("config", "dump", "init", "profile", "scan", "test"):
-            yield
+    with stackattrs(common, runstate=runstate, config=config):
+      # redo these because defaults is already initialised
+      with stackattrs(defaults, runstate=runstate,
+                      show_progress=show_progress):
+        if cmd in ("config", "dump", "init", "profile", "scan", "test"):
+          yield
+        else:
+          # open the default Store
+          if options.store_spec is None:
+            if cmd == "serve":
+              store_spec = '[server]'
+            else:
+              store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
+            options.store_spec = store_spec
+          try:
+            # set up the primary Store using the main programme RunState for control
+            S = Store(options.store_spec, options.config)
+          except (KeyError, ValueError) as e:
+            raise GetoptError(
+                "unusable Store specification: %s: %s" %
+                (options.store_spec, e)
+            )
+          except Exception as e:
+            exception(
+                "UNEXPECTED EXCEPTION: can't open store %r: %s",
+                options.store_spec, e
+            )
+            raise GetoptError(
+                "unusable Store specification: %s" % (options.store_spec,)
+            )
+          if options.cache_store_spec is None:
+            cacheS = None
           else:
-            # open the default Store
-            if options.store_spec is None:
-              if cmd == "serve":
-                store_spec = '[server]'
-              else:
-                store_spec = os.environ.get(self.VT_STORE_ENVVAR, '[default]')
-              options.store_spec = store_spec
             try:
-              # set up the primary Store using the main programme RunState for control
-              S = Store(options.store_spec, options.config)
-            except (KeyError, ValueError) as e:
-              raise GetoptError(
-                  "unusable Store specification: %s: %s" %
-                  (options.store_spec, e)
-              )
+              cacheS = Store(options.cache_store_spec, options.config)
             except Exception as e:
               exception(
-                  "UNEXPECTED EXCEPTION: can't open store %r: %s",
-                  options.store_spec, e
+                  "can't open cache store %r: %s", options.cache_store_spec, e
               )
               raise GetoptError(
-                  "unusable Store specification: %s" % (options.store_spec,)
+                  "unusable Store specification: %s" %
+                  (options.cache_store_spec,)
               )
-            if options.cache_store_spec is None:
-              cacheS = None
             else:
-              try:
-                cacheS = Store(options.cache_store_spec, options.config)
-              except Exception as e:
-                exception(
-                    "can't open cache store %r: %s", options.cache_store_spec,
-                    e
-                )
-                raise GetoptError(
-                    "unusable Store specification: %s" %
-                    (options.cache_store_spec,)
-                )
-              else:
-                S = ProxyStore(
-                    "%s:%s" % (cacheS.name, S.name),
-                    read=(cacheS,),
-                    read2=(S,),
-                    copy2=(cacheS,),
-                    save=(cacheS, S),
-                    archives=((S, '*'),),
-                )
-                S.config = options.config
-            with default.common_S(S):
-              with S:
-                yield
-            if cacheS:
-              cacheS.backend = None
+              S = ProxyStore(
+                  "%s:%s" % (cacheS.name, S.name),
+                  read=(cacheS,),
+                  read2=(S,),
+                  copy2=(cacheS,),
+                  save=(cacheS, S),
+                  archives=((S, '*'),),
+              )
+              S.config = options.config
+          if show_progress:
+            S = ProgressStore(S)
+            add_bar_cmgr = S.progress_add.bar("ADD")
+            get_bar_cmgr = S.progress_get.bar("GET")
+          else:
+            add_bar_cmgr = nullcontext()
+            get_bar_cmgr = nullcontext()
+          with defaults.common_S(S):
+            with S:
+              with add_bar_cmgr:
+                with get_bar_cmgr:
+                  yield
+          if cacheS:
+            cacheS.backend = None
     runstate.cancel()
-    if ticker:
-      ticker.join()
     signal(SIGHUP, old_sighup)
     signal(SIGINT, old_sigint)
     signal(SIGQUIT, old_sigquit)
@@ -954,6 +943,7 @@ class VTCmd(BaseCommand):
         os.remove(ospath)
     return 0
 
+  @pfx_method
   def _parse_pushable(self, s):
     ''' Parse an object specification and return the object.
     '''
@@ -972,7 +962,7 @@ class VTCmd(BaseCommand):
     else:
       # try a Store specification
       try:
-        obj = Store(s, self.config)
+        obj = Store(s, self.options.config)
       except ValueError:
         # try an object transcription eg "D{...}"
         try:
@@ -1032,13 +1022,18 @@ class VTCmd(BaseCommand):
       argv = (srcSspec,)
     dstS = defaults.S
     pushables = []
+    ok = True
     for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
         except ValueError as e:
-          raise GetoptError("unparsed: %s" % (e,)) from e
-        pushables.append(obj)
+          warning("unrecognised pushable: %s", e)
+          ok = False
+        else:
+          pushables.append(obj)
+    if not ok:
+      raise GetoptError("unrecognised pushables")
     return self._push(self.options, srcS, dstS, pushables)
 
   def cmd_pushto(self, argv):
@@ -1055,13 +1050,18 @@ class VTCmd(BaseCommand):
     with Pfx("other_store %r", dstSspec):
       dstS = Store(dstSspec, self.options.config)
     pushables = []
+    ok = True
     for obj_spec in argv:
       with Pfx(obj_spec):
         try:
           obj = self._parse_pushable(obj_spec)
         except ValueError as e:
-          raise GetoptError("unparsed: %s" % (e,)) from e
-        pushables.append(obj)
+          warning("unrecognised pushable: %s", e)
+          ok = False
+        else:
+          pushables.append(obj)
+    if not ok:
+      raise GetoptError("unrecognised pushables")
     return self._push(srcS, dstS, pushables)
 
   def cmd_save(self, argv):
@@ -1085,10 +1085,10 @@ class VTCmd(BaseCommand):
         if ospath == '-':
           chunks = CornuCopyBuffer.from_fd(0)
           try:
-            S = os.fstat(0)
+            st = os.fstat(0)
           except OSError as e:
             warning("fstat(0): %s", e)
-            S = None
+            st = None
         elif not existspath(ospath):
           error("missing")
           xit = 1
@@ -1101,10 +1101,10 @@ class VTCmd(BaseCommand):
           continue
         else:
           try:
-            S = os.stat(ospath)
+            st = os.stat(ospath)
           except OSError as e:
             warning("stat(%r): %s", ospath, e)
-            S = None
+            st = None
           chunks = CornuCopyBuffer.from_filename(ospath, readsize=1024 * 1024)
         block = top_block_for(
             progressbar(
@@ -1115,7 +1115,8 @@ class VTCmd(BaseCommand):
                 runstate=runstate,
                 update_frequency=64,
                 total=(
-                    S.st_size if S is not None and S_ISREG(S.st_mode) else None
+                    st.st_size
+                    if st is not None and S_ISREG(st.st_mode) else None
                 ),
             )
         )
