@@ -3,12 +3,14 @@
 ''' Basic stuff to do simple things with OGRE.
 '''
 
+from collections import defaultdict
 from contextlib import contextmanager
 from math import sqrt
 from pprint import pformat, pprint
 from typing import Optional, Tuple
 
 from cs.resources import MultiOpenMixin
+from cs.seq import Seq
 
 from cs.x import X
 
@@ -57,6 +59,7 @@ class App(MultiOpenMixin):
     if lightpoint is None:
       lightpoint = tuple(viewpoint)
     self.name = name
+    self.seqs = defaultdict(Seq)
     self.ambient_light = ambient_light
     self.background_colour = background_colour
     self.viewpoint = viewpoint
