@@ -98,6 +98,10 @@ class App(MultiOpenMixin):
     vp = ctx.getRenderWindow().addViewport(camera)
     vp.setBackgroundColour(self.background_colour)
 
+    win2, vp2, camera2 = self.add_viewport(
+        background_colour=self.background_colour
+    )
+
     yield
 
     self.ctx.closeApp()
@@ -198,6 +202,31 @@ class App(MultiOpenMixin):
         0, 0.3, self.distance(self.lightpoint, look_at or (0, 0, 0))
     )
     return camera, camera_node, camera_manager
+
+  def add_viewport(
+      self,
+      name=None,
+      *,
+      width=720,
+      height=420,
+      camera=None,
+      scene_manager=None,
+      background_colour=None,
+      **camera_kw,
+  ):
+    if name is None:
+      name = self.auto_name('viewport')
+    if camera is None:
+      camera, _, _ = self.add_camera(
+          name, scene_manager=scene_manager, **camera_kw
+      )
+    else:
+      assert not camera_kw
+    window = self.ctx.createWindow(name, width, height)
+    viewport = window.render.addViewport(camera)
+    if background_colour is not None:
+      viewport.setBackgroundColour(background_colour)
+    return window, viewport, camera
 
 if __name__ == "__main__":
   with App(__file__) as app:
