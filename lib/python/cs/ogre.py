@@ -163,7 +163,6 @@ class App(MultiOpenMixin):
     '''
     if name is None:
       name = self.auto_name('light')
-      name = f"{self.name}-light-{next(self.seqs['light'])}"
     if scene_manager is None:
       scene_manager = self.scene_manager
     light = scene_manager.createLight(name)
