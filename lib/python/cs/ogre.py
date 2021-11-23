@@ -89,12 +89,7 @@ class App(MultiOpenMixin):
     self.add_light(position=self.lightpoint)
 
     # create a default camera and manager
-    camera, camera_node = self.add_camera()
-    camera_manager = self.camera_manager = Ogre.Bites.CameraMan(camera_node)
-    camera_manager.setStyle(Ogre.Bites.CS_ORBIT)
-    camera_manager.setYawPitchDist(
-        0, 0.3, self.distance(self.lightpoint, (0, 0, 0))
-    )
+    camera, camera_node, camera_manager = self.add_camera()
 
     # map input events to camera controls
     ctx.addInputListener(camera_manager)
@@ -194,7 +189,15 @@ class App(MultiOpenMixin):
     camera = scene_manager.createCamera(name)
     camera.setNearClipDistance(near_clip_distance)
     camera.setAutoAspectRatio(auto_aspect_ratio)
-    return camera, self.attach(camera)
+    camera_node = self.attach(camera)
+    if look_at is not None:
+      camera_node.lookAt(look_at)
+    camera_manager = Ogre.Bites.CameraMan(camera_node)
+    camera_manager.setStyle(Ogre.Bites.CS_ORBIT)
+    camera_manager.setYawPitchDist(
+        0, 0.3, self.distance(self.lightpoint, look_at or (0, 0, 0))
+    )
+    return camera, camera_node, camera_manager
 
 if __name__ == "__main__":
   with App(__file__) as app:
