@@ -177,6 +177,7 @@ class App(MultiOpenMixin):
       near_clip_distance=1,  # arbitrary number
       auto_aspect_ratio=True,
       scene_manager=None,
+      look_at=None,
   ):
     ''' Add a camera, return the camera and the `SceneNode` enclosing it.
     '''
