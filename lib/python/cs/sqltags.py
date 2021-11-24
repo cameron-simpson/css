@@ -1505,6 +1505,12 @@ class SQLTags(BaseTagSets):
     return SQLTagSet(*a, _sqltags=_sqltags, **kw)
 
   @contextmanager
+  def startup_shutdown(self):
+    ''' Stub startup/shutdown since we use autosessions.
+        Particularly, we do not want to keep SQLite dbs open.
+    '''
+
+  @contextmanager
   def db_session(self, *, new=False):
     ''' Context manager to obtain a db session if required,
         just a shim for `self.orm.session()`.
