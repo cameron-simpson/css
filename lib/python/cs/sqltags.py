@@ -1509,6 +1509,7 @@ class SQLTags(BaseTagSets):
     ''' Stub startup/shutdown since we use autosessions.
         Particularly, we do not want to keep SQLite dbs open.
     '''
+    yield self
 
   @contextmanager
   def db_session(self, *, new=False):
