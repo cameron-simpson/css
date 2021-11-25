@@ -593,7 +593,7 @@ class VTCmd(BaseCommand):
 
         TODO: hook into vt.merge.
     '''
-    xit = 0
+    runstate = self.options.runstate
     delete = False
     overlay = False
     whole_read = False
@@ -618,6 +618,7 @@ class VTCmd(BaseCommand):
       special = None
     if argv:
       raise GetoptError("extra arguments: %s" % (' '.join(argv),))
+    xit = 0
     if special is None:
       D = Dir('.')
     else:
@@ -642,7 +643,7 @@ class VTCmd(BaseCommand):
         elif not dst.isdir:
           error('target name %r is not a directory', srcbase)
           xit = 1
-        elif not merge(dst, src):
+        elif not merge(dst, src, runstate=runstate):
           error("merge failed")
           xit = 1
       elif isfilepath(srcpath):
@@ -932,7 +933,7 @@ class VTCmd(BaseCommand):
       else:
         source = OSFile(ospath)
       X("target = %s, source= %s", type(target), type(source))
-      if not merge(target, source, self.options.runstate):
+      if not merge(target, source, runstate=self.options.runstate):
         error("merge into %r fails", arpath)
         return 1
       A.update(target)
@@ -1096,7 +1097,7 @@ class VTCmd(BaseCommand):
         elif isdirpath(ospath):
           target = Dir(basename(ospath))
           source = OSDir(ospath)
-          merge(target, source, self.options.runstate)
+          merge(target, source, runstate=self.options.runstate)
           print(target, ospath)
           continue
         else:
