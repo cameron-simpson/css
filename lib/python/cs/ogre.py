@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
+from cs.shims import call_setters
 
 from cs.x import X
 
@@ -178,26 +179,43 @@ class App(MultiOpenMixin):
       self,
       name=None,
       *,
-      near_clip_distance=1,  # arbitrary number
-      auto_aspect_ratio=True,
       scene_manager=None,
       look_at=None,
+      **kw,
   ):
-    ''' Add a camera, return the camera and the `SceneNode` enclosing it.
+    ''' Add a new camera;
+        return the camera and the `SceneNode` enclosing it.
+
+        Parameters:
+        * `name`: optional name for the camera
+        * `scene_manager`: optional `SceneManager`
+        * `look_at`: optional `Vector3` specifying a point for the camera to track,
+          passed to `camera.LookAt()`
+
+        Other keyword parameters are used to set things
+        on the camera or its manager.
+        For example, `near_clip_distance=1` would call `camera.setNearClipDistance(1)`
+        and `style=Ogre.Bites.CS_ORBIT` would call `camera_manager.setStyle(Ogre.Bites.CS_ORBIT)`.
+
+        The following default keywords are applied:
+        * `auto_aspect_ratio`: `True`
+        * `near_clip_distance`: `1`
+        * `style`: `Ogre.Bites.CS_ORBIT`
     '''
+    kw.setdefault('auto_aspect_ratio', True)
+    kw.setdefault('near_clip_distance', 1)
+    kw.setdefault('style', Ogre.Bites.CS_ORBIT)
     # create a default camera and manager
     if name is None:
       name = self.auto_name('camera')
     if scene_manager is None:
       scene_manager = self.scene_manager
     camera = scene_manager.createCamera(name)
-    camera.setNearClipDistance(near_clip_distance)
-    camera.setAutoAspectRatio(auto_aspect_ratio)
     camera_node = self.attach(camera)
     if look_at is not None:
       camera_node.lookAt(look_at)
     camera_manager = Ogre.Bites.CameraMan(camera_node)
-    camera_manager.setStyle(Ogre.Bites.CS_ORBIT)
+    call_setters((camera, camera_manager), kw)
     camera_manager.setYawPitchDist(
         0, 0.3, self.distance(self.lightpoint, look_at or (0, 0, 0))
     )
