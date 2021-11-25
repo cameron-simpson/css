@@ -145,7 +145,7 @@ class App(MultiOpenMixin):
     return node
 
   def new_entity(self, *a, parent=None, scene_manager=None):
-    ''' Add a new entity to the scene,
+    ''' Create a new entity and add it to the scene;
         return the `SceneNode` containing the new entity.
 
         The positional parameters are passed to `SceneManager.createEntity`
@@ -197,7 +197,7 @@ class App(MultiOpenMixin):
         For example, `near_clip_distance=1` would call `camera.setNearClipDistance(1)`
         and `style=Ogre.Bites.CS_ORBIT` would call `camera_manager.setStyle(Ogre.Bites.CS_ORBIT)`.
 
-        The following default keywords are applied:
+        The following default keyword arguments are applied:
         * `auto_aspect_ratio`: `True`
         * `near_clip_distance`: `1`
         * `style`: `Ogre.Bites.CS_ORBIT`
