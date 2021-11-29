@@ -80,7 +80,7 @@ class GetterSetterProxy:
     # try direct access first
     try:
       return getattr(self._proxied, attr)
-    except AttributeError as e:
+    except AttributeError:
       # not a native attribute, try a getter method
       # for a public name
       if not attr.startswith('_'):
