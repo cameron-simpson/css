@@ -22,6 +22,41 @@ from Ogre import *
 import Ogre.Bites
 import Ogre.RTShader
 
+# TODO: maybe put this in cs.shims if it feels clean
+def tupleish_call(func, obj_or_tuple, optional=False):
+  ''' Call `func` with `obj_or_tuple`
+      where `obj_or_tuple` may be a `list` or `tuple`
+      or some third type.
+      If it is a third type it is passed as a single positional parameter
+      otherwise it is unpacked to provide the positional parameters.
+      Return the return value from the call to `func`.
+
+      Parameters:
+      * `func`: the callable to call, usually an OGRE object method
+      * `obj_or_tuple`: a list or tuple, or some third thing
+      * `optional`: optional mode switch, default `False`;
+        if true then `obj_or_tuple` may also be `None`
+        in which case `func` will not be called at all
+
+      This is for OGRE object methods which accept,
+      for example, a `Vector3` or 3 explicit arguments.
+
+      Example:
+
+          tupleish_call(mobj.normal, normal, optional=True)
+
+      in `ManualObjectProxy.add_vertex`, where the `normal` might
+      be provided as a vector or as a 3tuple and the underlying
+      `mobj.normal` method is polymorphic.
+      Also, if `normal` is `None`, do not call `mobj.normal`,
+      as `normal` is an optional parameter to `add_vertex`.
+  '''
+  if optional and obj_or_tuple is None:
+    return
+  if isinstance(obj_or_tuple, (tuple, list)):
+    return pfx_call(func, *obj_or_tuple)
+  return pfx_call(func, obj_or_tuple)
+
 class AppKeyListener(Ogre.Bites.InputListener):
 
   def keyPressed(self, evt):
