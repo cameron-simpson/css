@@ -382,6 +382,9 @@ class ManualObjectProxy(GSProxy):
       )
     nvertices0 = self.current_vertex_count
     for i, vertex_index in enumerate(existing_vertex_indices):
+      if vertex_index is None:
+        # skip placeholder
+        continue
       # negative indices provide reuse of recent vertices
       if vertex_index < 0:
         vertex_index = nvertices0 + vertex_index
