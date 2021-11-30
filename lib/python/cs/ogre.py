@@ -126,17 +126,17 @@ class App(MultiOpenMixin):
 
     # create a default camera and manager
     camera, camera_node, camera_manager = self.add_camera()
+    self.camera = camera
 
     # map input events to camera controls
     ctx.addInputListener(camera_manager)
 
-    # and tell it to render into the main window
-    vp = ctx.getRenderWindow().addViewport(camera)
-    vp.setBackgroundColour(self.background_colour)
+    # note the default window
+    self.window = ctx.getRenderWindow()
 
-    win2, vp2, camera2 = self.add_viewport(
-        background_colour=self.background_colour
-    )
+    # and tell it to render into the main window
+    vp = self.window.addViewport(camera)
+    vp.setBackgroundColour(self.background_colour)
 
     yield
 
