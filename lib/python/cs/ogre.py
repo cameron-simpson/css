@@ -7,18 +7,21 @@ from collections import defaultdict
 from contextlib import contextmanager
 from math import sqrt
 from pprint import pformat, pprint
-from typing import Optional, Tuple
+import time
+from typing import Optional, Tuple, Union
 
+from cs.context import stackattrs
+from cs.pfx import pfx_call
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
-from cs.shims import call_setters
+from cs.shims import call_setters, GetterSetterProxy as GSProxy
 
 from cs.x import X
 
+from icontract import require
 from typeguard import typechecked
 
 import Ogre
-from Ogre import *
 import Ogre.Bites
 import Ogre.RTShader
 
