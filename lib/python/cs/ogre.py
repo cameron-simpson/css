@@ -291,6 +291,184 @@ class App(MultiOpenMixin):
       self.root.renderOneFrame()
       target.writeContentsToTimestampedFile("screenshot_", ext)
 
+class ManualObjectProxy(GSProxy):
+
+  @typechecked
+  def __init__(
+      self, name: Union[str, Ogre.ManualObject], *, app=None, dynamic=False
+  ):
+    ''' Initialise a proxy for an `Ogre.ManualObject`.
+
+        Parameters:
+        * `name`: a name for the new object, or a presupplied `Ogre.ManualObject`
+        * `app`: optional `App` instance, used for operations requiring some context
+        * `dynamic`: whether the `ManualObject` will be dynamic,
+          ignored if an object is presupplied
+    '''
+    if isinstance(name, str):
+      mobj = Ogre.ManualObject(name)
+      mobj.setDynamic(dynamic)
+    else:
+      assert isinstance(name, Ogre.ManualObject)
+      mobj = name
+      name = mobj.getName()
+    super().__init__(mobj)
+    self._app = app
+    self._adding_section = False
+    self._updating_section = False
+
+  @contextmanager
+  @typechecked
+  @require(lambda self: not self._adding_section)
+  def new_section(
+      self,
+      material_name: str,
+      op_type: int = Ogre.RenderOperation.OT_TRIANGLE_LIST
+  ):
+    ''' Context manager to enclose a new section definition.
+
+        Parameters:
+        * `material_name`: the material name
+        * `op_type`: the render operation type
+          from the operation types defined by `Ogre.RenderOperation`,
+          default: `Ogre.RenderOperation.OT_TRIANGLE_LIST`
+        * `dynamic`: whether this is a dynamic object, default `False`
+
+        Example:
+
+            with mobj_proxy.new_section():
+                with mobj_proxy.add_quad():
+                    mobj_proxy.add_vertex(...)
+                    mobj_proxy.add_vertex(...)
+                    mobj_proxy.add_vertex(...)
+                    mobj_proxy.add_vertex(...)
+    '''
+    self._proxied.begin(material_name, op_type)
+    try:
+      with stackattrs(self, _adding_section=True):
+        yield
+    finally:
+      self._proxied.end()
+
+  @typechecked
+  @require(lambda self: self._adding_section)
+  def add_vertex(
+      self, position: Tuple, *, normal=None, texture_coord=None, colour=None
+  ):
+    ''' Add a new vertex to the current section.
+
+        Parameters:
+        * `position`: the position of the vertex,
+          a `Vector3` or a coordinate 3-tuple
+        * `normal`: the optional normal to this vertex,
+          a `Vector3` or a vector 3-tuple
+        * `texture_coord`: an optional texture coordinate
+        * `colour`: an optional colour
+    '''
+    mobj = self._proxied
+    tupleish_call(mobj.position, position)
+    tupleish_call(mobj.normal, normal, optional=True)
+    tupleish_call(mobj.textureCoord, texture_coord, optional=True)
+    tupleish_call(mobj.colour, colour, optional=True)
+
+  def _build_vertex_list(self, vertex_indices, *existing_vertex_indices):
+    if len(existing_vertex_indices) > len(vertex_indices):
+      raise ValueError(
+          "too many existing_vertex_indices supplied, max %d, got %d: %r" % (
+              len(vertex_indices),
+              len(existing_vertex_indices),
+              existing_vertex_indices,
+          )
+      )
+    nvertices0 = self.current_vertex_count
+    for i, vertex_index in enumerate(existing_vertex_indices):
+      # negative indices provide reuse of recent vertices
+      if vertex_index < 0:
+        vertex_index = nvertices0 + vertex_index
+        assert vertex_index >= 0
+      vertex_indices[i] = vertex_index
+    yield vertex_indices
+    n_new_vertices = self.current_vertex_count - nvertices0
+    new_vertex_index = nvertices0
+    # fill in unfilled vertices with the additional vertex indices
+    for i in range(len(vertex_indices)):
+      if vertex_indices[i] is None:
+        # skip indices already listed
+        while new_vertex_index in vertex_indices:
+          new_vertex_index += 1
+        vertex_indices[i] = new_vertex_index
+        new_vertex_index += 1
+    if new_vertex_index < self.current_vertex_count:
+      warning(
+          "%d unused vertices left over",
+          self.current_vertex_count - new_vertex_index
+      )
+
+  @contextmanager
+  @require(lambda self: self._adding_section)
+  def add_quad(self, *existing_vertex_indices):
+    ''' Context manage to surround the addition of 4 vertices comprising a quad.
+
+        Example:
+
+            # add a new quad reusing 2 previously created vertices
+            # and 2 newly created ones inside the suite
+            with mobj_proxy.add_quad(-2, -1):
+                mobj_proxy.add_vertex(...)
+                mobj_proxy.add_vertex(...)
+    '''
+    vertex_indices = [None, None, None, None]
+    yield from self._build_vertex_list(
+        vertex_indices, *existing_vertex_indices
+    )
+    print("QUAD", vertex_indices)
+    pfx_call(self._proxied.quad, *vertex_indices)
+
+  @contextmanager
+  @require(lambda self: self._adding_section)
+  def add_triangle(self, *existing_vertex_indices):
+    ''' Context manage to surround the addition of 3 vertices comprising a triangle.
+
+        Example:
+
+            with mobj_proxy.add_triangle():
+                mobj_proxy.add_vertex(...)
+                mobj_proxy.add_vertex(...)
+                mobj_proxy.add_vertex(...)
+    '''
+    vertex_indices = [None, None, None]
+    yield from self._build_vertex_list(
+        vertex_indices, *existing_vertex_indices
+    )
+    print("TRIANGLE", vertex_indices)
+    pfx_call(self._proxied.triangle, *vertex_indices)
+
+  @contextmanager
+  @typechecked
+  @require(lambda self: not self._adding_section)
+  @require(lambda self: not self._updating_section)
+  @require(lambda section_index: section_index >= 0)
+  def update(self, section_index: int):
+    ''' Context manager to enclose a section update.
+    '''
+    with stackattrs(self, _updating_section=True):
+      self._proxied.begin_update(section_index)
+      try:
+        yield
+      finally:
+        self._proxied.end()
+
+  @typechecked
+  def as_mesh(self, mesh_name: Optional[str] = None, resource_group=None):
+    ''' Return a new `Ogre.Mesh` contructed from this object.
+    '''
+    if mesh_name is None:
+      app = self._app
+      mesh_name = app.auto_name(app.name + '--' + self.name)
+    if resource_group is None:
+      resource_group = 'General'
+    return self._proxied.convertToMesh(mesh_name, resource_group)
+
 if __name__ == "__main__":
   with App(__file__) as app:
     app.new_entity("sinbad-mesh", "Sinbad.mesh")
