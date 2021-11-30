@@ -434,10 +434,19 @@ class ManualObjectProxy(GSProxy):
 
         Example:
 
-            with mobj_proxy.add_triangle():
-                mobj_proxy.add_vertex(...)
-                mobj_proxy.add_vertex(...)
-                mobj_proxy.add_vertex(...)
+            mobjp = ManualObjectProxy("mobj1", app=app)
+            with mobjp.new_section("section1"):
+                # new triangle
+                with mobjp.add_triangle() as V:
+                    mobjp.add_vertex((-20, 20, 20), normal=(0, 0, 1), texture_coord=(0, 0))
+                    mobjp.add_vertex((-20, -20, 20), normal=(0, 0, 1), texture_coord=(0, 1))
+                    mobjp.add_vertex((20, -20, 20), normal=(0, 0, 1), texture_coord=(1, 1))
+                print("triangle 1 =", V)
+                # second triangle reusing the most recent 2 vertices
+                with mobjp.add_triangle(-1, None, -2) as V2:
+                    mobjp.add_vertex((20, -40, 40), normal=(0, 0, 1), texture_coord=(1, 1))
+                print("triangle 2 =", V2)
+
     '''
     vertex_indices = [None, None, None]
     yield from self._build_vertex_list(
