@@ -281,6 +281,16 @@ class App(MultiOpenMixin):
       viewport.setBackgroundColour(background_colour)
     return window, viewport, camera
 
+  def screenshot(self, camera, *, ext='.png'):
+    cproxy = GSProxy(camera)
+    vproxy = GSProxy(cproxy.viewport)
+    with stackattrs(vproxy, overlays_enabled=False):
+      target = vproxy.target
+      # why 2 renders?
+      self.root.renderOneFrame()
+      self.root.renderOneFrame()
+      target.writeContentsToTimestampedFile("screenshot_", ext)
+
 if __name__ == "__main__":
   with App(__file__) as app:
     app.new_entity("sinbad-mesh", "Sinbad.mesh")
