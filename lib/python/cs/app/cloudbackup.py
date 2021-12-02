@@ -51,7 +51,7 @@ from cs.cloud.crypt import (
 from cs.cmdutils import BaseCommand
 from cs.context import pushattrs, popattrs
 from cs.deco import fmtdoc, strable
-from cs.fileutils import UUIDNDJSONMapping, NamedTemporaryCopy
+from cs.fileutils import UUIDNDJSONMapping
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import info, warning, error, exception
@@ -1822,51 +1822,40 @@ class NamedBackup(SingletonMixin):
               return hashcode, fstat
           # no private keys with known passphrases
           # TODO: if interactive, offer available keys, request passphrase
+
         # need to reupload
-        # copy the file so that what we upload is stable
-        # this includes a second hashcode pass, alas
         if runstate.cancelled:
           return None, None
-        proxy("prepare upload")
-        subpath_tmpname_part = subpath.replace(os.sep, '_')
-        if len(subpath_tmpname_part) > 64:
-          subpath_tmpname_part = '...' + subpath_tmpname_part[-61:]
-        with NamedTemporaryCopy(
-            filename,
-            progress=65536,
-            progress_label="snapshot " + filename,
-            prefix='backup_filename__' + subpath_tmpname_part + '__',
-        ) as T:
-          if runstate.cancelled:
-            return None, None
-          with open(T.name, 'rb') as f2:
-            fd2 = f2.fileno()
-            with mmap(fd2, 0, prot=PROT_READ) as mm:
-              hasher = DEFAULT_HASHCLASS.digester()
-              if runstate.cancelled:
-                return None, None
-              hasher.update(mm)
-              hashcode = DEFAULT_HASHCLASS(hasher.digest())
-              # upload the content if not already uploaded
-              # TODO: shared by hashcode set of locks
-              if runstate.cancelled:
-                return None, None
-              P = Progress(name="crypt upload " + subpath, total=len(mm))
-              backup_run.upload_progress.add(P)
-              with P.bar(proxy=proxy, label=''):
-                self.upload_hashcode_content(
-                    backup_record,
-                    mm,
-                    hashcode,
-                    upload_progress=P,
-                    length=len(mm)
-                )
-              proxy.text = (
-                  P.format_counter(len(mm)) + ' in ' + transcribe(
-                      P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-                  )
-              )
-            backup_run.upload_progress.remove(P, accrue=True)
+
+        # direct upload, checksum the contents to notice modification
+        hasher = DEFAULT_HASHCLASS.digester()
+        bfr = CornuCopyBuffer.from_filename(
+            filename, copy_chunks=hasher.update
+        )
+        P = Progress(name="crypt upload " + subpath, total=len(mm))
+        backup_run.upload_progress.add(P)
+        with P.bar(proxy=proxy, label=''):
+          self.upload_hashcode_content(
+              backup_record,
+              bfr,
+              hashcode,
+              upload_progress=P,
+              length=fstat.st_size
+          )
+        proxy.text = (
+            P.format_counter(len(mm)) + ' in ' + transcribe(
+                P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
+        backup_run.upload_progress.remove(P, accrue=True)
+        up_hashcode = DEFAULT_HASHCLASS(hasher.digest())
+        if up_hashcode != hashcode:
+          # we return the original hashcode anyway, as that is the
+          # basis of the upload path
+          warning(
+              "uploaded content changed: original hashcode %s, uploaded content %s",
+              hashcode, up_hashcode
+          )
         return hashcode, fstat
 
   def upload_hashcode_content(
