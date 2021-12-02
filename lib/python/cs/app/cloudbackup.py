@@ -1771,7 +1771,6 @@ class NamedBackup(SingletonMixin):
               )
               return hashcode, fstat
             # compute hashcode from file contents
-            hashcode = DEFAULT_HASHCLASS.digester()
             with mmap(fd, fstat.st_size, prot=PROT_READ) as mm:
               if runstate.cancelled:
                 return None, None
