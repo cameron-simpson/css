@@ -145,9 +145,10 @@ class CornuCopyBuffer(object):
       self.buflen = len(buf)
     self.offset = offset
     self.seekable = seekable
-    input_data = self.input_data = iter(input_data)
+    input_data = iter(input_data)
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
+    self.input_data = input_data
     self.copy_offsets = copy_offsets
     # Try to compute the displacement between the input_data byte
     # offset and the buffer's logical offset.
