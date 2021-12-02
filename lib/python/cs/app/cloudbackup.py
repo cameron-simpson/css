@@ -1759,16 +1759,8 @@ class NamedBackup(SingletonMixin):
               raise ValueError("not a regular file")
             hasher = DEFAULT_HASHCLASS.digester()
             if fstat.st_size == 0:
-              # TODO: why upload empty files at all? back to the "inline small files" issue
-              # can't mmap empty files, and in any case they're easy
-              hashcode = DEFAULT_HASHCLASS(
-                  DEFAULT_HASHCLASS.digester().digest()
-              )
-              if runstate.cancelled:
-                return None, None
-              self.upload_hashcode_content(
-                  backup_record, fd, hashcode, length=fstat.st_size
-              )
+              # we do not even upload an empty file, just record the hash of empty data
+              hashcode = DEFAULT_HASHCLASS(hasher.digest())
               return hashcode, fstat
             # compute hashcode from file contents
             with mmap(fd, fstat.st_size, prot=PROT_READ) as mm:
