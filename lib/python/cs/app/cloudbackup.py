@@ -61,7 +61,7 @@ from cs.mappings import (
     UUIDedDict,
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, unpfx
+from cs.pfx import Pfx, pfx_method, unpfx, pfx_call
 from cs.progress import Progress, OverProgress, progressbar
 from cs.resources import RunStateMixin
 from cs.result import report, CancellationError
@@ -542,63 +542,59 @@ class CloudBackupCommand(BaseCommand):
                 hashpath = backup.hashcode_path(hashcode)
                 cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
-                length = name_details.st_size
-                download_progress = Progress(name=cloudpath, total=length)
-                with UpdProxy() as dl_proxy:
-                  with download_progress.bar(proxy=dl_proxy):
-                    P = crypt_download(
-                        content_area.cloud,
-                        content_area.bucket_name,
-                        cloudpath,
-                        private_path=private_path,
-                        passphrase=passphrase,
-                        public_key_name=public_key_name,
-                        download_progress=download_progress,
-                    )
                 fsdirpath = dirname(fspath)
                 if fsdirpath not in made_dirs:
-                  print("mkdir", fsdirpath)
-                  with Pfx("makedirs(%r)", fsdirpath):
-                    os.makedirs(fsdirpath, 0o777)
+                  pfx_call(os.makedirs, fsdirpath, 0o777)
                   made_dirs.add(fsdirpath)
-                with open(fspath, 'wb') as f:
-                  bfr = CornuCopyBuffer.from_file(P.stdout)
-                  digester = hashcode.digester()
-                  for bs in progressbar(
-                      bfr,
-                      label=pathname,
-                      total=length,
-                      itemlenfunc=len,
-                      units_scale=BINARY_BYTES_SCALE,
-                  ):
-                    digester.update(bs)
-                    f.write(bs)
-                retcode = P.wait()
-                if retcode != 0:
-                  error(
-                      "openssl %r returns exit code %s" % (
-                          P.args,
-                          retcode,
-                      )
-                  )
-                  xit = 1
+                digester = hashcode.digester()
+                length = name_details.st_size
+                if length == 0:
+                  # no need to download empty files
+                  with open(fspath, 'wb') as f:
+                    pass
                 else:
-                  with Pfx(
-                      "utime(%r,%f:%s)",
-                      fspath,
-                      name_details.st_mtime,
-                      datetime.fromtimestamp(name_details.st_mtime
-                                             ).isoformat(),
-                  ):
-                    os.utime(
-                        fspath,
-                        times=(
-                            name_details.get('st_atime')
-                            or name_details.st_mtime,
-                            name_details.st_mtime,
-                        ),
-                        follow_symlinks=False
+                  download_progress = Progress(name=cloudpath, total=length)
+                  with UpdProxy() as dl_proxy:
+                    with download_progress.bar(proxy=dl_proxy):
+                      P = crypt_download(
+                          content_area.cloud,
+                          content_area.bucket_name,
+                          cloudpath,
+                          private_path=private_path,
+                          passphrase=passphrase,
+                          public_key_name=public_key_name,
+                          download_progress=download_progress,
+                      )
+                      # TODO: use atomic_filename here
+                      with open(fspath, 'wb') as f:
+                        bfr = CornuCopyBuffer.from_file(P.stdout)
+                        for bs in progressbar(
+                            bfr,
+                            label=pathname,
+                            total=length,
+                            itemlenfunc=len,
+                            units_scale=BINARY_BYTES_SCALE,
+                        ):
+                          digester.update(bs)
+                          f.write(bs)
+                  retcode = P.wait()
+                  if retcode != 0:
+                    error(
+                        "openssl %r returns exit code %s" % (
+                            P.args,
+                            retcode,
+                        )
                     )
+                    xit = 1
+                pfx_call(
+                    os.utime,
+                    fspath,
+                    times=(
+                        name_details.get('st_atime') or name_details.st_mtime,
+                        name_details.st_mtime,
+                    ),
+                    follow_symlinks=False
+                )
                 retrieved_hashcode = type(hashcode)(digester.digest())
                 if hashcode != retrieved_hashcode:
                   error(
