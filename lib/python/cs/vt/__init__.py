@@ -43,6 +43,7 @@ from contextlib import contextmanager
 import os
 import tempfile
 from types import SimpleNamespace as NS
+from cs.context import stackattrs
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
@@ -193,6 +194,7 @@ class _Defaults(ThreadState):
     self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
+    self.show_progress = False
 
   @property
   def config(self):
@@ -208,7 +210,7 @@ class _Defaults(ThreadState):
     raise AttributeError(attr)
 
   @contextmanager
-  def common_S(S):
+  def common_S(self, S):
     ''' Context manager to push a Store onto `common.S`.
     '''
     with stackattrs(common, S=S):

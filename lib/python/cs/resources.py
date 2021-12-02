@@ -166,7 +166,10 @@ class MultiOpenMixin(ContextManagerMixin):
     try:
       startup = self.startup
     except AttributeError:
-      pass
+      warning(
+          "MultiOpenMixin.startup_shutdown: no %s.startup" %
+          (type(self).__name__,)
+      )
     else:
       startup()
     try:
@@ -175,7 +178,10 @@ class MultiOpenMixin(ContextManagerMixin):
       try:
         shutdown = self.shutdown
       except AttributeError:
-        pass
+        warning(
+            "MultiOpenMixin.startup_shutdown: no %s.shutdown" %
+            (type(self).__name__,)
+        )
       else:
         shutdown()
 

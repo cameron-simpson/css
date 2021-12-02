@@ -9,12 +9,12 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from contextlib import contextmanager
 from fnmatch import fnmatch
 from functools import partial
 import sys
 from threading import Semaphore
 from icontract import require
-from cs.context import ContextManagerMixin
 from cs.deco import fmtdoc
 from cs.excutils import logexc
 from cs.later import Later
@@ -220,7 +220,20 @@ class _BasicStoreCommon(Mapping, MultiOpenMixin, HashCodeUtilsMixin,
   ##
   def __enter_exit__(self):
     with defaults(S=self):
-      yield self
+      try:
+        super_eeg = super().__enter_exit__
+      except AttributeError:
+
+        def super_eeg():
+          yield
+
+      eeg = super_eeg()
+      next(eeg)
+      yield
+      try:
+        next(eeg)
+      except StopIteration:
+        pass
 
   ##########################
   ## MultiOpenMixin methods.
@@ -1051,24 +1064,6 @@ class _PlatonicStore(MappingStore):
     '''
     return self._datadir.get_Archive(name, missing_ok=missing_ok)
 
-class _ProgressStoreTemplateMapping:
-
-  def __init__(self, PS):
-    self.PS = PS
-
-  def __getitem__(self, key):
-    try:
-      category, aspect = key.rsplit('_', 1)
-    except ValueError:
-      category = key
-      aspect = 'position'
-    P = self.PS._progress[category]
-    try:
-      value = getattr(P, aspect)
-    except AttributeError as e:
-      raise KeyError("%s: aspect=%r: %s" % (key, aspect, e))
-    return value
-
 class ProgressStore(BasicStoreSync):
   ''' A shim for another Store to do progress reporting.
 
@@ -1079,82 +1074,88 @@ class ProgressStore(BasicStoreSync):
 
   def __init__(
       self,
-      name,
       S,
-      template='rq  {requests_position}  {requests_throughput}/s',
-      **kw
+      **kw,
   ):
-    ''' Wrapper for a Store which collects statistics on use.
+    ''' Wrapper for another Store which collects statistics on use.
     '''
-    BasicStoreAsync.__init__(self, "ProgressStore(%s)" % (name,), **kw)
+    super().__init__(f"{type(self).__name__}({S})", **kw)
     self.S = S
-    self.template = template
-    self.template_mapping = _ProgressStoreTemplateMapping(self)
-    Ps = {}
-    for category in 'requests', \
-                    'adds', 'gets', 'contains', 'flushes', \
-                    'bytes_stored', 'bytes_fetched':
-      Ps[category] = Progress(
-          name='-'.join((str(S), category)), throughput_window=4
-      )
-    self._progress = Ps
+    self.progress_add = Progress(
+        name=f"add_bytes:{self.name}", throughput_window=4, total=0
+    )
+    self.progress_get = Progress(
+        name=f"get_bytes:{self.name}", throughput_window=4, total=0
+    )
 
   def __str__(self):
     return self.status_text()
 
-  def startup(self):
-    super().startup()
-    self.S.open()
-
-  def shutdown(self):
-    self.S.close()
-    super().shutdown()
-
-  def status_text(self, template=None):
-    ''' Return a status text utilising the progress statistics.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Open the subStore.
     '''
-    if template is None:
-      template = self.template
-    return template.format_map(self.template_mapping)
+    with self.S:  # open the substore
+      with defaults(S=self):  # but make the default Store be self
+        yield
 
   def add(self, data):
-    progress = self._progress
-    progress['requests'] += 1
-    size = len(data)
+    ''' Advance the progress_add total, and the position on completion.
+    '''
+    progress_add = self.progress_add
+    data_len = len(data)
+    progress_add.total += data_len
+    result = self.S.add(data)
+    progress_add.position += data_len
+    return result
+
+  def add_bg(self, data):
+    ''' Advance the progress_add total, and the position on completion.
+    '''
+    progress_add = self.progress_add
+    data_len = len(data)
+    progress_add.total += data_len
     LF = self.S.add_bg(data)
     del data
-    progress['adds'] += 1
-    progress['bytes_stored'] += size
-    return LF()
 
-  def get(self, h, default=None):
-    progress = self._progress
-    progress['requests'] += 1
-    LF = self.S.get_bg(h, default=default)
-    progress['gets'] += 1
-    data = LF()
-    progress['bytes_fetched'] += len(data)
+    def notifier(LF):
+      _, exc = LF.join()
+      if exc is None:
+        progress_add.position += data_len
+
+    LF.notify(notifier)
+    return LF
+
+  def get(self, h):
+    ''' Request the data for the hashcode `h`,
+        advance `self.progress_get.position` by its length on return,
+        and return the data.
+    '''
+    data = self.S.get(h)
+    self.progress_get.position += len(data)
     return data
 
+  def get_bg(self, data):
+    ''' Advance the progress_add total, and the position on completion.
+    '''
+    LF = self.S.add_bg(data)
+
+    def notifier(LF):
+      data, exc = LF.join()
+      if exc is None:
+        self.progress_get.position += len(data)
+
+    LF.notify(notifier)
+    return LF
+
   def contains(self, h):
-    progress = self._progress
-    progress['requests'] += 1
-    LF = self.S.contains_bg(h)
-    progress['contains'] += 1
-    return LF()
+    return self.S.contains(h)
 
   def flush(self):
-    progress = self._progress
-    progress['requests'] += 1
-    LF = self.S.flush_bg()
-    progress['flushes'] += 1
-    return LF()
+    self.S.flush()
 
-  @property
-  def requests(self):
-    ''' The number of requests.
-    '''
-    return self._progress['requests'].position
+  def __len__(self):
+    return len(self.S)
 
 if __name__ == '__main__':
   from .store_tests import selftest
