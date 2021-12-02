@@ -422,8 +422,9 @@ def upload(
     overwrite: bool = False,
 ):
   ''' Upload `stdin` to `cloud` in bucket `bucket_name` at path `basepath`
-      using the public key from the file named `public_path`,
-      return the upload result and the created cloud paths
+      using the public key from the file named `public_path`.
+      Return `(upload_result,data_subpath,key_subpath)`
+      being the upload result and the created cloud paths
       (computed from `basepath`).
 
       Parameters:
