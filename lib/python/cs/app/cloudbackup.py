@@ -1835,7 +1835,7 @@ class NamedBackup(SingletonMixin):
         P = Progress(name="crypt upload " + subpath, total=fstat.st_size)
         backup_run.upload_progress.add(P)
         with P.bar(proxy=proxy, label=''):
-          self.upload_hashcode_content(
+          new_upload = self.upload_hashcode_content(
               backup_record,
               bfr,
               hashcode,
