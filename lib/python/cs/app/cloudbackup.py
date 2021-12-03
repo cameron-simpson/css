@@ -1848,10 +1848,6 @@ class NamedBackup(SingletonMixin):
             )
         )
         backup_run.upload_progress.remove(P, accrue=True)
-        assert bfr.offset == fstat.st_size, "bfr.offet=%d but fstat.st_size=%d" % (
-            bfr.offset, fstat.st_size
-        )
-
         up_hashcode = DEFAULT_HASHCLASS(hasher.digest())
         if up_hashcode != hashcode:
           # we return the original hashcode anyway, as that is the
@@ -1860,6 +1856,9 @@ class NamedBackup(SingletonMixin):
               "uploaded content changed: original hashcode %s, uploaded content %s",
               hashcode, up_hashcode
           )
+        assert not new_upload or bfr.offset == fstat.st_size, "bfr.offset=%d but fstat.st_size=%d" % (
+            bfr.offset, fstat.st_size
+        )
         return hashcode, fstat
 
   def upload_hashcode_content(
@@ -1876,7 +1875,7 @@ class NamedBackup(SingletonMixin):
     '''
     content_area = backup_record.content_area
     basepath = joinpath(content_area.basepath, self.hashcode_path(hashcode))
-    file_info, *cloudpaths = crypt_upload(
+    new_upload, file_info, *cloudpaths = crypt_upload(
         f,
         content_area.cloud,
         content_area.bucket_name,
@@ -1893,6 +1892,7 @@ class NamedBackup(SingletonMixin):
       upload_progress.position = length
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
+    return new_upload
 
 class FileBackupState(UUIDedDict):
   ''' A state record for a name within a directory.
