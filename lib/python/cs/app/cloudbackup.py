@@ -1832,7 +1832,7 @@ class NamedBackup(SingletonMixin):
         bfr = CornuCopyBuffer.from_filename(
             filename, copy_chunks=hasher.update
         )
-        P = Progress(name="crypt upload " + subpath, total=len(mm))
+        P = Progress(name="crypt upload " + subpath, total=fstat.st_size)
         backup_run.upload_progress.add(P)
         with P.bar(proxy=proxy, label=''):
           self.upload_hashcode_content(
@@ -1843,11 +1843,15 @@ class NamedBackup(SingletonMixin):
               length=fstat.st_size
           )
         proxy.text = (
-            P.format_counter(len(mm)) + ' in ' + transcribe(
+            P.format_counter(P.total) + ' in ' + transcribe(
                 P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
             )
         )
         backup_run.upload_progress.remove(P, accrue=True)
+        assert bfr.offset == fstat.st_size, "bfr.offet=%d but fstat.st_size=%d" % (
+            bfr.offset, fstat.st_size
+        )
+
         up_hashcode = DEFAULT_HASHCLASS(hasher.digest())
         if up_hashcode != hashcode:
           # we return the original hashcode anyway, as that is the
