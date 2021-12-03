@@ -51,7 +51,7 @@ from cs.cloud.crypt import (
 from cs.cmdutils import BaseCommand
 from cs.context import pushattrs, popattrs
 from cs.deco import fmtdoc, strable
-from cs.fileutils import UUIDNDJSONMapping, NamedTemporaryCopy
+from cs.fileutils import UUIDNDJSONMapping
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import info, warning, error, exception
@@ -61,14 +61,14 @@ from cs.mappings import (
     UUIDedDict,
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method, unpfx
+from cs.pfx import Pfx, pfx_method, unpfx, pfx_call
 from cs.progress import Progress, OverProgress, progressbar
 from cs.resources import RunStateMixin
 from cs.result import report, CancellationError
 from cs.seq import splitoff
 from cs.threads import locked
 from cs.tty import modify_termios
-from cs.units import BINARY_BYTES_SCALE, transcribe
+from cs.units import transcribe, BINARY_BYTES_SCALE, TIME_SCALE
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 DEFAULT_JOB_MAX = 16
@@ -542,63 +542,59 @@ class CloudBackupCommand(BaseCommand):
                 hashpath = backup.hashcode_path(hashcode)
                 cloudpath = joinpath(content_area.basepath, hashpath)
                 print(cloudpath, '=>', fspath)
-                length = name_details.st_size
-                download_progress = Progress(name=cloudpath, total=length)
-                with UpdProxy() as dl_proxy:
-                  with download_progress.bar(proxy=dl_proxy):
-                    P = crypt_download(
-                        content_area.cloud,
-                        content_area.bucket_name,
-                        cloudpath,
-                        private_path=private_path,
-                        passphrase=passphrase,
-                        public_key_name=public_key_name,
-                        download_progress=download_progress,
-                    )
                 fsdirpath = dirname(fspath)
                 if fsdirpath not in made_dirs:
-                  print("mkdir", fsdirpath)
-                  with Pfx("makedirs(%r)", fsdirpath):
-                    os.makedirs(fsdirpath, 0o777)
+                  pfx_call(os.makedirs, fsdirpath, 0o777)
                   made_dirs.add(fsdirpath)
-                with open(fspath, 'wb') as f:
-                  bfr = CornuCopyBuffer.from_file(P.stdout)
-                  digester = hashcode.digester()
-                  for bs in progressbar(
-                      bfr,
-                      label=pathname,
-                      total=length,
-                      itemlenfunc=len,
-                      units_scale=BINARY_BYTES_SCALE,
-                  ):
-                    digester.update(bs)
-                    f.write(bs)
-                retcode = P.wait()
-                if retcode != 0:
-                  error(
-                      "openssl %r returns exit code %s" % (
-                          P.args,
-                          retcode,
-                      )
-                  )
-                  xit = 1
+                digester = hashcode.digester()
+                length = name_details.st_size
+                if length == 0:
+                  # no need to download empty files
+                  with open(fspath, 'wb') as f:
+                    pass
                 else:
-                  with Pfx(
-                      "utime(%r,%f:%s)",
-                      fspath,
-                      name_details.st_mtime,
-                      datetime.fromtimestamp(name_details.st_mtime
-                                             ).isoformat(),
-                  ):
-                    os.utime(
-                        fspath,
-                        times=(
-                            name_details.get('st_atime')
-                            or name_details.st_mtime,
-                            name_details.st_mtime,
-                        ),
-                        follow_symlinks=False
+                  download_progress = Progress(name=cloudpath, total=length)
+                  with UpdProxy() as dl_proxy:
+                    with download_progress.bar(proxy=dl_proxy):
+                      P = crypt_download(
+                          content_area.cloud,
+                          content_area.bucket_name,
+                          cloudpath,
+                          private_path=private_path,
+                          passphrase=passphrase,
+                          public_key_name=public_key_name,
+                          download_progress=download_progress,
+                      )
+                      # TODO: use atomic_filename here
+                      with open(fspath, 'wb') as f:
+                        bfr = CornuCopyBuffer.from_file(P.stdout)
+                        for bs in progressbar(
+                            bfr,
+                            label=pathname,
+                            total=length,
+                            itemlenfunc=len,
+                            units_scale=BINARY_BYTES_SCALE,
+                        ):
+                          digester.update(bs)
+                          f.write(bs)
+                  retcode = P.wait()
+                  if retcode != 0:
+                    error(
+                        "openssl %r returns exit code %s" % (
+                            P.args,
+                            retcode,
+                        )
                     )
+                    xit = 1
+                pfx_call(
+                    os.utime,
+                    fspath,
+                    times=(
+                        name_details.get('st_atime') or name_details.st_mtime,
+                        name_details.st_mtime,
+                    ),
+                    follow_symlinks=False
+                )
                 retrieved_hashcode = type(hashcode)(digester.digest())
                 if hashcode != retrieved_hashcode:
                   error(
@@ -1177,7 +1173,7 @@ class BackupRun(RunStateMixin):
         self.folder_proxies.add(proxy)
 
   @contextmanager
-  def file_proxy(self):
+  def file_proxy(self, no_reset=False):
     ''' Allocate and return a file `UpdProxy` for use by a file scan.
     '''
     with self._lock:
@@ -1185,7 +1181,8 @@ class BackupRun(RunStateMixin):
     try:
       yield proxy
     finally:
-      proxy.reset()
+      if not no_reset:
+        proxy.reset()
       with self._lock:
         self.file_proxies.add(proxy)
 
@@ -1733,6 +1730,8 @@ class NamedBackup(SingletonMixin):
         Otherwise upload the file contents against the hashcode
         and return the stat and hashcode.
     '''
+    if backup_run.cancelled:
+      raise CancellationError("CANCELLED backup of %r" % (subpath,))
     validate_subpath(subpath)
     assert prevstate is None or isinstance(prevstate, AttrableMappingMixin)
     runstate = backup_run.runstate
@@ -1740,7 +1739,7 @@ class NamedBackup(SingletonMixin):
       return None, None
     filename = joinpath(backup_root_dirpath, subpath)
     with Pfx("backup_filename(%r)", filename):
-      with backup_run.file_proxy() as proxy:
+      with backup_run.file_proxy(no_reset=True) as proxy:
         proxy.prefix = subpath + ': '
         proxy("check against previous backup")
         backup_record = backup_run.backup_record
@@ -1760,22 +1759,11 @@ class NamedBackup(SingletonMixin):
               raise ValueError("not a regular file")
             hasher = DEFAULT_HASHCLASS.digester()
             if fstat.st_size == 0:
-              # TODO: why upload empty files at all? back to the "inline small files" issue
-              # can't mmap empty files, and in any case they're easy
-              hashcode = DEFAULT_HASHCLASS(
-                  DEFAULT_HASHCLASS.digester().digest()
-              )
-              if runstate.cancelled:
-                return None, None
-              self.upload_hashcode_content(
-                  backup_record, fd, hashcode, length=fstat.st_size
-              )
+              # we do not even upload an empty file, just record the hash of empty data
+              hashcode = DEFAULT_HASHCLASS(hasher.digest())
               return hashcode, fstat
             # compute hashcode from file contents
-            hashcode = DEFAULT_HASHCLASS.digester()
             with mmap(fd, fstat.st_size, prot=PROT_READ) as mm:
-              if runstate.cancelled:
-                return None, None
               hasher.update(mm)
             hashcode = DEFAULT_HASHCLASS(hasher.digest())
         except OSError as e:
@@ -1834,48 +1822,43 @@ class NamedBackup(SingletonMixin):
               return hashcode, fstat
           # no private keys with known passphrases
           # TODO: if interactive, offer available keys, request passphrase
+
         # need to reupload
-        # copy the file so that what we upload is stable
-        # this includes a second hashcode pass, alas
         if runstate.cancelled:
           return None, None
-        proxy("prepare upload")
-        with NamedTemporaryCopy(
-            filename,
-            progress=65536,
-            progress_label="snapshot " + filename,
-            prefix='backup_filename__' + subpath.replace(os.sep, '_') + '__',
-        ) as T:
-          if runstate.cancelled:
-            return None, None
-          with open(T.name, 'rb') as f2:
-            fd2 = f2.fileno()
-            with mmap(fd2, 0, prot=PROT_READ) as mm:
-              hasher = DEFAULT_HASHCLASS.digester()
-              if runstate.cancelled:
-                return None, None
-              hasher.update(mm)
-              hashcode = DEFAULT_HASHCLASS(hasher.digest())
-              # upload the content if not already uploaded
-              # TODO: shared by hashcode set of locks
-              if runstate.cancelled:
-                return None, None
-              P = Progress(name="crypt upload " + subpath, total=len(mm))
-              backup_run.upload_progress.add(P)
-              with P.bar(proxy=proxy, label=''):
-                self.upload_hashcode_content(
-                    backup_record,
-                    mm,
-                    hashcode,
-                    upload_progress=P,
-                    length=len(mm)
-                )
-              proxy.text = (
-                  P.format_counter(P.position) + ' in ' + transcribe(
-                      P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
-                  )
-              )
-            backup_run.upload_progress.remove(P, accrue=True)
+
+        # direct upload, checksum the contents to notice modification
+        hasher = DEFAULT_HASHCLASS.digester()
+        bfr = CornuCopyBuffer.from_filename(
+            filename, copy_chunks=hasher.update
+        )
+        P = Progress(name="crypt upload " + subpath, total=fstat.st_size)
+        backup_run.upload_progress.add(P)
+        with P.bar(proxy=proxy, label=''):
+          new_upload = self.upload_hashcode_content(
+              backup_record,
+              bfr,
+              hashcode,
+              upload_progress=P,
+              length=fstat.st_size
+          )
+        proxy.text = (
+            P.format_counter(P.total) + ' in ' + transcribe(
+                P.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
+            )
+        )
+        backup_run.upload_progress.remove(P, accrue=True)
+        up_hashcode = DEFAULT_HASHCLASS(hasher.digest())
+        if new_upload and up_hashcode != hashcode:
+          # we return the original hashcode anyway, as that is the
+          # basis of the upload path
+          warning(
+              "uploaded content changed: original hashcode %s, uploaded content %s",
+              hashcode, up_hashcode
+          )
+        assert not new_upload or bfr.offset == fstat.st_size, "bfr.offset=%d but fstat.st_size=%d" % (
+            bfr.offset, fstat.st_size
+        )
         return hashcode, fstat
 
   def upload_hashcode_content(
@@ -1892,7 +1875,7 @@ class NamedBackup(SingletonMixin):
     '''
     content_area = backup_record.content_area
     basepath = joinpath(content_area.basepath, self.hashcode_path(hashcode))
-    file_info, *cloudpaths = crypt_upload(
+    new_upload, file_info, *cloudpaths = crypt_upload(
         f,
         content_area.cloud,
         content_area.bucket_name,
@@ -1903,8 +1886,13 @@ class NamedBackup(SingletonMixin):
         public_key_name=backup_record.public_key_name,
         upload_progress=upload_progress,
     )
+    # I suspect that the B2 upload function, at least, does not
+    # necessarily report the completion point.
+    if upload_progress is not None:
+      upload_progress.position = length
     backup_record['count_uploaded_files'] += 1
     backup_record['count_uploaded_bytes'] += length
+    return new_upload
 
 class FileBackupState(UUIDedDict):
   ''' A state record for a name within a directory.

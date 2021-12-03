@@ -451,8 +451,8 @@ class RunState(object):
       A `RunState` has the following properties:
       * `cancelled`: true if `.cancel` has been called.
       * `running`: true if the task is running.
-        Further, assigning a true value to it also sets `.start_time` to now.
-        Assigning a false value to it also sets `.stop_time` to now.
+        Further, assigning a true value to it sets `.start_time` to now.
+        Assigning a false value to it sets `.stop_time` to now.
       * `start_time`: the time `.running` was last set to true.
       * `stop_time`: the time `.running` was last set to false.
       * `run_time`: `max(0,.stop_time-.start_time)`

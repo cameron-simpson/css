@@ -145,9 +145,10 @@ class CornuCopyBuffer(object):
       self.buflen = len(buf)
     self.offset = offset
     self.seekable = seekable
-    input_data = self.input_data = iter(input_data)
+    input_data = iter(input_data)
     if copy_chunks is not None:
       input_data = CopyingIterator(input_data, copy_chunks)
+    self.input_data = input_data
     self.copy_offsets = copy_offsets
     # Try to compute the displacement between the input_data byte
     # offset and the buffer's logical offset.
@@ -416,7 +417,7 @@ class CornuCopyBuffer(object):
         buffered byte is returned.
 
         This is usually not a very useful method;
-        its primary use case it to probe the buffer to make a parsing decision
+        its primary use case is to probe the buffer to make a parsing decision
         instead of taking a byte off and (possibly) pushing it back.
     '''
     if isinstance(index, slice):

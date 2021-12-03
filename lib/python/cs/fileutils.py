@@ -1743,6 +1743,7 @@ def atomic_filename(
 
       Example:
 
+          >>> import os
           >>> from os.path import exists as existspath
           >>> fn = 'test_atomic_filename'
           >>> with atomic_filename(fn, mode='w') as f:
@@ -1751,7 +1752,8 @@ def atomic_filename(
           ...     assert not existspath(fn)
           ...
           >>> assert existspath(fn)
-          >>> assert open(fn).read() == 'foo\n'
+          >>> assert open(fn).read() == 'foo\\n'
+          >>> os.remove(fn)
   '''
   if dir is None:
     dir = dirname(filename)
