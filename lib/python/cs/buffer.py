@@ -417,7 +417,7 @@ class CornuCopyBuffer(object):
         buffered byte is returned.
 
         This is usually not a very useful method;
-        its primary use case it to probe the buffer to make a parsing decision
+        its primary use case is to probe the buffer to make a parsing decision
         instead of taking a byte off and (possibly) pushing it back.
     '''
     if isinstance(index, slice):
