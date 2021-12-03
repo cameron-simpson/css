@@ -1849,7 +1849,7 @@ class NamedBackup(SingletonMixin):
         )
         backup_run.upload_progress.remove(P, accrue=True)
         up_hashcode = DEFAULT_HASHCLASS(hasher.digest())
-        if up_hashcode != hashcode:
+        if new_upload and up_hashcode != hashcode:
           # we return the original hashcode anyway, as that is the
           # basis of the upload path
           warning(
