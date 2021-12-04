@@ -6,6 +6,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from math import sqrt
+from os.path import basename
 from pprint import pformat, pprint
 import time
 from typing import Optional, Tuple, Union
@@ -81,6 +82,7 @@ class App(MultiOpenMixin):
       self,
       name,
       *,
+      app_subdir=None,
       ambient_light: Optional[Tuple[float, float, float]] = None,
       background_colour: Optional[Tuple[float, float, float]] = None,
       # create a camera here and point it at the origin
@@ -89,6 +91,8 @@ class App(MultiOpenMixin):
       # default from theviewpoint
       lightpoint: Optional[Tuple[float, float, float]] = None,
   ):
+    if app_subdir is None:
+      app_subdir = __name__ + '--' + basename(name)
     if ambient_light is None:
       ambient_light = self.DEFAULT_AMBIENCE
     if background_colour is None:
@@ -98,6 +102,8 @@ class App(MultiOpenMixin):
     if lightpoint is None:
       lightpoint = tuple(viewpoint)
     self.name = name
+    self.app_subdir = app_subdir
+    self.fsl = Ogre.FileSystemLayer(self.app_subdir)
     self.seqs = defaultdict(Seq)
     self.ambient_light = ambient_light
     self.background_colour = background_colour
