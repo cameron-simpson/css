@@ -61,6 +61,14 @@ def tupleish_call(func, obj_or_tuple, optional=False):
     return pfx_call(func, *obj_or_tuple)
   return pfx_call(func, obj_or_tuple)
 
+@staticmethod
+def distance(p1, p2):
+  ''' Compute the distance between 2 points (3-tuples).
+  '''
+  x1, y1, z1 = p1
+  x2, y2, z2 = p2
+  return sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
 class AppKeyListener(Ogre.Bites.InputListener):
 
   def keyPressed(self, evt):
@@ -152,14 +160,6 @@ class App(MultiOpenMixin):
 
   def run(self):
     self.root.startRendering()  # blocks until queueEndRendering is called
-
-  @staticmethod
-  def distance(p1, p2):
-    ''' Compute the distance between 2 points (3-tuples).
-    '''
-    x1, y1, z1 = p1
-    x2, y2, z2 = p2
-    return sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
 
   @typechecked
   def auto_name(self, flavour: str):
