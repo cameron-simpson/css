@@ -133,18 +133,17 @@ class App(MultiOpenMixin):
     # create a default light
     self.add_light(position=self.lightpoint)
 
-    # create a default camera and manager
-    camera, camera_node, camera_manager = self.add_camera()
-    self.camera = camera
+    # create a default camera proxy
+    self.camera = self.add_camera(distance=100)
 
     # map input events to camera controls
-    ctx.addInputListener(camera_manager)
+    ctx.addInputListener(self.camera._manager)
 
     # note the default window
     self.window = ctx.getRenderWindow()
 
     # and tell it to render into the main window
-    vp = self.window.addViewport(camera)
+    vp = self.window.addViewport(self.camera._camera)
     vp.setBackgroundColour(self.background_colour)
 
     yield
@@ -221,20 +220,24 @@ class App(MultiOpenMixin):
 
   def add_camera(
       self,
-      name=None,
+      camera: Optional[Union[str, Ogre.Camera]] = None,
       *,
       scene_manager=None,
-      look_at=None,
       **kw,
   ):
     ''' Add a new camera;
-        return the camera and the `SceneNode` enclosing it.
+        return a `CamweraProxy`.
 
         Parameters:
-        * `name`: optional name for the camera
-        * `scene_manager`: optional `SceneManager`
-        * `look_at`: optional `Vector3` specifying a point for the camera to track,
-          passed to `camera.LookAt()`
+        * `camera`: optional `Camera` or camera name
+        * `scene_manager`: optional `SceneManager`,
+          default from `self.scene_manager`.
+
+        Other keyword arguments are passed to the `CameraProxy` constructor.
+    '''
+    if scene_manager is None:
+      scene_manager = self.scene_manager
+    return CameraProxy(camera, scene_manager=scene_manager, **kw)
 
         Other keyword parameters are used to set things
         on the camera or its manager.
