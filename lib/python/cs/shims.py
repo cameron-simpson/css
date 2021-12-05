@@ -78,18 +78,10 @@ class GetterSetterProxy:
       i.e. `self._proxied[0]`.
   '''
 
-  def __init__(self, proxied):
+  def __init__(self, *proxied):
     ''' Initialise a proxy for the objects in `proxied`.
-
-        If `proxied` is of type `tuple`, `list` or `set`
-        then it is taken to be the objects to proxy,
-        otherwis it is taken to be a single object to proxy.
     '''
-    if type(proxied) is not tuple:
-      if type(proxied) in (list, set):
-        proxied = tuple(proxied)
-      else:
-        proxied = proxied,
+    proxied = tuple(proxied)
     self.__dict__['_proxied'] = proxied
     self.__dict__['_proxied0'] = proxied[0]
 
