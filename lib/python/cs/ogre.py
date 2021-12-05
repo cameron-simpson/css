@@ -373,12 +373,12 @@ class ManualObjectProxy(GSProxy):
                     mobj_proxy.add_vertex(...)
                     mobj_proxy.add_vertex(...)
     '''
-    self._proxied.begin(material_name, op_type)
+    self._proxied0.begin(material_name, op_type)
     try:
       with stackattrs(self, _adding_section=True):
         yield
     finally:
-      self._proxied.end()
+      self._proxied0.end()
 
   @typechecked
   @require(lambda self: self._adding_section)
@@ -395,7 +395,7 @@ class ManualObjectProxy(GSProxy):
         * `texture_coord`: an optional texture coordinate
         * `colour`: an optional colour
     '''
-    mobj = self._proxied
+    mobj = self._proxied0
     tupleish_call(mobj.position, position)
     tupleish_call(mobj.normal, normal, optional=True)
     tupleish_call(mobj.textureCoord, texture_coord, optional=True)
@@ -455,7 +455,7 @@ class ManualObjectProxy(GSProxy):
         vertex_indices, *existing_vertex_indices
     )
     print("QUAD", vertex_indices)
-    pfx_call(self._proxied.quad, *vertex_indices)
+    pfx_call(self._proxied0.quad, *vertex_indices)
 
   @contextmanager
   @require(lambda self: self._adding_section)
@@ -483,7 +483,7 @@ class ManualObjectProxy(GSProxy):
         vertex_indices, *existing_vertex_indices
     )
     print("TRIANGLE", vertex_indices)
-    pfx_call(self._proxied.triangle, *vertex_indices)
+    pfx_call(self._proxied0.triangle, *vertex_indices)
 
   @contextmanager
   @typechecked
@@ -494,11 +494,11 @@ class ManualObjectProxy(GSProxy):
     ''' Context manager to enclose a section update.
     '''
     with stackattrs(self, _updating_section=True):
-      self._proxied.begin_update(section_index)
+      self._proxied0.begin_update(section_index)
       try:
         yield
       finally:
-        self._proxied.end()
+        self._proxied0.end()
 
   @typechecked
   def as_mesh(self, mesh_name: Optional[str] = None, resource_group=None):
@@ -509,7 +509,7 @@ class ManualObjectProxy(GSProxy):
       mesh_name = app.auto_name(app.name + '--' + self.name)
     if resource_group is None:
       resource_group = 'General'
-    return self._proxied.convertToMesh(mesh_name, resource_group)
+    return self._proxied0.convertToMesh(mesh_name, resource_group)
 
 if __name__ == "__main__":
   with App(__file__) as app:
