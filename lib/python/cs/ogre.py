@@ -266,6 +266,16 @@ class App(MultiOpenMixin):
       viewport.setBackgroundColour(background_colour)
     return window, viewport, cproxy
 
+  def screenshot(self, camera=None, *, ext='.png'):
+    if camera is None:
+      camera = self.camera
+    vproxy = GSProxy(camera._camera.getViewport())
+    with stackattrs(vproxy, overlays_enabled=False):
+      target = vproxy.target
+      # why 2 renders?
+      self.root.renderOneFrame()
+      self.root.renderOneFrame()
+      target.writeContentsToTimestampedFile("screenshot_", ext)
 
 class CameraProxy(GSProxy):
   ''' A proxy for a camera with the associated scene node and manager;
