@@ -27,6 +27,15 @@ from Ogre import Vector3 as V3
 import Ogre.Bites
 import Ogre.RTShader
 
+@typechecked
+def V3of(v3: Union[V3, Tuple[float, float, float]]) -> V3:
+  ''' Return an `Ogre.Vector3` given a vector or a 3-tuple.
+  '''
+  return V3(*v3) if isinstance(v3, tuple) else v3
+
+# type for things accepting a Vector3 or a 3-tuple
+V3ish = Union[V3, Tuple[float, float, float]]
+
 # TODO: maybe put this in cs.shims if it feels clean
 def tupleish_call(func, obj_or_tuple, optional=False):
   ''' Call `func` with `obj_or_tuple`
@@ -205,18 +214,19 @@ class App(MultiOpenMixin):
       self,
       name=None,
       *,
-      position: Tuple[float, float, float],
+      position: V3ish,
       scene_manager=None,
   ):
     ''' Add a light, return the light and the `SceneNode` enclosing it.
     '''
     if name is None:
       name = self.auto_name('light')
+    position = V3of(position)
     if scene_manager is None:
       scene_manager = self.scene_manager
     light = scene_manager.createLight(name)
     light_node = self.attach(light)
-    light_node.setPosition(*position)
+    light_node.setPosition(position)
     return light, light_node
 
   def add_camera(
