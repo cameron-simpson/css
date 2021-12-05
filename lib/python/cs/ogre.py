@@ -278,15 +278,13 @@ class App(MultiOpenMixin):
       target.writeContentsToTimestampedFile("screenshot_", ext)
 
 class CameraProxy(GSProxy):
-  ''' A proxy for a camera with the associated scene node and manager;
-      the proxy is for the camera amanager, as post creation you
-      are encouraged to do most operations via the manager.
+  ''' A proxy for a camera with the associated scene node and manager.
 
       Attributes:
       * `_camera`: the `Camera`
       * `_manager`: the `CameraManager`
       * `_name`: the `Camera` name
-      * `node`: the `SceneNode`
+      * `_node`: the `SceneNode`
   '''
 
   _seq = Seq()
@@ -359,6 +357,9 @@ class CameraProxy(GSProxy):
     super().__init__(camera_manager, camera_node, camera)
 
 class ManualObjectProxy(GSProxy):
+  ''' A proxy for `Ogre.ManualObject`
+      with convenience methods for mesh definition.
+  '''
 
   @typechecked
   def __init__(
