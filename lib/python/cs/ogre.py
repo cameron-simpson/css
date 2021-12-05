@@ -239,6 +239,33 @@ class App(MultiOpenMixin):
       scene_manager = self.scene_manager
     return CameraProxy(camera, scene_manager=scene_manager, **kw)
 
+  @typechecked
+  def add_viewport(
+      self,
+      name=None,
+      *,
+      width=720,
+      height=420,
+      camera: Optional["CameraProxy"] = None,
+      scene_manager=None,
+      background_colour=None,
+      **camera_kw,
+  ):
+    ''' Create a new viewport and associated window.
+        Return `(Window,Viewport,CameraProxy)`.
+    '''
+    if name is None:
+      name = self.auto_name('viewport')
+    if camera is None:
+      cproxy = self.add_camera(name, scene_manager=scene_manager, **camera_kw)
+    else:
+      assert not camera_kw
+    window = self.ctx.createWindow(name, width, height)
+    viewport = window.render.addViewport(camera)
+    if background_colour is not None:
+      viewport.setBackgroundColour(background_colour)
+    return window, viewport, cproxy
+
 
 class CameraProxy(GSProxy):
   ''' A proxy for a camera with the associated scene node and manager;
