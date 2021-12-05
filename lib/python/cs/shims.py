@@ -64,60 +64,84 @@ def call_setters(objs, settings):
         setter(v)
 
 class GetterSetterProxy:
-  ''' A proxy class to convert snake case attribute access
+  ''' A proxy class to convert public snake case attribute access
       to C++ or Javaesque camel cased getter and setter method calls.
 
-      Attributes which already exist on the original object are
+      Attributes which already exist on a proxied object are
       accessed in preference to the getter/setter methods.
 
-      The original object is available as the `._proxied` attribute.
+      The proxied objects are available as the `._proxied` attribute
+      and the primary proxy object as `.proxied0` for convenience.
+
+      Trying to set a public name when no proxied object has a
+      corresponding setter will set it on the primary proxied object
+      i.e. `self._proxied[0]`.
   '''
 
   def __init__(self, proxied):
+    ''' Initialise a proxy for the objects in `proxied`.
+
+        If `proxied` is of type `tuple`, `list` or `set`
+        then it is taken to be the objects to proxy,
+        otherwis it is taken to be a single object to proxy.
+    '''
+    if type(proxied) is not tuple:
+      if type(proxied) in (list, set):
+        proxied = tuple(proxied)
+      else:
+        proxied = proxied,
     self.__dict__['_proxied'] = proxied
+    self.__dict__['_proxied0'] = proxied[0]
 
   def __getattr__(self, attr):
     # try direct access first
-    try:
-      return getattr(self._proxied, attr)
-    except AttributeError:
-      # not a native attribute, try a getter method
-      # for a public name
-      if not attr.startswith('_'):
-        camel_attr = camelcase(attr)
-        get_name = 'get' + camel_attr[0].upper() + camel_attr[1:]
+    for proxied in self._proxied:
+      try:
+        return getattr(proxied, attr)
+      except AttributeError:
+        pass
+    # not a native attribute, try a getter method
+    # for a public name
+    if not attr.startswith('_'):
+      camel_attr = camelcase(attr)
+      get_name = 'get' + camel_attr[0].upper() + camel_attr[1:]
+      for proxied in self._proxied:
         try:
-          pattr = getattr(self._proxied, get_name)
+          pattr = getattr(proxied, get_name)
         except AttributeError:
           pass
         else:
           return pattr()
-      # no getter, no attribute
-      raise AttributeError(
-          "%s(%s).%s: no .%s on %s" % (
-              type(self).__name__, type(self._proxied).__name__, attr, attr,
-              r(self._proxied)
-          )
-      )
+    # no getter, no attribute
+    raise AttributeError(
+        "%s(%s).%s: no .%s on %s" % (
+            type(self).__name__, type(self._proxied
+                                      ).__name__, attr, attr, r(self._proxied)
+        )
+    )
 
   def __setattr__(self, attr, value):
     # only intercept public names
     if not attr.startswith('_'):
-      if hasattr(self._proxied, attr):
-        # if the proxied object has this attribute, set it there
-        setattr(self._proxied, attr, value)
-      else:
-        # not a native of the proxy, try the setter method
-        camel_attr = camelcase(attr)
-        set_name = 'set' + camel_attr[0].upper() + camel_attr[1:]
+      for proxied in self._proxied:
+        if hasattr(proxied, attr):
+          # if the proxied object has this attribute, set it there
+          setattr(proxied, attr, value)
+          return
+      # not a native of the proxy, try the setter method
+      camel_attr = camelcase(attr)
+      set_name = 'set' + camel_attr[0].upper() + camel_attr[1:]
+      for proxied in self._proxied:
         try:
-          pattr = getattr(self._proxied, set_name)
+          pattr = getattr(proxied, set_name)
         except AttributeError:
-          # no setter, set it on the proxied object directly
-          setattr(self._proxied, attr, value)
+          pass
         else:
           # call the setter to set the value
           pattr(value)
+          return
+      # no setter, set it on the primary proxied object directly
+      setattr(self._proxied[0], attr, value)
     else:
       # private attribute, set it in .__dict__
       self.__dict__[attr] = value
