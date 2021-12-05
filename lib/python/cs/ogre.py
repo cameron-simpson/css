@@ -23,6 +23,7 @@ from icontract import require
 from typeguard import typechecked
 
 import Ogre
+from Ogre import Vector3 as V3
 import Ogre.Bites
 import Ogre.RTShader
 
@@ -82,7 +83,7 @@ class App(MultiOpenMixin):
 
   DEFAULT_AMBIENCE = 0.1, 0.1, 0.1
   DEFAULT_BACKGROUND_COLOUR = 0.3, 0.3, 0.3
-  DEFAULT_VIEWPOINT = 0.0, 0.0, 15.0
+  DEFAULT_VIEWPOINT = V3(0.0, 0.0, 15.0)
   DEFAULT_LIGHTPOINT = DEFAULT_VIEWPOINT
 
   @typechecked
@@ -331,7 +332,9 @@ class CameraProxy(GSProxy):
     kw.setdefault('near_clip_distance', 1)
     kw.setdefault('style', Ogre.Bites.CS_ORBIT)
     if look_at is None:
-      look_at = 0, 0, 0
+      look_at = V3(0, 0, 0)
+    elif isinstance(look_at, tuple):
+      look_at = V3(*look_at)
     if camera is None:
       camera = 'camera-' + str(next(self._seq))
     if isinstance(camera, str):
