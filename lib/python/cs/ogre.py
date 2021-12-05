@@ -421,7 +421,6 @@ class ManualObjectProxy(GSProxy):
         assert vertex_index >= 0
       vertex_indices[i] = vertex_index
     yield vertex_indices
-    n_new_vertices = self.current_vertex_count - nvertices0
     new_vertex_index = nvertices0
     # fill in unfilled vertices with the additional vertex indices
     for i in range(len(vertex_indices)):
