@@ -239,6 +239,49 @@ class App(MultiOpenMixin):
       scene_manager = self.scene_manager
     return CameraProxy(camera, scene_manager=scene_manager, **kw)
 
+
+class CameraProxy(GSProxy):
+  ''' A proxy for a camera with the associated scene node and manager;
+      the proxy is for the camera amanager, as post creation you
+      are encouraged to do most operations via the manager.
+
+      Attributes:
+      * `_camera`: the `Camera`
+      * `_manager`: the `CameraManager`
+      * `_name`: the `Camera` name
+      * `node`: the `SceneNode`
+  '''
+
+  _seq = Seq()
+
+  @typechecked
+  def __init__(
+      self,
+      camera: Optional[Union[str, Ogre.Camera]] = None,
+      *,
+      scene_manager,
+      parent_scene_node=None,
+      target_scene_node=None,
+      look_at=None,
+      yaw=0,
+      pitch=0.3,
+      distance=16,
+      **kw,
+  ):
+    ''' Initialise the `CameraProxy`.
+
+        Parameters:
+        * `camera`: optional `Camera` or camera name
+        * `scene_manager`: the scene manager
+        * `parent_scene_node`: optional parent node for the camera node,
+          default `scene_manager.getRootSceneNode()`
+        * `target_scene_node`: optional target node for the camera node,
+          default `scene_manager.getRootSceneNode()`
+        * `look_at`: optional target for the camera,
+          passed to the camera node `.lookAt()` method
+        * `yaw`, `pitch`, `distance`: optiona yaw/pitch/distance settings,
+          default `0`, `0.3` and `16` respectively
+
         Other keyword parameters are used to set things
         on the camera or its manager.
         For example, `near_clip_distance=1` would call `camera.setNearClipDistance(1)`
@@ -252,56 +295,31 @@ class App(MultiOpenMixin):
     kw.setdefault('auto_aspect_ratio', True)
     kw.setdefault('near_clip_distance', 1)
     kw.setdefault('style', Ogre.Bites.CS_ORBIT)
-    # create a default camera and manager
-    if name is None:
-      name = self.auto_name('camera')
-    if scene_manager is None:
-      scene_manager = self.scene_manager
-    camera = scene_manager.createCamera(name)
-    camera_node = self.attach(camera)
-    if look_at is not None:
-      camera_node.lookAt(look_at)
-    camera_manager = Ogre.Bites.CameraMan(camera_node)
-    call_setters((camera, camera_manager), kw)
-    camera_manager.setYawPitchDist(
-        0, 0.3, self.distance(self.lightpoint, look_at or (0, 0, 0))
-    )
-    return camera, camera_node, camera_manager
-
-  def add_viewport(
-      self,
-      name=None,
-      *,
-      width=720,
-      height=420,
-      camera=None,
-      scene_manager=None,
-      background_colour=None,
-      **camera_kw,
-  ):
-    if name is None:
-      name = self.auto_name('viewport')
+    if look_at is None:
+      look_at = 0, 0, 0
     if camera is None:
-      camera, _, _ = self.add_camera(
-          name, scene_manager=scene_manager, **camera_kw
-      )
+      camera = 'camera-' + str(next(self._seq))
+    if isinstance(camera, str):
+      name = camera
+      camera = scene_manager.createCamera(name)
+      for name in sorted(dir(camera)):
+        print(" ", name, type(getattr(camera, name)))
     else:
-      assert not camera_kw
-    window = self.ctx.createWindow(name, width, height)
-    viewport = window.render.addViewport(camera)
-    if background_colour is not None:
-      viewport.setBackgroundColour(background_colour)
-    return window, viewport, camera
-
-  def screenshot(self, camera, *, ext='.png'):
-    cproxy = GSProxy(camera)
-    vproxy = GSProxy(cproxy.viewport)
-    with stackattrs(vproxy, overlays_enabled=False):
-      target = vproxy.target
-      # why 2 renders?
-      self.root.renderOneFrame()
-      self.root.renderOneFrame()
-      target.writeContentsToTimestampedFile("screenshot_", ext)
+      name = camera.name
+    self._camera = camera
+    self._name = name
+    if parent_scene_node is None:
+      parent_scene_node = scene_manager.getRootSceneNode()
+    if target_scene_node is None:
+      target_scene_node = scene_manager.getRootSceneNode()
+    camera_node = self._node = parent_scene_node.createChildSceneNode()
+    camera_node.attachObject(camera)
+    camera_manager = self._manager = Ogre.Bites.CameraMan(camera_node)
+    pfx_call(camera_node.lookAt, look_at, Ogre.Node.TS_WORLD)
+    pfx_call(camera_manager.setTarget, target_scene_node)
+    pfx_call(camera_manager.setYawPitchDist, yaw, pitch, distance)
+    call_setters((camera_manager, camera, camera_node), kw)
+    super().__init__(camera_manager, camera_node, camera)
 
 class ManualObjectProxy(GSProxy):
 
