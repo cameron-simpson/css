@@ -12,7 +12,9 @@ import time
 from typing import Optional, Tuple, Union
 
 from cs.context import stackattrs
-from cs.pfx import pfx_call
+from cs.lex import r
+from cs.logutils import warning
+from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.shims import call_setters, GetterSetterProxy as GSProxy
@@ -118,7 +120,7 @@ class App(MultiOpenMixin):
     if viewpoint is None:
       viewpoint = self.DEFAULT_VIEWPOINT
     if lightpoint is None:
-      lightpoint = tuple(viewpoint)
+      lightpoint = viewpoint
     self.name = name
     self.app_subdir = app_subdir
     self.fsl = Ogre.FileSystemLayer(self.app_subdir)
