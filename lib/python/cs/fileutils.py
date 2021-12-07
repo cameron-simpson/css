@@ -12,7 +12,6 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import errno
 from functools import partial
-import json
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
@@ -26,7 +25,6 @@ from os.path import (
     exists as existspath,
     isabs as isabspath,
     isdir,
-    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -42,8 +40,6 @@ from cs.env import envsub
 from cs.filestate import FileState
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import IndexedSetMixin, UUIDedDict
-from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
@@ -69,8 +65,6 @@ DISTINFO = {
         'cs.filestate',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings>=20210717',
-        'cs.obj',
         'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.py3',
