@@ -31,7 +31,7 @@ cs.fileutils pypi.release="20210906" ok_revision="2b8a7da6c73858119d4a44d28e23cb
 cs.fstags pypi.release="20210306" ok_revision=f269ef03f4a6ef837d6aff9a565d72b54610e230
 cs.gimmicks ok_revision=b0f69fced453c315c5066ab2df8b72b87b473489 pypi.release="20211208" features={"20211208":["TimeoutError"]}
 cs.html pypi.release=20160828
-cs.id3 pypi.release="20150116.2"
+cs.id3 pypi.release="20150116.2" ok_revision="24205af056bd40eeacb6225dbb802ba3608701d2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.iso14496 pypi.release="20210306" ok_revision="30d3534ee55e6aef369c55e79c0fe63d6bc2e1e6"
 cs.later pypi.release=20191007 ok_revision="5728c540f10449709c3c11f482312cac827d1b83"
