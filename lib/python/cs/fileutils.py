@@ -12,6 +12,7 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import errno
 from functools import partial
+import gzip
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
@@ -38,6 +39,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
+from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
 from cs.pfx import Pfx, pfx_call
@@ -46,7 +48,6 @@ from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
-from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
 __version__ = '20210906-post'
@@ -63,6 +64,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
+        'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
         'cs.pfx>=pfx_call',
@@ -71,7 +73,6 @@ DISTINFO = {
         'cs.range',
         'cs.result',
         'cs.threads',
-        'cs.timeutils',
         'cs.units',
     ],
 }
@@ -1807,6 +1808,59 @@ class RWFileBlockCache(object):
     data = os.pread(fd, length, offset)
     assert len(data) == length
     return data
+
+@contextmanager
+def gzifopen(path, mode='r', *a, **kw):
+  ''' Context manager to open a file which may be a plain file or a gzipped file.
+
+      If `path` ends with `'.gz'` then the filesystem paths attempted
+      are `path` and `path` without the extension, otherwise the
+      filesystem paths attempted are `path+'.gz'` and `path`.  In
+      this way a path ending in `'.gz'` indicates a preference for
+      a gzipped file otherwise an uncompressed file.
+
+      However, if exactly one of the paths exists already then only
+      that path will be used.
+
+      Note that the single character modes `'r'`, `'a'`, `'w'` and `'x'`
+      are text mode for both uncompressed and gzipped opens,
+      like the builtin `open` and *unlike* `gzip.open`.
+      This is to ensure equivalent behaviour.
+  '''
+  compresslevel = kw.pop('compresslevel', 9)
+  path0 = path
+  path, ext = splitext(path)
+  if ext == '.gz':
+    # gzip preferred
+    gzpath = path0
+    path1, path2 = gzpath, path
+  else:
+    # unzipped has precedence
+    gzpath = path0 + '.gz'
+    path1, path2 = path0, gzpath
+  # if exactly one of the files exists, try only that file
+  if existspath(path1) and not existspath(path2):
+    paths = path1,
+  elif existspath(path2) and not existspath(path1):
+    paths = path2,
+  else:
+    paths = path1, path2
+  for openpath in paths:
+    try:
+      with (gzip.open(openpath,
+                      (mode + 't' if mode in ('r', 'a', 'w', 'x') else mode), *
+                      a, compresslevel=compresslevel, **kw) if
+            openpath.endswith('.gz') else open(openpath, mode, *a, **kw)) as f:
+        yield f
+    except FileNotFoundError:
+      # last path to try
+      if openpath == paths[-1]:
+        raise
+      # not present, try the other file
+      continue
+    # open succeeded, we're done
+    return
+  raise RuntimeError("NOTREACHED")
 
 if __name__ == '__main__':
   import cs.fileutils_tests
