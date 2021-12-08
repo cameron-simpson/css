@@ -13,7 +13,7 @@ cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5
 cs.app.ydl pypi.release="20210906" ok_revision=e914d76f88b22a7827f0175b2e45569ace2f7486
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20210316" ok_revision=e0d01b9045138b3bfb6175e5abfcd96549f4a001
-cs.buffer pypi.release="20210316" ok_revision="5ed745dde92e9f0734f14e7e80969978eca80258"
+cs.buffer pypi.release="20210316" ok_revision=d13e4361ea70ade9bb028568e34aca6f1bf291e6
 cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20210927" ok_revision="1953a32ac5fbb32782e04d65514a648a07fc07d1" features={"20210913":["apply_preargv"]}
