@@ -17,7 +17,7 @@ from cs.pfx import Pfx
 from cs.tagset import TagSet, TagsOntology
 from cs.threads import locked, locked_property
 
-__version__ = '20211208'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python3"],
