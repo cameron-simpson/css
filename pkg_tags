@@ -50,7 +50,7 @@ cs.pfx pypi.release="20211031" ok_revision="0da93aa4a25c75f2e547a3ecd3351a762828
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="86e03391b63b3b26367f2d00e3d828311cb12c5b" pypi.release="20210407.2"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b
-cs.progress pypi.release="20210803" ok_revision=f8c5d43b629a2c9a195445d3779b22e972d0d2a0 features={"20210803":["progress_runstate"]}
+cs.progress pypi.release="20210803" ok_revision="9b03cdb97f403edafe0ab10451d70f6a38f0f6e6" features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release=20190101 ok_revision=d48263d393ca9e6c9e3ee698307e5a6a19696efb
 cs.py.doc pypi.release="20210306" ok_revision=fc38c09619a42f8d8b9f15edb391e598401b7c5d
 cs.py.func pypi.release="20210913" ok_revision="6ec098bae6531764d93ab39a080314243ca1be84" features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"]}
