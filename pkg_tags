@@ -21,7 +21,7 @@ cs.configutils pypi.release="20210306" ok_revision="6046ff720496ea03f85ea7979f62
 cs.context pypi.release="20211115.1" ok_revision="9d416aa31309d2d7b4713d7363b7a03257ac0d45" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"]}
 cs.csvutils pypi.release="20201228"
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
-cs.debug pypi.release=20200318 ok_revision="137510f2452724617c329e44a142f807a73e6110"
+cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
 cs.deco pypi.release="20210823" ok_revision="65144526e2bdb229bbb69b15096b3f328901b13c"
 cs.edit pypi.release="20191201.1" ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
