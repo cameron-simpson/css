@@ -41,7 +41,7 @@ cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcf
 cs.mappings pypi.release="20210906" ok_revision="7823c38362bf28c2db78f4da7f8375da6a0316f6" features={"20210906":["RemappedMappingProxy"]}
 cs.mediainfo
 cs.mixin.ucattrs pypi.release=20150118 ok_revision="5f8b67b9d97c51b6bf32308032b832d30d5b9de1"
-cs.ndjson
+cs.ndjson ok_revision="957b3bd65fdfafaa522a07e28373c37fac4d8783"
 cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210717" ok_revision="385fe0965d7874d9f861ad9943a6e6d27827e692" features={"20210717":["SingletonMixin_key_is_none"]}
