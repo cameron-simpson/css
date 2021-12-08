@@ -14,7 +14,7 @@ from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 
-@strable
+@strable(open_func=lambda filename: gzifopen(filename, 'r', encoding='utf8'))
 def scan_ndjson(f, dictclass=dict, error_list=None):
   ''' Read a newline delimited JSON file, yield instances of `dictclass`
       (default `dict`, otherwise a class which can be instantiated
@@ -83,7 +83,8 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
       return
     self.__ndjson_filename = filename
     self.__dictclass = dictclass
-    if create and not isfilepath(filename):
+    if (create and not isfilepath(filename)
+        and not isfilepath(filename + '.gz')):
       # make sure the file exists
       with gzifopen(filename, 'a'):  # pylint: disable=unspecified-encoding
         pass
@@ -98,11 +99,10 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
   def scan(self):
     ''' Scan the backing file, yield records.
     '''
-    if existspath(self.__ndjson_filename):
-      self.scan_errors = []
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
-                                error_list=self.scan_errors):
-        yield record
+    self.scan_errors = []
+    for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
+                              error_list=self.scan_errors):
+      yield record
 
   def add_backend(self, record):
     ''' Append `record` to the backing file.
@@ -118,10 +118,11 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
         a rewrite will be required every so often.
     '''
     with self._lock:
-      with rewrite_cmgr(self.__ndjson_filename) as T:
+      # TODO: was with rewrite_cmgr(self.__ndjson_filename) as T:,
+      # needs gz support somehow
+      with gzifopen(self.__ndjson_filename, 'w') as f:
         i = 0
         for i, record in enumerate(self.by_uuid.values(), 1):
-          T.write(record.as_json())
-          T.write('\n')
-        T.flush()
+          f.write(record.as_json())
+          f.write('\n')
       self.scan_length = i
