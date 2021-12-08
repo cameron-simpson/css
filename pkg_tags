@@ -27,7 +27,7 @@ cs.edit pypi.release="20191201.1" ok_revision="736d50be6beeca69109fce2cffef3f4e0
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
-cs.fileutils pypi.release="20210906" ok_revision="2b8a7da6c73858119d4a44d28e23cbcf0a11a3da" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"]}
+cs.fileutils pypi.release="20210906" ok_revision="2b8a7da6c73858119d4a44d28e23cbcf0a11a3da" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"],"20211208":["gzifopen"]}
 cs.fstags pypi.release="20210306" ok_revision=f269ef03f4a6ef837d6aff9a565d72b54610e230
 cs.gimmicks ok_revision=b0f69fced453c315c5066ab2df8b72b87b473489 pypi.release="20211208" features={"20211208":["TimeoutError"]}
 cs.html pypi.release=20160828
