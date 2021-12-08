@@ -19,7 +19,7 @@ from cs.pfx import pfx_method
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-__version__ = '20210906-post'
+__version__ = '20211208'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
