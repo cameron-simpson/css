@@ -79,4 +79,4 @@ cs.upd pypi.release="20210717" ok_revision=e5963adf825873d78a355cd66b62437b10033
 cs.urlutils pypi.release=20191004
 cs.vt pypi.release=20190309
 cs.wol pypi.release=20171228
-cs.x pypi.release="20210123" ok_revision="3cedca4d43bff307e05540fd70a11a08982cc9b2"
+cs.x pypi.release="20210123" ok_revision=bdddcc3b5178f5b785ecc9faf0025e13ecd3351a
