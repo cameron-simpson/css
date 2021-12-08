@@ -59,7 +59,7 @@ cs.py.stack pypi.release=20190812 ok_revision=b4c205f9ed8706db33e7285fcd51109296
 cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3c46
 cs.queues pypi.release="20211116" ok_revision=c38e1f75478d7ae3d3ea9989fa6388df54a543c8 features={"20210913":["ListQueue"],"20210924":["iterable_channel"]}
 cs.range pypi.release=20190102 ok_revision="71250a2041fc87831ffcbbddeaa20316d64d3a5f"
-cs.resources pypi.release="20210906" ok_revision="5aef228fd1c54227469f52d8f6802c49e2078012"
+cs.resources pypi.release="20211208" ok_revision="5aef228fd1c54227469f52d8f6802c49e2078012"
 cs.result pypi.release="20210420" ok_revision="74ab7bb3315c4cf3df1b5507fcb9db156d92ef29"
 cs.rfc2047 pypi.release="20200524"
 cs.rfc2616 pypi.release=20160828 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
