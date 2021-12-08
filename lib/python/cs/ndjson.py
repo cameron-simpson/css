@@ -8,7 +8,7 @@ from os.path import abspath, exists as existspath, isfile as isfilepath
 from threading import RLock
 
 from cs.deco import strable
-from cs.fileutils import rewrite_cmgr
+from cs.fileutils import rewrite_cmgr, gzifopen
 from cs.logutils import warning
 from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
@@ -37,7 +37,7 @@ def scan_ndjson(f, dictclass=dict, error_list=None):
     yield d
 
 # pylint: disable=consider-using-with
-@strable(open_func=lambda filename: open(filename, 'w', encoding='utf8'))
+@strable(open_func=lambda filename: gzifopen(filename, 'w', encoding='utf8'))
 def write_ndjson(f, objs):
   ''' Transcribe an iterable of objects to a file as newline delimited JSON.
   '''
@@ -47,7 +47,7 @@ def write_ndjson(f, objs):
       f.write('\n')
 
 # pylint: disable=consider-using-with
-@strable(open_func=lambda filename: open(filename, 'a', encoding='utf8'))
+@strable(open_func=lambda filename: gzifopen(filename, 'a', encoding='utf8'))
 def append_ndjson(f, objs):
   ''' Append an iterable of objects to a file as newline delimited JSON.
   '''
@@ -85,7 +85,7 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
     self.__dictclass = dictclass
     if create and not isfilepath(filename):
       # make sure the file exists
-      with open(filename, 'a'):  # pylint: disable=unspecified-encoding
+      with gzifopen(filename, 'a'):  # pylint: disable=unspecified-encoding
         pass
     self.scan_errors = []
     self._lock = RLock()
@@ -107,7 +107,7 @@ class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
   def add_backend(self, record):
     ''' Append `record` to the backing file.
     '''
-    with open(self.__ndjson_filename, 'a', encoding='utf8') as f:
+    with gzifopen(self.__ndjson_filename, 'a', encoding='utf8') as f:
       f.write(record.as_json())
       f.write('\n')
 
