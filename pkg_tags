@@ -72,7 +72,7 @@ cs.sqlalchemy_utils pypi.release="20210420" ok_revision="8b26e480c08a97058e82dc7
 cs.sqltags ok_revision="9a633beb39c948befee8b94aea587967ba25b81f" pypi.release="20210913"
 cs.tagset pypi.release="20210913" ok_revision="29f2c713694933ee2758ea102a5f2a82b16f0fde" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.threads pypi.release="20211208" ok_revision=b9025dfd67aae44b210a842772767d5e8723b31b
-cs.timeutils pypi.release=20190220
+cs.timeutils pypi.release=20190220 ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
 cs.units pypi.release="20210809" ok_revision=c80d2889b58ebb4cf17cf572604e65e3a7d9060b
 cs.upd pypi.release="20210717" ok_revision=e5963adf825873d78a355cd66b62437b10033f94 features={"20200517":["multiline"],"20210428.4":["fix_stdout_not_tty_setupterm"]}
