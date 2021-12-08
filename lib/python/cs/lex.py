@@ -444,7 +444,7 @@ def strip_prefix_n(s, prefix, n=None):
       * `s`: the string to strip
       * `prefix`: the prefix string which must appear at the start of `s`
       * `n`: optional integer value;
-        if omitted any value will be accepted, otherise the numeric
+        if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
       Examples:
