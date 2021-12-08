@@ -9,7 +9,8 @@ import datetime
 import time
 
 DISTINFO = {
-    'description': "convenience routines for times and timing",
+    'description':
+    "convenience routines for times and timing",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -18,26 +19,6 @@ DISTINFO = {
     ],
     'install_requires': [],
 }
-
-try:
-  import builtins
-except ImportError:
-  TimeoutError = None
-else:
-  try:
-    TimeoutError = builtins.TimeoutError
-  except AttributeError:
-    TimeoutError = None
-if TimeoutError is None:
-  class TimeoutError(Exception):
-    ''' A TimeoutError.
-    '''
-    def __init__(self, message, timeout=None):
-      if timeout is None:
-        msg = "%s: timeout exceeded" % (message,)
-      else:
-        msg = "%s: timeout exceeded (%ss)" % (message, timeout,)
-      Exception.__init__(self, msg)
 
 def time_func(func, *args, **kw):
   ''' Run the supplied function and arguments.
@@ -69,7 +50,9 @@ def ISOtime(gmtime):
   dt = datetime.datetime.fromtimestamp(int(gmtime))
   if dt.microsecond != 0:
     from cs.logutils import warning
-    warning("ISOtime: fromtimestamp(%d).microsecond = %s", gmtime, dt.microsecond)
+    warning(
+        "ISOtime: fromtimestamp(%d).microsecond = %s", gmtime, dt.microsecond
+    )
   return dt.isoformat()
 
 def sleep(delay):
@@ -79,8 +62,8 @@ def sleep(delay):
   '''
   if delay < 0:
     raise ValueError(
-        "cs.timeutils.sleep: delay should be >= 0, given %g"
-        % (delay,))
+        "cs.timeutils.sleep: delay should be >= 0, given %g" % (delay,)
+    )
   t0 = time.time()
   end = t0 + delay
   while t0 < end:
