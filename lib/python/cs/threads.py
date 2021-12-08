@@ -24,7 +24,7 @@ from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
-__version__ = '20211208'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
