@@ -20,35 +20,6 @@ DISTINFO = {
     'install_requires': [],
 }
 
-try:
-  TimeoutError
-except NameError:
-  try:
-    import builtins
-  except ImportError:
-    TimeoutError = None  # pylint: disable=redefined-builtin
-  else:
-    try:
-      TimeoutError = builtins.TimeoutError
-    except AttributeError:
-      TimeoutError = None
-
-  if TimeoutError is None:
-
-    class TimeoutError(Exception):
-      ''' A TimeoutError.
-      '''
-
-      def __init__(self, message, timeout=None):
-        if timeout is None:
-          msg = "%s: timeout exceeded" % (message,)
-        else:
-          msg = "%s: timeout exceeded (%ss)" % (
-              message,
-              timeout,
-          )
-        Exception.__init__(self, msg)
-
 def time_func(func, *args, **kw):
   ''' Run the supplied function and arguments.
       Return a the elapsed time in seconds and the function's own return value.
