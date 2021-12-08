@@ -19,6 +19,7 @@ import threading
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
@@ -43,7 +44,6 @@ DISTINFO = {
         'cs.pfx',
         'cs.py.stack',
         'cs.py3',
-        'cs.result',
         'cs.seq',
         'cs.x',
     ],
