@@ -29,7 +29,7 @@ cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c
 cs.filestate pypi.release=20181107
 cs.fileutils pypi.release="20210906" ok_revision="444f6f27367ddbadd44a2cf01d45ddd25cd19579" features={"20210731":["atomic_filename"],"20210906":["atomic_filename"]}
 cs.fstags pypi.release="20210306" ok_revision=f269ef03f4a6ef837d6aff9a565d72b54610e230
-cs.gimmicks ok_revision=b0f69fced453c315c5066ab2df8b72b87b473489 pypi.release="20210306" features={"20211208":["TimeoutError"]}
+cs.gimmicks ok_revision=b0f69fced453c315c5066ab2df8b72b87b473489 pypi.release="20211208" features={"20211208":["TimeoutError"]}
 cs.html pypi.release=20160828
 cs.id3 pypi.release="20150116.2"
 cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
