@@ -14,7 +14,7 @@ from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
 
-__version__ = '20211208'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
