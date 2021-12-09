@@ -338,8 +338,6 @@ class CameraProxy(GSProxy):
     if isinstance(camera, str):
       name = camera
       camera = scene_manager.createCamera(name)
-      for name in sorted(dir(camera)):
-        print(" ", name, type(getattr(camera, name)))
     else:
       name = camera.name
     self._camera = camera
@@ -546,7 +544,6 @@ class ManualObjectProxy(GSProxy):
     yield from self._build_vertex_list(
         vertex_indices, *existing_vertex_indices
     )
-    print("QUAD", vertex_indices)
     pfx_call(self._proxied0.quad, *vertex_indices)
 
   @contextmanager
@@ -574,7 +571,6 @@ class ManualObjectProxy(GSProxy):
     yield from self._build_vertex_list(
         vertex_indices, *existing_vertex_indices
     )
-    print("TRIANGLE", vertex_indices)
     pfx_call(self._proxied0.triangle, *vertex_indices)
 
   @contextmanager
