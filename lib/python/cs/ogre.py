@@ -153,15 +153,13 @@ class App(MultiOpenMixin):
     # create a default light
     self.add_light(position=self.lightpoint)
 
-    # create a default camera proxy
-    self.camera = self.add_camera(distance=100)
-
-    # map input events to camera controls
-    ctx.addInputListener(self.camera._manager)
-
     # note the default window
     self.window = ctx.getRenderWindow()
 
+    # create a default camera proxy
+    self.camera = self.add_camera()
+    # map input events to camera controls
+    ctx.addInputListener(self.camera._manager)
     # and tell it to render into the main window
     vp = self.window.addViewport(self.camera._camera)
     vp.setBackgroundColour(self.background_colour)
