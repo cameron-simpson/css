@@ -321,10 +321,8 @@ class CameraProxy(GSProxy):
         * `scene_manager`: the scene manager
         * `parent_scene_node`: optional parent node for the camera node,
           default `scene_manager.getRootSceneNode()`
-        * `target_scene_node`: optional target node for the camera node,
+        * `target`: optional target for the camera as a position or a scene node,
           default `scene_manager.getRootSceneNode()`
-        * `look_at`: optional target for the camera,
-          passed to the camera node `.lookAt()` method
         * `yaw`, `pitch`, `distance`: optiona yaw/pitch/distance settings,
           default `0`, `0.3` and `16` respectively
 
@@ -341,10 +339,6 @@ class CameraProxy(GSProxy):
     kw.setdefault('auto_aspect_ratio', True)
     kw.setdefault('near_clip_distance', 1)
     kw.setdefault('style', Ogre.Bites.CS_ORBIT)
-    if look_at is None:
-      look_at = V3(0, 0, 0)
-    elif isinstance(look_at, tuple):
-      look_at = V3(*look_at)
     if camera is None:
       camera = 'camera-' + str(next(self._seq))
     if isinstance(camera, str):
@@ -358,16 +352,70 @@ class CameraProxy(GSProxy):
     self._name = name
     if parent_scene_node is None:
       parent_scene_node = scene_manager.getRootSceneNode()
-    if target_scene_node is None:
-      target_scene_node = scene_manager.getRootSceneNode()
+    if target is None:
+      target = scene_manager.getRootSceneNode()
+    elif isinstance(target, tuple):
+      target = V3(*target)
+    else:
+      assert isinstance(target, V3)
     camera_node = self._node = parent_scene_node.createChildSceneNode()
     camera_node.attachObject(camera)
     camera_manager = self._manager = Ogre.Bites.CameraMan(camera_node)
-    pfx_call(camera_node.lookAt, look_at, Ogre.Node.TS_WORLD)
-    pfx_call(camera_manager.setTarget, target_scene_node)
-    pfx_call(camera_manager.setYawPitchDist, yaw, pitch, distance)
-    call_setters((camera_manager, camera, camera_node), kw)
     super().__init__(camera_manager, camera_node, camera)
+    self.zoom(target)
+    call_setters((camera_manager, camera, camera_node), kw)
+
+  @typechecked
+  def aim(
+      self,
+      target: Union[SceneNode, V3ish],
+      *,
+      yaw: Union[float, Ogre.Radian] = 0,
+      pitch: Union[float, Ogre.Radian] = 0,
+      distance=None
+  ):
+    ''' Aim the camera at `target`, a `SceneNode` or `Vector3` or 3-tuple.
+    '''
+    if isinstance(target, tuple):
+      target = V3(*target)
+    if distance is None:
+      distance = (
+          self._node.getPosition().
+          distance(target if isinstance(target, V3) else target.getPosition())
+      )
+    if isinstance(target, SceneNode):
+      pfx_call(self._manager.setTarget, target)
+      pfx_call(self._manager.setYawPitchDist, yaw, pitch, distance)
+    else:
+      pfx_call(self._node.lookAt, target, Ogre.Node.TS_WORLD)
+
+  @pfx_method
+  @typechecked
+  def zoom(self, target: Ogre.SceneNode, *, excess_ratio: float = 1.1):
+    ''' Zoom this camera's view to encompass the target node's bounding radius.
+    '''
+    # obtain the angle within which the radius must fit
+    camera = self._camera
+    fov_y = camera.getFOVy()
+    # theta for the diameter
+    theta = min(fov_y, fov_y * camera.getAspectRatio())
+    # theta for the radius
+    theta2 = theta / 2.0
+    # our postion, the target position, the radius
+    pos = self.position
+    if target.numAttachedObjects() == 0:
+      # aim at the origin of the target
+      target_origin = target.convertLocalToWorldPosition(V3(0, 0, 0))
+      self.aim(target_origin, distance=10)
+    else:
+      target_obj = target.getAttachedObject(0)
+      target_sphere = target_obj.getWorldBoundingSphere()
+      target_pos = target_sphere.getCentre()
+      target_radius = target_sphere.getRadius()
+      # Compute distance so that the target_radius * excess_ratio
+      # subtends theta2.
+      new_distance = target_radius * excess_ratio / sin(theta2)
+      self.aim(target, distance=new_distance)
 
 class ManualObjectProxy(GSProxy):
   ''' A proxy for `Ogre.ManualObject`
