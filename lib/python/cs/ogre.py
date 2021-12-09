@@ -307,11 +307,7 @@ class CameraProxy(GSProxy):
       *,
       scene_manager,
       parent_scene_node=None,
-      target_scene_node=None,
-      look_at=None,
-      yaw=0,
-      pitch=0.3,
-      distance=16,
+      target: Optional[Union[SceneNode, V3ish]] = None,
       **kw,
   ):
     ''' Initialise the `CameraProxy`.
