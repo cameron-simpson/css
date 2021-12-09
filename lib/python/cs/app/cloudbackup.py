@@ -51,7 +51,6 @@ from cs.cloud.crypt import (
 from cs.cmdutils import BaseCommand
 from cs.context import pushattrs, popattrs
 from cs.deco import fmtdoc, strable
-from cs.fileutils import UUIDNDJSONMapping
 from cs.later import Later
 from cs.lex import cutsuffix, hexify, is_identifier
 from cs.logutils import info, warning, error, exception
@@ -60,6 +59,7 @@ from cs.mappings import (
     AttrableMapping,
     UUIDedDict,
 )
+from cs.ndjson import UUIDNDJSONMapping
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method, unpfx, pfx_call
 from cs.progress import Progress, OverProgress, progressbar

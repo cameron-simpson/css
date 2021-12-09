@@ -69,7 +69,7 @@ from cs.pfx import Pfx, XP
 from cs.py.func import funccite
 from cs.upd import Upd
 
-__version__ = '20210721-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -251,7 +251,9 @@ def setup_logging(
   main_handler = logging.StreamHandler(main_log)
   upd_ = Upd()
   if upd_mode:
-    main_handler = UpdHandler(main_log, ansi_mode=ansi_mode, over_handler=main_handler)
+    main_handler = UpdHandler(
+        main_log, ansi_mode=ansi_mode, over_handler=main_handler
+    )
     upd_ = main_handler.upd
 
   root_logger = logging.getLogger()
@@ -261,7 +263,7 @@ def setup_logging(
     # TODO: fix this clumsy hack, some kind of stackable state?
     main_handler.setFormatter(PfxFormatter(format))
     if supplant_root_logger:
-        root_logger.handlers.pop(0)
+      root_logger.handlers.pop(0)
     root_logger.addHandler(main_handler)
 
   if trace_mode:
@@ -658,7 +660,7 @@ def upd(msg, *args, **kwargs):
 
 # pylint: disable=too-many-instance-attributes
 class LogTime(object):
-  ''' LogTime is a content manager that logs the elapsed time of the enclosed
+  ''' LogTime is a context manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
@@ -715,7 +717,9 @@ class UpdHandler(StreamHandler):
       uses a `cs.upd.Upd` for transcription.
   '''
 
-  def __init__(self, strm=None, upd_level=None, ansi_mode=None, over_handler=None):
+  def __init__(
+      self, strm=None, upd_level=None, ansi_mode=None, over_handler=None
+  ):
     ''' Initialise the `UpdHandler`.
 
         Parameters:
