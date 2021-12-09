@@ -5,10 +5,8 @@
 
 from collections import defaultdict
 from contextlib import contextmanager
-from math import sqrt
+from math import sqrt, sin
 from os.path import basename
-from pprint import pformat, pprint
-import time
 from typing import Optional, Tuple, Union
 
 from cs.context import stackattrs
@@ -25,7 +23,7 @@ from icontract import require
 from typeguard import typechecked
 
 import Ogre
-from Ogre import Vector3 as V3
+from Ogre import SceneNode, Vector3 as V3
 import Ogre.Bites
 import Ogre.RTShader
 
