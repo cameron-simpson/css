@@ -131,7 +131,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.pfx',
         'cs.resources',
-        'cs.tagset',
+        'cs.tagset>=20211212',
         'cs.threads',
         'cs.upd',
         'icontract',

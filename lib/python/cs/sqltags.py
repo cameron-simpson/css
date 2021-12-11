@@ -96,7 +96,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.sqlalchemy_utils>=20210420',
-        'cs.tagset',
+        'cs.tagset>=20211212',
         'cs.threads>=20201025',
         'cs.upd',
         'icontract',
