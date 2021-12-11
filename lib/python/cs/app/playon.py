@@ -256,10 +256,16 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
+    need_refresh = False
     recordings = set(sqltags.recordings())
-    if (any(map(lambda recording: not recording.is_expired() and recording.
-                is_stale(max_age=max_age), recordings))
-        or all(map(lambda recording: recording.is_expired(), recordings))):
+    stale_map = {
+        recording.recording_id(): recording
+        for recording in recordings
+        if not recording.is_expired() and recording.is_stale(max_age=max_age)
+    }
+    if stale_map:
+      need_refresh = True
+    if need_refresh:
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
