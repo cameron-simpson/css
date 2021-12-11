@@ -50,6 +50,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Utilities",
     ],
+    'entry_points': {
+        'console_scripts': ['playon = cs.app.playon:main'],
+    },
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
@@ -66,6 +69,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'requests',
+        'typeguard',
     ],
 }
 
