@@ -7,6 +7,8 @@ cs.app.maildb pypi.release=20160828
 cs.app.mailfiler pypi.release="20200719"
 cs.app.megacli pypi.release="20211031" ok_revision="03033cc34d810f17745cceee447af3df5566ae33"
 cs.app.mklinks pypi.release="20210404" ok_revision="9f7cac4e2461bf0dc4851ae4d4714d9c4e56f55f"
+cs.app.nodedb
+cs.app.playon
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5270ebfb6
@@ -70,7 +72,7 @@ cs.sharedfile pypi.release="20201228" ok_revision="0d538c2f2ed900fb3418c429c22d2
 cs.socketutils pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.sqlalchemy_utils pypi.release="20210420" ok_revision="8b26e480c08a97058e82dc7937e0dc29dccf9a4c"
 cs.sqltags ok_revision="9a633beb39c948befee8b94aea587967ba25b81f" pypi.release="20210913"
-cs.tagset pypi.release="20210913" ok_revision="29f2c713694933ee2758ea102a5f2a82b16f0fde" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
+cs.tagset pypi.release="20210913" ok_revision="56c71f97f617262375ea86f745ae270e76ed3c58" features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.threads pypi.release="20211208" ok_revision=b9025dfd67aae44b210a842772767d5e8723b31b
 cs.timeutils pypi.release="20211208" ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
 cs.tty pypi.release="20210316" ok_revision="62e7c17f710e13db7893ea64324ef77bca01d6ec"
