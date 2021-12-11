@@ -238,7 +238,7 @@ class PlayOnCommand(BaseCommand):
             if no_download:
               recording.ls()
             else:
-              sem.acquire()
+              sem.acquire()  # pylint: disable=consider-using-with
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
 
     if Rs:
