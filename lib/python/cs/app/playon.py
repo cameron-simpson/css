@@ -461,7 +461,7 @@ class Recording(SQLTagSet):
     '''
     expires = self.get('playon.Expires')
     if not expires:
-      return False
+      return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
   @format_attribute
