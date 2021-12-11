@@ -1,0 +1,1 @@
+Rename `enter_exit` to `__enter_exit__` - the user doesn't call this overtly and it aligns better with `__enter__` and `__exit__`.

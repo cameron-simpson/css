@@ -5,6 +5,7 @@ enum34
 icontract
 lmdb
 lxml
+mobi
 mypy
 musicbrainzngs
 pycodestyle

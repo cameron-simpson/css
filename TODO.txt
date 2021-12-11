@@ -1,3 +1,10 @@
+UpdProxy: can we have an ftext property and monitor format keys for update?
+rip out all cs.daetutils and friends, use the arrow module
+unhostsify leaves temp files around, probably if interrupted
+cs.cmdutils: subcommands with no usage docstring are not listed in the usage output, need placeholder
+cs.deco: use @functools.wraps to gather up __doc__ etc
+fstags ls in / wigs out
+pfx_method no longer honours with_args, flip with_args to True and reimpl args?
 cs.cmdutils: cmd_help does not print the usage preamble, just the per command usages
 baseCommand autousage: make up a stub usage for subcommands with no usage
 parser for /etc/terminal-colors.d

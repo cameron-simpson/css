@@ -41,7 +41,7 @@ from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210913-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -444,7 +444,7 @@ def strip_prefix_n(s, prefix, n=None):
       * `s`: the string to strip
       * `prefix`: the prefix string which must appear at the start of `s`
       * `n`: optional integer value;
-        if omitted any value will be accepted, otherise the numeric
+        if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
       Examples:
@@ -1519,7 +1519,7 @@ class FormatableFormatter(Formatter):
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
-      - a `__format__ method which parses the `format_spec` string
+      - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
         with a suitable mapping derived from the instance
@@ -1604,7 +1604,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   ##@staticmethod
   def convert_field(self, value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
+    ''' The default converter for fields calls `Formatter.convert_field`.
     '''
     if conversion == '':
       warning(

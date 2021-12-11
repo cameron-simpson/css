@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Create and add a CBZ format for a Mobi format Calibre asset.
+# - Cameron Simpson <cs@cskk.id.au>
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+##trace=eecho
+
+calibre_library=${CALIBRE_LIBRARY:-$HOME/CALIBRE}
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-C calibre_library] mobipath [dbid]"
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-C ] && { calibre_library=$2; shift; shift; }
+
+[ -d "$calibre_library/" ] || {
+  echo "$cmd: calibre library is not a directory: $calibre_library" >&2
+  badopts=1
+}
+
+case $# in
+  0)    echo "$cmd: missing mobipath" >&2; badopts=1 ;;
+  1)    mobipath=$1 dbid= ;;
+  2)    mobipath=$1 dbid=$2 ;;
+  *)    shift; shift; echo "$cmd: extra arguments after dbid: $*" >&2
+        badopts=1
+        ;;
+esac
+
+[ -n "$dbid" ] || \
+  # infer dbid from a calibre library path
+  dbid=$( expr "/$mobipath" : '.*/[^/]* (\([1-9][0-9]*\))/[^/][^/]*$' ) \
+  && [ -n "$dbid" ] \
+  || {
+    echo "$cmd: cannot infer dbid from mobipath: $mobipath" >&2
+    echo "  expected \"*/* (dbid)/*\" style path" >&2
+    badopts=1
+  }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cbz=$( $trace mobi2cbz "$mobipath" )
+$trace calibredb add_format "--library-path=$calibre_library" "$dbid" "$cbz"
+printf '%s\n' "$cbz"

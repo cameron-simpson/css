@@ -23,7 +23,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210927-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -322,9 +322,11 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           short_usage = True
+          bad_subcmd = subcmd
+          subcmd = None
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
-                  subcmd,
+                  bad_subcmd,
                   ', '.join(sorted(subcmds.keys())),
               )
           )
@@ -665,5 +667,5 @@ class BaseCommand:
           continue
         print(' ', subusage.replace('\n', '\n    '))
     if unknown:
-      warning("I know: %s",', '.join(sorted(subcmds.keys())))
+      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit
