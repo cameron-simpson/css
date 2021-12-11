@@ -3,7 +3,7 @@
 # Playon facilities. - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Playon facilities.
+''' PlayOn facilities, primarily access to the download API.
 '''
 
 from collections import defaultdict
