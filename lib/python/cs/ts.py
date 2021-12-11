@@ -165,7 +165,7 @@ def scan_loglines(lines, *, start=1, drop_blanks=False):
         try:
           when = arrow.get(when_s)
         except arrow.ParserError as e:
-          warning(repr(when_s), e)
+          warning("%r: %e", when_s, e)
         else:
           curr = when.timestamp
     # leave the Pfx, it does not play well in a generator

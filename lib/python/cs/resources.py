@@ -19,7 +19,7 @@ from cs.pfx import pfx_method
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-__version__ = '20210906-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -451,8 +451,8 @@ class RunState(object):
       A `RunState` has the following properties:
       * `cancelled`: true if `.cancel` has been called.
       * `running`: true if the task is running.
-        Further, assigning a true value to it also sets `.start_time` to now.
-        Assigning a false value to it also sets `.stop_time` to now.
+        Further, assigning a true value to it sets `.start_time` to now.
+        Assigning a false value to it sets `.stop_time` to now.
       * `start_time`: the time `.running` was last set to true.
       * `stop_time`: the time `.running` was last set to false.
       * `run_time`: `max(0,.stop_time-.start_time)`
