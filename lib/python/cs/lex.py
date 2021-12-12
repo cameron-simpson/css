@@ -170,7 +170,7 @@ def typed_str(o, use_cls=False, use_repr=False, max_length=None):
   # pylint: disable=redefined-outer-name
   s = "%s:%s" % (
       type(o) if use_cls else type(o).__name__,
-      repr(o) if use_repr else str(o),
+      cropped(repr(o) if use_repr else str(o), max_length=max_length)
   )
   if max_length is not None:
     s = cropped(s, max_length)
