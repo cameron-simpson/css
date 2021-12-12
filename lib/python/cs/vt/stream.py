@@ -304,7 +304,6 @@ class StreamStore(BasicStoreSync):
       warning("unparsed bytes after BSUInt(length): %r", payload[offset:])
     return length
 
-  @pfx_method
   def add(self, data):
     h = self.hash(data)
     if self.mode_addif:
@@ -325,7 +324,6 @@ class StreamStore(BasicStoreSync):
       )
     return h
 
-  @pfx_method
   def get(self, h, default=None):
     try:
       flags, payload = self.do(GetRequest(h))
@@ -357,7 +355,6 @@ class StreamStore(BasicStoreSync):
       raise StoreError("unexpected payload: %r" % (payload,))
     return found
 
-  @pfx_method
   def flush(self):
     if self._conn is None:
       pass  # XP("SKIP FLUSH WHEN _conn=None")
