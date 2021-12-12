@@ -403,7 +403,7 @@ class Macro(object):
         Parameters:
         * `context`: source context.
         * `name`: macro name.
-        * `params`: list of paramater names.
+        * `params`: list of parameter names.
         * `text`: replacement text, unparsed.
     '''
     self.context = context
@@ -828,7 +828,7 @@ def parseMacro(context, text=None, offset=0):
           if text[offset] != ')':
             raise ParseError(
                 context, offset,
-                'macro paramaters: expected comma or closing parenthesis, found: %s',
+                'macro parameters: expected comma or closing parenthesis, found: %s',
                 text[offset:]
             )
         offset += 1

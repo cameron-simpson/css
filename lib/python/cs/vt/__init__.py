@@ -22,7 +22,7 @@
 
     These are logically disconnected.
     Dirents are not associated with particular Stores;
-    it is it sufficient to have access to any Store
+    it is sufficient to have access to any Store
     containing the required blocks.
 
     The other common entity is the Archive,
@@ -39,14 +39,18 @@
     which is also a system based on variable sized blocks.
 '''
 
+from contextlib import contextmanager
 import os
 import tempfile
-import threading
+from types import SimpleNamespace as NS
+from cs.context import stackattrs
 from cs.logutils import error, warning
+from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
+from cs.threads import State as ThreadState
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -81,11 +85,12 @@ DISTINFO = {
         'cs.resources',
         'cs.result',
         'cs.seq',
-        'cs.serialise',
         'cs.socketutils',
         'cs.threads',
+        'cs.testutils',
         'cs.tty',
         'cs.units',
+        'cs.upd',
         'cs.x',
         'icontract',
         'lmdb',
@@ -101,14 +106,14 @@ DISTINFO = {
     },
 }
 
+DEFAULT_BASEDIR = '~/.local/share/vt'
+
+DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
 
-DEFAULT_BASEDIR = '~/.vt_stores'
-
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG_MAP = {
     'GLOBAL': {
         'basedir': DEFAULT_BASEDIR,
-        'blockmapdir': '[default]/blockmaps',
     },
     'default': {
         'type': 'datadir',
@@ -156,7 +161,22 @@ MAX_FILE_SIZE = 1024 * 1024 * 1024
 # path separator, hardwired
 PATHSEP = '/'
 
-class _Defaults(threading.local):
+_progress = Progress(name="cs.vt.common.progress"),
+_over_progress = OverProgress(name="cs.vt.common.over_progress")
+
+# some shared default state, Thread independent
+common = NS(
+    progress=_progress,
+    over_progress=_over_progress,
+    runstate=RunState("cs.vt.common.runstate"),
+    config=None,
+    S=None,
+)
+
+del _progress
+del _over_progress
+
+class _Defaults(ThreadState):
   ''' Per-thread default context stack.
 
       A Store's __enter__/__exit__ methods push/pop that store
@@ -169,75 +189,32 @@ class _Defaults(threading.local):
   _Ss = []
 
   def __init__(self):
-    threading.local.__init__(self)
-    self.runstate = RunState(self.__module__ + " _Defaults initial")
+    super().__init__()
+    self.progress = common.progress
+    self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
-    self.Ss = []
-
-  def _fallback(self, key):
-    ''' Fallback function for empty stack.
-    '''
-    if key == 'S':
-      warning("no per-Thread Store stack, using the global stack")
-      stack_dump(indent=2)
-      Ss = self._Ss
-      if Ss:
-        return Ss[-1]
-      error(
-          "%s: no per-Thread defaults.S and no global stack, returning None",
-          self
-      )
-      return None
-    raise ValueError("no fallback for %r" % (key,))
+    self.show_progress = False
 
   @property
-  def S(self):
-    ''' The topmost Store.
-    '''
-    Ss = self.Ss
-    if Ss:
-      return self.Ss[-1]
-    _Ss = self._Ss
-    if _Ss:
-      return self._Ss[-1]
-    raise AttributeError('S')
+  def config(self):
+    cfg = common.config
+    if not cfg:
+      from .config import Config
+      cfg = Config()
+    return cfg
 
-  @S.setter
-  def S(self, newS):
-    ''' Set the topmost Store.
-        Sets the topmost global Store
-        if there's no current perThread Store stack.
-    '''
-    Ss = self.Ss
-    if Ss:
-      Ss[-1] = newS
-    else:
-      _Ss = self._Ss
-      if _Ss:
-        _Ss[-1] = newS
-      else:
-        _Ss.append(newS)
+  def __getattr__(self, attr):
+    if attr == 'S':
+      return common.S
+    raise AttributeError(attr)
 
-  def pushStore(self, newS):
-    ''' Push a new Store onto the per-Thread stack.
+  @contextmanager
+  def common_S(self, S):
+    ''' Context manager to push a Store onto `common.S`.
     '''
-    self.Ss.append(newS)
-
-  def popStore(self):
-    ''' Pop and return the topmost Store from the per-Thread stack.
-    '''
-    return self.Ss.pop()
-
-  def push_Ss(self, newS):
-    ''' Push a new Store onto the global stack.
-    '''
-    self._Ss.append(newS)
-
-  def pop_Ss(self):
-    ''' Pop and return the topmost Store from the global stack.
-    '''
-    return self._Ss.pop()
+    with stackattrs(common, S=S):
+      yield
 
 defaults = _Defaults()
 
@@ -265,10 +242,10 @@ class _TestAdditionsMixin:
     else:
       self.assertEqual(olen, length, *a, **kw)
 
-  def assertIsOrdered(self, s, reverse, strict=False):
+  def assertIsOrdered(self, s, strict=False):
     ''' Assertion to test that an object's elements are ordered.
     '''
     self.assertTrue(
-        isordered(s, reverse, strict),
-        "not ordered(reverse=%s,strict=%s): %r" % (reverse, strict, s)
+        isordered(s, strict=strict),
+        "not ordered(strict=%s): %r" % (strict, s)
     )

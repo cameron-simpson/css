@@ -9,7 +9,7 @@ from cs.fileutils import rewrite_cmgr
 
 def sort_struct(J):
   J["identities"] = sorted(
-      J["identities"], key=lambda C: (C["name"], C["userContextId"])
+      J["identities"], key=lambda C: (C.get("name",""), C["userContextId"])
   )
 
 def sort_cfile(filepath):
@@ -18,7 +18,7 @@ def sort_cfile(filepath):
   with open(filepath, 'r') as f:
     J = json.loads(f.read())
   sort_struct(J)
-  with rewrite_cmgr(filepath, backup_ext='', keep_backup=True) as f:
+  with rewrite_cmgr(filepath, backup_ext=".SAFE") as f:
     json.dump(J, f, indent=None, separators=(',', ':'))
 
 if __name__ == '__main__':

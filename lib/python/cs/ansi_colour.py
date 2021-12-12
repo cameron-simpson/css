@@ -5,13 +5,16 @@
 #
 
 '''
-Convenience functions for ANSI terminal colour sequences
+Convenience functions for ANSI terminal colour sequences [color].
 
 Mapping and function for adding ANSI terminal colour escape sequences
 to strings for colour highlighting of output.
 '''
 
+import os
 import re
+
+__version__ = '20200729-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -50,24 +53,39 @@ assert NORMAL_COLOUR in COLOURS
 DEFAULT_HIGHLIGHT = 'cyan'
 assert DEFAULT_HIGHLIGHT in COLOURS
 
-def colourise(s, colour=None, uncolour='normal'):
+def env_no_color(environ=None):
+  ''' Test the `$NO_COLOR` environment variable per the specification at
+      https://no-color.org/
+  '''
+  if environ is None:
+    environ = os.environ
+  return 'NO_COLOR' in environ
+
+def colourise(s, colour=None, uncolour=None):
   ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
 
       * `colour`: names the desired ANSI colour.
       * `uncolour`: may be used to specify the colour-off colour;
-        the default is 'normal'.
+        the default is 'normal' (from `NORMAL_COLOUR`).
   '''
   if colour is None:
     colour = DEFAULT_HIGHLIGHT
+  if uncolour is None:
+    uncolour = NORMAL_COLOUR
   return COLOURS[colour] + s + COLOURS[uncolour]
 
 def make_pattern(pattern, default_colour=None):
-  ''' Convert a pattern specification into a (colour, regexp) tuple.
+  ''' Convert a `pattern` specification into a `(colour,regexp)` tuple.
 
-      Each pattern may be:
+      Parameters:
+      * `pattern`: the pattern to parse
+      * `default_colour`: the highlight colour,
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
+
+      Each `pattern` may be:
       * a string of the form "[colour]:regexp"
       * a string containing no colon, taken to be a regexp
-      * a tuple of the form (colour, regexp)
+      * a tuple of the form `(colour,regexp)`
       * a regexp object
   '''
   if default_colour is None:
@@ -92,7 +110,12 @@ def make_pattern(pattern, default_colour=None):
 
 def make_patterns(patterns, default_colour=None):
   ''' Convert an iterable of pattern specifications into a list of
-      (colour, regexp) tuples.
+      `(colour,regexp)` tuples.
+
+      Parameters:
+      * `patterns`: an iterable of patterns to parse
+      * `default_colour`: the highlight colour,
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
 
       Each pattern may be:
       * a string of the form "[colour]:regexp"
@@ -106,23 +129,25 @@ def make_patterns(patterns, default_colour=None):
   ]
 
 def colourise_patterns(s, patterns, default_colour=None):
-  ''' Colourise a string according to patterns.
+  ''' Colourise a string `s` according to `patterns`.
 
-      * `s`: the string
-      * `patterns`: a sequence of patterns
+      Parameters:
+      * `s`: the string.
+      * `patterns`: a sequence of patterns.
       * `default_colour`: if a string pattern has no colon, or starts
-        with a colon, use this colour; default DEFAULT_HIGHLIGHT
+        with a colon, use this colour;
+        default "cyan" (from `DEFAULT_HIGHLIGHT`).
 
       Each pattern may be:
       * a string of the form "[colour]:regexp"
       * a string containing no colon, taken to be a regexp
-      * a tuple of the form (colour, regexp)
+      * a tuple of the form `(colour,regexp)`
       * a regexp object
 
       Returns the string with ANSI colour escapes embedded.
   '''
   patterns = make_patterns(patterns, default_colour=default_colour)
-  chars = [ [c, NORMAL_COLOUR] for c in s ]
+  chars = [[c, NORMAL_COLOUR] for c in s]
   for colour, regexp in patterns:
     for m in regexp.finditer(s):
       for pos in range(m.start(), m.end()):

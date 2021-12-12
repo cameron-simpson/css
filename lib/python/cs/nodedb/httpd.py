@@ -25,21 +25,32 @@ class CherryPyNode(object):
 
   def __init__(self, top):
     if not top.basepath.endswith('/'):
-      raise ValueError("top.basepath does not end in a slash: %s" % (top.basepath,))
+      raise ValueError(
+          "top.basepath does not end in a slash: %s" % (top.basepath,)
+      )
     self.top = top
     self.nodedb = top.nodedb
     self.basepath = top.basepath
     self.nodes_prefix = "%snodes/" % (self.basepath,)
 
   def _start(self):
-    self._tokens = [ ['BASE', {'HREF': self.basepath}],
-                     ['SCRIPT', {'LANGUAGE': 'javascript',
-                                 'SRC': os.path.join(self.basepath, 'lib-css.js'),
-                                }],
-                     ['SCRIPT', {'LANGUAGE': 'javascript',
-                                 'SRC': os.path.join(self.basepath, 'lib.js'),
-                                }]
-                   ]
+    self._tokens = [
+        ['BASE', {
+            'HREF': self.basepath
+        }],
+        [
+            'SCRIPT', {
+                'LANGUAGE': 'javascript',
+                'SRC': os.path.join(self.basepath, 'lib-css.js'),
+            }
+        ],
+        [
+            'SCRIPT', {
+                'LANGUAGE': 'javascript',
+                'SRC': os.path.join(self.basepath, 'lib.js'),
+            }
+        ]
+    ]
 
   def _flushtokens(self):
     ''' Transcribe the pending HTML tokens to text,
@@ -54,7 +65,7 @@ class CherryPyNode(object):
 
 class NodeDBView(CherryPyNode):
 
-  NODELIST_LEADATTRS = [ 'TYPE', 'NAME', 'COMMENT' ]
+  NODELIST_LEADATTRS = ['TYPE', 'NAME', 'COMMENT']
 
   def __init__(self, nodedb, basepath, readwrite=False):
     if not basepath.endswith('/'):
@@ -78,27 +89,44 @@ class NodeDBView(CherryPyNode):
     self._tokens.append("Types:")
     sep = " "
     for nodetype in nodetypes:
-      self._tokens.extend( (sep, ['A', {'HREF': "#type-"+nodetype}, nodetype]) )
+      self._tokens.extend(
+          (sep, ['A', {
+              'HREF': "#type-" + nodetype
+          }, nodetype])
+      )
       sep = ", "
     self._tokens.append(['BR'])
     self._tokens.append("\n")
     for nodetype in nodetypes:
-      self._tokens.append( (['H2', ['A', {'NAME': "type-"+nodetype}, "Type "+nodetype],
-                            " (",
-                            ['A', {'HREF': nodetype+"s.csv"}, "CSV"], ", ",
-                            ['A', {'HREF': nodetype+"s.txt"}, "CSV as text"], ", ",
-                            ['A', {'HREF': nodetype+"s.html"}, "HTML"],
-                            ")"]) )
+      self._tokens.append(
+          (
+              [
+                  'H2',
+                  ['A', {
+                      'NAME': "type-" + nodetype
+                  }, "Type " + nodetype], " (",
+                  ['A', {
+                      'HREF': nodetype + "s.csv"
+                  }, "CSV"], ", ",
+                  ['A', {
+                      'HREF': nodetype + "s.txt"
+                  }, "CSV as text"], ", ",
+                  ['A', {
+                      'HREF': nodetype + "s.html"
+                  }, "HTML"], ")"
+              ]
+          )
+      )
       self._tokens.append("\n")
       nodes = nodedb.type(nodetype)
-      nodes=list(nodes)
+      nodes = list(nodes)
       nodes.sort(by_name)
       first = True
       for N in nodes:
         if not first:
           self._tokens.append(", ")
         self._tokens.append(N.html(prefix=self.nodes_prefix))
-        first=False
+        first = False
       self._tokens.append("\n")
     return self._flushtokens()
 
@@ -134,9 +162,13 @@ class NodeDBView(CherryPyNode):
         # TYPEs.html
         if content_type == 'text/html':
           self._start()
-          self._tokens.append(TABLE_from_Nodes_wide(sorted(self.nodedb.type(k), by_type_then_name),
-                                                    self,
-                                                    leadattrs=self.nodelist_leadattrs))
+          self._tokens.append(
+              TABLE_from_Nodes_wide(
+                  sorted(self.nodedb.type(k), by_type_then_name),
+                  self,
+                  leadattrs=self.nodelist_leadattrs
+              )
+          )
           return self._flushtokens()
         raise cherrypy.HTTPError(501, basename)
 
@@ -166,7 +198,7 @@ class NodesView(CherryPyNode):
       raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
     if view == '':
       if hasattr(N, 'report'):
-        return tok2s( *N.report(self) )
+        return tok2s(*N.report(self))
       return self._basic_html_tokens(N)
     if view == 'basic.html':
       return self._basic_html_tokens(N)
@@ -203,9 +235,12 @@ class NodesView(CherryPyNode):
     self._tokens.append(heading)
 
     # locate parent/referring Nodes
-    parents = set( rN for rN, rAttr, rCount in N.references() )
+    parents = set(rN for rN, rAttr, rCount in N.references())
     if parents:
-      def bylabel(a, b): return cmp(str(a), str(b))
+
+      def bylabel(a, b):
+        return cmp(str(a), str(b))
+
       parents = list(parents)
       parents.sort(bylabel)
       self._tokens.append("Attached to:")
@@ -215,9 +250,9 @@ class NodesView(CherryPyNode):
         sep = ", "
         self._tokens.append(self.noderef(P))
       self._tokens.append(".")
-      self._tokens.extend( (['BR'], "\n") )
+      self._tokens.extend((['BR'], "\n"))
 
-    self._tokens.append( TABLE_from_Node(N, self) )
+    self._tokens.append(TABLE_from_Node(N, self))
     self._tokens.append("\n")
 
     return self._flushtokens()

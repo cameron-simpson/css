@@ -87,11 +87,12 @@ class Maker(MultiOpenMixin):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
+    self._makeQ.open()
 
   def shutdown(self):
     ''' Shut down the make queue and wait for it.
     '''
-    self._makeQ.shutdown()
+    self._makeQ.close()
     self._makeQ.wait()
 
   def report(self, fp=None):
@@ -464,7 +465,7 @@ class Maker(MultiOpenMixin):
           # presumably a target definition
           # gather up the target as a macro expression
           target_mexpr, offset = MacroExpression.parse(context, stopchars=':')
-          if context.text[offset] != ':':
+          if not context.text.startswith(':', offset):
             raise ParseError(context, offset, "no colon in target definition")
           prereqs_mexpr, offset = MacroExpression.parse(
               context, offset=offset + 1, stopchars=':'

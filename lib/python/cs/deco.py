@@ -10,12 +10,13 @@ Assorted decorator functions.
 
 from collections import defaultdict
 from contextlib import contextmanager
+from inspect import isgeneratorfunction
 import sys
 import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20200517.2-post'
+__version__ = '20210823-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -76,29 +77,39 @@ def decorator(deco):
   '''
 
   def metadeco(*da, **dkw):
-    # TODO: general handling of first-argument-callable
-    # to support func2 = deco(func1, args..., kwargs...).
-    # Currently this must be done as:
-    # func2=deco(args..., kwargs...)(func1)
-    #
-    # if there's exactly one callable position argument
-    # then it is the target function: call deco(func).
-    if len(da) == 1 and callable(da[0]) and not dkw:
+    ''' Compute either the wrapper function for `func`
+        or a decorator expecting to get `func` when used.
+
+        If there is at least one positional parameter
+        and it is callable the it is presumed to be the function to decorate;
+        decorate it directly.
+
+        Otherwise return a decorator using the provided arguments,
+        ready for the subsequent function.
+    '''
+    if len(da) >= 1 and callable(da[0]):
+      # `func` is already supplied, decorate it now.
       func = da[0]
-      decorated = deco(func)
-      if not getattr(decorated, '__doc__', None):
-        decorated.__doc__ = getattr(func, '__doc__', '')
-      func_module = getattr(func, '__module__', None)
-      try:
-        decorated.__module__ = func_module
-      except AttributeError:
-        pass
+      da = tuple(da[1:])
+      decorated = deco(func, *da, **dkw)
+      if decorated is not func:
+        # pretty up the returned wrapper
+        try:
+          decorated.__name__ = getattr(func, '__name__', str(func))
+        except AttributeError:
+          pass
+        if not getattr(decorated, '__doc__', None):
+          decorated.__doc__ = getattr(func, '__doc__', '')
+        func_module = getattr(func, '__module__', None)
+        try:
+          decorated.__module__ = func_module
+        except AttributeError:
+          pass
       return decorated
 
-    # otherwise we collect the arguments supplied
-    # and return a function which takes a callable
-    # and returns deco(func, *da, **kw).
-
+    # `func` is not supplied, collect the arguments supplied and return a
+    # decorator which takes the subsequent callable and returns
+    # `deco(func, *da, **kw)`.
     def overdeco(func):
       decorated = deco(func, *da, **dkw)
       decorated.__doc__ = getattr(func, '__doc__', '')
@@ -114,6 +125,187 @@ def decorator(deco):
   metadeco.__doc__ = getattr(deco, '__doc__', '')
   metadeco.__module__ = getattr(deco, '__module__', None)
   return metadeco
+
+@decorator
+def contextdecorator(cmgrfunc):
+  ''' A decorator for a context manager function `cmgrfunc`
+      which turns it into a decorator for other functions.
+
+      This supports easy implementation of "setup" and "teardown"
+      code around other functions without the tedium of defining
+      the wrapper function itself. See the examples below.
+
+      The resulting context manager accepts an optional keyword
+      parameter `provide_context`, default `False`. If true, the
+      context returned from the context manager is provided as the
+      first argument to the call to the wrapped function.
+
+      Note that the context manager function `cmgrfunc`
+      has _not_ yet been wrapped with `@contextmanager`,
+      that is done by `@contextdecorator`.
+
+      This decorator supports both normal functions and generator functions.
+
+      With a normal function the process is:
+      * call the context manager with `(func,a,kw,*da,**dkw)`,
+        returning `ctxt`,
+        where `da` and `dkw` are the positional and keyword parameters
+        supplied when the decorator was defined.
+      * within the context
+        return the value of `func(ctxt,*a,**kw)` if `provide_context` is true
+        or the value of `func(*a,**kw)` if not (the default)
+
+      With a generator function the process is:
+      * obtain an iterator by calling `func(*a,**kw)`
+      * for iterate over the iterator, yielding its results,
+        by calling the context manager with `(func,a,kw,**da,**dkw)`,
+        around each `next()`
+      Note that it is an error to provide a true value for `provide_context`
+      if the decorated function is a generator function.
+
+      Some examples follow.
+
+      Trace the call and return of a specific function:
+
+          @contextdecorator
+          def tracecall(func, a, kw):
+              """ Trace the call and return from some function.
+                  This can easily be adapted to purposes such as timing a
+                  function call or logging use.
+              """
+              print("call %s(*%r,**%r)" % (func, a, kw))
+              try:
+                yield
+              except Exception as e:
+                print("exception from %s(*%r,**%r): %s" % (func, a, kw, e))
+                raise
+              else:
+                print("return from %s(*%r,**%r)" % (func, a, kw))
+
+          @tracecall
+          def f():
+              """ Some function to trace.
+              """
+
+          @tracecall(provide_context=True):
+          def f(ctxt, *a, **kw):
+              """ A function expecting the context object as its first argument,
+                  ahead of whatever other arguments it would normally require.
+              """
+
+      See who is making use of a generator's values,
+      when a generator might be invoked in one place and consumed elsewhere:
+
+          from cs.py.stack import caller
+
+          @contextdecorator
+          def genuser(genfunc, *a, **kw):
+              user = caller(-4)
+              print(f"iterate over {genfunc}(*{a!r},**{kw!r}) from {user}")
+              yield
+
+          @genuser
+          def linesof(filename):
+              with open(filename) as f:
+                  yield from f
+
+          # obtain a generator of lines here
+          lines = linesof(__file__)
+
+          # perhaps much later, or in another function
+          for lineno, line in enumerate(lines, 1):
+              print("line %d: %d words" % (lineno, len(line.split())))
+
+      Turn on "verbose mode" around a particular function:
+
+          import sys
+          import threading
+          from cs.context import stackattrs
+
+          class State(threading.local):
+              def __init__(self):
+                  # verbose if stderr is on a terminal
+                  self.verbose = sys.stderr.isatty()
+
+          # per thread global state
+          state = State()
+
+          @contextdecorator
+          def verbose(func):
+              with stackattrs(state, verbose=True) as old_attrs:
+                  if not old_attrs['verbose']:
+                      print(f"enabled verbose={state.verbose} for function {func}")
+                  # yield the previous verbosity as the context
+                  yield old_attrs['verbose']
+
+          # turn on verbose mode
+          @verbose
+          def func(x, y):
+              if state.verbose:
+                  # print if verbose
+                  print("x =", x, "y =", y)
+
+          # turn on verbose mode and also pass in the previous state
+          # as the first argument
+          @verbose(provide_context=True):
+          def func2(old_verbose, x, y):
+              if state.verbose:
+                  # print if verbose
+                  print("old_verbosity =", old_verbose, "x =", x, "y =", y)
+  '''
+  # turn the function into a context manager
+  cmgr = contextmanager(cmgrfunc)
+
+  # prepare a new decorator which wraps functions in a context
+  # manager using `cmgrfunc`
+  @decorator
+  def cmgrdeco(func, *da, provide_context=False, **dkw):
+    ''' Decorator for functions which wraps calls to the function
+        in a context manager, optionally supplying the context
+        as the first argument to the called function.
+    '''
+    if isgeneratorfunction(func):
+      if provide_context:
+        raise ValueError(
+            "provide_context may not be true when func:%s is a generator" %
+            (func,)
+        )
+
+      def wrapped(*a, **kw):
+        ''' Wrapper function:
+            * obtain an iterator by calling `func(*a,**kw)`
+            * iterate over the iterator, yielding its results,
+              by calling the context manager with `(func,a,kw,**da,**dkw)`,
+              around each `next()`
+        '''
+        it = func(*a, **kw)
+        while True:
+          with cmgr(func, a, kw, *da, **dkw):
+            try:
+              value = next(it)
+            except StopIteration:
+              break
+          yield value
+
+    else:
+
+      def wrapped(*a, **kw):
+        ''' Wrapper function:
+            * call the context manager with `(func,a,kw,**da,**dkw)`,
+              returning `ctxt`
+            * within the context
+              return the value of `func(ctxt,*a,**kw)`
+              if `provide_context` is true
+              or the value of `func(*a,**kw)` if not (the default)
+        '''
+        with cmgr(func, a, kw, *da, **dkw) as ctxt:
+          if provide_context:
+            a = a.insert(0, ctxt)
+          return func(*a, **kw)
+
+    return wrapped
+
+  return cmgrdeco
 
 @decorator
 def logging_wrapper(log_call, stacklevel_increment=1):
@@ -204,35 +396,38 @@ def cachedmethod(
   sig_attr = val_attr + '__signature'
   rev_attr = val_attr + '__revision'
   lastpoll_attr = val_attr + '__lastpoll'
-  firstpoll_attr = val_attr + '__firstpoll'
 
+  # pylint: disable=too-many-branches
   def wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
-      first = getattr(self, firstpoll_attr, True)
-      sig = getattr(self, sig_attr, None)
-      setattr(self, firstpoll_attr, False)
+      now = None
       value0 = getattr(self, val_attr, unset_value)
-      if not first and value0 is not unset_value:
-        # see if we should use the cached value
-        if poll_delay is None and sig_func is None:
+      sig0 = getattr(self, sig_attr, None)
+      sig = getattr(self, sig_attr, None)
+      if value0 is unset_value:
+        # value unknown, needs compute
+        pass
+      # we have a cached value for return in the following logic
+      elif poll_delay is None:
+        # always poll
+        pass
+      else:
+        lastpoll = getattr(self, lastpoll_attr)
+        now = time.time()
+        if now - lastpoll < poll_delay:
+          # reuse cache
           return value0
-        if poll_delay is not None:
-          # too early to check the signature function?
-          now = time.time()
-          lastpoll = getattr(self, lastpoll_attr, None)
-          if lastpoll is not None and now - lastpoll < poll_delay:
-            # still valid, return the value
-            return value0
-          setattr(self, lastpoll_attr, now)
-        # no poll_delay or poll expired
-        if sig_func is None:
-          # no sig func
-          return value0
-        # see if the signature is unchanged
-        sig0 = getattr(self, sig_attr, None)
+      # not too soon, try to update the value
+      # update the poll time if we use it
+      if poll_delay is not None:
+        now = now or time.time()
+        setattr(self, lastpoll_attr, now)
+      # check the signature if provided
+      # see if the signature is unchanged
+      if sig_func is not None:
         try:
           sig = sig_func(self)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
           # signature function fails, use the cache
           warning("sig func %s(self): %s", sig_func, e, exc_info=True)
           return value0
@@ -244,14 +439,15 @@ def cachedmethod(
       # compute the current value
       try:
         value = method(self, *a, **kw)
-      except Exception as e:
+      except Exception as e:  # pylint: disable=broad-except
+        # computation fails, return cached value
         if value0 is unset_value:
+          # no cached value
           raise
         warning("exception calling %s(self): %s", method, e, exc_info=True)
         return value0
+      # update the cache
       setattr(self, val_attr, value)
-      if sig_func is not None and not first:
-        setattr(self, sig_attr, sig)
       # bump revision if the value changes
       # noncomparable values are always presumed changed
       changed = value0 is unset_value or value0 is not value
@@ -300,11 +496,10 @@ def OBSOLETE(func, suggestion=None):
   funcdoc = getattr(func, '__doc__', None) or ''
   doc = "OBSOLETE FUNCTION " + funcname
   if suggestion:
-    doc += ' - please use ' + suggestion
+    doc += ' suggestion: ' + suggestion
   wrapped.__name__ = '@OBSOLETE(%s)' % (funcname,)
-  wrapped.__doc__ = funcdoc
+  wrapped.__doc__ = doc + '\n\n' + funcdoc
   return wrapped
-
 
 @OBSOLETE(suggestion='cachedmethod')
 def cached(*a, **kw):
@@ -316,7 +511,7 @@ def contextual(func):
   ''' Wrap a simple function as a context manager.
 
       This was written to support users of `@strable`,
-      which requires its `open_func` to be a context manager;
+      which requires its `open_func` to return a context manager;
       this turns an arbitrary function into a context manager.
 
       Example promoting a trivial function:
@@ -377,12 +572,25 @@ def strable(func, open_func=None):
   if open_func is None:
     open_func = open
 
-  def accepts_str(arg, *a, **kw):
-    if isinstance(arg, str):
-      with Pfx(arg):
-        with open_func(arg) as opened:
-          return func(opened, *a, **kw)
-    return func(arg, *a, **kw)
+  if isgeneratorfunction(func):
+
+    def accepts_str(arg, *a, **kw):
+      if isinstance(arg, str):
+        with Pfx(arg):
+          with open_func(arg) as opened:
+            for item in func(opened, *a, **kw):
+              yield item
+      else:
+        for item in func(arg, *a, **kw):
+          yield item
+  else:
+
+    def accepts_str(arg, *a, **kw):
+      if isinstance(arg, str):
+        with Pfx(arg):
+          with open_func(arg) as opened:
+            return func(opened, *a, **kw)
+      return func(arg, *a, **kw)
 
   return accepts_str
 
@@ -441,7 +649,7 @@ def observable_class(property_names, only_unequal=False):
       for observer in self._observable_class__observers[attr]:
         try:
           observer(self, attr, value)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
           warning(
               "%s.%s=%r: observer %s(...) raises: %s",
               self,
@@ -487,8 +695,38 @@ def observable_class(property_names, only_unequal=False):
 
   return make_observable_class
 
-if __name__ == '__main__':
+def _teststuff():
 
+  @contextdecorator
+  def tracecall(func, a, kw):
+    print("call %s(*%r,**%r)" % (func, a, kw))
+    yield 9
+    print("return from %s(*%r,**%r)" % (func, a, kw))
+
+  @tracecall
+  def f(*a, **kw):
+    print("hello from f: a=%r, kw=%r" % (a, kw))
+    return "V"
+
+  @tracecall
+  def g(r):
+    yield from range(r)
+
+  @tracecall(provide_context=True)
+  def f2(ctxt, *a, **kw):
+    print("hello from f2: ctxt=%s, a=%r, kw=%r" % (ctxt, a, kw))
+    return "V2"
+
+  v = f("abc", y=1)
+  print("v =", v)
+  v = f2("abc2", y=1)
+  print("v2 =", v)
+  gg = g(9)
+  for i in gg:
+    print("i =", i)
+  sys.exit(1)
+
+  # pylint: disable=too-few-public-methods
   class Foo:
     ''' Dummy class.
     '''
@@ -509,3 +747,6 @@ if __name__ == '__main__':
   time.sleep(3)
   y = F.x(3)
   print("F.x() ==>", y)
+
+if __name__ == '__main__':
+  _teststuff()

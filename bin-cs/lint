@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Lint the named files.
-#   - Cameron Simpson <cs@cskk.id.au> 22apr2017
+# - Cameron Simpson <cs@cskk.id.au> 22apr2017
 #
 
 set -ue
@@ -12,13 +12,14 @@ trace=
 quick=
 pymode=3
 pyflakes2=pyflakes-2.7
-pyflakes3='py3 -m pyflakes'
+pyflakes3='python3 -m pyflakes'
 pylint2=pylint-2.7
-pylint3='py3 -m pylint'
-pycodestyle_ignore=E111,E114,E124,E126,E201,E202,E221,E226,E227,E265,E266,E301,E302,E305,E501,E731,W503,W504
-pylint_disable=bad-whitespace,bad-indentation,bad-continuation,invalid-name,useless-object-inheritance
+pylint3='python3 -m pylint'
+pyiclint=pyicontract-lint
+pycodestyle_ignore=E111,E114,E124,E125,E126,E129,E201,E202,E127,E221,E226,E227,E265,E266,E301,E302,E305,E501,E731,W503,W504
+pylint_disable=bad-whitespace,bad-indentation,bad-continuation,invalid-name,useless-object-inheritance,consider-using-f-string
 pylintrc=$( findup .pylintrc || echo "$HOME/.pylintrc" )
-shellcheck_exclusions=SC1007
+shellcheck_exclusions=SC1007,SC2244,SC2250
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
@@ -85,10 +86,12 @@ do
   if [ -z "$type" ] && magic=$( file "$lintfile" )
   then
     case "$magic" in
-      *'perl script'*)          type=pl ;;
+      *'perl script'*)
+            type=pl ;;
       *[Pp]'ython script'* | *'python3 script'* )
-                                type=py ;;
-      *'POSIX shell script'*)   type=sh ;;
+            type=py ;;
+      *'POSIX shell script'* | *'Bourne-Again shell script'* )
+            type=sh ;;
     esac
   fi
   [ -n "$type" ] || {
@@ -114,6 +117,7 @@ do
         $trace $pyflakes "$lintfile" || xit=1
         [ $quick ] || $trace $pycodestyle "--ignore=$pycodestyle_ignore" "$lintfile" || xit=1
         [ $quick ] || $trace $pylint "--rcfile=$pylintrc" "--disable=$pylint_disable" "$lintfile" || xit=1
+        [ $quick ] || $trace $pyiclint "$lintfile" || xit=1
       else
         xit=1
       fi
@@ -129,7 +133,7 @@ do
       fi
       ;;
     sh)
-      $trace shellcheck "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
+      $trace shellcheck -o all "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
       ;;
     *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
       ;;

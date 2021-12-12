@@ -1,0 +1,2 @@
+Initial "daemon" mode, suitable for "tail -f .ydld-queue | ydl -", handy for keeping around in a tmux session.
+Assorted small bugfixes.

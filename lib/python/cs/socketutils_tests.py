@@ -11,6 +11,8 @@ import unittest
 from cs.socketutils import OpenSocket, bind_next_port
 
 class _TestOpenSocket(object):
+  ''' Base class for socket tests.
+  '''
 
   def setUp(self):
     self._setUp_sock12()
@@ -74,11 +76,15 @@ class _TestOpenSocket(object):
     self.fp1_w.close()
 
 class TestOpenSocket_socketpair(_TestOpenSocket, unittest.TestCase):
+  ''' Tests for a socket pair.
+  '''
 
   def _setUp_sock12(self):
     self.sock1, self.sock2 = socket.socketpair()
 
 class TestOpenSocket_TCP(_TestOpenSocket, unittest.TestCase):
+  ''' Tests for TCP sockets.
+  '''
 
   def _setUp_sock12(self):
     self.sock0 = socket.socket()

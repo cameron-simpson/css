@@ -1,0 +1,2 @@
+lib/python/cs/py/func.py: cs.py.func: new func_a_kw_fmt(func,*a,**kw) imported from cs.pfx; hook it into @trace
+lib/python/cs/py/func.py: merge tagger => default

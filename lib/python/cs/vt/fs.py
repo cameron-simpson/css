@@ -232,7 +232,7 @@ class Inode(Transcriber, NS):
     m, offset = T.parse_mapping(s, offset, stopchar=stopchar, T=T)
     return cls(None, m['E'], m['refcount']), offset
 
-class Inodes(object):
+class Inodes:
   ''' Inode information for a filesystem.
 
       This consists of:
@@ -359,7 +359,7 @@ class Inodes(object):
       return False
     return True
 
-class FileSystem(object):
+class FileSystem:
   ''' The core filesystem functionality supporting FUSE operations
       and in principle other filesystem-like access.
 
@@ -437,6 +437,7 @@ class FileSystem(object):
     self._fs_gid = os.getegid()
     self._lock = RLock()
     self._later = Later(DEFAULT_FS_THREAD_MAX)
+    self._later.open()
     self._path_files = {}
     self._file_handles = []
     inodes = self._inodes = Inodes(self)

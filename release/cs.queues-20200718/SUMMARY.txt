@@ -1,0 +1,1 @@
+_QueueIterator: set finalise_later via new MultiOpenMixin property, required by recent MultiOpenMixin change.

@@ -46,7 +46,7 @@ def convert_param(params, key, *, decoder=None):
       params[key] = decoder(param)
 
 def convert_param_int(params, key):
-  ''' Convert an integer paramater to an int.
+  ''' Convert an integer parameter to an int.
   '''
   return convert_param(params, key, decoder=int)
 
@@ -56,7 +56,7 @@ def convert_param_scaled_int(params, key):
   return convert_param(params, key, decoder=scaled_value)
 
 def convert_param_bool(params, key):
-  ''' Convert an integer paramater to an bool.
+  ''' Convert an integer parameter to an bool.
   '''
   return convert_param(params, key, decoder=truthy_word)
 

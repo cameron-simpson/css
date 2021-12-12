@@ -17,6 +17,8 @@ testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.configutils')
 test_config_file = joinpath(testdatadir, 'test.ini')
 
 class TestConfigUtils(unittest.TestCase):
+  ''' Test `cs.configutils`.
+  '''
 
   def setUp(self):
     self.tmpdir = mkdtemp()

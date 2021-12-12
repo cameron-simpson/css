@@ -10,6 +10,8 @@ from random import randint
 from cs.range import Range, overlap, spans, Span
 
 class TestAll(unittest.TestCase):
+  ''' Tests for `cs.range`.
+  '''
 
   def setUp(self):
     self.items1 = [1, 2, 3, 7, 8, 11, 5]

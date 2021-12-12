@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Replace {hostname} with its IP address according to /etc/hosts.
+# - Cameron Simpson <cs@cskk.id.au> 24dec2020
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+etc_hosts=/etc/hosts
+re_subst_opts=
+
+cmd=$0
+usage="Usage: $cmd [etc-hosts-like-files...] < curly-input
+  etc-hosts     A file in the format of hosts(5) to use instead of $etc_hosts.
+  curly-input   Input data with {hostname} strings for replacement."
+
+badopts=
+
+[ $# = 0 ] || [ "x$1" != x-q ] || { re_subst_opts="$re_subst_opts $1"; shift; }
+[ $# = 0 ] && set -- "$etc_hosts"
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $# -gt 1 ]
+then
+  tmpf=$TMPDIR/unhostsify.$$
+  cat -- "$@" >"$tmpf"
+  "$0" $re_subst_opts "$tmpf"
+  xit=$?
+  rm -- "$tmpf"
+  exit $xit
+fi
+
+etc_hosts=$1; shift
+[ -f "$etc_hosts" ] || { echo "$cmd: not a file: $etc_hosts" >&2; exit 1; }
+
+exec re-subst -H "$etc_hosts" 's/{(?P<hostname>[^{}][^}]+)}/{{{hostname}}}/gf'

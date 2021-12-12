@@ -1,0 +1,5 @@
+lib/python/cs/mappings.py: cs.mappings: new IndexedMapping: wrapper for another mapping providing LoadableMappingMixin stype .by_* attributes
+lib/python/cs/mappings.py: cs.mappings: IndexedMapping: add required ._lock attribute
+lib/python/cs/mappings.py: cs.mappings: rename LoadableMappingMixin to IndexedSetMixin and make it abstract, rename .scan_mapping to .scan, .add_to_mapping to .add etc; adjust other modules to match
+lib/python/cs/mappings.py: cs.mappings: IndexedSetMixin: rename .append_to_mapping to .add_backend; cs.fileutils: UUIDNDJSONMapping: rename .rewrite_mapping to .rewrite_backend; adjust callers
+lib/python/cs/mappings.py: cs.mappings: clean some lint

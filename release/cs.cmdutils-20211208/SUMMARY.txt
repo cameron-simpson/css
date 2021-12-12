@@ -1,0 +1,1 @@
+BaseCommand: better handle an unknown subcommand.

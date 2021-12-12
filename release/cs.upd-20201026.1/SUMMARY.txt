@@ -1,0 +1,1 @@
+Bugfix Upd.nl: simple output if there are no status lines to accomodate.

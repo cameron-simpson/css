@@ -11,7 +11,9 @@ import sys
 import random
 import unittest
 from uuid import uuid4
+from .dir import Dir
 from .hash import Hash_SHA1
+from .meta import Meta
 from .transcribe import _TRANSCRIBE
 
 class TestTranscribe(unittest.TestCase):
@@ -39,6 +41,7 @@ class TestTranscribe(unittest.TestCase):
         uuid4(),
         Hash_SHA1.from_chunk(bytes(random.randint(0, 255)
                                    for _ in range(100))),
+        Dir("some_dir", meta=Meta(dict(x=dict(a=1, b=2)))),
     ):
       s = T.transcribe_s(o, None)
       self.assertIsInstance(s, str)

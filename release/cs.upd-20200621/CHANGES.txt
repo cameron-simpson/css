@@ -1,0 +1,3 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200613.
+lib/python/cs/upd.py: cs.upd: fix docstring typo
+lib/python/cs/upd.py: cs.upd: "disabled" mode, triggered by default if not backend.isatty()

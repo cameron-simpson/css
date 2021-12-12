@@ -1,0 +1,2 @@
+lib/python/cs/upd.py: Release information for cs.upd-20200626.
+lib/python/cs/upd.py: cs.upd: Upd.__exit__: bugfix test of SystemExit exceptions

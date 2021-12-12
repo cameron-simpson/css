@@ -13,7 +13,7 @@ import sys
 from cs.context import stackattrs
 from cs.pfx import Pfx
 
-__version__ = '20200521-post'
+__version__ = '20210123-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -101,7 +101,8 @@ def module_attributes(M):
   '''
   for attr in dir(M):
     value = getattr(M, attr, None)
-    if getmodule(value) is not M:
+    valueM= getmodule(value)
+    if valueM is not None and valueM is not M:
       continue
     yield attr, value
 

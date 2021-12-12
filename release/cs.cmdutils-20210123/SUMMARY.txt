@@ -1,0 +1,1 @@
+BaseCommand: propagate the format mapping (cmd, USAGE_KEYWORDS) to the subusage generation.

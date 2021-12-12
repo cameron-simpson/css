@@ -1,0 +1,7 @@
+lib/python/cs/tagset.py: cs.tagset: TagSet.get_va;lue (Formatter method): return {arg_name} as fallback, try direct tag name first, fall back to permitted attribute
+lib/python/cs/tagset.py: cs.tagset: TagSet.__getattr__: suppress warning about auto_infer(), this is normal; fix docstring typo
+lib/python/cs/tagset.py: cs.tagset: fix typo in selftest print()
+lib/python/cs/tagset.py: cs.agset: drop unused import
+lib/python/cs/tagset.py: merge tagger => default
+lib/python/cs/tagset.py: cs.tagset: TagSet.get_value: raise KeyError in strict mode, leave placeholder otherwise
+lib/python/cs/tagset.py: merge tagger ==> default: Tagger.auto_name: catch FormatAsError to skip tagger.auto_name format strings which cannot be resolved, related tweaks.

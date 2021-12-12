@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# Report the revisions assoiated with a a revset specification.
+# - Cameron Simpson <cs@cskk.id.au> 18aug2020
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [{-T|--template} template] [--] revsetspec"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+tty_template='{node} {rev} {date|isodate} {desc|firstline}\n'
+node_template='{node}\n'
+template=$node_template
+[ -t 1 ] && template=$tty_template
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -T|--template)
+        template=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognistion option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing revsetspec" >&2; badopts=1
+else  revsetspec=$1; shift
+fi
+
+[ $# = 0 ] || {
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec $trace hg log --template="$template" -r "$revsetspec"

@@ -1,0 +1,4 @@
+lib/python/cs/obj.py: cs.obj: set __version__ to '20200517-post'
+lib/python/cs/obj.py: merge default ==> vt
+lib/python/cs/obj.py: merge default ==> vt
+lib/python/cs/obj.py lib/python/cs/obj_tests.py: cs.obj: SingletonMixin: no longer require special _singleton_init method, reuse default __init__ implicitly through __new__ mechanics; add more docstringage explaining the implications; add trite unit test

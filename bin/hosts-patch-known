@@ -3,40 +3,71 @@
 # Patch /etc/hosts (by default) with raw /etc/hosts content from another file.
 # I use this to wire certain special addresses into my /etc/hosts files such
 # as IP addresses of specific machines on known local LANs.
-#   - Cameron Simpson <cs@cskk.id.au> 15apr2016
+# - Cameron Simpson <cs@cskk.id.au> 15apr2016
 #
 
 set -ue
 
+marker='KNOWN ADDRESSES'
 hosts=/etc/hosts
-sfx=.l
 
 cmd=$0
-usage="Usage: $cmd [hostsfile] <etc-hosts-content"
+usage="Usage: $cmd [-m marker] [/path/to/hostsfile] [localzones...] <etc-hosts-content
+  -m marker             Basis for the marker lines. Default: $marker
+  /path/to/hostsfile    Hosts file to patch, a full pathname.
+                        Default $hosts
+  localzones            Zone suffixes to supply in addition to the unadorned
+                        name."
 
 badopts=
 
+if [ $# -gt 0 ] && [ "x$1" = x-m ]
+then
+  marker=$2
+  shift; shift
+fi
+
 if [ $# -gt 0 ]
 then
-  hosts=$1
-  shift
+  case "$1" in
+    /*) hosts=$1; shift ;;
+  esac
 fi
+
+localzones=$*
 
 [ -s "$hosts" ] || { echo "$cmd: expected nonempty regular file: $hosts" >&2
                      badopts=1
                    }
 
-if [ $# -gt 0 ]
-then
-  echo "$cmd: extra arguments: $*" >&2
-  badopts=1
-fi
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+necho(){
+  printf "%s" "$*"
+}
+
 # make sure marker lines are present
-grep '^## BEGIN KNOWN ADDRESSES' "$hosts" >/dev/null \
-|| { echo; echo '## BEGIN KNOWN ADDRESSES'; echo '## END KNOWN ADDRESSES'; } \
+grep "^## BEGIN $marker" "$hosts" >/dev/null \
+|| { echo; echo "## BEGIN $marker"; echo "## END $marker"; } \
    >>"$hosts"
 
-exec rlr -f '^## BEGIN KNOWN ADDRESSES' -t '^## END KNOWN ADDRESSES' "$hosts"
+while read -r ip names
+do
+  case "$ip" in
+    '' | \#* ) continue ;;
+  esac
+  necho "$ip $names"
+  for name in $names
+  do
+    case "$name" in
+      *.*);;  # no local entry for things with dots
+      *)
+          for zone in $localzones
+          do  necho " $name.$zone"
+          done
+          ;;
+    esac
+  done
+  echo
+done \
+| rlr -f "^## BEGIN $marker" -t "^## END $marker" "$hosts"

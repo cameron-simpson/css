@@ -1,0 +1,1 @@
+lib/python/cs/obj.py: cs.obj: SingletonMixin: make singleton_also_by() a public method

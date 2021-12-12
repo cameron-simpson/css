@@ -1,0 +1,2 @@
+@locked: bump the default warning timeout to 10s, was firing too often.
+New State class for thread local state objects with default attribute values and a stacking __call__ context manager.

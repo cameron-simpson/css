@@ -32,14 +32,13 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 from email import message_from_file
 from email.header import decode_header, make_header
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
-from logging import DEBUG
+import logging
 import os
 import os.path
 import re
@@ -53,7 +52,6 @@ from types import SimpleNamespace as NS
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
-from cs.context import stackattrs
 from cs.deco import cachedmethod, fmtdoc
 import cs.env
 from cs.env import envsub
@@ -66,21 +64,22 @@ from cs.lex import (
     match_tokens, get_delimited
 )
 from cs.logutils import (
-    with_log, debug, status, STATUS, info, track, warning, error, exception,
-    LogTime
+    with_log, debug, status, info, track, warning, error, exception, LogTime
 )
 from cs.mailutils import (
     RFC5322_DATE_TIME, Maildir, message_addresses, modify_header, shortpath,
     ismaildir, make_maildir
 )
 from cs.obj import singleton
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 from cs.rfc2047 import unrfc2047
 from cs.seq import first
 from cs.threads import locked, locked_property
+
+__version__ = '20200719-post'
 
 DISTINFO = {
     'description':
@@ -94,7 +93,7 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.app.maildb',
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.configutils',
         'cs.deco',
         'cs.env',
@@ -104,6 +103,7 @@ DISTINFO = {
         'cs.lex',
         'cs.logutils',
         'cs.mailutils',
+        'cs.obj',
         'cs.pfx',
         'cs.py.func',
         'cs.py.modules',
@@ -131,9 +131,7 @@ SELF_FOLDER = '.'
 def main(argv=None, stdin=None):
   ''' Mailfiler main programme.
   '''
-  if 'DEBUG' not in os.environ:
-    os.environ['DEBUG'] = 'INFO'
-  return MailFilerCommand().run(argv, options=NS(stdin=stdin))
+  return MailFilerCommand(argv, stdin=stdin, log_level=logging.INFO).run()
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -149,10 +147,10 @@ class MailFilerCommand(BaseCommand):
           Maildir names.
           Default: {DEFAULT_RULES_PATTERN}'''
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up default options.
     '''
+    options = self.options
     options.stdin = getattr(options, 'stdin', None) or sys.stdin
     options.config_path = None
     options.maildb_path = None
@@ -160,26 +158,17 @@ class MailFilerCommand(BaseCommand):
     options.maildir = None
     options.rules_pattern = DEFAULT_RULES_PATTERN
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
+    options = self.options
     for opt, val in opts:
       if opt == '-R':
         options.rules_pattern = val
       else:
         raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
-  @contextmanager
-  def run_context(self, argv, options):
-    ''' Run commands at STATUS logging level (or lower if already lower).
-    '''
-    with super().run_context(argv, options):
-      loginfo = options.loginfo
-      with stackattrs(loginfo, level=min(loginfo.level, STATUS)):
-        yield
-
-  def cmd_monitor(self, argv, options):
+  def cmd_monitor(self, argv):
     ''' Usage: {cmd} [-1] [-d delay] [-n] [maildirs...]
           Monitor Maildirs for new messages and file them.
           -1  File at most 1 message per Maildir.
@@ -188,7 +177,6 @@ class MailFilerCommand(BaseCommand):
               Default is to make only one run over the Maildirs.
           -n  No remove. Keep filed messages in the origin Maildir.
     '''
-    warning("test warning")
     justone = False
     delay = None
     no_remove = False
@@ -218,15 +206,15 @@ class MailFilerCommand(BaseCommand):
       raise GetoptError("invalid arguments")
     if not mdirpaths:
       mdirpaths = None
-    return self.mailfiler(options).monitor(
+    return self.mailfiler().monitor(
         mdirpaths,
         delay=delay,
         justone=justone,
         no_remove=no_remove,
-        upd=options.loginfo.upd
+        upd=self.loginfo.upd
     )
 
-  def cmd_save(self, argv, options):
+  def cmd_save(self, argv):
     ''' Usage: {cmd} target[,target...] <message
           Save a message from standard input to the specified targets.
 
@@ -234,6 +222,7 @@ class MailFilerCommand(BaseCommand):
         a single command line argument of the form
         of a mailfiler targets field.
     '''
+    options = self.options
     badopts = False
     if not argv:
       warning("missing targets")
@@ -249,29 +238,27 @@ class MailFilerCommand(BaseCommand):
       badopts = True
     if badopts:
       raise GetoptError("invalid arguments")
-    return self.mailfiler(options).save(targets, message_fp)
+    return self.mailfiler().save(targets, message_fp)
 
-  def cmd_report(self, argv, options):
+  def cmd_report(self, argv):
     ''' Usage: {cmd} <message
           Report various things about a message from standard input.
     '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    return self.mailfiler(options).report(options.stdin)
+    return self.mailfiler().report(self.options.stdin)
 
-  def mailfiler(self, options):
-    ''' Prepare a `MailFiler` from the `options`.
+  def mailfiler(self):
+    ''' Prepare a `MailFiler` from `self.options`.
     '''
     return MailFiler(
         **{
             k: v
-            for k, v in options.__dict__.items()
+            for k, v in self.options.__dict__.items()
             if k in ('config_path', 'environ',
                      'rules_pattern') and v is not None
         }
     )
-
-MailFilerCommand.add_usage_to_docstring()
 
 def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
@@ -437,7 +424,7 @@ class MailFiler(NS):
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
     '''
-    debug("monitor: self.cfg=%s", self.cfg)
+    debug("cfg=%s", self.cfg)
     debug("maildb_path=%r", self.maildb_path)
     debug("msgiddb_path=%r", self.msgiddb_path)
     debug("rules_pattern=%r", self.rules_pattern)
@@ -464,7 +451,7 @@ class MailFiler(NS):
           idle = 0
         if delay is None:
           break
-        if upd:
+        if upd is not None:
           if idle > 0:
             status("sleep %ds; idle %ds", delay, idle)
           else:
@@ -523,7 +510,7 @@ class MailFiler(NS):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+          with LogTime("key = %s", key, threshold=1.0, level=logging.DEBUG):
             ok = self.file_wmdir_key(wmdir, key)
             if not ok:
               warning("NOT OK, lurking key %s", key)
@@ -582,10 +569,16 @@ class MailFiler(NS):
 
   def file_wmdir_key(self, wmdir, key):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
-        This does not remove a successfully filed message or update the lurking list.
+
+        This does not remove a successfully filed message or update
+        the lurking list.
     '''
-    with LogTime("file key %s", key, threshold=1.0, level=DEBUG):
-      M = wmdir[key]
+    with LogTime("file key %s", key, threshold=1.0, level=logging.DEBUG):
+      try:
+        M = wmdir[key]
+      except KeyError as e:
+        warning("unknown key: %s", e)
+        return False
       filer = MessageFiler(self)
       ok = filer.file(M, wmdir.rules, wmdir.keypath(key))
       if ok:
@@ -816,7 +809,8 @@ class MessageFiler(NS):
       ##for R in self.matched_rules:
       ##  M.add_header('X-Matched-Mailfiler-Rule', str(R))
       for R in self.matched_rules:
-        info("    MATCH %s", R)
+        if any(map(lambda T: not isinstance(T, Target_Assign), R.targets)):
+          info("    MATCH %s", R)
 
       return self.save_message()
 

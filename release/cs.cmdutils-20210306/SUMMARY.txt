@@ -1,0 +1,2 @@
+BREAKING CHANGE: rework BaseCommand as a more normal class instantiated with argv and with most methods being instance methods, getting the former `options` parameter from self.options.
+BaseCommand: provide default `apply_opt` and `apply_opts` methods; subclasses will generally just override the former.

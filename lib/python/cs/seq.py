@@ -14,18 +14,26 @@ in the course of its function.
 
 import heapq
 import itertools
-from threading import Lock, Condition
-from cs.logutils import warning
+from threading import Lock, Condition, Thread
+from cs.deco import decorator
+from cs.gimmicks import warning
+
+__version__ = '20210924-post'
 
 DISTINFO = {
-    'description': "Stuff to do with counters, sequences and iterables.",
+    'description':
+    "Stuff to do with counters, sequences and iterables.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.logutils'],
+    'install_requires': [
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.queues>=iterable_channel',
+    ],
 }
 
 class Seq(object):
@@ -54,7 +62,7 @@ __seq = Seq()
 def seq():
   ''' Return a new sequential value.
   '''
-  global __seq
+  global __seq  # pylint: disable=global-statement
   return next(__seq)
 
 def the(iterable, context=None):
@@ -71,8 +79,7 @@ def the(iterable, context=None):
       is_first = False
     else:
       raise IndexError(
-          "%s: got more than one element (%s, %s, ...)"
-          % (icontext, it, elem)
+          "%s: got more than one element (%s, %s, ...)" % (icontext, it, elem)
       )
   if is_first:
     raise IndexError("%s: got no elements" % (icontext,))
@@ -94,7 +101,7 @@ def last(iterable):
     nothing = False
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
-  return item
+  return item  # pylint: disable=undefined-loop-variable
 
 def get0(iterable, default=None):
   ''' Return first element of an iterable, or the default.
@@ -143,32 +150,35 @@ def imerge(*iters, **kw):
   if reverse:
     # tuples that compare in reverse order
     class _MergeHeapItem(tuple):
+
       def __lt__(self, other):
         return self[0] > other[0]
   else:
     # tuples that compare in forward order
     class _MergeHeapItem(tuple):
+
       def __lt__(self, other):
         return self[0] < other[0]
+
   # prime the list of head elements with (value, iter)
   heap = []
-  for I in iters:
-    I = iter(I)
+  for it in iters:
+    it = iter(it)
     try:
-      head = next(I)
+      head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem( (head, I)))
+      heapq.heappush(heap, _MergeHeapItem((head, it)))
   while heap:
-    head, I = heapq.heappop(heap)
+    head, it = heapq.heappop(heap)
     yield head
     try:
-      head = next(I)
+      head = next(it)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, _MergeHeapItem( (head, I)))
+      heapq.heappush(heap, _MergeHeapItem((head, it)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
@@ -184,11 +194,13 @@ def onetoone(func):
             strs = X(['Abc', 'Def'])
             lower_strs = X.lower()
   '''
+
   def gather(self, *a, **kw):
     ''' Yield the results of calling the function on each item.
     '''
     for item in self:
       yield func(item, *a, **kw)
+
   return gather
 
 def onetomany(func):
@@ -205,20 +217,22 @@ def onetomany(func):
             strs = X(['Abc', 'Def'])
             all_chars = X.chars()
   '''
+
   def gather(self, *a, **kw):
     ''' Chain the function results together.
     '''
-    return itertools.chain(*[ func(item, *a, **kw) for item in self ])
+    return itertools.chain(*[func(item, *a, **kw) for item in self])
+
   return gather
 
-def isordered(s, reverse=False, strict=False):
+def isordered(items, reverse=False, strict=False):
   ''' Test whether an iterable is ordered.
       Note that the iterable is iterated, so this is a destructive
       test for nonsequences.
   '''
   is_first = True
   prev = None
-  for item in s:
+  for item in items:
     if not is_first:
       if reverse:
         ordered = item < prev if strict else item <= prev
@@ -229,6 +243,26 @@ def isordered(s, reverse=False, strict=False):
     prev = item
     is_first = False
   return True
+
+def common_prefix_length(*seqs):
+  ''' Return the length of the common prefix of sequences `seqs`.
+  '''
+  if not seqs:
+    return 0
+  if len(seqs) == 1:
+    return len(seqs[0])
+  for i, items in enumerate(zip(*seqs)):
+    item0 = items[0]
+    # pylint: disable=cell-var-from-loop
+    if not all(map(lambda item: item == item0, items)):
+      return i
+  # return the length of the shorted sequence
+  return len(min(*seqs, key=len))
+
+def common_suffix_length(*seqs):
+  ''' Return the length of the common suffix of sequences `seqs`.
+  '''
+  return common_prefix_length(list(map(lambda s: list(reversed(s)), *seqs)))
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
@@ -357,6 +391,235 @@ class StatefulIterator(object):
     item, new_state = next(self.it)
     self.state = new_state
     return item
+
+def splitoff(sq, *sizes):
+  ''' Split a sequence into (usually short) prefixes and a tail,
+      for example to construct subdirectory trees based on a UUID.
+
+      Example:
+
+          >>> from uuid import UUID
+          >>> uuid = 'd6d9c510-785c-468c-9aa4-b7bda343fb79'
+          >>> uu = UUID(uuid).hex
+          >>> uu
+          'd6d9c510785c468c9aa4b7bda343fb79'
+          >>> splitoff(uu, 2, 2)
+          ['d6', 'd9', 'c510785c468c9aa4b7bda343fb79']
+  '''
+  if len(sizes) < 1:
+    raise ValueError("no sizes")
+  offset = 0
+  parts = []
+  for size in sizes:
+    if size < 1:
+      raise ValueError("size:%s < 1" % (size,))
+    end_offset = offset + size
+    if end_offset >= len(sq):
+      raise ValueError(
+          "size:%s consumes up to or beyond"
+          " the end of the sequence (length %d)" % (size, len(sq))
+      )
+    parts.append(sq[offset:end_offset])
+    offset = end_offset
+  parts.append(sq[offset:])
+  return parts
+
+def unrepeated(it, seen=None, signature=None):
+  ''' A generator yielding items from the iterable `it` with no repetitions.
+
+      Parameters:
+      * `it`: the iterable to process
+      * `seen`: an optional setlike container supporting `in` and `.add()`
+      * `signature`: an optional signature function for items from `it`
+        which produces the value to compare to recognise repeated items;
+        its values are stored in the `seen` set
+
+      The default `signature` function is identity - items are stored and compared.
+      This requires the items to be hashable and support equality tests.
+      The same applies to whatever values the `signature` function produces.
+
+      Since `seen` accrues all the signature values for yielded items
+      generally it will grow monotonicly as iteration proceeeds.
+      If the items are complaex or large it is well worth providing a signature
+      function even it the items themselves can be used in a set.
+  '''
+  if seen is None:
+    seen = set()
+  if signature is None:
+    signature = lambda item: item
+  for item in it:
+    sig = signature(item)
+    if sig in seen:
+      continue
+    seen.add(sig)
+    yield item
+
+@decorator
+def _greedy_decorator(g, queue_depth=0):
+
+  def greedy_generator(*a, **kw):
+    return greedy(g(*a, **kw), queue_depth=queue_depth)
+
+  return greedy_generator
+
+def greedy(g=None, queue_depth=0):
+  ''' A decorator or function for greedy computation of iterables.
+
+      If `g` is omitted or callable
+      this is a decorator for a generator function
+      causing it to compute greedily,
+      capacity limited by `queue_depth`.
+
+      If `g` is iterable
+      this function dispatches it in a `Thread` to compute greedily,
+      capacity limited by `queue_depth`.
+
+      Example with an iterable:
+
+          for packet in greedy(parse_data_stream(stream)):
+              ... process packet ...
+
+      which does some readahead of the stream.
+
+      Example as a function decorator:
+
+          @greedy
+          def g(n):
+              for item in range(n):
+                  yield n
+
+      This can also be used directly on an existing iterable:
+
+          for item in greedy(range(n)):
+              yield n
+
+      Normally a generator runs on demand.
+      This function dispatches a `Thread` to run the iterable
+      (typically a generator)
+      putting yielded values to a queue
+      and returns a new generator yielding from the queue.
+
+      The `queue_depth` parameter specifies the depth of the queue
+      and therefore how many values the original generator can compute
+      before blocking at the queue's capacity.
+
+      The default `queue_depth` is `0` which creates a `Channel`
+      as the queue - a zero storage buffer - which lets the generator
+      compute only a single value ahead of time.
+
+      A larger `queue_depth` allocates a `Queue` with that much storage
+      allowing the generator to compute as many as `queue_depth+1` values
+      ahead of time.
+
+      Here's a comparison of the behaviour:
+
+      Example without `@greedy`
+      where the "yield 1" step does not occur until after the "got 0":
+
+          >>> from time import sleep
+          >>> def g():
+          ...   for i in range(2):
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(0.1)
+          >>> for i in G:
+          ...   print("got", i)
+          ...   sleep(0.1)
+          ...
+          yield 0
+          got 0
+          yield 1
+          got 1
+          g done
+
+      Example with `@greedy`
+      where the "yield 1" step computes before the "got 0":
+
+          >>> from time import sleep
+          >>> @greedy
+          ... def g():
+          ...   for i in range(2):
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(0.1)
+          yield 0
+          >>> for i in G:
+          ...   print("got", repr(i))
+          ...   sleep(0.1)
+          ...
+          yield 1
+          got 0
+          g done
+          got 1
+
+      Example with `@greedy(queue_depth=1)`
+      where the "yield 1" step computes before the "got 0":
+
+          >>> from cs.x import X
+          >>> from time import sleep
+          >>> @greedy
+          ... def g():
+          ...   for i in range(3):
+          ...     X("Y")
+          ...     print("yield", i)
+          ...     yield i
+          ...   print("g done")
+          ...
+          >>> G = g(); sleep(2)
+          yield 0
+          yield 1
+          >>> for i in G:
+          ...   print("got", repr(i))
+          ...   sleep(0.1)
+          ...
+          yield 2
+          got 0
+          yield 3
+          got 1
+          g done
+          got 2
+
+  '''
+  assert queue_depth >= 0
+
+  if g is None:
+    # the parameterised @greedy(queue_depth=n) form
+    # pylint: disable=no-value-for-parameter
+    return _greedy_decorator(queue_depth=queue_depth)
+
+  if callable(g):
+    # the direct @greedy form
+    return _greedy_decorator(g, queue_depth=queue_depth)
+
+  # presumably an iterator - dispatch it in a Thread
+  try:
+    it = iter(g)
+  except TypeError as e:
+    # pylint: disable=raise-missing-from
+    raise TypeError("g=%r: neither callable nor iterable: %s" % (g, e))
+
+  # pylint: disable=import-outside-toplevel
+  from cs.queues import Channel, IterableQueue
+  if queue_depth == 0:
+    q = Channel()
+  else:
+    q = IterableQueue(queue_depth)
+
+  def run_generator():
+    ''' Thread body for greedy generator.
+    '''
+    try:
+      for item in it:
+        q.put(item)
+    finally:
+      q.close()
+
+  Thread(target=run_generator).start()
+  return iter(q)
 
 if __name__ == '__main__':
   import sys

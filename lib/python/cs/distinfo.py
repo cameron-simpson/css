@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 #
+# pylint: disable=too-many-lines
 
 ''' My Python package release script.
 '''
@@ -25,25 +26,32 @@ from os.path import (
 )
 from pprint import pprint, pformat
 import re
-import shutil
 from subprocess import Popen
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
-from cs.app.lastvalue import LastValues
+from typeguard import typechecked
+from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fstags import TagFile
-from cs.lex import cutsuffix
+from cs.lex import (
+    cutsuffix,
+    get_identifier,
+    get_dotted_identifier,
+    is_dotted_identifier,
+    is_identifier,
+)
 from cs.logutils import error, warning, info, status
-from cs.pfx import Pfx, pfx_method, XP
+from cs.obj import SingletonMixin
+from cs.pfx import Pfx, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.sh import quotestr as shq, quotecmd as shqv
+from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import Upd
 from cs.vcs.hg import VCS_Hg
 
@@ -53,10 +61,10 @@ URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return CSReleaseCommand().run(argv, cmd=cmd)
+  return CSReleaseCommand(argv).run()
 
 DISTINFO_CLASSIFICATION = {
     "Programming Language": "Python",
@@ -93,6 +101,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
@@ -101,31 +110,34 @@ class CSReleaseCommand(BaseCommand):
       -v  Verbose.
   '''
 
-  @classmethod
-  def apply_defaults(cls, options):
-    cmd = basename(options.cmd)
+  def apply_defaults(self):
+    options = self.options
+    cmd = basename(self.cmd)
     if cmd.endswith('.py'):
       cmd = 'cs-release'
-    options.cmd = cmd
+    self.cmd = cmd
     # verbose if stderr is a tty
     try:
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
+    # colourise if stdout is a tty
+    try:
+      options.colourise = sys.stdout.isatty()
+    except AttributeError:
+      options.colourise = False
     # TODO: get from cs.logutils?
     options.verbose = sys.stderr.isatty()
     options.force = False
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
-    options.last_values = LastValues()
-    options.modules = Modules()
-    options.modules.options = options
+    options.modules = Modules(options=options)
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply the command line options mapping `opts` to `options`.
     '''
-    for opt, val in opts:
+    options = self.options
+    for opt, _ in opts:
       if opt == '-f':
         options.force = True
       elif opt == '-q':
@@ -135,16 +147,23 @@ class CSReleaseCommand(BaseCommand):
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
 
+  @contextmanager
+  def run_context(self):
+    ''' Arrange to autosave the package tagsets.
+    '''
+    with self.options.pkg_tagsets:
+      yield
+
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
 
-  @staticmethod
-  def cmd_check(argv, options):
+  def cmd_check(self, argv):
     ''' Usage: {cmd} pkg_name...
           Perform sanity checks on the names packages.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     xit = 0
     with Upd(sys.stderr):
       for pkg_name in argv:
@@ -195,13 +214,14 @@ class CSReleaseCommand(BaseCommand):
                   )
     return xit
 
-  @staticmethod
-  def cmd_checkout(argv, options):
+  def cmd_checkout(self, argv):
     ''' Usage: {cmd} pkg_name [revision]
           Check out the named package.
     '''
     if not argv:
       raise GetoptError("missing package name")
+    options = self.options
+    vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
     if argv:
@@ -213,37 +233,39 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    with pkg.checkout(vcstag, checkout_dir, persist=True):
-      print(checkout_dir)
+    ModulePackageDir.fill(
+        checkout_dir, pkg, vcs, vcstag, do_mkdir=True, bare=True
+    )
+    print(checkout_dir)
 
-  @staticmethod
-  def cmd_distinfo(argv, options):
+  def cmd_distinfo(self, argv):
     ''' Usage: {cmd} pkg_name
           Print out the package distinfo mapping.
     '''
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
+    if not is_dotted_identifier(pkg_name):
+      raise GetoptError("invalid package name: %r" % (pkg_name,))
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    pkg = options.modules[pkg_name]
+    pkg = self.options.modules[pkg_name]
     pprint(pkg.compute_distinfo())
 
-  @staticmethod
-  def cmd_last(argv, options):
+  def cmd_last(self, argv):
     ''' Usage: {cmd} pkg_names...
           Print the latest release tags for the names packages.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         latest = pkg.latest
         print(pkg.name, latest.version if latest else "NONE")
 
-  @staticmethod
-  def cmd_log(argv, options):
+  def cmd_log(self, argv):
     ''' Usage: {cmd} pkg_name
           Print the commit log since the latest release.
     '''
@@ -251,8 +273,8 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r", argv)
-    pkg = options.modules[pkg_name]
+      raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = self.options.modules[pkg_name]
     for files, firstline in pkg.log_since():
       files = [
           filename[11:] if filename.startswith('lib/python/') else filename
@@ -260,40 +282,81 @@ class CSReleaseCommand(BaseCommand):
       ]
       print(' '.join(files) + ':', firstline)
 
-  @staticmethod
-  def cmd_ls(argv, options):
-    ''' Usage: {cmd}
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [package_name...]
           List package names and their latst PyPI releases.
     '''
+    options = self.options
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    tagsets = options.pkg_tagsets
-    for pkg_name in sorted(tagsets.keys()):
+      pkg_names = argv
+    else:
+      pkg_names = sorted(options.pkg_tagsets.keys())
+    for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
-        pypi_release = tagsets[pkg_name].get(TAG_PYPI_RELEASE)
+        pkg = options.modules[pkg_name]
+        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
-          print(pkg_name, pypi_release)
+          problems = pkg.problems()
+          problem_text = (
+              "%d problems" % (len(problems),) if problems else "ok"
+          )
+          if problems and options.colourise:
+            problem_text = colourise(problem_text, 'yellow')
+          list_argv = [
+              pkg_name,
+              pypi_release,
+              problem_text,
+          ]
+          features = pkg.features(pypi_release)
+          if features:
+            list_argv.append('[' + ' '.join(sorted(features)) + ']')
+          print(*list_argv)
     return 0
 
-  @staticmethod
-  def cmd_next(argv, options):
+  def cmd_next(self, argv):
     ''' Usage: next pkg_names...
           Print package names and their next release tag.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
         print(pkg.name, pkg.next().version)
 
-  @staticmethod
-  def cmd_package(argv, options):
+  def cmd_ok(self, argv):
+    ''' Usage: {cmd} pkg_name [changset-hash]
+          Mark a particulaqr changeset as ok for purposes of "check".
+          This lets one accept cosmetic outstanding commits as irrelevant.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      changeset_hash = argv.pop(0)
+    else:
+      changeset_hash = None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    pkg = options.modules[pkg_name]
+    if changeset_hash is None:
+      changeset_hash = pkg.latest_changeset_hash
+      if changeset_hash is None:
+        error("no changeset revisions for paths: %r", pkg.paths())
+        return 1
+    pkg.set_tag('ok_revision', changeset_hash, msg="mark revision as ok")
+    return 0
+
+  def cmd_package(self, argv):
     ''' Usage: package pkg_name [version]
           Export the package contents as a prepared package.
     '''
     if not argv:
       raise GetoptError("missing package name")
+    options = self.options
+    vcs = options.vcs
     pkg_name = argv.pop(0)
     pkg = options.modules[pkg_name]
     if argv:
@@ -305,46 +368,49 @@ class CSReleaseCommand(BaseCommand):
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
     checkout_dir = vcstag
-    with pkg.checkout(vcstag, checkout_dir, persist=True):
-      pkg.prepare_package(checkout_dir)
-      print(checkout_dir)
+    ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True)
+    print(checkout_dir)
 
-  @staticmethod
-  def cmd_pypi(argv, options):
+  def cmd_pypi(self, argv):
     ''' Usage: {cmd} pkg_names...
           Push the named packages to PyPI.
     '''
     if not argv:
       raise GetoptError("missing package names")
+    options = self.options
     for pkg_name in argv:
       with Pfx(pkg_name):
         pkg = options.modules[pkg_name]
+        vcs = options.vcs
         release = pkg.latest
         vcstag = release.vcstag
-        with TemporaryDirectory(prefix=vcstag + '-') as pkg_dir:
-          with Pfx(pkg_dir):
-            with pkg.checkout(vcstag, pkg_dir, exists=True, persist=True):
-              pkg.prepare_package(pkg_dir)
-              pkg.prepare_dist(pkg_dir)
-              pkg.upload_dist(pkg_dir)
-              pkg.latest_pypi_version = release.version
+        pkg_dir = ModulePackageDir(pkg, vcs, vcstag)
+        dirpath = pkg_dir.dirpath
+        pkg.upload_dist(dirpath)
+        pkg.latest_pypi_version = release.version
 
-  @staticmethod
-  def cmd_readme(argv, options):
-    ''' Usage: {cmd} pkg_name
+  def cmd_readme(self, argv):
+    ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
+          -a  Document all public class members (default is just
+              __new__ and __init__ for the PyPI README.md file).
     '''
+    all_class_names = False
+    if argv and argv[0] == '-a':
+      all_class_names = True
+      argv.pop(0)
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     pkg = options.modules[pkg_name]
-    docs = pkg.compute_doc()
+    docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
-  @staticmethod
-  def cmd_release(argv, options):
+  # pylint: disable=too-many-locals
+  def cmd_release(self, argv):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
     '''
@@ -353,6 +419,7 @@ class CSReleaseCommand(BaseCommand):
     pkg_name = argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
     pkg = options.modules[pkg_name]
     vcs = options.vcs
     # issue new release tag
@@ -380,10 +447,29 @@ class CSReleaseCommand(BaseCommand):
     if not release_message:
       error("empty release message, not making new release")
       return 1
-    latest = pkg.latest
-    next_release = pkg.latest.next() if pkg.latest else ReleaseTag.today(
-        pkg.name
+    print("Feature and bug names should be space separated identifiers.")
+    existing_features = pkg.named_features()
+    if existing_features:
+      print("Existing features:", ' '.join(sorted(existing_features)))
+    features = list(
+        filter(None,
+               prompt('Any named features with this release').split())
     )
+    if any(map(lambda feature_name: not is_identifier(feature_name) or
+               feature_name.startswith('fix_'), features)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(
+        filter(None,
+               prompt('Any named bugs fixed with this release').split())
+    )
+    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
+               startswith('fix_'), bugfixes)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
+    latest = pkg.latest
+    next_release = pkg.latest.next() if latest else ReleaseTag.today(pkg.name)
     next_vcstag = next_release.vcstag
     if not ask("Confirm new release for %r as %r" % (pkg.name, next_vcstag)):
       error("aborting release at user request")
@@ -407,12 +493,40 @@ class CSReleaseCommand(BaseCommand):
         (next_vcstag, release_message), summary_filename, changes_filename,
         versioned_filename
     )
-    vcs.tag(next_vcstag, message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag))
+    vcs.tag(
+        next_vcstag,
+        message="%s: added tag %s [IGNORE]" % (pkg.name, next_vcstag)
+    )
     pkg.patch__version__(next_release.version + '-post')
     vcs.commit(
-        '%s: bump __version__ to %s to avoid misleading value for future unreleased changes [IGNORE]'
-        % (pkg.name, next_release.version + '-post'), versioned_filename
+        '%s: bump __version__ to %s to avoid misleading value'
+        ' for future unreleased changes [IGNORE]' %
+        (pkg.name, next_release.version + '-post'), versioned_filename
     )
+    pkg.set_tag(
+        'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
+    )
+    for feature_name in features + bugfixes:
+      pkg.set_feature(feature_name, next_release.version)
+    return 0
+
+  def cmd_resolve(self, argv):
+    ''' Usage: {cmd} requirements_spec...
+          Resolve and print each requirements_spec into a valid install_requires value.
+    '''
+    if not argv:
+      raise GetoptError("missing requirements_specs")
+    xit = 0
+    modules = self.options.modules
+    for requirement_spec in argv:
+      with Pfx(requirement_spec):
+        try:
+          requirement = modules.resolve_requirement(requirement_spec)
+        except ValueError as e:
+          error("invalid requirement_spec: %s", e)
+        else:
+          print(requirement_spec, requirement)
+    return xit
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
@@ -428,7 +542,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
 
   @classmethod
   def today(cls, name):
-    ''' Basic release tag for today, without any `.`n suffix.
+    ''' Basic release tag for today, without any `.`*n* suffix.
     '''
     return cls(name, isodate(dashed=False))
 
@@ -459,13 +573,106 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
     version = today.version + '.' + str(next_seq)
     return type(self)(self.name, version)
 
+class ModuleRequirement(namedtuple('ModuleRequirement',
+                                   'module_name op requirements modules')):
+  ''' A parsed version of a module requirement string
+      such as `'cs.upd>=multiline'` or `'cs.obj>=20200716'`.
+
+      Attributes:
+      * `module_name`: the name of the module or package
+      * `op`: the relationship to the requirements,
+        supporting `'='` and `'>='`;
+        `None` if only the name is present
+      * `requirements`: a list of the requirement terms,
+        broken out on commas in the requirements part
+      * `modules`: a references to the `Modules` instance used to track module information
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_requirement(cls, requirement_spec, modules):
+    ''' Parse a requirement string, return a `ModuleRequirement`.
+    '''
+    with Pfx(requirement_spec):
+      module_name, offset = get_dotted_identifier(requirement_spec)
+      if not module_name:
+        raise ValueError('module_name is not a dotted identifier')
+      if offset == len(requirement_spec):
+        op = None
+      else:
+        for op in '>=', '=', None:
+          if op is None:
+            raise ValueError(
+                "no valid op after module_name at %r" %
+                (requirement_spec[offset:],)
+            )
+          if requirement_spec.startswith(op, offset):
+            offset += len(op)
+            break
+      if op is not None and offset == len(requirement_spec):
+        raise ValueError("no requirements after op %r" % (op,))
+      requirements = [
+          req for req in map(str.strip, requirement_spec[offset:].split(','))
+          if req
+      ]
+      return cls(
+          module_name=module_name,
+          op=op,
+          requirements=requirements,
+          modules=modules
+      )
+
+  @pfx_method
+  def resolve(self):
+    ''' Return a requirement string,
+        either `self.module_name` if `self.op` is `None`
+        or *module_name*{`=`,`>=`}*version*
+        satisfying the versions and features in `self.requirements`.
+    '''
+    if self.op is None:
+      return self.module_name
+    release_versions = set()
+    feature_set = set()
+    for requirement in self.requirements:
+      with Pfx("%r", requirement):
+        feature_name, _ = get_identifier(requirement)
+        if feature_name == requirement:
+          feature_set.add(feature_name)
+        else:
+          # not a bare identifier, presume release version
+          release_versions.add(requirement)
+    if feature_set:
+      pkg = self.modules[self.module_name]
+      release_version = pkg.release_with_features(feature_set)
+      if release_version is None:
+        raise ValueError(
+            "no release version satifying feature set %r" % (feature_set,)
+        )
+      release_versions.add(release_version)
+    if not release_versions:
+      raise ValueError("no satisfactory release versions")
+    if self.op == '=':
+      if len(release_versions) > 1:
+        raise ValueError(
+            "conflicting release versions for %r: %r" %
+            (self.op, release_versions)
+        )
+      release_version = release_versions.pop()
+    elif self.op == '>=':
+      # the release versions are minima: pick their maximum
+      release_version = max(release_versions)
+    else:
+      raise RuntimeError("onimplemenented op %r" % (self.op,))
+    return ''.join((self.module_name, self.op, release_version))
+
 def runcmd(argv, **kw):
   ''' Run command.
   '''
-  P = Popen(argv, **kw)
-  xit = P.wait()
-  if xit != 0:
-    raise ValueError("command failed, exit code %d: %r" % (xit, argv))
+  with Pfx("Popen(%r,...)", argv):
+    P = Popen(argv, **kw)
+    xit = P.wait()
+    if xit != 0:
+      raise ValueError("command failed, exit code %d: %r" % (xit, argv))
 
 def cd_shcmd(wd, shcmd):
   ''' Run a command supplied as a sh(1) command string.
@@ -500,8 +707,9 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def ask(message, fin=None, fout=None):
-  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+def prompt(message, fin=None, fout=None):
+  ''' Prompt for a one line answer.
+      Return the answer with trailing newlines or carriage returns stripped.
   '''
   if fin is None:
     fin = sys.stdin
@@ -509,7 +717,13 @@ def ask(message, fin=None, fout=None):
     fout = sys.stderr
   print(message, end='? ', file=fout)
   fout.flush()
-  response = fin.readline().rstrip().lower()
+  return fin.readline().rstrip('\r\n')
+
+def ask(message, fin=None, fout=None):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  response = prompt(message, fin=fin, fout=fout)
+  response = response.rstrip().lower()
   return response in ('y', 'yes')
 
 @contextmanager
@@ -529,13 +743,35 @@ class Modules(defaultdict):
   ''' An autopopulating dict of mod_name->Module.
   '''
 
+  def __init__(self, *, options):
+    super().__init__()
+    self.options = options
+
   def __missing__(self, mod_name):
-    assert isinstance(mod_name, str), "mod_name=%r" % (mod_name,)
+    assert isinstance(mod_name, str), "mod_name=%s:%r" % (
+        type(mod_name),
+        mod_name,
+    )
+    assert is_dotted_identifier(mod_name
+                                ), "not a dotted identifier: %r" % (mod_name,)
     M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
 
-class Module(object):
+  @pfx_method
+  def resolve_requirement(self, requirement_spec):
+    ''' Resolve the `install_requires` specification `requirement_spec`
+        into a requirement string.
+    '''
+    with Pfx(requirement_spec):
+      mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
+      requirement = mrq.resolve()
+      if requirement != requirement_spec:
+        warning("RESOLVE %r => %r", requirement_spec, requirement)
+      return requirement
+
+# pylint: disable=too-many-public-methods
+class Module:
   ''' Metadata about a Python module.
   '''
 
@@ -573,9 +809,9 @@ class Module(object):
       with Pfx("importlib.import_module(%r)", self.name):
         try:
           M = importlib.import_module(self.name)
-        except (ImportError, SyntaxError) as e:
+        except (ImportError, NameError, SyntaxError) as e:
           error("import fails: %s", e)
-          raise
+          M = None
       self._module = M
     return M
 
@@ -613,6 +849,8 @@ class Module(object):
         or `None` if this is not inside a package.
     '''
     M = self.module
+    if M is None:
+      return None
     tested_name = cutsuffix(self.name, '_tests')
     if tested_name is not self.name:
       # foo_tests is considered part of foo
@@ -634,6 +872,9 @@ class Module(object):
   @prop
   @pfx_method(use_str=True)
   def package(self):
+    ''' The python package Module for this Module
+        (which may be the package Module or some submodule).
+    '''
     name = self.package_name
     if name is None:
       raise ValueError("self.package_name is None")
@@ -658,11 +899,103 @@ class Module(object):
     '''
     return self.options.pkg_tagsets[self.name]
 
+  @pfx_method
+  def named_features(self):
+    ''' Return a set containing all the feature names in use by this `Module`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    all_feature_names = set()
+    for feature_names in feature_map.values():
+      for feature_name in feature_names:
+        if not is_identifier(feature_name):
+          warning("ignoring non-dentifier feature name: %r", feature_name)
+        else:
+          all_feature_names.add(feature_name)
+    return all_feature_names
+
+  @typechecked
+  def set_feature(self, feature_name: str, release_version: str):
+    ''' Include `feature_name` in the features for release `release_version`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    release_features = set(feature_map.get(release_version, []))
+    release_features.add(feature_name)
+    feature_map[release_version] = sorted(release_features)
+    self.set_tag(
+        'features',
+        feature_map,
+        msg="features[%s]+%s" % (release_version, feature_name)
+    )
+
+  @pfx_method(use_str=True)
+  def release_features(self):
+    ''' Yield `(release_version,feature_names)`
+        for all releases mentioned in the `features` tag.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    yield from feature_map.items()
+
+  @pfx_method(use_str=True)
+  def release_feature_set(self):
+    ''' Yield `(release_version,feature_sets)`
+        for all releases mentioned in the `features` tag
+        in release order.
+
+        This is an accumulation of features up to and including `release_version`.
+        Use of this method implies an assumption that features are
+        only added and never removed.
+    '''
+    feature_set = set()
+    for release_version, release_features in sorted(self.release_features()):
+      feature_set.update(release_features)
+      yield release_version, set(feature_set)
+
+  @pfx_method(use_str=True)
+  def features(self, release_version=None):
+    ''' Return a set of the feature names for `release_version`,
+        default from the `pypi.release`.
+
+        This is an accumulation of the features from prior releases.
+    '''
+    tags = self.pkg_tags
+    if release_version is None:
+      release_version = tags.get('pypi.release')
+      if release_version is None:
+        raise ValueError("no pypi.release")
+    release_set = set()
+    for version, feature_set in sorted(self.release_feature_set()):
+      if version > release_version:
+        break
+      release_set = feature_set
+    return release_set
+
+  @pfx_method(use_str=True)
+  def release_with_features(self, features):
+    ''' Return the earliest release version containing all the named features.
+        Return `None` if no release has all the features.
+    '''
+    for version, feature_set in sorted(self.release_feature_set()):
+      if all(map(lambda feature: feature in feature_set, features)):
+        return version
+    return None
+
   def save_pkg_tags(self):
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
     self.options.pkg_tagsets.save()
     return self.options.pkg_tagsets.filepath
+
+  @tag_or_tag_value
+  def set_tag(self, tag_name, value, *, msg):
+    ''' Set a tag value and commit the modified tag file.
+    '''
+    print("%s: set %s=%s" % (self.name, tag_name, value))
+    self.pkg_tags.set(tag_name, value)
+    self.save_pkg_tags()
+    self.vcs.commit(
+        f'{PKG_TAGS}: {self.name}: {msg+": " if msg else ""}set {tag_name}={value!r} [IGNORE]',
+        PKG_TAGS
+    )
 
   @cachedmethod
   def release_tags(self):
@@ -714,14 +1047,9 @@ class Module(object):
   def latest_pypi_version(self, new_version):
     ''' Update the last PyPI version.
     '''
-    self.pkg_tags.set(TAG_PYPI_RELEASE, new_version)
-    pkg_tags_filename = self.save_pkg_tags()
-    self.vcs.commit(
-        '%s: %s: set %s=%s [IGNORE]' %
-        (PKG_TAGS, self.name, TAG_PYPI_RELEASE, new_version), PKG_TAGS
-    )
+    self.set_tag(TAG_PYPI_RELEASE, new_version, msg='update PyPI release')
 
-  def compute_doc(self):
+  def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
     '''
     # break out the release log and format it
@@ -738,7 +1066,10 @@ class Module(object):
             f'*Release {release_tag.version}*:\n{release_entry}'
         )
     # split the module documentation after the opening paragraph
-    full_doc = module_doc(self.module)
+    full_doc = module_doc(
+        self.module,
+        method_names=None if all_class_names else ('__new__', '__init__')
+    )
     try:
       doc_head, doc_tail = full_doc.split('\n\n', 1)
     except ValueError:
@@ -763,6 +1094,19 @@ class Module(object):
         release_paragraphs=postamble_parts,
     )
 
+  @property
+  def latest_changeset_hash(self):
+    ''' The most recent changeset hash of the files in the module.
+    '''
+    path_revs = self.vcs.file_revisions(self.paths())
+    rev_latest = None
+    for rev, node in sorted(path_revs.values()):
+      if rev_latest is None or rev_latest < rev:
+        changeset_hash = node
+        rev_latest = rev
+    return changeset_hash
+
+  # pylint: disable=too-many-branches
   @pfx_method
   def compute_distinfo(
       self,
@@ -771,6 +1115,8 @@ class Module(object):
   ):
     ''' Compute the distutils info mapping for this package.
     '''
+    if '>' in self.name or '=' in self.name:
+      raise RuntimeError("bad module name %r" % (self.name))
     if pypi_package_name is None:
       pypi_package_name = self.name
     if pypi_package_version is None:
@@ -778,11 +1124,17 @@ class Module(object):
 
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
-    docs = self.compute_doc()
+    docs = self.compute_doc(all_class_names=True)
     dinfo.update(
         description=docs.description, long_description=docs.long_description
     )
     dinfo.update(self.module.DISTINFO)
+
+    # resolve install_requires
+    dinfo.update(
+        install_requires=self
+        .resolve_requirements(dinfo.pop('install_requires', ()))
+    )
 
     # fill in default fields
     for field in ('author', 'author_email', 'long_description_content_type',
@@ -892,13 +1244,15 @@ class Module(object):
     pathlist = []
     basepath = self.basepath
     if isdirpath(basepath):
-      for subpath, dirnames, filenames in os.walk(basepath):
+      for subpath, _, filenames in os.walk(basepath):
         if not subpath.startswith(basepath):
           info("SKIP %s", subpath)
           continue
         for filename in sorted(filenames):
-          if not (filename.endswith('.pyc') or filename.endswith('.o')):
-            pathlist.append(joinpath(subpath, filename))
+          if not any(map(lambda dotext: filename.endswith(dotext),
+                         ('.pyc', '.o', '.so'))):
+            filepath = joinpath(subpath, filename)
+            pathlist.append(filepath)
     else:
       base = self.basename
       updir = dirname(basepath)
@@ -915,28 +1269,7 @@ class Module(object):
       raise ValueError("no paths for %s" % (self,))
     return pathlist
 
-  @contextmanager
-  def checkout(self, vcs_revision, dirpath, exists=False, persist=False):
-    ''' Check out the specified `vcs_revision` to the directory `dirpath`.
-    '''
-    with Pfx("checkout %r ==> %r", vcs_revision, dirpath):
-      if exists:
-        if not isdirpath(dirpath):
-          raise ValueError("already exists")
-      else:
-        with Pfx("mkdir(%r)", dirpath):
-          os.mkdir(dirpath)
-      hg_argv = ['archive', '-r', vcs_revision]
-      hg_argv.extend(self.vcs.hg_include(self.paths()))
-      hg_argv.extend(['--', dirpath])
-      self.vcs.hg_cmd(*hg_argv)
-    try:
-      yield dirpath
-    finally:
-      if not persist:
-        with Pfx("rmtree(%r)", dirpath):
-          shutil.rmtree(dirpath)
-
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @pfx_method
   def prepare_package(self, pkg_dir):
     ''' Prepare an existing package checkout as a package for upload or install.
@@ -965,7 +1298,7 @@ class Module(object):
                 info("create %s", mddst)
                 with Pfx(mddst):
                   with open(mddst, 'w') as mddstf:
-                    runcmd(['md2man-roff', mdsrc], stdout=mddstf)
+                    runcmd(['md2man-roff', subpath], stdout=mddstf)
               mf.write('include ' + subpath + '\n')
               mf.write('include ' + prefix + '\n')
           elif ext == '.c':
@@ -1012,6 +1345,10 @@ class Module(object):
             else:
               out("  %s = %r," % (kw, distinfo[kw]))
             written.add(kw)
+        out(
+            "  %s = %r," %
+            ('install_requires', distinfo.pop('install_requires', ()))
+        )
         for kw, kv in sorted(distinfo.items()):
           if kw not in written:
             out("  %s = %r," % (kw, kv))
@@ -1019,20 +1356,37 @@ class Module(object):
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
+  def resolve_requirements(self, requirement_specs):
+    ''' Resolve the requirement specifications from `requirement_specs`
+        into valid `install_requires` specification.
+    '''
+    return list(map(self.modules.resolve_requirement, requirement_specs))
+
+  @staticmethod
+  def reldistfiles(pkg_dir):
+    ''' Return the relative paths existing within `pkg_dir`.
+
+        TODO: does not recurse: should this just run listdir?
+    '''
+    return [
+        relpath(fullpath, pkg_dir)
+        for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
+    ]
+
   @pfx_method
   def prepare_dist(self, pkg_dir):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check', 'sdist']))
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check']))
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'sdist']))
+    distfiles = self.reldistfiles(pkg_dir)
+    cd_shcmd(pkg_dir, shqv(['twine', 'check'] + distfiles))
 
   @pfx_method
   def upload_dist(self, pkg_dir):
     ''' Upload the package to PyPI using twine.
     '''
-    distfiles = [
-        relpath(fullpath, pkg_dir)
-        for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
-    ]
+    distfiles = self.reldistfiles(pkg_dir)
     cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
 
   @pfx_method(use_str=True)
@@ -1053,12 +1407,21 @@ class Module(object):
       else:
         vcstag = self.latest.vcstag
     paths = self.paths()
+    latest = self.latest
+    latest_release_line = 'Release information for ' + latest.vcstag + '.' if latest else None
     return (
         ([filename
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
-        if ignored or 'IGNORE' not in firstline
+        if (
+            ignored or (
+                'IGNORE' not in firstline and (
+                    latest_release_line is None
+                    or firstline != latest_release_line
+                )
+            )
+        )
     )
 
   def uncommitted_paths(self):
@@ -1139,6 +1502,7 @@ class Module(object):
     '''
     return self.DISTINFO.get('install_requires', [])
 
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
   @pfx_method(use_str=True)
   def problems(self):
     ''' Sanity check of this module.
@@ -1151,6 +1515,14 @@ class Module(object):
     if problems is not None:
       return problems
     problems = self._module_problems = []
+    latest_ok_rev = self.pkg_tags.get('ok_revision')
+    # see if this package has been marked "ok" as of a particular revision
+    unreleased_logs = None
+    if latest_ok_rev:
+      post_ok_commits = list(self.log_since(vcstag=latest_ok_rev))
+      if not post_ok_commits:
+        return problems
+      unreleased_logs = post_ok_commits
     subproblems = defaultdict(list)
     pkg_name = self.package_name
     if pkg_name is None:
@@ -1158,6 +1530,9 @@ class Module(object):
     else:
       pkg_prefix = pkg_name + '.'
     M = self.module
+    if M is None:
+      problems.append("module import fails")
+      return problems
     import_names = []
     for import_name in direct_imports(M.__file__, self.name):
       if self.modules[import_name].isstdlib():
@@ -1181,10 +1556,21 @@ class Module(object):
       if distinfo_requires is None:
         problems.append("missing DISTINFO[install_requires]")
       else:
-        if sorted(distinfo_requires) != import_names:
+        distinfo_requires_names = [
+            get_dotted_identifier(dirq)[0] for dirq in distinfo_requires
+        ]
+        if sorted(distinfo_requires_names) != import_names:
+          new_import_names = set(import_names) - set(distinfo_requires_names)
+          old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
-              "DISTINFO[install_requires=%r] != direct_imports=%r" %
-              (distinfo_requires, sorted(import_names))
+              (
+                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "  new imports %r\n"
+                  "  removed imports %r"
+              ) % (
+                  distinfo_requires, sorted(import_names),
+                  sorted(new_import_names), sorted(old_import_names)
+              )
           )
         for import_name in import_names:
           if not import_name.startswith(MODULE_PREFIX):
@@ -1193,13 +1579,21 @@ class Module(object):
           if import_problems:
             subproblems[import_name] = import_problems
     for required_name in sorted(self.requires):
-      if required_name not in self.imported_names:
-        problems.append("requirement %r not imported" % (required_name,))
+      with Pfx(required_name):
+        dotted_name, _ = get_dotted_identifier(required_name)
+        if not dotted_name:
+          problems.append(
+              "requirement %r does not start with a module name" %
+              (required_name,)
+          )
+        elif dotted_name not in self.imported_names:
+          problems.append("requirement %r not imported" % (required_name,))
     # check that this package has files
     if not self.paths():
       problems.append("no files")
-    # check for unrelease commit logs
-    unreleased_logs = list(self.log_since())
+    # check for unreleased commit logs
+    if unreleased_logs is None:
+      unreleased_logs = list(self.log_since())
     if unreleased_logs:
       problems.append(['unreleased commits'] + unreleased_logs)
     # check for uncommited changes
@@ -1233,6 +1627,60 @@ class Module(object):
     for name in sorted(self.imported_names):
       if name.startswith(prefix) and name != self.name:
         yield self.modules[name]
+
+class ModulePackageDir(SingletonMixin):
+  ''' A singleton class for module package distributions.
+  '''
+
+  # pylint: disable=unused-argument
+  @classmethod
+  def _singleton_key(cls, pkg, vcs, revision):
+    return pkg.name, revision
+
+  def __init__(self, pkg, vcs, revision, persist=False):
+    # upgrade persist setting if requested
+    self.persist = getattr(self, 'persist', False) or persist
+    if hasattr(self, 'pkg'):
+      return
+    self.pkg = pkg
+    self.vcs = vcs
+    self.revision = revision
+    self._setup()
+
+  def __del__(self):
+    ''' Clean out the scratch directory on deletion.
+    '''
+    if self.pkg_dir and not self.persist:
+      self.pkg_dir.cleanup()
+      self.pkg_dir = None
+
+  @pfx_method
+  def _setup(self):
+    ''' Set up the prepared package in a temporary scratch directory.
+    '''
+    pkg = self.pkg
+    vcs = self.vcs
+    vcs_revision = self.revision
+    pkg_dir = self.pkg_dir = TemporaryDirectory(prefix=vcs_revision + '-')
+    dirpath = self.dirpath = pkg_dir.name
+    self.fill(dirpath, pkg, vcs, vcs_revision)
+
+  @staticmethod
+  def fill(dirpath, pkg, vcs, vcs_revision, *, do_mkdir=False, bare=False):
+    ''' Fill in `dirpath` with the prepared package.
+    '''
+    with Pfx(dirpath):
+      if do_mkdir:
+        with Pfx("mkdir(%r)", dirpath):
+          os.mkdir(dirpath, 0o777)
+      hg_argv = ['archive', '-r', vcs_revision]
+      hg_argv.extend(vcs.hg_include(pkg.paths()))
+      hg_argv.extend(['--', dirpath])
+      vcs.hg_cmd(*hg_argv)
+      os.system("find %r -type f -print" % (dirpath,))
+      if not bare:
+        pkg.prepare_package(dirpath)
+        pkg.prepare_dist(dirpath)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

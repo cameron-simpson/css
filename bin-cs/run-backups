@@ -1,0 +1,151 @@
+#!/bin/sh
+#
+# Run my backups from the current machine to other places.
+# Consults ~/rc-local/run-backups files as follows:
+#   histbackup.*    update histbackup tree at target
+#   image.*         files for image backups (includes --delete)
+#   mv.*            files to move (delete after sync)
+#   push.*          files to push (no --delete)
+# - Cameron Simpson <cs@cskk.id.au> 25jul2020
+#
+
+set -ue
+
+quiet=
+rsvopts=
+trace=
+doit=1
+dont=
+isatty=
+[ -t 2 ] && isatty=1 rsvopts=-P trace=set-x
+
+rcdir=$HOME/.run-backups
+backups=$rcdir/backups
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-n] [srcs...]
+  -n    No action. Passed -n to rsync for the rsync backups,
+        and suppresses the histbackup runs.
+  -q    Quiet.
+  -x    Trace execution.
+  srcs...
+        Backup source paths; if specified, only these paths will be backed up.
+
+The configuration file: $backups
+contains lines of the form:
+    src mode dsthost [options...]
+
+Modes:
+  hg    Use \"hg push -f\" to push commits to
+        ssh://target/BACKUP/\$HOST/hg/path
+  histbackup
+        Use rhistbackup to backup from ~/src to target:BACKUP/\$HOST/histbackup/dst
+  mv, push, image
+        Uses rsync to backup from ~/path to target:BACKUP/\$HOST/rsync/path
+        mv: passes --remove-source-files to rsync.
+        push: does not use --delete, accumulating at the far end
+        image: passed --delete-after to rsync, making an image copy."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -h|--help)
+        echo "$usage"
+        exit 0
+        ;;
+    -n) doit= dont=echo ;;
+    -q) quiet=1 rsvopts= trace= ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+prefix(){
+  if [ $isatty ]
+  then  echo "$1 ..." >&2; shift; "$@"
+  else  pfx "$@"
+  fi
+}
+
+xit=0
+
+exec 3<"$backups"
+
+lineno=0
+while read -r src mode dsthost etc <&3
+do
+  lineno=$(( lineno + 1 ))
+  case "$src" in
+    '' | \#* ) continue ;;
+  esac
+  [ $# = 0 ] || \
+  case " $* " in
+    *" $src "*) ;;
+    *)  [ $quiet ] || echo "$cmd: skip $src" >&2
+        continue
+        ;;
+  esac
+  case "$src" in
+    /*) ;; *) src=$HOME/$src ;;
+  esac
+  if [ -d "$src/" ]
+  then  suffix=/
+  else  suffix=
+  fi
+  for dsthost in ${dsthost/,/ }
+  do
+    case "$dsthost" in
+      *:*)    dst=$(     expr "x$dsthost" : 'x[^:]*:\(.*\)' )
+              dsthost=$( expr "x$dsthost" : 'x\([^:]*\):.*' )
+              ;;
+      *)      dst=$( basename "$src" )
+              ;;
+    esac
+    case "$dst" in
+      /*)     ;;
+      *)      case "$mode" in
+                hg) ;;
+                image|mv|push)  dst=BACKUP/$HOST/rsync/$dst ;;
+                histbackup)     dst=BACKUP/$HOST/histbackup/$dst ;;
+                *)              echo "$cmd: $backups:$lineno: unknown mode: $mode" >&2
+                                exit 1
+                                ;;
+              esac
+              ;;
+    esac
+    case "$mode" in
+      hg)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    incd "$src" hg push -f $etc "ssh://$dsthost/$dst"
+                  ;;
+      image)      $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --delete-after $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      mv)         $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts --remove-source-files $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      push)       $dont pfx "$src:$dsthost:$dst" $trace \
+                    rsync -a $rsvopts $etc \
+                      "$src$suffix" "$dsthost:$dst$suffix"
+                  ;;
+      histbackup) $dont pfx "$src:$dsthost:$dst" $trace \
+                    rhistbackup "$src:$dsthost:$dst"
+                  ;;
+      *)          echo "$0: $backups:$lineno: unsupported mode: $mode" >&2
+                  exit 1
+                  ;;
+    esac || xit=1
+  done
+done
+
+exit $xit
