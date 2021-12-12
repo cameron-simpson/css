@@ -37,6 +37,7 @@ def frames():
 
 def caller(frame_index=-3):
   ''' Return the `Frame` of the caller's caller.
+      Return `None` if `frame_index` is out of range.
 
       Useful `frame_index` values:
       * `-1`: caller, this function
@@ -45,7 +46,11 @@ def caller(frame_index=-3):
 
       The default `from_index` value is `-3`.
   '''
-  return Frame(*frames()[frame_index])
+  frs = frames()
+  try:
+    return frs[frame_index]
+  except IndexError:
+    return None
 
 def stack_dump(fp=None, indent=0, Fs=None, skip=None):
   ''' Recite current or supplied stack to `fp`, default `sys.stderr`.
