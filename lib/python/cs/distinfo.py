@@ -31,11 +31,18 @@ import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
-from cs.app.lastvalue import LastValues
+from typeguard import typechecked
+from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.lex import cutsuffix, get_dotted_identifier
+from cs.lex import (
+    cutsuffix,
+    get_identifier,
+    get_dotted_identifier,
+    is_dotted_identifier,
+    is_identifier,
+)
 from cs.logutils import error, warning, info, status
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -94,6 +101,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
@@ -113,12 +121,16 @@ class CSReleaseCommand(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
+    # colourise if stdout is a tty
+    try:
+      options.colourise = sys.stdout.isatty()
+    except AttributeError:
+      options.colourise = False
     # TODO: get from cs.logutils?
     options.verbose = sys.stderr.isatty()
     options.force = False
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
-    options.last_values = LastValues()
     options.modules = Modules(options=options)
 
   def apply_opts(self, opts):
@@ -134,6 +146,13 @@ class CSReleaseCommand(BaseCommand):
         options.verbose = True
       else:
         raise RuntimeError("unhandled option: %s" % (opt,))
+
+  @contextmanager
+  def run_context(self):
+    ''' Arrange to autosave the package tagsets.
+    '''
+    with self.options.pkg_tagsets:
+      yield
 
   ##  export      Export release to temporary directory, report directory.
   ##  freshmeat-submit Announce last release to freshmeat.
@@ -226,6 +245,8 @@ class CSReleaseCommand(BaseCommand):
     if not argv:
       raise GetoptError("missing package name")
     pkg_name = argv.pop(0)
+    if not is_dotted_identifier(pkg_name):
+      raise GetoptError("invalid package name: %r" % (pkg_name,))
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     pkg = self.options.modules[pkg_name]
@@ -262,23 +283,34 @@ class CSReleaseCommand(BaseCommand):
       print(' '.join(files) + ':', firstline)
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [package_name...]
           List package names and their latst PyPI releases.
     '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
-    tagsets = options.pkg_tagsets
-    for pkg_name in sorted(tagsets.keys()):
+    if argv:
+      pkg_names = argv
+    else:
+      pkg_names = sorted(options.pkg_tagsets.keys())
+    for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
           problems = pkg.problems()
-          print(
-              pkg_name, pypi_release,
+          problem_text = (
               "%d problems" % (len(problems),) if problems else "ok"
           )
+          if problems and options.colourise:
+            problem_text = colourise(problem_text, 'yellow')
+          list_argv = [
+              pkg_name,
+              pypi_release,
+              problem_text,
+          ]
+          features = pkg.features(pypi_release)
+          if features:
+            list_argv.append('[' + ' '.join(sorted(features)) + ']')
+          print(*list_argv)
     return 0
 
   def cmd_next(self, argv):
@@ -295,7 +327,8 @@ class CSReleaseCommand(BaseCommand):
 
   def cmd_ok(self, argv):
     ''' Usage: {cmd} pkg_name [changset-hash]
-          Print the commit log since the latest release.
+          Mark a particulaqr changeset as ok for purposes of "check".
+          This lets one accept cosmetic outstanding commits as irrelevant.
     '''
     if not argv:
       raise GetoptError("missing package name")
@@ -414,6 +447,27 @@ class CSReleaseCommand(BaseCommand):
     if not release_message:
       error("empty release message, not making new release")
       return 1
+    print("Feature and bug names should be space separated identifiers.")
+    existing_features = pkg.named_features()
+    if existing_features:
+      print("Existing features:", ' '.join(sorted(existing_features)))
+    features = list(
+        filter(None,
+               prompt('Any named features with this release').split())
+    )
+    if any(map(lambda feature_name: not is_identifier(feature_name) or
+               feature_name.startswith('fix_'), features)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(
+        filter(None,
+               prompt('Any named bugs fixed with this release').split())
+    )
+    if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
+               startswith('fix_'), bugfixes)):
+      error("Rejecting nonidentifiers or fix_* names in feature list.")
+      return 1
+    bugfixes = list(map(lambda bug_name: 'fix_' + bug_name, bugfixes))
     latest = pkg.latest
     next_release = pkg.latest.next() if latest else ReleaseTag.today(pkg.name)
     next_vcstag = next_release.vcstag
@@ -452,7 +506,27 @@ class CSReleaseCommand(BaseCommand):
     pkg.set_tag(
         'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
+    for feature_name in features + bugfixes:
+      pkg.set_feature(feature_name, next_release.version)
     return 0
+
+  def cmd_resolve(self, argv):
+    ''' Usage: {cmd} requirements_spec...
+          Resolve and print each requirements_spec into a valid install_requires value.
+    '''
+    if not argv:
+      raise GetoptError("missing requirements_specs")
+    xit = 0
+    modules = self.options.modules
+    for requirement_spec in argv:
+      with Pfx(requirement_spec):
+        try:
+          requirement = modules.resolve_requirement(requirement_spec)
+        except ValueError as e:
+          error("invalid requirement_spec: %s", e)
+        else:
+          print(requirement_spec, requirement)
+    return xit
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
@@ -468,7 +542,7 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
 
   @classmethod
   def today(cls, name):
-    ''' Basic release tag for today, without any `.`n suffix.
+    ''' Basic release tag for today, without any `.`*n* suffix.
     '''
     return cls(name, isodate(dashed=False))
 
@@ -498,6 +572,98 @@ class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
       next_seq = 1
     version = today.version + '.' + str(next_seq)
     return type(self)(self.name, version)
+
+class ModuleRequirement(namedtuple('ModuleRequirement',
+                                   'module_name op requirements modules')):
+  ''' A parsed version of a module requirement string
+      such as `'cs.upd>=multiline'` or `'cs.obj>=20200716'`.
+
+      Attributes:
+      * `module_name`: the name of the module or package
+      * `op`: the relationship to the requirements,
+        supporting `'='` and `'>='`;
+        `None` if only the name is present
+      * `requirements`: a list of the requirement terms,
+        broken out on commas in the requirements part
+      * `modules`: a references to the `Modules` instance used to track module information
+  '''
+
+  @classmethod
+  @pfx_method
+  def from_requirement(cls, requirement_spec, modules):
+    ''' Parse a requirement string, return a `ModuleRequirement`.
+    '''
+    with Pfx(requirement_spec):
+      module_name, offset = get_dotted_identifier(requirement_spec)
+      if not module_name:
+        raise ValueError('module_name is not a dotted identifier')
+      if offset == len(requirement_spec):
+        op = None
+      else:
+        for op in '>=', '=', None:
+          if op is None:
+            raise ValueError(
+                "no valid op after module_name at %r" %
+                (requirement_spec[offset:],)
+            )
+          if requirement_spec.startswith(op, offset):
+            offset += len(op)
+            break
+      if op is not None and offset == len(requirement_spec):
+        raise ValueError("no requirements after op %r" % (op,))
+      requirements = [
+          req for req in map(str.strip, requirement_spec[offset:].split(','))
+          if req
+      ]
+      return cls(
+          module_name=module_name,
+          op=op,
+          requirements=requirements,
+          modules=modules
+      )
+
+  @pfx_method
+  def resolve(self):
+    ''' Return a requirement string,
+        either `self.module_name` if `self.op` is `None`
+        or *module_name*{`=`,`>=`}*version*
+        satisfying the versions and features in `self.requirements`.
+    '''
+    if self.op is None:
+      return self.module_name
+    release_versions = set()
+    feature_set = set()
+    for requirement in self.requirements:
+      with Pfx("%r", requirement):
+        feature_name, _ = get_identifier(requirement)
+        if feature_name == requirement:
+          feature_set.add(feature_name)
+        else:
+          # not a bare identifier, presume release version
+          release_versions.add(requirement)
+    if feature_set:
+      pkg = self.modules[self.module_name]
+      release_version = pkg.release_with_features(feature_set)
+      if release_version is None:
+        raise ValueError(
+            "no release version satifying feature set %r" % (feature_set,)
+        )
+      release_versions.add(release_version)
+    if not release_versions:
+      raise ValueError("no satisfactory release versions")
+    if self.op == '=':
+      if len(release_versions) > 1:
+        raise ValueError(
+            "conflicting release versions for %r: %r" %
+            (self.op, release_versions)
+        )
+      release_version = release_versions.pop()
+    elif self.op == '>=':
+      # the release versions are minima: pick their maximum
+      release_version = max(release_versions)
+    else:
+      raise RuntimeError("onimplemenented op %r" % (self.op,))
+    return ''.join((self.module_name, self.op, release_version))
 
 def runcmd(argv, **kw):
   ''' Run command.
@@ -541,8 +707,9 @@ def clean_release_entry(entry):
     lines = ['* ' + line for line in lines]
   return '\n'.join(lines)
 
-def ask(message, fin=None, fout=None):
-  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+def prompt(message, fin=None, fout=None):
+  ''' Prompt for a one line answer.
+      Return the answer with trailing newlines or carriage returns stripped.
   '''
   if fin is None:
     fin = sys.stdin
@@ -550,7 +717,13 @@ def ask(message, fin=None, fout=None):
     fout = sys.stderr
   print(message, end='? ', file=fout)
   fout.flush()
-  response = fin.readline().rstrip().lower()
+  return fin.readline().rstrip('\r\n')
+
+def ask(message, fin=None, fout=None):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  response = prompt(message, fin=fin, fout=fout)
+  response = response.rstrip().lower()
   return response in ('y', 'yes')
 
 @contextmanager
@@ -575,13 +748,30 @@ class Modules(defaultdict):
     self.options = options
 
   def __missing__(self, mod_name):
-    assert isinstance(mod_name, str), "mod_name=%r" % (mod_name,)
+    assert isinstance(mod_name, str), "mod_name=%s:%r" % (
+        type(mod_name),
+        mod_name,
+    )
+    assert is_dotted_identifier(mod_name
+                                ), "not a dotted identifier: %r" % (mod_name,)
     M = Module(mod_name, self.options)
     self[mod_name] = M
     return M
 
+  @pfx_method
+  def resolve_requirement(self, requirement_spec):
+    ''' Resolve the `install_requires` specification `requirement_spec`
+        into a requirement string.
+    '''
+    with Pfx(requirement_spec):
+      mrq = ModuleRequirement.from_requirement(requirement_spec, modules=self)
+      requirement = mrq.resolve()
+      if requirement != requirement_spec:
+        warning("RESOLVE %r => %r", requirement_spec, requirement)
+      return requirement
+
 # pylint: disable=too-many-public-methods
-class Module(object):
+class Module:
   ''' Metadata about a Python module.
   '''
 
@@ -708,6 +898,86 @@ class Module(object):
     ''' The `TagSet` for this package.
     '''
     return self.options.pkg_tagsets[self.name]
+
+  @pfx_method
+  def named_features(self):
+    ''' Return a set containing all the feature names in use by this `Module`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    all_feature_names = set()
+    for feature_names in feature_map.values():
+      for feature_name in feature_names:
+        if not is_identifier(feature_name):
+          warning("ignoring non-dentifier feature name: %r", feature_name)
+        else:
+          all_feature_names.add(feature_name)
+    return all_feature_names
+
+  @typechecked
+  def set_feature(self, feature_name: str, release_version: str):
+    ''' Include `feature_name` in the features for release `release_version`.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    release_features = set(feature_map.get(release_version, []))
+    release_features.add(feature_name)
+    feature_map[release_version] = sorted(release_features)
+    self.set_tag(
+        'features',
+        feature_map,
+        msg="features[%s]+%s" % (release_version, feature_name)
+    )
+
+  @pfx_method(use_str=True)
+  def release_features(self):
+    ''' Yield `(release_version,feature_names)`
+        for all releases mentioned in the `features` tag.
+    '''
+    feature_map = self.pkg_tags.features or {}
+    yield from feature_map.items()
+
+  @pfx_method(use_str=True)
+  def release_feature_set(self):
+    ''' Yield `(release_version,feature_sets)`
+        for all releases mentioned in the `features` tag
+        in release order.
+
+        This is an accumulation of features up to and including `release_version`.
+        Use of this method implies an assumption that features are
+        only added and never removed.
+    '''
+    feature_set = set()
+    for release_version, release_features in sorted(self.release_features()):
+      feature_set.update(release_features)
+      yield release_version, set(feature_set)
+
+  @pfx_method(use_str=True)
+  def features(self, release_version=None):
+    ''' Return a set of the feature names for `release_version`,
+        default from the `pypi.release`.
+
+        This is an accumulation of the features from prior releases.
+    '''
+    tags = self.pkg_tags
+    if release_version is None:
+      release_version = tags.get('pypi.release')
+      if release_version is None:
+        raise ValueError("no pypi.release")
+    release_set = set()
+    for version, feature_set in sorted(self.release_feature_set()):
+      if version > release_version:
+        break
+      release_set = feature_set
+    return release_set
+
+  @pfx_method(use_str=True)
+  def release_with_features(self, features):
+    ''' Return the earliest release version containing all the named features.
+        Return `None` if no release has all the features.
+    '''
+    for version, feature_set in sorted(self.release_feature_set()):
+      if all(map(lambda feature: feature in feature_set, features)):
+        return version
+    return None
 
   def save_pkg_tags(self):
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
@@ -845,6 +1115,8 @@ class Module(object):
   ):
     ''' Compute the distutils info mapping for this package.
     '''
+    if '>' in self.name or '=' in self.name:
+      raise RuntimeError("bad module name %r" % (self.name))
     if pypi_package_name is None:
       pypi_package_name = self.name
     if pypi_package_version is None:
@@ -857,6 +1129,12 @@ class Module(object):
         description=docs.description, long_description=docs.long_description
     )
     dinfo.update(self.module.DISTINFO)
+
+    # resolve install_requires
+    dinfo.update(
+        install_requires=self
+        .resolve_requirements(dinfo.pop('install_requires', ()))
+    )
 
     # fill in default fields
     for field in ('author', 'author_email', 'long_description_content_type',
@@ -1067,12 +1345,22 @@ class Module(object):
             else:
               out("  %s = %r," % (kw, distinfo[kw]))
             written.add(kw)
+        out(
+            "  %s = %r," %
+            ('install_requires', distinfo.pop('install_requires', ()))
+        )
         for kw, kv in sorted(distinfo.items()):
           if kw not in written:
             out("  %s = %r," % (kw, kv))
         out(")")
       if not ok:
         raise ValueError("could not construct valid setup.py file")
+
+  def resolve_requirements(self, requirement_specs):
+    ''' Resolve the requirement specifications from `requirement_specs`
+        into valid `install_requires` specification.
+    '''
+    return list(map(self.modules.resolve_requirement, requirement_specs))
 
   @staticmethod
   def reldistfiles(pkg_dir):
@@ -1119,15 +1407,20 @@ class Module(object):
       else:
         vcstag = self.latest.vcstag
     paths = self.paths()
-    latest_release_line = 'Release information for ' + self.latest.vcstag + '.'
+    latest = self.latest
+    latest_release_line = 'Release information for ' + latest.vcstag + '.' if latest else None
     return (
         ([filename
           for filename in files
           if filename in paths], firstline)
         for files, firstline in self.vcs.log_since(vcstag, paths)
         if (
-            ignored or
-            ('IGNORE' not in firstline and firstline != latest_release_line)
+            ignored or (
+                'IGNORE' not in firstline and (
+                    latest_release_line is None
+                    or firstline != latest_release_line
+                )
+            )
         )
     )
 

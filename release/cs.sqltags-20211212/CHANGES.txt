@@ -1,0 +1,8 @@
+lib/python/cs/sqltags.py: cs.{fstags,sqltags,tagset}: rename edit_many to edit_tagsets
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__str__: nicer output
+lib/python/cs/sqltags.py: cs.sqltags: bugfix SQLTags.values: name~glob does not quote (transcribe) the glob
+lib/python/cs/sqltags.py: cs.sqltags: clean some lint
+lib/python/cs/sqltags.py: merge default => tagger
+lib/python/cs/sqltags.py: cs.sqltags: stub SQLTags.startup_shutdown method to happy MultiOpenMixin
+lib/python/cs/sqltags.py: cs.sqltags: FIXUP: stub SQLTags.startup_shutdown method to happy MultiOpenMixin
+lib/python/cs/sqltags.py: cs.sqltags,cs.fstags: bump cs.tagset requirement to >=20211212

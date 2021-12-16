@@ -6,14 +6,16 @@
 
 set -ue
 
-: ${TMPDIR:=/tmp}
+tmpdir=${TMPDIR:=/tmp}
 
-tag_name=backup
-copies=a,b
-backup_area=/mnt
+tag_name=${TAGGED_BACKUP_TAG_NAME:-backup}
+copies=${TAGGED_BACKUP_COPIES:-a,b}
+backup_area=${TAGGED_BACKUP_AREA:-/mnt}
+backup_names=${TAGGED_BACKUP_TAG_VALUES:-''}
 do_mount=1
 rsync_exclude_opts='--exclude=.AppleDouble --exclude=.DS_Store --exclude=/.Trash/ --exclude=._*'
 rsync_delete_exclude_opts='--delete-excluded'
+rsync_extra_opts=
 quiet=
 hbopts=
 
@@ -27,16 +29,49 @@ usage="Usage: $cmd [options...] src_path[:backup_subpath]...
 
   Options:
     --backup-area=/path     Path to backup area, default: $backup_area
+                            or from \$TAGGED_BACKUP_AREA.
+    --backup-names=name,... Backup names to run, default from \$TAGGED_BACKUP_TAG_VALUES
+                            or collated from the fstags for the tag name.
+                            (The default tag name is \"$tag_name\".)
     --copies=sfx1,sfx2,...  Copy suffixes, default: $copies
+                            or from \$TAGGED_BACKUP_COPIES.
     --exclude=pattern       Additional rsync --exclude option.
     --no-mount              Do not mount the backup path, expect
                             it to be already present.
+    --progress              Passed to rsync via histbackup.
     --tag-name=tagname      Tag name, default: $tag_name
+                            or from \$TAGGED_BACKUP_TAG_NAME.
     -q                      Quiet.
-    -x                      Trace execution."
+    -x                      Trace execution.
+
+  Environment:
+    TAGGED_BACKUP_AREA        The mount area for backups: backup_area
+    TAGGED_BACKUP_COPIES      The backup copies to make: $copies
+    TAGGED_BACKUP_TAG_NAME    The default tag name: $tag_name
+    TAGGED_BACKUP_TAG_VALUES  The backup tag values to run; if not
+                              provided or specified by --backup-names
+                              the src_path is scanned for existing
+                              tag values.
+
+  The defaults use the backup tag \"$tag_name\", makes backup copies
+  for each of \"$copies\", and uses the backup area $backup_area.
+  My media archive presently has tag values \"archive1\" and
+  \"archive2\".
+
+  So when it backs up /export/video its process is to mount each
+  of /mnt/archive1a, /mnt/archive1b, /mnt/archive2a and /mnt/archive2b
+  and runs a histbackup from /exports/video to /mnt/archive1a/video,
+  /mnt/archive1b/video and so forth.  By having matching entries
+  for the mount in /etc/fstab with the \"user\" option associated
+  with the filesystem labels of the removeable backup drives this
+  works fairly seamlessly.
+"
 
 trace=
-##[ -t 2 ] && trace=set-x
+[ -t 2 ] && {
+  trace=set-x
+  rsync_extra_opts="$rsync_extra_opts --progress"
+}
 
 badopts=
 
@@ -45,12 +80,16 @@ do
   case "$1" in
     --backup-area=?*)
         backup_area=$( expr "x$1" : 'x--backup-area=\(.*\)' ) ;;
+    --backup-names=?*)
+        backup_names=$( expr "x$1" : 'x--backup-names=\(.*\)' ) ;;
     --copies=?*)
         copies=$( expr "x$1" : 'x--copies=\(.*\)' ) ;;
     --exclude=?*)
         rsync_exclude_opts="$rsync_exclude_opts $1" ;;
     --no-mount)
         do_mount= ;;
+    --progress)
+        rsync_extra_opts="$rsync_extra_opts $1" ;;
     --tag-name=?*)
         tag_name=$( expr "x$1" : 'x--tag-name=\(.*\)' ) ;;
     -q) quiet=1 ;;
@@ -87,7 +126,7 @@ fi
 
 xit=0
 
-tmpf=$TMPDIR/$cmd.$$
+tmpf=$tmpdir/$cmd.$$
 trap 'rm -f "$tmpf"' 0 1 3 15
 
 for src_dst
@@ -107,17 +146,19 @@ do
     continue
   }
   $vecho "scan $src_path for ${tag_name}= tags"
-  backup_names=$(
+  src_backup_names=$backup_names
+  [ -n "$src_backup_names" ] || src_backup_names=$(
     $trace fstags find -o "{$tag_name}" "$src_path" "$tag_name" | grep . | sort -u
   )
-  [ -n "$backup_names" ] || {
+  [ -n "$src_backup_names" ] || {
     echo "$cmd: $src_dst: no $tag_name tags in $src_path, skipping ALL BACKUPS" >&2
     xit=1
     continue
   }
-  $vecho "$src_path: $tag_name tags =" $backup_names
+  # shellcheck disable=SC2086
+  $vecho "$src_path: $tag_name tags =" $src_backup_names
   not_archive_tags=
-  for backup_name in $backup_names
+  for backup_name in $( printf '%s\n' "$src_backup_names" | tr , ' ' )
   do
     archive_tag=$tag_name=$backup_name
     not_archive_tags="$not_archive_tags -$archive_tag"
@@ -142,7 +183,8 @@ do
           && $trace histbackup $hbopts --copy-times \
                -- "$src_path" "$backup_path" \
                "--include-from=$tmpf" \
-               -O $rsync_exclude_opts $rsync_delete_exclude_opts
+               -O $rsync_exclude_opts $rsync_delete_exclude_opts \
+               $rsync_extra_opts
         } || xit=1
         [ $quiet ] || {
           du -sh "$backup_path/LATEST/" \
@@ -158,13 +200,16 @@ do
       fi
     done
   done
+
+  $vecho "scanning $src_path for files not covered by the backup tag values $src_backup_names ..."
   skipped_bytes=$( fstags find -o '{filesize}' "$src_path" $not_archive_tags | colsum 1 )
+
   [ "$skipped_bytes" = 0 ] || {
     echo "$cmd: $src_dst: $skipped_bytes bytes NOT ARCHIVED" >&2
     xit=1
     [ $quiet ] || {
       ( cd "$src_path"
-        echo "unbacked up series/seasons:"
+        echo "unbacked up grouped by series/seasons:"
         fstags find . -backup \
         | egrep '/(series|season)' \
         | sed 's|/[^/]*$||' \

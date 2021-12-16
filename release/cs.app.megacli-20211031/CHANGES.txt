@@ -1,0 +1,23 @@
+lib/python/cs/app/megacli.py: further cs.obj.O and related _O_* removal
+lib/python/cs/app/megacli.py: mcli,cs.app.mcli: python 3 update
+lib/python/cs/app/megacli.py: cs.app.megacli: docstring updates
+lib/python/cs/app/megacli.py: cs.app.megacli: autoformat
+lib/python/cs/app/megacli.py: cs.app.megacli: move common MegaCLI output tokenisation into MegaRAID._preparse
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRAID.info: call commands directly, pass output file to ._parse
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRAID.info: fix unbalanced cmd_append/cmd_pop; use debugging files instead of calling MegaCLI utility
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRIAD._preparse: fix signature, handle non"heading" lines
+lib/python/cs/app/megacli.py: merge default => megacli: pull in Python 3 changes etc
+lib/python/cs/app/megacli.py: cs.app.megacli: update DISTINFO
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRAID: list of acceptable firmware states now in FW_STATES_AVAILABLE
+lib/python/cs/app/megacli.py: cs.app.megaci: switch out offline-debug code (reading from sample output files), switch on the live queries
+lib/python/cs/app/megacli.py: cs.app.megacli: update the debug statements
+lib/python/cs/app/megacli.py: cs.app.megacli: update command output reader invocation
+lib/python/cs/app/megacli.py: cs.app.megacli: autoformat
+lib/python/cs/app/megacli.py: cs.app.megacli: drop local debug functions in favour of logging
+lib/python/cs/app/megacli.py: cs.app.megacli: re_SPEED: use a raw string
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRAID._parze: move low level parse into _preparse
+lib/python/cs/app/megacli.py: cs.app.megacli: MegaRAID._parse: parse the Adapter header regardless of mode
+lib/python/cs/app/megacli.py: cs.app.megacli: Dell PERC seems to say "Adapter #0" instead of "Adapter: 0"
+lib/python/cs/app/megacli.py: cs.app.megacli: add missing import
+lib/python/cs/app/megacli.py: cs.app.megacli: warning and debug messaging updates
+lib/python/cs/app/megacli.py: cs.app.megacli: update DISTINFO

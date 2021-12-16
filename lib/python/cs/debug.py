@@ -19,17 +19,17 @@ import threading
 import time
 import traceback
 from types import SimpleNamespace as NS
+
 import cs.logutils
 from cs.logutils import debug, error, warning, D, ifdebug, loginfo
 from cs.obj import Proxy
 from cs.pfx import Pfx
-from cs.py.func import funccite
 from cs.py.stack import caller
 from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.seq import seq
 from cs.x import X
 
-__version__ = '20200318'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -42,10 +42,8 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
-        'cs.py.func',
         'cs.py.stack',
         'cs.py3',
-        'cs.result',
         'cs.seq',
         'cs.x',
     ],
@@ -434,24 +432,6 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
-def trace(func):
-  ''' Decorator to report the call and return of a function.
-  '''
-
-  def subfunc(*a, **kw):
-    X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
-    try:
-      retval = func(*a, **kw)
-    except Exception as e:
-      X("CALL %s(): RAISES %r", funccite(func), e)
-      raise
-    else:
-      X("CALL %s(): RETURNS %r", funccite(func), retval)
-      return retval
-
-  subfunc.__name__ = "trace/subfunc/" + func.__name__
-  return subfunc
-
 def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
@@ -577,6 +557,7 @@ def debug_object_shell(o, prompt=None):
 def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
+  # pylint: disable=import-outside-toplevel
   if argv is None:
     argv = sys.argv
   import importlib

@@ -24,6 +24,41 @@ def main(argv=None):
   '''
   return InvoiceCommand(argv).run()
 
+def parse_ymd(ymd):
+  ''' Parse a YYYY-MM-DD or YYYYMMDD date string,
+      return the matching naive `datetime`.
+  '''
+  with Pfx("parse_ymd(%r)"):
+    try:
+      dt = datetime.strptime(ymd, '%Y-%m-%d')
+    except ValueError:
+      dt = datetime.strptime(ymd, '%Y%m%d')
+    return dt
+
+def parse_ym(yyyymm):
+  ''' Parse a YYYY-MM or YYYYMM date string,
+      return the matching naive `datetime`s
+      for the first day of the corresponding month
+      and the first day of the following month.
+  '''
+  with Pfx("parse_ym(YYYY-DD:%r)"):
+    try:
+      start_dt = datetime.strptime(yyyy_mm, "%Y-%m")
+    except ValueError:
+      start_dt = datetime.strptime(yyyy_mm, "%Y%m")
+    yyyy, mm = start_dt.year, start_dt.month
+    mm += 1
+    if mm > 12:
+      mm -= 12
+      yyyy += 1
+    end_dt = datetime(year=yyyy, month=mm, day=1)
+    return start_dt, end_dt
+
+def next_day(dt):
+  ''' The `datetime` for a day after `dt`.
+  '''
+  return dt + timedelta(days=1)
+
 class PrefixedNameSQLTagSet(SQLTagSet):
 
   # a prefix ending in a dot, for example "invoice."
@@ -68,27 +103,22 @@ class Invoices(SQLTags):
     '''
     cls = SQLTagSet
     for match_cls in Invoice, Client:
-      if name.startswith(match_cls.PREFIX):
+      if name is not None and name.startswith(match_cls.PREFIX):
         cls = match_cls
         break
     return cls(name=name, **kw)
 
-  @staticmethod
-  def parse_ymd(ymd):
-    ''' Parse a YYYY-MM-DD or YYYYMMDD date string,
-        return the matching naive `datetime`.
+  def __iter__(self):
+    ''' Yield the invoice `TagSet`s.
     '''
-    with Pfx("parse_ymd(%r)"):
-      try:
-        return datetime.strptime(ymd, '%Y-%m-%d')
-      except ValueError:
-        return datetime.strptime(ymd, '%Y%m%d')
-
-  @staticmethod
-  def next_day(dt):
-    ''' The `datetime` for a day after `dt`.
-    '''
-    return dt + timedelta(days=1)
+    for invoice in self.values(prefix=Invoice.PREFIX):
+      with Pfx(invoice.name):
+        try:
+          invoice.number
+        except ValueError as e:
+          warning("skip bad invoice number: %s", e)
+          continue
+        yield invoice
 
   def timespan_criteria(self, dt=None, span=None):
     ''' Given a start time and a time span,
@@ -110,7 +140,7 @@ class Invoices(SQLTags):
       if span is None:
         span = timedelta(days=1)
     elif isinstance(dt, str):
-      dt = self.parse_ymd(dt)
+      dt = parse_ymd(dt)
       if span is None:
         span = timedelta(days=1)
     elif isinstance(dt, date):
@@ -136,7 +166,7 @@ class Invoices(SQLTags):
       raise TypeError(
           "unhandled span type %s: %r" % (type(span).__name__, span)
       )
-    end_ts = self.next_day(dt).timestamp()
+    end_ts = next_day(dt).timestamp()
     return [
         f"unixtime>={start_ts}",
         f"unixtime<{end_ts}",
@@ -155,19 +185,7 @@ class Invoices(SQLTags):
   def daily_log(self, dt):
     ''' Return a list of log entries covering `dt` to `dt+1day`.
     '''
-    return list(self.sqltags.find(self.criteria_daily_log(dt)))
-
-  def __iter__(self):
-    ''' Yield the invoice `TagSet`s.
-    '''
-    for invoice in self.values(prefix=Invoice.PREFIX):
-      with Pfx(invoice.name):
-        try:
-          invoice.number
-        except ValueError as e:
-          warning("skip bad invoice number: %s", e)
-          continue
-        yield invoice
+    return list(self.find(self.criteria_daily_log(dt)))
 
   @typechecked
   def invoice(self, number: int) -> TagSet:
@@ -195,12 +213,12 @@ class InvoiceCommand(SQLTagsCommand):
     ''' Usage: {cmd} [yyyy-mm-dd]
           Edit the tally for yyyy-mm-dd or today.
     '''
-    invoices = self.options.invoices
+    invoices = self.options.sqltags
     badopts = False
     if argv:
       date_arg = argv.pop(0)
       try:
-        dt = invoices.parse_ymd(date_arg)
+        dt = parse_ymd(date_arg)
       except ValueError as e:
         warning("bad YYYY-MM-DD argument: %s", e)
         badopts = True
@@ -279,7 +297,7 @@ class InvoiceCommand(SQLTagsCommand):
         invoices = self.options.sqltags
         X("invoices=%s:%s",type(invoices),invoices)
         entry = invoices.new_invoice()
-        entry.client = client.name
+        entry.client = client.short_name
         entry.unixtime_start = start_dt.timestamp()
         entry.unixtime_end = end_dt.timestamp()
       else:

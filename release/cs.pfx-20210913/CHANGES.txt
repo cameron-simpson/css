@@ -1,0 +1,5 @@
+lib/python/cs/pfx.py: cs.pfx: get func_a_kw_fmt from cs.py.func
+lib/python/cs/pfx.py: cs.pfx: Pfx: do not fiddle with LookupError.args[0], it is the key
+lib/python/cs/pfx.py: merge tagger => default
+lib/python/cs/pfx.py: cs.pfx: Pfx.__exit__: suppress debugging message, could use some kind of mode switch
+lib/python/cs/pfx.py: merge tagger ==> default: Tagger.auto_name: catch FormatAsError to skip tagger.auto_name format strings which cannot be resolved, related tweaks.

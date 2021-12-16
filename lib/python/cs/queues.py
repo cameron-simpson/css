@@ -19,7 +19,7 @@ from cs.py3 import Queue, PriorityQueue, Queue_Empty
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 
-__version__ = '20201025-post'
+__version__ = '20211116-post'
 
 DISTINFO = {
     'description':
@@ -45,10 +45,7 @@ class _QueueIterator(MultiOpenMixin):
       It does not offer the .get or .get_nowait methods.
   '''
 
-  class _QueueIterator_Sentinel(object):
-    pass
-
-  sentinel = _QueueIterator_Sentinel()
+  sentinel = object()
 
   def __init__(self, q, name=None):
     if name is None:
@@ -60,7 +57,7 @@ class _QueueIterator(MultiOpenMixin):
     self._item_count = 0
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__,self.name)
+    return "%s(%r)" % (type(self).__name__, self.name)
 
   @not_closed
   def put(self, item, *args, **kw):
@@ -190,6 +187,18 @@ class Channel(object):
     '''
     if a:
       return self.put(*a)
+    return self.get()
+
+  def __iter__(self):
+    ''' A `Channel` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' `next(Channel)` calls `Channel.get()`.
+    '''
+    if self.closed:
+      raise StopIteration()
     return self.get()
 
   @not_closed
@@ -481,6 +490,68 @@ class TimerQueue(object):
             self.pending = [T, when, func]
             T.start()
       self.mainRunning = False
+
+class ListQueue:
+  ''' A simple iterable queue based on a `list`.
+  '''
+
+  def __init__(self, queued=None):
+    ''' Initialise the queue.
+        `queued` is an optional iterable of initial items for the queue.
+    '''
+    self.queued = []
+    if queued is not None:
+      # catch a common mistake
+      assert not isinstance(queued, str)
+      self.queued.extend(queued)
+    self._lock = Lock()
+
+  def get(self):
+    ''' Get pops from the start of the list.
+    '''
+    with self._lock:
+      try:
+        return self.queued.pop(0)
+      except IndexError:
+        raise Queue_Empty("list is empty")
+
+  def put(self, item):
+    ''' Put appends to the queue.
+    '''
+    with self._lock:
+      self.queued.append(item)
+
+  def extend(self, items):
+    ''' Convenient/performant queue-lots-of-items.
+    '''
+    with self._lock:
+      self.queued.extend(items)
+
+  def insert(self, index, item):
+    ''' Insert `item` at `index` in the queue.
+    '''
+    with self._lock:
+      self.queued.insert(index, item)
+
+  def __bool__(self):
+    ''' A `ListQueue` looks a bit like a container,
+        and is false when empty.
+    '''
+    with self._lock:
+      return bool(self.queued)
+
+  def __iter__(self):
+    ''' A `ListQueue` is iterable.
+    '''
+    return self
+
+  def __next__(self):
+    ''' Iteration gets from the queue.
+    '''
+    try:
+      return self.get()
+    except Queue_Empty:
+      raise StopIteration("list is empty")
 
 if __name__ == '__main__':
   import cs.queues_tests

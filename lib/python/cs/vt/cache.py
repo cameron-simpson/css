@@ -122,9 +122,11 @@ class FileCacheStore(BasicStoreSync):
     ''' Dummy sync operation.
     '''
 
-  def keys(self, hashclass=None):
-    if hashclass is None:
-      hashclass = self.hashclass
+  def __len__(self):
+    return len(self.cache) + len(self.backend)
+
+  def keys(self):
+    hashclass = self.hashclass
     # pylint: disable=unidiomatic-typecheck
     return (h for h in self.cache.keys() if type(h) is hashclass)
 
@@ -134,14 +136,14 @@ class FileCacheStore(BasicStoreSync):
   def contains(self, h):
     return h in self.cache
 
-  def add(self, data, hashclass=None):
-    h = self.hash(data, hashclass)
+  def add(self, data):
+    h = self.hash(data)
     self.cache[h] = data
     return h
 
   # add is deliberately very fast; just return a completed Result directly
-  def add_bg(self, data, hashclass=None):
-    return Result(result=self.add(data, hashclass))
+  def add_bg(self, data):
+    return Result(result=self.add(data))
 
   def get(self, h):
     try:
@@ -263,11 +265,11 @@ class FileDataMappingProxy(MultiOpenMixin, RunStateMixin):
       return h in backend
     return False
 
-  def keys(self, hashclass=None):
+  def keys(self):
     ''' Mapping method for .keys.
     '''
     seen = set()
-    for h in self.cached:
+    for h in list(self.cached.keys()):
       yield h
       seen.add(h)
     saved = self.saved
@@ -563,7 +565,7 @@ class BlockTempfile:
     '''
     with S:
       needed = len(block)
-      for data in block.datafrom():
+      for data in block:
         if runstate.cancelled:
           break
         assert len(data) <= needed

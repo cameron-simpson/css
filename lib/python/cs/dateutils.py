@@ -2,10 +2,17 @@
 #
 
 ''' A few conveniences to do with dates and times.
+
+    There are some other PyPI modules providing richer date handling
+    than the stdlib `datetime` module.
+    This module mostly contains conveniences used in my other code;
+    you're welcome to it, but it does not pretend to be large or complete.
 '''
 
 from datetime import date, datetime, tzinfo, timedelta
 from time import localtime, mktime, strftime
+
+__version__ = '20210306-post'
 
 DISTINFO = {
     'keywords': ["date", "time", "datetime", "python", "python3"],

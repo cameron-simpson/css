@@ -12,9 +12,9 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import errno
 from functools import partial
-import json
+import gzip
 import os
-from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read
+from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
   from os import pread
 except ImportError:
@@ -26,7 +26,6 @@ from os.path import (
     exists as existspath,
     isabs as isabspath,
     isdir,
-    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -40,20 +39,18 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
+from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import LoadableMappingMixin, UUIDedDict
-from cs.obj import SingletonMixin
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
-from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210131-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -67,17 +64,15 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
+        'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings',
-        'cs.obj',
-        'cs.pfx',
+        'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.py3',
         'cs.range',
         'cs.result',
         'cs.threads',
-        'cs.timeutils',
         'cs.units',
     ],
 }
@@ -89,7 +84,7 @@ DEFAULT_TAIL_PAUSE = 0.25
 def seekable(fp):
   ''' Try to test whether a filelike object is seekable.
 
-      First try the `IOBase.seekable` method, otherwise try getting a file 
+      First try the `IOBase.seekable` method, otherwise try getting a file
       descriptor from `fp.fileno` and `os.stat()`ing that,
       otherwise return `False`.
   '''
@@ -132,7 +127,7 @@ def compare(f1, f2, mode="rb"):
   ''' Compare the contents of two file-like objects `f1` and `f2` for equality.
 
       If `f1` or `f2` is a string, open the named file using `mode`
-      (default: "rb").
+      (default: `"rb"`).
   '''
   if isinstance(f1, str):
     with open(f1, mode) as f1fp:
@@ -142,6 +137,7 @@ def compare(f1, f2, mode="rb"):
       return compare(f1, f2fp, mode)
   return f1.read() == f2.read()
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 @contextmanager
 def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   ''' A context manager yielding a temporary copy of `filename`
@@ -157,7 +153,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
         otherwise it should be a `cs.progress.Progress` instance
       * `progress_label`: option progress bar label,
         only used if a progress bar is made
-      Other keyword parameters are passed to `tempfile.NaedTemporaryFile`.
+      Other keyword parameters are passed to `tempfile.NamedTemporaryFile`.
   '''
   if isinstance(f, str):
     # copy named file
@@ -184,6 +180,9 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
                                   progress_label=progress_label, **kw) as T:
             yield T
     return
+  prefix = kw.pop('prefix', None)
+  if prefix is None:
+    prefix = 'NamedTemporaryCopy'
   # prepare the buffer and try to infer the length
   if isinstance(f, CornuCopyBuffer):
     length = None
@@ -213,7 +212,7 @@ def NamedTemporaryCopy(f, progress=False, progress_label=None, **kw):
   else:
     need_bar = False
     assert isinstance(progress, Progress)
-  with NamedTemporaryFile(**kw) as T:
+  with NamedTemporaryFile(prefix=prefix, **kw) as T:
     it = (
         bfr if need_bar else progressbar(
             bfr,
@@ -330,43 +329,6 @@ def rewrite_cmgr(filepath, mode='w', **kw):
     T.flush()
     with open(T.name, 'rb') as f:
       rewrite(filepath, mode='wb', srcf=f, **kw)
-
-@strable
-def scan_ndjson(f, dictclass=dict, error_list=None):
-  ''' Read a newline delimited JSON file, yield instances of `dictclass`
-      (default `dict`, otherwise a class which can be instantiated
-      by `dictclass(a_dict)`).
-
-      `error_list` is an optional list to accrue `(lineno,exception)` tuples
-      for errors encountered during the scan.
-  '''
-  for lineno, line in enumerate(f, 1):
-    with Pfx("line %d", lineno):
-      try:
-        d = json.loads(line)
-      except json.JSONDecodeError as e:
-        warning("%s", e)
-        if error_list:
-          error_list.append((lineno, e))
-        continue
-      if dictclass is not dict:
-        d = dictclass(**d)
-    yield d
-
-@strable(open_func=lambda filename: open(filename, 'w'))
-def write_ndjson(f, objs):
-  ''' Transcribe an iterable of objects to a file as newline delimited JSON.
-  '''
-  for lineno, o in enumerate(objs, 1):
-    with Pfx("line %d", lineno):
-      f.write(json.dumps(o, separators=(',', ':')))
-      f.write('\n')
-
-@strable(open_func=lambda filename: open(filename, 'a'))
-def append_ndjson(f, objs):
-  ''' Append an iterable of objects to a file as newline delimited JSON.
-  '''
-  return write_ndjson(f, objs)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
@@ -587,7 +549,7 @@ def make_files_property(
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
 
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements,too-many-branches
     def getprop(self):
       ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
@@ -698,6 +660,7 @@ def makelockfile(
           raise
         if timeout is not None and timeout <= 0:
           # immediate failure
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
@@ -718,6 +681,7 @@ def makelockfile(
           sleep_for = min(poll_interval, start + timeout - now)
         # test for timeout
         if sleep_for <= 0:
+          # pylint: disable=raise-missing-from
           raise TimeoutError("pid %d timed out" % (os.getpid(),), timeout)
         time.sleep(sleep_for)
         continue
@@ -773,7 +737,8 @@ def crop_name(name, ext=None, name_max=255):
   max_base_len = name_max - len(ext)
   if max_base_len < 0:
     raise ValueError(
-        "cannot crop name before ext %r to <=%s: name=%r" % (ext, name_max, name)
+        "cannot crop name before ext %r to <=%s: name=%r" %
+        (ext, name_max, name)
     )
   if len(base) <= max_base_len:
     return name
@@ -1109,13 +1074,14 @@ def datafrom_fd(fd, offset=None, readsize=None, aligned=True, maxlength=None):
         to align the new offset with a multiple of `readsize`.
       * `maxlength`: if specified yield no more than this many bytes of data.
   '''
+  try:
+    cur_offset = os.lseek(fd, 0, SEEK_CUR)
+    is_seekable = True
+  except OSError:
+    cur_offset = 0  # guess
+    is_seekable = False
   if offset is None:
-    try:
-      offset = os.lseek(fd, 0, SEEK_CUR)
-      is_seekable = True
-    except OSError:
-      offset = 0
-      is_seekable = False
+    offset = cur_offset
   if readsize is None:
     readsize = DEFAULT_READSIZE
   if aligned:
@@ -1701,6 +1667,77 @@ def lines_of(fp, partials=None):
     partials = []
   return as_lines(read_from(fp), partials)
 
+# pylint: disable=redefined-builtin
+@contextmanager
+def atomic_filename(
+    filename,
+    exists_ok=False,
+    placeholder=False,
+    dir=None,
+    prefix=None,
+    suffix=None,
+    **kw
+):
+  ''' A context manager to create `filename` atomicly on completion.
+      This returns a `NamedTemporaryFile` to use to create the file contents.
+      On completion the temporary file is renamed to the target name `filename`.
+
+      Parameters:
+      * `filename`: the file name to create
+      * `exists_ok`: default `False`;
+        if true it not an error if `filename` already exists
+      * `placeholder`: create a placeholder file at `filename`
+        while the real contents are written to the temporary file
+      * `dir`: passed to `NamedTemporaryFile`, specifies the directory
+        to hold the temporary file; the default is `dirname(filename)`
+        to ensure the rename is atomic
+      * `prefix`: passed to `NamedTemporaryFile`, specifies a prefix
+        for the temporary file; the default is a dot (`'.'`) plus the prefix
+        from `splitext(basename(filename))`
+      * `suffix`: passed to `NamedTemporaryFile`, specifies a suffix
+        for the temporary file; the default is the extension obtained
+        from `splitext(basename(filename))`
+      Other keyword arguments are passed to the `NamedTemporaryFile` constructor.
+
+      Example:
+
+          >>> import os
+          >>> from os.path import exists as existspath
+          >>> fn = 'test_atomic_filename'
+          >>> with atomic_filename(fn, mode='w') as f:
+          ...     assert not existspath(fn)
+          ...     print('foo', file=f)
+          ...     assert not existspath(fn)
+          ...
+          >>> assert existspath(fn)
+          >>> assert open(fn).read() == 'foo\\n'
+          >>> os.remove(fn)
+  '''
+  if dir is None:
+    dir = dirname(filename)
+  fprefix, fsuffix = splitext(basename(filename))
+  if prefix is None:
+    prefix = '.' + fprefix
+  if suffix is None:
+    suffix = fsuffix
+  if existspath(filename) and not exists_ok:
+    raise ValueError("already exists: %r" % (filename,))
+  with NamedTemporaryFile(dir=dir, prefix=prefix, suffix=suffix, delete=False,
+                          **kw) as T:
+    if placeholder:
+      # create a placeholder file
+      with open(filename, 'ab' if exists_ok else 'xb'):
+        pass
+    yield T
+    if placeholder:
+      try:
+        pfx_call(shutil.copymode, filename, T.name)
+      except OSError as e:
+        warning(
+            "defaut modes not copied from from placeholder %r: %s", filename, e
+        )
+    pfx_call(rename, T.name, filename)
+
 class RWFileBlockCache(object):
   ''' A scratch file for storing data.
   '''
@@ -1753,11 +1790,13 @@ class RWFileBlockCache(object):
   def put(self, data):
     ''' Store `data`, return offset.
     '''
-    assert len(data) > 0
     fd = self.fd
     with self._lock:
       offset = os.lseek(fd, 0, 1)
-      length = os.write(fd, data)
+      if len(data) == 0:
+        length = 0
+      else:
+        length = os.write(fd, data)
     assert length == len(data)
     return offset
 
@@ -1770,76 +1809,58 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(SingletonMixin, LoadableMappingMixin):
-  ''' A subclass of `LoadableMappingMixin` which maintains records
-      from a newline delimited JSON file.
+@contextmanager
+def gzifopen(path, mode='r', *a, **kw):
+  ''' Context manager to open a file which may be a plain file or a gzipped file.
+
+      If `path` ends with `'.gz'` then the filesystem paths attempted
+      are `path` and `path` without the extension, otherwise the
+      filesystem paths attempted are `path+'.gz'` and `path`.  In
+      this way a path ending in `'.gz'` indicates a preference for
+      a gzipped file otherwise an uncompressed file.
+
+      However, if exactly one of the paths exists already then only
+      that path will be used.
+
+      Note that the single character modes `'r'`, `'a'`, `'w'` and `'x'`
+      are text mode for both uncompressed and gzipped opens,
+      like the builtin `open` and *unlike* `gzip.open`.
+      This is to ensure equivalent behaviour.
   '''
-
-  loadable_mapping_key = 'uuid'
-
-  @staticmethod
-  def _singleton_key(filename, dictclass=UUIDedDict, create=False):
-    ''' Key off the absolute path of `filename`.
-    '''
-    return abspath(filename)
-
-  def __init__(self, filename, dictclass=UUIDedDict, create=False):
-    ''' Initialise the mapping.
-
-        Parameters:
-        * `filename`: the file containing the newline delimited JSON data;
-          this need not yet exist
-        * `dictclass`: a optional `dict` subclass to hold each record,
-          default `UUIDedDict`
-        * `create`: if true, ensure the file exists
-          by transiently opening it for append if it is missing;
-          default `False`
-    '''
-    if hasattr(self, '_lock'):
-      return
-    self.__ndjson_filename = filename
-    self.__dictclass = dictclass
-    if create and not isfilepath(filename):
-      # make sure the file exists
-      with open(filename, 'a'):
-        pass
-    self._lock = RLock()
-
-  def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
-    )
-
-  def scan_mapping(self):
-    ''' Scan the backing file, yield records.
-    '''
-    if existspath(self.__ndjson_filename):
-      self.scan_errors = []
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
-                                error_list=self.scan_errors):
-        yield record
-
-  def append_to_mapping(self, record):
-    ''' Append `record` to the backing file.
-    '''
-    with open(self.__ndjson_filename, 'a') as f:
-      f.write(record.as_json())
-      f.write('\n')
-
-  def rewrite_mapping(self):
-    ''' Rewrite the backing file.
-
-        Because the record updates are normally written in append mode,
-        a rewrite will be required every so often.
-    '''
-    with self._lock:
-      with rewrite_cmgr(self.__ndjson_filename) as T:
-        i = 0
-        for i, record in enumerate(self.by_uuid.values(), 1):
-          T.write(record.as_json())
-          T.write('\n')
-        T.flush()
-      self.scan_mapping_length = i
+  compresslevel = kw.pop('compresslevel', 9)
+  path0 = path
+  path, ext = splitext(path)
+  if ext == '.gz':
+    # gzip preferred
+    gzpath = path0
+    path1, path2 = gzpath, path
+  else:
+    # unzipped has precedence
+    gzpath = path0 + '.gz'
+    path1, path2 = path0, gzpath
+  # if exactly one of the files exists, try only that file
+  if existspath(path1) and not existspath(path2):
+    paths = path1,
+  elif existspath(path2) and not existspath(path1):
+    paths = path2,
+  else:
+    paths = path1, path2
+  for openpath in paths:
+    try:
+      with (gzip.open(openpath,
+                      (mode + 't' if mode in ('r', 'a', 'w', 'x') else mode), *
+                      a, compresslevel=compresslevel, **kw) if
+            openpath.endswith('.gz') else open(openpath, mode, *a, **kw)) as f:
+        yield f
+    except FileNotFoundError:
+      # last path to try
+      if openpath == paths[-1]:
+        raise
+      # not present, try the other file
+      continue
+    # open succeeded, we're done
+    return
+  raise RuntimeError("NOTREACHED")
 
 if __name__ == '__main__':
   import cs.fileutils_tests

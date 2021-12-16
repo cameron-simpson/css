@@ -72,6 +72,8 @@ from contextlib import contextmanager
 import os
 import sys
 from threading import RLock
+from cs.context import stackattrs, StackableState
+from cs.deco import decorator
 from cs.gimmicks import warning
 from cs.lex import unctrl
 from cs.obj import SingletonMixin
@@ -83,7 +85,7 @@ except ImportError as e:
   warning("cannot import curses: %s", e)
   curses = None
 
-__version__ = '20210122-post'
+__version__ = '20210717-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -92,8 +94,14 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.gimmicks', 'cs.lex', 'cs.obj>=20210122', 'cs.tty'],
+    'install_requires': [
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.gimmicks',
+        'cs.lex',
+        'cs.obj>=20210122',
+        'cs.tty',
+    ],
 }
 
 def _cleanup():
@@ -158,11 +166,33 @@ class Upd(SingletonMixin):
       backend = sys.stderr
     return id(backend)
 
+  # pylint: disable=too-many-branches
   def __init__(self, backend=None, columns=None, disabled=None):
+    ''' Initialise the `Upd`.
+
+        Parameters:
+        * `backend`: the output file, default `sys.stderr`
+        * `columns`: the width of the output,
+          default from the width of the `backend` tty if it is a tty,
+          `80` otherwise
+        * `disabled`: if true, disable the output - just keep state;
+          default true if the output is not a tty;
+          this automatically silences the `Upd` if stderr is not a tty
+    '''
     if hasattr(self, '_backend'):
       return
     if backend is None:
       backend = sys.stderr
+    # test isatty and the associated file descriptor
+    isatty = backend.isatty()
+    if isatty:
+      try:
+        backend_fd = backend.fileno()
+      except OSError:
+        backend_fd = None
+        isatty = False
+    else:
+      backend_fd = None
     if columns is None:
       columns = 80
       if backend.isatty():
@@ -175,11 +205,32 @@ class Upd(SingletonMixin):
       except AttributeError:
         disabled = True
     self._backend = backend
+    self._backend_isatty = isatty
+    self._backend_fd = backend_fd
+    # prepare the terminfo capability mapping, if any
+    self._ti_strs = {}
+    if isatty:
+      if curses is not None:
+        try:
+          curses.setupterm(fd=backend_fd)
+        except TypeError:
+          pass
+        else:
+          for ti_name in (
+              'vi',
+              'vs',  # cursor invisible/visible
+              'cuu1',  # cursor up 1 line
+              'dl1',  # delete 1 line
+              'il1',  # insert one line
+              'el',  # clear to end of line
+          ):
+            s = curses.tigetstr(ti_name)
+            if s is not None:
+              s = s.decode('ascii')
+            self._ti_strs[ti_name] = s
     self._disabled = disabled
     self._disabled_backend = None
     self.columns = columns
-    self._ti_ready = False
-    self._ti_strs = {}
     self._cursor_visible = True
     self._current_slot = None
     self._reset()
@@ -367,27 +418,7 @@ class Upd(SingletonMixin):
     ''' Fetch the terminfo capability string named `ti_name`.
         Return the string or `None` if not available.
     '''
-    global curses  # pylint: disable=global-statement
-    try:
-      return self._ti_strs[ti_name]
-    except KeyError:
-      with self._lock:
-        if curses is None:
-          s = None
-        else:
-          if not self._ti_ready:
-            try:
-              curses.setupterm()
-            except TypeError:
-              curses = None
-              self._ti_ready = True
-              return None
-            self._ti_ready = True
-          s = curses.tigetstr(ti_name)
-          if s is not None:
-            s = s.decode('ascii')
-        self._ti_strs[ti_name] = s
-      return s
+    return self._ti_strs.get(ti_name, None)
 
   @staticmethod
   def normalise(txt):
@@ -398,13 +429,16 @@ class Upd(SingletonMixin):
     return unctrl(txt.rstrip())
 
   @classmethod
-  def _adjust_text_v(cls, oldtxt, newtxt, columns, raw_text=False):
+  def diff(cls, oldtxt, newtxt, columns, raw_text=False):
     ''' Compute the text sequences required to update `oldtxt` to `newtxt`
         presuming the cursor is at the right hand end of `oldtxt`.
         The available area is specified by `columns`.
 
         We normalise `newtxt` as using `self.normalise`.
         `oldtxt` is presumed to be already normalised.
+
+        If `raw_text` is true (default `False`) we do not normalise `newtxt`
+        before comparison.
     '''
     # normalise text
     if not raw_text:
@@ -530,7 +564,7 @@ class Upd(SingletonMixin):
     txts = self._move_to_slot_v(self._current_slot, slot)
     txts.extend(
         (
-            self._redraw_slot_v(slot) if redraw else self._adjust_text_v(
+            self._redraw_slot_v(slot) if redraw else self.diff(
                 self._slot_text[slot],
                 newtxt,
                 self.columns,
@@ -563,15 +597,14 @@ class Upd(SingletonMixin):
       slots = self._slot_text
       if slot == 0 and not slots:
         self.insert(0)
+      oldtxt = slots[slot]
       if self._disabled or self._backend is None:
-        oldtxt = self._slot_text[slot]
-        self._slot_text[slot] = txt
+        slots[slot] = txt
       else:
-        oldtxt = self._slot_text[slot]
         if oldtxt != txt:
           txts = self._update_slot_v(slot, txt, raw_text=True, redraw=redraw)
           self._current_slot = slot
-          self._slot_text[slot] = txt
+          slots[slot] = txt
           backend.write(''.join(txts))
           backend.flush()
     return oldtxt
@@ -745,6 +778,7 @@ class Upd(SingletonMixin):
     txts = []
     with self._lock:
       if index < 0:
+        # convert negative index to len-index, then check range
         index0 = index
         index = len(self) + index
         if index < 0:
@@ -772,6 +806,8 @@ class Upd(SingletonMixin):
 
       # no display? just insert the slot
       if self._disabled or self._backend is None:
+        slots.insert(index, txt)
+        proxies.insert(index, proxy)
         return proxy
 
       # not disabled: manage the display
@@ -888,7 +924,7 @@ class Upd(SingletonMixin):
           txts.append('\r')
           txts.append(slots[index])
         else:
-          # the effectiove index has now moved down
+          # the effective index has now moved down
           index -= 1
           if delete_line:
             # delete line and advance to the end of the new current line
@@ -940,7 +976,7 @@ class UpdProxy(object):
           default `1` (directly above the bottom status line)
         * `upd`: the `Upd` instance with which to associate this proxy,
           default the default `Upd` instance (associated with `sys.stderr`)
-        * `text`: optional initial text fot the new status line
+        * `text`: optional initial text for the new status line
     '''
     self.upd = None
     self.index = None
@@ -991,6 +1027,14 @@ class UpdProxy(object):
     old_prefix, self._prefix = self._prefix, new_prefix
     if new_prefix != old_prefix:
       self.text = self._text
+
+  @contextmanager
+  def extend_prefix(self, more_prefix):
+    ''' Context manager to append text to the prefix.
+    '''
+    new_prefix = self.prefix + more_prefix
+    with stackattrs(self, prefix=new_prefix):
+      yield new_prefix
 
   @property
   def text(self):
@@ -1053,6 +1097,47 @@ class UpdProxy(object):
       if self.index is not None:
         index += self.index
       return upd.insert(index, txt)
+
+# pylint: disable=too-few-public-methods
+class _UpdState(StackableState):
+
+  def __getattr__(self, attr):
+    if attr == 'upd':
+      value = Upd()
+    else:
+      raise AttributeError("%s.%s" % (type(self).__name__, attr))
+    setattr(self, attr, value)
+    return value
+
+state = _UpdState()
+
+@decorator
+def upd_proxy(func, prefix=None, insert_at=1):
+  ''' Decorator to create a new `UpdProxy` and record it as `state.proxy`.
+
+      Parameters:
+      * `func`: the function to decorate
+      * `prefix`: initial proxy prefix, default `func.__name__`
+      * `insert_at`: the position for the new proxy, default `1`
+
+      Typical example:
+
+          from cs.upd import upd_proxy, state as upd_state
+          ...
+          @upd_proxy
+          def func*(self, ...):
+              proxy = upd_state.proxy
+              proxy.prefix = str(self) + " taskname"
+  '''
+  if prefix is None:
+    prefix = func.__name__
+
+  def upd_proxy_wrapper(*a, **kw):
+    with state.upd.insert(insert_at) as proxy:
+      with stackattrs(state, proxy=proxy):
+        return func(*a, **kw)
+
+  return upd_proxy_wrapper
 
 def demo():
   ''' A tiny demo function for visual checking of the basic functionality.

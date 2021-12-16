@@ -1,0 +1,2 @@
+New CornuCopyBuffer.from_filename factory method.
+New CornuCopyBuffer.peek method to examine the leading bytes from the buffer.

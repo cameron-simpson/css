@@ -1,15 +1,18 @@
 #!/usr/bin/python
 #
 # FUSE tests.
-#       - Cameron Simpson <cs@cskk.id.au> 10jul2014
+# - Cameron Simpson <cs@cskk.id.au> 10jul2014
 #
 
+from contextlib import contextmanager
 import os
 import sys
 import unittest
 from random import randint
+from tempfile import TemporaryDirectory
 from cs.fileutils import BackedFile, BackedFile_TestMethods
 from cs.logutils import warning
+from cs.testutils import SetupTeardownMixin
 from cs.x import X
 from . import defaults
 from .dir import Dir
@@ -22,23 +25,23 @@ from .store import MappingStore
 
 TESTDIR = 'vtfuse_testdir'
 
-class Test_VTFuse(unittest.TestCase):
+class Test_VTFuse(SetupTeardownMixin, unittest.TestCase):
   ''' Tests for `cs.vt.fuse`.
   '''
 
-  def setUp(self):
+  @contextmanager
+  def setupTeardown(self):
+    testname = type(self).__name__
     self.store_dict = {}
-    self.S = MappingStore('Test_VTFuse', self.store_dict)
-    defaults.pushStore(self.S)
-    if os.path.exists(TESTDIR):
-      X("rmdir %s", TESTDIR)
-      os.rmdir(TESTDIR)
-    os.mkdir(TESTDIR)
-    self.E = Dir(TESTDIR)
-    mount(TESTDIR, self.E, self.S)
-
-  def tearDown(self):
-    os.rmdir(TESTDIR)
+    self.S = MappingStore(testname, self.store_dict)
+    with self.S:
+      self.tmpdir = TemporaryDirectory(prefix=testname + '-', dir='.')
+      self.testdirpath = self.tmpdir.name
+      self.E = Dir(self.testdirpath)
+      mount(self.testdirpath, self.E, S=self.S)
+      yield
+    os.system("set -x; umount '%s'" % self.testdirpath)
+    del self.tmpdir
 
   @unittest.skipIf(mount is None, "no FUSE mount function")
   def test_FS(self):
