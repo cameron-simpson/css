@@ -21,10 +21,10 @@ from cs.threads import locked_property
 from . import _Recording
 
 # an "access poiint" record from the .ap file
-Enigma2APInfo = BinaryMultiValue('Enigma2APInfo', '>QQ', 'pts offset')
+Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
 
 # a "cut" record from the .cuts file
-Enigma2Cut = BinaryMultiValue('Enigma2Cut', '>QL', 'pts type')
+Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
