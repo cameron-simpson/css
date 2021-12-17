@@ -33,7 +33,6 @@ general facility to do things just once, particularly warnings - then port cs.pr
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
 cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
 cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
-use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
 @OBSOLETE(PfxThread) and replace uses with cs.threads.bg
 cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
 vbox: cmd to associate the current default interface before starting vm?
@@ -70,7 +69,6 @@ cs.contextutils: no_recursion(identity_value[,default_return_value]) context man
 cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
 mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
 BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
-media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
 resolve bin/maildb vs bin-cs/cs-maildb
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging
