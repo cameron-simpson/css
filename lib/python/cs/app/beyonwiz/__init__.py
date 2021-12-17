@@ -357,7 +357,7 @@ class _Recording(ABC, HasFSTagsMixin):
     # set up the initial source path, options and metadata
     ffinopts = {
         'loglevel': 'repeat+error',
-        'strict': None,
+        ##'strict': None,
         ##'2': None,
     }
     ff = ffmpeg.input(srcpath, **ffinopts)
@@ -376,7 +376,7 @@ class _Recording(ABC, HasFSTagsMixin):
     )
     if overwrite:
       ff = ff.overwrite_output()
-    print(ff.get_args())
+    print('ffmpeg', *map(repr, ff.get_args()))
     ff.run()
     return ok
 
