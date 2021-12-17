@@ -12,12 +12,12 @@ usage="Usage: $cmd subcommand [args...]
     Snapshot the current db as dbname--timestamp--comment-words.
 
   Environment:
-    \$PG_DATABASE   The current PostgreSQL database."
+    \$PGDATABASE   The current PostgreSQL database."
 
 trace=
 [ -t 2 ] && trace=set-x
 mode=postgres
-dbname=${PG_DATABASE:-''}
+dbname=${PGDATABASE:-''}
 
 badopts=
 
@@ -52,14 +52,14 @@ else
         }
       fi
       [ -n "$dbname" ] || {
-        echo "$cmdpfx: no database name specified eg from \$PG_DATABASE" >&2
+        echo "$cmdpfx: no database name specified eg from \$PGDATABASE" >&2
         badopts=1
       }
       ;;
     snapshot)
       snapshot_comment_words=$*
       [ -n "$dbname" ] || {
-        echo "$cmdpfx: no database name specified eg from \$PG_DATABASE" >&2
+        echo "$cmdpfx: no database name specified eg from \$PGDATABASE" >&2
         badopts=1
       }
       ;;
