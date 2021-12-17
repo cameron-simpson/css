@@ -32,7 +32,7 @@ class Enigma2(_Recording):
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
 
-  DEFAULT_FILENAME_BASIS = '{meta.title_lc}--{file.channel_lc}--beyonwiz--{file.datetime}--{meta.description_lc}'
+  DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
