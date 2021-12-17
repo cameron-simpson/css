@@ -16,6 +16,7 @@ from os.path import join as joinpath, isdir as isdirpath
 import re
 from threading import Lock
 from types import SimpleNamespace as NS
+
 from cs.app.ffmpeg import (
     multiconvert as ffmconvert,
     MetaData as FFmpegMetaData,
@@ -29,6 +30,7 @@ from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
+
 import ffmpeg
 
 DISTINFO = {
@@ -218,11 +220,11 @@ class _Recording(ABC, HasFSTagsMixin):
       format = self.DEFAULT_FILENAME_BASIS
     if not ext.startswith('.'):
       ext = '.' + ext
-    return crop_name(
-        format.format_map(self.metadata.ns()
-                          ).replace('\r', '_').replace('\n', '_') + ext,
-        ext=ext
-    )
+    md = self.metadata
+    full_filename = self.metadata.format_as(format
+                                            ).replace('\r',
+                                                      '_').replace('\n', '_')
+    return crop_name(full_filename + ext, ext=ext)
 
   @abstractmethod
   def data(self):
