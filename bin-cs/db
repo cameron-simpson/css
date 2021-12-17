@@ -43,8 +43,7 @@ else
     revert)
       if [ $# = 0 ]
       then
-        echo "$cmdpfx: missing snapshot-name" >&2
-        badopts=1
+        revert_snapshot_name=
       else
         revert_snapshot_name=$1; shift
         [ $# = 0 ] || {
@@ -52,9 +51,17 @@ else
           badopts=1
         }
       fi
+      [ -n "$dbname" ] || {
+        echo "$cmdpfx: no database name specified eg from \$PG_DATABASE" >&2
+        badopts=1
+      }
       ;;
     snapshot)
       snapshot_comment_words=$*
+      [ -n "$dbname" ] || {
+        echo "$cmdpfx: no database name specified eg from \$PG_DATABASE" >&2
+        badopts=1
+      }
       ;;
     *)echo "$cmdpfx: unrecognised subcommand" >&2
       badopts=1
@@ -71,14 +78,19 @@ case "$subcmd" in
       fi
       ;;
   revert)
-    psql -- "$revert_snapshot_name" </dev/null || {
-      echo "$cmdpfx: unknown database name: $revert_snapshot_name" >&2
-      exit 1
-    }
-    ( echo "DROP DATABASE \"$dbname\";"
-      echo "CREATE DATABASE \"$dbname\" TEMPLATE \"$revert_snapshot_name\";"
-    ) | $trace psql -e -- "$revert_snapshot_name"
-    exit $?
+    if [ -z "$revert_snapshot_name" ]
+    then
+      "$0" ls | sed -n "s|^ \\($dbname--[^ ]*\\).*|\\1|p"
+    else
+      psql -- "$revert_snapshot_name" </dev/null || {
+        echo "$cmdpfx: unknown database name: $revert_snapshot_name" >&2
+        exit 1
+      }
+      ( echo "DROP DATABASE \"$dbname\";"
+        echo "CREATE DATABASE \"$dbname\" TEMPLATE \"$revert_snapshot_name\";"
+      ) | $trace psql -e -- "$revert_snapshot_name"
+      exit $?
+    fi
     ;;
   snapshot)
     if [ -z "$snapshot_comment_words" ]
@@ -89,7 +101,8 @@ case "$subcmd" in
       suffix=$( printf '%s\n' "$snapshot_comment_words" | tr ' ' - )
       snapshot_dbname=$dbname--$timestamp--$suffix
       echo "new snapshot: $snapshot_dbname"
-      echo "CREATE DATABASE \"$snapshot_dbname\" TEMPLATE \"$dbname\"" | $trace psql -e -d "$dbname"
+      echo "CREATE DATABASE \"$snapshot_dbname\" TEMPLATE \"$dbname\"" \
+      | $trace psql -e -d "$dbname"
       exit $?
     fi
     ;;
