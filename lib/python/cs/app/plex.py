@@ -81,8 +81,9 @@ class PlexCommand(BaseCommand):
       with Pfx(srcroot):
         for filepath in sorted(rfilepaths(srcroot)):
           with Pfx(filepath):
-            tags = fstags[filepath].format_tagset()
-            print(linkpath(filepath, dstroot, tags, update_mode=update_mode))
+            tagged_path = fstags[filepath]
+            subpath = plex_subpath(tagged_path)
+            print(subpath, "<=", basename(filepath))
 
 @pfx
 def subpath(tags):
