@@ -85,9 +85,8 @@ class PlexCommand(BaseCommand):
             subpath = plex_subpath(tagged_path)
             print(subpath, "<=", basename(filepath))
 
-@pfx
-def subpath(tags):
-  ''' Compute a Plex filesystem subpath based on the `TagSet` `tags`.
+def plex_subpath(tagged_path):
+  ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
   ns = tags.ns()
   title = ns.series_title_s or ns.title_s
