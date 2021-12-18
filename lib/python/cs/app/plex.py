@@ -120,7 +120,7 @@ def plex_subpath(tagged_path):
 def linkpath(srcpath, dstroot, tags, update_mode=False):
   ''' Symlink `srcpath` to the approriate name under `dstroot` based on `tags`.
   '''
-  dstbase = subpath(tags)
+  dstbase = plex_subpath(tags)
   _, srcext = splitext(basename(srcpath))
   linkpath = abspath(srcpath)
   dstpath = joinpath(dstroot, dstbase + srcext)
