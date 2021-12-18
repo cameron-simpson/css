@@ -88,26 +88,21 @@ class PlexCommand(BaseCommand):
 def plex_subpath(tagged_path):
   ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
-  ns = tags.ns()
-  title = ns.series_title_s or ns.title_s
-  if not title:
-    raise ValueError("no title")
-  season = ns.season_i
-  episode = ns.episode_i
-  episode_title = ns.episode_title_s
-  extra = ns.extra_i
-  part = ns.part_i
+  base, ext = splitext(basename(tagged_path.filepath))
+  title = tagged_path.series_title or tagged_path.title or base
+  season = tagged_path.season and int(tagged_path.season)
+  episode = tagged_path.episode and int(tagged_path.episode)
+  episode_title = tagged_path.episode_title
+  extra = tagged_path.extra and int(tagged_path.extra)
+  part = tagged_path.part and int(tagged_path.part)
   is_tv_episode = bool(season and (episode or extra))
   dstbase = title
   if is_tv_episode:
     # TV Series
-    season = int(season)
     dstpath = ['TV Shows', title, f'Season {season:02d}']
-    if episode:
-      episode = int(episode)
+    if tagged_path.episode:
       dstbase += f' - s{season:02d}e{episode:02d}'
     else:
-      extra = int(extra)
       dstbase += f' - s{season:02d}x{extra:02d}'
   else:
     # Movie
@@ -120,7 +115,7 @@ def plex_subpath(tagged_path):
     dstbase += f' - pt{part:d}'
   dstbase = dstbase.replace('/', '::')
   dstpath.append(dstbase)
-  return joinpath(*dstpath)
+  return joinpath(*dstpath) + ext
 
 def linkpath(srcpath, dstroot, tags, update_mode=False):
   ''' Symlink `srcpath` to the approriate name under `dstroot` based on `tags`.
