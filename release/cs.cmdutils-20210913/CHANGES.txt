@@ -1,0 +1,3 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: new apply_preargv method to gather special arguments before subcommands
+lib/python/cs/cmdutils.py: cs.cmdutils: imports, lint
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.apply_opts: improve Pfx context

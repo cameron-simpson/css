@@ -2676,10 +2676,7 @@ def parse_tags(path, tag_prefix=None):
         if tags:
           if tag_prefix:
             new_tags = TagSet()
-            new_tags.update(
-                Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
-                for tag in tags
-            )
+            new_tags.update(Tag(tag, prefix=tag_prefix) for tag in tags)
             tags = new_tags
           yield box, tags
 

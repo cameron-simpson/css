@@ -119,19 +119,15 @@ def scan_vtd(bfr):
 def scan_mp3(bfr):
   ''' Scan MP3 data from `bfr` and yield frame start offsets.
   '''
-  from cs.mp3 import framesof as parse_mp3_from_buffer
-  with Pfx("scan_mp3"):
-
-    def run_parser(bfr):
-      for _ in parse_mp3_from_buffer(bfr):
-        pass
-
-    return report_offsets(bfr, run_parser)
-
-scan_mp3_from_chunks = chunky(scan_mp3)
+  from cs.mp3 import MP3Frame
+  for frame in MP3Frame.scan(bfr):
+    yield bfr.offset
 
 def scan_mp4(bfr):
   ''' Scan ISO14496 input and yield Box start offsets.
+
+      This is more complex than the MP3 scanner because Boxes nest
+      in the MP4 structure.
   '''
   from cs.iso14496 import Box
   with Pfx("parse_mp4"):
@@ -145,7 +141,7 @@ def scan_mp4(bfr):
 parse_mp4_from_chunks = chunky(scan_mp4)
 
 def scanner_from_filename(filename):
-  ''' Choose a scanner based a filename.
+  ''' Choose a scanner based on a filename.
       Returns None if these is no special scanner.
   '''
   _, ext = splitext(basename(filename))
@@ -157,7 +153,7 @@ def scanner_from_filename(filename):
   return None
 
 def scanner_from_mime_type(mime_type):
-  ''' Choose a scanner based a mime_type.
+  ''' Choose a scanner based on a mime_type.
   '''
   return SCANNERS_BY_MIME_TYPE.get(mime_type)
 

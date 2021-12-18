@@ -1,0 +1,6 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: note TODO about indentation formatting bug with BaseCommand.__init_subclass__
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init_subclass__: fix indentation by dedenting the original docstring
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.apply_opts: drop redundant assignment; improve an exception message
+lib/python/cs/cmdutils.py: cs.cmdutils: cosmetic changes
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.getopt_error_handler: replace error print() with warning()
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.getopt_error_handler: update docstring

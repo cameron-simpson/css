@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Run my mail collection stuff once.
+# - Cameron Simpson <cs@cskk.id.au> 10apr2021
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+# run "pop3 dl"
+while read account spool <&3
+do
+  $trace pop3 dl "$account" "$spool" 3<&-
+done 3<$HOME/rc-local/pop3_dl
+
+# run "getmail"
+lastvalue getmail \
+| while read -r getm
+  do
+    $trace getmail -r "$getm" </dev/null
+  done

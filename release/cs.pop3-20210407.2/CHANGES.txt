@@ -1,0 +1,1 @@
+lib/python/cs/pop3.py: cs.pop3: provide "pop3" console_script

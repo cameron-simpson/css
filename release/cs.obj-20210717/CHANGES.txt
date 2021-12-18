@@ -1,0 +1,2 @@
+lib/python/cs/obj.py: cs.obj: improve incomplete docstring
+lib/python/cs/obj.py: cs.obj: SingletonMixin: if cls._singleton_key returns None we always make a new instance and do not registr it

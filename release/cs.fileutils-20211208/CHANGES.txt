@@ -1,0 +1,5 @@
+lib/python/cs/fileutils.py: cs.fileutils: fix message typo
+lib/python/cs/fileutils.py: cs.fileutils: @atomic_filename: make doctest clean up, escape a slosh
+lib/python/cs/fileutils.py: cs.fileutils,cs.ndjson: move NDJSON code from cs.fileutils to cs.ndjson
+lib/python/cs/fileutils.py: cs.fileutils: drop no longer used imports and requirements
+lib/python/cs/fileutils.py: cs.fileutils: new gzifopen to open either a gzipped file or an uncompressed file; adjust import for move of TimeoutError

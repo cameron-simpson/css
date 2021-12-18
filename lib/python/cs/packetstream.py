@@ -35,7 +35,7 @@ def tick_fd_2(bs):
   '''
   os.write(2, bs)
 
-__version__ = '20210306-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -88,7 +88,8 @@ class Packet(SimpleBinary):
     return (
         bool(self.is_request) == bool(other.is_request)
         and self.channel == other.channel and self.tag == other.tag
-        and self.flags == other.flags and self.rq_type == other.rq_type
+        and self.flags == other.flags
+        and (not self.is_request or self.rq_type == other.rq_type)
         and self.payload == other.payload
     )
 

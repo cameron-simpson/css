@@ -6,7 +6,7 @@
 from contextlib import contextmanager
 import threading
 try:
-  from contextlib import nullcontext  # pylint: disable=unused-import
+  from contextlib import nullcontext  # pylint: disable=unused-import,ungrouped-imports
 except ImportError:
 
   @contextmanager
@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20210306-post'
+__version__ = '20211115.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -277,33 +277,61 @@ def stackkeys(d, **key_values):
 def twostep(cmgr):
   ''' Return a generator which operates the context manager `cmgr`.
 
-      See also the `setup_cmgr(cmgr)` function
-      which is a convenience wrapper for this low level generator.
+      The first iteration performs the "enter" phase and yields the result.
+      The second iteration performs the "exit" phase and yields `None`.
+
+      See also the `push_cmgr(obj,attr,cmgr)` function
+      and its partner `pop_cmgr(obj,attr)`
+      which form a convenience wrapper for this low level generator.
 
       The purpose of `twostep()` is to split any context manager's operation
-      across two steps when the set up and teardown phases must operate
+      across two steps when the set up and tear down phases must operate
       in different parts of your code.
       A common situation is the `__enter__` and `__exit__` methods
-      of another context manager class.
+      of another context manager class
+      or the `setUp` and `tearDown` methods of a unit test case.
 
-      The first iteration performs the "enter" phase and yields.
-      The second iteration performs the "exit" phase and yields.
+      *Note*:
+      this function expects `cmgr` to be an existing context manager
+      and _not_ the function which returns the context manager.
 
-      Example use in a class:
+      In particular, if you define some function like this:
+
+          @contextmanager
+          def my_cmgr_func(...):
+              ...
+              yield
+              ...
+
+      then the correct use of `twostep()` is:
+
+          cmgr_iter = twostep(my_cmgr_func(...))
+          next(cmgr_iter)   # set up
+          next(cmgr_iter)   # tear down
+
+      and _not_:
+
+          cmgr_iter = twostep(my_cmgr_func)
+          next(cmgr_iter)   # set up
+          next(cmgr_iter)   # tear down
+
+      Example use in a class (but really, use `push_cmgr`/`pop_cmgr` instead):
 
           class SomeClass:
               def __init__(self, foo)
                   self.foo = foo
-                  self._cmgr = None
+                  self._cmgr_ = None
               def __enter__(self):
-                  self._cmgr = next(stackattrs(o, setting=foo))
+                  self._cmgr_stepped = twostep(stackattrs(o, setting=foo))
+                  self._cmgr = next(self._cmgr_stepped)
+                  return self._cmgr
               def __exit__(self, *_):
-                  next(self._cmgr)
+                  next(self._cmgr_stepped)
                   self._cmgr = None
   '''
-  with cmgr:
-    yield cmgr
-  yield cmgr
+  with cmgr as enter:
+    yield enter
+  yield
 
 def setup_cmgr(cmgr):
   ''' Run the set up phase of the context manager `cmgr`
@@ -311,6 +339,27 @@ def setup_cmgr(cmgr):
 
       This is a convenience wrapper for the lower level `twostep()` function
       which produces a two iteration generator from a context manager.
+
+      Please see the `push_cmgr` function, a superior wrapper for `twostep()`.
+
+      *Note*:
+      this function expects `cmgr` to be an existing context manager.
+      In particular, if you define some context manager function like this:
+
+          @contextmanager
+          def my_cmgr_func(...):
+              ...
+              yield
+              ...
+
+      then the correct use of `setup_cmgr()` is:
+
+          teardown = setup_cmgr(my_cmgr_func(...))
+
+      and _not_:
+
+          cmgr_iter = setup_cmgr(my_cmgr_func)
+          ...
 
       The purpose of `setup_cmgr()` is to split any context manager's operation
       across two steps when the set up and teardown phases must operate
@@ -331,9 +380,154 @@ def setup_cmgr(cmgr):
               def __enter__(self):
                   self._teardown = setup_cmgr(stackattrs(o, setting=foo))
               def __exit__(self, *_):
-                  self._teardown()
-                  self._teardown = None
+                  teardown, self._teardown = self._teardown, None
+                  teardown()
   '''
   cmgr_twostep = twostep(cmgr)
   next(cmgr_twostep)
   return lambda: next(cmgr_twostep)
+
+def push_cmgr(o, attr, cmgr):
+  ''' A convenience wrapper for `twostep(cmgr)`
+      to run the `__enter__` phase of `cmgr` and save its value as `o.`*attr*`.
+      Return the result of the `__enter__` phase.
+
+      The `__exit__` phase is run by `pop_cmgr(o,attr)`,
+      returning the return value of the exit phase.
+
+      Example use in a unit test:
+
+          class TestThing(unittest.TestCase):
+              def setUp(self):
+                  # save the temp dir path as self.dirpath
+                  push_cmgr(self, 'dirpath', TemporaryDirectory())
+              def tearDown(self):
+                  # clean up the temporary directory, discard self.dirpath
+                  pop_cmgr(self, 'dirpath')
+
+      The `cs.testutils` `SetupTeardownMixin` class does this
+      allowing the provision of a single `setupTeardown()` context manager method
+      for test case setUp/tearDown.
+
+      Doc test:
+
+          >>> from os.path import isdir as isdirpath
+          >>> from tempfile import TemporaryDirectory
+          >>> from types import SimpleNamespace
+          >>> obj = SimpleNamespace()
+          >>> dirpath = push_cmgr(obj, 'path', TemporaryDirectory())
+          >>> assert dirpath == obj.path
+          >>> assert isdirpath(dirpath)
+          >>> pop_cmgr(obj, 'path')
+          >>> assert not hasattr(obj, 'path')
+          >>> assert not isdirpath(dirpath)
+  '''
+  cmgr_twostep = twostep(cmgr)
+  enter_value = next(cmgr_twostep)
+  pop_func = lambda: (popattrs(o, (attr,), pushed), next(cmgr_twostep))[1]
+  pop_func_attr = '_push_cmgr__popfunc__' + attr
+  pushed = pushattrs(o, **{attr: enter_value, pop_func_attr: pop_func})
+  return enter_value
+
+def pop_cmgr(o, attr):
+  ''' Run the `__exit__` phase of a context manager commenced with `push_cmgr`.
+      Restore `attr` as it was before `push_cmgr`.
+      Return the result of `__exit__`.
+  '''
+  pop_func = getattr(o, '_push_cmgr__popfunc__' + attr)
+  return pop_func()
+
+class ContextManagerMixin:
+  ''' A mixin to provide context manager `__enter__` and `__exit__` methods
+      running the first and second steps of a single `__enter_exit__` generator method.
+
+      This makes it easy to use context managers inside `__enter_exit__`
+      as the setup/teardown process, for example:
+
+          def __enter_exit__(self):
+              with open(self.datafile, 'r') as f:
+                  yield f
+
+      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
+      Like a context manager created via `@contextmanager`
+      it performs the setup phase and then `yield`s the value for the `with` statement.
+      If `None` is `yield`ed (as from a bare `yield`)
+      then `self` is returned from `__enter__`.
+      As with `@contextmanager`,
+      if there was an exception in the managed suite
+      then that exception is raised on return from the `yield`.
+
+      *However*, and _unlike_ an `@contextmanager` method,
+      the `__enter_exit__` generator _may_ also `yield`
+      an additional true/false value to use as the result
+      of the `__exit__` method, to indicate whether the exception was handled.
+      This extra `yield` is _optional_ and if it is omitted the `__exit__` result
+      will be `False` indicating that an exception was not handled.
+
+      Here is a sketch of a method which can handle a `SomeException` specially:
+
+          class CMgr(ContextManagerMixin):
+              def __enter_exit__(self):
+                  ... do some setup here ...
+                  # Returning self is common, but might be any relevant value.
+                  # Note that ifyou want `self`, you can just use a bare yield
+                  # and ContextManagerMixin will provide `self` as the default.
+                  enter_result = self
+                  exit_result = False
+                  try:
+                      yield enter_result
+                  except SomeException as e:
+                      ... handle e ...
+                      exit_result = True
+                  finally:
+                      ... do tear down here ...
+                  yield exit_result
+  '''
+
+  def __enter__(self):
+    ''' Run `super().__enter__` (if any)
+        then the `__enter__` phase of `self.__enter_exit__()`.
+    '''
+    try:
+      super_enter = super().__enter__
+    except AttributeError:
+      pass
+    else:
+      super_enter()
+    eegen = self.__enter_exit__()
+    enter_value = next(eegen)
+    if enter_value is None:
+      enter_value = self
+    pushed = {}
+    pushed.update(pushattrs(self, _ContextManagerMixin__state=(eegen, pushed)))
+    return enter_value
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    ''' Run the `__exit__` step of `self.__enter_exit__()`,
+        then `super().__exit__` (if any).
+    '''
+    # get generator, restore attributes
+    eegen, pushed = self._ContextManagerMixin__state
+    popattrs(self, ('_ContextManagerMixin__state',), pushed)
+    # return to the generator to run the __exit__ phase
+    try:
+      if exc_type:
+        exit_result = eegen.throw(exc_type, exc_value, traceback)
+      else:
+        exit_result = next(eegen)
+    except StopIteration:
+      # there was no optional extra yield
+      exit_result = None
+    else:
+      if exit_result:
+        # exception handled, conceal it from the super method
+        exc_type, exc_value, traceback = None, None, None
+    try:
+      super_exit = super().__exit__
+    except AttributeError:
+      # no super __exit__, skip
+      pass
+    else:
+      if super_exit(exc_type, exc_value, traceback):
+        exit_result = True
+    return exit_result

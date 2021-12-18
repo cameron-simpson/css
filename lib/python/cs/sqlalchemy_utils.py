@@ -3,19 +3,29 @@
 ''' Assorted utility functions to support working with SQLAlchemy.
 '''
 
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from inspect import isgeneratorfunction
 import logging
-from sqlalchemy import Column, Integer
+import os
+from os.path import abspath
+from threading import current_thread, Lock
+from sqlalchemy import Column, Integer, create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.pool import NullPool
 from icontract import require
 from cs.deco import decorator, contextdecorator
+from cs.fileutils import makelockfile
+from cs.lex import cutprefix
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20210306-post'
+__version__ = '20210420-post'
 
 DISTINFO = {
     'description':
@@ -30,6 +40,10 @@ DISTINFO = {
         'icontract',
         'sqlalchemy',
         'cs.deco',
+        'cs.fileutils',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
         'cs.py.func',
         'cs.resources',
         'cs.threads',
@@ -40,9 +54,15 @@ class SQLAState(State):
   ''' Thread local state for SQLAlchemy ORM and session.
   '''
 
-  def __init__(self, *, orm, session=None, **kw):
+  def __init__(
+      self, *, orm, engine=None, session=None, sessionmaker=None, **kw
+  ):
     # enforce provision of an ORM, default session=None
-    super().__init__(orm=orm, session=session, **kw)
+    super().__init__(**kw)
+    self.orm = orm
+    self.engine = engine
+    self.session = session
+    self.sessionmaker = sessionmaker
 
   @contextmanager
   def new_session(self, *, orm=None):
@@ -55,9 +75,10 @@ class SQLAState(State):
             "%s.new_session: no orm supplied and no self.orm" %
             (type(self).__name__,)
         )
-    with orm.session() as session:
-      with self(orm=orm, session=session):
-        yield session
+    with orm.arranged_session() as session:
+      with session.begin_nested():
+        with self(orm=orm, session=session):
+          yield session
 
   @contextmanager
   def auto_session(self, *, orm=None):
@@ -65,11 +86,13 @@ class SQLAState(State):
         if not `None`, otherwise to make one using `orm` or `self.orm`.
     '''
     session = self.session
-    if session is None:
+    if session is None or (orm is not None and orm is not self.orm):
+      # new session required
       with self.new_session(orm=orm) as session:
         yield session
     else:
-      yield session
+      with session.begin_nested():
+        yield session
 
 # global state, not tied to any specific ORM or session
 state = SQLAState(orm=None, session=None)
@@ -164,18 +187,23 @@ def auto_session(function):
 
   if isgeneratorfunction(function):
 
-    def wrapper(*a, orm=None, session=None, **kw):
+    def auto_session_generator_wrapper(*a, orm=None, session=None, **kw):
       ''' Yield from the function with a session.
       '''
       with using_session(orm=orm, session=session) as active_session:
         yield from function(*a, session=active_session, **kw)
+
+    wrapper = auto_session_generator_wrapper
+
   else:
 
-    def wrapper(*a, orm=None, session=None, **kw):
+    def auto_session_function_wrapper(*a, orm=None, session=None, **kw):
       ''' Call the function with a session.
       '''
       with using_session(orm=orm, session=session) as active_session:
         return function(*a, session=active_session, **kw)
+
+    wrapper = auto_session_function_wrapper
 
   wrapper.__name__ = "@auto_session(%s)" % (funccite(function,),)
   wrapper.__doc__ = function.__doc__
@@ -199,7 +227,8 @@ def log_level(func, a, kw, level=None):  # pylint: disable=unused-argument
   finally:
     logger.setLevel(old_level)
 
-class ORM(MultiOpenMixin):
+# pylint: disable=too-many-instance-attributes
+class ORM(MultiOpenMixin, ABC):
   ''' A convenience base class for an ORM class.
 
       This defines a `.Base` attribute which is a new `DeclarativeBase`
@@ -208,89 +237,175 @@ class ORM(MultiOpenMixin):
       supporting nested open/close sequences and use as a context manager.
 
       Subclasses must define the following:
-      * `.Session`: a factory in their own `__init__`, typically
-        `self.Session=sessionmaker(bind=engine)`
       * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
         even if these just `pass`
   '''
 
-  def __init__(self):
+  @pfx_method
+  def __init__(self, db_url, serial_sessions=None):
+    ''' Initialise the ORM.
+
+        If `serial_sessions` is true (default `False`)
+        then allocate a lock to serialise session allocation.
+        This might be chosen with SQL backends which do not support
+        concurrent sessions such as SQLite.
+
+        In the case of SQLite there's a small inbuilt timeout in
+        an attempt to serialise transactions but it is possible to
+        exceed it easily and recovery is usually infeasible.
+        Instead we use the `serial_sessions` option to obtain a
+        mutex before allocating a session.
+    '''
+    db_fspath = cutprefix(db_url, 'sqlite://')
+    if db_fspath is db_url:
+      # no leading "sqlite://"
+      if db_url.startswith(('/', './', '../')) or '://' not in db_url:
+        # turn filesystenm pathnames into SQLite db URLs
+        db_fspath = abspath(db_url)
+        db_url = 'sqlite:///' + db_url
+      else:
+        # sqlite://memory or something - no filesystem object
+        db_fspath = None
+    self.db_url = db_url
+    self.db_fspath = db_fspath
+    is_sqlite = db_url.startswith('sqlite://')
+    if serial_sessions is None:
+      # serial SQLite sessions
+      serial_sessions = is_sqlite
+    elif not serial_sessions:
+      if is_sqlite:
+        warning(
+            "serial_sessions specified as %r, but is_sqlite=%s:"
+            " this may cause trouble with multithreaded use",
+            serial_sessions,
+            is_sqlite,
+        )
+    self.serial_sessions = serial_sessions or is_sqlite
+    self._lockfilepath = None
     self.Base = declarative_base()
-    self.Session = None
-    self.sqla_state = SQLAState(orm=self)
+    self.sqla_state = SQLAState(
+        orm=self, engine=None, sessionmaker=None, session=None
+    )
+    if serial_sessions:
+      self._serial_sessions_lock = Lock()
+    else:
+      self._engine = None
+      self._sessionmaker_raw = None
+    self.db_url = db_url
+    self.engine_keywords = {}
+    self.engine_keywords = dict(
+        case_sensitive=True,
+        echo=(
+            bool(os.environ.get('DEBUG'))
+            or 'echo' in os.environ.get('SQLTAGS_MODES', '').split(',')
+        ),  # 'debug'
+    )
+    if is_sqlite:
+      # do not pool these connects and disable the Thread check
+      # because we
+      self.engine_keywords.update(
+          poolclass=NullPool, connect_args={'check_same_thread': False}
+      )
+    self.declare_schema()
+
+  @abstractmethod
+  def declare_schema(self):
+    ''' Declare the database schema / ORM mapping.
+        This just defines the relation types etc.
+        It *does not* act on the database itself.
+        It is called automatically at the end of `__init__`.
+
+        Example:
+
+            def declare_schema(self):
+              """ Define the database schema / ORM mapping.
+              """
+              orm = self
+              Base = self.Base
+              class Entities(
+              ........
+              self.entities = Entities
+
+        After this, methods can access the example `Entities` relation
+        as `self.entites`.
+    '''
+    raise NotImplementedError("declare_schema")
+
+  def startup(self):
+    ''' Startup: define the tables if not present.
+    '''
+    if self.db_fspath:
+      self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
+
+  def shutdown(self):
+    ''' Stub shutdown.
+    '''
+    if self._lockfilepath is not None:
+      with Pfx("remove(%r)", self._lockfilepath):
+        os.remove(self._lockfilepath)
+      self._lockfilepath = None
+
+  @property
+  def engine(self):
+    ''' SQLAlchemy engine, made on demand.
+    '''
+    orm_state = self.sqla_state
+    if self.serial_sessions:
+      engine = orm_state.engine
+    else:
+      engine = self._engine
+    if engine is None:
+      engine = create_engine(self.db_url, **self.engine_keywords)
+      self._engine = engine
+      orm_state.engine = engine  # pylint: disable=attribute-defined-outside-init
+    return engine
+
+  @property
+  def _sessionmaker(self):
+    ''' SQLAlchemy sessionmaker for the current `Thread`.
+    '''
+    orm_state = self.sqla_state
+    if self.serial_sessions:
+      sessionmaker = orm_state.sessionmaker
+    else:
+      sessionmaker = self._sessionmaker_raw
+    if sessionmaker is None:
+      sessionmaker = sqla_sessionmaker(bind=self.engine)
+      self._sessionmaker_raw = sessionmaker
+      orm_state.sessionmaker = sessionmaker  # pylint: disable=attribute-defined-outside-init
+    return sessionmaker
 
   @contextmanager
-  def session(self, *a, **kw):
-    ''' Context manager to issue a new session and close it down.
-
-        Note that this performs a `COMMIT` or `ROLLBACK` at the end.
+  @pfx_method(use_str=True)
+  def arranged_session(self):
+    ''' Arrange a new session for this `Thread`.
     '''
+    orm_state = self.sqla_state
     with self:
-      new_session = self.Session(*a, **kw)
-      with using_session(orm=self, session=new_session):
-        try:
+      if self.serial_sessions:
+        if orm_state.session is not None:
+          T = current_thread()
+          tid = "Thread:%d:%s" % (T.ident, T.name)
+          raise RuntimeError(
+              "%s: this Thread already has an ORM session: %s" % (
+                  tid,
+                  orm_state.session,
+              )
+          )
+        with self._serial_sessions_lock:
+          new_session = self._sessionmaker()
+          with new_session.begin_nested():
+            yield new_session
+      else:
+        new_session = self._sessionmaker()
+        with new_session.begin_nested():
           yield new_session
-          new_session.commit()
-        except:
-          new_session.rollback()
-          raise
-        finally:
-          new_session.close()
 
-  @staticmethod
-  def auto_session(method):
-    ''' Decorator to run a method in a session derived from this ORM
-        if a session is not presupplied.
-
-        See `with_session` for details.
+  @property
+  def default_session(self):
+    ''' The current per-`Thread` session.
     '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          yield from method(self, *a, session=session, **kw)
-    else:
-
-      def wrapper(self, *a, session=None, **kw):
-        ''' Prepare a session if one is not supplied.
-        '''
-        with using_session(session=session, orm=self):
-          return method(self, *a, session=session, **kw)
-
-    wrapper.__name__ = "@ORM.auto_session(%s)" % (funcname(method),)
-    wrapper.__doc__ = method.__doc__
-    wrapper.__module__ = getattr(method, '__module__', None)
-    return wrapper
-
-  @staticmethod
-  def orm_method(method):
-    ''' Decorator for ORM subclass methods
-        to set the shared state `orm` to `self`.
-    '''
-
-    if isgeneratorfunction(method):
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared state `orm`.
-        '''
-        with state(orm=self):
-          yield from method(self, *a, **kw)
-    else:
-
-      def wrapper(self, *a, **kw):
-        ''' Call `method` with its ORM as the shared state `orm`.
-        '''
-        with state(orm=self):
-          return method(self, *a, **kw)
-
-    wrapper.__name__ = method.__name__
-    wrapper.__doc__ = method.__doc__
-    return wrapper
-
-orm_method = ORM.orm_method
+    return self.sqla_state.session
 
 def orm_auto_session(method):
   ''' Decorator to run a method in a session derived from `self.orm`

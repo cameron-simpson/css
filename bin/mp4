@@ -5,9 +5,6 @@
 #
 
 import sys
-from os.path import basename
+sys.path[:] = [ path for path in sys.path if path ]
 from cs.iso14496 import main
-
-argv = list(sys.argv)
-argv[0] = basename(argv[0])
-sys.exit(main(argv))
+sys.exit(main(sys.argv))

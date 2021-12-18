@@ -1,0 +1,1 @@
+Update parse() for new structure in the scale definitions.

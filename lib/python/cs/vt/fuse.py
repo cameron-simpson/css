@@ -285,7 +285,6 @@ class StoreFS_LLFUSE(llfuse.Operations):
     # llfuse reads additional mount options from the fsname :-(
     fsname = fsname.replace(',', ':')
     with S:
-      defaults.push_Ss(S)
       opts = set(self._vt_llf_opts)
       opts.add("fsname=" + fsname)
       ##opts.add('noappledouble')
@@ -300,10 +299,10 @@ class StoreFS_LLFUSE(llfuse.Operations):
         '''
         with stackattrs(defaults, fs=fs):
           with S:
-            llfuse.main(workers=32)
-            llfuse.close()
+            with defaults.common_S(S):
+              llfuse.main(workers=32)
+              llfuse.close()
         S.close()
-        defaults.pop_Ss()
 
       T = PfxThread(target=mainloop)
       S.open()

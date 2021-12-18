@@ -1,0 +1,1 @@
+lib/python/cs/queues.py: cs.queues: Channel: make a Channel iterable

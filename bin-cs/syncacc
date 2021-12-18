@@ -49,7 +49,7 @@ dosync()
   shift; shift
 
   $trace \
-    mrsync -rlptOHCi --delete \
+    mrsync -rptOHCli --delete \
         '--no-implied-dirs' \
         '--exclude=.DS_Store' \
         '--exclude=.zsh_history' \
@@ -60,7 +60,8 @@ dosync()
         '--exclude=*.pyc' \
         '--exclude=__pycache__/' \
         ${1+"$@"} \
-        "$_ds_from." "$_ds_to."
+        "$_ds_from." "$_ds_to." \
+  | fgrep -v ': skipping non-regular file "'
 }
 
 # common files

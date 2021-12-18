@@ -1,0 +1,5 @@
+ORM: drop .Session from docstring, no longer used.
+Rename ORM.sessionmaker to ORM._sessionmaker, not for public use.
+ORM: replace session with arranged_session, which allocates a session in conformance with ORM.serial_sessions (serial sessions are used with SQLite).
+Drop @ORM.auto_session and @ORM.orm_method decorators, no longer used.
+SQLAState.new_session: use orm.arranged_session(), use begin_nested(); SQLAState.auto_session: use begin_nested().

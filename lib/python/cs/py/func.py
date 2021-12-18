@@ -9,9 +9,10 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
+from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 
-__version__ = '20200518-post'
+__version__ = '20210913-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -20,7 +21,11 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.py3'],
+    'install_requires': [
+        'cs.deco',
+        'cs.py3',
+        'cs.x',
+    ],
 }
 
 def funcname(func):
@@ -33,6 +38,8 @@ def funcname(func):
     try:
       return func.__name__
     except AttributeError:
+      if isinstance(func, partial):
+        return "partial(%s)" % (funcname(func.func),)
       return str(func)
 
 def funccite(func):
@@ -43,6 +50,60 @@ def funccite(func):
   except AttributeError:
     return "%s[no.__code__]" % (repr(func),)
   return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+
+def func_a_kw_fmt(func, *a, **kw):
+  ''' Prepare a percent-format string and associated argument list
+      describing a call to `func(*a,**kw)`.
+      Return `format,args`.
+
+      The `func` argument can also be a string,
+      presumably a prepared description of `func` such as `funccite(func)`.
+  '''
+  av = [
+      func if isinstance(func, str) else getattr(func, '__name__', str(func))
+  ]
+  afv = ['%r'] * len(a)
+  av.extend(a)
+  afv.extend(['%s=%r'] * len(kw))
+  for kv in kw.items():
+    av.extend(kv)
+  return '%s(' + ','.join(afv) + ')', av
+
+@decorator
+def trace(func, call=True, retval=False, exception=False, pfx=False):
+  ''' Decorator to report the call and return of a function.
+  '''
+
+  citation = funccite(func)
+
+  def traced_function_wrapper(*a, **kw):
+    ''' Wrapper for `func` to trace call and return.
+    '''
+    # late import so that we can use this in modules we import
+    if pfx:
+      try:
+        from cs.pfx import XP as xlog
+      except ImportError:
+        from cs.x import X as xlog
+    else:
+      from cs.x import X as xlog
+    if call:
+      fmt, av = func_a_kw_fmt(citation, *a, **kw)
+      xlog("CALL " + fmt, *av)
+    try:
+      retval = func(*a, **kw)
+    except Exception as e:
+      if exception:
+        xlog("CALL %s RAISE %r", citation, e)
+      raise
+    else:
+      if retval:
+        xlog("CALL %s RETURN %r", citation, retval)
+      return retval
+
+  traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
+  traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
+  return traced_function_wrapper
 
 def callmethod_if(o, method, default=None, a=None, kw=None):
   ''' Call the named `method` on the object `o` if it exists.

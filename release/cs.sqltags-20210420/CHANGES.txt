@@ -1,0 +1,16 @@
+lib/python/cs/sqltags.py: cs.sqltags: new PolyValueMixin pulled out of Tags for common support of the (float_value,string_value,structured_value)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: new TagSubValues containing broken out values for values which are sequences, to support efficient lookup if sequence values such as log entry categories
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM: new Entities._update_multivalues: maintain the TagSubValues entries
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.Entities._update_multivalues: silently skip uniterables values
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.prepare_metanode: make sure the new metanode entities is part of the session before adding tags
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.db_session: obtain the session via self.orm.sqla_state
+lib/python/cs/sqltags.py: cs.sqltags: update db_session methods
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.define_schema: obtain a session
+lib/python/cs/sqltags.py: cs.sqltags: new BaseSQLTagsCommand.parse_categories static method to parse FOO,BAH into ['foo','bah']
+lib/python/cs/sqltags.py: cs.sqltags: sqltags find: change default format to "{datetime} {headline}"
+lib/python/cs/sqltags.py: cs.sqltags: SQLTagsORM.search: new optional `order_by` and `limit` parameters (UNTESTED, and `limit` presently unused)
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.find: new optional `order_by` and `limit` parameters, plumbed to `SQLTagsORM.search`
+lib/python/cs/sqltags.py: cs.sqltags: import sqlalchemy.desc
+lib/python/cs/sqltags.py: merge css => css-ts
+lib/python/cs/sqltags.py: cs.sqltags: SQLTags.__getitem__: do not require a new session (I think this was a hack to for instantiation of new items - implied transaction should do that)
+lib/python/cs/sqltags.py: cs.sqltags: bump dependency on cs.sqlalchemy_utils to 20210420

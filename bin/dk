@@ -53,6 +53,12 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
     rsync rsync-args...
       Rsync into or out of the container where the container name
       comes from the \"host\" part of an rsync remote path.
+    try [name [command...]]
+      Shorthand for \"docker-compose run --rm name command...\".
+      The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
+      The default command is bash.
+    update
+      Run down, volume rm var, pull, build, up setup.
 
   Environment:
     DK_COMPOSE_YML
@@ -161,7 +167,8 @@ resolve_container_path(){
 
 DK_COMPOSE_YML=$( realpath "$DK_COMPOSE_YML" )
 ymlbasedir=$( dirname "$DK_COMPOSE_YML" )
-base=$( basename "$ymlbasedir" )
+: ${DK_BASE_PREFIX:=${COMPOSE_PROJECT_NAME:-$( basename "$ymlbasedir" )}}
+base=$DK_BASE_PREFIX
 primary_container=$( resolve_shortname "$DK_PRIMARY_SERVICE" )
 
 case "$op" in
@@ -241,10 +248,25 @@ case "$op" in
   rsync)
       set -x
       exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
+  try)
+      if [ $# = 0 ]
+      then
+        service=$DK_PRIMARY_SERVICE
+        [ -n "$service" ] || {
+          echo "$cmd try: no service name and name \$DK_PRIMARY_SERVICE" >&2
+          exit 1
+        }
+      else
+        service=$1; shift
+      fi
+      [ $# - gt 0 ] || set -- bash
+      set -x
+      docker-compose run --rm "$service" "$@"
+      ;;
   update)
       set -ex
       "$0" down
-      docker volume rm "${base}_var"
+      docker volume rm "${base}_var" || :
       "$0" pull
       "$0" build
       "$0" up setup

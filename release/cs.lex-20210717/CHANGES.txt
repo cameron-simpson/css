@@ -1,0 +1,69 @@
+lib/python/cs/lex.py: cs.lex: FormatableMixin: make the .format_kwargs method optional, defaulting to the instance
+lib/python/cs/lex.py: cs.lex: format_as, FormatableMixin.format_as: new optional format_class parameter to specify a string.Formatter duckclass
+lib/python/cs/lex.py: cs.lex: FormatableMixin: add a bunch of overrideable methods to support FormattableFormatter(Formatter), a new class to format a FormatableMixin flexibly
+lib/python/cs/lex.py: cs.lex: format_as: accept an optional instantiated Formatter subclass instance instead of a Formatter subclass; FormatableMixin.format_as: pass in FormattableFormatter(self)
+lib/python/cs/lex.py: cs.lex: new @format_recover decorator for __format__ methods to catch ValueError and substitute a placeholder value
+lib/python/cs/lex.py: cs.lex: FormatableMixin: new @format_recover(__format__) method which tries the object's methods as format_spec implementations if super().__format__(format_spec) fails
+lib/python/cs/lex.py: cs.lex: spelling fix
+lib/python/cs/lex.py: cs.lex: imports, distinfo, type checks, docstrings, sanity checks
+lib/python/cs/lex.py: cs.lex: new FStr(FormatableMixin,str) class whose __format__ method can use the object methods as conversions - we promote str to this in some places
+lib/python/cs/lex.py: cs.lex: FormatableMixin: new convert_via_method(value, format_spec) method which can use zero argument methods of value as conversions
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_convert_field: convert conversion=='' into None to placate a foible of string.Formatter.convert_field
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_format_field: promote a str to FStr, try value.__format__ before Formatter.format_field
+lib/python/cs/lex.py: cs.lex: FormatableMixin.__format__: simplify fallback to just use convert_via_method then format_get_subfield
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_get_subfield: short circuit subfield_text=='', tweak FormatableFormatter instantiation
+lib/python/cs/lex.py: cs.lex: FormatableFormatter: regexps to suppose parsing a format string and associate (but disabled) parse() method; we do use the RE_FIELD_EXPR regexp in the conversion method later
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_subfield: promote a str return from subfield_fmt.format_map to FStr to aid further use
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: treat format_spec as a colon separated sequence of conversions (matching the FormatableFormatter.RE_FIELD_EXPR regexp), and support convert_via_method for each intermediate value
+lib/python/cs/lex.py: cs.lex: @format_recover: improve the placeholder warning
+lib/python/cs/lex.py: cs.lex: FormatableMixin: rename convert_via_method to convert_via_method_or_attr, return attribute or result of method call
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: fix call to self.obj.format_format_field
+lib/python/cs/lex.py: cs.lex: format_as: default formatter is FormatableFormatter(format_mapping) instead of string.Formatter
+lib/python/cs/lex.py: cs.lex: FormatableFormatter: new __repr__ method
+lib/python/cs/lex.py: cs.lex: FormatableFormatter;get_value: dereference kw instead of using self.obj.format_get_value, which resulted in ignoring kw
+lib/python/cs/lex.py: cs.lex: FormatableMixin: drop format_get_value, this is always done by dereferencing kw in get_value
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_field: more Pfx context
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_field: drop print=True, heisenbug
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: drop redundant comparison, and return value unchanged if no identifier
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_format_field: greatly simplify, just use value.__format__, keep self to illustrate subclass override form
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: simplify logic: try value.format_format_field if present, otherwise convert_via_method_or_attr; promote return to FStr
+lib/python/cs/lex.py: cs.lex: clean lint
+lib/python/cs/lex.py: cs.lex: FStr: add a bunch of convenience methods
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: improve ValueError message text
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_format_field: promte str to FStr, then just call __format__
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: improved semantics: try value.format_field then FormattableMixin.convert_via_method_or_attr(value) then FormattableMixin.convert_via_method_or_attr(FStr(value)), always return an FStr for added utility
+lib/python/cs/lex.py: cs.lex: import update, drop done TODO
+lib/python/cs/lex.py: cs.lex: remove debug
+lib/python/cs/lex.py: cs.lex: fix import, clean lint
+lib/python/cs/lex.py: cs.lex: FormatableMixin: drop format_get_subfield, not used - just use FormatableFormatter.get_subfield; new utility method json() returning compact JSON
+lib/python/cs/lex.py: cs.lex: explainatory comment
+lib/python/cs/lex.py: cs.lex: new @format_method method decorator and @has_format_methods class decorator for indicating which methods are available for use in format strings
+lib/python/cs/lex.py: cs.lex: mark FormatableMixin and FStr with @has_format_methods, prefill FStr with string methods
+lib/python/cs/lex.py: cs.lex: FormatableMixin: new format_methods() class method to return the mapping of available format string methods
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: update to use the format_methods() safe mapping of format methods
+lib/python/cs/lex.py: cs.lex: mark a couple of methods with @format_method
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: simplify, particularly since there's no format_format_field method any more
+lib/python/cs/lex.py: cs.lex: FormatableMixin: rename JSON_ENCODER to FORMAT_JSON_ENCODER for clarity
+lib/python/cs/lex.py: cs.lex: clean tiny lint
+lib/python/cs/lex.py: cs.lex: new typed_repr like typed_str but using repr
+lib/python/cs/lex.py: cs.lex: move FormatableFormatter up above FromatableMixin because we're going to use it as a superclass
+lib/python/cs/lex.py: cs.lex: FormatableMixin now a mixin of FormatableFormatter
+lib/python/cs/lex.py: cs.lex: drop some debugging
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.format_field: pull out the format_spec parser and the per-subspec formatting as get_format_subspecs and format_field1 class emthods
+lib/python/cs/lex.py: cs.lex: @has_format_methods: small optimisation; FormatableMixin.format_methods: get _format_methods from cls.__dict__, cumbersome shuffle because that is a proxy instead of a dict
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_value: just return kw[arg_name], no funny business
+lib/python/cs/lex.py: cs.lex: FormatableMixin.__format__: call new __format1__ if no colon in format_spec
+lib/python/cs/lex.py: cs.lex: FormatableMixin.__format__: catch TypeError in addition to ValueError
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: drop redundant test
+lib/python/cs/lex.py: cs.lex: formatting: talk about attributes instead of methods, clean up the convert_via_method_or_attr logic to match
+lib/python/cs/lex.py: cs.lex: docstring updates
+lib/python/cs/lex.py: cs.lex: FormatableMixin.__format__: just call self.format_field()
+lib/python/cs/lex.py: cs.lex: drop old secondary FormatableMixin.__format__
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_as: simpler format_kwargs lookup
+lib/python/cs/lex.py: cs.lex,cs.tagset: clean some lint
+lib/python/cs/lex.py: cs.lex: FormatableMixin.format_as: fix call to get_format_mapping
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.convert_via_method_or_attr: if we get a TypeError from calling the attribute, convert to FStr and retry eg turn a PurePosixPath into an FStr for JSONing; add some context and tweak a docstring
+lib/python/cs/lex.py: cs.lex: FormatableMixin.convert_via_method_or_attr: refactor both method-not-allowed and method-rejects-type to fall back via FStr
+lib/python/cs/lex.py: cs.lex: move get_arg_name from FormatableMixin to FormatableFormatter where it is called
+lib/python/cs/lex.py: cs.lex: clean lint
+lib/python/cs/lex.py: cs.lex: update DISTINFO requirements

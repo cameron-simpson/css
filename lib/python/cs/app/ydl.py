@@ -31,7 +31,7 @@ from getopt import GetoptError
 import logging
 from os.path import splitext
 import sys
-from threading import RLock
+from threading import RLock, Semaphore
 from youtube_dl import YoutubeDL
 from youtube_dl.utils import DownloadError
 from cs.cmdutils import BaseCommand
@@ -41,10 +41,9 @@ from cs.logutils import error, warning, LogTime
 from cs.pfx import Pfx, pfx_method
 from cs.progress import Progress, OverProgress
 from cs.result import bg as bg_result, report
-from cs.tagset import Tag
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210306-post'
+__version__ = '20210906-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -60,15 +59,14 @@ DISTINFO = {
         "Topic :: Utilities",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.excutils',
         'cs.fstags',
         'cs.logutils',
         'cs.pfx',
         'cs.progress',
         'cs.result',
-        'cs.tagset',
-        'cs.upd',
+        'cs.upd>=multiline',
         'youtube_dl',
     ],
     'entry_points': {
@@ -78,6 +76,7 @@ DISTINFO = {
     },
 }
 
+DEFAULT_PARALLEL = 4
 DEFAULT_OUTPUT_FORMAT = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best'
 DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
     '%(uploader)s--%(title)s--%(upload_date)s--%(resolution)s' \
@@ -85,7 +84,7 @@ DEFAULT_OUTPUT_FILENAME_TEMPLATE = \
 
 FSTAGS_PREFIX = 'youtube_dl'
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
   return YDLCommand(argv).run()
@@ -94,13 +93,19 @@ class YDLCommand(BaseCommand):
   ''' `ydl` command line implementation.
   '''
 
-  GETOPT_SPEC = 'f'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] {{URLs|-}}...
-    -f  Force download - do not use the cache.'''
+  GETOPT_SPEC = 'fj:'
+  USAGE_FORMAT = '''Usage: {cmd} [-f] [-j jobs] {{URLs|-}}...
+    -f      Force download - do not use the cache.
+    -j jobs Number of jobs (downloads) to run in parallel.
+            Default: {DEFAULT_PARALLEL}'''
+  USAGE_KEYWORDS = {
+      'DEFAULT_PARALLEL': DEFAULT_PARALLEL,
+  }
 
   def apply_defaults(self):
     ''' Initial defaults options.
     '''
+    self.options.parallel = DEFAULT_PARALLEL
     self.options.ydl_opts = dict(logger=self.loginfo.logger)
 
   def apply_opts(self, opts):
@@ -108,10 +113,21 @@ class YDLCommand(BaseCommand):
     '''
     options = self.options
     for opt, val in opts:
-      if opt == '-f':
-        options.ydl_opts.update(cachedir=False)
-      else:
-        raise RuntimeError("unhandled option: %s=%s" % (opt, val))
+      with Pfx(opt):
+        if opt == '-f':
+          options.ydl_opts.update(cachedir=False)
+        elif opt == '-j':
+          with Pfx(val):
+            try:
+              options.parallel = int(val)
+            except ValueError as e:
+              # pylint: disable=raise-missing-from
+              raise GetoptError("invalid integer: %s" % (e,))
+            else:
+              if options.parallel < 1:
+                raise GetoptError("must be >= 1")
+        else:
+          raise RuntimeError("unhandled option: %s=%s" % (opt, val))
 
   def main(self, argv):
     ''' Command line main programme.
@@ -134,8 +150,6 @@ class YDLCommand(BaseCommand):
       for _ in over_ydl.report():
         pass
 
-YDLCommand.add_usage_to_docstring()
-
 # pylint: disable=too-many-instance-attributes
 class OverYDL:
   ''' A manager for multiple `YDL` instances.
@@ -148,12 +162,14 @@ class OverYDL:
       fstags=None,
       all_progress=None,
       ydl_opts=None,
+      parallel=DEFAULT_PARALLEL,
   ):
     if upd is None:
       upd = Upd()
     if all_progress is None:
       all_progress = OverProgress()
     self.upd = upd
+    self.sem = Semaphore(parallel)
     self.proxy0 = upd.insert(0)
     self.fstags = fstags
     self.all_progress = all_progress
@@ -204,6 +220,7 @@ class OverYDL:
           upd=self.upd,
           tick=self.update0,
           over_progress=self.all_progress,
+          sem=self.sem,
           **self.ydl_opts,
       )
       R = Y.bg()
@@ -234,6 +251,7 @@ class YDL:
       upd=None,
       tick=None,
       over_progress=None,
+      sem,
       **kw_opts
   ):
     ''' Initialise the manager.
@@ -244,6 +262,7 @@ class YDL:
         * `upd`: optional `cs.upd.Upd` instance for progress reporting
         * `tick`: optional callback to indicate state change
         * `over_progress`: an `OverProgress` to which to add each new `Progress` instance
+        * `sem`: a shared `Semaphore` governing download parallelism
         * `kw_opts`: other keyword arguments are used to initialise
           the options for the underlying `YoutubeDL` instance
     '''
@@ -251,6 +270,7 @@ class YDL:
       upd = Upd()
     if tick is None:
       tick = lambda: None
+    self.sem = sem
     self.url = url
     self.fstags = fstags
     self.tick = tick
@@ -312,17 +332,19 @@ class YDL:
           ydl_opts.update(self.kw_opts)
         ydl = self.ydl = YoutubeDL(ydl_opts)
 
-        proxy('extract_info...')
-        self.tick()
-        ie_result = ydl.extract_info(url, download=False, process=True)
-        output_path = ydl.prepare_filename(ie_result)
-        proxy.prefix = (ie_result.get('title') or output_path) + ' '
+        proxy('await run slot...')
+        with self.sem:
+          proxy('extract_info...')
+          self.tick()
+          ie_result = ydl.extract_info(url, download=False, process=True)
+          output_path = ydl.prepare_filename(ie_result)
+          proxy.prefix = (ie_result.get('title') or output_path) + ' '
 
-        proxy('download...')
-        self.tick()
-        with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
-          with ydl:
-            ydl.download([url])
+          proxy('download...')
+          self.tick()
+          with LogTime("%s.download(%r)", type(ydl).__name__, url) as LT:
+            with ydl:
+              ydl.download([url])
         proxy("elapsed %ds, saving metadata ...", LT.elapsed)
         self.tick()
 
