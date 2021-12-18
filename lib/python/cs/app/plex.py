@@ -55,7 +55,7 @@ class PlexCommand(BaseCommand):
       yield
 
   def cmd_linktree(self, argv):
-    ''' Usage: {cmd} [-u] linktree srctrees... dsttree
+    ''' Usage: {cmd} [-u] srctrees... dsttree
           Link media files from the srctrees into the dsttree
           using the Plex naming conventions.
           -u  Update mode: require dsttree to already exist,
