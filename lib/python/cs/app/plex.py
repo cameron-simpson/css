@@ -55,28 +55,18 @@ class PlexCommand(BaseCommand):
       yield
 
   def cmd_linktree(self, argv):
-    ''' Usage: {cmd} [-u] srctrees... dsttree
+    ''' Usage: {cmd} srctrees... dsttree
           Link media files from the srctrees into the dsttree
           using the Plex naming conventions.
-          -u  Update mode: require dsttree to already exist,
-              replace conflicting paths.
     '''
-    update_mode = False
-    if argv and argv[0] == '-u':
-      argv.pop(0)
-      update_mode = True
     if len(argv) < 2:
       raise GetoptError("missing srctrees or dsttree")
     dstroot = argv.pop()
     srcroots = argv
     options = self.options
     fstags = options.fstags
-    if update_mode:
-      if not isdirpath(dstroot):
-        raise GetoptError("dstroot does not exist: %s" % (dstroot,))
-    else:
-      with Pfx("mkdir(%r)", dstroot):
-        os.mkdir(dstroot)
+    if not isdirpath(dstroot):
+      raise GetoptError("dstroot does not exist: %s" % (dstroot,))
     for srcroot in srcroots:
       with Pfx(srcroot):
         for filepath in sorted(rfilepaths(srcroot)):
