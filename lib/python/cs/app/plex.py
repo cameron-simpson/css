@@ -4,18 +4,29 @@
 ''' Stuff for Plex media libraries.
 '''
 
+import builtins
 from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
-    abspath, exists as existspath, basename, dirname, join as joinpath,
-    splitext, isdir as isdirpath
+    abspath,
+    basename,
+    dirname,
+    exists as existspath,
+    isdir as isdirpath,
+    join as joinpath,
+    relpath,
+    samefile,
+    splitext,
 )
 import sys
 from cs.cmdutils import BaseCommand
 from cs.fstags import FSTags, rfilepaths, TaggedPath
-from cs.logutils import Pfx, warning, error
-from cs.pfx import pfx, pfx_method, XP
+from cs.logutils import warning, error
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method, XP
+from cs.py.func import trace
+
+from cs.x import X
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -71,9 +82,7 @@ class PlexCommand(BaseCommand):
       with Pfx(srcroot):
         for filepath in sorted(rfilepaths(srcroot)):
           with Pfx(filepath):
-            tagged_path = fstags[filepath]
-            subpath = plex_subpath(tagged_path)
-            print(subpath, "<=", basename(filepath))
+            plex_linkpath(fstags, filepath, dstroot)
 
 def plex_subpath(tagged_path):
   ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
@@ -106,6 +115,42 @@ def plex_subpath(tagged_path):
   dstbase = dstbase.replace('/', '::')
   dstpath.append(dstbase)
   return joinpath(*dstpath) + ext
+
+def plex_linkpath(
+    fstags, filepath, plex_topdirpath, do_hardlink=False, print=None
+):
+  '''
+  '''
+  if print is None:
+    print = builtins.print
+  tagged_path = fstags[filepath]
+  subpath = plex_subpath(tagged_path)
+  plexpath = joinpath(plex_topdirpath, subpath)
+  plexdirpath = dirname(plexpath)
+  if do_hardlink:
+    if existspath(plexpath):
+      if samefile(filepath, plexpath):
+        return
+      pfx_call(os.unlink, plexpath)
+    print(subpath, "<=", basename(filepath))
+    if not isdirpath(plexdirpath):
+      pfx_call(os.makedirs, plexdirpath)
+    pfx_call(os.link, filepath, plexpath)
+  else:
+    rfilepath = relpath(filepath, plexdirpath)
+    if existspath(plexpath):
+      try:
+        sympath = os.readlink(plexpath)
+      except OSError as e:
+        warning("readlink(%r): %s", plexpath, e)
+      else:
+        if rfilepath == sympath:
+          return
+      pfx_call(os.unlink, plexpath)
+    print(subpath, "<=", basename(filepath))
+    if not isdirpath(plexdirpath):
+      pfx_call(os.makedirs, plexdirpath)
+    pfx_call(os.symlink, rfilepath, plexpath)
 
 def linkpath(srcpath, dstroot, tags, update_mode=False):
   ''' Symlink `srcpath` to the approriate name under `dstroot` based on `tags`.
