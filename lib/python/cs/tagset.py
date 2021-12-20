@@ -632,7 +632,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
 
-        If `attr` is in `self.__dict__` then that is updated,
+        If `attr` is private or is in `self.__dict__` then that is updated,
         supporting "normal" attributes set on the instance.
         Otherwise the `Tag` named `attr` is set to `value`.
 
@@ -643,7 +643,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
             self.__dict__.update(id=_id, ontology=_ontology, modified=False)
     '''
-    if attr in self.__dict__:
+    if attr.startswith('_') or attr in self.__dict__:
       self.__dict__[attr] = value
     else:
       self[attr] = value
