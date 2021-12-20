@@ -80,7 +80,8 @@ class PlexCommand(BaseCommand):
       raise GetoptError("dstroot does not exist: %s" % (dstroot,))
     for srcroot in srcroots:
       with Pfx(srcroot):
-        for filepath in sorted(rfilepaths(srcroot)):
+        for filepath in srcroot if isfilepath(srcroot) else sorted(
+            rfilepaths(srcroot)):
           with Pfx(filepath):
             plex_linkpath(fstags, filepath, dstroot)
 
