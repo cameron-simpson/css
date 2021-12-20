@@ -116,8 +116,6 @@ from cs.tagset import (
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-from cs.x import X
-
 __version__ = '20211212-post'
 
 DISTINFO = {
@@ -1679,7 +1677,6 @@ class TaggedPath(TagSet, HasFSTagsMixin):
               value = upconv(value)
             tag_name = prefix
             if tag_name not in itags:
-              X("set %s=%r", tag_name, value)
               itags.set(tag_name, value)
             break
         else:
