@@ -93,7 +93,12 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
 from cs.fileutils import crop_name, findup, shortpath
-from cs.lex import (get_ini_clause_entryname, FormatAsError)
+from cs.lex import (
+    cutsuffix,
+    get_ini_clause_entryname,
+    FormatAsError,
+    titleify_lc,
+)
 from cs.logutils import error, warning, ifverbose
 from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin
@@ -110,6 +115,8 @@ from cs.tagset import (
 )
 from cs.threads import locked, locked_property, State
 from cs.upd import print  # pylint: disable=redefined-builtin
+
+from cs.x import X
 
 __version__ = '20211212-post'
 
@@ -456,6 +463,23 @@ class FSTagsCommand(BaseCommand, TagsCommandMixin):
         else:
           path = te.name
         self[path].update(te)
+
+  def cmd_infer(self, argv):
+    ''' Usage: {cmd} pathname
+          Print the base and inferred tags for pathname.
+    '''
+    options = self.options
+    fstags = options.fstags
+    path, = argv
+    print("path =", path)
+    tagged = fstags[path]
+    print("base tags:")
+    for tag in sorted(tagged.as_tags()):
+      print(" ", tag)
+    itags = tagged.infer_tags()
+    print("inferred tags:")
+    for tag in sorted(itags.as_tags()):
+      print(" ", tag)
 
   # pylint: disable=too-many-branches,too-many-statements
   def cmd_json_import(self, argv):
@@ -1632,6 +1656,36 @@ class TaggedPath(TagSet, HasFSTagsMixin):
           if tag.name not in tagset:
             tagset.add(tag)
     return tagset
+
+  def infer_tags(self):
+    ''' Infer tags for this path.
+
+        In order of preference:
+        * from filesystem fstags
+        * from file basename matching
+        * from the cascade rules
+    '''
+    itags = TagSet()
+    itags.update(self.as_tags(all_tags=True))
+    itags.update(self.infer_from_basename())
+    # implied tags by suffix
+    for tag_name, value in sorted(itags.items()):
+      while True:
+        for conv, upconv in dict(lc=titleify_lc, n=int).items():
+          suffix = '_' + conv
+          prefix = cutsuffix(tag_name, suffix)
+          if prefix is not tag_name:
+            with Pfx("%r:%r via %s", tag_name, value, upconv):
+              value = upconv(value)
+            tag_name = prefix
+            if tag_name not in itags:
+              X("set %s=%r", tag_name, value)
+              itags.set(tag_name, value)
+            break
+        else:
+          break
+    itags.update(self.fstags.cascade_tags(itags))
+    return itags
 
   def prune_inherited(self):
     ''' Examine the tags of this path's parent.
