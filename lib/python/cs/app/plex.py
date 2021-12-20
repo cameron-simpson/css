@@ -89,18 +89,24 @@ def plex_subpath(tagged_path):
   ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
   base, ext = splitext(basename(tagged_path.filepath))
-  title = tagged_path.series_title or tagged_path.title or base
-  season = tagged_path.season and int(tagged_path.season)
-  episode = tagged_path.episode and int(tagged_path.episode)
-  episode_title = tagged_path.episode_title
-  extra = tagged_path.extra and int(tagged_path.extra)
-  part = tagged_path.part and int(tagged_path.part)
+  itags = tagged_path.infer_tags()
+  print("plex_subpath: itags:")
+  for tag in sorted(itags):
+    print(" ", tag)
+  t = itags.auto
+  tv = t.tv
+  title = tv.series_title or t.title or base
+  season = tv.season and int(tv.season)
+  episode = tv.episode and int(tv.episode)
+  episode_title = tv.episode_title
+  extra = tv.extra and int(tv.extra)
+  part = tv.part and int(tv.part)
   is_tv_episode = bool(season and (episode or extra))
   dstbase = title
-  if is_tv_episode:
+  if tv.series_title:
     # TV Series
-    dstpath = ['TV Shows', title, f'Season {season:02d}']
-    if tagged_path.episode:
+    dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
+    if episode:
       dstbase += f' - s{season:02d}e{episode:02d}'
     else:
       dstbase += f' - s{season:02d}x{extra:02d}'
