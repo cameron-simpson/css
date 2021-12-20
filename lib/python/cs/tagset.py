@@ -361,7 +361,7 @@ class _FormatStringTagProxy:
   '''
 
   def __init__(self, proxied):
-    assert isinstance(proxied,Tag), "proxied is not a Tag: %s" % (r(proxied),)
+    assert isinstance(proxied, Tag), "proxied is not a Tag: %s" % (r(proxied),)
     self.__proxied = proxied
 
   def __str__(self):
@@ -505,7 +505,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       else:
         value = attribute() if callable(attribute) else attribute
     else:
-      value = _FormatStringTagProxy(Tag(arg_name,value,ontology=kw.ontology))
+      value = _FormatStringTagProxy(Tag(arg_name, value, ontology=kw.ontology))
     return value, arg_name
 
   ################################################################
