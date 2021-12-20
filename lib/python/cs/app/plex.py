@@ -9,11 +9,11 @@ from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
-    abspath,
     basename,
     dirname,
     exists as existspath,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     relpath,
     samefile,
@@ -21,12 +21,9 @@ from os.path import (
 )
 import sys
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, rfilepaths, TaggedPath
-from cs.logutils import warning, error
-from cs.pfx import Pfx, pfx, pfx_call, pfx_method, XP
-from cs.py.func import trace
-
-from cs.x import X
+from cs.fstags import FSTags, rfilepaths
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -101,7 +98,6 @@ def plex_subpath(tagged_path):
   episode_title = tv.episode_title
   extra = tv.extra and int(tv.extra)
   part = tv.part and int(tv.part)
-  is_tv_episode = bool(season and (episode or extra))
   dstbase = title
   if tv.series_title:
     # TV Series
@@ -123,10 +119,20 @@ def plex_subpath(tagged_path):
   dstpath.append(dstbase)
   return joinpath(*dstpath) + ext
 
+# pylint: disable=redefined-builtin
 def plex_linkpath(
     fstags, filepath, plex_topdirpath, do_hardlink=False, print=None
 ):
-  '''
+  ''' Link `filepath` into `plex_topdirpath`.
+
+      Parameters:
+      * `fstags`: the `FSTags` instance
+      * `filepath`: filesystem pathname of file to link into Plex tree
+      * `plex_topdirpath`: filesystem pathname of the Plex tree
+      * `do_hardlink`: use a hard link if true, otherwise a softlink;
+        default `False`
+      * `print`: print function for the link action,
+        default from `builtins.print`
   '''
   if print is None:
     print = builtins.print
@@ -158,35 +164,6 @@ def plex_linkpath(
     if not isdirpath(plexdirpath):
       pfx_call(os.makedirs, plexdirpath)
     pfx_call(os.symlink, rfilepath, plexpath)
-
-def linkpath(srcpath, dstroot, tags, update_mode=False):
-  ''' Symlink `srcpath` to the approriate name under `dstroot` based on `tags`.
-  '''
-  dstbase = plex_subpath(tags)
-  _, srcext = splitext(basename(srcpath))
-  linkpath = abspath(srcpath)
-  dstpath = joinpath(dstroot, dstbase + srcext)
-  with Pfx(dstpath):
-    if existspath(dstpath):
-      if update_mode:
-        try:
-          existing_link = os.readlink(dstpath)
-        except OSError as e:
-          raise ValueError("existing path is not a symlink: %s", e)
-        else:
-          if existing_link == linkpath:
-            return dstpath
-          else:
-            warning("replace -> %s", linkpath)
-            os.remove(dstpath)
-    else:
-      dstdir = dirname(dstpath)
-      if not existspath(dstdir):
-        with Pfx("makedirs(%r)", dstdir):
-          os.makedirs(dstdir)
-    with Pfx("symlink"):
-      os.symlink(linkpath, dstpath)
-  return dstpath
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
