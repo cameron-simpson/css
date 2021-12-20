@@ -87,16 +87,14 @@ def plex_subpath(tagged_path):
   '''
   base, ext = splitext(basename(tagged_path.filepath))
   itags = tagged_path.infer_tags()
-  print("plex_subpath: itags:")
-  for tag in sorted(itags):
-    print(" ", tag)
   t = itags.auto
   tv = t.tv
   title = tv.series_title or t.title or base
   season = tv.season and int(tv.season)
-  episode = tv.episode and int(tv.episode)
+  episode = isinstance(tv.episode, (int, str)) and int(tv.episode)
   episode_title = tv.episode_title
-  extra = tv.extra and int(tv.extra)
+  extra = isinstance(tv.extra, (int, str)) and int(tv.extra)
+  extra_title = tv.extra_title
   part = tv.part and int(tv.part)
   dstbase = title
   if tv.series_title:
@@ -113,6 +111,8 @@ def plex_subpath(tagged_path):
       dstbase += f' - {episode:d}'
   if episode_title and episode_title != title:
     dstbase += f' - {episode_title}'
+  elif extra_title and extra_title != title:
+    dstbase += f' - {extra_title}'
   if part:
     dstbase += f' - pt{part:d}'
   dstbase = dstbase.replace('/', '::')
