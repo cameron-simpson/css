@@ -12,6 +12,7 @@ from os.path import (
     basename,
     dirname,
     exists as existspath,
+    expanduser,
     isdir as isdirpath,
     isfile as isfilepath,
     join as joinpath,
@@ -48,12 +49,26 @@ class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
   '''
 
-  GETOPT_SPEC = ''
+  GETOPT_SPEC = 'd:'
+  USAGE_FORMAT = r'''Usage: {cmd} [-d linktree] subcommand ...
+      -d linktree   Specify the Plex link tree location,
+                    default from \$PLEX_LINKTREE or ~/var/plextree'''
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
     self.options.fstags = FSTags()
+    self.options.plextree = os.environ.get(
+        'PLEX_LINKTREE', expanduser('~/var/plextree')
+    )
+
+  def apply_opt(self, opt, val):
+    ''' Apply an option.
+    '''
+    if opt == '-d':
+      self.options.plextree = val
+    else:
+      return super().apply_opt(opt, val)
 
   @contextmanager
   def run_context(self):
