@@ -27,14 +27,14 @@ from Ogre import SceneNode, Vector3 as V3
 import Ogre.Bites
 import Ogre.RTShader
 
+# type for things accepting a Vector3 or a 3-tuple
+V3ish = Union[V3, Tuple[float, float, float]]
+
 @typechecked
-def V3of(v3: Union[V3, Tuple[float, float, float]]) -> V3:
+def V3of(v3: V3ish) -> V3:
   ''' Return an `Ogre.Vector3` given a vector or a 3-tuple.
   '''
   return V3(*v3) if isinstance(v3, tuple) else v3
-
-# type for things accepting a Vector3 or a 3-tuple
-V3ish = Union[V3, Tuple[float, float, float]]
 
 # TODO: maybe put this in cs.shims if it feels clean
 def tupleish_call(func, obj_or_tuple, optional=False):
