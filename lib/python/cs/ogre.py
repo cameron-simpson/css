@@ -106,7 +106,7 @@ class App(MultiOpenMixin):
       # create a camera here and point it at the origin
       viewpoint: Optional[Tuple[float, float, float]] = None,
       # create a light here and point it at the origin
-      # default from theviewpoint
+      # default from the viewpoint
       lightpoint: Optional[Tuple[float, float, float]] = None,
   ):
     if app_subdir is None:
@@ -162,9 +162,10 @@ class App(MultiOpenMixin):
     vp = self.window.addViewport(self.camera._camera)
     vp.setBackgroundColour(self.background_colour)
 
-    yield
-
-    self.ctx.closeApp()
+    try:
+      yield
+    finally:
+      self.ctx.closeApp()
 
   def run(self):
     self.root.startRendering()  # blocks until queueEndRendering is called
