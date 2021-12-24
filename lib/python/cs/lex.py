@@ -151,7 +151,7 @@ def tabpadding(padlen, tabsize=8, offset=0):
 
   return pad
 
-def typed_str(o, use_cls=False, use_repr=False, max_length=None):
+def typed_str(o, use_cls=False, use_repr=False, max_length=32):
   ''' Return "type(o).__name__:str(o)" for some object `o`.
       This is available as both `typed_str` and `s`.
 
