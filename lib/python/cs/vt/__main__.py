@@ -295,32 +295,6 @@ class VTCmd(BaseCommand):
     if ifdebug():
       dump_debug_threads()
 
-  def cmd_profile(self, argv):
-    ''' Usage: {cmd} other-vt-subcommand [argv...]
-          Wrapper to profile other subcommands and report.
-    '''
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    if not argv:
-      cmd_method = None
-    else:
-      subcmd = argv.pop(0)
-      try:
-        cmd_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
-      except AttributeError:
-        raise GetoptError("no subcommand %r" % (subcmd,))
-    P = profile.Profile()
-    P.enable()
-    try:
-      xit = cmd_method(argv)
-    finally:
-      P.disable()
-    P.create_stats()
-    P.print_stats(sort='cumulative')
-    return xit
-
   def cmd_benchmark(self, argv):
     ''' Usage: {cmd} mode [args...] < data
           Modes:
@@ -949,6 +923,32 @@ class VTCmd(BaseCommand):
       else:
         os.remove(ospath)
     return 0
+
+  def cmd_profile(self, argv):
+    ''' Usage: {cmd} other-vt-subcommand [argv...]
+          Wrapper to profile other subcommands and report.
+    '''
+    try:
+      import cProfile as profile
+    except ImportError:
+      import profile
+    if not argv:
+      cmd_method = None
+    else:
+      subcmd = argv.pop(0)
+      try:
+        cmd_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+      except AttributeError:
+        raise GetoptError("no subcommand %r" % (subcmd,))
+    P = profile.Profile()
+    P.enable()
+    try:
+      xit = cmd_method(argv)
+    finally:
+      P.disable()
+    P.create_stats()
+    P.print_stats(sort='cumulative')
+    return xit
 
   @pfx_method
   def _parse_pushable(self, s):
