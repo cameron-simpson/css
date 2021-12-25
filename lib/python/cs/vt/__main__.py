@@ -512,7 +512,7 @@ class VTCmd(BaseCommand):
             xit = 1
             continue
           bfr = CornuCopyBuffer.from_fd(fd)
-          for offset, DR, _ in DataRecord.parse_buffer_with_offsets(bfr):
+          for offset, DR, _ in DataRecord.scan_with_offsets(bfr):
             data = DR.data
             hashcode = hashclass(data)
             leadin = '%9d %16.16s' % (offset, hashcode)

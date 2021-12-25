@@ -1286,7 +1286,7 @@ class Dir(_Dirent, DirLike):
     # push the Dir block data
     B.pushto_queue(Q, runstate=runstate, progress=progress)
     # and recurse into contents
-    for E in DirentRecord.parse_buffer_values(B.bufferfrom()):
+    for E in DirentRecord.scan_values(B.bufferfrom()):
       if runstate and runstate.cancelled:
         warning("push cancelled")
         return False
