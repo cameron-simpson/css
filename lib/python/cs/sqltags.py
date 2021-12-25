@@ -75,7 +75,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20210913-post'
+__version__ = '20211212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -96,7 +96,7 @@ DISTINFO = {
         'cs.obj',
         'cs.pfx',
         'cs.sqlalchemy_utils>=20210420',
-        'cs.tagset',
+        'cs.tagset>=20211212',
         'cs.threads>=20201025',
         'cs.upd',
         'icontract',

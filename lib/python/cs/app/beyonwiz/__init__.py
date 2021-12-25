@@ -16,6 +16,7 @@ from os.path import join as joinpath, isdir as isdirpath
 import re
 from threading import Lock
 from types import SimpleNamespace as NS
+
 from cs.app.ffmpeg import (
     multiconvert as ffmconvert,
     MetaData as FFmpegMetaData,
@@ -29,6 +30,8 @@ from cs.mediainfo import EpisodeInfo
 from cs.pfx import Pfx, pfx, pfx_method
 from cs.py.func import prop
 from cs.tagset import Tag
+
+import ffmpeg
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -54,7 +57,31 @@ DISTINFO = {
     },
 }
 
-DEFAULT_FORMAT = 'mp4'
+DEFAULT_MEDIAFILE_FORMAT = 'mp4'
+
+FFMPEG_METADATA_MAPPINGS = {
+
+    # available metadata for MP4 files
+    'mp4': {
+        'album': None,
+        'album_artist': None,
+        'author': None,
+        'comment': None,
+        'composer': None,
+        'copyright': None,
+        'description': None,
+        'episode_id': None,
+        'genre': None,
+        'grouping': None,
+        'lyrics': None,
+        'network': lambda M: M['file.channel'],
+        'show': lambda M: M['meta.title'],
+        'synopsis': lambda M: M['meta.description'],
+        'title': lambda M: M['meta.title'],
+        'track': None,
+        'year': None,
+    }
+}
 
 # UNUSED
 def trailing_nul(bs):
@@ -164,11 +191,6 @@ class _Recording(ABC, HasFSTagsMixin):
   ''' Base class for video recordings.
   '''
 
-  PATH_FIELDS = (
-      'series_name', 'episode_info_part', 'episode_name', 'tags_part',
-      'source_name', 'start_dt_iso', 'description'
-  )
-
   def __init__(self, path, fstags=None):
     self._fstags = fstags
     self.path = path
@@ -198,11 +220,11 @@ class _Recording(ABC, HasFSTagsMixin):
       format = self.DEFAULT_FILENAME_BASIS
     if not ext.startswith('.'):
       ext = '.' + ext
-    return crop_name(
-        format.format_map(self.metadata.ns()
-                          ).replace('\r', '_').replace('\n', '_') + ext,
-        ext=ext
-    )
+    md = self.metadata
+    full_filename = self.metadata.format_as(format
+                                            ).replace('\r',
+                                                      '_').replace('\n', '_')
+    return crop_name(full_filename + ext, ext=ext)
 
   @abstractmethod
   def data(self):
@@ -230,21 +252,6 @@ class _Recording(ABC, HasFSTagsMixin):
     '''
     return str(self.metadata.episodeinfo)
 
-  def converted_path(self, outext):
-    ''' Generate the output filename with parts separated by '--'.
-    '''
-    parts = []
-    for field in self.PATH_FIELDS:
-      part = getattr(self, field, None)
-      if part:
-        part = str(part).lower().replace('/', '|').replace(' ', '-')
-        part = re.sub('--+', '-', part)
-        parts.append(part)
-    filename = '--'.join(parts)
-    filename = filename[:250 - (len(outext) + 1)]
-    filename += '.' + outext
-    return filename
-
   # TODO: move into cs.fileutils?
   @staticmethod
   def choose_free_path(path, max_n=32):
@@ -261,19 +268,23 @@ class _Recording(ABC, HasFSTagsMixin):
     )
 
   def convert(
-      self, dstpath, dstfmt=None, max_n=None, timespans=(), extra_opts=None
+      self,
+      dstpath,
+      *,
+      dstfmt=None,
+      max_n=None,
+      timespans=(),
+      extra_opts=None,
+      overwrite=False,
+      use_data=False,
   ):
-    ''' Transcode video to `dstpath` in FFMPEG `dstfmt`.
+    ''' Transcode video to `dstpath` in FFMPEG compatible `dstfmt`.
     '''
     if dstfmt is None:
-      dstfmt = DEFAULT_FORMAT
-    if not timespans:
-      timespans = ((None, None),)
-    srcfmt = 'mpegts'
-    do_copyto = hasattr(self, 'data')
-    if do_copyto:
+      dstfmt = DEFAULT_MEDIAFILE_FORMAT
+    if use_data:
       srcpath = None
-      if len(timespans) > 1:
+      if timespans:
         raise ValueError(
             "%d timespans but do_copyto is true" % (len(timespans,))
         )
@@ -317,37 +328,63 @@ class _Recording(ABC, HasFSTagsMixin):
         dstfmt = ext[1:]
       fstags = self.fstags
       with fstags:
-        fstags[dstpath].update(self.metadata.as_tags(prefix='beyonwiz'))
-      ffmeta = self.ffmpeg_metadata(dstfmt)
-      sources = []
-      for start_s, end_s in timespans:
-        sources.append(FFSource(srcpath, srcfmt, start_s, end_s))
-      P, ffargv = ffmconvert(sources, dstpath, dstfmt, ffmeta, overwrite=False)
-      info("running %r", ffargv)
-      if do_copyto:
-        # feed .copyto data to FFmpeg
-        try:
-          self.copyto(P.stdin)
-        except OSError as e:
-          if e.errno == errno.EPIPE:
-            warning("broken pipe writing to ffmpeg")
-            ok = False
+        metatags = list(self.metadata.as_tags(prefix='beyonwiz'))
+        fstags[dstpath].update(metatags)
+        fstags.sync()
+    # compute the metadata for the output format
+    # which may be passed with the input arguments
+    M = self.metadata
+    with Pfx("metadata for dstformat %r", dstfmt):
+      ffmeta_kw = dict(comment=f'Transcoded from {self.path!r} using ffmpeg.')
+      for ffmeta, beymeta in FFMPEG_METADATA_MAPPINGS[dstfmt].items():
+        with Pfx("%r->%r", beymeta, ffmeta):
+          if beymeta is None:
+            continue
+          elif isinstance(beymeta, str):
+            ffmetavalue = M.get(beymeta, '')
+          elif callable(beymeta):
+            ffmetavalue = beymeta(M)
           else:
-            raise
-        P.stdin.close()
-      xit = P.wait()
-      if xit == 0:
-        ok = True
-      else:
-        warning("ffmpeg failed, exit status %d", xit)
-        ok = False
-      return ok
+            raise RuntimeError(
+                "unsupported beymeta %s:%r" %
+                (type(beymeta).__name__, beymeta)
+            )
+          assert isinstance(ffmetavalue, str), (
+              "ffmetavalue should be a str, got %s:%r" %
+              (type(ffmetavalue).__name__, ffmetavalue)
+          )
+          ffmeta_kw[ffmeta] = beymeta(M)
+    # set up the initial source path, options and metadata
+    ffinopts = {
+        'loglevel': 'repeat+error',
+        ##'strict': None,
+        ##'2': None,
+    }
+    ff = ffmpeg.input(srcpath, **ffinopts)
+    if timespans:
+      ffin = ff
+      ff = ffmpeg.concat(
+          *map(
+              lambda timespan: ffin.trim(start=timespan[0], end=timespan[1]),
+              timespans
+          )
+      )
+    ff = ff.output(
+        dstpath,
+        format=dstfmt,
+        metadata=list(map('='.join, ffmeta_kw.items()))
+    )
+    if overwrite:
+      ff = ff.overwrite_output()
+    print('ffmpeg', *map(repr, ff.get_args()))
+    ff.run()
+    return ok
 
   def ffmpeg_metadata(self, dstfmt=None):
     ''' Return a new `FFmpegMetaData` containing our metadata.
     '''
     if dstfmt is None:
-      dstfmt = DEFAULT_FORMAT
+      dstfmt = DEFAULT_MEDIAFILE_FORMAT
     M = self.metadata
     comment = f'Transcoded from {self.path!r} using ffmpeg.'
     recording_dt = M.get('file.datetime')
