@@ -36,8 +36,9 @@ class ArchiveEntry(BinaryMultiValue('ArchiveEntry',
   ''' An Archive entry record.
   '''
 
+@pfx
 def Archive(path, missing_ok=False, weird_ok=False, config=None):
-  ''' Return an Archive from the specification `path`.
+  ''' Return an `Archive` from the specification `path`.
 
       If the `path` begins with `'['`
       then it is presumed to be a Store Archive
