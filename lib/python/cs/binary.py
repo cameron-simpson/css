@@ -218,6 +218,10 @@ def pt_spec(pt, name=None):
 
 class BinaryMixin:
   ''' Presupplied helper methods for binary objects.
+
+      Naming conventions:
+      - `parse`* methods parse a single instance from a buffer
+      - `scan`* methods are generators yielding successive instances from a buffer
   '''
 
   @pfx_method
@@ -379,7 +383,7 @@ class BinaryMixin:
 
   @classmethod
   def scan_with_offsets(cls, bfr, count=None, min_count=None, max_count=None):
-    ''' Wrapper for `scan()` which yields (pre_offset,instance,post_offset)`
+    ''' Wrapper for `scan()` which yields `(pre_offset,instance,post_offset)`
         indicating the start and end offsets of the yielded instances.
         All parameters are as for `scan()`.
     '''
