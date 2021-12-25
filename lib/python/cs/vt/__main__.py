@@ -1260,19 +1260,28 @@ class VTCmd(BaseCommand):
       raise GetoptError("unrecognised subcommand")
 
   def cmd_unpack(self, argv):
-    ''' Usage: {cmd} arpath
-          Unpack the archive file _archive_`.vt` as _archive_.
+    ''' Usage: {cmd} archive.vt [unpacked]
+          Unpack arpath to unpacked. If unpacked is omitted, unpack
+          from the archive file _archive_`.vt` as _archive_.
     '''
     if not argv:
       raise GetoptError("missing archive name")
     arpath = argv.pop(0)
-    arbase, arext = splitext(arpath)
-    if arext != '.vt':
-      raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
     if argv:
-      raise GetoptError("extra arguments after archive name %r" % (arpath,))
-    if pathexists(arbase):
-      error("archive base already exists: %r", arbase)
+      targetpath = argv.pop(0)
+    else:
+      targetpath, arext = splitext(arpath)
+      if arext != '.vt':
+        raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
+    if argv:
+      raise GetoptError(
+          "extra arguments after unpacked %r: %r" % (
+              targetpath,
+              argv,
+          )
+      )
+    if pathexists(targetpath):
+      error("unpacked %r already exists", targetpath)
       return 1
     with Pfx(arpath):
       entry = Archive(arpath).last
@@ -1281,10 +1290,10 @@ class VTCmd(BaseCommand):
         error("no entries in archive")
         return 1
       if source.isdir:
-        target = OSDir(arbase)
+        target = OSDir(targetpath)
       else:
-        target = OSFile(arbase)
-    with Pfx(arbase):
+        target = OSFile(targetpath)
+    with Pfx(targetpath):
       if not merge(target, source, runstate=self.options.runstate):
         return 1
     return 0
