@@ -1077,7 +1077,7 @@ class VTCmd(BaseCommand):
           or dirref for each.
           The argument "-" reads data from standard input and prints a fileref.
           The default argument list is "-".
-          -F  Print a FileDirent instead of a bockref for file contents.
+          -F  Print a FileDirent instead of a block ref for file contents.
     '''
     runstate = self.options.runstate
     use_filedirent = False
