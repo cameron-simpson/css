@@ -568,7 +568,7 @@ class VTCmd(BaseCommand):
     httpd_main([self.cmd + ': ' + 'httpd'] + argv)
 
   def cmd_import(self, argv):
-    ''' Usage: {cmd} [-oW] srcpath {{-|special}}
+    ''' Usage: {cmd} [-oW] srcpath {{-|archivepath}}
           Import paths into the Store, print top Dirent for each.
 
         TODO: hook into vt.merge.
@@ -589,29 +589,30 @@ class VTCmd(BaseCommand):
         else:
           raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
-      raise GetoptError("missing path")
+      raise GetoptError("missing srcpath")
     srcpath = argv.pop(0)
     if not argv:
-      raise GetoptError("missing archive.vt")
-    special = argv.pop(0)
-    if special == '-':
-      special = None
+      raise GetoptError("missing archivepath")
+    archivepath = argv.pop(0)
+    if archivepath == '-':
+      archivepath = None
     if argv:
       raise GetoptError("extra arguments: %s" % (' '.join(argv),))
     xit = 0
-    if special is None:
+    if archivepath is None:
       D = Dir('.')
     else:
-      with Pfx(repr(special)):
+      with Pfx(repr(archivepath)):
         try:
-          with open(special, 'a'):
+          with open(archivepath, 'a'):
             pass
         except OSError as e:
           error("cannot open archive for append: %s", e)
           return 1
-        _, D = Archive(special).last
+        last_entry = Archive(archivepath).last
+        D = last_entry.dirent
       if D is None:
-        dstbase, suffix = splitext(basename(special))
+        dstbase, suffix = splitext(basename(archivepath))
         D = Dir(dstbase)
     with Pfx(srcpath):
       srcbase = basename(srcpath.rstrip(os.sep))
@@ -636,12 +637,12 @@ class VTCmd(BaseCommand):
       else:
         error("unsupported file type")
         xit = 1
-    if special is None:
+    if archivepath is None:
       print(D)
     else:
-      with Pfx(special):
+      with Pfx(archivepath):
         if xit == 0:
-          Archive(special).update(D)
+          Archive(archivepath).update(D)
         else:
           warning("archive not updated")
     return xit
