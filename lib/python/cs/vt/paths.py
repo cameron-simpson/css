@@ -226,7 +226,7 @@ class DirLike(ABC):
           continue
         subnode = node.get(name)
         if subnode is None:
-          warning("walk(%s): %r: dirname %r not in node", self, rapth, name)
+          warning("walk(%s): %r: dirname %r not in node", self, rpath, name)
           continue
         pending.append((subnode, rparts + [name]))
 
