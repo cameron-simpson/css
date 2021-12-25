@@ -303,14 +303,20 @@ class VTCmd(BaseCommand):
       import cProfile as profile
     except ImportError:
       import profile
+    if not argv:
+      cmd_method = None
+    else:
+      subcmd = argv.pop(0)
+      try:
+        cmd_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd)
+      except AttributeError:
+        raise GetoptError("no subcommand %r" % (subcmd,))
     P = profile.Profile()
     P.enable()
     try:
-      xit = self.run(argv)
-    except Exception:
+      xit = cmd_method(argv)
+    finally:
       P.disable()
-      raise
-    P.disable()
     P.create_stats()
     P.print_stats(sort='cumulative')
     return xit
