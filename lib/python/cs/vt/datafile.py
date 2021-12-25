@@ -155,7 +155,7 @@ class DataFilePushable:
     with open(self.pathname, 'rb') as f:
       f.seek(offset)
       bfr = CornuCopyBuffer(datafrom(f, offset), offset=offset)
-      for DR in DataRecord.parse_buffer(bfr):
+      for DR in DataRecord.scan(bfr):
         if runstate and runstate.cancelled:
           return False
         data = DR.data
