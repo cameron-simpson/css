@@ -1,3 +1,4 @@
+vt.vhost vs vt.httpd
 cs.vt.merge: merge: implement trust_stat_type_size_mtime mode
 DataDir: only show progress if defaults.show_progress is true
 revisit keys/hashcodes for the datadir stores - seem unreliable, maybe because of cache and queues - removed from unit tests for now
