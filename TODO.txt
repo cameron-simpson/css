@@ -1,11 +1,18 @@
+UpdProxy: can we have an ftext property and monitor format keys for update?
+rip out all cs.daetutils and friends, use the arrow module
+unhostsify leaves temp files around, probably if interrupted
+cs.cmdutils: subcommands with no usage docstring are not listed in the usage output, need placeholder
+cs.deco: use @functools.wraps to gather up __doc__ etc
+fstags ls in / wigs out
+pfx_method no longer honours with_args, flip with_args to True and reimpl args?
+cs.cmdutils: cmd_help does not print the usage preamble, just the per command usages
+baseCommand autousage: make up a stub usage for subcommands with no usage
+parser for /etc/terminal-colors.d
 cs.upd/cs.logutils: if the Upd is disabled, logging upd_mode goes silent - fall back to plain nonupd_mode?
 cs.upd: add pprint wrapper
-TagsOntology: reverse prefix mappings
 cs.app.playon: keep playon recording info as ontology, distinct from state db
-TagsOntology: accept directory, process files within, deduce prefix from filename, ONTOLOGY.sqlite for the default
 gitlog - record the branch too - maybe totally record dlog
 extended prime seive impl?
-TagSet.subtags: subclass PrefixedMappingProxy also
 let $XDG_* envvars override $VARDIR $LOGDIR ~/rc etc
 cs.pop3: buffering for the SSL mode
 an atomic-sh make scratch dir then rename to target name decorator
@@ -26,7 +33,6 @@ general facility to do things just once, particularly warnings - then port cs.pr
 Upd instances: callable like a proxy, has a .text property too - basicly a proxy for prxoies[0]
 cs.ansi_colour: parser to recognise/strip ANSI colours? general ANSI sequences? splitter with offsets for cutting things up?
 cs.lex: unctrl: duh - it calls expandtabs at the bottom - back out the inline tab expander?
-use cs.binary._TestPacketFields to test the data formats in cs.app.beyonwiz
 @OBSOLETE(PfxThread) and replace uses with cs.threads.bg
 cs.logutils: nested cs.cmdutils can call setup_logging more than once, make that sane instead of adding multiple loghandlers
 vbox: cmd to associate the current default interface before starting vm?
@@ -42,12 +48,11 @@ cs.progress: control over status display - units etc
 cs.upd: rate per proxy, bisect to update counter, autotune?
 incd: remote tmux session to be per target dir
 haproxy-tool: turn "ssh borg listen remote..." into haproxy clauses, mode to emit header settings too, to make haproxy.conf
-BaseCommand: accept bare -h or --help somehow? may not mesh with common option parser
 new cs.dlog module and bin-cs/dlog command doing what the shell script does now
 dlog: commit logs - tags the commit hash and branch
 dlog: accept tags (leading tag=value words)?
 rig-portfwd command doing the tmrc setup, scrub, ssh-agent reconnect
-can putacc be recoded to use fstags --for-rsync efficiently?
+can putacc be recoded to use fstags --for-rsync efficiently? PROBABLY NOT REQUIRES FULL TREE WALK unless we can target the subtrees
 ydl - accept pathnames as arguments, accept -t (tail) to tail a single filename argument including stdin
 treet - a tree tool to read "parentkey key text" and render various tree listings, like all rows containing a string, and all their children, and their direct parents to a root, and things like that - makes pt scripts much easier, and applies to other things like vcs logs, trees in db listings etc
 pf-genrules command to read a list of high level src-peer-port-proto type rules and make pf rules for an anchor, with apply mode and diff
@@ -57,7 +62,6 @@ cs.lex: doc for get_sloshed_text includes mapper=<function slosh_mapper at 0x111
 incd: only save target for remote targets
 incd: trusting fstags is a security issue in hostile directories - make incd only accept ssh+cd, not cd+exec, and maybe require writable .fstags file?
 cs.logutils: present main_handler in loginfo, have a mode to outright replace the root logger handlers
-TagSetMapping: base class for TagFile and Entity providing singleton TagSets with modification tracking and autosave
 signature based @cached properties, with revision numbers as fallback mode
 replace use of sys.hexversion with sys.version.major etc
 cs.rfc2047: command line mode with filter-text and rename-filename modes
@@ -65,7 +69,6 @@ cs.contextutils: no_recursion(identity_value[,default_return_value]) context man
 cs.obj: new IndexableNamespace with _from_nested_dicts factory method (_or_ optional leading positional nested dicts), to publish and to use as the basis for ExtendedNamespace, itself to be renamed as FormattableNamespace
 mailfiler run_context stackattrs loginfo.level=INFO is actually ineffective, how to modify cs.logutils to fix this?
 BaseCommand: accept dict for initial options, some way to honour this during apply_defaults
-media,beyonwiz: use ffmpeg-python for ffmpeg control, obsolete cs.ffmpeg or turn into a shim
 bin/nodedb: turn into pure python nodedb main programme, replace this script with secure python stub
 resolve bin/maildb vs bin-cs/cs-maildb
 svcd: subprocess to chdir to $HOME or defined directory - via incd? - for reliable behaviour and logging

@@ -17,7 +17,7 @@ from cs.deco import OBSOLETE
 from cs.id3 import ID3V1Frame, ID3V2Frame, EnhancedTagFrame
 from cs.logutils import warning, error
 from cs.pfx import Pfx
-from cs.tagset import TagSet
+from cs.tagset import TagSet, TagsOntology
 
 def main(argv=None):
   ''' MP3 command line implementation.
@@ -92,6 +92,9 @@ class MP3AudioFrame(SimpleBinary):
   SAMPLERATES_BY_MPEG2_HZ = [22050, 24000, 16000, None]
 
   AUDIO_MODE_IDS = [2.5, None, 2, 1]
+
+  # TODO: fill out the ont with the MP3 spec and demo doctest
+  ONTOLOGY = TagsOntology()
 
   @staticmethod
   @ensure(lambda bfr: bfr.at_eof() or bfr.peek(2).startswith(b'\xff'))

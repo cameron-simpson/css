@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20210123-post'
+__version__ = '20210823-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -92,13 +92,19 @@ def decorator(deco):
       func = da[0]
       da = tuple(da[1:])
       decorated = deco(func, *da, **dkw)
-      if not getattr(decorated, '__doc__', None):
-        decorated.__doc__ = getattr(func, '__doc__', '')
-      func_module = getattr(func, '__module__', None)
-      try:
-        decorated.__module__ = func_module
-      except AttributeError:
-        pass
+      if decorated is not func:
+        # pretty up the returned wrapper
+        try:
+          decorated.__name__ = getattr(func, '__name__', str(func))
+        except AttributeError:
+          pass
+        if not getattr(decorated, '__doc__', None):
+          decorated.__doc__ = getattr(func, '__doc__', '')
+        func_module = getattr(func, '__module__', None)
+        try:
+          decorated.__module__ = func_module
+        except AttributeError:
+          pass
       return decorated
 
     # `func` is not supplied, collect the arguments supplied and return a
@@ -294,7 +300,7 @@ def contextdecorator(cmgrfunc):
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
           if provide_context:
-            a = a.insert(0,ctxt)
+            a = a.insert(0, ctxt)
           return func(*a, **kw)
 
     return wrapped
@@ -451,7 +457,7 @@ def cachedmethod(
         except TypeError:
           changed = True
       if changed:
-        setattr(self, rev_attr, getattr(self, rev_attr, 0) + 1)
+        setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
   return wrapper

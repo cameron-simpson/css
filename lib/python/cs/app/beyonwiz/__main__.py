@@ -10,17 +10,18 @@ import os.path
 from pprint import pformat
 import sys
 from cs.cmdutils import BaseCommand
+from cs.logutils import warning
 from cs.pfx import Pfx
-from . import Recording, DEFAULT_FORMAT
+from . import Recording, DEFAULT_MEDIAFILE_FORMAT
 from .tvwiz import TVWiz
 from .wizpnp import WizPnP
 
 TRY_N = 32
 
-def main(argv=None, cmd=None):
+def main(argv=None):
   ''' Main command line.
   '''
-  return BWizCmd(argv, cmd=cmd).run()
+  return BWizCmd(argv).run()
 
 class BWizCmd(BaseCommand):
   ''' Command line handler.
@@ -47,7 +48,7 @@ class BWizCmd(BaseCommand):
   def cmd_convert(self, args):
     ''' Convert a recording to MP4.
 
-        Usage: {cmd} recording [start..end]... [output.mp4]
+        Usage: {cmd} [start..end]... recording [output.mp4]
           Convert the video content of the named recording to
           the named output file (typically MP4, though the ffmpeg
           output format chosen is based on the extension).
@@ -55,30 +56,27 @@ class BWizCmd(BaseCommand):
           start..end: Optional start and end offsets in seconds, used
             to crop the recording output.
     '''
-    if not args:
-      raise GetoptError("missing recording")
-    srcpath = args.pop(0)
     badopts = False
-    with Pfx(srcpath):
-      # parse optional start..end arguments
-      timespans = []
-      while (args and args[0] and args[0].isdigit() and args[-1].isdigit()
-             and '..' in args[0]):
-        with Pfx(args[0]):
-          try:
-            start, end = args[0].split('..')
-            start_s = float(start)
-            end_s = float(end)
-          except ValueError:
-            # parse fails, not a range argument
-            break
-          else:
-            # use this argument as a timespan
-            args.pop(0)
-            if start_s > end_s:
-              warning("start:%s > end:%s", start, end)
-              badopts = True
-            timespans.append((start_s, end_s))
+    # parse optional start..end arguments
+    timespans = []
+    while args:
+      range_arg = args[0]
+      with Pfx("timespan %r", range_arg):
+        try:
+          start, end = range_arg.split('..')
+          start_s = float(start)
+          end_s = float(end)
+        except ValueError:
+          break
+        else:
+          args.pop(0)
+          if start_s > end_s:
+            warning("start:%s > end:%s", start, end)
+            badopts = True
+          timespans.append((start_s, end_s))
+      if not args:
+        raise GetoptError("missing recording")
+      srcpath = args.pop(0)
       # collect optional dstpath
       if args:
         dstpath = args.pop(0)
@@ -120,7 +118,7 @@ class BWizCmd(BaseCommand):
         print(filename)
         print(pformat(R.metadata))
         print(R.DEFAULT_FILENAME_BASIS)
-        print(R.filename(ext=DEFAULT_FORMAT))
+        print(R.filename(ext=DEFAULT_MEDIAFILE_FORMAT))
     return 0
 
   def cmd_scan(self, args):
@@ -183,4 +181,4 @@ class BWizCmd(BaseCommand):
     return 0
 
 if __name__ == '__main__':
-  sys.exit(main(sys.argv, cmd=__package__))
+  sys.exit(main(sys.argv))

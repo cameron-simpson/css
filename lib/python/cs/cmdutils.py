@@ -19,11 +19,11 @@ from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20210420-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -270,19 +270,31 @@ class BaseCommand:
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
     self.cmd = cmd
-    self.usage = self.usage_text(cmd=cmd)
     self.loginfo = loginfo
     self.apply_defaults()
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
     # we catch GetoptError from this suite...
+    subcmd = None  # default: no subcmd specific usage available
+    short_usage = False
     try:
       getopt_spec = getattr(self, 'GETOPT_SPEC', '')
-      # we do this regardless in order to honour '--'
-      opts, argv = getopt(argv, getopt_spec, '')
-      if getopt_spec:
-        self.apply_opts(opts)  # pylint: disable=no-member
+      # catch bare -h or --help if no 'h' in the getopt_spec
+      if ('h' not in getopt_spec and len(argv) == 1
+          and argv[0] in ('-h', '-help', '--help')):
+        argv = ['help']
+      else:
+        # we do this regardless in order to honour '--'
+        try:
+          opts, argv = getopt(argv, getopt_spec, '')
+        except GetoptError:
+          short_usage = True
+          raise
+        self.apply_opts(opts)
+        # we do this regardless so that subclasses can do some presubcommand parsing
+        # after any command line options
+        argv = self.apply_preargv(argv)
 
       # now prepare:
       # * a callable `main` accepting `argv`
@@ -294,20 +306,27 @@ class BaseCommand:
         if not argv:
           default_argv = getattr(self, 'SUBCOMMAND_ARGV_DEFAULT', None)
           if not default_argv:
+            short_usage = True
             raise GetoptError(
                 "missing subcommand, expected one of: %s" %
                 (', '.join(sorted(subcmds.keys())),)
             )
-          argv = list(default_argv)
+          argv = (
+              [default_argv]
+              if isinstance(default_argv, str) else list(default_argv)
+          )
         subcmd = argv.pop(0)
         subcmd_ = subcmd.replace('-', '_')
         try:
           main_method = getattr(self, self.SUBCOMMAND_METHOD_PREFIX + subcmd_)
         except AttributeError:
           # pylint: disable=raise-missing-from
+          short_usage = True
+          bad_subcmd = subcmd
+          subcmd = None
           raise GetoptError(
               "%s: unrecognised subcommand, expected one of: %s" % (
-                  subcmd,
+                  bad_subcmd,
                   ', '.join(sorted(subcmds.keys())),
               )
           )
@@ -326,17 +345,19 @@ class BaseCommand:
         try:
           main = lambda: self.main(argv)
         except AttributeError:
-          raise GetoptError("no main method and no subcommand methods")  # pylint: disable=raise-missing-from
+          # pylint: disable=raise-missing-from
+          raise GetoptError("no main method and no subcommand methods")
         main_cmd = cmd
         main_context = nullcontext()
     except GetoptError as e:
-      handler = getattr(self, 'getopt_error_handler')
-      if handler and handler(cmd, self.options, e, self.usage):
+      if self.getopt_error_handler(cmd, self.options, e,
+                                   self.usage_text(subcmd=subcmd,
+                                                   short=short_usage)):
         self._printed_usage = True
         return
       raise
     else:
-      self._run = main, main_cmd, argv, main_context
+      self._run = main, main_cmd, argv, main_context, subcmd
 
   @classmethod
   def subcommands(cls):
@@ -352,16 +373,20 @@ class BaseCommand:
     }
 
   @classmethod
-  @cachedmethod
-  def usage_text(cls, *, cmd=None, format_mapping=None):
+  def usage_text(
+      cls, *, cmd=None, format_mapping=None, subcmd=None, short=False
+  ):
     ''' Compute the "Usage:" message for this class
         from the top level `USAGE_FORMAT`
         and the `'Usage:'`-containing docstrings
         from its `cmd_*` methods.
 
-        This is a cached method because it tries to update the
-        method docstrings after formatting, which is bad if it
-        happens more than once.
+        Parameters:
+        * `cmd`: optional command name, default derived from the class name
+        * `format_mapping`: an optional format mapping for filling
+          in format strings in the usage text
+        * `subcmd`: constrain the usage to a particular subcommand named `subcmd`;
+          this is used to produce a shorter usage for subcommand usage failures
     '''
     if cmd is None:
       cmd = cutsuffix(cls.__name__, 'Command').lower()
@@ -374,6 +399,13 @@ class BaseCommand:
     usage_format = getattr(cls, 'USAGE_FORMAT', None)
     subcmds = cls.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
+    if subcmd and not has_subcmds:
+      raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
+    if subcmd and subcmd not in subcmds:
+      raise ValueError(
+          "subcmd=%r: unknown subcommand, I know %r" %
+          (subcmd, sorted(subcmds.keys()))
+      )
     if usage_format is None:
       usage_format = (
           r'Usage: {cmd} subcommand [...]'
@@ -382,16 +414,22 @@ class BaseCommand:
     usage_message = usage_format.format_map(usage_format_mapping)
     if has_subcmds:
       subusages = []
-      for attr in sorted(subcmds):
+      for attr in sorted(subcmds) if subcmd is None else (subcmd,):
         with Pfx(attr):
           subusage = cls.subcommand_usage_text(
-              attr, usage_format_mapping=usage_format_mapping
+              attr, usage_format_mapping=usage_format_mapping, short=short
           )
           if subusage:
             subusages.append(subusage.replace('\n', '\n  '))
       if subusages:
+        subcmds_header = 'Subcommands' if subcmd is None else 'Subcommand'
+        if short:
+          subcmds_header += ' (short form, long form with "help", "-h" or "--help")'
         usage_message = '\n'.join(
-            [usage_message, '  Subcommands:'] + [
+            [
+                usage_message,
+                '  ' + subcmds_header + ':',
+            ] + [
                 '    ' + subusage.replace('\n', '\n    ')
                 for subusage in subusages
             ]
@@ -400,7 +438,7 @@ class BaseCommand:
 
   @classmethod
   def subcommand_usage_text(
-      cls, subcmd, fulldoc=False, usage_format_mapping=None
+      cls, subcmd, fulldoc=False, usage_format_mapping=None, short=False
   ):
     ''' Return the usage text for a subcommand.
 
@@ -409,7 +447,15 @@ class BaseCommand:
         * `fulldoc`: if true (default `False`)
           return the full docstring with the Usage section expanded
           otherwise just return the Usage section.
+        * `short`: just include the first line of the usage message,
+          intented for when there are many subcommands
+
+        It is an error to set both `fulldoc` and `short`.
     '''
+    if fulldoc and short:
+      raise ValueError(
+          "fulldoc:%s and short:%s may not both be true" % (fulldoc, short)
+      )
     method = cls.subcommands()[subcmd]
     subusage = None
     try:
@@ -427,6 +473,8 @@ class BaseCommand:
         post_usage_format = post_usage_parts.pop(0)
         subusage_format = stripped_dedent(post_usage_format)
         if subusage_format:
+          if short:
+            subusage_format, *_ = subusage_format.split('\n', 1)
           mapping = dict(sys.modules[method.__module__].__dict__)
           if usage_format_mapping:
             mapping.update(usage_format_mapping)
@@ -444,8 +492,15 @@ class BaseCommand:
         Subclasses can override this to set up the initial state of `self.options`.
     '''
 
+  @pfx_method
+  # pylint: disable=no-self-use
   def apply_opt(self, opt, val):
-    ''' Handle a individual global command line option.
+    ''' Handle an individual global command line option.
+
+        This default implementation raises a `RuntimeError`.
+        It only fires if `getopt` actually gathered arguments
+        and would imply that a `GETOPT_SPEC` was supplied
+        without an `apply_opt` or `apply_opts` method to implement the options.
     '''
     raise RuntimeError("unhandled option %r" % (opt,))
 
@@ -453,8 +508,17 @@ class BaseCommand:
     ''' Apply command line options.
     '''
     for opt, val in opts:
-      with Pfx(opt):
+      with Pfx(opt if val is None else "%s %r" % (opt, val)):
         self.apply_opt(opt, val)
+
+  # pylint: disable=no-self-use
+  def apply_preargv(self, argv):
+    ''' Do any preparsing of `argv` before the subcommand/main-args.
+        Return the remaining arguments.
+
+        This default implementation returns `argv` unchanged.
+    '''
+    return argv
 
   @classmethod
   def run_argv(cls, argv, **kw):
@@ -487,11 +551,12 @@ class BaseCommand:
         and with `cmd=None` for `main`.
     '''
     options = self.options
+    subcmd = None
     try:
       if self._run is None:
         main_cmd = self.cmd  # used in "except" below
         raise GetoptError("bad invocation")
-      main, main_cmd, main_argv, main_context = self._run
+      main, main_cmd, main_argv, main_context, subcmd = self._run
       runstate = getattr(options, 'runstate', RunState(main_cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
@@ -508,38 +573,45 @@ class BaseCommand:
                 with main_context:
                   return main()
     except GetoptError as e:
-      handler = getattr(self, 'getopt_error_handler')
-      if handler and handler(main_cmd, options, e,
-                             None if self._printed_usage else self.usage):
+      if self.getopt_error_handler(
+          main_cmd,
+          options,
+          e,
+          (None if self._printed_usage else self.usage_text(cmd=self.cmd,
+                                                            subcmd=subcmd)),
+          subcmd=subcmd,
+      ):
+        self._printed_usage = True
         return 2
       raise
 
   # pylint: disable=unused-argument
   @staticmethod
-  def getopt_error_handler(cmd, options, e, usage):  # pylint: disable=unused-argument
+  def getopt_error_handler(cmd, options, e, usage, subcmd=None):  # pylint: disable=unused-argument
     ''' The `getopt_error_handler` method
         is used to control the handling of `GetoptError`s raised
         during the command line parse
         or during the `main` or `cmd_`*subcmd*` calls.
+
+        This default handler issues a warning containing the exception text,
+        prints the usage message to standard error,
+        and returns `True` to indicate that the error has been handled.
 
         The handler is called with these parameters:
         * `cmd`: the command name
         * `options`: the `options` object
         * `e`: the `GetoptError` exception
         * `usage`: the command usage or `None` if this was not provided
+        * `subcmd`: optional subcommand name;
+          if not `None`, is the name of the subcommand which caused the error
 
         It returns a true value if the exception is considered handled,
         in which case the main `run` method returns 2.
         It returns a false value if the exception is considered unhandled,
         in which case the main `run` method reraises the `GetoptError`.
 
-        This default handler issues a warning containing the exception text,
-        prints the usage message to standard error,
-        and returns `True` to indicate that the error has been handled.
-
         To let the exceptions out unhandled
-        this can be overridden with a method which just returns `False`
-        or even by setting the `getopt_error_handler` attribute to `None`.
+        this can be overridden with a method which just returns `False`.
 
         Otherwise,
         the handler may perform any suitable action
@@ -564,9 +636,9 @@ class BaseCommand:
 
   # pylint: disable=unused-argument
   @classmethod
-  def cmd_help(cls, argv, options):  # pylint: disable=unused-argument
+  def cmd_help(cls, argv):
     ''' Usage: {cmd} [subcommand-names...]
-          Print the help for the named subcommands,
+          Print the full help for the named subcommands,
           or for all subcommands if no names are specified.
     '''
     subcmds = cls.subcommands()
@@ -577,16 +649,23 @@ class BaseCommand:
       argv = sorted(subcmds)
     xit = 0
     print("help:")
+    unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
         if subcmd not in subcmds:
           warning("unknown subcommand")
+          unknown = True
           xit = 1
           continue
-        subusage = cls.subcommand_usage_text(subcmd, fulldoc=fulldoc)
+        usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
+        subusage = cls.subcommand_usage_text(
+            subcmd, fulldoc=fulldoc, usage_format_mapping=usage_format_mapping
+        )
         if not subusage:
           warning("no help")
           xit = 1
           continue
         print(' ', subusage.replace('\n', '\n    '))
+    if unknown:
+      warning("I know: %s", ', '.join(sorted(subcmds.keys())))
     return xit

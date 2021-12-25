@@ -39,16 +39,18 @@
     which is also a system based on variable sized blocks.
 '''
 
+from contextlib import contextmanager
 import os
 import tempfile
-import threading
 from types import SimpleNamespace as NS
+from cs.context import stackattrs
 from cs.logutils import error, warning
 from cs.progress import Progress, OverProgress
 from cs.py.stack import stack_dump
 from cs.seq import isordered
 import cs.resources
 from cs.resources import RunState
+from cs.threads import State as ThreadState
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -85,6 +87,7 @@ DISTINFO = {
         'cs.seq',
         'cs.socketutils',
         'cs.threads',
+        'cs.testutils',
         'cs.tty',
         'cs.units',
         'cs.upd',
@@ -105,6 +108,7 @@ DISTINFO = {
 
 DEFAULT_BASEDIR = '~/.local/share/vt'
 
+DEFAULT_CONFIG_ENVVAR = 'VT_CONFIG'
 DEFAULT_CONFIG_PATH = '~/.vtrc'
 
 DEFAULT_CONFIG_MAP = {
@@ -165,13 +169,14 @@ common = NS(
     progress=_progress,
     over_progress=_over_progress,
     runstate=RunState("cs.vt.common.runstate"),
-    config=None
+    config=None,
+    S=None,
 )
 
 del _progress
 del _over_progress
 
-class _Defaults(threading.local):
+class _Defaults(ThreadState):
   ''' Per-thread default context stack.
 
       A Store's __enter__/__exit__ methods push/pop that store
@@ -184,12 +189,12 @@ class _Defaults(threading.local):
   _Ss = []
 
   def __init__(self):
-    threading.local.__init__(self)
+    super().__init__()
     self.progress = common.progress
     self.runstate = common.runstate
     self.fs = None
     self.block_cache = None
-    self.Ss = []
+    self.show_progress = False
 
   @property
   def config(self):
@@ -199,69 +204,17 @@ class _Defaults(threading.local):
       cfg = Config()
     return cfg
 
-  def _fallback(self, key):
-    ''' Fallback function for empty stack.
-    '''
-    if key == 'S':
-      warning("no per-Thread Store stack, using the global stack")
-      stack_dump(indent=2)
-      Ss = self._Ss
-      if Ss:
-        return Ss[-1]
-      error(
-          "%s: no per-Thread defaults.S and no global stack, returning None",
-          self
-      )
-      return None
-    raise ValueError("no fallback for %r" % (key,))
+  def __getattr__(self, attr):
+    if attr == 'S':
+      return common.S
+    raise AttributeError(attr)
 
-  @property
-  def S(self):
-    ''' The topmost Store.
+  @contextmanager
+  def common_S(self, S):
+    ''' Context manager to push a Store onto `common.S`.
     '''
-    Ss = self.Ss
-    if Ss:
-      return self.Ss[-1]
-    _Ss = self._Ss
-    if _Ss:
-      return self._Ss[-1]
-    raise AttributeError('S')
-
-  @S.setter
-  def S(self, newS):
-    ''' Set the topmost Store.
-        Sets the topmost global Store
-        if there's no current perThread Store stack.
-    '''
-    Ss = self.Ss
-    if Ss:
-      Ss[-1] = newS
-    else:
-      _Ss = self._Ss
-      if _Ss:
-        _Ss[-1] = newS
-      else:
-        _Ss.append(newS)
-
-  def pushStore(self, newS):
-    ''' Push a new Store onto the per-Thread stack.
-    '''
-    self.Ss.append(newS)
-
-  def popStore(self):
-    ''' Pop and return the topmost Store from the per-Thread stack.
-    '''
-    return self.Ss.pop()
-
-  def push_Ss(self, newS):
-    ''' Push a new Store onto the global stack.
-    '''
-    self._Ss.append(newS)
-
-  def pop_Ss(self):
-    ''' Pop and return the topmost Store from the global stack.
-    '''
-    return self._Ss.pop()
+    with stackattrs(common, S=S):
+      yield
 
 defaults = _Defaults()
 

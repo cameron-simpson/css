@@ -17,9 +17,9 @@ pylint2=pylint-2.7
 pylint3='python3 -m pylint'
 pyiclint=pyicontract-lint
 pycodestyle_ignore=E111,E114,E124,E125,E126,E129,E201,E202,E127,E221,E226,E227,E265,E266,E301,E302,E305,E501,E731,W503,W504
-pylint_disable=bad-whitespace,bad-indentation,bad-continuation,invalid-name,useless-object-inheritance
+pylint_disable=bad-whitespace,bad-indentation,bad-continuation,invalid-name,useless-object-inheritance,consider-using-f-string
 pylintrc=$( findup .pylintrc || echo "$HOME/.pylintrc" )
-shellcheck_exclusions=SC1007
+shellcheck_exclusions=SC1007,SC2244,SC2250
 
 cmd=$0
 usage="Usage: $cmd [-2] [-3] filenames...
@@ -133,7 +133,7 @@ do
       fi
       ;;
     sh)
-      $trace shellcheck "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
+      $trace shellcheck -o all "--exclude=$shellcheck_exclusions" -s sh "$lintfile" || xit=1
       ;;
     *)echo "$cmd: $lintfile: no linter (type=$type)" >&2
       ;;

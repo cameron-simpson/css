@@ -401,7 +401,7 @@ class _Dirent(Transcriber):
     prev_blockref = self._prev_dirent_blockref
     if prev_blockref is None:
       return None
-    bfr = CornuCopyBuffer(prev_blockref.datafrom())
+    bfr = CornuCopyBuffer(prev_blockref)
     E = _Dirent.from_buffer(bfr)
     if not bfr.at_eof():
       warning(
@@ -524,8 +524,7 @@ class _Dirent(Transcriber):
         perm_bits = 0o600
     st_mode = self.unix_typemode | perm_bits
     st_ino = I.inum if I else -1
-    # TODO: dev from FileSystem
-    st_dev = fs.device_id
+    st_dev = None if fs is None else fs.device_id
     if self.isdir:
       # TODO: should nlink for Dirs count its subdirs?
       st_nlink = 1
@@ -821,7 +820,7 @@ class FileDirent(_Dirent, MultiOpenMixin, FileLike):
     '''
     f = self.open_file
     if f is None:
-      return self.block.datafrom()
+      return iter(self.block)
     return f.datafrom()
 
   @property

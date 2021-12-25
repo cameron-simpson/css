@@ -1,3 +1,11 @@
+DataDir: only show progress if defaults.show_progress is true
+revisit keys/hashcodes for the datadir stores - seem unreliable, maybe because of cache and queues - removed from unit tests for now
+dropped the histogram stuff for blocked_chunks_of2, need some QA tests to look at block size distributions
+scanbuf: should it do the min/max offset limiting - should be faster, particularly in C
+blocked_chunks_of: should it run pure-extra parser (with min/max or scanbuf of big chunks) until eof or error, then pure scanbuf? should be faster
+fast version of blocked_chunks_of for no parser and hardwired min/max block sizes
+_scan.c: the # for PyArg_ParseTuple is no longer valid - maybe only when PY_SSIZE_T_CLEAN is not defined - maybe drop that half of the ifdef in an error raising way
+_scan.c: the # for PyArg_ParseTuple is no longer valid - find out what to do - or is it only PyArg_Parse which breaks?
 file merge - dig through common ancestor data revisions? fork a copy if not direct ancestor?
 IndexClasses to be singletons based on their pathname
 replace HASHCLASS_BY_ENUM and HASHCLASS_BY_NAME with HasCode.by_index([int,str])
