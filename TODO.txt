@@ -1,4 +1,3 @@
-playon not autorefreshing
 UpdProxy: can we have an ftext property and monitor format keys for update?
 rip out all cs.daetutils and friends, use the arrow module
 unhostsify leaves temp files around, probably if interrupted
