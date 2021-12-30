@@ -41,6 +41,8 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+__version__ = '20211212-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -50,6 +52,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Utilities",
     ],
+    'entry_points': {
+        'console_scripts': ['playon = cs.app.playon:main'],
+    },
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
@@ -66,6 +71,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'requests',
+        'typeguard',
     ],
 }
 
