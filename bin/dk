@@ -5,22 +5,26 @@
 
 set -ue
 
+: ${DK_APP_USER:='appuser'}
 : ${DK_COMPOSE_YML:='docker-compose.yml'}
 : ${DK_CP_PREFIX:='.'}
 : ${DK_ENVVARS:=''}
 : ${DK_EXEC_PREFIX:=''}
-: ${DK_PRIMARY_SERVICE=''}
+: ${DK_PRIMARY_SERVICE='gunicorn'}
 : ${DK_PSQL_SERVICE=''}
 : ${DK_PSQL_DBNAME=''}
 : ${DK_PSQL_SETUP_USERNAME=''}
 
 docker_compose_opts=
+docker_exec_opts=-i
+[ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
 
 cmd=$0
 usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
   -f docker-compose.yml
     Specify docker-compose YAML file.
     Default from \$DK_COMPOSE_YML: $DK_COMPOSE_YML
+  -i Passed to \"docker exec\", for commands which use that.
   -n name
     Specify primary service name.
     This is also the target service for \"exec\".
@@ -55,6 +59,8 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       comes from the \"host\" part of an rsync remote path.
     ssh [ssh-args...]
       Ssh into the container.
+    sshd
+      Invoke an inet-mode sshd inside the container.
     try [name [command...]]
       Shorthand for \"docker-compose run --rm name command...\".
       The default name comes from \$DK_PRIMARY_SERVICE ($DK_PRIMARY_SERVICE).
@@ -63,6 +69,9 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       Run down, volume rm var, pull, build, up setup.
 
   Environment:
+    DK_APP_USER
+      The nonroot username inside the container.
+      Presently used by the \"ssh\" op.
     DK_COMPOSE_YML
       The docker-compose filename, default docker-compose.yml.
       If not present in the current directory it will be sought in an ancestor.
@@ -188,8 +197,6 @@ case "$op" in
       exec docker "$op" "$src" "$dst"
       ;;
   exec)
-      docker_exec_opts=-i
-      [ -t 0 -a -t 1 ] && docker_exec_opts="$docker_exec_opts -t"
       [ $# -gt 0 ] || set bash
       if [ -n "$DK_ENVVARS" ]
       then
@@ -249,8 +256,22 @@ case "$op" in
       set -x
       exec rsync -e "set-x env DK_EXEC_PREFIX= $0 rsh" ${1+"$@"} ;;
   ssh)
+      # ssh into the container via an inet-mode sshd
       set -x
-      exec ssh -o "proxycommand=set-x docker exec -i $primary_container /usr/sbin/sshd -ei -o AuthenticationMethods=publickey -o PubkeyAcceptedKeyTypes=+ssh-dss" appuser@localhost ${1+"$@"}
+      exec ssh -o "proxycommand=set-x '$0' -n '$primary_container' sshd" \
+            "$DK_APP_USER@localhost" ${1+"$@"}
+      ;;
+  sshd)
+      # invoke an inet-mode sshd inside the container
+      set -x
+      DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
+      "$0" -n "$primary_container" exec mkdir -p /run/sshd
+      exec "$0" -n "$primary_container" \
+            exec /usr/sbin/sshd \
+                  -edi \
+                  -o AuthenticationMethods=publickey \
+                  -o PubkeyAcceptedKeyTypes=+ssh-dss \
+                  ${1+"$@"}
       ;;
   try)
       if [ $# = 0 ]
