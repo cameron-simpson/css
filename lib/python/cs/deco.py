@@ -398,7 +398,7 @@ def cachedmethod(
   lastpoll_attr = val_attr + '__lastpoll'
 
   # pylint: disable=too-many-branches
-  def wrapper(self, *a, **kw):
+  def cachedmethod_wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
       value0 = getattr(self, val_attr, unset_value)
@@ -460,7 +460,7 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  return wrapper
+  return cachedmethod_wrapper
 
 @decorator
 def OBSOLETE(func, suggestion=None):
