@@ -32,8 +32,8 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
     branch      Report current branch name.
     branches    Report all branch names.
     clone2      Wrapper for \"$cmd sibling\" which copies some additional state:
-                  Files or directories named in \$CLONE2_CP are copied.
-                  Files or directories named in \$CLONE2_SYM are symlinked.
+                  Files or directories named in \$VCS_CLONE2_CP are copied.
+                  Files or directories named in \$VCS_CLONE2_SYM are symlinked.
                 Relative paths in these variables are resolved
                 relative to the VCS top.
     diff        Run the VCS diff command.
@@ -44,6 +44,7 @@ usage="Usage: $cmd [-d dir] [-V vcs_type] [command [args...]]
                 Fetch all or specified remote branches.
     info        Report VCS type, top and branch.
     modified    Report the names of modified files.
+    record      Record partial changes: \"hg record\" or \"git add -p\".
     remote      Report remote paths.
     report      (Default.) Report brief summary.
     sibling clonedir
@@ -161,8 +162,26 @@ case "$op" in
       # report all branches
       branches,git) git branch ;;
       branches,hg)  hg branches ${1+"$@"} ;;
-      clone2,*)     clonedir=$1; shift
+      clone2,*)     exec 3>&1 1>&2
+                    clonedir=$1; shift
                     [ $# = 0 ] || { echo "$cmd $op: extra arguments: $*" >&2; exit 2; }
+                    case "$clonedir" in
+                      */*)  clone_branch= ;;
+                      [a-z1-9]*-*)
+                            clone_branch=$clonedir
+                            br=$( "$0" branch )
+                            wd=$( pwd )
+                            base=$( basename "$wd" )
+                            case "$base" in
+                              *-"$br")  pfx=$( expr "x$base" : 'x\(.*\)-'"$br" )
+                                        clonedir=../$pfx-$clone_branch
+                                        ;;
+                              *)        clonedir=$wd-$br
+                                        ;;
+                            esac
+                            ;;
+                      *)    clone_branch= ;;
+                    esac
                     "$0" sibling "$clonedir"
                     for mode in cp sym
                     do
@@ -200,6 +219,16 @@ case "$op" in
                         esac
                       done
                     done
+                    [ -z "$clone_branch" ] || {
+                      case "$vcs_type" in
+                        hg)   ask "create branch $clone_branch" \
+                              && incd "$clonedir" hg bookmark "$clone_branch"
+                              ;;
+                        git)  incd "$clonedir" git co -b "$clone_branch"
+                              ;;
+                      esac
+                    }
+                    incd "$clonedir" pwd >&3
                     ;;
       # current diff
       diff,git)     git diff ${1+"$@"} ;;
@@ -246,6 +275,12 @@ case "$op" in
                     )
                     ;;
       modified,hg)  hg status -n -am ${1+"$@"} ;;
+      # record partial changes
+      record,hg)    hg record ${1+"$@"} ;;
+      record,git)   git add -p ${1+"$@"} && git diff --staged \
+                    && msg=$( readline "commit message? " ) && [ -n "$msg" ] \
+                    && git commit -m "$msg"
+                    ;;
       # report remote repo paths
       remote,git)   git remote ${1+"$@"} ${1-"-v"} ;;
       remote,hg)    hg config paths ${1+"$@"} ;;

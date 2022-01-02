@@ -35,5 +35,8 @@ then
 else
   format={cs.dlog}
   category=$( fstags ls -d -o "$format" -- "$path" )
-  [ -n "$category" ] && [ "x$category" != "x$format" ] && echo "$category"
+  case "$category" in
+    '' | '{}' | "$format" ) ;;
+    *)  echo "$category" ;;
+  esac
 fi

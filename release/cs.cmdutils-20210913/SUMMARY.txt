@@ -1,0 +1,1 @@
+New BaseCommand.apply_preargv method to gather special arguments before subcommands.

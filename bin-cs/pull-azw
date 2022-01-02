@@ -1,0 +1,140 @@
+#!/bin/sh
+#
+# Scan Kindle media directory and import into Calibre.
+# - Cameron Simpson <cs@cskk.id.au> 24oct2021
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+
+trace=
+[ -t 2 ] && trace=set-x
+##trace=eecho
+
+calibre_library=${CALIBRE_LIBRARY:-$HOME/CALIBRE}
+kindle_library=${KINDLE_LIBRARY:-$HOME/KINDLE}
+
+force=
+cal_add_opts=
+make_cbz=1
+output_dirpath=${PULL_AZW_OUTPUTDIR:-''}
+tsbase=.timestamp-$cmd
+
+usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz] [book-files...]
+  -C calibre_library
+        Specify calibre library location, default from \$CALIBRE_LIBRARY: $calibre_library
+  -cbz  Do not bother to construct a CBZ file from each book-file.
+  +cbz  Also construct a CBZ file from each book-file and add it is a format.
+        This is the default.
+  -f    Force: pass -d (duplicates: add even if present) to \"calibredb add\".
+  -K kindle_library
+        Specify kindle library location, default from \$KINDLE_LIBRARY: $kindle_library
+  -n    No action. Recite planned actions.
+  -o output_dirpath
+        Also link the resulting AZW3 and optional CBZ files into output_dirpath.
+        Default from \$PULL_AZW_OUTPUTDIR
+  -x    Trace execution."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -C) calibre_library=$2; shift ;;
+    -cbz) make_cbz= ;;
+    +cbz) make_cbz=1 ;;
+    -f) force=1 ;;
+    -K) kindle_library=$2; shift ;;
+    -n) trace=eecho ;;
+    -o) output_dirpath=$2; shift ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+for bookf
+do
+  [ -s "$bookf" ] || { echo "$cmd: not a file: $bookf" >&2; badopts=1; }
+done
+
+[ -d "$calibre_library/" ] || {
+  echo "$cmd: calibre library not a directory: $calibre_library" >&2
+  badopts=1
+}
+
+[ -d "$kindle_library/" ] || {
+  echo "$cmd: kindle library not a directory: $kindle_library" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $force ] && cal_add_opts="$cal_add_opts -d"   ## --automerge=new_record
+
+if [ $# = 0 ]
+then
+  # resolve paths before cd
+  wd=$( pwd )
+  case "$calibre_library" in /*) ;; *) calibre_library=$wd/$calibre_library ;; esac
+  case "$kindle_library" in /*) ;; *) kindle_library=$wd/$kindle_library ;; esac
+  case "$output_dirpath" in /*) ;; *) output_dirpath=$wd/$output_dirpath ;; esac
+fi
+
+if [ -n "$output_dirpath" ]
+then
+  [ -d "$output_dirpath/" ] || set-x mkdir "$output_dirpath"
+fi
+
+# timestamp reference file
+tsfile=$calibre_library/$tsbase
+new_tsfile=$tsfile-$$
+
+time_based=
+if [ $# = 0 ]
+then
+  # automatic mode, based on timestamp file
+  time_based=1
+  cd "$kindle_library"
+  touch "$new_tsfile"
+  if [ -e "$tsfile" ]
+  then
+    set -- $( find */*.azw* -type f -newer "$tsfile" -print )
+  else
+    # first time - make a marker file, import everything
+    set -- */*.azw*
+  fi
+fi
+
+if $trace calibredb add "--library-path=$calibre_library" $cal_add_opts -- "$@"
+then
+  # advance timestamp
+  [ $time_based ] && mv "$new_tsfile" "$tsfile"
+else
+  # discard new timestamp if any
+  [ $time_based ] && rm -f "$new_tsfile"
+fi \
+| tee /dev/fd/2 \
+| sed '/^Added book ids: /!d; s/^Added book ids: *//; s/ *, */ /g' | tr ' ' '\012' \
+| while read dbid
+  do
+    set -- "$calibre_library"/*/*" ($dbid)"/*.azw3
+    for azw3
+    do
+      ls -d "$azw3" || continue
+      [ -z "$output_dirpath" ] || {
+        ln "$azw3" "$output_dirpath/" 2>/dev/null || cp "$azw3" "$output_dirpath/"
+      }
+      if [ $make_cbz ]
+      then
+        cbz=$( $trace add-cbz -C "$calibre_library" "$azw3" "$dbid" )
+        if [ -n "$output_dirpath" ]
+        then  $trace mv "$cbz" "$output_dirpath/"
+        else  $trace rm "$cbz"
+        fi
+      fi
+    done
+  done

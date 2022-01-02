@@ -1,0 +1,8 @@
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: tweak references to self.options
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run_argv: move to just above run(), plumb optional keyword arguments
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.__init__: tweak logic around cmd_foo being a BaseCommand subclass
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: apply optional keyword arguments to self.options during the run
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: tweak run context setup
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: look for self.SUBCOMMAND_ARGV_DEFAULT if no subcommand is supplied
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand.run: bugfix case for "main" method and no "cmd_*" methods
+lib/python/cs/cmdutils.py: cs.cmdutils: BaseCommand: cmd_help: drop obsolete options parameter; cmd_help: plumb usage_format_mapping to subcommand_usage_text()
