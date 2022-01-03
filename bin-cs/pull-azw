@@ -25,7 +25,7 @@ usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz
   -C calibre_library
         Specify calibre library location, default from \$CALIBRE_LIBRARY: $calibre_library
   -cbz  Do not bother to construct a CBZ file from each book-file.
-  +cbz  Also construct a CBZ file from each book-file and add it is a format.
+  +cbz  Also construct a CBZ file from each book-file and add it as a format.
         This is the default.
   -f    Force: pass -d (duplicates: add even if present) to \"calibredb add\".
   -K kindle_library
@@ -34,7 +34,7 @@ usage="Usage: $cmd [-C calibre_library] [-f] [-K kindle_library] [-n] [-x] [+cbz
   -o output_dirpath
         Also link the resulting AZW3 and optional CBZ files into output_dirpath.
         Default from \$PULL_AZW_OUTPUTDIR
-  -x    Trace execution."
+  -x    Trace execution. Default if stderr is a tty."
 
 badopts=
 
