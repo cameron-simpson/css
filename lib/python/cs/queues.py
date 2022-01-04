@@ -103,10 +103,12 @@ class _QueueIterator(MultiOpenMixin):
       item = q.get()
     except Queue_Empty as e:
       warning(
-          "%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self
+          "%s: Queue_Empty: %s, (SHOULD THIS HAPPEN?) calling finalise...",
+          self, e
       )
       self._put(self.sentinel)
       self.finalise()
+      # pylint: disable=raise-missing-from
       raise StopIteration("Queue_Empty: %s" % (e,))
     if item is self.sentinel:
       # sentinel consumed (clients won't see it, so we must)
@@ -125,6 +127,7 @@ class _QueueIterator(MultiOpenMixin):
     try:
       return next(self)
     except StopIteration as e:
+      # pylint: disable=raise-missing-from
       raise Queue_Empty("got %s from %s" % (e, self))
 
   def empty(self):
@@ -157,6 +160,7 @@ class Channel(object):
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
 
+  # pylint: disable=consider-using-with
   def __init__(self):
     self.__readable = Lock()
     self.__readable.acquire()
@@ -164,6 +168,7 @@ class Channel(object):
     self.__writable.acquire()
     self.closed = False
 
+  # pylint: disable=consider-using-with
   def __str__(self):
     if self.__readable.acquire(False):
       if self.__writable.acquire(False):
@@ -201,6 +206,7 @@ class Channel(object):
       raise StopIteration()
     return self.get()
 
+  # pylint: disable=consider-using-with
   @not_closed
   def get(self):
     ''' Read a value from the Channel.
@@ -214,6 +220,7 @@ class Channel(object):
     delattr(self, '_value')
     return value
 
+  # pylint: disable=attribute-defined-outside-init,consider-using-with
   @not_closed
   def put(self, value):
     ''' Write a value to the Channel.
@@ -283,7 +290,6 @@ class PushQueue(MultiOpenMixin):
   def startup(self):
     ''' Start up.
     '''
-    pass
 
   def shutdown(self):
     ''' shutdown() is called by MultiOpenMixin._close() to close
@@ -320,7 +326,6 @@ class NullQueue(MultiOpenMixin):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
-    pass
 
   def get(self):
     ''' Get the next value. Always raises Queue_Empty.
@@ -333,12 +338,10 @@ class NullQueue(MultiOpenMixin):
   def startup(self):
     ''' Start the queue.
     '''
-    pass
 
   def shutdown(self):
     ''' Shut down the queue.
     '''
-    pass
 
   def __iter__(self):
     return self
@@ -347,7 +350,7 @@ class NullQueue(MultiOpenMixin):
     try:
       return self.get()
     except Queue_Empty:
-      raise StopIteration
+      raise StopIteration  # pylint: disable=raise-missing-from
 
   next = __next__
 
@@ -463,8 +466,8 @@ class TimerQueue(object):
           # function due now - run it
           try:
             retval = func()
-          except Exception:
-            exception("func %s threw exception", func)
+          except Exception as e:  # pylint: disable=broad-except
+            exception("func %s threw exception: %s", func, e)
           else:
             debug("func %s returns %s", func, retval)
         else:
@@ -480,8 +483,8 @@ class TimerQueue(object):
             if Tfunc:
               try:
                 retval = Tfunc()
-              except Exception:
-                exception("func %s threw exception", Tfunc)
+              except Exception as e:  # pylint: disable=broad-except
+                exception("func %s threw exception: %s", Tfunc, e)
               else:
                 debug("func %s returns %s", Tfunc, retval)
 
@@ -513,7 +516,7 @@ class ListQueue:
       try:
         return self.queued.pop(0)
       except IndexError:
-        raise Queue_Empty("list is empty")
+        raise Queue_Empty("list is empty")  # pylint: disable=raise-missing-from
 
   def put(self, item):
     ''' Put appends to the queue.
@@ -559,7 +562,7 @@ class ListQueue:
     try:
       return self.get()
     except Queue_Empty:
-      raise StopIteration("list is empty")
+      raise StopIteration("list is empty")  # pylint: disable=raise-missing-from
 
 if __name__ == '__main__':
   import cs.queues_tests
