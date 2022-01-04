@@ -533,6 +533,14 @@ class ListQueue:
     with self._lock:
       self.queued.insert(index, item)
 
+  def prepend(self, items, offset=0):
+    ''' Insert `items` at `offset` (default `0`, the front of the queue).
+    '''
+    if not isinstance(items, (list, tuple)):
+      items = list(items)
+    with self._lock:
+      self.queued[offset:offset] = items
+
   def __bool__(self):
     ''' A `ListQueue` looks a bit like a container,
         and is false when empty.
