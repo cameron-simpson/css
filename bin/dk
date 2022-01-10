@@ -261,6 +261,25 @@ case "$op" in
       exec ssh -o "proxycommand=set-x '$0' -n '$primary_container' sshd" \
             "$DK_APP_USER@localhost" ${1+"$@"}
       ;;
+  ssh-add-pubkey)
+      ok=1
+      for pubkeyfile
+      do
+        [ -s "$pubkeyfile" ] || {
+          echo "$cmd: expected nonempty file: $pubkeyfile" >&2
+          ok=
+        }
+      done
+      [ $ok ] || exit 2
+      set -x
+      DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
+      "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'umask 022; cd; mkdir -p .ssh; >>.ssh/authorized_keys'
+      for pubkeyfile
+      do
+        "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'cd; cat >>.ssh/authorized_keys' <"$pubkeyfile"
+      done
+      exit $?
+      ;;
   sshd)
       # invoke an inet-mode sshd inside the container
       set -x
