@@ -1,3 +1,4 @@
+module_doc: special case BaseCommand subclass cmd_ method formattings, partiularly the usage string
 module_doc: do not use headings for class attributes/methods, maybe paragraphs with bold leadin
 module_doc: partition names into constants, functions, classes etc
 cs-release: release: add "features/fixes" prompt, update pkg_tags accordingly lib/python/cs/distinfo.py
