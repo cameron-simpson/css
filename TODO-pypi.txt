@@ -2,6 +2,7 @@ module_doc: special case BaseCommand subclass cmd_ method formattings, partiular
 module_doc: do not use headings for class attributes/methods, maybe paragraphs with bold leadin
 module_doc: partition names into constants, functions, classes etc
 cs-release: release: add "features/fixes" prompt, update pkg_tags accordingly lib/python/cs/distinfo.py
+cs.distinfo: update URLs from bitbucket to sr.ht
 cs.distinfo: release log: include href to full commit log for the primary file or dir
 ds.distinfo: add cmd_diff to present diff from latest release
 compute_doc: mode to document all methods for use in upcoming module-README-autodoc.md
@@ -10,10 +11,7 @@ MRO: "builtins.*" should get the "builtins." stripped eg builtins.dict
 can we put anchors on class and function headings?
 if second and following paragraphs exists, maybe give them an Overview header?
 pull first paragraph to to above "latest release"
-render release log lines as markdown lists
 module check code: produce nested {imported_name=>[errors]}, each error is either a str or another {import=>errors} mapping; nice printout to go with it for cmd_check
-move lastvalues into repo maintained "pkg_tags" file
-cs.distinfo: port to BaseCommand
 upgrade the distinfo stuff with a mode to emit all the docstrings so that a module automatic README.md describes everything
 cs-release,cs.distinfo: include not just names from the direct module but also names imported from the current package as in cs.p3
 distinfo: append __init__ docstring to class docstring? summary of other methods? kinda verbose

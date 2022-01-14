@@ -5,7 +5,7 @@
 #
 
 : ${LOGDIR:=$HOME/var/log}
-dlog=$LOGDIR/dlog
+dlog=$LOGDIR/dlog-quick
 
 cmd=`basename "$0"`
 usage="Usage: $cmd regexp"

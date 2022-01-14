@@ -17,7 +17,7 @@ from . import CloudArea
 def main(argv=None):
   ''' Create a `CloudCommand` instance and call its main method.
   '''
-  return CloudCommand().run(argv)
+  return CloudCommand(argv).run()
 
 class CloudCommand(BaseCommand):
   ''' A main programme instance.
@@ -25,9 +25,10 @@ class CloudCommand(BaseCommand):
 
   GETOPTS_SPEC = 'A:'
   USAGE_FORMAT = r'''Usage: {cmd} [-A cloud_area] subcommand [...]
-      cloud_area    A cloud storage area of the form prefix://bucket/subpath.
+    -A cloud_area   A cloud storage area of the form prefix://bucket/subpath.
                     Default from the $CS_CLOUD_AREA environment variable.
   '''
+  SUBCOMMAND_ARGV_DEFAULT = 'stat'
 
   # pylint: disable=too-few-public-methods
   class OPTIONS_CLASS(SimpleNamespace):
@@ -49,25 +50,34 @@ class CloudCommand(BaseCommand):
         )
       return CloudArea.from_cloudpath(self.cloud_area_path)
 
-  @staticmethod
-  def apply_defaults(options):
-    options.cloud_area_path = os.environ.get('CS_CLOUD_AREA')
+  def apply_defaults(self):
+    self.options.cloud_area_path = os.environ.get('CS_CLOUD_AREA')
 
-  @staticmethod
-  def apply_options(options, opts):
-    ''' Apply main command line options.
+  def apply_opt(self, opt, val):
+    ''' Handle an individual global command line option.
     '''
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-A':
-          options.cloud_area_path = val
-        else:
-          raise RuntimeError("unimplemented option")
+    if opt == '-A':
+      self.options.cloud_area_path = val
+    else:
+      raise RuntimeError("unimplemented option")
+
+  def cmd_stat(self, argv):
+    ''' Usage: {cmd}
+          Report the current settings.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r", argv)
+    CAF = self.options.cloud_area
+    print("Cloud area:")
+    print("  cloud", CAF.cloud)
+    print("  bucket_name", CAF.bucket_name)
+    print("  basepath", CAF.basepath)
 
   @staticmethod
-  def cmd_download(argv, options):
+  def cmd_download(self, argv):
     ''' Usage: {cmd} area_subpath dst
     '''
+    options = self.options
     area_subpath, dst = argv
     CAF = options.cloud_area[area_subpath]
     label = f"{CAF} => {dst}"
@@ -83,11 +93,11 @@ class CloudCommand(BaseCommand):
       for k, v in sorted(dl_result.items()):
         print(" ", k, v)
 
-  @staticmethod
-  def cmd_upload(argv, options):
+  def cmd_upload(self, argv):
     ''' Usage: upload src area_subpath
           Upload the file src to cloud area subpath dst.
     '''
+    options = self.options
     src, area_subpath = argv
     CAF = options.cloud_area[area_subpath]
     label = f"{src} => {CAF}"

@@ -565,7 +565,7 @@ class BlockTempfile:
     '''
     with S:
       needed = len(block)
-      for data in block.datafrom():
+      for data in block:
         if runstate.cancelled:
           break
         assert len(data) <= needed

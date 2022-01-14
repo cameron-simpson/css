@@ -36,14 +36,14 @@ import sys
 from threading import RLock
 from cs.cmdutils import BaseCommand
 from cs.lex import cutprefix, cutsuffix
-from cs.logutils import warning
+from cs.logutils import debug, warning, exception
 from cs.pfx import pfx
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
 
-__version__ = '20210407.2-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -104,24 +104,39 @@ class POP3(MultiOpenMixin):
   def shutdown(self):
     ''' Quit and disconnect.
     '''
-    quitR = self.client_quit_bg()
-    self.flush()
-    quitR.join()
+    logmsg = debug
+    logmsg("send client QUIT")
+    try:
+      quitR = self.client_quit_bg()
+      logmsg("flush QUIT")
+      self.flush()
+      logmsg("join QUIT")
+      quitR.join()
+    except Exception as e:
+      exception("client quit: %s", e)
+      logmsg = warning
     if self._result_queue:
+      logmsg("close result queue")
       self._result_queue.close()
       self._result_queue = None
     if self._client_worker:
+      logmsg("join client worker")
       self._client_worker.join()
       self._client_worker = None
+    logmsg("close sendf")
     self.sendf.close()
     self.sendf = None
+    logmsg("check for uncollected server responses")
     bs = self.recvf.read()
     if bs:
       warning("received %d bytes from the server at shutdown", len(bs))
+    logmsg("close recvf")
     self.recvf.close()
     self.recvf = None
+    logmsg("close socket")
     self._sock.close()
     self._sock = None
+    logmsg("shutdown complete")
 
   def readline(self):
     ''' Read a CRLF terminated line from `self.recvf`.

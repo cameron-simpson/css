@@ -1,0 +1,3 @@
+lib/python/cs/context.py: cs.context: twostep: iteration 1 now returns the result of __enter__, iteration 2 now returns None
+lib/python/cs/context.py: cs.context: new functions push_cmgr(obj,attr,cmgr) and partner pop_cmgr(obj,attr) to run a twostep()ed context manager conveniently; recommend these over setup_cmgr()
+lib/python/cs/context.py: cs.context: clean some lint

@@ -742,7 +742,7 @@ class Box(SimpleBinary):
       if length is Ellipsis:
         end_offset = Ellipsis
         bfr_tail = bfr
-        warning("Box.parse_buffer: Box %s has no length", header)
+        warning("Box.parse: Box %s has no length", header)
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)
@@ -2676,10 +2676,7 @@ def parse_tags(path, tag_prefix=None):
         if tags:
           if tag_prefix:
             new_tags = TagSet()
-            new_tags.update(
-                Tag.with_prefix(tag.name, tag.value, prefix=tag_prefix)
-                for tag in tags
-            )
+            new_tags.update(Tag(tag, prefix=tag_prefix) for tag in tags)
             tags = new_tags
           yield box, tags
 

@@ -34,11 +34,16 @@ import json
 from string import ascii_letters, digits
 import sys
 from uuid import UUID
+
+from typeguard import typechecked
+
 from cs.deco import decorator
 from cs.lex import get_identifier, is_identifier, \
                    get_decimal_or_float_value, get_qstr, \
                    texthexify
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_call, pfx_method
+
+from cs.x import X
 
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
@@ -238,6 +243,7 @@ class Transcribe:
         self.transcribe(v, None, fp)
         first = False
 
+  @pfx_method
   def parse(self, s, offset=0):
     ''' Parse an object from the string `s` starting at `offset`.
         Return the object and the new offset.
@@ -246,7 +252,6 @@ class Transcribe:
         * `s`: the source string
         * `offset`: optional string offset, default 0
     '''
-    ##X("parse %r ...", s[offset:])
     # strings
     value, offset2 = self.parse_qs(s, offset, optional=True)
     if value is not None:
@@ -257,7 +262,7 @@ class Transcribe:
     # {json}
     if s.startswith('{', offset):
       sub = s[offset:]
-      m, suboffset = json.JSONDecoder().raw_decode(sub)
+      m, suboffset = pfx_call(json.JSONDecoder().raw_decode, sub)
       offset += suboffset
       return m, offset
     # prefix{....}

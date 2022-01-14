@@ -1,0 +1,15 @@
+lib/python/cs/fstags.py: cs.fstags: drop use of TagSet namespaces and update formats for new FormatableMixin format string syntax
+lib/python/cs/fstags.py: cs.fstags: update imports, tweak distinfo formatting
+lib/python/cs/fstags.py: cs.fstags: FSTags: rename ontologyfile to ontology_filepath for clarity, allow absolute path for ontology_filepath, honour $FSTAGS_ONTOLOGY envvar, update find-ontology logic
+lib/python/cs/fstags.py: cs.fstags: remove debug, clean some lint
+lib/python/cs/fstags.py: cs.fstags: TaggedPath.set: wrap in @tag_or_tag_value to match superclass
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_ls: indent docstring
+lib/python/cs/fstags.py: cs.fstags: FSTags.ontology: break out the ontbase, no semantic change
+lib/python/cs/fstags.py: cs.app.fstags: new "fstags cptags" subcommand to copy the tags from one path to another
+lib/python/cs/fstags.py: cs.fstags: fix some typos, add a couple of comments
+lib/python/cs/fstags.py: cs.fstags: FSTagsCommand.cmd_autotag: fix spelling of self.options; clean a little lint
+lib/python/cs/fstags.py: cs.fstags: new TaggedPath.prune_inherited: to prune inherited tags from a file's direct tags, returning a TagSet contained the discarded tags
+lib/python/cs/fstags.py: cs.fstags: TaggedPath: new auto_infer method overriding the inherited TagSet.auto_infer which consults the cascade_rules from the .fstagsrc
+lib/python/cs/fstags.py: cs.fstags: fstags ls: new -l option to print a multiline tag listing
+lib/python/cs/fstags.py: cs.fstags: CascadeRule: add type hint and pfx_method context
+lib/python/cs/fstags.py: cs.fstags,cs.tagset: docstring updates for .auto_info methods

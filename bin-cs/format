@@ -135,7 +135,7 @@ do
     py3)case $pyformat in
           yapf)   style=$(yapf-style-for "$srcfile")
                   $trace python3 -m yapf --style "$style" -i "$srcfile" ;;
-          black)  $trace black -q -t py38 "$srcfile" ;;
+          black)  $trace black -q -t py38 -S "$srcfile" ;;
           *)      echo "$cmd: unsupported Python formatter: $pyformat" >&2
                   exit 1
                   ;;

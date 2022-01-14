@@ -11,7 +11,7 @@ use Getopt::Std;
 
 sub copyout($;$);
 
-$::BSize=65536;
+$::BSize=1048576;
 $::Type=BINARY;
 $::Units=CHAR;
 

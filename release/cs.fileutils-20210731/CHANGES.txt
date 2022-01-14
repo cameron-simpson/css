@@ -1,0 +1,1 @@
+lib/python/cs/fileutils.py: cs.fileutils: new atomic_filename context manager wrapping NamedTemporaryFile for presenting a file after its contents are prepared

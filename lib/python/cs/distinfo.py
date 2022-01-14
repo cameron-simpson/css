@@ -32,6 +32,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from icontract import ensure
 from typeguard import typechecked
+from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
@@ -100,6 +101,7 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = ['ls']
   GETOPT_SPEC = 'fqv'
   USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
@@ -119,6 +121,11 @@ class CSReleaseCommand(BaseCommand):
       options.verbose = sys.stderr.isatty()
     except AttributeError:
       options.verbose = False
+    # colourise if stdout is a tty
+    try:
+      options.colourise = sys.stdout.isatty()
+    except AttributeError:
+      options.colourise = False
     # TODO: get from cs.logutils?
     options.verbose = sys.stderr.isatty()
     options.force = False
@@ -283,17 +290,22 @@ class CSReleaseCommand(BaseCommand):
     if argv:
       pkg_names = argv
     else:
-      pkg_names = sorted(options.tagsets.keys())
+      pkg_names = sorted(options.pkg_tagsets.keys())
     for pkg_name in pkg_names:
       if pkg_name.startswith(MODULE_PREFIX):
         pkg = options.modules[pkg_name]
         pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
         if pypi_release is not None:
           problems = pkg.problems()
+          problem_text = (
+              "%d problems" % (len(problems),) if problems else "ok"
+          )
+          if problems and options.colourise:
+            problem_text = colourise(problem_text, 'yellow')
           list_argv = [
               pkg_name,
               pypi_release,
-              "%d problems" % (len(problems),) if problems else "ok",
+              problem_text,
           ]
           features = pkg.features(pypi_release)
           if features:
@@ -441,17 +453,15 @@ class CSReleaseCommand(BaseCommand):
       print("Existing features:", ' '.join(sorted(existing_features)))
     features = list(
         filter(None,
-               prompt('Any named features with this release? ').split())
+               prompt('Any named features with this release').split())
     )
     if any(map(lambda feature_name: not is_identifier(feature_name) or
                feature_name.startswith('fix_'), features)):
       error("Rejecting nonidentifiers or fix_* names in feature list.")
       return 1
     bugfixes = list(
-        filter(
-            None,
-            prompt('Any named bugs fixed with this release? ').split()
-        )
+        filter(None,
+               prompt('Any named bugs fixed with this release').split())
     )
     if any(map(lambda bug_name: not is_identifier(bug_name) or bug_name.
                startswith('fix_'), bugfixes)):
@@ -497,7 +507,7 @@ class CSReleaseCommand(BaseCommand):
         'ok_revision', pkg.latest_changeset_hash, msg="mark revision as ok"
     )
     for feature_name in features + bugfixes:
-      pkg.set_feature(feature_name, next_release)
+      pkg.set_feature(feature_name, next_release.version)
     return 0
 
   def cmd_resolve(self, argv):
@@ -910,8 +920,12 @@ class Module:
     feature_map = self.pkg_tags.features or {}
     release_features = set(feature_map.get(release_version, []))
     release_features.add(feature_name)
-    feature_map = list(release_features)
-    self.pkg_tags.set('features', feature_map)
+    feature_map[release_version] = sorted(release_features)
+    self.set_tag(
+        'features',
+        feature_map,
+        msg="features[%s]+%s" % (release_version, feature_name)
+    )
 
   @pfx_method(use_str=True)
   def release_features(self):

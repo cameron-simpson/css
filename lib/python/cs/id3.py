@@ -2,7 +2,9 @@
 # - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Support for ID3 tags. Mostly a convenience wrapper for Doug Zongker's pyid3lib:
+''' Support for ID3 tags.
+    A cs.binary based parser/transcriber for ID3 tags
+    and a convenience wrapper for Doug Zongker's pyid3lib:
     http://pyid3lib.sourceforge.net/
 '''
 
@@ -12,16 +14,15 @@ from cs.binary import SimpleBinary, BinarySingleValue, UInt32BE, UInt16BE
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import info, debug, warning
 from cs.pfx import Pfx
-from cs.tagset import TagSet
+from cs.tagset import TagSet, TagsOntology
 from cs.threads import locked, locked_property
 
+__version__ = '20211208-post'
+
 DISTINFO = {
-    'description':
-    "support for ID3 tags, mostly a convenience wrapper for Doug Zongker's pyid3lib",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
     'install_requires':
@@ -182,6 +183,9 @@ class ID3V1Frame(SimpleBinary):
       * `genre_id`: a number value from 0 to 255
   '''
 
+  # TODO: fill out the ont with the ID3V1 spec.
+  ONTOLOGY = TagsOntology()
+
   @classmethod
   def parse(cls, bfr):
     ''' Parse a 128 byte ID3V1 or ID3v1.1 record.
@@ -210,7 +214,7 @@ class ID3V1Frame(SimpleBinary):
       comment_bs = comment_bs[:-2]
     else:
       self.track = 0
-    self.comment = comment_bs.decode('ascii').rstrip()
+    self.comment = comment_bs.decode('ascii').rstrip('\0').rstrip()
     self.genre_id = bfr.byte0()
     assert bfr.offset - offset0 == 128
     return self
@@ -244,12 +248,16 @@ class ID3V1Frame(SimpleBinary):
                 genre_id=self.genre_id,
             ).items()
             if v is not None and not (isinstance(v, int) and v == 0)
-        }
+        },
+        _ontology=self.ONTOLOGY,
     )
 
 class EnhancedTagFrame(SimpleBinary):
   ''' An Enhanced Tag.
   '''
+
+  # TODO: fill out the ont with the enhanced fram spec.
+  ONTOLOGY = TagsOntology()
 
   @classmethod
   def parse(cls, bfr):
@@ -804,6 +812,9 @@ class ID3V2Frame(SimpleBinary):
       https://web.archive.org/web/20120527211939/http://www.unixgods.org/~tilo/ID3/docs/id3v2-00.html
   '''
 
+  # TODO: fill out the ont with the MP3 spec and demo doctest
+  ONTOLOGY = TagsOntology()
+
   @classmethod
   def parse(cls, bfr):
     ''' Return an ID3v2 frame as described here:
@@ -836,7 +847,12 @@ class ID3V2Frame(SimpleBinary):
   def tagset(self):
     ''' Return a `TagSet` with the ID3 tag information.
     '''
-    tags = TagSet()
+    tags = TagSet(
+        _ontology=self.ONTOLOGY,
+        v1=self.v1,
+        v2=self.v2,
+        version=f'{self.v1}.{self.v2}',
+    )
     for tag_frame in self.tag_frames:
       tag_id = tag_frame.tag_id.decode('ascii').lower()
       tags.set(tag_id, tag_frame.datafrome_body.value)
@@ -875,6 +891,9 @@ class ID3V2Tags(SimpleNamespace):
 
 class ID3(SimpleNamespace):
   ''' Wrapper for pyid3lib.tag.
+
+      OBSOLETE.
+      Going away when I'm sure the other classes cover all this stuff off.
   '''
 
   # mapping from frameids to nice names ("artist" etc)

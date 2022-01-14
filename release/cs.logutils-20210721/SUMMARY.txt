@@ -1,0 +1,1 @@
+UpdHandler.emit: for newline-emitting messages, fall back to new .over_handler if the Upd is disabled.

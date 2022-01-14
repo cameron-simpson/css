@@ -1,0 +1,1 @@
+Channel: make a Channel iterable.
