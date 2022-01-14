@@ -26,10 +26,6 @@ from cs.resources import RunState
 __version__ = '20211208-post'
 
 DISTINFO = {
-    'description':
-    "a `BaseCommand` class for constructing command lines,"
-    " some convenience functions for working with the `cmd` module,"
-    " and some other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
