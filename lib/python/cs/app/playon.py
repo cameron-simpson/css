@@ -4,6 +4,7 @@
 #
 
 ''' PlayOn facilities, primarily access to the download API.
+    Includes a nice command line tool.
 '''
 
 from collections import defaultdict
@@ -88,7 +89,8 @@ DEFAULT_FILENAME_FORMAT = (
 DEFAULT_DL_PARALLELISM = 2
 
 def main(argv=None):
-  ''' Playon command line mode.
+  ''' Playon command line mode;
+      see the `PlayOnCommand` class below.
   '''
   return PlayOnCommand(argv).run()
 
