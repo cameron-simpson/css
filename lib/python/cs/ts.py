@@ -113,7 +113,10 @@ class LogSpan:
           span = cls(entry.unixtime)
         else:
           if last_unixtime > entry.unixtime:
-            warning("unordered entries< last_unixtime=%s", last_unixtime)
+            warning(
+                "unordered entries (last_unixtime:%s > entry.unixtime:%s"),
+                last_unixtime, entry.unixtime
+            )
           if not in_span(entry):
             # new span, this entry is too far beyond the previous one
             if span is not None:
@@ -143,7 +146,7 @@ class LogSpan:
     for entry in self.entries:
       etime = arrow.get(entry.unixtime)
       print(
-          indent + etime.format("  hh:mm"),
+          indent + etime.format("  HH:mm"),
           "\n    ".join(entry.entry),
           file=file
       )
