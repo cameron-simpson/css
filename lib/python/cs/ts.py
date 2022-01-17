@@ -152,7 +152,7 @@ class LogSpan:
       )
 
 def scan_loglines(lines, *, start=1, drop_blanks=False):
-  ''' Generator to can lines and collate into `LogEntry` instances.
+  ''' Generator to scan lines and collate into `LogEntry` instances.
   '''
   entry_unixtime = None
   entry_lines = []
