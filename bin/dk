@@ -245,7 +245,7 @@ case "$op" in
       ;;
   logs)
       set -x
-      [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
+      [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
       ;;
   rsh)
       rhost=$1; shift
