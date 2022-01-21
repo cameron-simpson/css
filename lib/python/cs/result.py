@@ -7,47 +7,50 @@
 r'''
 Result and friends: various subclassable classes for deferred delivery of values.
 
-A Result is the base class for several callable subclasses
+A `Result` is the base class for several callable subclasses
 which will receive values at a later point in time,
 and can also be used standalone without subclassing.
 
-A call to a Result will block until the value is received or the Result is cancelled,
+A call to a `Result` will block until the value is received or the `Result` is cancelled,
 which will raise an exception in the caller.
-A Result may be called by multiple users, before or after the value has been delivered;
+A `Result` may be called by multiple users, before or after the value has been delivered;
 if the value has been delivered the caller returns with it immediately.
-A Result's state may be inspected (pending, running, ready, cancelled).
-Callbacks can be registered via a Result's .notify method.
+A `Result`'s state may be inspected (pending, running, ready, cancelled).
+Callbacks can be registered via a `Result`'s .notify method.
 
-An incomplete Result can be told to call a function to compute its value;
+An incomplete `Result` can be told to call a function to compute its value;
 the function return will be stored as the value unless the function raises an exception,
 in which case the exception information is recorded instead.
-If an exception occurred, it will be reraised for any caller of the Result.
+If an exception occurred, it will be reraised for any caller of the `Result`.
 
-Trite example::
+Trite example:
 
-  R = Result(name="my demo")
+    R = Result(name="my demo")
 
-  Thread 1:
+Thread 1:
+
     # this blocks until the Result is ready
     value = R()
     print(value)
     # prints 3 once Thread 2 (below) assigns to it
 
-  Thread 2:
+Thread 2:
+
     R.result = 3
 
-  Thread 3:
+Thread 3:
+
     value = R()
     # returns immediately with 3
 
-You can also collect multiple Results in completion order using the report() function::
+You can also collect multiple `Result`s in completion order using the `report()` function:
 
-  Rs = [ ... list of Results of whatever type ... ]
-  ...
-  for R in report(Rs):
-    x = R()     # collect result, will return immediately because
-                # the Result is complete
-    print(x)    # print result
+    Rs = [ ... list of Results of whatever type ... ]
+    ...
+    for R in report(Rs):
+        x = R()     # collect result, will return immediately because
+                    # the Result is complete
+        print(x)    # print result
 '''
 
 try:
@@ -98,7 +101,7 @@ class ResultState(Enum):
 AsynchState = ResultState
 
 class CancellationError(Exception):
-  ''' Raised when accessing result or exc_info after cancellation.
+  ''' Raised when accessing `result` or `exc_info` after cancellation.
   '''
 
   def __init__(self, msg=None):
@@ -164,31 +167,31 @@ class Result(object):
 
   @property
   def ready(self):
-    ''' Whether the Result state is ready or cancelled.
+    ''' Whether the `Result` state is ready or cancelled.
     '''
     return self.state in (ResultState.ready, ResultState.cancelled)
 
   @property
   def cancelled(self):
-    ''' Test whether this Result has been cancelled.
+    ''' Test whether this `Result` has been cancelled.
     '''
     return self.state == ResultState.cancelled
 
   @property
   def pending(self):
-    ''' Whether the Result is pending.
+    ''' Whether the `Result` is pending.
     '''
     return self.state == ResultState.pending
 
   def empty(self):
-    ''' Analogue to Queue.empty().
+    ''' Analogue to `Queue.empty()`.
     '''
     return not self.ready
 
   def cancel(self):
     ''' Cancel this function.
-        If self.state is pending or cancelled, return True.
-        Otherwise return False (too late to cancel).
+        If `self.state` is pending or cancelled, return `True`.
+        Otherwise return `False` (too late to cancel).
     '''
     with self._lock:
       state = self.state
@@ -226,19 +229,19 @@ class Result(object):
 
   @result.setter
   def result(self, new_result):
-    ''' Set the .result attribute, completing the Result.
+    ''' Set the `.result` attribute, completing the `Result`.
     '''
     with self._lock:
       self._complete(new_result, None)
 
   def put(self, value):
-    ''' Store the value. Queue-like idiom.
+    ''' Store the value. `Queue`-like idiom.
     '''
     self.result = value
 
   @property
   def exc_info(self):
-    ''' The exception information from a completed Result.
+    ''' The exception information from a completed `Result`.
         This is not available before completion.
     '''
     state = self.state
@@ -285,7 +288,7 @@ class Result(object):
       self.result = r
 
   def bg(self, func, *a, **kw):
-    ''' Submit a function to compute the result in a separate `Thread`;
+    ''' Submit a function to compute the result in a separate `Thread`,
         returning the `Thread`.
 
         This dispatches a `Thread` to run `self.call(func,*a,**kw)`
@@ -303,7 +306,7 @@ class Result(object):
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
-        Expect to be called _inside_ self._lock.
+        Expect to be called _inside_ `self._lock`.
     '''
     if result is not None and exc_info is not None:
       raise ValueError(
@@ -347,18 +350,15 @@ class Result(object):
 
   @pfx_method
   def join(self):
-    ''' Calling the .join() method waits for the function to run to
-        completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue, a tuple of:
-          result, exc_info
-        On completion the sequence:
-          result, None
-        is returned.
-        If an exception occurred computing the result the sequence:
-          None, exc_info
-        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
-        If the function was cancelled the sequence:
-          None, None
+    ''' Calling the `.join()` method waits for the function to run to
+        completion and returns a tuple as for the `WorkerThreadPool`'s
+        `.dispatch()` return queue, a tuple of `(result,exc_info)`.
+
+        On completion the sequence `(result,None)` is returned.
+        If an exception occurred computing the result the sequence
+        `(None,exc_info)` is returned
+        where `exc_info` is a tuple of `(exc_type,exc_value,exc_traceback)`.
+        If the function was cancelled the sequence `(None,None)`
         is returned.
     '''
     self._get_lock.acquire()
@@ -366,7 +366,8 @@ class Result(object):
     return self.result, self.exc_info
 
   def get(self, default=None):
-    ''' Wait for readiness; return the result if exc_info is None, otherwise `default`.
+    ''' Wait for readiness; return the result if `self.exc_info` is `None`,
+        otherwise `default`.
     '''
     result, exc_info = self.join()
     if not self.cancelled and exc_info is None:
@@ -374,11 +375,11 @@ class Result(object):
     return default
 
   def __call__(self, *a, **kw):
-    ''' Call the result: wait for it to be ready and then return or raise.
+    ''' Call the `Result`: wait for it to be ready and then return or raise.
 
         You can optionally supply a callable and arguments,
         in which case `callable(*args,**kwargs)` will be called
-        via `Result.call` and the results applied to this Result.
+        via `Result.call` and the results applied to this `Result`.
     '''
     if a:
       if not self.pending:
@@ -392,7 +393,7 @@ class Result(object):
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, run notifier(self).
+    ''' After the function completes, run `notifier(self)`.
 
         If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
@@ -406,7 +407,8 @@ class Result(object):
       self.collected = True
 
   def with_result(self, submitter, prefix=None):
-    ''' On completion without an exception, call `submitter(self.result)` or report exception.
+    ''' On completion without an exception, call `submitter(self.result)`
+        or report exception.
     '''
 
     def notifier(R):
@@ -457,7 +459,7 @@ def report(LFs):
     yield Q.get()
 
 class ResultSet(set):
-  ''' A `set` if `Result`s,
+  ''' A `set` subclass containing `Result`s,
       on which one may iterate as `Result`s complete.
   '''
 
