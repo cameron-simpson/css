@@ -272,13 +272,15 @@ class Result(object):
       except:  # pylint: disable=bare-except
         self.exc_info = sys.exc_info()
 
-  @require(lambda self: self.state == ResultState.pending)
   def call(self, func, *a, **kw):
     ''' Have the `Result` call `func(*a,**kw)` and store its return value as
         `self.result`.
         If `func` raises an exception, store it as `self.exc_info`.
     '''
-    self.state = ResultState.running
+    with self._lock:
+      if self.state != ResultState.pending:
+        raise RuntimeError("%s: state should be pending but is %s" % (self, self.state))
+      self.state = ResultState.running
     try:
       r = func(*a, **kw)
     except BaseException:
@@ -384,8 +386,6 @@ class Result(object):
         via `Result.call` and the results applied to this `Result`.
     '''
     if a:
-      if not self.pending:
-        raise RuntimeError("calling complete %s" % (type(self).__name__,))
       self.call(*a, **kw)
     result, exc_info = self.join()
     if self.cancelled:
