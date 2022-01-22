@@ -65,7 +65,7 @@ from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import funcname
 from cs.py3 import Queue, raise3, StringTypes
-from cs.seq import seq
+from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread
 
 __version__ = '20210420-post'
@@ -118,6 +118,8 @@ class Result(object):
       objects with asynchronous termination.
   '''
 
+  _seq = Seq()
+
   def __init__(self, name=None, lock=None, result=None, extra=None):
     ''' Base initialiser for `Result` objects and subclasses.
 
@@ -133,7 +135,7 @@ class Result(object):
     if lock is None:
       lock = RLock()
     if name is None:
-      name = "%s-%d" % (type(self).__name__, seq())
+      name = "%s-%d" % (type(self).__name__, next(self._seq))
     self.name = name
     self.extra = AttrableMapping()
     if extra:
