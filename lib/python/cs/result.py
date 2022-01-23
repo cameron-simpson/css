@@ -59,7 +59,11 @@ except ImportError:
   from enum34 import Enum  # type: ignore
 import sys
 from threading import Lock, RLock
+import time
+
 from icontract import require
+
+from cs.deco import decorator
 from cs.logutils import exception, error, warning, debug
 from cs.mappings import AttrableMapping
 from cs.pfx import Pfx, pfx_method
@@ -78,6 +82,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.logutils',
         'cs.mappings',
         'cs.pfx',
@@ -144,7 +149,7 @@ class Result(object):
     self.notifiers = []
     self.collected = False
     self._get_lock = Lock()
-    self._get_lock.acquire()
+    self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._lock = lock
     if result is not None:
       self.result = result
@@ -279,7 +284,9 @@ class Result(object):
     '''
     with self._lock:
       if self.state != ResultState.pending:
-        raise RuntimeError("%s: state should be pending but is %s" % (self, self.state))
+        raise RuntimeError(
+            "%s: state should be pending but is %s" % (self, self.state)
+        )
       self.state = ResultState.running
     try:
       r = func(*a, **kw)
@@ -320,8 +327,8 @@ class Result(object):
     state = self.state
     if state in (ResultState.cancelled, ResultState.running,
                  ResultState.pending):
-      self._result = result
-      self._exc_info = exc_info
+      self._result = result  # pylint: disable=attribute-defined-outside-init
+      self._exc_info = exc_info  # pylint: disable=attribute-defined-outside-init
       if state != ResultState.cancelled:
         self.state = ResultState.ready
     else:
@@ -342,7 +349,6 @@ class Result(object):
     notifiers = self.notifiers
     del self.notifiers
     for notifier in notifiers:
-      debug("%s._complete: notify via %r", self, notifier)
       try:
         notifier(self)
       except Exception as e:  # pylint: disable=broad-except
@@ -365,7 +371,7 @@ class Result(object):
         If the function was cancelled the sequence `(None,None)`
         is returned.
     '''
-    self._get_lock.acquire()
+    self._get_lock.acquire()  # pylint: disable=consider-using-with
     self._get_lock.release()
     return self.result, self.exc_info
 
@@ -395,10 +401,10 @@ class Result(object):
     return result
 
   def notify(self, notifier):
-    ''' After the function completes, run `notifier(self)`.
+    ''' After the function completes, call `notifier(self)`.
 
         If the function has already completed this will happen immediately.
-        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+        example: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
     with self._lock:
       if not self.ready:
