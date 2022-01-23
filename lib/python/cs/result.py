@@ -618,6 +618,20 @@ class Task(Result):
 
   def then(self, func, *a, **kw):
     ''' Queue a call to `func(*a,**kw)` to run after the completion of this task.
+
+        This supports a chain of actions:
+
+            >>> t = Task()
+            >>> final_t = t.then(print,1).then(print,2)
+            >>> final_t.ready   # the final task has not yet run
+            False
+            >>> # finalise t, wait for final_t (which runs immediately)
+            >>> t.result = 1; print(final_t.join())
+            1
+            2
+            (None, None)
+            >>> final_t.ready
+            True
     '''
     post_task = type(self)()
     post_task.require(self)
