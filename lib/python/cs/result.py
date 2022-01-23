@@ -608,6 +608,7 @@ class Task(Result):
     ''' Add a requirement that `otask` be complete before we proceed.
     '''
     assert otask is not self
+    assert self.state == ResultState.pending
     with self._lock:
       self._required.add(otask)
 
