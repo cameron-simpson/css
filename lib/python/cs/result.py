@@ -719,11 +719,6 @@ def task(func, task_class=Task):
 
   '''
 
-  def task_func_wrapper(*a, **kw):
-    ''' Call the function directly.
-    '''
-    return func(*a, **kw)
-
   # pylint: disable=redefined-outer-name
   def dispatch(a=None, kw=None, after=(), deferred=False, delay=0.0):
     ''' Dispatch the function asynchronously.
@@ -771,8 +766,8 @@ def task(func, task_class=Task):
         ft.bg(func, *a, **kw)
     return ft
 
-  task_func_wrapper.dispatch = dispatch
-  return task_func_wrapper
+  func.dispatch = dispatch
+  return func
 
 if __name__ == '__main__':
   import cs.result_tests
