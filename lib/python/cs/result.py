@@ -559,6 +559,201 @@ class OnDemandResult(Result):
 
 OnDemandFunction = OnDemandResult
 
+class BlockedError(Exception):
+  ''' Raised by a blocked `Task` if attempted.
+  '''
+
+class Task(Result):
+  ''' A task which may require the completion of other tasks.
+      This is a subclass of `Result`.
+
+      Example:
+
+          t1 = Task(name="task1")
+          t1.bg(time.sleep, 10)
+          t2 = Task("name="task2")
+          # prevent t2 from running until t1 completes
+          t2.require(t1)
+          # try to run sleep(5) for t2 immediately after t1 completes
+          t1.notify(t2.call, sleep, 5)
+  '''
+
+  _seq = Seq()
+
+  def __init__(self, *a, lock=None, **kw):
+    if lock is None:
+      lock = RLock()
+    super().__init__(*a, lock=lock, **kw)
+    self._required = set()
+
+  def __hash__(self):
+    return id(self)
+
+  def __eq__(self, otask):
+    return self is otask
+
+  def required(self):
+    ''' Return a `set` contained any required tasks.
+    '''
+    with self._lock:
+      return set(self._required)
+
+  def require(self, otask):
+    ''' Add a requirement that `otask` be complete before we proceed.
+    '''
+    assert otask is not self
+    with self._lock:
+      self._required.add(otask)
+
+  def block(self, otask):
+    ''' Block another task until we are complete.
+    '''
+    otask.require(self)
+
+  def then(self, func, *a, **kw):
+    ''' Queue a call to `func(*a,**kw)` to run after the completion of this task.
+    '''
+    post_task = type(self)()
+    post_task.require(self)
+    self.notify(lambda _: post_task.bg(func, *a, **kw))
+    return post_task
+
+  def blockers(self):
+    ''' A generator yielding tasks from `self.required()`
+        which should block this task.
+        Cancelled tasks are not blockers
+        but if we encounter one we do cancel the current task.
+    '''
+    for otask in self.required():
+      if otask.cancelled:
+        warning("%s cancelled because %s is also cancelled" % (self, otask))
+        self.cancel()
+        continue
+      if not otask.ready:
+        yield otask
+        continue
+      if otask.exc_info:
+        yield otask
+        continue
+
+  def call(self, func, *a, **kw):
+    ''' Attempt to perform the `Task` by calling `func(*a,**kw)`.
+        If we are cancelled, raise `CancellationError`.
+        If there are blocking required tasks, raise `BlockedError`.
+        Otherwise run `Result.call(func,*a,**kw)`.
+    '''
+    if self.cancelled:
+      raise CancellationError()
+    for otask in self.blockers():
+      raise BlockedError("%s blocked by %s" % (self, otask))
+    if self.cancelled:
+      raise CancellationError()
+    try:
+      super().call(func, *a, **kw)
+    except CancellationError:
+      self.cancel()
+      raise
+
+  def callif(self, func, *a, **kw):
+    ''' Trigger a call to `func(*a,**kw)` if we're pending and not
+        blocked or cancelled.
+    '''
+    with self._lock:
+      if not self.ready:
+        try:
+          self.call(func, *a, **kw)
+        except (BlockedError, CancellationError) as e:
+          debug("%s.callif: %s", self, e)
+
+@decorator
+def task(func, task_class=Task):
+  ''' Decorator for a function which runs it as a `Task`.
+      The function may still be called directly.
+
+      The following function attributes are provided:
+      * `dispatch(after=(),deferred=False,delay=0.0)`: run this function
+        after the completion of the tasks specified by `after`
+        and after at least `delay` seconds;
+        return the `Task` for the queued function
+
+      Examples:
+
+          >>> import time
+          >>> @task
+          ... def f(x):
+          ...     return x * 2
+          ...
+          >>> print(f(3))  # call the function normally
+          6
+          >>> # dispatch f(5) after 0.5s, get Task
+          >>> t0 = time.time()
+          >>> ft = f.dispatch((5,), delay=0.5)
+          >>> # calling  Task, as with a Result, is like calling the function
+          >>> print(ft())
+          10
+          >>> # check that we were blocked for 0.5s
+          >>> now = time.time()
+          >>> now - t0 >= 0.5
+          True
+
+
+  '''
+
+  def task_func_wrapper(*a, **kw):
+    ''' Call the function directly.
+    '''
+    return func(*a, **kw)
+
+  # pylint: disable=redefined-outer-name
+  def dispatch(a=None, kw=None, after=(), deferred=False, delay=0.0):
+    ''' Dispatch the function asynchronously.
+        Return the `Task`.
+
+        Optional positional parameters:
+        * `a`: an iterable of positional arguments for `func`
+        * `kw`: a mapping of keyword arguments for `func`
+
+        Keyword parameters:
+        * `after`: optional iterable of `Task`s;
+          `func` will not be dispatched until these are complete.
+        * `deferred`: (default `False`); if true,
+          block the task on `after` but do not trigger a call on
+          their completion.
+          This thus creates the `Task` but does not dispatch it.
+        * `delay`: delay the dispatch of `func` by at least `delay` seconds,
+          default `0.0`s.
+    '''
+    if a is None:
+      a = ()
+    if kw is None:
+      kw = {}
+    if not isinstance(after, list):
+      after = list(after)
+    if delay > 0.0:
+      delay_task = task_class(name="sleep(%s)" % (delay,))
+      delay_task.bg(time.sleep, delay)
+      after.append(delay_task)
+    ft_name = funcname(func) + '-task'
+    if a:
+      ft_name = ft_name + ':' + repr(a)
+    if kw:
+      ft_name = ft_name + ':' + repr(kw)
+    ft = task_class()
+    if after:
+      for otask in after:
+        ft.require(otask)
+    if not deferred:
+      if after:
+        for otask in after:
+          otask.notify(lambda _: ft.callif(func, *a, **kw))
+      else:
+        # dispatch the task immediately, but in another Thread
+        ft.bg(func, *a, **kw)
+    return ft
+
+  task_func_wrapper.dispatch = dispatch
+  return task_func_wrapper
+
 if __name__ == '__main__':
   import cs.result_tests
   cs.result_tests.selftest(sys.argv)
