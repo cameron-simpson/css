@@ -3,7 +3,7 @@
 # Playon facilities. - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Playon facilities.
+''' PlayOn facilities, primarily access to the download API.
 '''
 
 from collections import defaultdict
@@ -41,6 +41,8 @@ from cs.threads import monitor, bg as bg_thread
 from cs.units import BINARY_BYTES_SCALE
 from cs.upd import print  # pylint: disable=redefined-builtin
 
+__version__ = '20211212-post'
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
@@ -50,6 +52,9 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Utilities",
     ],
+    'entry_points': {
+        'console_scripts': ['playon = cs.app.playon:main'],
+    },
     'install_requires': [
         'cs.cmdutils',
         'cs.context',
@@ -66,6 +71,8 @@ DISTINFO = {
         'cs.threads',
         'cs.units',
         'cs.upd',
+        'requests',
+        'typeguard',
     ],
 }
 
@@ -238,7 +245,7 @@ class PlayOnCommand(BaseCommand):
             if no_download:
               recording.ls()
             else:
-              sem.acquire()
+              sem.acquire()  # pylint: disable=consider-using-with
               Rs.append(bg_result(_dl, dl_id, sem, _extra=dict(dl_id=dl_id)))
 
     if Rs:
@@ -256,10 +263,16 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
+    need_refresh = False
     recordings = set(sqltags.recordings())
-    if (any(map(lambda recording: not recording.is_expired() and recording.
-                is_stale(max_age=max_age), recordings))
-        or all(map(lambda recording: recording.is_expired(), recordings))):
+    stale_map = {
+        recording.recording_id(): recording
+        for recording in recordings
+        if not recording.is_expired() and recording.is_stale(max_age=max_age)
+    }
+    if stale_map:
+      need_refresh = True
+    if need_refresh:
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
       for T in Ts:
@@ -455,7 +468,7 @@ class Recording(SQLTagSet):
     '''
     expires = self.get('playon.Expires')
     if not expires:
-      return False
+      return True
     return PlayOnAPI.from_playon_date(expires).timestamp() < time.time()
 
   @format_attribute
@@ -464,11 +477,11 @@ class Recording(SQLTagSet):
         i.e. the time since `self.last_updated` exceeds `max_age` seconds,
         default from `self.STALE_AGE`.
     '''
+    if max_age is None:
+      max_age = self.STALE_AGE
     if self.is_expired():
       # expired recording will never become unstale
       return False
-    if max_age is None:
-      max_age = self.STALE_AGE
     if max_age <= 0:
       return True
     last_updated = self.last_updated

@@ -24,7 +24,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.range import Range
 
-__version__ = '20201228-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':

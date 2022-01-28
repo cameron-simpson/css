@@ -79,7 +79,7 @@ class Maker(MultiOpenMixin):
     return (
         '%s:%s(parallel=%s,fail_fast=%s,no_action=%s,default_target=%s)' % (
             type(self).__name__, self.name, self.parallel, self.fail_fast,
-            self.no_action, self.default_target
+            self.no_action, self.default_target.name
         )
     )
 

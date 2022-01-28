@@ -1,0 +1,1 @@
+Move the TimeoutError definiton to cs.gimmicks.

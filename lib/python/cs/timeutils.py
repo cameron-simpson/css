@@ -8,6 +8,8 @@ from __future__ import print_function
 import datetime
 import time
 
+__version__ = '20211208-post'
+
 DISTINFO = {
     'description':
     "convenience routines for times and timing",

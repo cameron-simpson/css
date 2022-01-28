@@ -4,17 +4,26 @@
 ''' Stuff for Plex media libraries.
 '''
 
+import builtins
+from contextlib import contextmanager
 from getopt import GetoptError
 import os
 from os.path import (
-    abspath, exists as existspath, basename, dirname, join as joinpath,
-    splitext, isdir as isdirpath
+    basename,
+    dirname,
+    exists as existspath,
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+    relpath,
+    samefile,
+    splitext,
 )
 import sys
 from cs.cmdutils import BaseCommand
-from cs.fstags import FSTags, rfilepaths, TaggedPath
-from cs.logutils import Pfx, warning, error
-from cs.pfx import pfx, pfx_method, XP
+from cs.fstags import FSTags, rfilepaths
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -33,7 +42,7 @@ def main(argv=None):
   '''
   if argv is None:
     argv = sys.argv
-  return PlexCommand().run(argv)
+  return PlexCommand(argv).run()
 
 class PlexCommand(BaseCommand):
   ''' `plex` main command line class.
@@ -41,65 +50,61 @@ class PlexCommand(BaseCommand):
 
   GETOPT_SPEC = ''
 
-  def apply_defaults(self, options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    options.fstags = FSTags()
+    self.options.fstags = FSTags()
 
-  @staticmethod
-  def cmd_linktree(argv, options):
-    ''' Usage: {cmd} [-u] linktree srctrees... dsttree
+  @contextmanager
+  def run_context(self):
+    ''' Use the FSTags context.
+    '''
+    with self.options.fstags:
+      yield
+
+  def cmd_linktree(self, argv):
+    ''' Usage: {cmd} srctrees... dsttree
           Link media files from the srctrees into the dsttree
           using the Plex naming conventions.
-          -u  Update mode: require dsttree to already exist,
-              replace conflicting paths.
     '''
-    update_mode = False
-    if argv and argv[0] == '-u':
-      argv.pop(0)
-      update_mode = True
     if len(argv) < 2:
       raise GetoptError("missing srctrees or dsttree")
     dstroot = argv.pop()
     srcroots = argv
+    options = self.options
     fstags = options.fstags
-    if update_mode:
-      if not isdirpath(dstroot):
-        raise GetoptError("dstroot does not exist: %s" % (dstroot,))
-    else:
-      with Pfx("mkdir(%r)", dstroot):
-        os.mkdir(dstroot)
+    if not isdirpath(dstroot):
+      raise GetoptError("dstroot does not exist: %s" % (dstroot,))
     for srcroot in srcroots:
       with Pfx(srcroot):
-        for filepath in sorted(rfilepaths(srcroot)):
+        for filepath in srcroot if isfilepath(srcroot) else sorted(
+            rfilepaths(srcroot)):
           with Pfx(filepath):
-            tags = fstags[filepath].format_tagset()
-            print(linkpath(filepath, dstroot, tags, update_mode=update_mode))
+            plex_linkpath(fstags, filepath, dstroot)
 
-@pfx
-def subpath(tags):
-  ''' Compute a Plex filesystem subpath based on the `TagSet` `tags`.
+def plex_subpath(tagged_path):
+  ''' Compute a Plex filesystem subpath based on the tags of `filepath`.
   '''
-  ns = tags.ns()
-  title = ns.series_title_s or ns.title_s
-  if not title:
-    raise ValueError("no title")
-  season = ns.season_i
-  episode = ns.episode_i
-  episode_title = ns.episode_title_s
-  extra = ns.extra_i
-  part = ns.part_i
-  is_tv_episode = bool(season and (episode or extra))
+  base, ext = splitext(basename(tagged_path.filepath))
+  itags = tagged_path.infer_tags()
+  print("plex_subpath: itags:")
+  for tag in sorted(itags):
+    print(" ", tag)
+  t = itags.auto
+  tv = t.tv
+  title = tv.series_title or t.title or base
+  season = tv.season and int(tv.season)
+  episode = tv.episode and int(tv.episode)
+  episode_title = tv.episode_title
+  extra = tv.extra and int(tv.extra)
+  part = tv.part and int(tv.part)
   dstbase = title
-  if is_tv_episode:
+  if tv.series_title:
     # TV Series
-    season = int(season)
-    dstpath = ['TV Shows', title, f'Season {season:02d}']
+    dstpath = ['TV Shows', tv.series_title, f'Season {season:02d}']
     if episode:
-      episode = int(episode)
       dstbase += f' - s{season:02d}e{episode:02d}'
     else:
-      extra = int(extra)
       dstbase += f' - s{season:02d}x{extra:02d}'
   else:
     # Movie
@@ -112,36 +117,53 @@ def subpath(tags):
     dstbase += f' - pt{part:d}'
   dstbase = dstbase.replace('/', '::')
   dstpath.append(dstbase)
-  return joinpath(*dstpath)
+  return joinpath(*dstpath) + ext
 
-def linkpath(srcpath, dstroot, tags, update_mode=False):
-  ''' Symlink `srcpath` to the approriate name under `dstroot` based on `tags`.
+# pylint: disable=redefined-builtin
+def plex_linkpath(
+    fstags, filepath, plex_topdirpath, do_hardlink=False, print=None
+):
+  ''' Link `filepath` into `plex_topdirpath`.
+
+      Parameters:
+      * `fstags`: the `FSTags` instance
+      * `filepath`: filesystem pathname of file to link into Plex tree
+      * `plex_topdirpath`: filesystem pathname of the Plex tree
+      * `do_hardlink`: use a hard link if true, otherwise a softlink;
+        default `False`
+      * `print`: print function for the link action,
+        default from `builtins.print`
   '''
-  dstbase = subpath(tags)
-  _, srcext = splitext(basename(srcpath))
-  linkpath = abspath(srcpath)
-  dstpath = joinpath(dstroot, dstbase + srcext)
-  with Pfx(dstpath):
-    if existspath(dstpath):
-      if update_mode:
-        try:
-          existing_link = os.readlink(dstpath)
-        except OSError as e:
-          raise ValueError("existing path is not a symlink: %s", e)
-        else:
-          if existing_link == linkpath:
-            return dstpath
-          else:
-            warning("replace -> %s", linkpath)
-            os.remove(dstpath)
-    else:
-      dstdir = dirname(dstpath)
-      if not existspath(dstdir):
-        with Pfx("makedirs(%r)", dstdir):
-          os.makedirs(dstdir)
-    with Pfx("symlink"):
-      os.symlink(linkpath, dstpath)
-  return dstpath
+  if print is None:
+    print = builtins.print
+  tagged_path = fstags[filepath]
+  subpath = plex_subpath(tagged_path)
+  plexpath = joinpath(plex_topdirpath, subpath)
+  plexdirpath = dirname(plexpath)
+  if do_hardlink:
+    if existspath(plexpath):
+      if samefile(filepath, plexpath):
+        return
+      pfx_call(os.unlink, plexpath)
+    print(subpath, "<=", basename(filepath))
+    if not isdirpath(plexdirpath):
+      pfx_call(os.makedirs, plexdirpath)
+    pfx_call(os.link, filepath, plexpath)
+  else:
+    rfilepath = relpath(filepath, plexdirpath)
+    if existspath(plexpath):
+      try:
+        sympath = os.readlink(plexpath)
+      except OSError as e:
+        warning("readlink(%r): %s", plexpath, e)
+      else:
+        if rfilepath == sympath:
+          return
+      pfx_call(os.unlink, plexpath)
+    print(subpath, "<=", basename(filepath))
+    if not isdirpath(plexdirpath):
+      pfx_call(os.makedirs, plexdirpath)
+    pfx_call(os.symlink, rfilepath, plexpath)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

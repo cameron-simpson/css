@@ -67,7 +67,7 @@ except NameError:
           )
         Exception.__init__(self, msg)
 
-__version__ = '20210306-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

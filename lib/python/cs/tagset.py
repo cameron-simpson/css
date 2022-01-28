@@ -228,7 +228,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20210913-post'
+__version__ = '20211212-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -361,7 +361,7 @@ class _FormatStringTagProxy:
   '''
 
   def __init__(self, proxied):
-    assert isinstance(proxied,Tag), "proxied is not a Tag: %s" % (r(proxied),)
+    assert isinstance(proxied, Tag), "proxied is not a Tag: %s" % (r(proxied),)
     self.__proxied = proxied
 
   def __str__(self):
@@ -505,7 +505,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       else:
         value = attribute() if callable(attribute) else attribute
     else:
-      value = _FormatStringTagProxy(Tag(arg_name,value,ontology=kw.ontology))
+      value = _FormatStringTagProxy(Tag(arg_name, value, ontology=kw.ontology))
     return value, arg_name
 
   ################################################################
@@ -632,7 +632,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __setattr__(self, attr, value):
     ''' Attribute based `Tag` access.
 
-        If `attr` is in `self.__dict__` then that is updated,
+        If `attr` is private or is in `self.__dict__` then that is updated,
         supporting "normal" attributes set on the instance.
         Otherwise the `Tag` named `attr` is set to `value`.
 
@@ -643,7 +643,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
             self.__dict__.update(id=_id, ontology=_ontology, modified=False)
     '''
-    if attr in self.__dict__:
+    if attr.startswith('_') or attr in self.__dict__:
       self.__dict__[attr] = value
     else:
       self[attr] = value

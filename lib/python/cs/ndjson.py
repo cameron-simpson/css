@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' Utilities for working with newline delimiter JSON (NDJSON) files.
+''' Utilities for working with newline delimited JSON (NDJSON) files.
 '''
 
 import json
@@ -13,6 +13,27 @@ from cs.logutils import warning
 from cs.mappings import IndexedSetMixin, UUIDedDict
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx
+
+__version__ = '20211208-post'
+
+DISTINFO = {
+    'description':
+    "utilities for working with newline delimited JSON (NDJSON) files",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [
+        'cs.deco',
+        'cs.fileutils>=gzifopen',
+        'cs.logutils',
+        'cs.mappings',
+        'cs.obj',
+        'cs.pfx',
+    ],
+}
 
 @strable(open_func=lambda filename: gzifopen(filename, 'r', encoding='utf8'))
 def scan_ndjson(f, dictclass=dict, error_list=None):
