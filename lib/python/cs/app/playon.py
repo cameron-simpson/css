@@ -420,7 +420,7 @@ class Recording(SQLTagSet):
   @format_attribute
   def nice_name(self):
     ''' A nice name for the recording: the PlayOn series and name,
-        omitting the series if None.
+        omitting the series if `None`.
     '''
     playon_tags = self.subtags('playon')
     citation = playon_tags.Name
@@ -465,7 +465,7 @@ class Recording(SQLTagSet):
   @format_attribute
   def is_expired(self):
     ''' Test whether this recording is expired,
-        should imply no longer available for download.
+        which implies that it is no longer available for download.
     '''
     expires = self.get('playon.Expires')
     if not expires:
@@ -475,8 +475,10 @@ class Recording(SQLTagSet):
   @format_attribute
   def is_stale(self, max_age=None):
     ''' Test whether this entry is stale
-        i.e. the time since `self.last_updated` exceeds `max_age` seconds,
-        default from `self.STALE_AGE`.
+        i.e. the time since `self.last_updated` exceeds `max_age` seconds
+        (default from `self.STALE_AGE`).
+        Note that expired recordings are never stale
+        because they can no longer be queried from the API.
     '''
     if max_age is None:
       max_age = self.STALE_AGE
