@@ -405,7 +405,8 @@ class Recording(SQLTagSet):
 
   @format_attribute
   def resolution(self):
-    ''' The recording resultion derived from the quality.
+    ''' The recording resolution derived from the quality
+        via the `Recording.RECORDING_QUALITY` mapping.
     '''
     quality = self.get('playon.Quality')
     return self.RECORDING_QUALITY.get(quality, quality)
