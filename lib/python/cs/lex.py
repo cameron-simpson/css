@@ -1175,6 +1175,71 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+def camelcase(snakecased, first_letter_only=False):
+  ''' Convert a snake cased string `snakecased` into camel case.
+
+      Parameters:
+      * `snakecased`: the snake case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> camelcase('abc_def')
+          'abcDef'
+          >>> camelcase('ABc_def')
+          'abcDef'
+          >>> camelcase('abc_dEf')
+          'abcDef'
+          >>> camelcase('abc_dEf', first_letter_only=True)
+          'abcDEf'
+  '''
+  words = snakecased.split('_')
+  for i, word in enumerate(words):
+    if not word:
+      continue
+    if first_letter_only:
+      word = word[0].upper() + word[1:]
+    else:
+      word = word.title()
+    if i == 0:
+      word = word[0].lower() + word[1:]
+    words[i] = word
+  return ''.join(words)
+
+def snakecase(camelcased):
+  ''' Convert a camel cased string `camelcased` into snake case.
+
+      Parameters:
+      * `cameelcased`: the cameel case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> snakecase('abcDef')
+          'abc_def'
+          >>> snakecase('abcDEf')
+          'abc_def'
+          >>> snakecase('AbcDef')
+          'abc_def'
+  '''
+  strs = []
+  was_lower = False
+  for i, c in enumerate(camelcased):
+    if c.isupper():
+      c = c.lower()
+      if was_lower:
+        # boundary
+        was_lower = False
+        strs.append('_')
+    else:
+      was_lower = True
+    strs.append(c)
+  return ''.join(strs)
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1709,8 +1774,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 @has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
-      particularly its `__format__`
-      which use `str` method names as valid formats.
+      particularly its `__format__` method
+      which uses `str` method names as valid formats.
 
       It also has a bunch of utility methods which are available
       as `:`*method* in format strings.

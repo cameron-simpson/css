@@ -59,6 +59,9 @@ usage="Usage: $cmd [-f docker-compose.yml] [-n name] op [args...]
       comes from the \"host\" part of an rsync remote path.
     ssh [ssh-args...]
       Ssh into the container.
+    ssh-add-pubkey pubkey-files...
+      Add the pubkey-files to the .ssh/authorized_keys file for
+      \$DK_APP_USER ($DK_APP_USER).
     sshd
       Invoke an inet-mode sshd inside the container.
     try [name [command...]]
@@ -245,7 +248,7 @@ case "$op" in
       ;;
   logs)
       set -x
-      [ $# -gt 0 ] || set -- -f "$DK_PRIMARY_SERVICE"
+      [ $# -gt 0 ] || set -- -f -t --tail=50 "$DK_PRIMARY_SERVICE"
       ;;
   rsh)
       rhost=$1; shift
