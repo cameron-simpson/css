@@ -61,7 +61,7 @@ from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
 from cs.fileutils import shortpath
-from cs.lex import FormatAsError, get_decimal_value, r
+from cs.lex import FormatAsError, has_format_attributes, format_attribute, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -116,7 +116,7 @@ CATEGORIES_PREFIX_re = re.compile(
 DBURL_ENVVAR = 'SQLTAGS_DBURL'
 DBURL_DEFAULT = '~/var/sqltags.sqlite'
 
-FIND_OUTPUT_FORMAT_DEFAULT = '{datetime} {headline}'
+FIND_OUTPUT_FORMAT_DEFAULT = '{localtime} {headline}'
 
 def main(argv=None):
   ''' Command line mode.
@@ -1192,6 +1192,7 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
         raise ValueError("unrecognised mode")
     return query
 
+@has_format_attributes(inherit=True)
 class SQLTagSet(SingletonMixin, TagSet):
   ''' A singleton `TagSet` attached to an `SQLTags` instance.
 
