@@ -1293,6 +1293,18 @@ class SQLTagSet(SingletonMixin, TagSet):
   def __hash__(self):
     return id(self)
 
+  def __getitem__(self, key):
+    try:
+      return super().__getitem__(key)
+    except KeyError:
+      if key == 'name':
+        return self._name
+      if key == 'id':
+        return self._id
+      if key == 'unixtime':
+        return self._unixtime
+      raise
+
   @property
   def name(self):
     ''' Return the `.name`.
