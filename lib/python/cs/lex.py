@@ -1267,7 +1267,7 @@ def format_as(
 _format_as = format_as  # for reuse in the format_as method below
 
 def format_attribute(method):
-  ''' Mark a method as available as a format method.
+  ''' A decorator to mark a method as available as a format method.
       Requires the enclosing class to be decorated with `@has_format_attributes`.
 
       For example,
@@ -1292,12 +1292,37 @@ def format_attribute(method):
   method.is_format_attribute = True
   return method
 
-def has_format_attributes(cls):
+@decorator
+def has_format_attributes(cls, inherit=False):
   ''' Class decorator to walk this class for direct methods
       marked as for use in format strings
       and to include them in `cls.format_attributes()`.
+
+      Methods are normally marked with the `@format_attribute` decorator.
+
+      If `inherit` is true the base format attributes will be
+      obtained from other classes:
+      * `inherit` is `True`: use `cls.__mro__`
+      * `inherit` is a class: use that class
+      * otherwise assume `inherit` is an iterable of classes
+      For each class `otherclass`, update the initial attribute
+      mapping from `otherclass.get_format_attributes()`.
   '''
   attributes = cls.get_format_attributes()
+  if inherit:
+    if inherit is True:
+      classes = cls.__mro__
+    elif isclass(inherit):
+      classes = inherit,
+    else:
+      classes = inherit
+    for superclass in classes:
+      try:
+        super_attributes = superclass.get_format_attributes()
+      except AttributeError:
+        pass
+      else:
+        attributes.update(super_attributes)
   for attr in dir(cls):
     try:
       attribute = getattr(cls, attr)
