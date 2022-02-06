@@ -1083,36 +1083,67 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           tag = criterion.tag
           tag_name = tag.name
           tag_value = tag.value
-          if tag_name == 'id':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_ID_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (entities, tag_value)
-            )
-          elif tag_name == 'name':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_NAME_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (entities, tag_value)
-            )
-          elif tag_name == 'unixtime':
-            alias = entities
-            entity_tests.append(
-                criterion.SQL_UNIXTIME_VALUE_COMPARISON_FUNCS[
-                    criterion.comparison](entities, tag_value)
-            )
+          # no subsequent check of the tagged entity
+          post_check = None
+          # default operation map
+          op = criterion.comparison
+          op_map = {
+              '=': lambda column, value: column == value,
+              '!=': lambda column, value: column != value,
+              '<': lambda column, value: column < value,
+              '<=': lambda column, value: column <= value,
+              '>': lambda column, value: column > value,
+              '>=': lambda column, value: column >= value,
+          }
+          if tag_name in ('id', 'name', 'unixtime'):
+            # criterion based on the entities table
+            column = getattr(entities, tag_name)
+            tests = entity_tests
           else:
-            tag_tests = per_tag_tests[tag_name]
-            if tag_tests:
+            # criterion based on the tags table
+            tests = per_tag_tests[tag_name]
+            if tests:
               # reuse existing alias - same tag name
               alias = per_tag_aliases[tag_name]
             else:
               # first test for this tag - make an alias
-              per_tag_aliases[tag_name] = aliased(tags)
-            tag_tests.append(
-                criterion.SQL_TAG_VALUE_COMPARISON_FUNCS[criterion.comparison]
-                (per_tag_aliases[tag_name], tag_value)
-            )
+              alias = per_tag_aliases[tag_name] = aliased(tags)
+            if tag_value is None:
+              column = None
+              op_map = {
+                  '=':
+                  lambda column, value: and_(
+                      alias.float_value is None, alias.string_value is None,
+                      alias.structured_value is None
+                  ),
+              }
+            elif isinstance(tag_value, (int, float)):
+              column = alias.float_value
+            elif isinstance(tag_value, str):
+              column = alias.string_value
+            elif isinstance(tag_value, re.Pattern):
+              column = alias.string_value
+              op_map = {
+                  '~': lambda column, value: column is not None,
+              }
+              post_check = lambda te: value.match(te[tag_name])
+            else:
+              raise TypeError(
+                  "unhandled type for %s=%s" % (
+                      tag_name,
+                      r(tag_value),
+                  )
+              )
+            try:
+              op_func = op_map[criterion.comparison]
+            except KeyError as e:
+              raise TypeError(
+                  "no implementation of op %r for %s=%s" %
+                  (op, tag_name, r(tag_value))
+              )
+          test_func = op_map[op]
+          test_cond = test_func(column, tag_value)
+          tests.append(test_cond)
         else:
           try:
             sqlp = criterion.sql_parameters(self)
