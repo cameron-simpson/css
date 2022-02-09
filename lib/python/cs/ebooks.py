@@ -10,6 +10,7 @@ import os
 from os.path import (
     basename,
     exists as existspath,
+    expanduser,
     isfile as isfilepath,
     join as joinpath,
     relpath,
@@ -21,8 +22,10 @@ from zipfile import ZipFile, ZIP_STORED
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.fstags import FSTags
 from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
+from cs.resources import MultiOpenMixin
 
 import mobi
 
@@ -45,7 +48,7 @@ class Mobi:
     ''' Extract the contents of the MOBI file into a directory.
         Return `(dirpath,rfilepath)` where `dirpath` is the extracted
         file tree and `filepath` is the relative pathname of the
-        primary epub, html or pdf file depending on the mobi type/
+        primary epub, html or pdf file depending on the mobi type.
     '''
     if dirpath is not None and existspath(dirpath):
       raise ValueError("dirpath %r already exists", dirpath)
@@ -126,8 +129,61 @@ class Mobi2CBZCommand(BaseCommand):
     outcbzpath = MB.make_cbz(cbzpath)
     print(outcbzpath)
 
+class KindleTree(MultiOpenMixin):
+  ''' Work with a Kindle ebook tree.
+
+      This actually knows very little about Kindle ebooks or its rather opaque database.
+      This is mostly to aid keeping track of state using `cs.fstags`.
+  '''
+
+  def __init__(self, kindle_library=None):
+    if kindle_library is None:
+      kindle_library = os.environ.get('KINDLE_LIBRARY')
+      if kindle_library is None:
+        # default to the MacOS path, needs updates for other platforms
+        kindle_library = expanduser(
+            '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
+        )
+    self.path = kindle_library
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Context manager to obtain and release resources.
+    '''
+    with FSTags() as fstags:
+      with stackattrs(self, fstags=fstags):
+        yield
+
+  @property
+  def dbpath(self):
+    ''' The path to the SQLite database file.
+    '''
+    return joinpath(self.path, 'book_asset.db')
+
+  @staticmethod
+  def is_book_subdir(subdir_name):
+    ''' Test whther `subdir_name` is a Kindle ebook subdirectory basename.
+    '''
+    return subdir_name.endswith(('_EBOK', '_EBSP'))
+
+  def book_subdirs(self):
+    ''' Return a list of the individual ebook subdirectory names.
+    '''
+    return [
+        dirbase for dirbase in os.listdir(self.path)
+        if self.is_book_subdir(dirbase)
+    ]
+
+  def __getitem__(self, subdir_name):
+    ''' Return the `cs.fstags.TaggedPath` for the ebook subdirectory named `subdir_name`.
+    '''
+    if not self.is_book_subdir(subdir_name):
+      raise ValueError(
+          "not a Kindle ebook subdirectory name: %r" % (subdir_name,)
+      )
+    return self.fstags[joinpath(self.path, subdir_name)]
+
 if __name__ == '__main__':
-  mb = Mobi(sys.argv[1])
-  print(mb)
-  cbzpath = mb.make_cbz()
-  print("->", cbzpath)
+  with KindleTree() as kindle:
+    for subdir_name in kindle.book_subdirs():
+      print(subdir_name, kindle[subdir_name])
