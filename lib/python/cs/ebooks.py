@@ -41,8 +41,6 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 
-from cs.x import X
-
 class Mobi:
   ''' Work with an existing MOBI ebook file.
   '''
@@ -271,7 +269,6 @@ class KindleBookAssetDB(ORM):
   def __init__(self, tree):
     self.tree = tree
     self.db_url = 'sqlite:///' + self.db_path
-    X("KindleBookAssetDB: db_url=%r", self.db_url)
     super().__init__(self.db_url)
 
   @property
@@ -432,7 +429,6 @@ class KindleBookAssetDB(ORM):
     # just suck the version out
     with self.db_session() as session:
       self.version_info = VersionInfo.lookup1(session=session).version
-    X("self.version_info=%r", self.version_info)
     # references to table definitions
     self.download_state_map = DownloadState
     self.books = Book
