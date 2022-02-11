@@ -21,6 +21,12 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZIP_STORED
 
 import mobi
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+)
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -29,6 +35,13 @@ from cs.fstags import FSTags
 from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
 from cs.resources import MultiOpenMixin
+from cs.sqlalchemy_utils import (
+    ORM,
+    BasicTableMixin,
+    HasIdMixin,
+)
+
+from cs.x import X
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -99,6 +112,7 @@ class Mobi:
       except Exception:
         if existspath(cbzpath):
           pfx_call(os.unlink, cbzpath)
+        raise
     return cbzpath
 
 class Mobi2CBZCommand(BaseCommand):
@@ -109,7 +123,8 @@ class Mobi2CBZCommand(BaseCommand):
     Unpack a MOBI file and construct a CBZ file.
     Prints the path of the CBZ file to the output.'''
 
-  def main(self, argv):
+  @staticmethod
+  def main(argv):
     ''' `mobi2cbz` command line implementation.
     '''
     if not argv:
@@ -146,6 +161,7 @@ class KindleTree(MultiOpenMixin):
             '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
         )
     self.path = kindle_library
+    self.asset_db = KindleBookAssetDB(self)
     self._bookrefs = {}
 
   def __str__(self):
@@ -247,6 +263,185 @@ class KindleBook:
     ''' The `FSTags` for this book subdirectory.
     '''
     return self.tree.fstags[self.path]
+
+class KindleBookAssetDB(ORM):
+  ''' An ORM to access the Kindle `book_asset.db` SQLite database.
+  '''
+
+  def __init__(self, tree):
+    self.tree = tree
+    self.db_url = 'sqlite:///' + self.db_path
+    X("KindleBookAssetDB: db_url=%r", self.db_url)
+    super().__init__(self.db_url)
+
+  @property
+  def orm(self):
+    ''' No distinct ORM class for `KindleBookAssetDB`.
+    '''
+    return self
+
+  @property
+  def db_path(self):
+    ''' The filesystem path to the database.
+    '''
+    return joinpath(self.tree.path, 'book_asset.db')
+
+  # lifted from SQLTags
+  @contextmanager
+  def db_session(self, *, new=False):
+    ''' Context manager to obtain a db session if required
+        (or if `new` is true).
+    '''
+    orm_state = self.orm.sqla_state
+    get_session = orm_state.new_session if new else orm_state.auto_session
+    with get_session() as session2:
+      yield session2
+
+  def declare_schema(self):
+    r''' Define the database schema / ORM mapping.
+
+        Database schema queried thus:
+
+            sqlite3 ~/KINDLE/book_asset.db .schema | sed 's/,  *\([^ ]\)/,\n    \1/g'
+    '''
+    Base = self.Base
+
+    # pylint: disable=missing-class-docstring
+    class VersionInfo(Base, BasicTableMixin):
+      __tablename__ = 'VersionInfo'
+      version = Column(
+          Integer,
+          primary_key=True,
+          comment='database schema version number, just one row'
+      )
+
+    # pylint: disable=missing-class-docstring
+    class DownloadState(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'DownloadState'
+      state = Column(
+          String,
+          nullable=False,
+          unique=True,
+          comment='mapping of download state ids to text description'
+      )
+
+    # pylint: disable=missing-class-docstring
+    class Book(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'Book'
+      asin = Column(String, nullable=False, comment='Amazon ASIN indentifier')
+      type = Column(
+          String, nullable=False, comment='Book type eg "kindle.ebook"'
+      )
+      revision = Column(
+          String, nullable=False, comment='Book revision, often blank'
+      )
+      sampling = Column(
+          String,
+          nullable=False,
+          comment=
+          'Book sample state, often blank, "Sample" for a sample download'
+      )
+
+    # pylint: disable=missing-class-docstring
+    class BookDownloadInfo(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'BookDownloadInfo'
+      bookId = Column(
+          Integer,
+          ForeignKey("Book.id"),
+          nullable=False,
+          index=True,
+          comment='Book row id',
+      )
+      responseContext = Column(String, comment='BASE64 encoded information')
+
+    # pylint: disable=missing-class-docstring
+    class RequirementLevel(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'RequirementLevel'
+      level = Column(
+          String,
+          nullable=False,
+          unique=True,
+          comment='mapping of requirement level ids to text description'
+      )
+
+    # pylint: disable=missing-class-docstring
+    class Asset(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'Asset'
+      bookId = Column(
+          Integer,
+          ForeignKey("Book.id"),
+          nullable=False,
+          index=True,
+          comment='Book row id',
+      )
+      guid = Column(String, nullable=False, comment='GUID of the Asset?')
+      requirementLevel = Column(
+          Integer,
+          ForeignKey("RequirementLevel.id"),
+          nullable=False,
+          index=True,
+          comment='Requirement Level id'
+      )
+      size = Column(Integer)
+      contentType = Column(String, nullable=False)
+      localFilename = Column(String)
+      downloadState = Column(
+          Integer,
+          ForeignKey("DownloadState.id"),
+          default=1,
+          comment='Asset download state id'
+      )
+
+    # pylint: disable=missing-class-docstring
+    class EndpointType(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'EndpointType'
+      type = Column(String, nullable=False)
+
+    # pylint: disable=missing-class-docstring
+    class DeliveryType(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'DeliveryType'
+      type = Column(String, nullable=False)
+
+    # pylint: disable=missing-class-docstring
+    class AssetDownloadInfo(Base, BasicTableMixin, HasIdMixin):
+      __tablename__ = 'AssetDownloadInfo'
+      assetId = Column(
+          Integer,
+          ForeignKey("Asset.id"),
+          nullable=False,
+          index=True,
+          comment='Asset row id',
+      )
+      endpoint = Column(String, nullable=False)
+      endpointType = Column(
+          Integer,
+          ForeignKey("EndpointType.id"),
+          nullable=False,
+          index=True,
+          comment='Endpoint type id'
+      )
+      responseContext = Column(String)
+      deliveryType = Column(
+          Integer,
+          ForeignKey("DeliveryType.id"),
+          nullable=False,
+          index=True,
+          comment='Delivery type id'
+      )
+
+    # just suck the version out
+    with self.db_session() as session:
+      self.version_info = VersionInfo.lookup1(session=session).version
+    X("self.version_info=%r", self.version_info)
+    # references to table definitions
+    self.download_state_map = DownloadState
+    self.books = Book
+    self.book_download_info = BookDownloadInfo
+    self.requirement_level_map = RequirementLevel
+    self.assets = Asset
+    self.endpoint_type_map = EndpointType
+    self.delivery_type_map = DeliveryType
+    self.asset_download_info = AssetDownloadInfo
 
 if __name__ == '__main__':
   with KindleTree() as kindle:
