@@ -20,7 +20,7 @@ from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -331,18 +331,15 @@ class ORM(MultiOpenMixin, ABC):
     '''
     raise NotImplementedError("declare_schema")
 
-  def startup(self):
-    ''' Startup: define the tables if not present.
+  @contextmanager
+  def startup_shutdoewn(self):
+    ''' Startup/shutdown context manager.
     '''
     if self.db_fspath:
       self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
-
-  def shutdown(self):
-    ''' Stub shutdown.
-    '''
+    yield
     if self._lockfilepath is not None:
-      with Pfx("remove(%r)", self._lockfilepath):
-        os.remove(self._lockfilepath)
+      pfx_call(os.remove, self._lockfilepath)
       self._lockfilepath = None
 
   @property
