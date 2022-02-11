@@ -332,7 +332,7 @@ class ORM(MultiOpenMixin, ABC):
     raise NotImplementedError("declare_schema")
 
   @contextmanager
-  def startup_shutdoewn(self):
+  def startup_shutdown(self):
     ''' Startup/shutdown context manager.
     '''
     if self.db_fspath:
