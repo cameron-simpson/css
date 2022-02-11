@@ -24,6 +24,7 @@ import mobi
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
@@ -145,6 +146,13 @@ class KindleTree(MultiOpenMixin):
             '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
         )
     self.path = kindle_library
+    self._bookrefs = {}
+
+  def __str__(self):
+    return "%s:%s" % (type(self).__name__, shortpath(self.path))
+
+  def __repr__(self):
+    return "%s(%r)" % (type(self).__name__, self.path)
 
   @contextmanager
   def startup_shutdown(self):
@@ -166,13 +174,18 @@ class KindleTree(MultiOpenMixin):
     '''
     return subdir_name.endswith(('_EBOK', '_EBSP'))
 
-  def book_subdirs(self):
+  def book_subdir_names(self):
     ''' Return a list of the individual ebook subdirectory names.
     '''
     return [
         dirbase for dirbase in os.listdir(self.path)
         if self.is_book_subdir(dirbase)
     ]
+
+  def keys(self):
+    ''' The keys of a `KindleTree` are its book subdirectory names.
+    '''
+    return self.book_subdir_names()
 
   def __getitem__(self, subdir_name):
     ''' Return the `cs.fstags.TaggedPath` for the ebook subdirectory named `subdir_name`.
@@ -181,9 +194,61 @@ class KindleTree(MultiOpenMixin):
       raise ValueError(
           "not a Kindle ebook subdirectory name: %r" % (subdir_name,)
       )
-    return self.fstags[joinpath(self.path, subdir_name)]
+    try:
+      book = self._bookrefs[subdir_name]
+    except KeyError:
+      book = self._bookrefs[subdir_name] = KindleBook(self, subdir_name)
+    return book
+
+  def __iter__(self):
+    ''' Mapping iteration method.
+    '''
+    return iter(self.keys())
+
+  def values(self):
+    ''' Mapping method yielding `KindleBook` instances.
+    '''
+    yield from map(self.__getitem__, self)
+
+  def items(self):
+    ''' Mapping method yielding `(subdir_name,KindleBook)` pairs.
+    '''
+    for k in self:
+      yield k, self[k]
+
+class KindleBook:
+  ''' A reference to a Kindle library book subdirectory.
+  '''
+
+  def __init__(self, tree, subdir_name):
+    ''' Initialise this book subdirectory reference.
+
+        Parameters:
+        * `tree`: the `Kindletree` containing the subdirectory
+        * `subdir_name`: the subdirectory name
+    '''
+    self.tree = tree
+    self.subdir_name = subdir_name
+
+  def __str__(self):
+    return "%s[%s]:%s" % (self.tree, self.subdir_name, self.tags)
+
+  def __repr__(self):
+    return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
+
+  @property
+  def path(self):
+    ''' The filesystem path of this book subdirectory.
+    '''
+    return joinpath(self.tree.path, self.subdir_name)
+
+  @property
+  def tags(self):
+    ''' The `FSTags` for this book subdirectory.
+    '''
+    return self.tree.fstags[self.path]
 
 if __name__ == '__main__':
   with KindleTree() as kindle:
-    for subdir_name in kindle.book_subdirs():
-      print(subdir_name, kindle[subdir_name])
+    for book in kindle.values():
+      print(book.subdir_name, book)
