@@ -20,14 +20,14 @@ import sys
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZIP_STORED
 
+import mobi
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fstags import FSTags
 from cs.logutils import error, info
 from cs.pfx import pfx, pfx_call
 from cs.resources import MultiOpenMixin
-
-import mobi
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -51,7 +51,7 @@ class Mobi:
         primary epub, html or pdf file depending on the mobi type.
     '''
     if dirpath is not None and existspath(dirpath):
-      raise ValueError("dirpath %r already exists", dirpath)
+      raise ValueError("dirpath %r already exists" % (dirpath,))
     # divert stdout because the mobi library sends some warnings etc to stdout
     with stackattrs(sys, stdout=sys.stderr):
       tmpdirpath, filepath = pfx_call(mobi.extract, self.path)
@@ -83,7 +83,7 @@ class Mobi:
       mobibase, mobiext = splitext(basename(self.path))
       cbzpath = mobibase + '.cbz'
     if existspath(cbzpath):
-      raise ValueError("CBZ path %r already exists", cbzpath)
+      raise ValueError("CBZ path %r already exists" % (cbzpath,))
     with self.extracted() as df:
       dirpath, rfilepath = df
       imagepaths = sorted(glob(joinpath(dirpath, 'mobi8/OEBPS/Images/*.*')))
