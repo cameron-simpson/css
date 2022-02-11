@@ -85,7 +85,7 @@ class MultiOpenMixin(ContextManagerMixin):
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
-      Classes using this mixin need to _either_:
+      Classes using this mixin need to:
       * _either_ define a context manager method `.startup_shutdown`
         which does the startup actions before yeilding
         and then does the shutdown actions
