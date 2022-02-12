@@ -18,6 +18,7 @@ from os.path import (
 )
 import sys
 from tempfile import TemporaryDirectory
+from threading import Lock
 from zipfile import ZipFile, ZIP_STORED
 
 from icontract import require
@@ -46,6 +47,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.threads import locked_property
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -165,8 +167,8 @@ class KindleTree(MultiOpenMixin):
             '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
         )
     self.path = kindle_library
-    self.asset_db = KindleBookAssetDB(self)
     self._bookrefs = {}
+    self._lock = Lock()
 
   def __str__(self):
     return "%s:%s" % (type(self).__name__, shortpath(self.path))
@@ -182,11 +184,12 @@ class KindleTree(MultiOpenMixin):
       with stackattrs(self, fstags=fstags):
         yield
 
-  @property
-  def dbpath(self):
-    ''' The path to the SQLite database file.
+  @locked_property
+  def db(self):
+    ''' The associated KindleBookAssetDB ORM,
+        instantiated on demand'
     '''
-    return joinpath(self.path, 'book_asset.db')
+    return KindleBookAssetDB(self)
 
   @staticmethod
   def is_book_subdir(subdir_name):
@@ -311,6 +314,8 @@ class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
   '''
 
+  DB_FILENAME = 'book_asset.db'
+
   def __init__(self, tree):
     self.tree = tree
     self.db_url = 'sqlite:///' + self.db_path
@@ -326,7 +331,7 @@ class KindleBookAssetDB(ORM):
   def db_path(self):
     ''' The filesystem path to the database.
     '''
-    return joinpath(self.tree.path, 'book_asset.db')
+    return joinpath(self.tree.path, self.DB_FILENAME)
 
   # lifted from SQLTags
   @contextmanager
