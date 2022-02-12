@@ -33,6 +33,7 @@ from sqlalchemy import (
     String,
     ForeignKey,
 )
+from sqlalchemy.orm import relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -399,6 +400,7 @@ class KindleBookAssetDB(ORM):
           index=True,
           comment='Book row id',
       )
+      book = relationship("Book")
       responseContext = Column(String, comment='BASE64 encoded information')
 
     # pylint: disable=missing-class-docstring
@@ -421,23 +423,28 @@ class KindleBookAssetDB(ORM):
           index=True,
           comment='Book row id',
       )
+      book = relationship("Book")
       guid = Column(String, nullable=False, comment='GUID of the Asset?')
-      requirementLevel = Column(
+      requirementLevel_id = Column(
+          "requirementLevel",
           Integer,
           ForeignKey("RequirementLevel.id"),
           nullable=False,
           index=True,
           comment='Requirement Level id'
       )
+      requirementLevel = relationship("RequirementLevel")
       size = Column(Integer)
       contentType = Column(String, nullable=False)
       localFilename = Column(String)
-      downloadState = Column(
+      downloadState_id = Column(
+          "downloadState",
           Integer,
           ForeignKey("DownloadState.id"),
           default=1,
           comment='Asset download state id'
       )
+      downloadState = relationship("DownloadState")
 
     # pylint: disable=missing-class-docstring
     class EndpointType(Base, BasicTableMixin, HasIdMixin):
@@ -479,6 +486,7 @@ class KindleBookAssetDB(ORM):
     # just suck the version out
     with self.db_session() as session:
       self.version_info = VersionInfo.lookup1(session=session).version
+
     # references to table definitions
     self.download_state_map = DownloadState
     self.books = Book
