@@ -21,6 +21,10 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZIP_STORED
 
 from icontract import require
+try:
+  from lxml import etree
+except ImportError:
+  import xml.etree.ElementTree as etree
 import mobi
 from sqlalchemy import (
     Column,
@@ -35,7 +39,7 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.logutils import error, info
-from cs.pfx import pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -287,6 +291,22 @@ class KindleBook:
     '''
     return joinpath(self.path, name)
 
+  def phl_xml(self):
+    ''' Decode the `.phl` XML file if present and return an XML `ElementTree`.
+        Return `None` if the file is not present.
+
+        This file seems to contain popular highlights in the
+        `popular/content/annotation` tags.
+      '''
+    phl_path = self.subpath(self.subdir_name + '.phl')
+    try:
+      with open(phl_path, 'rb') as f:
+        xml_bs = f.read()
+    except FileNotFoundError:
+      return None
+    with Pfx(phl_path):
+      return pfx_call(etree.fromstring, xml_bs)
+
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
   '''
@@ -468,3 +488,6 @@ if __name__ == '__main__':
   with KindleTree() as kindle:
     for book in kindle.values():
       print(book.subdir_name, book)
+      phl = book.phl_xml()
+      if phl is not None:
+        print(etree.tostring(phl, pretty_print=True).decode())
