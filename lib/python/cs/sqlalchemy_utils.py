@@ -235,10 +235,6 @@ class ORM(MultiOpenMixin, ABC):
       and provides various Session related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
-
-      Subclasses must define the following:
-      * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
-        even if these just `pass`
   '''
 
   @pfx_method
@@ -333,7 +329,14 @@ class ORM(MultiOpenMixin, ABC):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' Startup/shutdown context manager.
+    ''' Default startup/shutdown context manager.
+
+        This base method operates a lockfile to manage concurrent access
+        by other programmes (which would also need to honour this file).
+        If you actually expect this to be common
+        you should try to keep the `ORM` "open" as briefly as possible.
+        The lock file is only operated if `self.db_fspath`,
+        current set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
       self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
@@ -440,7 +443,7 @@ class BasicTableMixin:
 
   @classmethod
   def lookup(cls, *, session, **criteria):
-    ''' Return iterable of row entities matching `criteria`.
+    ''' Return an iterable `Query` of row entities matching `criteria`.
     '''
     return session.query(cls).filter_by(**criteria)
 
@@ -452,6 +455,8 @@ class BasicTableMixin:
 
   @classmethod
   def __getitem__(cls, index):
+    ''' Index the table by its `id` column.
+    '''
     row = cls.lookup1(id=index, session=state.session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
