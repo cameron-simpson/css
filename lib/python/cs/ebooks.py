@@ -40,6 +40,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
+from cs.lex import cutsuffix
 from cs.logutils import error, info
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.resources import MultiOpenMixin
@@ -267,6 +268,18 @@ class KindleBook:
 
   def __repr__(self):
     return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
+
+  @property
+  def asin(self):
+    ''' The ASIN of this book subdirectory.
+    '''
+    for suffix in '_EBOK', '_EBSP':
+      prefix = cutsuffix(self.subdir_name, suffix)
+      if prefix is not self.subdir_name:
+        return prefix
+    raise ValueError(
+        "subdir_name %r does not end with _EBOK or _BSP" % (self.subdir_name,)
+    )
 
   def listdir(self):
     ''' Return a list of the names inside the subdirectory,
