@@ -254,6 +254,15 @@ class KindleBook:
   def __repr__(self):
     return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
 
+  def listdir(self):
+    ''' Return a list of the names inside the subdirectory,
+          or an empty list if the subdirectory is not present.
+      '''
+    try:
+      return os.listdir(self.path)
+    except FileNotFoundError:
+      return []
+
   @property
   def path(self):
     ''' The filesystem path of this book subdirectory.
@@ -265,6 +274,18 @@ class KindleBook:
     ''' The `FSTags` for this book subdirectory.
     '''
     return self.tree.fstags[self.path]
+
+  def asset_names(self):
+    ''' Return the names of files within the subdirectory
+        whose names start with `self.subdir_name+'.'`.
+    '''
+    prefix_ = self.subdir_name
+    return [name for name in self.listdir() if name.startswith(prefix_)]
+
+  def subpath(self, name):
+    ''' The filesystem path of `name` within this subdirectory.
+    '''
+    return joinpath(self.path, name)
 
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
