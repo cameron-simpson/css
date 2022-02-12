@@ -20,6 +20,7 @@ import sys
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZIP_STORED
 
+from icontract import require
 import mobi
 from sqlalchemy import (
     Column,
@@ -27,6 +28,7 @@ from sqlalchemy import (
     String,
     ForeignKey,
 )
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
@@ -234,7 +236,9 @@ class KindleBook:
   ''' A reference to a Kindle library book subdirectory.
   '''
 
-  def __init__(self, tree, subdir_name):
+  @typechecked
+  @require(lambda subdir_name: os.sep not in subdir_name)
+  def __init__(self, tree: KindleTree, subdir_name: str):
     ''' Initialise this book subdirectory reference.
 
         Parameters:
