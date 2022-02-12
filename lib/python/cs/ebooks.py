@@ -206,6 +206,12 @@ class KindleTree(MultiOpenMixin):
         if self.is_book_subdir(dirbase)
     ]
 
+  def asins(self):
+    db = self.db
+    books = db.books
+    with db.db_session() as session:
+      return set(asin for asin, in session.query(books.asin))
+
   def keys(self):
     ''' The keys of a `KindleTree` are its book subdirectory names.
     '''
