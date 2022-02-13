@@ -20,7 +20,7 @@ from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -252,16 +252,19 @@ class ORM(MultiOpenMixin, ABC):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
-    db_fspath = cutprefix(db_url, 'sqlite://')
+    db_fspath = cutprefix(db_url, 'sqlite:///')
     if db_fspath is db_url:
-      # no leading "sqlite://"
+      # unchanged - no leading "sqlite:///"
       if db_url.startswith(('/', './', '../')) or '://' not in db_url:
         # turn filesystenm pathnames into SQLite db URLs
         db_fspath = abspath(db_url)
         db_url = 'sqlite:///' + db_url
       else:
-        # sqlite://memory or something - no filesystem object
+        # no fs path
         db_fspath = None
+    else:
+      # starts with sqlite:///, we have the db_fspath
+      pass
     self.db_url = db_url
     self.db_fspath = db_fspath
     is_sqlite = db_url.startswith('sqlite://')
