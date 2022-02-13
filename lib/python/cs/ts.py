@@ -138,7 +138,7 @@ class LogSpan:
           ((elapsed + round_up - 1) // round_up) * round_up / 3600, 2
       )
       print(
-          indent + f'{hours} {start.format("hh:mm")}-{end.format("hh:mm")}',
+          indent + f'{hours} {start.format("HH:mm")}-{end.format("HH:mm")}',
           file=file
       )
     else:
