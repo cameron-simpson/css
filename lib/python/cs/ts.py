@@ -114,7 +114,7 @@ class LogSpan:
         else:
           if last_unixtime > entry.unixtime:
             warning(
-                "unordered entries (last_unixtime:%s > entry.unixtime:%s"),
+                "unordered entries (last_unixtime:%s > entry.unixtime:%s",
                 last_unixtime, entry.unixtime
             )
           if not in_span(entry):
