@@ -222,6 +222,11 @@ class KindleTree(MultiOpenMixin):
     with db.db_session() as session:
       return set(asin for asin, in session.query(books.asin))
 
+  def by_asin(self, asin):
+    ''' Return a `KindleBook` for the supplied `asin`.
+    '''
+    return self[asin.upper() + '_EBOK']
+
   def keys(self):
     ''' The keys of a `KindleTree` are its book subdirectory names.
     '''
