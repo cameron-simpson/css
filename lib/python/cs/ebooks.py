@@ -160,14 +160,18 @@ class KindleTree(MultiOpenMixin):
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
+  # default to the MacOS path, needs updates for other platforms
+  KINDLE_LIBRARY_DEFAULT = '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
+
+  # environment variable to override the path
+  KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+
   def __init__(self, kindle_library=None):
     if kindle_library is None:
-      kindle_library = os.environ.get('KINDLE_LIBRARY')
+      kindle_library = os.environ.get(self.KINDLE_LIBRARY_ENVVAR)
       if kindle_library is None:
         # default to the MacOS path, needs updates for other platforms
-        kindle_library = expanduser(
-            '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
-        )
+        kindle_library = expanduser(self.KINDLE_LIBRARY_DEFAULT)
     self.path = kindle_library
     self._bookrefs = {}
     self._lock = Lock()
