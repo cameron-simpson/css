@@ -710,10 +710,18 @@ class CalibreMetadataDB(ORM):
       lang_code = Column(String, nullable=False, unique=True)
       item_order = Column(Integer, nullable=False, default=1)
 
+    class Identifiers(Base, _CalibreTable):
+      __tablename__ = 'identifiers'
+      book_id = Column("book", ForeignKey('books.id'), nullable=False)
+      type = Column(String, nullable=False, default="isbn")
+      val = Column(String, nullable=None)
+
     Authors.book_links = relationship(
         BooksAuthorsLink, back_populates="author"
     )
     Books.author_links = relationship(BooksAuthorsLink, back_populates="book")
+    Books.identifiers = relationship(Identifiers, back_populates="book")
+    Identifiers.book = relationship(Books, back_populates="identifiers")
 
     # references to table definitions
     self.authors = Authors
@@ -790,6 +798,9 @@ if __name__ == '__main__':
   with db.db_session() as session:
     for book in db.books.lookup(session=session):
       print(book.title)
+      print(" ", book.path)
+      for identifier in book.identifiers:
+        print("%s=%s" % (identifier.type, identifier.val))
       for author_link in book.author_links:
         print(" ", author_link.author.name)
   ##sys.exit(KindleCommand(sys.argv).run())
