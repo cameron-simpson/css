@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from getopt import GetoptError
 from glob import glob
 import os
@@ -28,12 +29,15 @@ except ImportError:
   import xml.etree.ElementTree as etree
 import mobi
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
-    ForeignKey,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -43,6 +47,7 @@ from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import error, info
 from cs.pfx import Pfx, pfx, pfx_call
+from cs.psutils import run
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -780,9 +785,11 @@ class KindleCommand(BaseCommand):
       calibre.add(kbook.extpath('azw'))
 
 if __name__ == '__main__':
-  with KindleTree() as kindle:
-    for book in kindle.values():
-      print(book.subdir_name, book)
-      phl = book.phl_xml()
-      if phl is not None:
-        print(etree.tostring(phl, pretty_print=True).decode())
+  calibre = CalibreTree()
+  db = calibre.db
+  with db.db_session() as session:
+    for book in db.books.lookup(session=session):
+      print(book.title)
+      for author_link in book.author_links:
+        print(" ", author_link.author.name)
+  ##sys.exit(KindleCommand(sys.argv).run())
