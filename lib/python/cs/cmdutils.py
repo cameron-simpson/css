@@ -342,7 +342,7 @@ class BaseCommand:
           main_is_class = False
         if main_is_class:
           subcmd_cls = main_method
-          main = lambda: subcmd_cls(argv, cmd=subcmd).run
+          main = lambda: subcmd_cls(argv, cmd=subcmd).run()
         else:
           main = lambda: main_method(argv)
         main_cmd = subcmd
