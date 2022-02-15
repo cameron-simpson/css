@@ -192,8 +192,8 @@ class KindleTree(MultiOpenMixin):
 
   @locked_property
   def db(self):
-    ''' The associated KindleBookAssetDB ORM,
-        instantiated on demand'
+    ''' The associated `KindleBookAssetDB` ORM,
+        instantiated on demand.
     '''
     return KindleBookAssetDB(self)
 
@@ -299,6 +299,18 @@ class KindleBook:
     ''' The filesystem path of this book subdirectory.
     '''
     return joinpath(self.tree.path, self.subdir_name)
+
+  def pathto(self, subpath):
+    ''' Return the filesystem path of `subpath`
+        located within the book subdirectory.
+    '''
+    return joinpath(self.path, subpath)
+
+  def extpath(self, ext):
+    ''' Return the filesystem path to the booknamed file
+        within the book subdirectory.
+    '''
+    return self.pathto(self.subdir_name + '.' + ext)
 
   @property
   def tags(self):
