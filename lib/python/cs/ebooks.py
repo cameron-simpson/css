@@ -45,7 +45,7 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
-from cs.logutils import error, info
+from cs.logutils import error, warning, info
 from cs.pfx import Pfx, pfx, pfx_call
 from cs.psutils import run
 from cs.resources import MultiOpenMixin
@@ -832,6 +832,7 @@ class KindleCommand(BaseCommand):
               kb.tags['calibre.dbid'] = book.id
 
 if __name__ == '__main__':
+  sys.exit(KindleCommand(sys.argv).run())
   calibre = CalibreTree()
   db = calibre.db
   with db.db_session() as session:
