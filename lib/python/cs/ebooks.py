@@ -707,6 +707,14 @@ class CalibreMetadataDB(ORM):
           default=datetime(2000, 1, 1, tzinfo=timezone.utc)
       )
 
+      def identifiers_as_dict(self):
+        ''' Return a `dict` mapping identifier types to values.
+        '''
+        return {
+            identifier.type: identifier.val
+            for identifier in self.identifiers
+        }
+
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       pass
 
