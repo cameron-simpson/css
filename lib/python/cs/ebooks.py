@@ -805,6 +805,32 @@ class KindleCommand(BaseCommand):
         continue
       calibre.add(kbook.extpath('azw'))
 
+  def cmd_calibre_import_dbids(self, argv):
+    ''' Usage: {cmd}
+          Import Calibre database ids by backtracking from Calibre
+          `mobi-asin` identifier records.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    kindle = options.kindle
+    calibre = options.calibre
+    with calibre.db.db_session() as session:
+      for book in calibre.db.books.lookup(session=session):
+        with Pfx("%d: %s", book.id, book.path):
+          print(book.path)
+          asin = book.identifiers_as_dict().get('mobi-asin')
+          if asin:
+            kb = kindle.by_asin(asin)
+            print(kb.path)
+            dbid = kb.tags.auto.calibre.dbid
+            if dbid:
+              if dbid != book.id:
+                warning("book dbid %s != kb calibre.dbid %s", book.id, dbid)
+            else:
+              print("kb %s + calibre.dbid=%r" % (asin, book.id))
+              kb.tags['calibre.dbid'] = book.id
+
 if __name__ == '__main__':
   calibre = CalibreTree()
   db = calibre.db
