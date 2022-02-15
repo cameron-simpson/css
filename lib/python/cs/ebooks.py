@@ -714,6 +714,71 @@ class CalibreMetadataDB(ORM):
     self.authors = Authors
     self.books = Books
 
+class KindleCommand(BaseCommand):
+  ''' Command line for interacting with a Kindle filesystem tree.
+  '''
+
+  GETOPT_SPEC = 'K:'
+
+  USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
+  -C calibre_library
+    Specify calibre library location, default from ${CALIBRE_LIBRARY_ENVVAR}:
+    {CALIBRE_LIBRARY_DEFAULT}
+  -K kindle_library
+    Specify kindle library location, default from ${KINDLE_LIBRARY_ENVVAR}:
+    {KINDLE_LIBRARY_DEFAULT}'''
+
+  USAGE_KEYWORDS = {
+      'CALIBRE_LIBRARY_ENVVAR': CalibreTree.CALIBRE_LIBRARY_ENVVAR,
+      'CALIBRE_LIBRARY_DEFAULT': CalibreTree.CALIBRE_LIBRARY_DEFAULT,
+      'KINDLE_LIBRARY_ENVVAR': KindleTree.KINDLE_LIBRARY_ENVVAR,
+      'KINDLE_LIBRARY_DEFAULT': KindleTree.KINDLE_LIBRARY_DEFAULT,
+  }
+
+  def apply_defaults(self):
+    ''' Set up the default values in `options`.
+    '''
+    options = self.options
+    options.kindle_path = None
+    options.calibre_path = None
+
+  def apply_opt(self, opt, val):
+    ''' Apply a command line option.
+    '''
+    options = self.options
+    if opt == '-C':
+      options.calibre_path = val
+    elif opt == '-K':
+      options.kindle_path = val
+    else:
+      super().apply_opt(opt, val)
+
+  @contextmanager
+  def run_context(self):
+    ''' Prepare the `SQLTags` around each command invocation.
+    '''
+    options = self.options
+    with KindleTree(kindle_library=options.kindle_path) as kt:
+      with CalibreTree(calibre_library=options.calibre_path) as cal:
+        with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
+          yield
+
+  def cmd_calibre_export(self, argv):
+    ''' Usage: {cmd}
+          Export AZW files to Calibre library.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    kindle = options.kindle
+    calibre = options.calibre
+    for subdir_name, kbook in kindle.items():
+      dbid = kbook.tags.auto.calibre.dbid
+      if dbid:
+        print(subdir_name, "calibre.dbid:", dbid)
+        continue
+      calibre.add(kbook.extpath('azw'))
+
 if __name__ == '__main__':
   with KindleTree() as kindle:
     for book in kindle.values():
