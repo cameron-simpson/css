@@ -1,53 +1,36 @@
 #!/usr/bin/env python3
 
-''' Utilities for working with EBooks.
+''' Support for Kindle libraries.
 '''
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from getopt import GetoptError
-from glob import glob
 import os
-from os.path import (
-    basename,
-    exists as existspath,
-    expanduser,
-    isfile as isfilepath,
-    join as joinpath,
-    relpath,
-    splitext,
-)
+from os.path import expanduser, join as joinpath
 import sys
-from tempfile import TemporaryDirectory
 from threading import Lock
-from zipfile import ZipFile, ZIP_STORED
 
 from icontract import require
-try:
-  from lxml import etree
-except ImportError:
-  import xml.etree.ElementTree as etree
-import mobi
 from sqlalchemy import (
-    Boolean,
     Column,
-    DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
 )
-from sqlalchemy.orm import declared_attr, relationship
+from sqlalchemy.orm import relationship
 from typeguard import typechecked
+try:
+  from lxml import etree
+except ImportError:
+  import xml.etree.ElementTree as etree
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
-from cs.logutils import error, warning, info
-from cs.pfx import Pfx, pfx, pfx_call
-from cs.psutils import run
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -55,108 +38,6 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.threads import locked_property
-
-class Mobi:
-  ''' Work with an existing MOBI ebook file.
-  '''
-
-  def __init__(self, mobipath):
-    if not isfilepath(mobipath):
-      raise ValueError("mobipath %r is not a file" % (mobipath,))
-    self.path = mobipath
-
-  def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, repr(self.path))
-
-  __str__ = __repr__
-
-  @pfx
-  def extract(self, dirpath=None):
-    ''' Extract the contents of the MOBI file into a directory.
-        Return `(dirpath,rfilepath)` where `dirpath` is the extracted
-        file tree and `filepath` is the relative pathname of the
-        primary epub, html or pdf file depending on the mobi type.
-    '''
-    if dirpath is not None and existspath(dirpath):
-      raise ValueError("dirpath %r already exists" % (dirpath,))
-    # divert stdout because the mobi library sends some warnings etc to stdout
-    with stackattrs(sys, stdout=sys.stderr):
-      tmpdirpath, filepath = pfx_call(mobi.extract, self.path)
-    rfilepath = relpath(filepath, tmpdirpath)
-    if dirpath is None:
-      dirpath = tmpdirpath
-    else:
-      pfx_call(os.rename, tmpdirpath, dirpath)
-    return dirpath, rfilepath
-
-  @contextmanager
-  def extracted(self):
-    ''' Context manager version of `extract()` which extracts the
-        MOBI into a temporary directory and yields the resulting
-        `(dirpath,rfilepath)` as for `extract()`.
-    '''
-    with TemporaryDirectory(prefix='%s.extracted-' % (type(self).__name__,),
-                            suffix='-%s' %
-                            (self.path.replace(os.sep, '_'),)) as T:
-      dirpath, rfilepath = self.extract(dirpath=joinpath(T, 'extracted'))
-      yield dirpath, rfilepath
-
-  @pfx
-  def make_cbz(self, cbzpath=None):
-    ''' Create a CBZ file from the images in the MOBI file.
-        Return the path to the created CBZ file.
-    '''
-    if cbzpath is None:
-      mobibase, mobiext = splitext(basename(self.path))
-      cbzpath = mobibase + '.cbz'
-    if existspath(cbzpath):
-      raise ValueError("CBZ path %r already exists" % (cbzpath,))
-    with self.extracted() as df:
-      dirpath, rfilepath = df
-      imagepaths = sorted(glob(joinpath(dirpath, 'mobi8/OEBPS/Images/*.*')))
-      info("write %s", cbzpath)
-      try:
-        with pfx_call(ZipFile, cbzpath, 'x', compression=ZIP_STORED) as cbz:
-          for imagepath in imagepaths:
-            pfx_call(cbz.write, imagepath, arcname=basename(imagepath))
-      except FileExistsError as e:
-        error("CBZ already eixsts: %r: %s", cbzpath, e)
-        return 1
-      except Exception:
-        if existspath(cbzpath):
-          pfx_call(os.unlink, cbzpath)
-        raise
-    return cbzpath
-
-class Mobi2CBZCommand(BaseCommand):
-  ''' Command line implementation for `mobi2cbz`.
-  '''
-
-  USAGE_FORMAT = r'''Usage: {cmd} mobipath [cbzpath]
-    Unpack a MOBI file and construct a CBZ file.
-    Prints the path of the CBZ file to the output.'''
-
-  @staticmethod
-  def main(argv):
-    ''' `mobi2cbz` command line implementation.
-    '''
-    if not argv:
-      raise GetoptError("missing mobipath")
-    mobipath = argv.pop(0)
-    mobibase, mobiext = splitext(basename(mobipath))
-    if argv:
-      cbzpath = argv.pop(0)
-    else:
-      cbzpath = mobibase + '.cbz'
-    if argv:
-      raise GetoptError("extra arguments after cbzpath: %r" % (argv,))
-    if not existspath(mobipath):
-      raise GetoptError("mobipath does not exist: %r" % (mobipath,))
-    if existspath(cbzpath):
-      raise GetoptError("CBZ already exists: %r" % (cbzpath,))
-    MB = Mobi(mobipath)
-    outcbzpath = MB.make_cbz(cbzpath)
-    print(outcbzpath)
 
 class KindleTree(MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
@@ -217,6 +98,8 @@ class KindleTree(MultiOpenMixin):
     ]
 
   def asins(self):
+    ''' Return a `set` of the `books.asin` column values.
+    '''
     db = self.db
     books = db.books
     with db.db_session() as session:
@@ -542,204 +425,6 @@ class KindleBookAssetDB(ORM):
     self.delivery_type_map = DeliveryType
     self.asset_download_info = AssetDownloadInfo
 
-class CalibreTree(MultiOpenMixin):
-
-  CALIBRE_LIBRARY_DEFAULT = '~/CALIBRE'
-  CALIBRE_LIBRARY_ENVVAR = 'CALIBRE_LIBRARY'
-  CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
-
-  def __init__(self, calibre_library=None):
-    if calibre_library is None:
-      calibre_library = os.environ.get(self.CALIBRE_LIBRARY_ENVVAR)
-      if calibre_library is None:
-        calibre_library = expanduser(self.CALIBRE_LIBRARY_DEFAULT)
-    self.path = calibre_library
-    self._lock = Lock()
-
-  @locked_property
-  def db(self):
-    ''' The associated `CalibreMetadataDB` ORM,
-        instantiated on demand.
-    '''
-    return CalibreMetadataDB(self)
-
-  def _run(self, *calargv):
-    ''' Run a Calibre utility command.
-    '''
-    X("calargv=%r", calargv)
-    cmd, *calargv = calargv
-    if not cmd.startswith(os.sep):
-      cmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, cmd)
-    print("RUN", cmd, *calargv)
-    ##return run([cmd, *calargv])
-
-  def calibredb(self, dbcmd, *argv):
-    ''' Run `dbcmd` via the `calibredb` command.
-    '''
-    return self._run('calibredb', dbcmd, '--library-path=' + self.path, *argv)
-
-  def add(self, bookpath):
-    ''' Add a book file via the `calibredb` command.
-    '''
-    self.calibredb('add', bookpath)
-
-class CalibreMetadataDB(ORM):
-  ''' An ORM to access the Calibre `metadata.db` SQLite database.
-  '''
-
-  DB_FILENAME = 'metadata.db'
-
-  def __init__(self, tree):
-    self.tree = tree
-    self.db_url = 'sqlite:///' + self.db_path
-    super().__init__(self.db_url)
-
-  @property
-  def orm(self):
-    ''' No distinct ORM class for `CalibreMetadataDB`.
-    '''
-    return self
-
-  @property
-  def db_path(self):
-    ''' The filesystem path to the database.
-    '''
-    return joinpath(self.tree.path, self.DB_FILENAME)
-
-  # lifted from SQLTags
-  @contextmanager
-  def db_session(self, *, new=False):
-    ''' Context manager to obtain a db session if required
-        (or if `new` is true).
-    '''
-    orm_state = self.orm.sqla_state
-    get_session = orm_state.new_session if new else orm_state.auto_session
-    with get_session() as session2:
-      yield session2
-
-  def declare_schema(self):
-    r''' Define the database schema / ORM mapping.
-
-        Database schema queried thus:
-
-            sqlite3 ~/CALIBRE/metadata.db .schema
-    '''
-    Base = self.Base
-
-    class _CalibreTable(BasicTableMixin, HasIdMixin):
-      ''' Base class for Calibre tables.
-      '''
-
-    def _linktable(left_name, right_name, **addtional_columns):
-      ''' Prepare and return a Calibre link table base class.
-
-          Parameters:
-          * `left_name`: the left hand entity, lowercase, singular,
-            example `'book'`
-          * `right_name`: the right hand entity, lowercase, singular,
-            example `'author'`
-          * `addtional_columns`: other keyword parameters
-            define further `Column`s and relationships
-      '''
-
-      class linktable(_CalibreTable):
-        __tablename__ = f'{left_name}s_{right_name}s_link'
-
-      setattr(
-          linktable, f'{left_name}_id',
-          declared_attr(
-              lambda self: Column(
-                  left_name,
-                  ForeignKey(f'{left_name}s.id'),
-                  primary_key=True,
-              )
-          )
-      )
-      setattr(
-          linktable, left_name,
-          declared_attr(lambda self: relationship(f'{left_name.title()}s'))
-      )
-      setattr(
-          linktable, f'{right_name}_id',
-          declared_attr(
-              lambda self: Column(
-                  right_name,
-                  ForeignKey(f'{right_name}s.id'),
-                  primary_key=True,
-              )
-          )
-      )
-      setattr(
-          linktable, right_name,
-          declared_attr(lambda self: relationship(f'{right_name.title()}s'))
-      )
-      for colname, colspec in addtional_columns.items():
-        setattr(linktable, colname, declared_attr(lambda self: colspec))
-      ##linktable.__name__ = f'{left_name.title()}s{right_name.title()}sLink'
-      X("%s: %r", linktable, dir(linktable))
-      return linktable
-
-    # pylint: disable=missing-class-docstring
-    class Authors(Base, _CalibreTable):
-      __tablename__ = 'authors'
-      name = Column(String, nullable=False, unique=True)
-      sort = Column(String)
-      link = Column(String, nullable=False, default="")
-
-    # pylint: disable=missing-class-docstring
-    class Books(Base, _CalibreTable):
-      __tablename__ = 'books'
-      title = Column(String, nullable=False, unique=True, default='unknown')
-      sort = Column(String)
-      timestamp = Column(DateTime)
-      pubdate = Column(DateTime)
-      series_index = Column(Float, nullable=False, default=1.0)
-      author_sort = Column(String)
-      isbn = Column(String, default="")
-      lccn = Column(String, default="")
-      path = Column(String, nullable=False, default="")
-      flags = Column(Integer, nullable=False, default=1)
-      uuid = Column(String)
-      has_cover = Column(Boolean, default=False)
-      last_modified = Column(
-          DateTime,
-          nullable=False,
-          default=datetime(2000, 1, 1, tzinfo=timezone.utc)
-      )
-
-      def identifiers_as_dict(self):
-        ''' Return a `dict` mapping identifier types to values.
-        '''
-        return {
-            identifier.type: identifier.val
-            for identifier in self.identifiers
-        }
-
-    class BooksAuthorsLink(Base, _linktable('book', 'author')):
-      pass
-
-    class Languages(Base, _CalibreTable):
-      __tablename__ = 'languages'
-      lang_code = Column(String, nullable=False, unique=True)
-      item_order = Column(Integer, nullable=False, default=1)
-
-    class Identifiers(Base, _CalibreTable):
-      __tablename__ = 'identifiers'
-      book_id = Column("book", ForeignKey('books.id'), nullable=False)
-      type = Column(String, nullable=False, default="isbn")
-      val = Column(String, nullable=None)
-
-    Authors.book_links = relationship(
-        BooksAuthorsLink, back_populates="author"
-    )
-    Books.author_links = relationship(BooksAuthorsLink, back_populates="book")
-    Books.identifiers = relationship(Identifiers, back_populates="book")
-    Identifiers.book = relationship(Books, back_populates="identifiers")
-
-    # references to table definitions
-    self.authors = Authors
-    self.books = Books
-
 class KindleCommand(BaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
@@ -748,18 +433,9 @@ class KindleCommand(BaseCommand):
 
   USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
   -C calibre_library
-    Specify calibre library location, default from ${CALIBRE_LIBRARY_ENVVAR}:
-    {CALIBRE_LIBRARY_DEFAULT}
+    Specify calibre library location.
   -K kindle_library
-    Specify kindle library location, default from ${KINDLE_LIBRARY_ENVVAR}:
-    {KINDLE_LIBRARY_DEFAULT}'''
-
-  USAGE_KEYWORDS = {
-      'CALIBRE_LIBRARY_ENVVAR': CalibreTree.CALIBRE_LIBRARY_ENVVAR,
-      'CALIBRE_LIBRARY_DEFAULT': CalibreTree.CALIBRE_LIBRARY_DEFAULT,
-      'KINDLE_LIBRARY_ENVVAR': KindleTree.KINDLE_LIBRARY_ENVVAR,
-      'KINDLE_LIBRARY_DEFAULT': KindleTree.KINDLE_LIBRARY_DEFAULT,
-  }
+    Specify kindle library location.'''
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
@@ -783,6 +459,7 @@ class KindleCommand(BaseCommand):
   def run_context(self):
     ''' Prepare the `SQLTags` around each command invocation.
     '''
+    from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     options = self.options
     with KindleTree(kindle_library=options.kindle_path) as kt:
       with CalibreTree(calibre_library=options.calibre_path) as cal:
@@ -833,14 +510,3 @@ class KindleCommand(BaseCommand):
 
 if __name__ == '__main__':
   sys.exit(KindleCommand(sys.argv).run())
-  calibre = CalibreTree()
-  db = calibre.db
-  with db.db_session() as session:
-    for book in db.books.lookup(session=session):
-      print(book.title)
-      print(" ", book.path)
-      for identifier in book.identifiers:
-        print("%s=%s" % (identifier.type, identifier.val))
-      for author_link in book.author_links:
-        print(" ", author_link.author.name)
-  ##sys.exit(KindleCommand(sys.argv).run())
