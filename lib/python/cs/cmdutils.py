@@ -16,7 +16,6 @@ from os.path import basename
 import sys
 from types import SimpleNamespace
 from cs.context import stackattrs
-from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
@@ -39,7 +38,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
@@ -281,6 +279,7 @@ class BaseCommand:
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
+
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     short_usage = False
@@ -348,6 +347,7 @@ class BaseCommand:
         main_cmd = subcmd
         main_context = Pfx(subcmd)
       else:
+        # no subcommands
         try:
           main = lambda: self.main(argv)
         except AttributeError:
@@ -584,8 +584,7 @@ class BaseCommand:
             with stackattrs(options, **kw_options):
               with self.run_context():
                 with self._run.main_contextmgr:
-                  main_xit = self._run.main_with_argv()
-                  return main_xit
+                  return self._run.main_with_argv()
     except GetoptError as e:
       if self.getopt_error_handler(
           main_cmd,
