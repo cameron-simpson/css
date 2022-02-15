@@ -46,6 +46,12 @@ class CalibreTree(MultiOpenMixin):
     self.path = calibre_library
     self._lock = Lock()
 
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Stub startup/shutdown.
+    '''
+    yield
+
   @locked_property
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
