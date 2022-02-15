@@ -9,6 +9,7 @@
 '''
 
 from __future__ import print_function, absolute_import
+from collections import namedtuple
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
@@ -93,6 +94,11 @@ def docmd(dofunc):
   docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
+
+class _BaseCommandRun(namedtuple(
+    '_BaseCommandRun', 'main_with_argv main_cmd argv main_contextmgr subcmd')):
+  ''' A class to embody the `BaseCommand` run state.
+  '''
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -357,7 +363,13 @@ class BaseCommand:
         return
       raise
     else:
-      self._run = main, main_cmd, argv, main_context, subcmd
+      self._run = _BaseCommandRun(
+          main_with_argv=main,
+          main_cmd=main_cmd,
+          argv=argv,
+          main_contextmgr=main_context,
+          subcmd=subcmd
+      )
 
   @classmethod
   def subcommands(cls):
@@ -553,24 +565,27 @@ class BaseCommand:
     subcmd = None
     try:
       if self._run is None:
-        main_cmd = self.cmd  # used in "except" below
+        # used in "except" below
+        main_cmd = self.cmd
+        subcmd = None
         raise GetoptError("bad invocation")
-      main, main_cmd, main_argv, main_context, subcmd = self._run
-      runstate = getattr(options, 'runstate', RunState(main_cmd))
+      main_cmd = self._run.main_cmd
+      runstate = getattr(options, 'runstate', RunState(self._run.main_cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with runstate:
         with upd_context:
           with stackattrs(
               options,
-              cmd=main_cmd,
+              cmd=self._run.main_cmd,
               runstate=runstate,
               upd=upd,
           ):
             with stackattrs(options, **kw_options):
               with self.run_context():
-                with main_context:
-                  return main()
+                with self._run.main_contextmgr:
+                  main_xit = self._run.main_with_argv()
+                  return main_xit
     except GetoptError as e:
       if self.getopt_error_handler(
           main_cmd,
