@@ -9,13 +9,13 @@
 '''
 
 from __future__ import print_function, absolute_import
+from collections import namedtuple
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from os.path import basename
 import sys
 from types import SimpleNamespace
 from cs.context import stackattrs
-from cs.deco import cachedmethod
 from cs.gimmicks import nullcontext
 from cs.lex import cutprefix, cutsuffix, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
@@ -38,7 +38,6 @@ DISTINFO = {
     ],
     'install_requires': [
         'cs.context',
-        'cs.deco',
         'cs.gimmicks',
         'cs.lex',
         'cs.logutils',
@@ -93,6 +92,11 @@ def docmd(dofunc):
   docmd_wrapper.__name__ = '@docmd(%s)' % (funcname,)
   docmd_wrapper.__doc__ = dofunc.__doc__
   return docmd_wrapper
+
+class _BaseCommandRun(namedtuple(
+    '_BaseCommandRun', 'main_with_argv main_cmd argv main_contextmgr subcmd')):
+  ''' A class to embody the `BaseCommand` run state.
+  '''
 
 class BaseCommand:
   ''' A base class for handling nestable command lines.
@@ -174,7 +178,7 @@ class BaseCommand:
         will be called where `subcmd_argv` contains the command line arguments
         following *subcmd*.
       * `main(argv)`:
-        if there are no command line aguments after the options
+        if there are no command line arguments after the options
         or the first argument does not have a corresponding
         `cmd_`*subcmd* method
         then method `main(argv)`
@@ -275,6 +279,7 @@ class BaseCommand:
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
+
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     short_usage = False
@@ -336,12 +341,13 @@ class BaseCommand:
           main_is_class = False
         if main_is_class:
           subcmd_cls = main_method
-          main = lambda: subcmd_cls(argv, cmd=subcmd).run
+          main = lambda: subcmd_cls(argv, cmd=subcmd).run()
         else:
           main = lambda: main_method(argv)
         main_cmd = subcmd
         main_context = Pfx(subcmd)
       else:
+        # no subcommands
         try:
           main = lambda: self.main(argv)
         except AttributeError:
@@ -357,7 +363,13 @@ class BaseCommand:
         return
       raise
     else:
-      self._run = main, main_cmd, argv, main_context, subcmd
+      self._run = _BaseCommandRun(
+          main_with_argv=main,
+          main_cmd=main_cmd,
+          argv=argv,
+          main_contextmgr=main_context,
+          subcmd=subcmd
+      )
 
   @classmethod
   def subcommands(cls):
@@ -438,24 +450,15 @@ class BaseCommand:
 
   @classmethod
   def subcommand_usage_text(
-      cls, subcmd, fulldoc=False, usage_format_mapping=None, short=False
+      cls, subcmd, usage_format_mapping=None, short=False
   ):
     ''' Return the usage text for a subcommand.
 
         Parameters:
         * `subcmd`: the subcommand name
-        * `fulldoc`: if true (default `False`)
-          return the full docstring with the Usage section expanded
-          otherwise just return the Usage section.
         * `short`: just include the first line of the usage message,
           intented for when there are many subcommands
-
-        It is an error to set both `fulldoc` and `short`.
     '''
-    if fulldoc and short:
-      raise ValueError(
-          "fulldoc:%s and short:%s may not both be true" % (fulldoc, short)
-      )
     method = cls.subcommands()[subcmd]
     subusage = None
     try:
@@ -463,28 +466,36 @@ class BaseCommand:
     except TypeError:
       classy = False
     if classy:
-      subusage = method.usage_text(cmd=subcmd)
+      # first paragraph of the class usage text
+      doc = method.usage_text(cmd=subcmd)
+      subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     else:
+      # extract the usage from the object docstring
       doc = obj_docstring(method)
-      if doc and 'Usage:' in doc:
-        pre_usage, post_usage = doc.split('Usage:', 1)
-        pre_usage = pre_usage.strip()
-        post_usage_parts = post_usage.split('\n\n', 1)
-        post_usage_format = post_usage_parts.pop(0)
-        subusage_format = stripped_dedent(post_usage_format)
-        if subusage_format:
-          if short:
-            subusage_format, *_ = subusage_format.split('\n', 1)
-          mapping = dict(sys.modules[method.__module__].__dict__)
-          if usage_format_mapping:
-            mapping.update(usage_format_mapping)
-          mapping.update(cmd=subcmd)
-          subusage = subusage_format.format_map(mapping)
-          if fulldoc:
-            parts = [pre_usage, subusage] if pre_usage else [subusage]
-            parts.extend(post_usage_parts)
-            subusage = '\n\n'.join(parts)
-    return subusage if subusage else None
+      if doc:
+        if 'Usage:' in doc:
+          # extract the Usage: paragraph
+          pre_usage, post_usage = doc.split('Usage:', 1)
+          pre_usage = pre_usage.strip()
+          post_usage_format, *_ = post_usage.split('\n\n', 1)
+          subusage_format = stripped_dedent(post_usage_format)
+        else:
+          # extract the first paragraph
+          subusage_format, *_ = doc.split('\n\n', 1)
+      else:
+        # default usage text - include the docstring below a header
+        subusage_format = "\n  ".join(
+            ['{cmd} ...'] + [doc.split('\n\n', 1)[0]]
+        )
+    if subusage_format:
+      if short:
+        subusage_format, *_ = subusage_format.split('\n', 1)
+      mapping = dict(sys.modules[method.__module__].__dict__)
+      if usage_format_mapping:
+        mapping.update(usage_format_mapping)
+      mapping.update(cmd=subcmd)
+      subusage = subusage_format.format_map(mapping)
+    return subusage or None
 
   def apply_defaults(self):
     ''' Stub `apply_defaults` method.
@@ -554,24 +565,26 @@ class BaseCommand:
     subcmd = None
     try:
       if self._run is None:
-        main_cmd = self.cmd  # used in "except" below
+        # used in "except" below
+        main_cmd = self.cmd
+        subcmd = None
         raise GetoptError("bad invocation")
-      main, main_cmd, main_argv, main_context, subcmd = self._run
-      runstate = getattr(options, 'runstate', RunState(main_cmd))
+      main_cmd = self._run.main_cmd
+      runstate = getattr(options, 'runstate', RunState(self._run.main_cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
       with runstate:
         with upd_context:
           with stackattrs(
               options,
-              cmd=main_cmd,
+              cmd=self._run.main_cmd,
               runstate=runstate,
               upd=upd,
           ):
             with stackattrs(options, **kw_options):
               with self.run_context():
-                with main_context:
-                  return main()
+                with self._run.main_contextmgr:
+                  return self._run.main_with_argv()
     except GetoptError as e:
       if self.getopt_error_handler(
           main_cmd,
@@ -642,10 +655,7 @@ class BaseCommand:
           or for all subcommands if no names are specified.
     '''
     subcmds = cls.subcommands()
-    if argv:
-      fulldoc = True
-    else:
-      fulldoc = False
+    if not argv:
       argv = sorted(subcmds)
     xit = 0
     print("help:")
@@ -659,7 +669,7 @@ class BaseCommand:
           continue
         usage_format_mapping = dict(getattr(cls, 'USAGE_KEYWORDS', {}))
         subusage = cls.subcommand_usage_text(
-            subcmd, fulldoc=fulldoc, usage_format_mapping=usage_format_mapping
+            subcmd, usage_format_mapping=usage_format_mapping
         )
         if not subusage:
           warning("no help")

@@ -41,6 +41,7 @@ from subprocess import run
 from threading import RLock
 import time
 from typing import List, Optional
+
 from icontract import ensure, require
 from sqlalchemy import (
     Column,
@@ -1513,8 +1514,8 @@ class SQLTags(BaseTagSets):
 
   @contextmanager
   def db_session(self, *, new=False):
-    ''' Context manager to obtain a db session if required,
-        just a shim for `self.orm.session()`.
+    ''' Context manager to obtain a db session if required
+        (or if `new` is true).
     '''
     orm_state = self.orm.sqla_state
     get_session = orm_state.new_session if new else orm_state.auto_session

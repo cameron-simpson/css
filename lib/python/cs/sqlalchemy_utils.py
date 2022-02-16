@@ -20,7 +20,7 @@ from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -235,10 +235,6 @@ class ORM(MultiOpenMixin, ABC):
       and provides various Session related convenience methods.
       It is also a `MultiOpenMixin` subclass
       supporting nested open/close sequences and use as a context manager.
-
-      Subclasses must define the following:
-      * `.startup` and `.shutdown` methods to support the `MultiOpenMixin`,
-        even if these just `pass`
   '''
 
   @pfx_method
@@ -256,16 +252,19 @@ class ORM(MultiOpenMixin, ABC):
         Instead we use the `serial_sessions` option to obtain a
         mutex before allocating a session.
     '''
-    db_fspath = cutprefix(db_url, 'sqlite://')
+    db_fspath = cutprefix(db_url, 'sqlite:///')
     if db_fspath is db_url:
-      # no leading "sqlite://"
+      # unchanged - no leading "sqlite:///"
       if db_url.startswith(('/', './', '../')) or '://' not in db_url:
         # turn filesystenm pathnames into SQLite db URLs
         db_fspath = abspath(db_url)
         db_url = 'sqlite:///' + db_url
       else:
-        # sqlite://memory or something - no filesystem object
+        # no fs path
         db_fspath = None
+    else:
+      # starts with sqlite:///, we have the db_fspath
+      pass
     self.db_url = db_url
     self.db_fspath = db_fspath
     is_sqlite = db_url.startswith('sqlite://')
@@ -331,18 +330,22 @@ class ORM(MultiOpenMixin, ABC):
     '''
     raise NotImplementedError("declare_schema")
 
-  def startup(self):
-    ''' Startup: define the tables if not present.
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Default startup/shutdown context manager.
+
+        This base method operates a lockfile to manage concurrent access
+        by other programmes (which would also need to honour this file).
+        If you actually expect this to be common
+        you should try to keep the `ORM` "open" as briefly as possible.
+        The lock file is only operated if `self.db_fspath`,
+        current set only for filesystem SQLite database URLs.
     '''
     if self.db_fspath:
       self._lockfilepath = makelockfile(self.db_fspath, poll_interval=0.2)
-
-  def shutdown(self):
-    ''' Stub shutdown.
-    '''
+    yield
     if self._lockfilepath is not None:
-      with Pfx("remove(%r)", self._lockfilepath):
-        os.remove(self._lockfilepath)
+      pfx_call(os.remove, self._lockfilepath)
       self._lockfilepath = None
 
   @property
@@ -443,7 +446,7 @@ class BasicTableMixin:
 
   @classmethod
   def lookup(cls, *, session, **criteria):
-    ''' Return iterable of row entities matching `criteria`.
+    ''' Return an iterable `Query` of row entities matching `criteria`.
     '''
     return session.query(cls).filter_by(**criteria)
 
@@ -455,6 +458,8 @@ class BasicTableMixin:
 
   @classmethod
   def __getitem__(cls, index):
+    ''' Index the table by its `id` column.
+    '''
     row = cls.lookup1(id=index, session=state.session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
