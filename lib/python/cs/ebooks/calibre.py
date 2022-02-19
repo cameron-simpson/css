@@ -193,6 +193,9 @@ class CalibreMetadataDB(ORM):
       link = Column(String, nullable=False, default="")
 
     # pylint: disable=missing-class-docstring
+      def __hash__(self):
+        return self.id
+
       def __eq__(self, other):
         return self.id == other.id
 
@@ -218,6 +221,9 @@ class CalibreMetadataDB(ORM):
           nullable=False,
           default=datetime(2000, 1, 1, tzinfo=timezone.utc)
       )
+
+      def __hash__(self):
+        return self.id
 
       def __eq__(self, other):
         return self.id == other.id
