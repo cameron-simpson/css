@@ -52,6 +52,12 @@ class CalibreTree(MultiOpenMixin):
     '''
     yield
 
+  def pathto(self, subpath):
+    ''' Return the filesystem path of `subpath`
+        located within the Calibre filesystem tree.
+    '''
+    return joinpath(self.path, subpath)
+
   @locked_property
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
@@ -100,7 +106,7 @@ class CalibreMetadataDB(ORM):
   def db_path(self):
     ''' The filesystem path to the database.
     '''
-    return joinpath(self.tree.path, self.DB_FILENAME)
+    return self.tree.pathto(self.DB_FILENAME)
 
   # lifted from SQLTags
   @contextmanager
