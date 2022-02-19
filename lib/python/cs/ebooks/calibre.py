@@ -185,6 +185,7 @@ class CalibreMetadataDB(ORM):
       return linktable
 
     # pylint: disable=missing-class-docstring
+    @total_ordering
     class Authors(Base, _CalibreTable):
       __tablename__ = 'authors'
       name = Column(String, nullable=False, unique=True)
@@ -192,6 +193,12 @@ class CalibreMetadataDB(ORM):
       link = Column(String, nullable=False, default="")
 
     # pylint: disable=missing-class-docstring
+      def __eq__(self, other):
+        return self.id == other.id
+
+      def __lt__(self, other):
+        return self.sort.lower() < other.sort.lower()
+
     class Books(Base, _CalibreTable):
       __tablename__ = 'books'
       title = Column(String, nullable=False, unique=True, default='unknown')
@@ -211,6 +218,12 @@ class CalibreMetadataDB(ORM):
           nullable=False,
           default=datetime(2000, 1, 1, tzinfo=timezone.utc)
       )
+
+      def __eq__(self, other):
+        return self.id == other.id
+
+      def __lt__(self, other):
+        return self.author_sort.lower() < other.author_sort.lower()
 
       def identifiers_as_dict(self):
         ''' Return a `dict` mapping identifier types to values.
