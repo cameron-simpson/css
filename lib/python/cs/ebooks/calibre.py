@@ -248,6 +248,15 @@ class CalibreMetadataDB(ORM):
             for identifier in self.identifiers
         }
 
+      def formats_as_dict(self):
+        ''' Return a `dict` mapping formats to book format relative paths.
+        '''
+        return {
+            format.format:
+            joinpath(self.path, f'{format.name}.{format.format.lower()}')
+            for format in self.formats
+        }
+
     class Data(Base, _CalibreTable):
       ''' Data files associated with a book.
       '''
