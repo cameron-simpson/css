@@ -297,9 +297,6 @@ class CalibreMetadataDB(ORM):
     Books.formats = relationship(Data, backref="book")
 
     Identifiers.book = relationship(Books, back_populates="identifiers")
-    ##Books.language_links = relationship(
-    ##    BooksLanguagesLink, back_populates="book"
-    ##)
 
     # references to table definitions
     self.authors = Authors
