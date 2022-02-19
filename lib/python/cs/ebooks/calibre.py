@@ -202,6 +202,7 @@ class CalibreMetadataDB(ORM):
       def __lt__(self, other):
         return self.sort.lower() < other.sort.lower()
 
+    @total_ordering
     class Books(Base, _CalibreTable):
       __tablename__ = 'books'
       title = Column(String, nullable=False, unique=True, default='unknown')
