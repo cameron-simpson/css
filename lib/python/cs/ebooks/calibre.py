@@ -240,8 +240,24 @@ class CalibreMetadataDB(ORM):
             for identifier in self.identifiers
         }
 
-    class BooksAuthorsLink(Base, _linktable('book', 'author')):
-      pass
+    class Data(Base, _CalibreTable):
+      ''' Data files associated with a book.
+      '''
+      __tablename__ = 'data'
+      book_id = Column(
+          "book", ForeignKey('books.id'), nullable=False, primary_key=True
+      )
+      format = Column(String, nullable=False, primary_key=True)
+      uncompressed_size = Column(Integer, nullable=False)
+      name = Column(String, nullable=False)
+
+    class Identifiers(Base, _CalibreTable):
+      ''' Identifiers associated with a book such as `"isbn"` or `"mobi-asin"`.
+      '''
+      __tablename__ = 'identifiers'
+      book_id = Column("book", ForeignKey('books.id'), nullable=False)
+      type = Column(String, nullable=False, default="isbn")
+      val = Column(String, nullable=None)
 
     class Languages(Base, _CalibreTable):
       __tablename__ = 'languages'
@@ -249,19 +265,19 @@ class CalibreMetadataDB(ORM):
       item_order = Column(Integer, nullable=False, default=1)
 
     ##class BooksLanguagesLink(Base, _linktable('book', 'language')):
+    class BooksAuthorsLink(Base, _linktable('book', 'author')):
+      pass
+
     ##  pass
 
-    class Identifiers(Base, _CalibreTable):
-      __tablename__ = 'identifiers'
-      book_id = Column("book", ForeignKey('books.id'), nullable=False)
-      type = Column(String, nullable=False, default="isbn")
-      val = Column(String, nullable=None)
+    Authors.book_links = relationship(BooksAuthorsLink)
+    Authors.books = association_proxy('book_links', 'book')
 
-    Authors.book_links = relationship(
-        BooksAuthorsLink, back_populates="author"
-    )
-    Books.author_links = relationship(BooksAuthorsLink, back_populates="book")
-    Books.identifiers = relationship(Identifiers, back_populates="book")
+    Books.author_links = relationship(BooksAuthorsLink)
+    Books.authors = association_proxy('author_links', 'author')
+    Books.identifiers = relationship(Identifiers)
+    Books.formats = relationship(Data, backref="book")
+
     Identifiers.book = relationship(Books, back_populates="identifiers")
     ##Books.language_links = relationship(
     ##    BooksLanguagesLink, back_populates="book"
