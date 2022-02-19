@@ -5,8 +5,11 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import total_ordering
+from getopt import GetoptError
 import os
 from os.path import expanduser, join as joinpath
+import sys
 from threading import Lock
 
 from sqlalchemy import (
@@ -18,15 +21,20 @@ from sqlalchemy import (
     Integer,
     String,
 )
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
 
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.pfx import Pfx, pfx_call
+from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
     BasicTableMixin,
     HasIdMixin,
 )
-from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
+from cs.units import transcribe_bytes_geek
 
 from cs.x import X
 
@@ -180,19 +188,17 @@ class CalibreMetadataDB(ORM):
       )
       for colname, colspec in addtional_columns.items():
         setattr(linktable, colname, declared_attr(lambda self: colspec))
-      ##linktable.__name__ = f'{left_name.title()}s{right_name.title()}sLink'
-      X("%s: %r", linktable, dir(linktable))
       return linktable
 
-    # pylint: disable=missing-class-docstring
     @total_ordering
     class Authors(Base, _CalibreTable):
+      ''' An author.
+      '''
       __tablename__ = 'authors'
       name = Column(String, nullable=False, unique=True)
       sort = Column(String)
       link = Column(String, nullable=False, default="")
 
-    # pylint: disable=missing-class-docstring
       def __hash__(self):
         return self.id
 
@@ -204,6 +210,8 @@ class CalibreMetadataDB(ORM):
 
     @total_ordering
     class Books(Base, _CalibreTable):
+      ''' A book.
+      '''
       __tablename__ = 'books'
       title = Column(String, nullable=False, unique=True, default='unknown')
       sort = Column(String)
@@ -260,15 +268,16 @@ class CalibreMetadataDB(ORM):
       val = Column(String, nullable=None)
 
     class Languages(Base, _CalibreTable):
+      ''' Lamguage codes.
+      '''
       __tablename__ = 'languages'
       lang_code = Column(String, nullable=False, unique=True)
       item_order = Column(Integer, nullable=False, default=1)
 
-    ##class BooksLanguagesLink(Base, _linktable('book', 'language')):
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
-      pass
+      ''' Link table between `Books` and `Authors`.
+      '''
 
-    ##  pass
 
     Authors.book_links = relationship(BooksAuthorsLink)
     Authors.books = association_proxy('book_links', 'book')
