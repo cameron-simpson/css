@@ -52,7 +52,7 @@ from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.sh import quotestr as shq, quotecmd as shqv
 from cs.tagset import TagFile, tag_or_tag_value
-from cs.upd import Upd
+from cs.upd import Upd, print
 from cs.vcs.hg import VCS_Hg
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
@@ -159,53 +159,52 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("missing package names")
     options = self.options
     xit = 0
-    with Upd(sys.stderr):
-      for pkg_name in argv:
-        with Pfx(pkg_name):
-          status("...")
-          pkg = options.modules[pkg_name]
-          problems = pkg.problems()
-          status('')
-          if problems:
-            xit = 1
-            for problem in problems:
-              if isinstance(problem, str):
-                warning(problem)
-              elif isinstance(problem, list):
-                label, *values = problem
-                warning("%s:", label)
-                for subproblem in values:
-                  warning(
-                      "  %s", ', '.join(
-                          map(str, subproblem) if
-                          isinstance(subproblem, (list, tuple)) else subproblem
-                      )
-                  )
-              else:
-                for subpkg, subproblems in sorted(problem.items()):
-                  warning(
-                      "%s: %s", subpkg, ', '.join(
-                          subproblem if isinstance(subproblem, str) else (
-                              (
-                                  (
-                                      subproblem[0] if len(subproblem) ==
-                                      1 else "%s (%d)" %
-                                      (subproblem[0], len(subproblem) - 1)
-                                  )
-                              ) if isinstance(subproblem, list) else (
-                                  "{" + ", ".join(
-                                      "%s: %d %s" % (
-                                          subsubkey, len(subsubproblems),
-                                          "problem" if len(subsubproblems) ==
-                                          1 else "problems"
-                                      ) for subsubkey, subsubproblems in
-                                      sorted(subproblem.items())
-                                  ) + "}"
-                              ) if hasattr(subproblem, 'items') else
-                              repr(subproblem)
-                          ) for subproblem in subproblems
-                      )
-                  )
+    for pkg_name in argv:
+      with Pfx(pkg_name):
+        status("...")
+        pkg = options.modules[pkg_name]
+        problems = pkg.problems()
+        status('')
+        if problems:
+          xit = 1
+          for problem in problems:
+            if isinstance(problem, str):
+              warning(problem)
+            elif isinstance(problem, list):
+              label, *values = problem
+              warning("%s:", label)
+              for subproblem in values:
+                warning(
+                    "  %s", ', '.join(
+                        map(str, subproblem) if
+                        isinstance(subproblem, (list, tuple)) else subproblem
+                    )
+                )
+            else:
+              for subpkg, subproblems in sorted(problem.items()):
+                warning(
+                    "%s: %s", subpkg, ', '.join(
+                        subproblem if isinstance(subproblem, str) else (
+                            (
+                                (
+                                    subproblem[0] if len(subproblem) ==
+                                    1 else "%s (%d)" %
+                                    (subproblem[0], len(subproblem) - 1)
+                                )
+                            ) if isinstance(subproblem, list) else (
+                                "{" + ", ".join(
+                                    "%s: %d %s" % (
+                                        subsubkey, len(subsubproblems),
+                                        "problem" if len(subsubproblems) ==
+                                        1 else "problems"
+                                    ) for subsubkey, subsubproblems in
+                                    sorted(subproblem.items())
+                                ) + "}"
+                            ) if hasattr(subproblem, 'items') else
+                            repr(subproblem)
+                        ) for subproblem in subproblems
+                    )
+                )
     return xit
 
   def cmd_checkout(self, argv):
