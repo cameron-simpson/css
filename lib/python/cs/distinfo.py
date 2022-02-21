@@ -116,18 +116,12 @@ class CSReleaseCommand(BaseCommand):
     if cmd.endswith('.py'):
       cmd = 'cs-release'
     self.cmd = cmd
-    # verbose if stderr is a tty
     try:
-      options.verbose = sys.stderr.isatty()
+      is_tty = sys.stderr.isatty()
     except AttributeError:
-      options.verbose = False
-    # colourise if stdout is a tty
-    try:
-      options.colourise = sys.stdout.isatty()
-    except AttributeError:
-      options.colourise = False
-    # TODO: get from cs.logutils?
-    options.verbose = sys.stderr.isatty()
+      is_tty = False
+    options.verbose = is_tty
+    options.colourise = is_tty
     options.force = False
     options.vcs = VCS_Hg()
     options.pkg_tagsets = TagFile(joinpath(options.vcs.get_topdir(), PKG_TAGS))
