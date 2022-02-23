@@ -88,7 +88,7 @@ DECIMAL_SCALE = (
 
 def decompose(n, scale):
   ''' Decompose a nonnegative integer `n` into counts by unit from `scale`.
-      Returns a list of `(modulus,UnitStep)`.
+      Returns a list of `(modulus,UnitStep)` in order from smallest unit upward.
 
       Parameters:
       * `n`: a nonnegative integer.
