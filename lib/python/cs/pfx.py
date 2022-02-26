@@ -185,7 +185,7 @@ class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefixes.
   '''
 
-  # instantiate the thread-local state object
+  # instantiate the thread-local class state object
   _state = _PfxThreadState()
 
   def __init__(self, mark, *args, **kwargs):
