@@ -431,7 +431,8 @@ class PfxFormatter(Formatter):
       cur_pfx = Pfx._state.prefix
       if not cur_pfx:
         return old_format(record)
-      with stackattrs(record, msg=cur_pfx + ': ' + record.msg):
+      with stackattrs(record,
+                      msg=cur_pfx + cs.pfx.DEFAULT_SEPARATOR + record.msg):
         return old_format(record)
 
     formatter.format = new_format
