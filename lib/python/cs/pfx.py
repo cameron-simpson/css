@@ -55,7 +55,7 @@ from cs.py.func import funcname, func_a_kw_fmt
 from cs.py3 import StringTypes, ustr, unicode
 from cs.x import X
 
-__version__ = '20211031-post'
+__version__ = '20220227'
 
 DISTINFO = {
     'description':
