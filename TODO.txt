@@ -1,3 +1,4 @@
+cs.logutils: drop warning and friends, no longer needed?
 cs.pfx: drop Pfx.warning and friends, never used?
 cs.logutils: context manager version of setup_logging, call it from setup_logging
 UpdProxy: can we have an ftext property and monitor format keys for update?
