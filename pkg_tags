@@ -39,7 +39,7 @@ cs.iso14496 pypi.release="20210306" ok_revision="30d3534ee55e6aef369c55e79c0fe63
 cs.jdson
 cs.later pypi.release=20191007 ok_revision="5728c540f10449709c3c11f482312cac827d1b83"
 cs.lex pypi.release="20220227" ok_revision="8b998791809f173ce5114a452c268f4d3cdf1441" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
-cs.logutils pypi.release="20211208" ok_revision="96d112ee6bbd21ea70a8b5b13395691482782b17" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"]}
+cs.logutils pypi.release="20220227" ok_revision="96d112ee6bbd21ea70a8b5b13395691482782b17" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20211208" ok_revision="9a5a23f7f0feedb70c8b9810f7546bd6a66e1135" features={"20210906":["RemappedMappingProxy"]}
 cs.mediainfo
