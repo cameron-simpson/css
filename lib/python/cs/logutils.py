@@ -62,6 +62,7 @@ import time
 import traceback
 from types import SimpleNamespace as NS
 from cs.ansi_colour import colourise, env_no_color
+from cs.context import stackattrs
 from cs.deco import fmtdoc, logging_wrapper
 from cs.lex import is_dotted_identifier
 import cs.pfx
@@ -79,8 +80,13 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.ansi_colour>=20200729', 'cs.deco', 'cs.lex', 'cs.pfx',
-        'cs.py.func', 'cs.upd'
+        'cs.ansi_colour>=20200729',
+        'cs.context>=stackable_state',
+        'cs.deco',
+        'cs.lex',
+        'cs.pfx',
+        'cs.py.func',
+        'cs.upd',
     ],
 }
 
@@ -130,6 +136,14 @@ def setup_logging(
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging; return an object with informative attributes.
       That object is also available as the global `cs.logutils.loginfo`.
+
+      Amongst other things, the default logger now includes
+      the `cs.pfx` prefix in the message.
+
+      This function runs in two modes:
+      - if logging has not been set up, it sets up a root logger
+      - if the root logger already has handlers,
+        monkey patch the first handler's formatter to prefix the `cs.pfx` state
 
       Parameters:
       * `cmd_name`: program name, default from `basename(sys.argv[0])`.
@@ -248,23 +262,29 @@ def setup_logging(
 
     signal.signal(signal.SIGHUP, handler)
 
-  main_handler = logging.StreamHandler(main_log)
   upd_ = Upd()
-  if upd_mode:
-    main_handler = UpdHandler(
-        main_log, ansi_mode=ansi_mode, over_handler=main_handler
-    )
-    upd_ = main_handler.upd
 
   root_logger = logging.getLogger()
-  root_logger.setLevel(level)
-  if loginfo is None:
-    # only do this the first time
-    # TODO: fix this clumsy hack, some kind of stackable state?
-    main_handler.setFormatter(PfxFormatter(format))
-    if supplant_root_logger:
-      root_logger.handlers.pop(0)
-    root_logger.addHandler(main_handler)
+  if root_logger.handlers:
+    # The logging system is already set up.
+    # Just monkey patch the leading handler's formatter.
+    PfxFormatter.patch_formatter(root_logger.handlers[0].formatter)
+  else:
+    # Set up a handler etc.
+    main_handler = logging.StreamHandler(main_log)
+    if upd_mode:
+      main_handler = UpdHandler(
+          main_log, ansi_mode=ansi_mode, over_handler=main_handler
+      )
+      upd_ = main_handler.upd
+    root_logger.setLevel(level)
+    if loginfo is None:
+      # only do this the first time
+      # TODO: fix this clumsy hack, some kind of stackable state?
+      main_handler.setFormatter(PfxFormatter(format))
+      if supplant_root_logger:
+        root_logger.handlers.pop(0)
+      root_logger.addHandler(main_handler)
 
   if trace_mode:
     # enable tracing in the thread that called setup_logging
@@ -396,6 +416,25 @@ class PfxFormatter(Formatter):
       raise
     record.message = s
     return s
+
+  @staticmethod
+  def patch_formatter(formatter):
+    ''' Monkey patch an existing `Formatter` instance
+        with a `format` method which prepends the current `Pfx` prefix.
+    '''
+    old_format = formatter.format
+
+    def new_format(record):
+      ''' Call the former `formatter.format` method
+          and prepend the current `Pfx` prefix to the start.
+      '''
+      cur_pfx = Pfx._state.prefix
+      if not cur_pfx:
+        return old_format(record)
+      with stackattrs(record, msg=cur_pfx + ': ' + record.msg):
+        return old_format(record)
+
+    formatter.format = new_format
 
 # pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
