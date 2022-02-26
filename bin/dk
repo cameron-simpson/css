@@ -276,6 +276,7 @@ case "$op" in
       [ $ok ] || exit 2
       set -x
       DK_EXEC_PREFIX=; export DK_EXEC_PREFIX
+      "$0" -n "$primary_container" exec mkdir -p /run/sshd
       "$0" -n "$primary_container" exec su "$DK_APP_USER" -c 'umask 022; cd; mkdir -p .ssh; >>.ssh/authorized_keys'
       for pubkeyfile
       do
