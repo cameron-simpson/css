@@ -1,4 +1,4 @@
-cs.ansi_colour pypi.release="20200729" ok_revision="6790b9b6946cc7d66b03cfec771154d463f2cc18" features={"20220227":["TerminalColors","colour_escape"]}
+cs.ansi_colour pypi.release="20200729" ok_revision="6790b9b6946cc7d66b03cfec771154d463f2cc18" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
 cs.app.dlog
 cs.app.ffmpeg
