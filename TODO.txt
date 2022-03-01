@@ -1,3 +1,4 @@
+BaseCommand: drop run_argv method
 cs.logutils: supplant_logger should override the logging-already-set-up check?
 cs.logutils: call basicConfig for the no-existing-logging mode
 cs.logutils: drop supplant_logger, maybe turn into some mode
