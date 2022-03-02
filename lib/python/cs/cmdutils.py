@@ -116,9 +116,9 @@ class _BaseSubCommand:
         method = getattr(command_cls, attr)
         subcommands_map[subcmd] = (
             _ClassSubCommand(
-                attr,
+                subcmd,
                 method,
-                usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', None))
+                usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ()))
             ) if isclass(method) else _MethodSubCommand(subcmd, method)
         )
     return subcommands_map
