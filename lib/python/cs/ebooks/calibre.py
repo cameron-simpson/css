@@ -98,10 +98,16 @@ class CalibreTree(MultiOpenMixin):
       raise
     return cp
 
-  def calibredb(self, dbcmd, *argv):
+  def calibredb(self, dbcmd, *argv, subp_options=None):
     ''' Run `dbcmd` via the `calibredb` command.
     '''
-    return self._run('calibredb', dbcmd, '--library-path=' + self.path, *argv)
+    return self._run(
+        'calibredb',
+        dbcmd,
+        '--library-path=' + self.path,
+        *argv,
+        subp_options=subp_options
+    )
 
   def add(self, bookpath):
     ''' Add a book file via the `calibredb` command.
