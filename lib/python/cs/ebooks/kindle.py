@@ -480,7 +480,9 @@ class KindleCommand(BaseCommand):
       if dbid:
         print(subdir_name, "calibre.dbid:", dbid)
         continue
-      calibre.add(kbook.extpath('azw'))
+      azw_path = kbook.extpath('azw')
+      dbid = calibre.add(azw_path)
+      kbook.tags['calibre.dbid'] = dbid
 
   def cmd_calibre_import_dbids(self, argv):
     ''' Usage: {cmd}
