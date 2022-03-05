@@ -111,8 +111,22 @@ class CalibreTree(MultiOpenMixin):
 
   def add(self, bookpath):
     ''' Add a book file via the `calibredb` command.
+        Return the database id.
     '''
-    self.calibredb('add', bookpath)
+    cp = self.calibredb(
+        'add',
+        '--duplicates',
+        bookpath,
+        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True)
+    )
+    # Extract the database id from the "calibredb add" output.
+    dbids = []
+    for line in cp.stdout.split('\n'):
+      line_sfx = cutprefix(line, 'Added book ids:')
+      if line_sfx is not line:
+        dbids.extend(map(lambda s: int(s.strip()), line_sfx.split(',')))
+    dbid, = dbids
+    return dbid
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
