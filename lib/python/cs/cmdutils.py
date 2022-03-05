@@ -101,6 +101,11 @@ class _BaseSubCommand:
     self.method = method
     self.usage_mapping = usage_mapping or {}
 
+  def __str__(self):
+    return "%s(cmd=%r,method=%s,..)" % (
+        type(self).__name__, self.cmd, self.method
+    )
+
   @staticmethod
   def from_class(command_cls):
     ''' Return a mapping of subcommand names to subcommand specifications
