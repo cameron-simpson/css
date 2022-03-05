@@ -437,6 +437,8 @@ class KindleCommand(BaseCommand):
   -K kindle_library
     Specify kindle library location.'''
 
+  SUBCOMMAND_ARGV_DEFAULT = 'ls'
+
   def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
@@ -509,6 +511,16 @@ class KindleCommand(BaseCommand):
             else:
               print("kb %s + calibre.dbid=%r" % (asin, book.id))
               kb.tags['calibre.dbid'] = book.id
+
+  def cmd_ls(self, argv):
+    options = self.options
+    kindle = options.kindle
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    for subdir_name, kbook in kindle.items():
+      print(subdir_name)
+      for tag in sorted(kbook.tags):
+        print(" ", tag)
 
 if __name__ == '__main__':
   sys.exit(KindleCommand(sys.argv).run())
