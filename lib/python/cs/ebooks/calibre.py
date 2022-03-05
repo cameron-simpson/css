@@ -73,15 +73,30 @@ class CalibreTree(MultiOpenMixin):
     '''
     return CalibreMetadataDB(self)
 
-  def _run(self, *calargv):
+  def _run(self, *calargv, subp_options=None):
     ''' Run a Calibre utility command.
+
+        Parameters:
+        * `calargv`: an iterable of the calibre command to issue;
+          if the command name is not an absolute path
+          it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
+        * `subp_options`: optional mapping of keyword arguments
+          to pass to `subprocess.run`
     '''
     X("calargv=%r", calargv)
+    if subp_options is None:
+      subp_options = {}
+    subp_options.setdefault('check', True)
     cmd, *calargv = calargv
-    if not cmd.startswith(os.sep):
+    if not isabspath(cmd):
       cmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, cmd)
     print("RUN", cmd, *calargv)
-    ##return run([cmd, *calargv])
+    try:
+      cp = pfx_call(run, [cmd, *calargv], **subp_options)
+    except CalledProcessError as cpe:
+      error("run fails: %s\n  %s", cpe, cpe.stderr.replace('\n', '  \n'))
+      raise
+    return cp
 
   def calibredb(self, dbcmd, *argv):
     ''' Run `dbcmd` via the `calibredb` command.
