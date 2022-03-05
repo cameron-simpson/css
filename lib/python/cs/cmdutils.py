@@ -349,10 +349,6 @@ class BaseCommand:
     '''
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
-    self._argv = argv
-    self._run = lambda _: 2
-    self._subcmd = None
-    self._printed_usage = False
     options = self.options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
@@ -372,7 +368,10 @@ class BaseCommand:
     # override the default options
     for option, value in kw_options.items():
       setattr(options, option, value)
-
+    self._argv = argv
+    self._run = lambda subcmd, command, argv: 2
+    self._subcmd = None
+    self._printed_usage = False
     # we catch GetoptError from this suite...
     subcmd = None  # default: no subcmd specific usage available
     short_usage = False
@@ -432,8 +431,8 @@ class BaseCommand:
                   ', '.join(sorted(subcmds.keys())),
               )
           )
-        self._subcmd = subcmd
         self._run = subcommand
+      self._subcmd = subcmd
     except GetoptError as e:
       if self.getopt_error_handler(cmd, self.options, e,
                                    self.usage_text(subcmd=subcmd,
@@ -650,7 +649,7 @@ class BaseCommand:
           ):
             with stackattrs(options, **kw_options):
               with self.run_context():
-                return self._run(self._argv)
+                return self._run(self._subcmd, self, self._argv)
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
