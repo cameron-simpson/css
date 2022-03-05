@@ -285,6 +285,7 @@ class BaseCommand:
 
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
+  SUBCOMMAND_ARGV_DEFAULT = None
   OPTIONS_CLASS = SimpleNamespace
 
   def __init_subclass__(cls):
