@@ -150,9 +150,9 @@ class _MethodSubCommand(_BaseSubCommand):
   ''' A class to represent a subcommand implemented with a method.
   '''
 
-  def __call__(self, argv):
-    with Pfx(self.cmd):
-      return self.method(argv)
+  def __call__(self, subcmd, command, argv):
+    with Pfx(subcmd):
+      return self.method(command, argv)
 
   def usage_format(self):
     ''' Return the usage format string from the method docstring.
