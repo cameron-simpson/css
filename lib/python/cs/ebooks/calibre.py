@@ -94,7 +94,13 @@ class CalibreTree(MultiOpenMixin):
     try:
       cp = pfx_call(run, [cmd, *calargv], **subp_options)
     except CalledProcessError as cpe:
-      error("run fails: %s\n  %s", cpe, cpe.stderr.replace('\n', '  \n'))
+      error(
+          "run fails, exit code %s:\n  %s",
+          cpe.returncode,
+          ' '.join(map(repr, cpe.cmd)),
+      )
+      if cpe.stderr:
+        print(cpe.stderr.replace('\n', '  \n'), file=sys.stderr)
       raise
     return cp
 
