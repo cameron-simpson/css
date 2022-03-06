@@ -429,9 +429,9 @@ class KindleCommand(BaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
 
-  GETOPT_SPEC = 'K:'
+  GETOPT_SPEC = 'C:K:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
+  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
