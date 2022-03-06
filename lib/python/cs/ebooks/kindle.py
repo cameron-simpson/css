@@ -468,8 +468,8 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
-  def cmd_calibre_export(self, argv):
     ''' Usage: {cmd}
+  def cmd_export_to_calibre(self, argv):
           Export AZW files to Calibre library.
     '''
     if argv:
@@ -486,7 +486,7 @@ class KindleCommand(BaseCommand):
       dbid = calibre.add(azw_path)
       kbook.tags['calibre.dbid'] = dbid
 
-  def cmd_calibre_import_dbids(self, argv):
+  def cmd_import_calibre_dbids(self, argv):
     ''' Usage: {cmd}
           Import Calibre database ids by backtracking from Calibre
           `mobi-asin` identifier records.
