@@ -80,10 +80,10 @@ class CalibreTree(MultiOpenMixin):
   @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
-  def book_by_dbid(self, dbid):
+  def book_by_dbid(self, dbid, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
-    return CalibreBook(self, dbid)
+    return CalibreBook(self, dbid, db_book=db_book)
 
   def __iter__(self):
     ''' Generator yielding `CalibreBook`s.
@@ -94,7 +94,7 @@ class CalibreTree(MultiOpenMixin):
         with Pfx("%d:%s", author.id, author.name):
           print(author.name)
           for book in sorted(author.books):
-            yield self[book.id]
+            yield self.book_by_dbid(book.id, db_book=book)
 
   def _run(self, *calargv, subp_options=None):
     ''' Run a Calibre utility command.
@@ -161,9 +161,10 @@ class CalibreTree(MultiOpenMixin):
 class CalibreBook:
 
   @typechecked
-  def __init__(self, tree: CalibreTree, dbid: int):
+  def __init__(self, tree: CalibreTree, dbid: int, *, db_book=None):
     self.tree = tree
     self.dbid = dbid
+    self._db_book = db_book
 
   @cachedmethod
   def db_book(self):
