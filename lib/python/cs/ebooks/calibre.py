@@ -196,6 +196,8 @@ class CalibreMetadataDB(ORM):
   DB_FILENAME = 'metadata.db'
 
   def __init__(self, tree):
+    if isinstance(tree, str):
+      tree = CalibreTree(tree)
     self.tree = tree
     self.db_url = 'sqlite:///' + self.db_path
     super().__init__(self.db_url)
