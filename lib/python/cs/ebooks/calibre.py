@@ -73,6 +73,29 @@ class CalibreTree(MultiOpenMixin):
     '''
     return CalibreMetadataDB(self)
 
+  @typechecked
+  def __getitem__(self, dbid: int):
+    return self.book_by_dbid(dbid)
+
+  @lru_cache(maxsize=None)
+  @typechecked
+  @require(lambda dbid: dbid > 0)
+  def book_by_dbid(self, dbid):
+    ''' Return a cached `CalibreBook` for `dbid`.
+    '''
+    return CalibreBook(self, dbid)
+
+  def __iter__(self):
+    ''' Generator yielding `CalibreBook`s.
+    '''
+    db = self.db
+    with db.db_session() as session:
+      for author in sorted(db.authors.lookup(session=session)):
+        with Pfx("%d:%s", author.id, author.name):
+          print(author.name)
+          for book in sorted(author.books):
+            yield self[book.id]
+
   def _run(self, *calargv, subp_options=None):
     ''' Run a Calibre utility command.
 
