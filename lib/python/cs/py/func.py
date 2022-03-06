@@ -69,6 +69,26 @@ def func_a_kw_fmt(func, *a, **kw):
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
 
+def callif(doit, func, *a, **kw):
+  ''' Call `func(*a,**kw)` if `doit` is true
+      otherwise just print it out.
+
+      The parameter `func` may be preceeded optionally by a `dict`
+      containing modes. The current modes are:
+      * `'print'`: the print function, default the builtin `print`
+  '''
+  if isinstance(func, dict):
+    modes = func
+    func = a.pop(0)
+  else:
+    modes = {}
+  modes.setdefault('print', print)
+  if doit:
+    return func(*a, **kw)
+  else:
+    fmt, av = func_a_kw_fmt(func, *a, **kw)
+    modes['print'](fmt % tuple(av))
+
 @decorator
 def trace(func, call=True, retval=False, exception=False, pfx=False):
   ''' Decorator to report the call and return of a function.
