@@ -134,6 +134,30 @@ class CalibreTree(MultiOpenMixin):
     dbid, = dbids
     return dbid
 
+
+class CalibreBook:
+
+  @typechecked
+  def __init__(self, tree: CalibreTree, dbid: int):
+    self.tree = tree
+    self.dbid = dbid
+
+  @cachedmethod
+  def db_book(self):
+    ''' Return a cached reference to the database book record.
+    '''
+    db = self.tree.db
+    with db.db_session() as session:
+      X("FETCH BOOK %r", self.dbid)
+      return db.books.by_id(self.dbid, session=session)
+
+  def __getattr__(self, attr):
+    ''' Unknown public attributes defer to the database record.
+    '''
+    if attr.startswith('_'):
+      raise AttributeError(attr)
+    return getattr(self.db_book(), attr)
+
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
   '''
