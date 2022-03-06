@@ -11,7 +11,7 @@
 from __future__ import print_function, absolute_import
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
-from inspect import isclass
+from inspect import isclass, ismethod
 from os.path import basename
 import sys
 from types import SimpleNamespace
@@ -152,7 +152,13 @@ class _MethodSubCommand(_BaseSubCommand):
 
   def __call__(self, subcmd, command, argv):
     with Pfx(subcmd):
-      return self.method(command, argv)
+      method = self.method
+      if ismethod(method):
+        # already bound
+        return method(argv)
+      else:
+        # unbound - supply the instance
+        return method(command, argv)
 
   def usage_format(self):
     ''' Return the usage format string from the method docstring.
