@@ -5,13 +5,15 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from functools import total_ordering
+from functools import lru_cache, total_ordering
 from getopt import GetoptError
 import os
-from os.path import expanduser, join as joinpath
+from os.path import isabs as isabspath, expanduser, join as joinpath
+from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from threading import Lock
 
+from icontract import require
 from sqlalchemy import (
     Boolean,
     Column,
@@ -23,9 +25,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import declared_attr, relationship
+from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.deco import cachedmethod
+from cs.logutils import error
+from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -33,6 +39,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.tagset import TagSet
 from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek
 
@@ -139,7 +146,7 @@ class CalibreTree(MultiOpenMixin):
     )
 
   def add(self, bookpath):
-    ''' Add a book file via the `calibredb` command.
+    ''' Add a book file via the `calibredb add` command.
         Return the database id.
     '''
     cp = self.calibredb(
