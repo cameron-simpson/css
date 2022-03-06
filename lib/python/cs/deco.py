@@ -353,6 +353,10 @@ def cachedmethod(
           @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
+      The cached result may be cleared by calling its `.flush()` attribute:
+
+          instance.method.flush()
+
       Optional keyword arguments:
       * `attr_name`: the basis name for the supporting attributes.
         Default: the name of the method.
@@ -402,7 +406,7 @@ def cachedmethod(
   lastpoll_attr = val_attr + '__lastpoll'
 
   # pylint: disable=too-many-branches
-  def wrapper(self, *a, **kw):
+  def cachedmethod_wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
       value0 = getattr(self, val_attr, unset_value)
@@ -464,7 +468,10 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  return wrapper
+  # provide a .flush() function to clear the cached value
+  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+
+  return cachedmethod_wrapper
 
 @decorator
 def OBSOLETE(func, suggestion=None):
