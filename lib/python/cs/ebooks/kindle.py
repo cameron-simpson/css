@@ -39,6 +39,8 @@ from cs.sqlalchemy_utils import (
 )
 from cs.threads import locked_property
 
+from . import HasFSPath
+
 class KindleTree(HasFSPath, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
