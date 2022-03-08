@@ -517,6 +517,7 @@ class KindleCommand(BaseCommand):
     kindle = options.kindle
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
+    print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
       print(subdir_name)
       for tag in sorted(kbook.tags):
