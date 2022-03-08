@@ -99,6 +99,21 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
           for book in sorted(author.books):
             yield self.book_by_dbid(book.id, db_book=book)
 
+  def by_identifier(self, type_, value):
+    ''' Generator yielding `CalibreBook`
+        matching the provided `(type,val)` identifier.
+    '''
+    db = self.db
+    with db.db_session() as session:
+      for identifier in db.identifiers.lookup(session=session, type=type_,
+                                              val=value):
+        yield self[identifier.book_id]
+
+  def by_asin(self, asin):
+    ''' Return an iterable of `CalibreBook`s with the supplied ASIN.
+    '''
+    return self.by_identifier('mobi-asin', asin.upper())
+
   def _run(self, *calargv, subp_options=None):
     ''' Run a Calibre utility command.
 
