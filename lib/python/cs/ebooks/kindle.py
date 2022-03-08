@@ -4,10 +4,11 @@
 '''
 
 from contextlib import contextmanager
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 import os
-from os.path import expanduser, join as joinpath
+from os.path import basename, expanduser, join as joinpath
 import sys
+from tempfile import TemporaryDirectory
 from threading import Lock
 
 from icontract import require
@@ -31,6 +32,7 @@ from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.py.func import callif
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
