@@ -483,19 +483,16 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     calibre = options.calibre
-    db = options.db
-    session = options.session
-    for author in sorted(db.authors.lookup(session=session)):
-      with Pfx("%d:%s", author.id, author.name):
-        print(author.name)
-        for book in sorted(author.books):
-          with Pfx("%d:%s", book.id, book.title):
-            print(" ", book.title)
-            for fmt, subpath in book.formats_as_dict().items():
-              with Pfx(fmt):
-                fspath = calibre.pathto(subpath)
-                size = pfx_call(os.stat, fspath).st_size
-                print("   ", fmt, transcribe_bytes_geek(size), subpath)
+    for book in calibre:
+      with Pfx("%d:%s", book.id, book.title):
+        print(f"{book.title} ({book.dbid})")
+        print(" ", book.path)
+        print("   ", TagSet(book.identifiers_as_dict()))
+        for fmt, subpath in book.formats_as_dict().items():
+          with Pfx(fmt):
+            fspath = calibre.pathto(subpath)
+            size = pfx_call(os.stat, fspath).st_size
+            print("   ", fmt, transcribe_bytes_geek(size), subpath)
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
