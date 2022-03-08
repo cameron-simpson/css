@@ -470,49 +470,121 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
-    ''' Usage: {cmd}
   def cmd_export_to_calibre(self, argv):
+    ''' Usage: {cmd} [-n] [--cbz] [ASINs...]
           Export AZW files to Calibre library.
+          -n    No action, recite planned actions.
+          --cbz Create a CBZ comics format and drop the AZW3 format.
+                (This is because Calibre can't be told to prefer the CBZ for reading.)
+                The default is to keep the AZW3 format and add an EPUB conversion.
+          ASINs Optional ASIN identifiers to export.
+                The default is to export all books with no "calibre.dbid" fstag.
     '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+    from .mobi import Mobi
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    for subdir_name, kbook in kindle.items():
+    doit = True
+    force = False
+    cbz_mode = False
+    conversions = ['epub']
+    delete_formats = []
+    opts, argv = getopt(argv, 'fn', 'cbz')
+    for opt, _ in opts:
+      if opt == '-f':
+        force = False
+      elif opt == '-n':
+        doit = False
+      elif opt == '--cbz':
+        cbz_mode = True
+        conversions = []
+        delete_formats.append('azw3')
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
+    kbook_map = {}
+    for asin in argv:
+      kbook = kindle.by_asin(asin)
+      kbook_map[kbook.subdir_name] = kbook
+    if not kbook_map:
+      kbook_map = dict(sorted(kindle.items()))
+    for subdir_name, kbook in kbook_map.items():
+      azw_path = kbook.extpath('azw')
       dbid = kbook.tags.auto.calibre.dbid
       if dbid:
         print(subdir_name, "calibre.dbid:", dbid)
-        continue
-      azw_path = kbook.extpath('azw')
-      dbid = calibre.add(azw_path)
-      kbook.tags['calibre.dbid'] = dbid
+        cbook = calibre[dbid]
+        formats = cbook.formats_as_dict()
+        print("formats =", repr(formats))
+        if 'AZW3' in formats and not force:
+          warning("format AZW3 already present, not adding")
+        else:
+          callif(doit, calibre.add_format, azw_path, dbid, force=force)
+      else:
+        dbid = callif(doit, calibre.add, azw_path)
+        if doit:
+          X("dbid = %d", dbid)
+          kbook.tags['calibre.dbid'] = dbid
+          cbook = calibre.by_id(dbid)
+          formats = cbook.formats_as_dict()
+      if cbz_mode:
+        if doit:
+          X("cbook = %s %r", cbook, formats)
+          mobipath = calibre.pathto(formats['AZW3'])
+          MB = Mobi(mobipath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
+            MB.make_cbz(cbzpath)
+            calibre.add_format(cbzpath, dbid)
+        else:
+          print("create CBZ from the imported AZW3, then remove the AZW3")
+      else:
+        print(subdir_name, "add", azw_path)
 
   def cmd_import_calibre_dbids(self, argv):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [--scrub]
           Import Calibre database ids by backtracking from Calibre
           `mobi-asin` identifier records.
+          --scrub   Remove the calibre.dbid tag if no Calibre book
+                    has the Kindle book's ASIN.
     '''
+    scrub = False
+    opts, argv = getopt(argv, '', 'scrub')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '--scrub':
+          scrub = True
+        else:
+          raise RuntimeError("unhandled option")
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    with calibre.db.db_session() as session:
-      for book in calibre.db.books.lookup(session=session):
-        with Pfx("%d: %s", book.id, book.path):
-          print(book.path)
-          asin = book.identifiers_as_dict().get('mobi-asin')
-          if asin:
-            kb = kindle.by_asin(asin)
-            print(kb.path)
-            dbid = kb.tags.auto.calibre.dbid
-            if dbid:
-              if dbid != book.id:
-                warning("book dbid %s != kb calibre.dbid %s", book.id, dbid)
-            else:
-              print("kb %s + calibre.dbid=%r" % (asin, book.id))
-              kb.tags['calibre.dbid'] = book.id
+    for kbook in kindle.values():
+      asin = kbook.asin
+      with Pfx("kb %s", asin):
+        dbid = kbook.tags.get('calibre.dbid', None)
+        cbooks = list(calibre.by_asin(asin))
+        if not cbooks:
+          warning("no Calibre books with ASIN %s", asin)
+          if scrub and dbid is not None:
+            print(f"kb {asin} - calibre.dbid={dbid}")
+            del kbook.tags['calibre.dbid']
+          continue
+        cbook = cbooks[0]
+        if len(cbooks) > 1:
+          if dbid is not None and dbid in [cb.id for cb in cbooks]:
+            # dbid matchs a book, use that one
+            cbook, = [cb for cb in cbooks if cb.id == dbid]
+          else:
+            # pick arbitrarily
+            warning(
+                "%d Calibre books with ASIN %s, using calibre.dbid=%d",
+                len(cbooks), asin, cbook.id
+            )
+        if dbid is not None and cbook.id != dbid:
+          print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
+          kbook.tags['calibre.dbid'] = cbook.id
 
   def cmd_ls(self, argv):
     options = self.options
