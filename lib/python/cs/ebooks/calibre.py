@@ -175,6 +175,23 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
     dbid, = dbids
     return dbid
 
+  @typechecked
+  def add_format(self, bookpath: str, dbid: int, *, force: bool = False):
+    ''' Add a book file to the existing book entry with database id `dbid`
+        via the `calibredb add_format` command.
+
+        Parameters:
+        * `bookpath`: filesystem path to the source MOBI file
+        * `dbid`: the Calibre database id
+        * `force`: replace an existing format if already present, default `False`
+    '''
+    self.calibredb(
+        'add_format',
+        *(() if force else ('--dont-replace',)),
+        str(dbid),
+        bookpath,
+        subp_options=dict(stdin=DEVNULL),
+    )
 
 class CalibreBook:
 
