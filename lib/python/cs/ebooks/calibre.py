@@ -45,7 +45,9 @@ from cs.units import transcribe_bytes_geek
 
 from cs.x import X
 
-class CalibreTree(MultiOpenMixin):
+from . import HasFSPath
+
+class CalibreTree(HasFSPath, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
@@ -58,7 +60,7 @@ class CalibreTree(MultiOpenMixin):
       calibre_library = os.environ.get(self.CALIBRE_LIBRARY_ENVVAR)
       if calibre_library is None:
         calibre_library = expanduser(self.CALIBRE_LIBRARY_DEFAULT)
-    self.path = calibre_library
+    HasFSPath.__init__(self, calibre_library)
     self._lock = Lock()
 
   @contextmanager
@@ -66,12 +68,6 @@ class CalibreTree(MultiOpenMixin):
     ''' Stub startup/shutdown.
     '''
     yield
-
-  def pathto(self, subpath):
-    ''' Return the filesystem path of `subpath`
-        located within the Calibre filesystem tree.
-    '''
-    return joinpath(self.path, subpath)
 
   @locked_property
   def db(self):
@@ -140,7 +136,7 @@ class CalibreTree(MultiOpenMixin):
     return self._run(
         'calibredb',
         dbcmd,
-        '--library-path=' + self.path,
+        '--library-path=' + self.fspath,
         *argv,
         subp_options=subp_options
     )

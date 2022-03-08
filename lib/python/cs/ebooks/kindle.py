@@ -39,7 +39,7 @@ from cs.sqlalchemy_utils import (
 )
 from cs.threads import locked_property
 
-class KindleTree(MultiOpenMixin):
+class KindleTree(HasFSPath, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
       This actually knows very little about Kindle ebooks or its rather opaque database.
@@ -58,15 +58,15 @@ class KindleTree(MultiOpenMixin):
       if kindle_library is None:
         # default to the MacOS path, needs updates for other platforms
         kindle_library = expanduser(self.KINDLE_LIBRARY_DEFAULT)
-    self.path = kindle_library
+    HasFSPath.__init__(self, kindle_library)
     self._bookrefs = {}
     self._lock = Lock()
 
   def __str__(self):
-    return "%s:%s" % (type(self).__name__, shortpath(self.path))
+    return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
 
   def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.path)
+    return "%s(%r)" % (type(self).__name__, self.fspath)
 
   @contextmanager
   def startup_shutdown(self):
@@ -93,7 +93,7 @@ class KindleTree(MultiOpenMixin):
     ''' Return a list of the individual ebook subdirectory names.
     '''
     return [
-        dirbase for dirbase in os.listdir(self.path)
+        dirbase for dirbase in os.listdir(self.fspath)
         if self.is_book_subdir(dirbase)
     ]
 
@@ -183,7 +183,7 @@ class KindleBook:
           or an empty list if the subdirectory is not present.
       '''
     try:
-      return os.listdir(self.path)
+      return os.listdir(self.fspath)
     except FileNotFoundError:
       return []
 
@@ -191,7 +191,7 @@ class KindleBook:
   def path(self):
     ''' The filesystem path of this book subdirectory.
     '''
-    return joinpath(self.tree.path, self.subdir_name)
+    return joinpath(self.tree.pathto(self.subdir_name))
 
   def pathto(self, subpath):
     ''' Return the filesystem path of `subpath`
