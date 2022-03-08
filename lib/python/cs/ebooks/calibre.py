@@ -427,6 +427,7 @@ class CalibreMetadataDB(ORM):
     # references to table definitions
     self.authors = Authors
     self.books = Books
+    self.identifiers = Identifiers
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
