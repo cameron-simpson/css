@@ -1,4 +1,4 @@
-cs.ansi_colour pypi.release="20200729"
+cs.ansi_colour pypi.release="20220227" ok_revision="6790b9b6946cc7d66b03cfec771154d463f2cc18" features={"20220227":["COLOUR_CODES","TerminalColors","colour_escape"]}
 cs.app.beyonwiz pypi.release=20160828
 cs.app.dlog
 cs.app.ffmpeg
@@ -20,11 +20,11 @@ cs.cache pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966ed
 cs.clockutils pypi.release=20190101
 cs.cmdutils pypi.release="20211208" ok_revision="95ffe11614cd3239089a489f8ce4182a01478bbd" features={"20210913":["apply_preargv"]}
 cs.configutils pypi.release="20210306" ok_revision="6046ff720496ea03f85ea7979f62da908a884d3b"
-cs.context pypi.release="20211115.1" ok_revision="9d416aa31309d2d7b4713d7363b7a03257ac0d45" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"]}
+cs.context pypi.release="20220227" ok_revision="5b24e4b71ed207d9f9c0af211214c1faaef28283" features={"20210306":["stackable_state"],"20210727":["push_cmgr"],"20211114":["ContextManagerMixin"],"20220227":["stack_signals"]}
 cs.csvutils pypi.release="20201228"
 cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="20210306"
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
-cs.deco pypi.release="20210823" ok_revision="65144526e2bdb229bbb69b15096b3f328901b13c"
+cs.deco pypi.release="20220227" ok_revision=a91dc3746c567778d846a4e9c851435a8c4b8ec6
 cs.edit pypi.release="20191201.1" ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
@@ -38,8 +38,8 @@ cs.inttypes pypi.release=20150120 ok_revision=b4c205f9ed8706db33e7285fcd51109296
 cs.iso14496 pypi.release="20210306" ok_revision="30d3534ee55e6aef369c55e79c0fe63d6bc2e1e6"
 cs.jdson
 cs.later pypi.release=20191007 ok_revision="5728c540f10449709c3c11f482312cac827d1b83"
-cs.lex pypi.release="20211208" ok_revision=e4f601f87780bcb7a1148ac718cdbdc3c64cf1f7 features={"20210906":["strip_prefix_n"]}
-cs.logutils pypi.release="20211208" ok_revision=e21d3f002ed49e729a693fdf6409aa50874c0960 features={"20210718":["supplant_root_logger"]}
+cs.lex pypi.release="20220227" ok_revision="8b998791809f173ce5114a452c268f4d3cdf1441" features={"20210906":["strip_prefix_n"],"20220227":["camelcase","snakecase"]}
+cs.logutils pypi.release="20220227" ok_revision="96d112ee6bbd21ea70a8b5b13395691482782b17" features={"20210718":["supplant_root_logger"],"20220227":["patch_formatter"]}
 cs.mailutils pypi.release="20210306" ok_revision="48733f5381f7056442a6d8fc80adcfdff20bd455"
 cs.mappings pypi.release="20211208" ok_revision="9a5a23f7f0feedb70c8b9810f7546bd6a66e1135" features={"20210906":["RemappedMappingProxy"]}
 cs.mediainfo
@@ -49,7 +49,7 @@ cs.nodedb pypi.release=20160828
 cs.numeric pypi.release=20190309
 cs.obj pypi.release="20210717" ok_revision="385fe0965d7874d9f861ad9943a6e6d27827e692" features={"20210717":["SingletonMixin_key_is_none"]}
 cs.packetstream pypi.release="20211208" ok_revision="906f6148d57dfa082d18e6f4b27b8081ee317ba8"
-cs.pfx pypi.release="20211031" ok_revision="0da93aa4a25c75f2e547a3ecd3351a762828e5a2" features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"]}
+cs.pfx pypi.release="20220227" ok_revision=cb659312fba46797d4c8e89d689dc437127440f4 features={"20210717":["pfx_method_with_args"],"20210731":["pfx_call"],"20210906":["pfxprint"]}
 cs.pipeline pypi.release="20191007.1" ok_revision=fdf8009af610626fe5788b22eec90c609da040c5
 cs.pop3 ok_revision="019fedaf9dc8160038817d341ddc2985cba36230" pypi.release="20211208"
 cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550cf8232e49b

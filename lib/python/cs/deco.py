@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20210823-post'
+__version__ = '20220227-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -63,14 +63,17 @@ def decorator(deco):
 
       Examples:
 
+          # define your decorator as if always called with func and args
           @decorator
-          def mydeco(func, *da, kw=None):
-            ... decorate func subject to the values of da and kw
+          def mydeco(func, *da, arg2=None):
+            ... decorate func subject to the values of da and arg2
 
+          # mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
+          @ mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
@@ -87,13 +90,14 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) >= 1 and callable(da[0]):
-      # `func` is already supplied, decorate it now.
+    if len(da) > 0 and callable(da[0]):
+      # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])
+      # decorate func
       decorated = deco(func, *da, **dkw)
       if decorated is not func:
-        # pretty up the returned wrapper
+        # we got a wrapper function back, pretty up the returned wrapper
         try:
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
@@ -349,6 +353,10 @@ def cachedmethod(
           @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
+      The cached result may be cleared by calling its `.flush()` attribute:
+
+          instance.method.flush()
+
       Optional keyword arguments:
       * `attr_name`: the basis name for the supporting attributes.
         Default: the name of the method.
@@ -398,7 +406,7 @@ def cachedmethod(
   lastpoll_attr = val_attr + '__lastpoll'
 
   # pylint: disable=too-many-branches
-  def wrapper(self, *a, **kw):
+  def cachedmethod_wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
       value0 = getattr(self, val_attr, unset_value)
@@ -456,7 +464,10 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  return wrapper
+  # provide a .flush() function to clear the cached value
+  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+
+  return cachedmethod_wrapper
 
 @decorator
 def OBSOLETE(func, suggestion=None):
