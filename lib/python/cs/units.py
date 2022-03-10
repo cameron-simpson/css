@@ -16,6 +16,7 @@ Presupplied scales:
 '''
 
 from collections import namedtuple
+from cs.deco import OBSOLETE
 from cs.lex import get_chars, get_decimal, skipwhite
 
 __version__ = '20210809-post'
@@ -27,7 +28,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.lex'],
+    'install_requires': ['cs.deco', 'cs.lex'],
 }
 
 class UnitStep(namedtuple('UnitStep', 'factor unit max_width')):
@@ -85,9 +86,9 @@ DECIMAL_SCALE = (
     UnitStep(0, 'P', 3),
 )
 
-def human(n, scale):
+def decompose(n, scale):
   ''' Decompose a nonnegative integer `n` into counts by unit from `scale`.
-      Returns a list of `(modulus,UnitStep)`.
+      Returns a list of `(modulus,UnitStep)` in order from smallest unit upward.
 
       Parameters:
       * `n`: a nonnegative integer.
@@ -111,28 +112,40 @@ def human(n, scale):
     raise ValueError("invalid scale, final factor must be 0: %r" % (scale,))
   return components
 
+@OBSOLETE(suggestion="decompose")
+def human(n, scale):
+  return decompose(n, scale)
+
 def geek_bytes(n):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `BINARY_BYTES_SCALE`.
   '''
-  return human(n, BINARY_BYTES_SCALE)
+  return decompose(n, BINARY_BYTES_SCALE)
 
-def human_bytes(n):
+def decompose_bytes(n):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `DECIMAL_BYTES_SCALE`.
   '''
-  return human(n, DECIMAL_BYTES_SCALE)
+  return decompose(n, DECIMAL_BYTES_SCALE)
 
-def human_time(n, scale=None):
+@OBSOLETE(suggestion="decompose_bytes")
+def human_bytes(n):
+  return decompose_bytes(n)
+
+def decompose_time(n, scale=None):
   ''' Decompose a nonnegative integer `n` into counts by unit
       from `TIME_SCALE`.
   '''
   if scale is None:
     scale = TIME_SCALE
-  return human(n, scale)
+  return decompose(n, scale)
+
+@OBSOLETE(suggestion="decompose_time")
+def human_time(n, scale=None):
+  return decompose_time(n, scale=scale)
 
 def combine(components, scale):
-  ''' Combine a sequence of value components as from `human()` into an integer.
+  ''' Combine a sequence of value components as from `decompose()` into an integer.
   '''
   factors = {}
   current_factor = 1
@@ -162,7 +175,7 @@ def transcribe(
       * `skip_zero`: omit components of value 0.
       * `sep`: separator between words, default: `''`.
   '''
-  components = human(n, scale)
+  components = decompose(n, scale)
   text = []
   for count, step in reversed(components):
     if skip_zero and count == 0:
@@ -182,7 +195,7 @@ def transcribe_bytes_geek(n, max_parts=1, **kw):
   '''
   return transcribe(n, BINARY_BYTES_SCALE, max_parts=max_parts, **kw)
 
-def transcribe_bytes_human(n, max_parts=1, **kw):
+def transcribe_bytes_decompose(n, max_parts=1, **kw):
   ''' Transcribe a nonnegative integer `n` against `DECIMAL_BYTES_SCALE`.
   '''
   return transcribe(n, DECIMAL_BYTES_SCALE, max_parts=max_parts, **kw)

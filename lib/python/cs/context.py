@@ -15,7 +15,7 @@ except ImportError:
     '''
     yield None
 
-__version__ = '20211115.1-post'
+__version__ = '20220227-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -441,6 +441,9 @@ class ContextManagerMixin:
   ''' A mixin to provide context manager `__enter__` and `__exit__` methods
       running the first and second steps of a single `__enter_exit__` generator method.
 
+      *Note*: the `__enter_exit__` method is _not_ a context manager,
+      but a short generator method.
+
       This makes it easy to use context managers inside `__enter_exit__`
       as the setup/teardown process, for example:
 
@@ -448,7 +451,6 @@ class ContextManagerMixin:
               with open(self.datafile, 'r') as f:
                   yield f
 
-      The `__enter_exit__` method is _not_ a context manager, but a short generator method.
       Like a context manager created via `@contextmanager`
       it performs the setup phase and then `yield`s the value for the `with` statement.
       If `None` is `yield`ed (as from a bare `yield`)
