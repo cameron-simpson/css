@@ -304,7 +304,7 @@ def contextdecorator(cmgrfunc):
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
           if provide_context:
-            a = a.insert(0, ctxt)
+            a = [ctxt] + list(a)
           return func(*a, **kw)
 
     return wrapped
@@ -387,7 +387,7 @@ def cachedmethod(
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
@@ -487,6 +487,7 @@ def OBSOLETE(func, suggestion=None):
     '''
     frame = traceback.extract_stack(None, 2)[0]
     caller = frame[0], frame[1]
+    # pylint: disable=protected-access
     try:
       callers = func._OBSOLETE_callers
     except AttributeError:
@@ -576,7 +577,7 @@ def strable(func, open_func=None):
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if open_func is None:
     open_func = open
 
@@ -620,6 +621,7 @@ def observable_class(property_names, only_unequal=False):
   if isinstance(property_names, str):
     property_names = (property_names,)
 
+  # pylint: disable=protected-access
   def make_observable_class(cls):
     ''' Annotate the class `cls` with observable properties.
     '''
