@@ -12,6 +12,7 @@ from functools import partial
 from pprint import pformat
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
+from cs.x import X
 
 __version__ = '20210913-post'
 
@@ -89,9 +90,9 @@ def trace(
       try:
         from cs.pfx import XP as xlog
       except ImportError:
-        from cs.x import X as xlog
+        xlog = X
     else:
-      from cs.x import X as xlog
+      xlog = X
     if call:
       fmt, av = func_a_kw_fmt(citation, *a, **kw)
       xlog("CALL " + fmt, *av)
