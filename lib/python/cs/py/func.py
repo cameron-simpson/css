@@ -14,7 +14,7 @@ from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 from cs.x import X
 
-__version__ = '20220311'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
