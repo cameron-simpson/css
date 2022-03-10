@@ -1,0 +1,9 @@
+lib/python/cs/result.py: cs.result: docstring formatting updates
+lib/python/cs/result.py: cs.result: class-local Result Seq instance
+lib/python/cs/result.py: cs.result: Result.call: thread safe runtime check of self.state==pending
+lib/python/cs/result.py: cs.result: new Task (subclass of Result) with support for prerequisite Tasks; new @task decorator for functions
+lib/python/cs/result.py: cs.result: clean lint, tweak docstrings, update DISTINFO
+lib/python/cs/result.py: cs.result: Task.then: docstring update
+lib/python/cs/result.py: cs.result: simplify @task decorator - no need for a wrapper function
+lib/python/cs/result.py: cs.result: additional assertion
+lib/python/cs/result.py: cs.result: Task: supply func and optional args at init time, new cancel_on_exception and cancel_on_result parameters, update docstrings, related updates
