@@ -70,6 +70,7 @@ def func_a_kw_fmt(func, *a, **kw):
     av.extend(kv)
   return '%s(' + ','.join(afv) + ')', av
 
+# pylint: disable=too-many-arguments
 @decorator
 def trace(
     func, call=True, retval=False, exception=False, pfx=False, pprint=False
@@ -83,6 +84,7 @@ def trace(
     ''' Wrapper for `func` to trace call and return.
     '''
     # late import so that we can use this in modules we import
+    # pylint: disable=import-outside-toplevel
     if pfx:
       try:
         from cs.pfx import XP as xlog
@@ -139,6 +141,7 @@ def prop(func):
       into RuntimeErrors.
   '''
 
+  # pylint: disable=inconsistent-return-statements
   def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)
