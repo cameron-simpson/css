@@ -94,7 +94,7 @@ def trace(
       fmt, av = func_a_kw_fmt(citation, *a, **kw)
       xlog("CALL " + fmt, *av)
     try:
-      retval = func(*a, **kw)
+      result = func(*a, **kw)
     except Exception as e:
       if exception:
         xlog("CALL %s RAISE %r", citation, e)
@@ -103,9 +103,9 @@ def trace(
       if retval:
         xlog(
             "CALL %s RETURN %s", citation,
-            (pformat if pprint else repr)(retval)
+            (pformat if pprint else repr)(result)
         )
-      return retval
+      return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
