@@ -4,6 +4,7 @@
 #
 
 ''' PlayOn facilities, primarily access to the download API.
+    Includes a nice command line tool.
 '''
 
 from collections import defaultdict
@@ -88,7 +89,8 @@ DEFAULT_FILENAME_FORMAT = (
 DEFAULT_DL_PARALLELISM = 2
 
 def main(argv=None):
-  ''' Playon command line mode.
+  ''' Playon command line mode;
+      see the `PlayOnCommand` class below.
   '''
   return PlayOnCommand(argv).run()
 
@@ -263,15 +265,16 @@ class PlayOnCommand(BaseCommand):
     ''' Refresh the queue and recordings if any unexpired records are stale
         or if all records are expired.
     '''
-    need_refresh = False
     recordings = set(sqltags.recordings())
-    stale_map = {
-        recording.recording_id(): recording
-        for recording in recordings
-        if not recording.is_expired() and recording.is_stale(max_age=max_age)
-    }
-    if stale_map:
-      need_refresh = True
+    need_refresh = (
+        # any current recordings whose state is stale
+        any(
+            not recording.is_expired() and recording.is_stale(max_age=max_age)
+            for recording in recordings
+        ) or
+        # no recording is current
+        not all(recording.is_expired() for recording in recordings)
+    )
     if need_refresh:
       print("refresh queue and recordings...")
       Ts = [bg_thread(api.queue), bg_thread(api.recordings)]
