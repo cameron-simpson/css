@@ -56,7 +56,7 @@ cs.predicate pypi.release="20210306" ok_revision=cc43734a474276e72351353fadd550c
 cs.progress pypi.release="20211208" ok_revision="9b03cdb97f403edafe0ab10451d70f6a38f0f6e6" features={"20210803":["progress_runstate"]}
 cs.psutils pypi.release=20190101 ok_revision=d48263d393ca9e6c9e3ee698307e5a6a19696efb
 cs.py.doc pypi.release="20210306" ok_revision=fc38c09619a42f8d8b9f15edb391e598401b7c5d
-cs.py.func pypi.release="20220311" ok_revision=b329423bcced297c54bd88e1a5255cc42b745468 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
+cs.py.func pypi.release="20220311.1" ok_revision=b329423bcced297c54bd88e1a5255cc42b745468 features={"20210717":["trace_decorator"],"20210913":["func_a_kw_fmt"],"20220311.1":["callif"]}
 cs.py.modules pypi.release="20210123" ok_revision="0cc66f44758664a5b70c3904561c946c6aa3b6aa"
 cs.py.stack pypi.release=20190812 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
 cs.py3 pypi.release="20200517" ok_revision=eba1e541117bba411add64aafd98fbd2fdaf3c46
