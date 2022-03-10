@@ -359,7 +359,7 @@ def cachedmethod(
       * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
-        Default: `None`, meaning no poll delay.
+        Default: `None`, meaning the value never becomes stale.
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
@@ -413,19 +413,15 @@ def cachedmethod(
         pass
       # we have a cached value for return in the following logic
       elif poll_delay is None:
-        # always poll
-        pass
-      else:
-        lastpoll = getattr(self, lastpoll_attr)
-        now = time.time()
-        if now - lastpoll < poll_delay:
-          # reuse cache
-          return value0
-      # not too soon, try to update the value
+        return value0
+      # see if the value is stale
+      lastpoll = getattr(self, lastpoll_attr, None)
+      now = time.time()
+      if lastpoll is not None and now - lastpoll < poll_delay:
+        # reuse cache
+        return value0
       # update the poll time if we use it
-      if poll_delay is not None:
-        now = now or time.time()
-        setattr(self, lastpoll_attr, now)
+      setattr(self, lastpoll_attr, now)
       # check the signature if provided
       # see if the signature is unchanged
       if sig_func is not None:

@@ -457,16 +457,18 @@ class BasicTableMixin:
     return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
-  def __getitem__(cls, index):
+  def by_id(cls, index, *, session):
     ''' Index the table by its `id` column.
     '''
-    row = cls.lookup1(id=index, session=state.session)
+    row = cls.lookup1(id=index, session=session)
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
           cls,
           index,
       ))
     return row
+
+  __getitem__ = by_id
 
 # pylint: disable=too-few-public-methods
 class HasIdMixin:

@@ -4,10 +4,11 @@
 '''
 
 from contextlib import contextmanager
-from getopt import GetoptError
+from getopt import getopt, GetoptError
 import os
-from os.path import expanduser, join as joinpath
+from os.path import basename, expanduser, join as joinpath
 import sys
+from tempfile import TemporaryDirectory
 from threading import Lock
 
 from icontract import require
@@ -31,6 +32,7 @@ from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call
+from cs.py.func import callif
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -39,7 +41,9 @@ from cs.sqlalchemy_utils import (
 )
 from cs.threads import locked_property
 
-class KindleTree(MultiOpenMixin):
+from . import HasFSPath
+
+class KindleTree(HasFSPath, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
       This actually knows very little about Kindle ebooks or its rather opaque database.
@@ -58,15 +62,15 @@ class KindleTree(MultiOpenMixin):
       if kindle_library is None:
         # default to the MacOS path, needs updates for other platforms
         kindle_library = expanduser(self.KINDLE_LIBRARY_DEFAULT)
-    self.path = kindle_library
+    HasFSPath.__init__(self, kindle_library)
     self._bookrefs = {}
     self._lock = Lock()
 
   def __str__(self):
-    return "%s:%s" % (type(self).__name__, shortpath(self.path))
+    return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
 
   def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.path)
+    return "%s(%r)" % (type(self).__name__, self.fspath)
 
   @contextmanager
   def startup_shutdown(self):
@@ -93,7 +97,7 @@ class KindleTree(MultiOpenMixin):
     ''' Return a list of the individual ebook subdirectory names.
     '''
     return [
-        dirbase for dirbase in os.listdir(self.path)
+        dirbase for dirbase in os.listdir(self.fspath)
         if self.is_book_subdir(dirbase)
     ]
 
@@ -183,7 +187,7 @@ class KindleBook:
           or an empty list if the subdirectory is not present.
       '''
     try:
-      return os.listdir(self.path)
+      return os.listdir(self.fspath)
     except FileNotFoundError:
       return []
 
@@ -191,7 +195,7 @@ class KindleBook:
   def path(self):
     ''' The filesystem path of this book subdirectory.
     '''
-    return joinpath(self.tree.path, self.subdir_name)
+    return joinpath(self.tree.pathto(self.subdir_name))
 
   def pathto(self, subpath):
     ''' Return the filesystem path of `subpath`
@@ -429,13 +433,15 @@ class KindleCommand(BaseCommand):
   ''' Command line for interacting with a Kindle filesystem tree.
   '''
 
-  GETOPT_SPEC = 'K:'
+  GETOPT_SPEC = 'C:K:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
+  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] [subcommand [...]]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
     Specify kindle library location.'''
+
+  SUBCOMMAND_ARGV_DEFAULT = 'ls'
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
@@ -466,47 +472,132 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
-  def cmd_calibre_export(self, argv):
-    ''' Usage: {cmd}
+  def cmd_export_to_calibre(self, argv):
+    ''' Usage: {cmd} [-n] [--cbz] [ASINs...]
           Export AZW files to Calibre library.
+          -n    No action, recite planned actions.
+          --cbz Create a CBZ comics format and drop the AZW3 format.
+                (This is because Calibre can't be told to prefer the CBZ for reading.)
+                The default is to keep the AZW3 format and add an EPUB conversion.
+          ASINs Optional ASIN identifiers to export.
+                The default is to export all books with no "calibre.dbid" fstag.
     '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
+    from .mobi import Mobi
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    for subdir_name, kbook in kindle.items():
+    doit = True
+    force = False
+    cbz_mode = False
+    conversions = ['epub']
+    delete_formats = []
+    opts, argv = getopt(argv, 'fn', 'cbz')
+    for opt, _ in opts:
+      if opt == '-f':
+        force = False
+      elif opt == '-n':
+        doit = False
+      elif opt == '--cbz':
+        cbz_mode = True
+        conversions = []
+        delete_formats.append('azw3')
+      else:
+        raise RuntimeError("unhandled option: %r" % (opt,))
+    kbook_map = {}
+    for asin in argv:
+      kbook = kindle.by_asin(asin)
+      kbook_map[kbook.subdir_name] = kbook
+    if not kbook_map:
+      kbook_map = dict(sorted(kindle.items()))
+    for subdir_name, kbook in kbook_map.items():
+      azw_path = kbook.extpath('azw')
       dbid = kbook.tags.auto.calibre.dbid
       if dbid:
         print(subdir_name, "calibre.dbid:", dbid)
-        continue
-      calibre.add(kbook.extpath('azw'))
+        cbook = calibre[dbid]
+        formats = cbook.formats_as_dict()
+        print("formats =", repr(formats))
+        if 'AZW3' in formats and not force:
+          warning("format AZW3 already present, not adding")
+        else:
+          callif(doit, calibre.add_format, azw_path, dbid, force=force)
+      else:
+        dbid = callif(doit, calibre.add, azw_path)
+        if doit:
+          X("dbid = %d", dbid)
+          kbook.tags['calibre.dbid'] = dbid
+          cbook = calibre.by_id(dbid)
+          formats = cbook.formats_as_dict()
+      if cbz_mode:
+        if doit:
+          X("cbook = %s %r", cbook, formats)
+          mobipath = calibre.pathto(formats['AZW3'])
+          MB = Mobi(mobipath)
+          with TemporaryDirectory() as tmpdirpath:
+            cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
+            MB.make_cbz(cbzpath)
+            calibre.add_format(cbzpath, dbid)
+        else:
+          print("create CBZ from the imported AZW3, then remove the AZW3")
+      else:
+        print(subdir_name, "add", azw_path)
 
-  def cmd_calibre_import_dbids(self, argv):
-    ''' Usage: {cmd}
+  def cmd_import_calibre_dbids(self, argv):
+    ''' Usage: {cmd} [--scrub]
           Import Calibre database ids by backtracking from Calibre
           `mobi-asin` identifier records.
+          --scrub   Remove the calibre.dbid tag if no Calibre book
+                    has the Kindle book's ASIN.
     '''
+    scrub = False
+    opts, argv = getopt(argv, '', 'scrub')
+    for opt, _ in opts:
+      with Pfx(opt):
+        if opt == '--scrub':
+          scrub = True
+        else:
+          raise RuntimeError("unhandled option")
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
-    with calibre.db.db_session() as session:
-      for book in calibre.db.books.lookup(session=session):
-        with Pfx("%d: %s", book.id, book.path):
-          print(book.path)
-          asin = book.identifiers_as_dict().get('mobi-asin')
-          if asin:
-            kb = kindle.by_asin(asin)
-            print(kb.path)
-            dbid = kb.tags.auto.calibre.dbid
-            if dbid:
-              if dbid != book.id:
-                warning("book dbid %s != kb calibre.dbid %s", book.id, dbid)
-            else:
-              print("kb %s + calibre.dbid=%r" % (asin, book.id))
-              kb.tags['calibre.dbid'] = book.id
+    for kbook in kindle.values():
+      asin = kbook.asin
+      with Pfx("kb %s", asin):
+        dbid = kbook.tags.get('calibre.dbid', None)
+        cbooks = list(calibre.by_asin(asin))
+        if not cbooks:
+          warning("no Calibre books with ASIN %s", asin)
+          if scrub and dbid is not None:
+            print(f"kb {asin} - calibre.dbid={dbid}")
+            del kbook.tags['calibre.dbid']
+          continue
+        cbook = cbooks[0]
+        if len(cbooks) > 1:
+          if dbid is not None and dbid in [cb.id for cb in cbooks]:
+            # dbid matchs a book, use that one
+            cbook, = [cb for cb in cbooks if cb.id == dbid]
+          else:
+            # pick arbitrarily
+            warning(
+                "%d Calibre books with ASIN %s, using calibre.dbid=%d",
+                len(cbooks), asin, cbook.id
+            )
+        if dbid is not None and cbook.id != dbid:
+          print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
+          kbook.tags['calibre.dbid'] = cbook.id
+
+  def cmd_ls(self, argv):
+    options = self.options
+    kindle = options.kindle
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(kindle.fspath)
+    for subdir_name, kbook in kindle.items():
+      print(subdir_name)
+      for tag in sorted(kbook.tags):
+        print(" ", tag)
 
 if __name__ == '__main__':
   sys.exit(KindleCommand(sys.argv).run())

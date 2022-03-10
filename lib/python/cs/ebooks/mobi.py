@@ -1,8 +1,30 @@
 #!/usr/bin/env python3
 
+''' Support for MOBI format ebook files.
+'''
+
+from contextlib import contextmanager
+from getopt import GetoptError
+from glob import glob
+import os
+from os.path import (
+    basename,
+    exists as existspath,
+    isfile as isfilepath,
+    join as joinpath,
+    relpath,
+    splitext,
+)
+import sys
+from tempfile import TemporaryDirectory
 from zipfile import ZipFile, ZIP_STORED
 
 import mobi
+
+from cs.cmdutils import BaseCommand
+from cs.context import stackattrs
+from cs.logutils import error, info
+from cs.pfx import pfx, pfx_call
 
 class Mobi:
   ''' Work with an existing MOBI ebook file.
@@ -76,17 +98,42 @@ class Mobi:
         raise
     return cbzpath
 
-class Mobi2CBZCommand(BaseCommand):
+class MobiCommand(BaseCommand):
   ''' Command line implementation for `mobi2cbz`.
   '''
 
-  USAGE_FORMAT = r'''Usage: {cmd} mobipath [cbzpath]
-    Unpack a MOBI file and construct a CBZ file.
-    Prints the path of the CBZ file to the output.'''
+  def cmd_extract(self, argv):
+    ''' Usage: {cmd} mobipath [outdir]
+          Extract the contents of the MOBI file mobipath
+          into the directory outdir, default based on the mobipath basename.
+          Prints the outdir and the name of the top file.
+    '''
+    outdirpath = None
+    if not argv:
+      raise GetoptError("missing mobipath")
+    mobipath = argv.pop(0)
+    if argv:
+      outdirpath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after cbzpath: %r" % (argv,))
+    if not existspath(mobipath):
+      raise GetoptError("mobipath does not exist: %r" % (mobipath,))
+    if outdirpath is None:
+      outdirpath, mobiext = splitext(basename(mobipath))
+    if existspath(outdirpath):
+      raise GetoptError("outdir already exists: %s" % (outdirpath,))
+    MB = Mobi(mobipath)
+    extdirpath, rfilepath = MB.extract(outdirpath)
+    assert extdirpath == outdirpath
+    print(outdirpath)
+    print(rfilepath)
 
-  @staticmethod
-  def main(argv):
-    ''' `mobi2cbz` command line implementation.
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} mobipath [cbzpath]
+          Unpack a MOBI file and construct a CBZ file.
+          Prints the path of the CBZ file to the output.
+          The default cbzpath is mobibase.cbz where mobibase is the
+          basename of mobipath with its extension removed.
     '''
     if not argv:
       raise GetoptError("missing mobipath")
