@@ -19,7 +19,7 @@ from collections import namedtuple
 from cs.deco import OBSOLETE
 from cs.lex import get_chars, get_decimal, skipwhite
 
-__version__ = '20210809-post'
+__version__ = '20220311'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
