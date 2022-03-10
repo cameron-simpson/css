@@ -353,10 +353,6 @@ def cachedmethod(
           @cachedmethod(poll_delay=0.25)
           def method(self, ...)
 
-      The cached result may be cleared by calling its `.flush()` attribute:
-
-          instance.method.flush()
-
       Optional keyword arguments:
       * `attr_name`: the basis name for the supporting attributes.
         Default: the name of the method.
@@ -468,8 +464,9 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  # provide a .flush() function to clear the cached value
-  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+  ##  Doesn't work, has no access to self. :-(
+  ##  # provide a .flush() function to clear the cached value
+  ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
 
   return cachedmethod_wrapper
 
