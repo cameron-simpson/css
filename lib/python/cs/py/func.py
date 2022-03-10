@@ -81,15 +81,16 @@ def callif(doit, func, *a, **kw):
   '''
   if isinstance(func, dict):
     modes = func
+    a = list(a)
     func = a.pop(0)
   else:
     modes = {}
   modes.setdefault('print', print)
   if doit:
     return func(*a, **kw)
-  else:
-    fmt, av = func_a_kw_fmt(func, *a, **kw)
-    modes['print'](fmt % tuple(av))
+  fmt, av = func_a_kw_fmt(func, *a, **kw)
+  modes['print'](fmt % tuple(av))
+  return None
 
 @decorator
 # pylint: disable=too-many-arguments
