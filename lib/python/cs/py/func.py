@@ -9,6 +9,7 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
+from pprint import pformat
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
 
@@ -70,7 +71,9 @@ def func_a_kw_fmt(func, *a, **kw):
   return '%s(' + ','.join(afv) + ')', av
 
 @decorator
-def trace(func, call=True, retval=False, exception=False, pfx=False):
+def trace(
+    func, call=True, retval=False, exception=False, pfx=False, pprint=False
+):
   ''' Decorator to report the call and return of a function.
   '''
 
@@ -98,7 +101,10 @@ def trace(func, call=True, retval=False, exception=False, pfx=False):
       raise
     else:
       if retval:
-        xlog("CALL %s RETURN %r", citation, retval)
+        xlog(
+            "CALL %s RETURN %s", citation,
+            (pformat if pprint else repr)(retval)
+        )
       return retval
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
