@@ -867,6 +867,7 @@ class PlayOnAPI(MultiOpenMixin):
       for entry in entries:
         entry_id = entry['ID']
         with Pfx(entry_id):
+          # pylint: disable=use-dict-literal
           for field, conv in sorted(dict(
               ##Created=self.from_playon_date,
               ##Expires=self.from_playon_date,
