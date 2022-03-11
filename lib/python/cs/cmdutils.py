@@ -106,7 +106,7 @@ class _BaseSubCommand:
   def from_class(command_cls):
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with
-        `command_cls.SUBCOMMAND_METHOD_PREFIX`
+        `command_cls.SUBCOMMAND_METHOD_PREFIX`,
         by default `'cmd_'`.
     '''
     prefix = command_cls.SUBCOMMAND_METHOD_PREFIX
@@ -124,9 +124,10 @@ class _BaseSubCommand:
         )
     return subcommands_map
 
-  def usage_text(self, short):
+  def usage_text(self, short, usage_format_mapping=None):
     ''' Return the filled out usage text for this subcommand.
     '''
+    usage_format_mapping = usage_format_mapping or {}
     subusage_format = self.usage_format()  # pylint: disable=no-member
     if subusage_format:
       if short:
@@ -136,6 +137,8 @@ class _BaseSubCommand:
           for k, v in sys.modules[self.method.__module__].__dict__.items()
           if k and not k.startswith('_')
       }
+      if usage_format_mapping:
+        mapping.update(usage_format_mapping)
       if self.usage_mapping:
         mapping.update(self.usage_mapping)
       mapping.update(cmd=self.cmd)
@@ -503,7 +506,9 @@ class BaseCommand:
       for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
                                 ((subcmd, subcmds[subcmd]),)):
         with Pfx(attr):
-          subusage = subcmd_spec.usage_text(short=short)
+          subusage = subcmd_spec.usage_text(
+              short=short, usage_format_mapping=usage_format_mapping
+          )
           cls.subcommand_usage_text(
               attr, usage_format_mapping=usage_format_mapping, short=short
           )
