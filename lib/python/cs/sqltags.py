@@ -55,6 +55,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
@@ -92,6 +93,7 @@ DISTINFO = {
         'cs.context',
         'cs.dateutils',
         'cs.deco',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
