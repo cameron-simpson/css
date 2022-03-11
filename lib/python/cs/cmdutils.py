@@ -237,9 +237,14 @@ class BaseCommand:
       generally just implement a `main(argv)` method.
 
       Subclasses with subcommands
-      should implement a `cmd_`*subcommand*`(argv)` method
+      should implement a `cmd_`*subcommand*`(argv)` instance method
       for each subcommand.
-      If there is a paragraph in the method docstring
+      If a subcommand is itself implemented using `BaseCommand`
+      then it can be a simple attribute:
+
+          cmd_subthing = SubThingCommand
+
+      Returning to methods, if there is a paragraph in the method docstring
       commencing with `Usage:`
       then that paragraph is incorporated automatically
       into the main usage message.
