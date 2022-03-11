@@ -72,7 +72,9 @@ cs.serialise pypi.release="20210316.2" ok_revision="3bf522faeba630b0135e21effd09
 cs.sh pypi.release="20210316" ok_revision="41bb35a582f79767acefff34c2653f18dacd130c"
 cs.sharedfile pypi.release="20201228" ok_revision="0d538c2f2ed900fb3418c429c22d28efddeb5144"
 cs.socketutils pypi.release=20181228 ok_revision=b4c205f9ed8706db33e7285fcd511092966eda7d
-cs.sqlalchemy_utils pypi.release="20210420" ok_revision="8b26e480c08a97058e82dc7937e0dc29dccf9a4c"
+cs.sqlalchemy
+cs.sqlalchemy_release
+cs.sqlalchemy_utils pypi.release="20210420" ok_revision=fea318dbdbed39049bb872b87fea60bd00c25606
 cs.sqltags ok_revision="35eeaeec5809b411b416f41d45fac5981d5bd21e" pypi.release="20211212"
 cs.tagset pypi.release="20220311" ok_revision=ed72f977f4b713a95712e16ccac8d669e55fa681 features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.tagsset
