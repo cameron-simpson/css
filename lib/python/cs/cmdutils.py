@@ -24,7 +24,7 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220311'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
