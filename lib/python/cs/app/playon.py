@@ -24,8 +24,10 @@ import sys
 from threading import RLock, Semaphore
 import time
 from urllib.parse import unquote as unpercent
+
 import requests
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import fmtdoc
