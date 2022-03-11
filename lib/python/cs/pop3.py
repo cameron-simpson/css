@@ -43,7 +43,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
 
-__version__ = '20220312'
+__version__ = '20220312-post'
 
 DISTINFO = {
     'keywords': ["python3"],
