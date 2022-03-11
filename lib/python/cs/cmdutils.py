@@ -643,6 +643,9 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    # short circuit if we've already complaints about bad invocation
+    if self._printed_usage:
+      return 2
     options = self.options
     try:
       runstate = getattr(options, 'runstate', RunState(self.cmd))
