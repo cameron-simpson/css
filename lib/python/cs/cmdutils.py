@@ -605,9 +605,16 @@ class BaseCommand:
   def apply_opts(self, opts):
     ''' Apply command line options.
     '''
+    badopts = False
     for opt, val in opts:
       with Pfx(opt if val is None else "%s %r" % (opt, val)):
-        self.apply_opt(opt, val)
+        try:
+          self.apply_opt(opt, val)
+        except GetoptError as e:
+          warning("%s", e)
+          badopts = True
+    if badopts:
+      raise GetoptError("bad options")
 
   # pylint: disable=no-self-use
   def apply_preargv(self, argv):
