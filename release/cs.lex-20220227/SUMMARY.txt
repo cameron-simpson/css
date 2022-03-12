@@ -1,0 +1,2 @@
+typed_str,typed_repr: make max_length the first optional positional parameter, make other parameters keyword only.
+New camelcase() and snakecase() functions.

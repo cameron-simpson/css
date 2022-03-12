@@ -43,7 +43,7 @@ from cs.resources import MultiOpenMixin
 from cs.result import Result, ResultSet
 from cs.threads import bg as bg_thread
 
-__version__ = '20211208-post'
+__version__ = '20220312-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -66,7 +66,7 @@ DISTINFO = {
         'cs.threads',
     ],
     'entry_points': {
-      'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
+        'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
     },
 }
 
@@ -522,8 +522,7 @@ class POP3Command(BaseCommand):
   '''
 
   # pylint: disable=too-many-locals
-  @staticmethod
-  def cmd_dl(argv):
+  def cmd_dl(self, argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
         Usage: {cmd} [{{ssl,tcp}}:]{{netrc_account|[user@]host[!sni_name][:port]}} maildir

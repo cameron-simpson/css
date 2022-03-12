@@ -217,7 +217,7 @@ from cs.lex import (
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
     has_format_attributes, format_attribute, FStr, r
 )
-from cs.logutils import setup_logging, warning, error, ifverbose
+from cs.logutils import setup_logging, debug, warning, error, ifverbose
 from cs.mappings import (
     AttrableMappingMixin, IndexedMapping, PrefixedMappingProxy,
     RemappedMappingProxy
@@ -228,7 +228,7 @@ from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
 
-__version__ = '20211212-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -921,7 +921,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         if present.
     '''
     if attr in self:
-      warning("returning direct tag value for %r", attr)
+      debug("returning direct tag value for %r", attr)
       return self[attr]
     raise ValueError("cannot infer value for %r" % (attr,))
 
