@@ -3,6 +3,7 @@
 ''' Make make processes.
 '''
 
+from contextlib import contextmanager
 import errno
 import getopt
 import logging
@@ -13,19 +14,20 @@ from subprocess import Popen
 import sys
 import time
 from types import SimpleNamespace as NS
+
 from cs.debug import RLock
 from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.later import Later
 from cs.lex import get_identifier, get_white
 from cs.logutils import debug, info, error, exception, D
-from cs.pfx import Pfx
+import cs.pfx
+from cs.pfx import pfx, Pfx
 from cs.py.func import prop
 from cs.queues import MultiOpenMixin
 from cs.result import Result, ResultState
 from cs.threads import Lock, locked, locked_property
-import cs.logutils
-import cs.pfx
+
 from .parse import (SPECIAL_MACROS, Macro, MacroExpression, readMakefileLines, ParseError)
 
 SHELL = '/bin/sh'
@@ -42,18 +44,23 @@ class Maker(MultiOpenMixin):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  def __init__(self, makecmd, parallel=1, name=None):
+  DEFAULT_PARALLELISM = 1
+
+  def __init__(self, makecmd, parallel=None, name=None):
     ''' Initialise a Maker.
-        `makecmd`: used to define $(MAKE), typically sys.argv[0].
-        `parallel`: the degree of parallelism of shell actions.
+
+        Parameters:
+        * `makecmd`: used to define `$(MAKE)`, typically `sys.argv[0]`.
+        * `parallel`: the degree of parallelism of shell actions.
     '''
+    if parallel is None:
+      parallel = self.DEFAULT_PARALLELISM
     if parallel < 1:
       raise ValueError(
           "expected positive integer for parallel, got: %s" % (parallel,)
       )
     if name is None:
       name = cs.pfx.cmd
-    MultiOpenMixin.__init__(self)
     self.parallel = parallel
     self.name = name
     self.debug = MakeDebugFlags()
@@ -83,16 +90,13 @@ class Maker(MultiOpenMixin):
         )
     )
 
-  def startup(self):
+  @contextmanager
+  def startup_shutdown(self):
     ''' Set up the `Later` work queue.
     '''
     self._makeQ = Later(self.parallel, self.name)
-    self._makeQ.open()
-
-  def shutdown(self):
-    ''' Shut down the make queue and wait for it.
-    '''
-    self._makeQ.close()
+    with self._makeQ:
+      yield
     self._makeQ.wait()
 
   def report(self, fp=None):
@@ -206,12 +210,12 @@ class Maker(MultiOpenMixin):
     self._makeQ.after(LFs, R, func, *a, **kw)
     return R
 
+  @pfx
   def make(self, targets):
     ''' Synchronous call to make targets in series.
     '''
     ok = True
-    with Pfx("%s.make(%s)", self, " ".join(targets)):
-      for target in targets:
+    for target in targets:
         if isinstance(target, str):
           T = self[target]
         else:
@@ -225,14 +229,15 @@ class Maker(MultiOpenMixin):
           if self.fail_fast:
             self.debug_make("ABORT MAKE")
             break
-      self.debug_make("%r: %s", targets, ok)
-      return ok
+    self.debug_make("%r: %s", targets, ok)
+    return ok
 
   def __getitem__(self, name):
     ''' Return the specified Target.
     '''
     return self.targets[name]
 
+  @pfx
   def setDebug(self, flag, value):
     ''' Set or clear the named debug option.
     '''
@@ -255,56 +260,6 @@ class Maker(MultiOpenMixin):
           else:
             if log_level < logging.INFO:
               logger.setLevel(logging.INFO)
-
-  def getopt(self, args, options=None):
-    ''' Parse command line options.
-        Returns (args, badopts) being remaining command line arguments
-        and the error state (unparsed or invalid options encountered).
-    '''
-    badopts = False
-    opts, args = getopt.getopt(args, 'dD:eEf:ij:kmNnpqrRsS:tuvx')
-    for opt, value in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          # debug mode
-          self.setDebug('make', True)
-        elif opt == '-D':
-          for flag in [w.strip().lower() for w in value.split(',')]:
-            if len(flag) == 0:
-              # silently skip empty flag items
-              continue
-            if flag.startswith('-'):
-              value = False
-              flag = flag[1:]
-            else:
-              value = True
-            try:
-              self.setDebug(flag, value)
-            except AttributeError as e:
-              error("bad flag %r: %s", flag, e)
-              badopts = True
-        elif opt == '-f':
-          self._makefiles.append(value)
-        elif opt == '-j':
-          try:
-            value = int(value)
-          except ValueError as e:
-            error("invalid -j value: %s", e)
-            badopts = True
-          else:
-            if value < 1:
-              error("invalid -j value: %d, must be >= 1", value)
-              badopts = True
-            else:
-              self.parallel = int(value)
-        elif opt == '-k':
-          self.fail_fast = False
-        elif opt == '-n':
-          self.no_action = True
-        else:
-          error("unimplemented")
-          badopts = True
-    return args, badopts
 
   def loadMakefiles(self, makefiles, parent_context=None):
     ''' Load the specified Makefiles; return success.
