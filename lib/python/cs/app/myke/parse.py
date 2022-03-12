@@ -15,10 +15,11 @@ from os.path import dirname, isabs
 import re
 from string import whitespace
 import unittest
+
 from cs.deco import strable
 from cs.lex import get_other_chars, get_white, get_identifier, r
 from cs.logutils import error, warning, debug
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import prop
 
 # mapping of special macro names to evaluation functions
@@ -465,10 +466,10 @@ def readMakefileLines(
     # open file, yield contents
     filename = fp
     try:
-      with Pfx("open %r", filename).partial(open, filename)() as fp:
-        for O in readMakefileLines(M, fp, parent_context,
-                                   missing_ok=missing_ok):
-          yield O
+      with pfx_call(open, filename) as fp:
+        yield from readMakefileLines(
+            M, fp, parent_context,
+            missing_ok=missing_ok)
     except OSError as e:
       if e.errno == errno.ENOENT or e.errno == errno.EPERM:
         yield parent_context, e
