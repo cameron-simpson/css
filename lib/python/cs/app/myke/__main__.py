@@ -3,56 +3,101 @@
 ''' Myke main programme.
 '''
 
+from contextlib import contextmanager
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error
+
+from cs.cmdutils import BaseCommand
+from cs.logutils import error
+
 from .make import Maker
 from .parse import Macro
 
-default_cmd = 'myke'
-
-usage = "Usage: %s [options...] [macro=value...] [targets...]"
-
 def main(argv=None):
-  ''' The main command line.
-  '''
-  if argv is None:
-    argv = sys.argv
+  return MykeCommand(argv).run()
 
-  cmd, args = argv[0], argv[1:]
-  setup_logging(cmd)
+class MykeCommand(BaseCommand):
 
-  M = Maker(argv[0])
-  try:
-    args, badopts = M.getopt(args)
-  except GetoptError as e:
-    warning("bad options: %s", e)
-    badopts = True
-  if badopts:
-    print(usage % (cmd,), file=sys.stderr)
-    return 2
+  GETOPT_SPEC = 'dD:eEf:ij:kmNnpqrRsS:tuvx'
+  USAGE_FORMAT = "Usage: {cmd} [options...] [macro=value...] [targets...]"
 
-  # gather any macro assignments and apply
-  cmd_ns = {}
-  while args:
-    try:
-      macro = Macro.from_assignment("command line", args[0])
-    except ValueError:
-      break
-    cmd_ns[macro.name] = macro
-    args.pop(0)
+  def OPTIONS_CLASS(self):
+    ''' Factory function to prepare the `.options` object,
+        which is a `Maker`.
+    '''
+    return Maker(self.cmd)
 
-  # defer __enter__ until after option parsing
-  ok = M.loadMakefiles(M.makefiles)
-  ok = ok and M.loadMakefiles(M.appendfiles)
-  if cmd_ns:
+  def apply_opt(self, opt, val):
+    ''' Modify the `Maker` according to a command line option.
+        '''
+    M = self.options
+    if opt == '-d':
+      # debug mode
+      M.setDebug('make', True)
+    elif opt == '-D':
+      for flag in [w.strip().lower() for w in val.split(',')]:
+        if len(flag) == 0:
+          # silently skip empty flag items
+          continue
+        if flag.startswith('-'):
+          val = False
+          flag = flag[1:]
+        else:
+          val = True
+        try:
+          M.setDebug(flag, val)
+        except AttributeError as e:
+          raise GetoptError("bad flag %r: %s"%( flag, e))
+    elif opt == '-f':
+      M._makefiles.append(val)
+    elif opt == '-j':
+      try:
+        val = int(val)
+      except ValueError as e:
+        raise GetoptError("invalid -j val: %s"%(e,))
+      if val < 1:
+        raise GetoptError("invalid -j value: %d, must be >= 1"%( val,))
+      M.parallel = int(val)
+    elif opt == '-k':
+      M.fail_fast = False
+    elif opt == '-n':
+      M.no_action = True
+    else:
+      raise RuntimeError("unhandled option")
+
+  def apply_preargv(self, argv):
+    # gather any macro assignments and apply
+    M = self.options
+    cmd_ns = M.cmd_ns = {}
+    while argv:
+      try:
+        macro = Macro.from_assignment("command line", argv[0])
+      except ValueError:
+        break
+      cmd_ns[macro.name] = macro
+      argv.pop(0)
     M.insert_namespace(cmd_ns)
-  if not ok:
-    error("errors loading Mykefiles")
-    xit = 1
-  else:
-    if args:
-      targets = args
+    return argv
+
+  @contextmanager
+  def run_context(self):
+    M = self.options
+    ok = M.loadMakefiles(M.makefiles)
+    ok = ok and M.loadMakefiles(M.appendfiles)
+    # prepend the command line namespace at the front again
+    if M.cmd_ns:
+      M.insert_namespace(M.cmd_ns)
+    if not ok:
+      raise GetoptError("errors loading Mykefiles")
+    with M:
+      yield
+
+  def main(self, argv):
+    ''' Main body.
+    '''
+    M = self.options
+    if argv:
+      targets = argv
     else:
       target = M.default_target
       if target is None:
@@ -61,12 +106,8 @@ def main(argv=None):
         targets = (M.default_target.name,)
     if not targets:
       error("no default target")
-      xit = 1
-    else:
-      with M:
-        xit = 0 if M.make(targets) else 1
-
-  return xit
+      return 1
+    return 0 if M.make(targets) else 1
 
 if __name__ == '__main__':
-  sys.exit(main([default_cmd] + sys.argv[1:]))
+  sys.exit(main(sys.argv))
