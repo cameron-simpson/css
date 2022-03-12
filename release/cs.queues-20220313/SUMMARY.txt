@@ -1,0 +1,1 @@
+New ListQueue.prepend(items[,offset=0]) method.
