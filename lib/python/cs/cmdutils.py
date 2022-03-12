@@ -360,7 +360,6 @@ class BaseCommand:
     '''
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
-    options = self.options = self.OPTIONS_CLASS()
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -370,10 +369,11 @@ class BaseCommand:
       argv = list(argv)
     if cmd is None:
       cmd = basename(argv.pop(0))
+    self.cmd = cmd
+    options = self.options = self.OPTIONS_CLASS()
     log_level = getattr(options, 'log_level', None)
     loginfo = setup_logging(cmd, level=log_level)
     # post: argv is list of arguments after the command name
-    self.cmd = cmd
     self.loginfo = loginfo
     self.apply_defaults()
     # override the default options
