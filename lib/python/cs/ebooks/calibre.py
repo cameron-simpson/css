@@ -466,6 +466,8 @@ class CalibreMetadataDB(ORM):
       ''' Link table between `Books` and `Authors`.
       '''
 
+    class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
+      item_order = Column(Integer, nullable=False, default=1)
 
     Authors.book_links = relationship(BooksAuthorsLink)
     Authors.books = association_proxy('book_links', 'book')
@@ -475,12 +477,16 @@ class CalibreMetadataDB(ORM):
     Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
 
+    ##Books.language_links = relationship(BooksLanguagesLink)
+    ##Books.languages = association_proxy('languages_links', 'languages')
+
     Identifiers.book = relationship(Books, back_populates="identifiers")
 
     # references to table definitions
     self.authors = Authors
     self.books = Books
     self.identifiers = Identifiers
+    self.languages = Languages
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
