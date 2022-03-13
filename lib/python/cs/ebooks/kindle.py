@@ -30,7 +30,7 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
-from cs.logutils import warning
+from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_call
 from cs.py.func import callif
 from cs.resources import MultiOpenMixin
@@ -180,21 +180,24 @@ class KindleTree(HasFSPath, MultiOpenMixin):
         dbid = kbook.tags.auto.calibre.dbid
         if dbid:
           # book already present in calibre
-          print(subdir_name, "calibre.dbid:", dbid)
           cbook = calibre[dbid]
           with Pfx("calibre %d: %s", dbid, cbook.title):
             formats = cbook.formats_as_dict()
-            print("formats =", repr(formats))
             if 'AZW3' in formats and not replace_format:
-              warning("format AZW3 already present, not adding")
+              ##warning("format AZW3 already present, not adding")
+              pass
+            elif 'CBZ' in formats:
+              ##warning("format CBZ format present, not adding AZW3")
+              pass
             else:
-              callif(
-                  doit,
-                  calibre.add_format,
-                  azw_path,
-                  dbid,
-                  force=replace_format,
-              )
+              if doit:
+                calibre.add_format(
+                    azw_path,
+                    dbid,
+                    force=replace_format,
+                )
+              else:
+                info("add %s", azw_path)
         else:
           # book does not have a known dbid, presume not added
           if doit:
