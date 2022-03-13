@@ -544,7 +544,7 @@ class KindleCommand(BaseCommand):
     calibre = options.calibre
     doit = True
     force = False
-    cbz_mode = False
+    make_cbz = False
     conversions = ['epub']
     delete_formats = []
     opts, argv = getopt(argv, 'fn', 'cbz')
@@ -554,14 +554,19 @@ class KindleCommand(BaseCommand):
       elif opt == '-n':
         doit = False
       elif opt == '--cbz':
-        cbz_mode = True
+        make_cbz = True
         conversions = []
         delete_formats.append('azw3')
       else:
         raise RuntimeError("unhandled option: %r" % (opt,))
-    kindle.export_to_calibre(
-        calibre, argv, doit=doit, cbz_mode=cbz_mode, replace_format=force
-    )
+    if not argv:
+      argv = sorted(kindle.asins())
+    for asin in argv:
+      with Pfx(asin):
+        kbook = kindle.by_asin(asin)
+        kbook.export_to_calibre(
+            calibre, doit=doit, make_cbz=make_cbz, replace_format=force
+        )
 
   def cmd_import_calibre_dbids(self, argv):
     ''' Usage: {cmd} [--scrub]
