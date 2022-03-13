@@ -8,7 +8,13 @@ from datetime import datetime, timezone
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
 import os
-from os.path import isabs as isabspath, expanduser, join as joinpath
+from os.path import (
+    basename,
+    isabs as isabspath,
+    expanduser,
+    join as joinpath,
+    splitext,
+)
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from threading import Lock
@@ -240,9 +246,10 @@ class CalibreBook:
       mobi_subpath = self.mobi_subpath
       if mobi_subpath:
         mobipath = calibre.pathto(mobi_subpath)
+        base, ext = splitext(basename(mobipath))
         MB = Mobi(mobipath)
         with TemporaryDirectory() as tmpdirpath:
-          cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
+          cbzpath = joinpath(tmpdirpath, base + '.cbz')
           pfx_call(MB.make_cbz, cbzpath)
           calibre.add_format(cbzpath, self.dbid, force=replace_format)
       else:
