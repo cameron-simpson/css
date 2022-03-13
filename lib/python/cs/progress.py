@@ -16,6 +16,7 @@ import functools
 import sys
 from threading import RLock
 import time
+from typing import Optional
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
@@ -30,7 +31,9 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20210803-post'
+from typeguard import typechecked
+
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -38,8 +41,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.deco', 'cs.logutils', 'cs.py.func', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires': [
+        'cs.deco',
+        'cs.logutils',
+        'cs.py.func',
+        'cs.seq',
+        'cs.units',
+        'cs.upd',
+        'typeguard',
+    ],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -355,6 +365,7 @@ class BaseProgress(object):
   def bar(
       self,
       label=None,
+      *,
       upd=None,
       proxy=None,
       statusfunc=None,
@@ -377,7 +388,7 @@ class BaseProgress(object):
           which uses `sys.stderr` for display.
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
         * `window`: optional timeframe to define "recent" in seconds;
@@ -621,14 +632,16 @@ class Progress(BaseProgress):
   '''
 
   # pylint: disable=too-many-arguments
+  @typechecked
   def __init__(
       self,
-      position=None,
-      name=None,
-      start=None,
-      start_time=None,
-      throughput_window=None,
-      total=None,
+      name: Optional[str] = None,
+      *,
+      position: Optional[int] = None,
+      start: Optional[int] = None,
+      start_time: Optional[float] = None,
+      throughput_window: Optional[int] = None,
+      total: Optional[int] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.

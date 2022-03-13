@@ -1,101 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
-# Log an action to $LOGDIR/dlog-quick and also via buglog's dlog facility,
-# which uses buglog-daily.      - Cameron Simpson <cs@cskk.id.au>
-# 
+# Run the cs.app.dlog module command line mode.
+# - Cameron Simpson <cs@cskk.id.au> 07sep2021
+#
 
-set -ue
-
-cmd=$0
-usage="Usage: $cmd [-c cats] [-d datetime] [-l {log|logfile}] [--] [CATEGORIES:] [remark...]"
-
-dlog_cats=
-logname=dlog-quick
-trace=  ##set-x
-echo=:
-[ -t 2 ] && echo=eecho
-
-: ${LOGDIR:=$HOME/var/log}
-: ${DLOG_SQLTAGS:=${SQLTAGS_DBURL:-$HOME/var/sqltags.sqlite}}
-
-when=${DLOG_WHEN:-}
-
-[ -t 0 ] && exec </dev/null
-
-if [ -n "${HOMEHOST:-}" ]
-then
-  if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
-  then
-    if flag DLOG_REMOTE_DISABLE
-    then
-      $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
-    else
-      exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
-    fi
-  fi
-fi
-
-badopts=
-
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -c) dlog_cats=$2; shift ;;
-    -d) when=$2; shift ;;
-    -l) logname=$2; shift ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-if [ $# = 0 ]
-then
-  read -r headline || {
-    echo "$cmd: no headline on standard input" >&2
-    exit 1
-  }
-else
-  headline=$*
-fi
-
-# use -c or headline or dlog-category or UNKNOWN
-[ -n "$dlog_cats" ] || {
-  if    dlog_cats=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
-  then
-    headline=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
-  else
-    dlog_cats=`dlog-category` || {
-      echo "$cmd: WARNING: no -c option and no headline categories and no dlog-category, using UNKNOWN" >&2
-      dlog_cats=UNKNOWN
-    }
-  fi
-}
-
-case "$logname" in
-  /*) ;;
-  *) logname=$LOGDIR/$logname ;;
-esac
-
-# compute ISO8601 timestamp string
-if [ -n "$when" ]
-then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
-else  ts=`date '+%Y-%m-%d %H:%M:%S'`
-fi
-
-echo "$ts $dlog_cats: $headline" >>"$logname"
-(
-  ( set --
-    [ -z "$dlog_cats" ] || set -- -c "$dlog_cats"
-    [ -z "$when" ] || set -- -d "$when"
-    $trace sqltags -f "$DLOG_SQLTAGS" log "$@" -- "$headline"
-  ) &
-  $trace buglog-daily "$dlog_cats: $headline" &
-  for category in `printf "%s\n" "$dlog_cats" | tr , ' '`
-  do
-    $trace log-tsline -\? -d "$when" -- "$category" "$headline"
-  done &
-)
+import os
+import sys
+sys.path[:] = [ path for path in sys.path if path ]
+from cs.app.dlog import main
+sys.exit(main(sys.argv))

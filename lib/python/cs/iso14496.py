@@ -742,7 +742,7 @@ class Box(SimpleBinary):
       if length is Ellipsis:
         end_offset = Ellipsis
         bfr_tail = bfr
-        warning("Box.parse_buffer: Box %s has no length", header)
+        warning("Box.parse: Box %s has no length", header)
       else:
         end_offset = self.offset + length
         bfr_tail = bfr.bounded(end_offset)

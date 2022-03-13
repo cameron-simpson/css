@@ -9,10 +9,12 @@ Convenience facilities related to Python functions.
 '''
 
 from functools import partial
+from pprint import pformat
 from cs.deco import decorator
 from cs.py3 import unicode, raise_from
+from cs.x import X
 
-__version__ = '20210717-post'
+__version__ = '20220311.1-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -22,6 +24,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
+        'cs.deco',
         'cs.py3',
         'cs.x',
     ],
@@ -37,6 +40,8 @@ def funcname(func):
     try:
       return func.__name__
     except AttributeError:
+      if isinstance(func, partial):
+        return "partial(%s)" % (funcname(func.func),)
       return str(func)
 
 def funccite(func):
@@ -48,8 +53,50 @@ def funccite(func):
     return "%s[no.__code__]" % (repr(func),)
   return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
 
+def func_a_kw_fmt(func, *a, **kw):
+  ''' Prepare a percent-format string and associated argument list
+      describing a call to `func(*a,**kw)`.
+      Return `format,args`.
+
+      The `func` argument can also be a string,
+      presumably a prepared description of `func` such as `funccite(func)`.
+  '''
+  av = [
+      func if isinstance(func, str) else getattr(func, '__name__', str(func))
+  ]
+  afv = ['%r'] * len(a)
+  av.extend(a)
+  afv.extend(['%s=%r'] * len(kw))
+  for kv in kw.items():
+    av.extend(kv)
+  return '%s(' + ','.join(afv) + ')', av
+
+def callif(doit, func, *a, **kw):
+  ''' Call `func(*a,**kw)` if `doit` is true
+      otherwise just print it out.
+
+      The parameter `func` may be preceeded optionally by a `dict`
+      containing modes. The current modes are:
+      * `'print'`: the print function, default the builtin `print`
+  '''
+  if isinstance(func, dict):
+    modes = func
+    a = list(a)
+    func = a.pop(0)
+  else:
+    modes = {}
+  modes.setdefault('print', print)
+  if doit:
+    return func(*a, **kw)
+  fmt, av = func_a_kw_fmt(func, *a, **kw)
+  modes['print'](fmt % tuple(av))
+  return None
+
 @decorator
-def trace(func, call=True, retval=False, exception=False, pfx=False):
+# pylint: disable=too-many-arguments
+def trace(
+    func, call=True, retval=False, exception=False, pfx=False, pprint=False
+):
   ''' Decorator to report the call and return of a function.
   '''
 
@@ -59,25 +106,30 @@ def trace(func, call=True, retval=False, exception=False, pfx=False):
     ''' Wrapper for `func` to trace call and return.
     '''
     # late import so that we can use this in modules we import
+    # pylint: disable=import-outside-toplevel
     if pfx:
       try:
         from cs.pfx import XP as xlog
       except ImportError:
-        from cs.x import X as xlog
+        xlog = X
     else:
-      from cs.x import X as xlog
+      xlog = X
     if call:
-      xlog("CALL %s (a=%r,kw=%r)...", citation, a, kw)
+      fmt, av = func_a_kw_fmt(citation, *a, **kw)
+      xlog("CALL " + fmt, *av)
     try:
-      retval = func(*a, **kw)
+      result = func(*a, **kw)
     except Exception as e:
       if exception:
         xlog("CALL %s RAISE %r", citation, e)
       raise
     else:
       if retval:
-        xlog("CALL %s RETURN %r", citation, retval)
-      return retval
+        xlog(
+            "CALL %s RETURN %s", citation,
+            (pformat if pprint else repr)(result)
+        )
+      return result
 
   traced_function_wrapper.__name__ = "@trace(%s)" % (citation,)
   traced_function_wrapper.__doc__ = "@trace(%s)\n\n" + (func.__doc__ or '')
@@ -111,6 +163,7 @@ def prop(func):
       into RuntimeErrors.
   '''
 
+  # pylint: disable=inconsistent-return-statements
   def prop_wrapper(*a, **kw):
     try:
       return func(*a, **kw)

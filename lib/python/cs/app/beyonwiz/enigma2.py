@@ -11,21 +11,20 @@ import errno
 from collections import namedtuple
 import datetime
 import os.path
-from cs.binary import BinaryMultiValue
+from cs.binary import structtuple
 from cs.buffer import CornuCopyBuffer
 from cs.logutils import warning
 from cs.pfx import Pfx, pfx_method
 from cs.py3 import datetime_fromisoformat
 from cs.tagset import TagSet
 from cs.threads import locked_property
-from cs.x import X
-from . import _Recording, RecordingMetaData
+from . import _Recording
 
 # an "access poiint" record from the .ap file
-Enigma2APInfo = BinaryMultiValue('Enigma2APInfo', '>QQ', 'pts offset')
+Enigma2APInfo = structtuple('Enigma2APInfo', '>QQ', 'pts offset')
 
 # a "cut" record from the .cuts file
-Enigma2Cut = BinaryMultiValue('Enigma2Cut', '>QL', 'pts type')
+Enigma2Cut = structtuple('Enigma2Cut', '>QL', 'pts type')
 
 class Enigma2(_Recording):
   ''' Access Enigma2 recordings, such as those used on the Beyonwiz T3, T4 etc devices.
@@ -33,10 +32,11 @@ class Enigma2(_Recording):
         https://github.com/oe-alliance/oe-alliance-enigma2/blob/master/doc/FILEFORMAT
   '''
 
-  DEFAULT_FILENAME_BASIS = '{meta.title_lc}--{file.channel_lc}--beyonwiz--{file.datetime}--{meta.description_lc}'
+  DEFAULT_FILENAME_BASIS = '{meta.title:lc}--{file.channel:lc}--beyonwiz--{file.datetime}--{meta.description:lc}'
 
   def __init__(self, tspath):
     _Recording.__init__(self, tspath)
+    self.srcfmt = 'mpegts'
     self.tspath = tspath
     self.metapath = tspath + '.meta'
     self.appath = tspath + '.ap'
@@ -52,7 +52,7 @@ class Enigma2(_Recording):
     }
     with Pfx("meta %r", path):
       try:
-        with open(path) as metafp:
+        with open(path, 'r', encoding='utf8') as metafp:
           data['service_ref'] = metafp.readline().rstrip()
           data['title'] = metafp.readline().rstrip()
           data['description'] = metafp.readline().rstrip()

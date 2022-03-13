@@ -23,14 +23,14 @@ import re
 from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20210717-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -55,6 +55,8 @@ DISTINFO = {
 # pylint: disable=too-many-statements
 def named_row_tuple(*column_names, **kw):
   ''' Return a namedtuple subclass factory derived from `column_names`.
+      The primary use case is using the header row of a spreadsheet
+      to keey the data from the subsequent rows.
 
       Parameters:
       * `column_names`: an iterable of `str`, such as the heading columns
@@ -425,6 +427,11 @@ class SeqMapUC_Attrs(object):
     self.__M = M
     self.keepEmpty = keepEmpty
 
+  def __repr__(self):
+    return "%s(%r, keepEmpty=%s)" % (
+        type(self).__name__, self.__M, self.keepEmpty
+    )
+
   def __str__(self):
     kv = []
     for k, value in self.__M.items():
@@ -650,7 +657,7 @@ class MappingChain(object):
 
   def __getitem__(self, key):
     ''' Return the first value for `key` found in the mappings.
-        Raise KeyError if the key in not found in any mapping.
+        Raise `KeyError` if the key in not found in any mapping.
     '''
     for mapping in self.get_mappings():
       try:
@@ -948,7 +955,7 @@ class AttrableMappingMixin(object):
     ''' Unknown attributes are obtained from the mapping entries.
 
         Note that this first consults `self.__dict__`.
-        For many classes that is redundants, but subclasses of
+        For many classes that is redundant, but subclasses of
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
@@ -993,7 +1000,7 @@ class JSONableMappingMixin:
 
   @classmethod
   def from_json(cls, js):
-    ''' Prepare an dict from JSON text.
+    ''' Prepare a `dict` from JSON text.
 
       If the class has `json_object_hook` or `json_object_pairs_hook`
       attributes these are used as the `object_hook` and
@@ -1010,7 +1017,7 @@ class JSONableMappingMixin:
     return d
 
   def as_json(self):
-    ''' The dict transcribed as JSON.
+    ''' Return the `dict` transcribed as JSON.
 
         If the instance's class has `json_default` or `json_separators` these
         are used for the `default` and `separators` parameters of the `json.dumps()`
@@ -1282,6 +1289,20 @@ class RemappedMappingProxy:
     self._mapped_keys = {}
     self._mapped_subkeys = {}
 
+  def _self_check(self):
+    X("SELF CHECK")
+    assert len(self._mapped_keys) == len(self._mapped_subkeys)
+    assert set(self._mapped_keys.values()) == set(self._mapped_subkeys.keys())
+    assert set(self._mapped_keys.keys()) == set(self._mapped_subkeys.values())
+    for subk, k in self._mapped_subkeys.items():
+      with Pfx("subkey %r vs key %r", subk, k):
+        assert self._mapped_keys[k] == subk, (
+            "subkey %r => %r: self._mapped_keys[key]:%r != subkey:%r" %
+            (subk, k, self._mapped_keys[k], subk)
+        )
+    return True
+
+  @pfx_method
   def subkey(self, key):
     ''' Return the internal key for `key`.
     '''
@@ -1289,30 +1310,39 @@ class RemappedMappingProxy:
       subk = self._mapped_keys[key]
     except KeyError:
       subk = self._to_subkey(key)
-      assert subk not in self._mapped_subkeys
+      if subk in self._mapped_subkeys:
+        warning(
+            "no self._mapped_keys[key=%r], but we do have self._mapped_subkeys[subk=%r] => %r",
+            key, subk, self._mapped_subkeys[subk]
+        )
+        assert self._mapped_subkeys[subk] == key, \
+            "self._mapped_subkeys[subk=%r]:%r != key:%r" % (subk,self._mapped_subkeys[subk],key)
       self._mapped_keys[key] = subk
       self._mapped_subkeys[subk] = key
     return subk
 
-  def key(self, subkey):
-    ''' Return the external key for `subkey`.
+  @pfx_method
+  def key(self, subk):
+    ''' Return the external key for `subk`.
     '''
     try:
-      k = self._mapped_subkeys[subkey]
+      k = self._mapped_subkeys[subk]
     except KeyError:
-      k = self._from_subkey(subkey)
+      k = self._from_subkey(subk)
       assert k not in self._mapped_keys
-      self._mapped_keys[k] = subkey
-      self._mapped_subkeys[subkey] = k
+      self._mapped_keys[k] = subk
+      self._mapped_subkeys[subk] = k
     return k
 
   def keys(self, select_key=None):
     ''' Yield the external keys.
     '''
-    key_iter = self.mapping.keys()
+    subkey_iter = self.mapping.keys()
     if select_key is not None:
-      key_iter = filter(lambda subkey: select_key(self.key(subkey)), key_iter)
-    return map(self.key, key_iter)
+      subkey_iter = filter(
+          lambda subkey: select_key(self.key(subkey)), subkey_iter
+      )
+    return map(self.key, subkey_iter)
 
   def __contains__(self, key):
     return self.subkey(key) in self.mapping
@@ -1340,15 +1370,40 @@ class PrefixedMappingProxy(RemappedMappingProxy):
   '''
 
   def __init__(self, mapping, prefix):
+    # precompute function references
+    unprefixify = self.unprefixify_key
+    prefixify = self.prefixify_subkey
     super().__init__(
         mapping,
-        lambda key: prefix + key,
-        lambda subkey: cutprefix(subkey, prefix),
+        to_subkey=lambda key: prefixify(key, prefix),
+        from_subkey=lambda subk: unprefixify(subk, prefix),
     )
     self.prefix = prefix
+
+  def __str__(self):
+    return "%s[%r](prefix=%r,mapping=%s)" % (
+        type(self).__name__, type(self).__mro__, self.prefix, r(self.mapping)
+    )
+
+  @staticmethod
+  def prefixify_subkey(subk, prefix):
+    ''' Return the external (prefixed) key from a subkey `subk`.
+    '''
+    assert not subk.startswith(prefix)
+    return prefix + subk
+
+  @staticmethod
+  def unprefixify_key(key, prefix):
+    ''' Return the internal subkey (unprefixed) from the external `key`.
+    '''
+    assert key.startswith(prefix), \
+        "key:%r does not start with prefix:%r" % (key, prefix)
+    return cutprefix(key, prefix)
 
   # pylint: disable=arguments-differ
   def keys(self):
     ''' Yield the post-prefix suffix of the keys in `self.mapping`.
     '''
-    return super().keys(lambda subkey: subkey.startswith(self.prefix))
+    return super().keys(
+        select_key=lambda subkey: subkey.startswith(self.prefix)
+    )

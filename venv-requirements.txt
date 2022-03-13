@@ -2,9 +2,11 @@ b2sdk
 bs4
 discid
 enum34
+-e git+https://github.com/kkroening/ffmpeg-python.git@master#egg=ffmpeg-python
 icontract
 lmdb
 lxml
+mobi
 mypy
 musicbrainzngs
 pycodestyle
@@ -14,6 +16,7 @@ pylint
 pytest
 requests
 sqlalchemy
+tkmacosx
 twine
 typeguard
 watchdog

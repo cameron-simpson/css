@@ -41,6 +41,7 @@ from subprocess import run
 from threading import RLock
 import time
 from typing import List, Optional
+
 from icontract import ensure, require
 from sqlalchemy import (
     Column,
@@ -54,11 +55,13 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
 from cs.deco import fmtdoc
-from cs.lex import FormatAsError, get_decimal_value, typed_repr as r
+from cs.fileutils import shortpath
+from cs.lex import FormatAsError, get_decimal_value, r
 from cs.logutils import error, warning, track, info, ifverbose
 from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_method
@@ -74,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20210420-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -90,12 +93,13 @@ DISTINFO = {
         'cs.context',
         'cs.dateutils',
         'cs.deco',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
         'cs.sqlalchemy_utils>=20210420',
-        'cs.tagset',
+        'cs.tagset>=20211212',
         'cs.threads>=20201025',
         'cs.upd',
         'icontract',
@@ -451,6 +455,8 @@ class SQTEntityIdTest(SQTCriterion):
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.entity_ids)
 
+  # decimal parse, delim parameter not relevant
+  # pylint: disable=unused-argument
   @classmethod
   def parse(cls, s, offset=0, delim=None):
     ''' Parse a decimal entity id from `s`.
@@ -1235,7 +1241,9 @@ class SQLTagSet(SingletonMixin, TagSet):
     return d
 
   @typechecked
-  def __init__(self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw):
+  def __init__(
+      self, *, name=None, _id: int, _sqltags: "SQLTags", unixtime=None, **kw
+  ):
     try:
       pre_sqltags = self.__dict__['sqltags']
     except KeyError:
@@ -1264,7 +1272,7 @@ class SQLTagSet(SingletonMixin, TagSet):
   def name(self, new_name):
     ''' Set the `.name`.
     '''
-    if new_name != self._name:
+    if new_name != self._name:  # pylint: disable=access-member-before-definition
       e = self._get_db_entity()
       e.name = new_name
       self._name = new_name
@@ -1448,13 +1456,15 @@ class SQLTagSet(SingletonMixin, TagSet):
       )
     return children
 
+# pylint: disable=too-many-ancestors
 class SQLTags(BaseTagSets):
   ''' A class using an SQL database to store its `TagSet`s.
   '''
 
   @pfx_method
   def TagSetClass(self, *, name, **kw):
-    ''' Local implementation of `TagSetClass` so that we can annotate it with a `.singleton_also_by` attribute.
+    ''' Local implementation of `TagSetClass`
+        so that we can annotate it with a `.singleton_also_by` attribute.
     '''
     return super().TagSetClass(name=name, **kw)
 
@@ -1480,11 +1490,17 @@ class SQLTags(BaseTagSets):
     ## UNUSED? ## self.tags = SQLTagProxies(self.orm)
 
   def __str__(self):
-    return "%s(db_url=%r)" % (
-        type(self).__name__, getattr(self, 'db_url', None)
-    )
+    db_url = getattr(self, 'db_url', None)
+    if isinstance(db_url, str):
+      db_url_s = shortpath(db_url)
+    else:
+      db_url_s = str(db_url)
+    return "%s(%s)" % (type(self).__name__, db_url_s)
 
   def TAGSETCLASS_DEFAULT(self, *a, _sqltags=None, **kw):
+    ''' Factory to return a suitable `TagSet` subclass instance.
+        This produces an `SQLTagSet` instance correctly associated with this `SQLTags`.
+    '''
     if _sqltags is None:
       _sqltags = self
     else:
@@ -1492,9 +1508,16 @@ class SQLTags(BaseTagSets):
     return SQLTagSet(*a, _sqltags=_sqltags, **kw)
 
   @contextmanager
+  def startup_shutdown(self):
+    ''' Stub startup/shutdown since we use autosessions.
+        Particularly, we do not want to keep SQLite dbs open.
+    '''
+    yield self
+
+  @contextmanager
   def db_session(self, *, new=False):
-    ''' Context manager to obtain a db session if required,
-        just a shim for `self.orm.session()`.
+    ''' Context manager to obtain a db session if required
+        (or if `new` is true).
     '''
     orm_state = self.orm.sqla_state
     get_session = orm_state.new_session if new else orm_state.auto_session
@@ -1540,9 +1563,9 @@ class SQLTags(BaseTagSets):
               tag.name, to_polyvalue(tag.name, tag.value), session=session
           )
       # refresh entry from some source if there is a .refresh() method
-      refresh = te.refresh
+      refresh = getattr(type(te), 'refresh', None)
       if refresh is not None and callable(refresh):
-        refresh()
+        refresh(te)
     else:
       # update the existing SQLTagSet
       if unixtime is not None:
@@ -1644,7 +1667,8 @@ class SQLTags(BaseTagSets):
       criterion = "name"
     else:
       # anything with a name commencing with prefix
-      criterion = 'name~' + Tag.transcribe_value(prefix + '?*')
+      # note that the ~ comparitor expects a bare glob after the ~
+      criterion = 'name~' + prefix + '?*'
     return self.find(criterion)
 
   @staticmethod
@@ -1921,7 +1945,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     tes = list(sqltags.find(tag_criteria))
-    changed_tes = TagSet.edit_many(tes)  # verbose=state.verbose
+    changed_tes = TagSet.edit_tagsets(tes)  # verbose=state.verbose
     for old_name, new_name, te in changed_tes:
       print("changed", repr(te.name or te.id))
       if old_name != new_name:

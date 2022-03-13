@@ -12,7 +12,7 @@ from __future__ import with_statement, print_function, absolute_import
 from contextlib import contextmanager
 import errno
 from functools import partial
-import json
+import gzip
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET, O_RDONLY, read, rename
 try:
@@ -26,7 +26,6 @@ from os.path import (
     exists as existspath,
     isabs as isabspath,
     isdir,
-    isfile as isfilepath,
     join as joinpath,
     splitext,
 )
@@ -40,20 +39,18 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
+from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
-from cs.mappings import IndexedSetMixin, UUIDedDict
-from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.progress import Progress, progressbar
 from cs.py3 import ustr, bytes, pread  # pylint: disable=redefined-builtin
 from cs.range import Range
 from cs.result import CancellationError
 from cs.threads import locked
-from cs.timeutils import TimeoutError
 from cs.units import BINARY_BYTES_SCALE
 
-__version__ = '20210731-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -67,17 +64,15 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
+        'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
-        'cs.mappings>=20210717',
-        'cs.obj',
         'cs.pfx>=pfx_call',
         'cs.progress',
         'cs.py3',
         'cs.range',
         'cs.result',
         'cs.threads',
-        'cs.timeutils',
         'cs.units',
     ],
 }
@@ -334,43 +329,6 @@ def rewrite_cmgr(filepath, mode='w', **kw):
     T.flush()
     with open(T.name, 'rb') as f:
       rewrite(filepath, mode='wb', srcf=f, **kw)
-
-@strable
-def scan_ndjson(f, dictclass=dict, error_list=None):
-  ''' Read a newline delimited JSON file, yield instances of `dictclass`
-      (default `dict`, otherwise a class which can be instantiated
-      by `dictclass(a_dict)`).
-
-      `error_list` is an optional list to accrue `(lineno,exception)` tuples
-      for errors encountered during the scan.
-  '''
-  for lineno, line in enumerate(f, 1):
-    with Pfx("line %d", lineno):
-      try:
-        d = json.loads(line)
-      except json.JSONDecodeError as e:
-        warning("%s", e)
-        if error_list:
-          error_list.append((lineno, e))
-        continue
-      if dictclass is not dict:
-        d = dictclass(**d)
-    yield d
-
-@strable(open_func=lambda filename: open(filename, 'w'))
-def write_ndjson(f, objs):
-  ''' Transcribe an iterable of objects to a file as newline delimited JSON.
-  '''
-  for lineno, o in enumerate(objs, 1):
-    with Pfx("line %d", lineno):
-      f.write(json.dumps(o, separators=(',', ':')))
-      f.write('\n')
-
-@strable(open_func=lambda filename: open(filename, 'a'))
-def append_ndjson(f, objs):
-  ''' Append an iterable of objects to a file as newline delimited JSON.
-  '''
-  return write_ndjson(f, objs)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
@@ -1743,6 +1701,7 @@ def atomic_filename(
 
       Example:
 
+          >>> import os
           >>> from os.path import exists as existspath
           >>> fn = 'test_atomic_filename'
           >>> with atomic_filename(fn, mode='w') as f:
@@ -1751,7 +1710,8 @@ def atomic_filename(
           ...     assert not existspath(fn)
           ...
           >>> assert existspath(fn)
-          >>> assert open(fn).read() == 'foo\n'
+          >>> assert open(fn).read() == 'foo\\n'
+          >>> os.remove(fn)
   '''
   if dir is None:
     dir = dirname(filename)
@@ -1774,7 +1734,7 @@ def atomic_filename(
         pfx_call(shutil.copymode, filename, T.name)
       except OSError as e:
         warning(
-            "defaut modes not copied from from placehodler %r: %s", filename, e
+            "defaut modes not copied from from placeholder %r: %s", filename, e
         )
     pfx_call(rename, T.name, filename)
 
@@ -1849,78 +1809,58 @@ class RWFileBlockCache(object):
     assert len(data) == length
     return data
 
-class UUIDNDJSONMapping(SingletonMixin, IndexedSetMixin):
-  ''' A subclass of `IndexedSetMixin` which maintains records
-      from a newline delimited JSON file.
+@contextmanager
+def gzifopen(path, mode='r', *a, **kw):
+  ''' Context manager to open a file which may be a plain file or a gzipped file.
+
+      If `path` ends with `'.gz'` then the filesystem paths attempted
+      are `path` and `path` without the extension, otherwise the
+      filesystem paths attempted are `path+'.gz'` and `path`.  In
+      this way a path ending in `'.gz'` indicates a preference for
+      a gzipped file otherwise an uncompressed file.
+
+      However, if exactly one of the paths exists already then only
+      that path will be used.
+
+      Note that the single character modes `'r'`, `'a'`, `'w'` and `'x'`
+      are text mode for both uncompressed and gzipped opens,
+      like the builtin `open` and *unlike* `gzip.open`.
+      This is to ensure equivalent behaviour.
   '''
-
-  IndexedSetMixin__pk = 'uuid'
-
-  # pylint: disable=unused-argument
-  @staticmethod
-  def _singleton_key(filename, dictclass=UUIDedDict, create=False):
-    ''' Key off the absolute path of `filename`.
-    '''
-    return abspath(filename)
-
-  def __init__(self, filename, dictclass=UUIDedDict, create=False):
-    ''' Initialise the mapping.
-
-        Parameters:
-        * `filename`: the file containing the newline delimited JSON data;
-          this need not yet exist
-        * `dictclass`: a optional `dict` subclass to hold each record,
-          default `UUIDedDict`
-        * `create`: if true, ensure the file exists
-          by transiently opening it for append if it is missing;
-          default `False`
-    '''
-    if hasattr(self, '_lock'):
-      return
-    self.__ndjson_filename = filename
-    self.__dictclass = dictclass
-    if create and not isfilepath(filename):
-      # make sure the file exists
-      with open(filename, 'a'):
-        pass
-    self.scan_errors = []
-    self._lock = RLock()
-
-  def __str__(self):
-    return "%s(%r,%s)" % (
-        type(self).__name__, self.__ndjson_filename, self.__dictclass.__name__
-    )
-
-  def scan(self):
-    ''' Scan the backing file, yield records.
-    '''
-    if existspath(self.__ndjson_filename):
-      self.scan_errors = []
-      for record in scan_ndjson(self.__ndjson_filename, self.__dictclass,
-                                error_list=self.scan_errors):
-        yield record
-
-  def add_backend(self, record):
-    ''' Append `record` to the backing file.
-    '''
-    with open(self.__ndjson_filename, 'a') as f:
-      f.write(record.as_json())
-      f.write('\n')
-
-  def rewrite_backend(self):
-    ''' Rewrite the backing file.
-
-        Because the record updates are normally written in append mode,
-        a rewrite will be required every so often.
-    '''
-    with self._lock:
-      with rewrite_cmgr(self.__ndjson_filename) as T:
-        i = 0
-        for i, record in enumerate(self.by_uuid.values(), 1):
-          T.write(record.as_json())
-          T.write('\n')
-        T.flush()
-      self.scan_length = i
+  compresslevel = kw.pop('compresslevel', 9)
+  path0 = path
+  path, ext = splitext(path)
+  if ext == '.gz':
+    # gzip preferred
+    gzpath = path0
+    path1, path2 = gzpath, path
+  else:
+    # unzipped has precedence
+    gzpath = path0 + '.gz'
+    path1, path2 = path0, gzpath
+  # if exactly one of the files exists, try only that file
+  if existspath(path1) and not existspath(path2):
+    paths = path1,
+  elif existspath(path2) and not existspath(path1):
+    paths = path2,
+  else:
+    paths = path1, path2
+  for openpath in paths:
+    try:
+      with (gzip.open(openpath,
+                      (mode + 't' if mode in ('r', 'a', 'w', 'x') else mode), *
+                      a, compresslevel=compresslevel, **kw) if
+            openpath.endswith('.gz') else open(openpath, mode, *a, **kw)) as f:
+        yield f
+    except FileNotFoundError:
+      # last path to try
+      if openpath == paths[-1]:
+        raise
+      # not present, try the other file
+      continue
+    # open succeeded, we're done
+    return
+  raise RuntimeError("NOTREACHED")
 
 if __name__ == '__main__':
   import cs.fileutils_tests

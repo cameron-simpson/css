@@ -1,0 +1,6 @@
+SQLTagsCommand: rename cmd_ns to cmd_list,cmd_ls.
+SQLTagsCommand.cmd_export: accept "-F export_format" for csv or fstags export, accept no criteria to mean all tagsets.
+Encoding schema for nonJSONable types.
+Rename the TagSets abstract base class to BaseTagSets.
+BaseSQLTagsCommand.cmd_edit: implement rename.
+Many other internal small changes.
