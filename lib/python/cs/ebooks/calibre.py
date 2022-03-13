@@ -237,13 +237,18 @@ class CalibreBook:
     if 'CBZ' in formats and not replace_format:
       warning("format CBZ already present, not adding")
     else:
-      azw3_subpath = formats['AZW3']
-      mobipath = calibre.pathto(azw3_subpath)
-      MB = Mobi(mobipath)
-      with TemporaryDirectory() as tmpdirpath:
-        cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
-        pfx_call(MB.make_cbz, cbzpath)
-        calibre.add_format(cbzpath, self.dbid, force=replace_format)
+      mobi_subpath = self.mobi_subpath
+      if mobi_subpath:
+        mobipath = calibre.pathto(mobi_subpath)
+        MB = Mobi(mobipath)
+        with TemporaryDirectory() as tmpdirpath:
+          cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
+          pfx_call(MB.make_cbz, cbzpath)
+          calibre.add_format(cbzpath, self.dbid, force=replace_format)
+      else:
+        raise ValueError(
+            "no AZW3, AZW or MOBI format from which to construct a CBZ"
+        )
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
