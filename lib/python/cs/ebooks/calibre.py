@@ -39,6 +39,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
+from cs.fileutils import shortpath
 from cs.logutils import error, warning
 from cs.lex import cutprefix
 from cs.obj import SingletonMixin
@@ -513,13 +514,19 @@ class CalibreCommand(BaseCommand):
 
   GETOPT_SPEC = 'C:K:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
+  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
     Specify kindle library location.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'ls'
+
+  DEFAULT_LINK_IDENTIFIER = 'mobi-asin'
+
+  USAGE_KEYWORDS = {
+      'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
+  }
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
@@ -599,6 +606,44 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+
+  def cmd_import_from_calibre(self, argv):
+    ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
+          Import formats from another Calibre library.
+          other-library: the path to another Calibre library tree
+          identifier-name: the key on which to link matching books;
+            the default is {DEFAULT_LINK_IDENTIFIER}
+          identifier-values: specific book identifiers to import
+    '''
+    options = self.options
+    calibre = options.calibre
+    if not argv:
+      raise GetoptError("missing other-library")
+    other_library = CalibreTree(argv.pop(0))
+    with Pfx(shortpath(other_library.fspath)):
+      if other_library is calibre:
+        raise GetoptError("cannot import from the same library")
+      if argv:
+        identifier_name = argv.pop(0)
+      else:
+        identifier_name = self.DEFAULT_LINK_IDENTIFIER
+      if argv:
+        identifier_values = argv
+      else:
+        identifier_values = sorted(
+            set(
+                filter(
+                    lambda idv: idv is not None, (
+                        cbook.identifiers_as_dict().get(identifier_name)
+                        for cbook in other_library
+                    )
+                )
+            )
+        )
+      for identifier_value in identifier_values:
+        with Pfx("%s:%s", identifier_name, identifier_value):
+          ##print(identifier_value)
+          pass
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
