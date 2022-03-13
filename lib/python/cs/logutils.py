@@ -422,20 +422,26 @@ class PfxFormatter(Formatter):
     ''' Monkey patch an existing `Formatter` instance
         with a `format` method which prepends the current `Pfx` prefix.
     '''
-    old_format = formatter.format
+    if isinstance(formatter, PfxFormatter):
+      return
+    try:
+      getattr(formatter, 'PfxFormatter__monkey_patched')
+    except AttributeError:
+      old_format = formatter.format
 
-    def new_format(record):
-      ''' Call the former `formatter.format` method
-          and prepend the current `Pfx` prefix to the start.
-      '''
-      cur_pfx = Pfx._state.prefix
-      if not cur_pfx:
-        return old_format(record)
-      with stackattrs(record,
-                      msg=cur_pfx + cs.pfx.DEFAULT_SEPARATOR + record.msg):
-        return old_format(record)
+      def new_format(record):
+        ''' Call the former `formatter.format` method
+            and prepend the current `Pfx` prefix to the start.
+        '''
+        cur_pfx = Pfx._state.prefix
+        if not cur_pfx:
+          return old_format(record)
+        with stackattrs(record,
+                        msg=cur_pfx + cs.pfx.DEFAULT_SEPARATOR + record.msg):
+          return old_format(record)
 
-    formatter.format = new_format
+      formatter.format = new_format
+      formatter.PfxFormatter__monkey_patched = True
 
 # pylint: disable=too-many-branches,too-many-statements,redefined-outer-name
 def infer_logging_level(env_debug=None, environ=None, verbose=None):
