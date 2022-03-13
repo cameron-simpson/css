@@ -13,12 +13,14 @@ from os.path import (
     isabs as isabspath,
     expanduser,
     join as joinpath,
+    realpath,
     splitext,
 )
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from tempfile import TemporaryDirectory
 from threading import Lock
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -39,6 +41,7 @@ from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.logutils import error, warning
 from cs.lex import cutprefix
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -54,7 +57,7 @@ from cs.x import X
 
 from . import HasFSPath
 
-class CalibreTree(HasFSPath, MultiOpenMixin):
+class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
@@ -62,11 +65,27 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
   CALIBRE_LIBRARY_ENVVAR = 'CALIBRE_LIBRARY'
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
-  def __init__(self, calibre_library=None):
+  @classmethod
+  def _get_default_library_path(cls):
+    calibre_library = os.environ.get(cls.CALIBRE_LIBRARY_ENVVAR)
     if calibre_library is None:
-      calibre_library = os.environ.get(self.CALIBRE_LIBRARY_ENVVAR)
-      if calibre_library is None:
-        calibre_library = expanduser(self.CALIBRE_LIBRARY_DEFAULT)
+      calibre_library = expanduser(cls.CALIBRE_LIBRARY_DEFAULT)
+    return calibre_library
+
+  @classmethod
+  def _singleton_key(cls, calibre_library=None):
+    ''' `CalibreTree`s are identified by `realpath(calibre_library)`.
+    '''
+    if calibre_library is None:
+      calibre_library = cls._get_default_library_path()
+    return realpath(calibre_library)
+
+  @typechecked
+  def __init__(self, calibre_library: Optional[str] = None):
+    if hasattr(self, '_lock'):
+      return
+    if calibre_library is None:
+      calibre_library = self._get_default_library_path()
     HasFSPath.__init__(self, calibre_library)
     self._lock = Lock()
 
