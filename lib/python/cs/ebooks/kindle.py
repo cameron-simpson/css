@@ -240,7 +240,7 @@ class KindleBook:
       '''
     phl_path = self.subpath(self.subdir_name + '.phl')
     try:
-      with open(phl_path, 'rb') as f:
+      with pfx_call(open, phl_path, 'rb') as f:
         xml_bs = f.read()
     except FileNotFoundError:
       return None
