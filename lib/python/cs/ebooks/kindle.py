@@ -54,6 +54,8 @@ class KindleTree(HasFSPath, MultiOpenMixin):
   # environment variable to override the path
   KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
 
+  SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
+
   def __init__(self, kindle_library=None):
     if kindle_library is None:
       kindle_library = os.environ.get(self.KINDLE_LIBRARY_ENVVAR)
@@ -89,7 +91,7 @@ class KindleTree(HasFSPath, MultiOpenMixin):
   def is_book_subdir(subdir_name):
     ''' Test whther `subdir_name` is a Kindle ebook subdirectory basename.
     '''
-    return subdir_name.endswith(('_EBOK', '_EBSP'))
+    return subdir_name.endswith(self.SUBDIR_SUFFIXES)
 
   def book_subdir_names(self):
     ''' Return a list of the individual ebook subdirectory names.
@@ -110,7 +112,12 @@ class KindleTree(HasFSPath, MultiOpenMixin):
   def by_asin(self, asin):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
-    return self[asin.upper() + '_EBOK']
+    ASIN = asin.upper()
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = ASIN + suffix
+      if isdirpath(self.pathto(subdir_name)):
+        return self[subdir_name]
+    return self[ASIN + self.SUBDIR_SUFFIXES[0]]
 
   def keys(self):
     ''' The keys of a `KindleTree` are its book subdirectory names.
