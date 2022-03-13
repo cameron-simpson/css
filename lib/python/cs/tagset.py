@@ -88,104 +88,102 @@
         >>> subtopic2 in tags
         False
 
-== Ontologies ==
+    == Ontologies ==
 
-`Tag`s and `TagSet`s suffice to apply simple annotations to things.
-However, an ontology brings meaning to those annotations.
+    `Tag`s and `TagSet`s suffice to apply simple annotations to things.
+    However, an ontology brings meaning to those annotations.
 
-See the `TagsOntology` class for implementation details,
-access methods and more examples.
+    See the `TagsOntology` class for implementation details,
+    access methods and more examples.
 
-Consider a record about a movie, with these tags (a `TagSet`):
+    Consider a record about a movie, with these tags (a `TagSet`):
 
-    title="Avengers Assemble"
-    series="Avengers (Marvel)"
-    cast={"Scarlett Johansson":"Black Widow (Marvel)"}
+        title="Avengers Assemble"
+        series="Avengers (Marvel)"
+        cast={"Scarlett Johansson":"Black Widow (Marvel)"}
 
-where we have the movie title,
-a name for the series in which it resides,
-and a cast as an association of actors with roles.
+    where we have the movie title,
+    a name for the series in which it resides,
+    and a cast as an association of actors with roles.
 
-An ontology lets us associate implied types and metadata with these values.
+    An ontology lets us associate implied types and metadata with these values.
 
-Here's an example ontology supporting the above `TagSet`:
+    Here's an example ontology supporting the above `TagSet`:
 
-    type.cast type=dict key_type=person member_type=character description="members of a production"
-    type.character description="an identified member of a story"
-    type.series type=str
-    character.marvel.black_widow type=character names=["Natasha Romanov"]
-    person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
+        type.cast type=dict key_type=person member_type=character description="members of a production"
+        type.character description="an identified member of a story"
+        type.series type=str
+        character.marvel.black_widow type=character names=["Natasha Romanov"]
+        person.scarlett_johansson fullname="Scarlett Johansson" bio="Known for Black Widow in the Marvel stories."
 
-The type information for a `cast`
-is defined by the ontology entry named `type.cast`,
-which tells us that a `cast` `Tag` is a `dict`,
-whose keys are of type `person`
-and whose values are of type `character`.
-(The default type is `str`.)
+    The type information for a `cast`
+    is defined by the ontology entry named `type.cast`,
+    which tells us that a `cast` `Tag` is a `dict`,
+    whose keys are of type `person`
+    and whose values are of type `character`.
+    (The default type is `str`.)
 
-To find out the underlying type for a `character`
-we look that up in the ontology in turn;
-because it does not have a specified `type` `Tag`, it it taken to be a `str`.
+    To find out the underlying type for a `character`
+    we look that up in the ontology in turn;
+    because it does not have a specified `type` `Tag`, it it taken to be a `str`.
 
-Having the types for a `cast`,
-it is now possible to look up the metadata for the described cast members.
+    Having the types for a `cast`,
+    it is now possible to look up the metadata for the described cast members.
 
-The key `"Scarlett Johansson"` is a `person`
-(from the type definition of `cast`).
-The ontology entry for her is named `person.scarlett_johansson`
-which is computed as:
-* `person`: the type name
-* `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
-  and replacing whitespace with an underscore.
-  The full conversion process is defined
-  by the `TagsOntology.value_to_tag_name` function.
+    The key `"Scarlett Johansson"` is a `person`
+    (from the type definition of `cast`).
+    The ontology entry for her is named `person.scarlett_johansson`
+    which is computed as:
+    * `person`: the type name
+    * `scarlett_johansson`: obtained by downcasing `"Scarlett Johansson"`
+      and replacing whitespace with an underscore.
+      The full conversion process is defined
+      by the `TagsOntology.value_to_tag_name` function.
 
-The key `"Black Widow (Marvel)"` is a `character`
-(again, from the type definition of `cast`).
-The ontology entry for her is named `character.marvel.black_widow`
-which is computed as:
-* `character`: the type name
-* `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
-  replacing whitespace with an underscore,
-  and moving a bracketed suffix to the front as an unbracketed prefix.
-  The full conversion process is defined
-  by the `TagsOntology.value_to_tag_name` function.
+    The key `"Black Widow (Marvel)"` is a `character`
+    (again, from the type definition of `cast`).
+    The ontology entry for her is named `character.marvel.black_widow`
+    which is computed as:
+    * `character`: the type name
+    * `marvel.black_widow`: obtained by downcasing `"Black Widow (Marvel)"`,
+      replacing whitespace with an underscore,
+      and moving a bracketed suffix to the front as an unbracketed prefix.
+      The full conversion process is defined
+      by the `TagsOntology.value_to_tag_name` function.
 
-== Format Strings ==
+    == Format Strings ==
 
-You can just use `str.format_map` as shown above
-for the direct values in a `TagSet`,
-since it subclasses `dict`.
+    You can just use `str.format_map` as shown above
+    for the direct values in a `TagSet`,
+    since it subclasses `dict`.
 
-However, `TagSet`s also subclass `cs.lex.FormatableMixin`
-and therefore have a richer `format_as` method which has an extended syntax
-for the format component.
-Command line tools like `fstags` use this for output format specifications.
+    However, `TagSet`s also subclass `cs.lex.FormatableMixin`
+    and therefore have a richer `format_as` method which has an extended syntax
+    for the format component.
+    Command line tools like `fstags` use this for output format specifications.
 
-An example:
+    An example:
 
-    >>> # an ontology specifying the type for a colour
-    >>> # and some information about the colour "blue"
-    >>> ont = TagsOntology(
-    ...   {
-    ...       'type.colour':
-    ...       TagSet(description="a colour, a hue", type="str"),
-    ...       'colour.blue':
-    ...       TagSet(
-    ...           url='https://en.wikipedia.org/wiki/Blue',
-    ...           wavelengths='450nm-495nm'
-    ...       ),
-    ...   }
-    ... )
-    >>> # tag set with a "blue" tag, using the ontology above
-    >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
-    >>> tags.format_as('The colour is {colour}.')
-    'The colour is blue.'
-    >>> # format a string about the tags showing some metadata about the colour
-    >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
-    'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
-
-
+        >>> # an ontology specifying the type for a colour
+        >>> # and some information about the colour "blue"
+        >>> ont = TagsOntology(
+        ...   {
+        ...       'type.colour':
+        ...       TagSet(description="a colour, a hue", type="str"),
+        ...       'colour.blue':
+        ...       TagSet(
+        ...           url='https://en.wikipedia.org/wiki/Blue',
+        ...           wavelengths='450nm-495nm'
+        ...       ),
+        ...   }
+        ... )
+        >>> # tag set with a "blue" tag, using the ontology above
+        >>> tags = TagSet(colour='blue', labels=['a', 'b', 'c'], size=9, _ontology=ont)
+        >>> tags.format_as('The colour is {colour}.')
+        'The colour is blue.'
+        >>> # format a string about the tags showing some metadata about the colour
+        >>> tags.format_as('Information about the colour may be found here: {colour:metadata.url}')
+        'Information about the colour may be found here: https://en.wikipedia.org/wiki/Blue'
 '''
 
 from abc import ABC, abstractmethod
