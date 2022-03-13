@@ -613,7 +613,7 @@ class KindleCommand(BaseCommand):
                 "%d Calibre books with ASIN %s, using calibre.dbid=%d",
                 len(cbooks), asin, cbook.id
             )
-        if dbid is not None and cbook.id != dbid:
+        if dbid is None or cbook.id != dbid:
           print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
           kbook.tags['calibre.dbid'] = cbook.id
 
