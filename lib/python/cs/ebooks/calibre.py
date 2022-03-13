@@ -17,6 +17,7 @@ from os.path import (
 )
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
+from tempfile import TemporaryDirectory
 from threading import Lock
 
 from icontract import require
@@ -36,7 +37,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.logutils import error
+from cs.logutils import error, warning
 from cs.lex import cutprefix
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
@@ -89,7 +90,7 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
   @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
-  def book_by_dbid(self, dbid, *, db_book=None):
+  def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
     return CalibreBook(self, dbid, db_book=db_book)
@@ -199,6 +200,8 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
     )
 
 class CalibreBook:
+  ''' A reference to a book in a Calibre library.
+  '''
 
   @typechecked
   def __init__(self, tree: CalibreTree, dbid: int, *, db_book=None):
@@ -237,7 +240,7 @@ class CalibreBook:
   def make_cbz(self, replace_format=False):
     ''' Create a CBZ format from the AZW3 Mobi format.
     '''
-    from .mobi import Mobi
+    from .mobi import Mobi  # pylint: disable=import-outside-toplevel
     calibre = self.tree
     formats = self.formats_as_dict()
     if 'CBZ' in formats and not replace_format:
@@ -246,7 +249,7 @@ class CalibreBook:
       mobi_subpath = self.mobi_subpath
       if mobi_subpath:
         mobipath = calibre.pathto(mobi_subpath)
-        base, ext = splitext(basename(mobipath))
+        base, _ = splitext(basename(mobipath))
         MB = Mobi(mobipath)
         with TemporaryDirectory() as tmpdirpath:
           cbzpath = joinpath(tmpdirpath, base + '.cbz')
