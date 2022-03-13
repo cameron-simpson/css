@@ -148,6 +148,71 @@ class KindleTree(HasFSPath, MultiOpenMixin):
     for k in self:
       yield k, self[k]
 
+  def export_to_calibre(
+      self,
+      calibre,
+      asins,
+      *,
+      doit=True,
+      cbz_mode=False,
+      replace_format=False,
+  ):
+    ''' Export Kindle books to a Calibre instance.
+
+        Parameters:
+        * `calibre`: the `CalibreTree`
+        * `asins`: an iterable of ASINs;
+          if empty then all books are considered
+        * `doit`: if false, just recite actions; default `True`
+        * `cbz_mode`: create a CBZ file after the initial import
+        * `replace_format`: if true, export even if the `AZW3` format is already present
+    '''
+    from .mobi import Mobi
+    kbook_map = {}
+    for asin in asins:
+      kbook = self.by_asin(asin)
+      kbook_map[kbook.subdir_name] = kbook
+    if not kbook_map:
+      kbook_map = dict(sorted(self.items()))
+    for subdir_name, kbook in kbook_map.items():
+      with Pfx(kbook.asin):
+        azw_path = kbook.extpath('azw')
+        dbid = kbook.tags.auto.calibre.dbid
+        if dbid:
+          # book already present in calibre
+          print(subdir_name, "calibre.dbid:", dbid)
+          cbook = calibre[dbid]
+          with Pfx("calibre %d: %s", dbid, cbook.title):
+            formats = cbook.formats_as_dict()
+            print("formats =", repr(formats))
+            if 'AZW3' in formats and not replace_format:
+              warning("format AZW3 already present, not adding")
+            else:
+              callif(
+                  doit,
+                  calibre.add_format,
+                  azw_path,
+                  dbid,
+                  force=replace_format,
+              )
+        else:
+          # book does not have a known dbid, presume not added
+          if doit:
+            dbid = calibre.add(azw_path)
+            X("dbid = %d", dbid)
+            kbook.tags['calibre.dbid'] = dbid
+            cbook = calibre.by_id(dbid)
+            formats = cbook.formats_as_dict()
+          else:
+            info("calibre.add %s", azw_path)
+        # AZW added, check if a CBZ is required
+        if cbz_mode:
+          if doit:
+            with Pfx("calibre %d: %s", dbid, cbook.title):
+              cbook.make_cbz(replace_format=replace_format)
+          else:
+            print("create CBZ from the imported AZW3, then remove the AZW3")
+
 class KindleBook:
   ''' A reference to a Kindle library book subdirectory.
   '''
@@ -482,7 +547,6 @@ class KindleCommand(BaseCommand):
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
-    from .mobi import Mobi
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
@@ -503,44 +567,9 @@ class KindleCommand(BaseCommand):
         delete_formats.append('azw3')
       else:
         raise RuntimeError("unhandled option: %r" % (opt,))
-    kbook_map = {}
-    for asin in argv:
-      kbook = kindle.by_asin(asin)
-      kbook_map[kbook.subdir_name] = kbook
-    if not kbook_map:
-      kbook_map = dict(sorted(kindle.items()))
-    for subdir_name, kbook in kbook_map.items():
-      azw_path = kbook.extpath('azw')
-      dbid = kbook.tags.auto.calibre.dbid
-      if dbid:
-        print(subdir_name, "calibre.dbid:", dbid)
-        cbook = calibre[dbid]
-        formats = cbook.formats_as_dict()
-        print("formats =", repr(formats))
-        if 'AZW3' in formats and not force:
-          warning("format AZW3 already present, not adding")
-        else:
-          callif(doit, calibre.add_format, azw_path, dbid, force=force)
-      else:
-        dbid = callif(doit, calibre.add, azw_path)
-        if doit:
-          X("dbid = %d", dbid)
-          kbook.tags['calibre.dbid'] = dbid
-          cbook = calibre.by_id(dbid)
-          formats = cbook.formats_as_dict()
-      if cbz_mode:
-        if doit:
-          X("cbook = %s %r", cbook, formats)
-          mobipath = calibre.pathto(formats['AZW3'])
-          MB = Mobi(mobipath)
-          with TemporaryDirectory() as tmpdirpath:
-            cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
-            MB.make_cbz(cbzpath)
-            calibre.add_format(cbzpath, dbid)
-        else:
-          print("create CBZ from the imported AZW3, then remove the AZW3")
-      else:
-        print(subdir_name, "add", azw_path)
+    kindle.export_to_calibre(
+        calibre, argv, doit=doit, cbz_mode=cbz_mode, replace_format=force
+    )
 
   def cmd_import_calibre_dbids(self, argv):
     ''' Usage: {cmd} [--scrub]
