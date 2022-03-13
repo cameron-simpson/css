@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20210306-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

@@ -73,7 +73,7 @@ from cs.resources import RunState
 from cs.seq import seq, Seq
 from cs.threads import bg as bg_thread, State as ThreadState
 
-__version__ = '20210420-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

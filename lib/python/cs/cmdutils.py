@@ -24,13 +24,9 @@ from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20211208-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
-    'description':
-    "a `BaseCommand` class for constructing command lines,"
-    " some convenience functions for working with the `cmd` module,"
-    " and some other command line related stuff",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -110,7 +106,7 @@ class _BaseSubCommand:
   def from_class(command_cls):
     ''' Return a mapping of subcommand names to subcommand specifications
         for class attributes which commence with
-        `command_cls.SUBCOMMAND_METHOD_PREFIX`
+        `command_cls.SUBCOMMAND_METHOD_PREFIX`,
         by default `'cmd_'`.
     '''
     prefix = command_cls.SUBCOMMAND_METHOD_PREFIX
@@ -128,9 +124,10 @@ class _BaseSubCommand:
         )
     return subcommands_map
 
-  def usage_text(self, short):
+  def usage_text(self, short, usage_format_mapping=None):
     ''' Return the filled out usage text for this subcommand.
     '''
+    usage_format_mapping = usage_format_mapping or {}
     subusage_format = self.usage_format()  # pylint: disable=no-member
     if subusage_format:
       if short:
@@ -140,6 +137,8 @@ class _BaseSubCommand:
           for k, v in sys.modules[self.method.__module__].__dict__.items()
           if k and not k.startswith('_')
       }
+      if usage_format_mapping:
+        mapping.update(usage_format_mapping)
       if self.usage_mapping:
         mapping.update(self.usage_mapping)
       mapping.update(cmd=self.cmd)
@@ -238,9 +237,14 @@ class BaseCommand:
       generally just implement a `main(argv)` method.
 
       Subclasses with subcommands
-      should implement a `cmd_`*subcommand*`(argv)` method
+      should implement a `cmd_`*subcommand*`(argv)` instance method
       for each subcommand.
-      If there is a paragraph in the method docstring
+      If a subcommand is itself implemented using `BaseCommand`
+      then it can be a simple attribute:
+
+          cmd_subthing = SubThingCommand
+
+      Returning to methods, if there is a paragraph in the method docstring
       commencing with `Usage:`
       then that paragraph is incorporated automatically
       into the main usage message.
@@ -507,7 +511,9 @@ class BaseCommand:
       for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
                                 ((subcmd, subcmds[subcmd]),)):
         with Pfx(attr):
-          subusage = subcmd_spec.usage_text(short=short)
+          subusage = subcmd_spec.usage_text(
+              short=short, usage_format_mapping=usage_format_mapping
+          )
           cls.subcommand_usage_text(
               attr, usage_format_mapping=usage_format_mapping, short=short
           )
@@ -642,6 +648,9 @@ class BaseCommand:
         called with `cmd=`*subcmd* for subcommands
         and with `cmd=None` for `main`.
     '''
+    # short circuit if we've already complaints about bad invocation
+    if self._printed_usage:
+      return 2
     options = self.options
     try:
       runstate = getattr(options, 'runstate', RunState(self.cmd))

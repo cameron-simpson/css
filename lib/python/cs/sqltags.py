@@ -55,6 +55,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select
 from sqlalchemy.sql.expression import and_, or_, case
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.dateutils import UNIXTimeMixin, datetime2unixtime
@@ -76,7 +77,7 @@ from cs.tagset import (
 from cs.threads import locked, State as ThreadState
 from cs.upd import print  # pylint: disable=redefined-builtin
 
-__version__ = '20211212-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -92,6 +93,7 @@ DISTINFO = {
         'cs.context',
         'cs.dateutils',
         'cs.deco',
+        'cs.fileutils',
         'cs.lex',
         'cs.logutils',
         'cs.obj',

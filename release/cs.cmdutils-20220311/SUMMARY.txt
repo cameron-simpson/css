@@ -1,0 +1,1 @@
+BaseCommand: big refactor of subcommand internals and make the "cmd_foo=FooCommand" implementation work properly.

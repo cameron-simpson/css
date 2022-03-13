@@ -10,12 +10,14 @@ import logging
 import os
 from os.path import abspath
 from threading import current_thread, Lock
+
+from icontract import require
 from sqlalchemy import Column, Integer, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
-from icontract import require
+
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
@@ -25,7 +27,7 @@ from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
 
-__version__ = '20210420-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'description':
