@@ -339,7 +339,12 @@ class CalibreMetadataDB(ORM):
       )
       setattr(
           linktable, left_name,
-          declared_attr(lambda self: relationship(f'{left_name.title()}s'))
+          declared_attr(
+              lambda self: relationship(
+                  f'{left_name.title()}s',
+                  back_populates=f'{right_name}_links',
+              )
+          )
       )
       setattr(
           linktable, f'{right_name}_id',
@@ -353,7 +358,12 @@ class CalibreMetadataDB(ORM):
       )
       setattr(
           linktable, right_name,
-          declared_attr(lambda self: relationship(f'{right_name.title()}s'))
+          declared_attr(
+              lambda self: relationship(
+                  f'{right_name.title()}s',
+                  back_populates=f'{left_name}_links',
+              )
+          )
       )
       for colname, colspec in addtional_columns.items():
         setattr(linktable, colname, declared_attr(lambda self: colspec))
