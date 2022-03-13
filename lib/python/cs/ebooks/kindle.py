@@ -257,7 +257,8 @@ class KindleBook:
       replace_format=False,
       once=False,
   ):
-    ''' Export this Kindle book to a Calibre instance.
+    ''' Export this Kindle book to a Calibre instance,
+        return the `CalibreBook`.
 
         Parameters:
         * `calibre`: the `CalibreTree`
@@ -303,6 +304,7 @@ class KindleBook:
             cbook.make_cbz(replace_format=replace_format)
         else:
           print("create CBZ from the imported AZW3, then remove the AZW3")
+      return cbook
 
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
@@ -568,9 +570,10 @@ class KindleCommand(BaseCommand):
     for asin in argv:
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
-        kbook.export_to_calibre(
+        cbook = kbook.export_to_calibre(
             calibre, doit=doit, make_cbz=make_cbz, replace_format=force
         )
+        print(f"{cbook.title} ({cbook.dbid})")
 
   def cmd_import_calibre_dbids(self, argv):
     ''' Usage: {cmd} [--scrub]
