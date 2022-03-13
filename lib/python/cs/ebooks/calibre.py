@@ -216,6 +216,18 @@ class CalibreBook:
       raise AttributeError(attr)
     return getattr(self.db_book(), attr)
 
+  @property
+  def mobi_subpath(self):
+    ''' The subpath of a Mobi format book file, or `None`.
+    '''
+    formats = self.formats_as_dict()
+    for fmtk in 'MOBI', 'AZW3', 'AZW':
+      try:
+        return formats[fmtk]
+      except KeyError:
+        pass
+    return None
+
   def make_cbz(self, replace_format=False):
     ''' Create a CBZ format from the AZW3 Mobi format.
     '''
