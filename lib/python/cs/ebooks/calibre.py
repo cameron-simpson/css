@@ -508,6 +508,27 @@ class CalibreCommand(BaseCommand):
                           session=session, verbose=True):
             yield
 
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} dbids...
+    '''
+    if not argv:
+      raise GetoptError("missing dbids")
+    options = self.options
+    calibre = options.calibre
+    xit = 0
+    for dbid_s in argv:
+      with Pfx(dbid_s):
+        try:
+          dbid = int(dbid_s)
+        except ValueError as e:
+          warning("invalid dbid: %s", e)
+          xit = 1
+          continue
+        cbook = calibre[dbid]
+        with Pfx("%s: make_cbz", cbook.title):
+          cbook.make_cbz()
+    return xit
+
   def cmd_ls(self, argv):
     ''' Usage: {cmd} [-l]
           List the contents of the Calibre library.
