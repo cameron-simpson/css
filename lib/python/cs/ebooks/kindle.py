@@ -6,9 +6,8 @@
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 import os
-from os.path import basename, expanduser, join as joinpath
+from os.path import expanduser, isdir as isdirpath, join as joinpath
 import sys
-from tempfile import TemporaryDirectory
 from threading import Lock
 
 from icontract import require
@@ -32,7 +31,6 @@ from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_call
-from cs.py.func import callif
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -260,7 +258,6 @@ class KindleBook:
         * `make_cbz`: create a CBZ file after the initial import
         * `replace_format`: if true, export even if the `AZW3` format is already present
     '''
-    from .mobi import Mobi
     with Pfx(self.asin):
       azw_path = self.extpath('azw')
       dbid = self.tags.auto.calibre.dbid
