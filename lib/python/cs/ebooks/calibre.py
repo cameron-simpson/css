@@ -217,6 +217,23 @@ class CalibreBook:
       raise AttributeError(attr)
     return getattr(self.db_book(), attr)
 
+  def make_cbz(self, replace_format=False):
+    ''' Create a CBZ format from the AZW3 Mobi format.
+    '''
+    from .mobi import Mobi
+    calibre = self.tree
+    formats = self.formats_as_dict()
+    if 'CBZ' in formats and not replace_format:
+      warning("format CBZ already present, not adding")
+    else:
+      azw3_subpath = formats['AZW3']
+      mobipath = calibre.pathto(azw3_subpath)
+      MB = Mobi(mobipath)
+      with TemporaryDirectory() as tmpdirpath:
+        cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
+        pfx_call(MB.make_cbz, cbzpath)
+        calibre.add_format(cbzpath, self.dbid, force=replace_format)
+
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
   '''
