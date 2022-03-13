@@ -87,9 +87,8 @@ class KindleTree(HasFSPath, MultiOpenMixin):
     '''
     return KindleBookAssetDB(self)
 
-  @staticmethod
-  def is_book_subdir(subdir_name):
-    ''' Test whther `subdir_name` is a Kindle ebook subdirectory basename.
+  def is_book_subdir(self, subdir_name):
+    ''' Test whether `subdir_name` is a Kindle ebook subdirectory basename.
     '''
     return subdir_name.endswith(self.SUBDIR_SUFFIXES)
 
