@@ -321,7 +321,7 @@ class KindleBookAssetDB(ORM):
   def db_path(self):
     ''' The filesystem path to the database.
     '''
-    return joinpath(self.tree.path, self.DB_FILENAME)
+    return self.tree.pathto(self.DB_FILENAME)
 
   # lifted from SQLTags
   @contextmanager
