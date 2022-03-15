@@ -241,23 +241,30 @@ class Channel(object):
       self.closed = True
 
 class PushQueue(MultiOpenMixin):
-  ''' A puttable object which looks like an iterable Queue.
+  ''' A puttable object which looks like an iterable `Queue`.
 
-      Calling .put(item) calls `func_push` supplied at initialisation
-      to trigger a function on data arrival, whose processing is mediated
-      queued via a Later for delivery to the output queue.
+      In this base class,
+      calling `.put(item)` calls `functor` supplied at initialisation
+      to trigger a function on data arrival
+      whose iterable of results are put onto the output queue.
+
+      As an example, the `cs.pipeline.Pipeline` class
+      uses subclasses of `PushQueue` for each pipeline stage,
+      overriding the `.put(item)` method
+      to mediate the call of `functor` through `cs.later.Later`
+      as resource controlled concurrency.
   '''
 
   def __init__(self, name, functor, outQ):
-    ''' Initialise the PushQueue with the Later `L`, the callable `functor`
+    ''' Initialise the PushQueue with the callable `functor`
         and the output queue `outQ`.
 
         Parameters:
         * `functor` is a one-to-many function which accepts a single
           item of input and returns an iterable of outputs; it may be a
-          generator. These outputs are passed to outQ.put individually as
+          generator. These outputs are passed to `outQ.put` individually as
           received.
-        * `outQ` is a MultiOpenMixin which accepts via its .put() method.
+        * `outQ` is a `MultiOpenMixin` which accepts via its `.put()` method.
     '''
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), functor)
