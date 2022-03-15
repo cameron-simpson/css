@@ -8,10 +8,19 @@ from datetime import datetime, timezone
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
 import os
-from os.path import isabs as isabspath, expanduser, join as joinpath
+from os.path import (
+    basename,
+    isabs as isabspath,
+    expanduser,
+    join as joinpath,
+    realpath,
+    splitext,
+)
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
+from tempfile import TemporaryDirectory
 from threading import Lock
+from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -30,8 +39,10 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.logutils import error
+from cs.fileutils import shortpath
+from cs.logutils import error, warning
 from cs.lex import cutprefix
+from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -47,7 +58,7 @@ from cs.x import X
 
 from . import HasFSPath
 
-class CalibreTree(HasFSPath, MultiOpenMixin):
+class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
@@ -55,11 +66,27 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
   CALIBRE_LIBRARY_ENVVAR = 'CALIBRE_LIBRARY'
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
-  def __init__(self, calibre_library=None):
+  @classmethod
+  def _get_default_library_path(cls):
+    calibre_library = os.environ.get(cls.CALIBRE_LIBRARY_ENVVAR)
     if calibre_library is None:
-      calibre_library = os.environ.get(self.CALIBRE_LIBRARY_ENVVAR)
-      if calibre_library is None:
-        calibre_library = expanduser(self.CALIBRE_LIBRARY_DEFAULT)
+      calibre_library = expanduser(cls.CALIBRE_LIBRARY_DEFAULT)
+    return calibre_library
+
+  @classmethod
+  def _singleton_key(cls, calibre_library=None):
+    ''' `CalibreTree`s are identified by `realpath(calibre_library)`.
+    '''
+    if calibre_library is None:
+      calibre_library = cls._get_default_library_path()
+    return realpath(calibre_library)
+
+  @typechecked
+  def __init__(self, calibre_library: Optional[str] = None):
+    if hasattr(self, '_lock'):
+      return
+    if calibre_library is None:
+      calibre_library = self._get_default_library_path()
     HasFSPath.__init__(self, calibre_library)
     self._lock = Lock()
 
@@ -83,7 +110,7 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
   @lru_cache(maxsize=None)
   @typechecked
   @require(lambda dbid: dbid > 0)
-  def book_by_dbid(self, dbid, *, db_book=None):
+  def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
     return CalibreBook(self, dbid, db_book=db_book)
@@ -95,7 +122,6 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
     with db.db_session() as session:
       for author in sorted(db.authors.lookup(session=session)):
         with Pfx("%d:%s", author.id, author.name):
-          print(author.name)
           for book in sorted(author.books):
             yield self.book_by_dbid(book.id, db_book=book)
 
@@ -194,6 +220,8 @@ class CalibreTree(HasFSPath, MultiOpenMixin):
     )
 
 class CalibreBook:
+  ''' A reference to a book in a Calibre library.
+  '''
 
   @typechecked
   def __init__(self, tree: CalibreTree, dbid: int, *, db_book=None):
@@ -216,6 +244,41 @@ class CalibreBook:
     if attr.startswith('_'):
       raise AttributeError(attr)
     return getattr(self.db_book(), attr)
+
+  @property
+  def mobi_subpath(self):
+    ''' The subpath of a Mobi format book file, or `None`.
+    '''
+    formats = self.formats_as_dict()
+    for fmtk in 'MOBI', 'AZW3', 'AZW':
+      try:
+        return formats[fmtk]
+      except KeyError:
+        pass
+    return None
+
+  def make_cbz(self, replace_format=False):
+    ''' Create a CBZ format from the AZW3 Mobi format.
+    '''
+    from .mobi import Mobi  # pylint: disable=import-outside-toplevel
+    calibre = self.tree
+    formats = self.formats_as_dict()
+    if 'CBZ' in formats and not replace_format:
+      warning("format CBZ already present, not adding")
+    else:
+      mobi_subpath = self.mobi_subpath
+      if mobi_subpath:
+        mobipath = calibre.pathto(mobi_subpath)
+        base, _ = splitext(basename(mobipath))
+        MB = Mobi(mobipath)
+        with TemporaryDirectory() as tmpdirpath:
+          cbzpath = joinpath(tmpdirpath, base + '.cbz')
+          pfx_call(MB.make_cbz, cbzpath)
+          calibre.add_format(cbzpath, self.dbid, force=replace_format)
+      else:
+        raise ValueError(
+            "no AZW3, AZW or MOBI format from which to construct a CBZ"
+        )
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
@@ -296,7 +359,12 @@ class CalibreMetadataDB(ORM):
       )
       setattr(
           linktable, left_name,
-          declared_attr(lambda self: relationship(f'{left_name.title()}s'))
+          declared_attr(
+              lambda self: relationship(
+                  f'{left_name.title()}s',
+                  back_populates=f'{right_name}_links',
+              )
+          )
       )
       setattr(
           linktable, f'{right_name}_id',
@@ -310,7 +378,12 @@ class CalibreMetadataDB(ORM):
       )
       setattr(
           linktable, right_name,
-          declared_attr(lambda self: relationship(f'{right_name.title()}s'))
+          declared_attr(
+              lambda self: relationship(
+                  f'{right_name.title()}s',
+                  back_populates=f'{left_name}_links',
+              )
+          )
       )
       for colname, colspec in addtional_columns.items():
         setattr(linktable, colname, declared_attr(lambda self: colspec))
@@ -413,6 +486,8 @@ class CalibreMetadataDB(ORM):
       ''' Link table between `Books` and `Authors`.
       '''
 
+    class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
+      item_order = Column(Integer, nullable=False, default=1)
 
     Authors.book_links = relationship(BooksAuthorsLink)
     Authors.books = association_proxy('book_links', 'book')
@@ -422,12 +497,16 @@ class CalibreMetadataDB(ORM):
     Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
 
+    ##Books.language_links = relationship(BooksLanguagesLink)
+    ##Books.languages = association_proxy('languages_links', 'languages')
+
     Identifiers.book = relationship(Books, back_populates="identifiers")
 
     # references to table definitions
     self.authors = Authors
     self.books = Books
     self.identifiers = Identifiers
+    self.languages = Languages
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -435,13 +514,19 @@ class CalibreCommand(BaseCommand):
 
   GETOPT_SPEC = 'C:K:'
 
-  USAGE_FORMAT = '''Usage: {cmd} [-K kindle-library-path] subcommand [...]
+  USAGE_FORMAT = '''Usage: {cmd} [-C calibre_library] [-K kindle-library-path] subcommand [...]
   -C calibre_library
     Specify calibre library location.
   -K kindle_library
     Specify kindle library location.'''
 
   SUBCOMMAND_ARGV_DEFAULT = 'ls'
+
+  DEFAULT_LINK_IDENTIFIER = 'mobi-asin'
+
+  USAGE_KEYWORDS = {
+      'DEFAULT_LINK_IDENTIFIER': DEFAULT_LINK_IDENTIFIER,
+  }
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
@@ -475,10 +560,35 @@ class CalibreCommand(BaseCommand):
                           session=session, verbose=True):
             yield
 
+  def cmd_make_cbz(self, argv):
+    ''' Usage: {cmd} dbids...
+    '''
+    if not argv:
+      raise GetoptError("missing dbids")
+    options = self.options
+    calibre = options.calibre
+    xit = 0
+    for dbid_s in argv:
+      with Pfx(dbid_s):
+        try:
+          dbid = int(dbid_s)
+        except ValueError as e:
+          warning("invalid dbid: %s", e)
+          xit = 1
+          continue
+        cbook = calibre[dbid]
+        with Pfx("%s: make_cbz", cbook.title):
+          cbook.make_cbz()
+    return xit
+
   def cmd_ls(self, argv):
-    ''' Usage: {cmd}
+    ''' Usage: {cmd} [-l]
           List the contents of the Calibre library.
     '''
+    long = False
+    if argv and argv[0] == '-l':
+      long = True
+      argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
@@ -486,13 +596,54 @@ class CalibreCommand(BaseCommand):
     for book in calibre:
       with Pfx("%d:%s", book.id, book.title):
         print(f"{book.title} ({book.dbid})")
-        print(" ", book.path)
-        print("   ", TagSet(book.identifiers_as_dict()))
-        for fmt, subpath in book.formats_as_dict().items():
-          with Pfx(fmt):
-            fspath = calibre.pathto(subpath)
-            size = pfx_call(os.stat, fspath).st_size
-            print("   ", fmt, transcribe_bytes_geek(size), subpath)
+        if long:
+          print(" ", book.path)
+          identifiers = book.identifiers_as_dict()
+          if identifiers:
+            print("   ", TagSet(identifiers))
+          for fmt, subpath in book.formats_as_dict().items():
+            with Pfx(fmt):
+              fspath = calibre.pathto(subpath)
+              size = pfx_call(os.stat, fspath).st_size
+              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+
+  def cmd_import_from_calibre(self, argv):
+    ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
+          Import formats from another Calibre library.
+          other-library: the path to another Calibre library tree
+          identifier-name: the key on which to link matching books;
+            the default is {DEFAULT_LINK_IDENTIFIER}
+          identifier-values: specific book identifiers to import
+    '''
+    options = self.options
+    calibre = options.calibre
+    if not argv:
+      raise GetoptError("missing other-library")
+    other_library = CalibreTree(argv.pop(0))
+    with Pfx(shortpath(other_library.fspath)):
+      if other_library is calibre:
+        raise GetoptError("cannot import from the same library")
+      if argv:
+        identifier_name = argv.pop(0)
+      else:
+        identifier_name = self.DEFAULT_LINK_IDENTIFIER
+      if argv:
+        identifier_values = argv
+      else:
+        identifier_values = sorted(
+            set(
+                filter(
+                    lambda idv: idv is not None, (
+                        cbook.identifiers_as_dict().get(identifier_name)
+                        for cbook in other_library
+                    )
+                )
+            )
+        )
+      for identifier_value in identifier_values:
+        with Pfx("%s:%s", identifier_name, identifier_value):
+          ##print(identifier_value)
+          pass
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())

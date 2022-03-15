@@ -120,7 +120,11 @@ class _BaseSubCommand:
                 subcmd,
                 method,
                 usage_mapping=dict(getattr(method, 'USAGE_KEYWORDS', ()))
-            ) if isclass(method) else _MethodSubCommand(subcmd, method)
+            ) if isclass(method) else _MethodSubCommand(
+                subcmd,
+                method,
+                usage_mapping=dict(getattr(command_cls, 'USAGE_KEYWORDS', ()))
+            )
         )
     return subcommands_map
 

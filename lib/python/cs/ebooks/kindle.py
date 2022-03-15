@@ -6,9 +6,8 @@
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 import os
-from os.path import basename, expanduser, join as joinpath
+from os.path import expanduser, isdir as isdirpath, join as joinpath
 import sys
-from tempfile import TemporaryDirectory
 from threading import Lock
 
 from icontract import require
@@ -30,9 +29,8 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
-from cs.logutils import warning
+from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_call
-from cs.py.func import callif
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -55,6 +53,8 @@ class KindleTree(HasFSPath, MultiOpenMixin):
 
   # environment variable to override the path
   KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+
+  SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
   def __init__(self, kindle_library=None):
     if kindle_library is None:
@@ -87,11 +87,10 @@ class KindleTree(HasFSPath, MultiOpenMixin):
     '''
     return KindleBookAssetDB(self)
 
-  @staticmethod
-  def is_book_subdir(subdir_name):
-    ''' Test whther `subdir_name` is a Kindle ebook subdirectory basename.
+  def is_book_subdir(self, subdir_name):
+    ''' Test whether `subdir_name` is a Kindle ebook subdirectory basename.
     '''
-    return subdir_name.endswith(('_EBOK', '_EBSP'))
+    return subdir_name.endswith(self.SUBDIR_SUFFIXES)
 
   def book_subdir_names(self):
     ''' Return a list of the individual ebook subdirectory names.
@@ -112,7 +111,12 @@ class KindleTree(HasFSPath, MultiOpenMixin):
   def by_asin(self, asin):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
-    return self[asin.upper() + '_EBOK']
+    ASIN = asin.upper()
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = ASIN + suffix
+      if isdirpath(self.pathto(subdir_name)):
+        return self[subdir_name]
+    return self[ASIN + self.SUBDIR_SUFFIXES[0]]
 
   def keys(self):
     ''' The keys of a `KindleTree` are its book subdirectory names.
@@ -236,12 +240,70 @@ class KindleBook:
       '''
     phl_path = self.subpath(self.subdir_name + '.phl')
     try:
-      with open(phl_path, 'rb') as f:
+      with pfx_call(open, phl_path, 'rb') as f:
         xml_bs = f.read()
     except FileNotFoundError:
       return None
     with Pfx(phl_path):
       return pfx_call(etree.fromstring, xml_bs)
+
+  def export_to_calibre(
+      self,
+      calibre,
+      *,
+      doit=True,
+      make_cbz=False,
+      replace_format=False,
+      once=False,
+  ):
+    ''' Export this Kindle book to a Calibre instance,
+        return the `CalibreBook`.
+
+        Parameters:
+        * `calibre`: the `CalibreTree`
+        * `doit`: if false, just recite actions; default `True`
+        * `make_cbz`: create a CBZ file after the initial import
+        * `replace_format`: if true, export even if the `AZW3` format is already present
+    '''
+    with Pfx(self.asin):
+      azw_path = self.extpath('azw')
+      dbid = self.tags.auto.calibre.dbid
+      if dbid:
+        # book already present in calibre
+        cbook = calibre[dbid]
+        with Pfx("calibre %d: %s", dbid, cbook.title):
+          formats = cbook.formats_as_dict()
+          if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
+              and not replace_format):
+            info("format AZW3 already present, not adding")
+          elif 'CBZ' in formats:
+            info("format CBZ format present, not adding AZW3")
+          else:
+            if doit:
+              calibre.add_format(
+                  azw_path,
+                  dbid,
+                  force=replace_format,
+              )
+            else:
+              info("add %s", azw_path)
+      else:
+        # book does not have a known dbid, presume not added
+        if doit:
+          dbid = calibre.add(azw_path)
+          self.tags['calibre.dbid'] = dbid
+          cbook = calibre[dbid]
+          formats = cbook.formats_as_dict()
+        else:
+          info("calibre.add %s", azw_path)
+      # AZW added, check if a CBZ is required
+      if make_cbz:
+        if doit:
+          with Pfx("calibre %d: %s", dbid, cbook.title):
+            cbook.make_cbz(replace_format=replace_format)
+        else:
+          print("create CBZ from the imported AZW3, then remove the AZW3")
+      return cbook
 
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
@@ -264,7 +326,7 @@ class KindleBookAssetDB(ORM):
   def db_path(self):
     ''' The filesystem path to the database.
     '''
-    return joinpath(self.tree.path, self.DB_FILENAME)
+    return self.tree.pathto(self.DB_FILENAME)
 
   # lifted from SQLTags
   @contextmanager
@@ -482,13 +544,12 @@ class KindleCommand(BaseCommand):
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
-    from .mobi import Mobi
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
     doit = True
     force = False
-    cbz_mode = False
+    make_cbz = False
     conversions = ['epub']
     delete_formats = []
     opts, argv = getopt(argv, 'fn', 'cbz')
@@ -498,49 +559,20 @@ class KindleCommand(BaseCommand):
       elif opt == '-n':
         doit = False
       elif opt == '--cbz':
-        cbz_mode = True
+        make_cbz = True
         conversions = []
         delete_formats.append('azw3')
       else:
         raise RuntimeError("unhandled option: %r" % (opt,))
-    kbook_map = {}
+    if not argv:
+      argv = sorted(kindle.asins())
     for asin in argv:
-      kbook = kindle.by_asin(asin)
-      kbook_map[kbook.subdir_name] = kbook
-    if not kbook_map:
-      kbook_map = dict(sorted(kindle.items()))
-    for subdir_name, kbook in kbook_map.items():
-      azw_path = kbook.extpath('azw')
-      dbid = kbook.tags.auto.calibre.dbid
-      if dbid:
-        print(subdir_name, "calibre.dbid:", dbid)
-        cbook = calibre[dbid]
-        formats = cbook.formats_as_dict()
-        print("formats =", repr(formats))
-        if 'AZW3' in formats and not force:
-          warning("format AZW3 already present, not adding")
-        else:
-          callif(doit, calibre.add_format, azw_path, dbid, force=force)
-      else:
-        dbid = callif(doit, calibre.add, azw_path)
-        if doit:
-          X("dbid = %d", dbid)
-          kbook.tags['calibre.dbid'] = dbid
-          cbook = calibre.by_id(dbid)
-          formats = cbook.formats_as_dict()
-      if cbz_mode:
-        if doit:
-          X("cbook = %s %r", cbook, formats)
-          mobipath = calibre.pathto(formats['AZW3'])
-          MB = Mobi(mobipath)
-          with TemporaryDirectory() as tmpdirpath:
-            cbzpath = joinpath(tmpdirpath, basename(mobipath) + '.cbz')
-            MB.make_cbz(cbzpath)
-            calibre.add_format(cbzpath, dbid)
-        else:
-          print("create CBZ from the imported AZW3, then remove the AZW3")
-      else:
-        print(subdir_name, "add", azw_path)
+      with Pfx(asin):
+        kbook = kindle.by_asin(asin)
+        cbook = kbook.export_to_calibre(
+            calibre, doit=doit, make_cbz=make_cbz, replace_format=force
+        )
+        print(f"{cbook.title} ({cbook.dbid})")
 
   def cmd_import_calibre_dbids(self, argv):
     ''' Usage: {cmd} [--scrub]
@@ -584,7 +616,7 @@ class KindleCommand(BaseCommand):
                 "%d Calibre books with ASIN %s, using calibre.dbid=%d",
                 len(cbooks), asin, cbook.id
             )
-        if dbid is not None and cbook.id != dbid:
+        if dbid is None or cbook.id != dbid:
           print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
           kbook.tags['calibre.dbid'] = cbook.id
 
