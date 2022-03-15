@@ -1,0 +1,1 @@
+A bit of a hack to prevent double patching a formatter, as when BaseCommand calls a BaseCommand and other circumstances where setup_logging() gets called more than once.
