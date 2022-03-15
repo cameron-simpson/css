@@ -643,10 +643,47 @@ class CalibreCommand(BaseCommand):
                 )
             )
         )
+      xit = 0
       for identifier_value in identifier_values:
         with Pfx("%s:%s", identifier_name, identifier_value):
-          ##print(identifier_value)
-          pass
+          obooks = list(
+              other_library.by_identifier(identifier_name, identifier_value)
+          )
+          if not obooks:
+            error("no books with this identifier")
+            xit = 1
+            continue
+          if len(obooks) > 1:
+            warning(
+                "  \n".join(
+                    [
+                        "multiple \"other\" books with this identifier:",
+                        *map(str, obooks)
+                    ]
+                )
+            )
+            xit = 1
+            continue
+          obook, = obooks
+          cbooks = list(
+              calibre.by_identifier(identifier_name, identifier_value)
+          )
+          if not cbooks:
+            print("NEW BOOK", obook)
+          elif len(cbooks) > 1:
+            warning(
+                "  \n".join(
+                    [
+                        "multiple \"local\" books with this identifier:",
+                        *map(str, cbooks)
+                    ]
+                )
+            )
+            print("PULL", obook, "AS NEW BOOK")
+          else:
+            cbook, = cbooks
+            print("MERGE", obook, "INTO", cbook)
+    return xit
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
