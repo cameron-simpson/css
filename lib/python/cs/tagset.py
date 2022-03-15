@@ -385,7 +385,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
       *NOTE*: iteration yields `Tag`s, not dict keys.
 
-      Also note that all the `Tags` from `TagSet`
+      Also note that all the `Tags` from a `TagSet`
       share its ontology.
 
       Subclasses should override the `set` and `discard` methods;
@@ -406,11 +406,12 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         a `float` holding seconds since the UNIX epoch
         (midnight, 1 January 1970 UTC).
         This is typically the row creation time
-        for entities associated with database rows.
+        for entities associated with database rows,
+        but usually the event time for `TagSet`s describing an event.
 
       Because ` TagSet` subclasses `cs.mappings.AttrableMappingMixin`
       you can also access tag values as attributes
-      provided that they do not conflict with instance attributes
+      *provided* that they do not conflict with instance attributes
       or class methods or properties.
       The `TagSet` class defines the class attribute `ATTRABLE_MAPPING_DEFAULT`
       as `None` which causes attribute access to return `None`
@@ -513,7 +514,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __getattr__(self, attr):
     ''' Support access to dotted name attributes.
 
-        The following attribute access are supported:
+        The following attribute accesses are supported:
 
         If `attr` is a key, return `self[attr]`.
 
