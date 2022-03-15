@@ -198,7 +198,7 @@ class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
         dbids.extend(map(lambda s: int(s.strip()), line_sfx.split(',')))
-    dbid, = dbids
+    dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
   @typechecked
