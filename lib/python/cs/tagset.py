@@ -88,7 +88,7 @@
         >>> subtopic2 in tags
         False
 
-    == Ontologies ==
+    ## Ontologies
 
     `Tag`s and `TagSet`s suffice to apply simple annotations to things.
     However, an ontology brings meaning to those annotations.
@@ -151,7 +151,7 @@
       The full conversion process is defined
       by the `TagsOntology.value_to_tag_name` function.
 
-    == Format Strings ==
+    ## Format Strings
 
     You can just use `str.format_map` as shown above
     for the direct values in a `TagSet`,
@@ -263,11 +263,11 @@ EDITOR = os.environ.get('TAGSET_EDITOR') or os.environ.get('EDITOR')
 def tag_or_tag_value(func, no_self=False):
   ''' A decorator for functions or methods which may be called as:
 
-          func(name, [value])
+          func(name[,value])
 
       or as:
 
-          func(Tag, [None])
+          func(Tag)
 
       The optional decorator argument `no_self` (default `False`)
       should be supplied for plain functions
