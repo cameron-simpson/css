@@ -489,8 +489,8 @@ class CalibreMetadataDB(ORM):
       ''' Link table between `Books` and `Authors`.
       '''
 
-    class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
-      item_order = Column(Integer, nullable=False, default=1)
+    ##class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
+    ##  item_order = Column(Integer, nullable=False, default=1)
 
     Authors.book_links = relationship(BooksAuthorsLink)
     Authors.books = association_proxy('book_links', 'book')
