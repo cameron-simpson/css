@@ -229,6 +229,9 @@ class CalibreBook:
     self.dbid = dbid
     self._db_book = db_book
 
+  def __str__(self):
+    return f"{self.title} ({self.dbid})"
+
   @cachedmethod
   def db_book(self):
     ''' Return a cached reference to the database book record.
