@@ -56,39 +56,16 @@ from cs.units import transcribe_bytes_geek
 
 from cs.x import X
 
-from . import HasFSPath
+from . import FSPathBasedSingleton
 
-class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
+class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
-  CALIBRE_LIBRARY_DEFAULT = '~/CALIBRE'
-  CALIBRE_LIBRARY_ENVVAR = 'CALIBRE_LIBRARY'
+  FSPATH_DEFAULT = '~/CALIBRE'
+  FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
-
-  @classmethod
-  def _get_default_library_path(cls):
-    calibre_library = os.environ.get(cls.CALIBRE_LIBRARY_ENVVAR)
-    if calibre_library is None:
-      calibre_library = expanduser(cls.CALIBRE_LIBRARY_DEFAULT)
-    return calibre_library
-
-  @classmethod
-  def _singleton_key(cls, calibre_library=None):
-    ''' `CalibreTree`s are identified by `realpath(calibre_library)`.
-    '''
-    if calibre_library is None:
-      calibre_library = cls._get_default_library_path()
-    return realpath(calibre_library)
-
-  @typechecked
-  def __init__(self, calibre_library: Optional[str] = None):
-    if hasattr(self, '_lock'):
-      return
-    if calibre_library is None:
-      calibre_library = self._get_default_library_path()
-    HasFSPath.__init__(self, calibre_library)
-    self._lock = Lock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -556,7 +533,7 @@ class CalibreCommand(BaseCommand):
     from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
     options = self.options
     with KindleTree(kindle_library=options.kindle_path) as kt:
-      with CalibreTree(calibre_library=options.calibre_path) as cal:
+      with CalibreTree(options.calibre_path) as cal:
         db = cal.db
         with db.db_session() as session:
           with stackattrs(options, kindle=kt, calibre=cal, db=db,
