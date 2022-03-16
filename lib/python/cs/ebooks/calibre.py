@@ -544,7 +544,7 @@ class CalibreCommand(BaseCommand):
     '''
     from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
     options = self.options
-    with KindleTree(kindle_library=options.kindle_path) as kt:
+    with KindleTree(options.kindle_path) as kt:
       with CalibreTree(options.calibre_path) as cal:
         db = cal.db
         with db.db_session() as session:
