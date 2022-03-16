@@ -561,31 +561,13 @@ class CalibreCommand(BaseCommand):
           cbook.make_cbz()
     return xit
 
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
-          List the contents of the Calibre library.
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database prompt.
     '''
-    long = False
-    if argv and argv[0] == '-l':
-      long = True
-      argv.pop(0)
     if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    calibre = options.calibre
-    for book in calibre:
-      with Pfx("%d:%s", book.id, book.title):
-        print(f"{book.title} ({book.dbid})")
-        if long:
-          print(" ", book.path)
-          identifiers = book.identifiers_as_dict()
-          if identifiers:
-            print("   ", TagSet(identifiers))
-          for fmt, subpath in book.formats_as_dict().items():
-            with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+      raise GetoptError("extra arguments: %r", argv)
+    return self.options.calibre.dbshell()
 
   def cmd_import_from_calibre(self, argv):
     ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
@@ -661,6 +643,32 @@ class CalibreCommand(BaseCommand):
             cbook, = cbooks
             print("MERGE", obook, "INTO", cbook)
     return xit
+
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-l]
+          List the contents of the Calibre library.
+    '''
+    long = False
+    if argv and argv[0] == '-l':
+      long = True
+      argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    calibre = options.calibre
+    for book in calibre:
+      with Pfx("%d:%s", book.id, book.title):
+        print(f"{book.title} ({book.dbid})")
+        if long:
+          print(" ", book.path)
+          identifiers = book.identifiers_as_dict()
+          if identifiers:
+            print("   ", TagSet(identifiers))
+          for fmt, subpath in book.formats_as_dict().items():
+            with Pfx(fmt):
+              fspath = calibre.pathto(subpath)
+              size = pfx_call(os.stat, fspath).st_size
+              print("   ", fmt, transcribe_bytes_geek(size), subpath)
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
