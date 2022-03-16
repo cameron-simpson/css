@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from getopt import GetoptError
 from glob import glob
 from os.path import join as joinpath
+from pprint import pprint
 from subprocess import run
 import sys
 
@@ -30,7 +31,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import strable
 from cs.logutils import warning
-from cs.app.osx.plist import import_as_etree
+from cs.app.osx.plist import ingest_plist
 from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import ORM, BasicTableMixin
@@ -42,6 +43,12 @@ class AppleBooksTree(FSPathBasedSingleton, MultiOpenMixin):
 
   FSPATH_DEFAULT = '~/Library/Containers/com.apple.iBooksX/Data//Documents/BKLibrary'
   FSPATH_ENVVAR = 'APPLE_BOOKS_LIBRARY'
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' For MultiOpenMixin.
+    '''
+    yield
 
   @locked_property
   def db(self):
@@ -177,11 +184,10 @@ class AppleBooksDB(ORM):
       uuid = Column('Z_UUID', String)
       plist = Column('Z_PLIST', LargeBinary)
 
-      @property
-      def plist_as_etree(self):
-        ''' The plist column as an `ElementTree`.
+      def plist_as_dict(self):
+        ''' Return the plist column as a `PListDict`.
         '''
-        return import_as_etree(self.plist)
+        return ingest_plist(self.plist)
 
     class Collection(Base, BasicTableMixin, HasPKMixin):
       __tablename__ = 'ZBKCOLLECTION'
@@ -228,13 +234,26 @@ class AppleBooksCommand(BaseCommand):
     return self.options.apple.dbshell()
 
   def cmd_ls(self, argv):
-    ''' Usage: {cmd} ls
+    ''' Usage: {cmd}
+          List books in the library.
     '''
     options = self.options
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     for book in options.apple:
       print(f"{book.title}, {book.author} ({book.asset_id})")
+
+  def cmd_md(self, argv):
+    ''' Usage: {cmd}
+          List metadata.
+    '''
+    options = self.options
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    db = options.apple.db
+    with db.db_session() as session:
+      for md in db.metadata.lookup(session=session):
+        pprint(md.plist_as_dict())
 
 if __name__ == '__main__':
   sys.exit(AppleBooksCommand(sys.argv).run())
