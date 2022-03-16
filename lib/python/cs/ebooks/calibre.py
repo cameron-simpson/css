@@ -80,6 +80,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return CalibreMetadataDB(self)
 
+  def dbshell(self):
+    ''' Interactive db shell.
+    '''
+    return self.db.shell()
+
   @typechecked
   def __getitem__(self, dbid: int):
     return self.book_by_dbid(dbid)
@@ -284,6 +289,13 @@ class CalibreMetadataDB(ORM):
     ''' The filesystem path to the database.
     '''
     return self.tree.pathto(self.DB_FILENAME)
+
+  def shell(self):
+    ''' Interactive db shell.
+    '''
+    print("sqlite3", self.db_path)
+    run(['sqlite3', self.db_path], check=True)
+    return 0
 
   # lifted from SQLTags
   @contextmanager
