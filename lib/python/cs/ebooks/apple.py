@@ -160,7 +160,7 @@ class AppleBooksDB(ORM):
       account_id = Column('ZACCOUNTID', String)
       asset_id = Column('ZASSETID', String)
       author = Column('ZAUTHOR', String)
-      book_description = Column('ZBOOKDESCRIPTION', String)
+      description = Column('ZBOOKDESCRIPTION', String)
       cover_url = Column('ZCOVERURL', String)
       epub_id = Column('ZEPUBID', String)
       family_id = Column('ZFAMILYID', String)
@@ -238,10 +238,22 @@ class AppleBooksCommand(BaseCommand):
           List books in the library.
     '''
     options = self.options
+    long_mode = False
+    if argv and argv[0] == '-l':
+      long_mode = True
+      argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     for book in options.apple:
       print(f"{book.title}, {book.author} ({book.asset_id})")
+      if long_mode:
+        if book.cover_url:
+          print("  cover:", book.cover_url)
+        if book.genre:
+          print("  genre:", book.genre)
+        if book.description:
+          print("  description:")
+          print("   ", book.description.replace("\n", "    \n"))
 
   def cmd_md(self, argv):
     ''' Usage: {cmd}
