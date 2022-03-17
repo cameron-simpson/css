@@ -7,10 +7,12 @@
 ''' Queue-like items: iterable queues, channels, etc.
 '''
 
-import sys
+from contextlib import contextmanager
 from functools import partial
 from threading import Timer, Lock, RLock, Thread
+import sys
 import time
+
 ##from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import exception, warning, debug
@@ -40,7 +42,7 @@ DISTINFO = {
 }
 
 class _QueueIterator(MultiOpenMixin):
-  ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which 
+  ''' A `QueueIterator` is a wrapper for a `Queue` (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the `.get` or `.get_nowait` methods.
   '''
@@ -81,7 +83,7 @@ class _QueueIterator(MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    ''' `MultiOpenMixin` support; putsthe sentinel onto the underlying queue 
+    ''' `MultiOpenMixin` support; putsthe sentinel onto the underlying queue
         on the final close.
     '''
     yield
