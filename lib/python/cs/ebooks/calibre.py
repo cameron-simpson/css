@@ -11,16 +11,12 @@ import os
 from os.path import (
     basename,
     isabs as isabspath,
-    expanduser,
     join as joinpath,
-    realpath,
     splitext,
 )
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from tempfile import TemporaryDirectory
-from threading import Lock
-from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -40,9 +36,8 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fileutils import shortpath
-from cs.logutils import error, warning
 from cs.lex import cutprefix
-from cs.obj import SingletonMixin
+from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -378,7 +373,11 @@ class CalibreMetadataDB(ORM):
           )
       )
       for colname, colspec in addtional_columns.items():
-        setattr(linktable, colname, declared_attr(lambda self: colspec))
+        setattr(
+            linktable,
+            colname,
+            declared_attr(lambda self, colspec=colspec: colspec),
+        )
       return linktable
 
     @total_ordering
@@ -472,7 +471,6 @@ class CalibreMetadataDB(ORM):
       '''
       __tablename__ = 'languages'
       lang_code = Column(String, nullable=False, unique=True)
-      item_order = Column(Integer, nullable=False, default=1)
 
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
@@ -578,7 +576,7 @@ class CalibreCommand(BaseCommand):
           Start an interactive database prompt.
     '''
     if argv:
-      raise GetoptError("extra arguments: %r", argv)
+      raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
 
   def cmd_import_from_calibre(self, argv):
