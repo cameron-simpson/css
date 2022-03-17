@@ -11,31 +11,26 @@ from pprint import pprint
 from subprocess import run
 import sys
 
-from . import FSPathBasedSingleton
-
 from sqlalchemy import (
-    Boolean,
     Column,
-    DateTime,
     Float,
-    ForeignKey,
     Integer,
     LargeBinary,
     String,
 )
-from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.orm import declared_attr, relationship
 from typeguard import typechecked
 
+from cs.app.osx.plist import ingest_plist
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import strable
 from cs.logutils import warning
-from cs.app.osx.plist import ingest_plist
 from cs.pfx import pfx_call, pfx_method
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import ORM, BasicTableMixin
 from cs.threads import locked_property
+
+from . import FSPathBasedSingleton
 
 class AppleBooksTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with an Apple Books tree.
@@ -153,9 +148,9 @@ class AppleBooksDB(ORM):
       content_type = Column('ZCONTENTTYPE', Integer)
       file_size = Column('ZFILESIZE', Integer)
       page_size = Column('ZPAGECOUNT', Integer)
-      creation_date = Column('ZCREATIONDATE', Float)  ##DateTime)
-      purchase_date = Column('ZPURCHASEDATE', Float)  ##DateTime)
-      release_date = Column('ZRELEASEDATE', Float)  ##DateTime)
+      creation_date = Column('ZCREATIONDATE', Float)  # not a DateTime
+      purchase_date = Column('ZPURCHASEDATE', Float)  # not a DateTime
+      release_date = Column('ZRELEASEDATE', Float)  # not a DateTime
       version_number = Column('ZVERSIONNUMBER', Float)
       account_id = Column('ZACCOUNTID', String)
       asset_id = Column('ZASSETID', String)
@@ -179,6 +174,8 @@ class AppleBooksDB(ORM):
       year = Column('ZYEAR', String)
 
     class Metadata(Base, BasicTableMixin):
+      ''' The metadata table - seems to be a single row with library metadata in a plist.
+      '''
       __tablename__ = 'Z_METADATA'
       version = Column('Z_VERSION', Integer, primary_key=True)
       uuid = Column('Z_UUID', String)
@@ -190,12 +187,16 @@ class AppleBooksDB(ORM):
         return ingest_plist(self.plist)
 
     class Collection(Base, BasicTableMixin, HasPKMixin):
+      ''' Collection definitions.
+      '''
       __tablename__ = 'ZBKCOLLECTION'
       collection_id = Column('ZCOLLECTIONID', String)
       details = Column('ZDETAILS', String)
       title = Column('ZTITLE', String)
 
     class CollectionMember(Base, BasicTableMixin, HasPKMixin):
+      ''' Collection members.
+      '''
       __tablename__ = 'ZBKCOLLECTIONMEMBER'
       asset = Column('ZASSET', Integer)
       collection = Column('ZCOLLECTION', Integer)
