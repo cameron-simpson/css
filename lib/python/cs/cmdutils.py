@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 from cs.context import stackattrs
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, cutsuffix, stripped_dedent
+from cs.lex import cutprefix, cutsuffix, format_escape, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_method
 from cs.py.doc import obj_docstring
@@ -176,10 +176,14 @@ class _MethodSubCommand(_BaseSubCommand):
         subusage_format = stripped_dedent(post_usage_format)
       else:
         # extract the first paragraph
-        subusage_format, *_ = doc.split('\n\n', 1)
+        lines = ['{cmd} ...']
+        doc_p1 = stripped_dedent(doc.split('\n\n', 1)[0])
+        if doc_p1:
+          lines.extend(map(format_escape, doc_p1.split('\n')))
+        subusage_format = "\n  ".join(lines)
     else:
-      # default usage text - include the docstring below a header
-      subusage_format = "\n  ".join(['{cmd} ...'] + [doc.split('\n\n', 1)[0]])
+      # default usage text
+      subusage_format = '{cmd} ...'
     return subusage_format
 
 class _ClassSubCommand(_BaseSubCommand):
