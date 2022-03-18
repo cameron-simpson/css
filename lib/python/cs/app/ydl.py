@@ -136,7 +136,11 @@ class YDLCommand(BaseCommand):
       raise GetoptError("missing URLs")
     options = self.options
     with FSTags() as fstags:
-      over_ydl = OverYDL(fstags=fstags, ydl_opts=options.ydl_opts)
+      over_ydl = OverYDL(
+          fstags=fstags,
+          ydl_opts=options.ydl_opts,
+          parallel=options.parallel,
+      )
       for url in argv:
         if url == '-':
           with Pfx('stdin'):
