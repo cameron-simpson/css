@@ -39,32 +39,26 @@ from cs.sqlalchemy_utils import (
 )
 from cs.threads import locked_property
 
-from . import HasFSPath
 
-class KindleTree(HasFSPath, MultiOpenMixin):
+from . import FSPathBasedSingleton
+
+class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
 
       This actually knows very little about Kindle ebooks or its rather opaque database.
       This is mostly to aid keeping track of state using `cs.fstags`.
   '''
 
-  # default to the MacOS path, needs updates for other platforms
-  KINDLE_LIBRARY_DEFAULT = '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
-
-  # environment variable to override the path
-  KINDLE_LIBRARY_ENVVAR = 'KINDLE_LIBRARY'
+  FSPATH_DEFAULT = '~/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle/My Kindle Content'
+  FSPATH_ENVVAR = 'KINDLE_LIBRARY'
 
   SUBDIR_SUFFIXES = '_EBOK', '_EBSP'
 
-  def __init__(self, kindle_library=None):
-    if kindle_library is None:
-      kindle_library = os.environ.get(self.KINDLE_LIBRARY_ENVVAR)
-      if kindle_library is None:
-        # default to the MacOS path, needs updates for other platforms
-        kindle_library = expanduser(self.KINDLE_LIBRARY_DEFAULT)
-    HasFSPath.__init__(self, kindle_library)
+  def __init__(self, fspath=None):
+    if hasattr(self, '_bookrefs'):
+      return
+    super().__init__(fspath=fspath)
     self._bookrefs = {}
-    self._lock = Lock()
 
   def __str__(self):
     return "%s:%s" % (type(self).__name__, shortpath(self.fspath))
@@ -529,7 +523,7 @@ class KindleCommand(BaseCommand):
     '''
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     options = self.options
-    with KindleTree(kindle_library=options.kindle_path) as kt:
+    with KindleTree(options.kindle_path) as kt:
       with CalibreTree(calibre_library=options.calibre_path) as cal:
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield

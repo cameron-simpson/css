@@ -11,16 +11,12 @@ import os
 from os.path import (
     basename,
     isabs as isabspath,
-    expanduser,
     join as joinpath,
-    realpath,
     splitext,
 )
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from tempfile import TemporaryDirectory
-from threading import Lock
-from typing import Optional
 
 from icontract import require
 from sqlalchemy import (
@@ -40,9 +36,8 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fileutils import shortpath
-from cs.logutils import error, warning
 from cs.lex import cutprefix
-from cs.obj import SingletonMixin
+from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_call
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -56,39 +51,16 @@ from cs.units import transcribe_bytes_geek
 
 from cs.x import X
 
-from . import HasFSPath
+from . import FSPathBasedSingleton
 
-class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
+class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
 
-  CALIBRE_LIBRARY_DEFAULT = '~/CALIBRE'
-  CALIBRE_LIBRARY_ENVVAR = 'CALIBRE_LIBRARY'
+  FSPATH_DEFAULT = '~/CALIBRE'
+  FSPATH_ENVVAR = 'CALIBRE_LIBRARY'
+
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
-
-  @classmethod
-  def _get_default_library_path(cls):
-    calibre_library = os.environ.get(cls.CALIBRE_LIBRARY_ENVVAR)
-    if calibre_library is None:
-      calibre_library = expanduser(cls.CALIBRE_LIBRARY_DEFAULT)
-    return calibre_library
-
-  @classmethod
-  def _singleton_key(cls, calibre_library=None):
-    ''' `CalibreTree`s are identified by `realpath(calibre_library)`.
-    '''
-    if calibre_library is None:
-      calibre_library = cls._get_default_library_path()
-    return realpath(calibre_library)
-
-  @typechecked
-  def __init__(self, calibre_library: Optional[str] = None):
-    if hasattr(self, '_lock'):
-      return
-    if calibre_library is None:
-      calibre_library = self._get_default_library_path()
-    HasFSPath.__init__(self, calibre_library)
-    self._lock = Lock()
 
   @contextmanager
   def startup_shutdown(self):
@@ -102,6 +74,11 @@ class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
         instantiated on demand.
     '''
     return CalibreMetadataDB(self)
+
+  def dbshell(self):
+    ''' Interactive db shell.
+    '''
+    return self.db.shell()
 
   @typechecked
   def __getitem__(self, dbid: int):
@@ -198,7 +175,7 @@ class CalibreTree(SingletonMixin, HasFSPath, MultiOpenMixin):
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
         dbids.extend(map(lambda s: int(s.strip()), line_sfx.split(',')))
-    dbid, = dbids
+    dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
   @typechecked
@@ -228,6 +205,9 @@ class CalibreBook:
     self.tree = tree
     self.dbid = dbid
     self._db_book = db_book
+
+  def __str__(self):
+    return f"{self.title} ({self.dbid})"
 
   @cachedmethod
   def db_book(self):
@@ -304,6 +284,13 @@ class CalibreMetadataDB(ORM):
     ''' The filesystem path to the database.
     '''
     return self.tree.pathto(self.DB_FILENAME)
+
+  def shell(self):
+    ''' Interactive db shell.
+    '''
+    print("sqlite3", self.db_path)
+    run(['sqlite3', self.db_path], check=True)
+    return 0
 
   # lifted from SQLTags
   @contextmanager
@@ -386,7 +373,11 @@ class CalibreMetadataDB(ORM):
           )
       )
       for colname, colspec in addtional_columns.items():
-        setattr(linktable, colname, declared_attr(lambda self: colspec))
+        setattr(
+            linktable,
+            colname,
+            declared_attr(lambda self, colspec=colspec: colspec),
+        )
       return linktable
 
     @total_ordering
@@ -480,14 +471,13 @@ class CalibreMetadataDB(ORM):
       '''
       __tablename__ = 'languages'
       lang_code = Column(String, nullable=False, unique=True)
-      item_order = Column(Integer, nullable=False, default=1)
 
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
       '''
 
-    class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
-      item_order = Column(Integer, nullable=False, default=1)
+    ##class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
+    ##  item_order = Column(Integer, nullable=False, default=1)
 
     Authors.book_links = relationship(BooksAuthorsLink)
     Authors.books = association_proxy('book_links', 'book')
@@ -552,8 +542,8 @@ class CalibreCommand(BaseCommand):
     '''
     from .kindle import KindleTree  # pylint: disable=import-outside-toplevel
     options = self.options
-    with KindleTree(kindle_library=options.kindle_path) as kt:
-      with CalibreTree(calibre_library=options.calibre_path) as cal:
+    with KindleTree(options.kindle_path) as kt:
+      with CalibreTree(options.calibre_path) as cal:
         db = cal.db
         with db.db_session() as session:
           with stackattrs(options, kindle=kt, calibre=cal, db=db,
@@ -581,31 +571,13 @@ class CalibreCommand(BaseCommand):
           cbook.make_cbz()
     return xit
 
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
-          List the contents of the Calibre library.
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database prompt.
     '''
-    long = False
-    if argv and argv[0] == '-l':
-      long = True
-      argv.pop(0)
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    calibre = options.calibre
-    for book in calibre:
-      with Pfx("%d:%s", book.id, book.title):
-        print(f"{book.title} ({book.dbid})")
-        if long:
-          print(" ", book.path)
-          identifiers = book.identifiers_as_dict()
-          if identifiers:
-            print("   ", TagSet(identifiers))
-          for fmt, subpath in book.formats_as_dict().items():
-            with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+    return self.options.calibre.dbshell()
 
   def cmd_import_from_calibre(self, argv):
     ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
@@ -640,10 +612,73 @@ class CalibreCommand(BaseCommand):
                 )
             )
         )
+      xit = 0
       for identifier_value in identifier_values:
         with Pfx("%s:%s", identifier_name, identifier_value):
-          ##print(identifier_value)
-          pass
+          obooks = list(
+              other_library.by_identifier(identifier_name, identifier_value)
+          )
+          if not obooks:
+            error("no books with this identifier")
+            xit = 1
+            continue
+          if len(obooks) > 1:
+            warning(
+                "  \n".join(
+                    [
+                        "multiple \"other\" books with this identifier:",
+                        *map(str, obooks)
+                    ]
+                )
+            )
+            xit = 1
+            continue
+          obook, = obooks
+          cbooks = list(
+              calibre.by_identifier(identifier_name, identifier_value)
+          )
+          if not cbooks:
+            print("NEW BOOK", obook)
+          elif len(cbooks) > 1:
+            warning(
+                "  \n".join(
+                    [
+                        "multiple \"local\" books with this identifier:",
+                        *map(str, cbooks)
+                    ]
+                )
+            )
+            print("PULL", obook, "AS NEW BOOK")
+          else:
+            cbook, = cbooks
+            print("MERGE", obook, "INTO", cbook)
+    return xit
+
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-l]
+          List the contents of the Calibre library.
+    '''
+    long = False
+    if argv and argv[0] == '-l':
+      long = True
+      argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    calibre = options.calibre
+    for book in calibre:
+      with Pfx("%d:%s", book.id, book.title):
+        print(f"{book.title} ({book.dbid})")
+        if long:
+          print(" ", book.path)
+          identifiers = book.identifiers_as_dict()
+          if identifiers:
+            print("   ", TagSet(identifiers))
+          for fmt, subpath in book.formats_as_dict().items():
+            with Pfx(fmt):
+              fspath = calibre.pathto(subpath)
+              size = pfx_call(os.stat, fspath).st_size
+              print("   ", fmt, transcribe_bytes_geek(size), subpath)
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
