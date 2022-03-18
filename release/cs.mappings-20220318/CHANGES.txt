@@ -1,0 +1,2 @@
+lib/python/cs/mappings.py: cs.mappings: new `SeqMapUC_Attrs.__repr__`, some docstring updates
+lib/python/cs/mappings.py: cs.mappings: DISTINFO: advance cs.sharedfile to get an import fix
