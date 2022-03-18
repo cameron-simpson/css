@@ -416,7 +416,7 @@ class BaseCommand:
         except AttributeError:
           # pylint: disable=raise-missing-from
           raise GetoptError("no main method and no subcommand methods")
-        self._run = main
+        self._run = _MethodSubCommand(None, main)
       else:
         # expect a subcommand on the command line
         if not argv:
