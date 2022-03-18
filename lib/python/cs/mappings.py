@@ -48,7 +48,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.seq',
-        'cs.sharedfile',
+        'cs.sharedfile>=20211208',
     ],
 }
 
