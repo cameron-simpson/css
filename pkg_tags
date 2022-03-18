@@ -12,7 +12,7 @@ cs.app.playon ok_revision="9b884dfceafcc251cbbd3e174e99937a7e76e9ae" pypi.releas
 cs.app.portfwd pypi.release="20210316" ok_revision=a340f42feecc3b8910c40cef2d2d2c8a0ca8e96c
 cs.app.ssh pypi.release=20161003
 cs.app.svcd pypi.release="20210316" ok_revision=ef88e3114c7f2dc23e8e794046d469b5270ebfb6
-cs.app.ydl pypi.release="20210906" ok_revision=e914d76f88b22a7827f0175b2e45569ace2f7486
+cs.app.ydl pypi.release="20210906" ok_revision=c3034b39089e541de85a33496e6cb57d48b0436f
 cs.asynchron pypi.release=20160828
 cs.binary pypi.release="20210316" ok_revision=e0d01b9045138b3bfb6175e5abfcd96549f4a001
 cs.buffer pypi.release="20210316" ok_revision=d13e4361ea70ade9bb028568e34aca6f1bf291e6
