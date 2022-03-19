@@ -615,15 +615,16 @@ class KindleCommand(BaseCommand):
           kbook.tags['calibre.dbid'] = cbook.id
 
   def cmd_ls(self, argv):
+    ''' Usage: {cmd}
+          List the contents of the librayr.
+    '''
     options = self.options
     kindle = options.kindle
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
-      print(subdir_name)
-      for tag in sorted(kbook.tags):
-        print(" ", tag)
+      print(subdir_name, " ".join(map(str, sorted(kbook.tags))))
 
 if __name__ == '__main__':
   sys.exit(KindleCommand(sys.argv).run())
