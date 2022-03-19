@@ -106,6 +106,12 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
     ASIN = asin.upper()
+    # convert ASIN_EBOK to ASIN, handy for copy/paste of subdir name from listing
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = cutsuffix(ASIN, suffix)
+      if subdir_name is not ASIN:
+        ASIN = subdir_name
+        break
     for suffix in self.SUBDIR_SUFFIXES:
       subdir_name = ASIN + suffix
       if isdirpath(self.pathto(subdir_name)):
