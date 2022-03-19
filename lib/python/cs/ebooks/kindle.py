@@ -524,7 +524,7 @@ class KindleCommand(BaseCommand):
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     options = self.options
     with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(calibre_library=options.calibre_path) as cal:
+      with CalibreTree(options.calibre_path) as cal:
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
