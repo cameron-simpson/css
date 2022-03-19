@@ -1,3 +1,4 @@
+shortpath: optional using_symlinks mode switch to use bin-cs/shortpath-prompt sylink algoritm
 BaseCommand: drop run_argv method
 cs.logutils: supplant_logger should override the logging-already-set-up check?
 cs.logutils: call basicConfig for the no-existing-logging mode
