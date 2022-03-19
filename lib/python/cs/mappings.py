@@ -30,7 +30,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20211208-post'
+__version__ = '20220318-post'
 
 DISTINFO = {
     'description':
@@ -48,7 +48,7 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.seq',
-        'cs.sharedfile',
+        'cs.sharedfile>=20211208',
     ],
 }
 

@@ -16,7 +16,7 @@ import time
 import traceback
 from cs.gimmicks import warning
 
-__version__ = '20210823-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -63,14 +63,17 @@ def decorator(deco):
 
       Examples:
 
+          # define your decorator as if always called with func and args
           @decorator
-          def mydeco(func, *da, kw=None):
-            ... decorate func subject to the values of da and kw
+          def mydeco(func, *da, arg2=None):
+            ... decorate func subject to the values of da and arg2
 
+          # mydeco called with defaults
           @mydeco
           def func1(...):
             ...
 
+          @ mydeco called with nondefault arguments
           @mydeco('foo', arg2='bah')
           def func2(...):
             ...
@@ -87,13 +90,14 @@ def decorator(deco):
         Otherwise return a decorator using the provided arguments,
         ready for the subsequent function.
     '''
-    if len(da) >= 1 and callable(da[0]):
-      # `func` is already supplied, decorate it now.
+    if len(da) > 0 and callable(da[0]):
+      # `func` is already supplied, pop it off and decorate it now.
       func = da[0]
       da = tuple(da[1:])
+      # decorate func
       decorated = deco(func, *da, **dkw)
       if decorated is not func:
-        # pretty up the returned wrapper
+        # we got a wrapper function back, pretty up the returned wrapper
         try:
           decorated.__name__ = getattr(func, '__name__', str(func))
         except AttributeError:
@@ -300,7 +304,7 @@ def contextdecorator(cmgrfunc):
         '''
         with cmgr(func, a, kw, *da, **dkw) as ctxt:
           if provide_context:
-            a = a.insert(0, ctxt)
+            a = [ctxt] + list(a)
           return func(*a, **kw)
 
     return wrapped
@@ -355,7 +359,7 @@ def cachedmethod(
       * `poll_delay`: minimum time between polls; after the first
         access, subsequent accesses before the `poll_delay` has elapsed
         will return the cached value.
-        Default: `None`, meaning no poll delay.
+        Default: `None`, meaning the value never becomes stale.
       * `sig_func`: a signature function, which should be significantly
         cheaper than the method. If the signature is unchanged, the
         cached value will be returned. The signature function
@@ -383,7 +387,7 @@ def cachedmethod(
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if poll_delay is not None and poll_delay <= 0:
     raise ValueError("poll_delay <= 0: %r" % (poll_delay,))
   if poll_delay is not None and poll_delay <= 0:
@@ -398,7 +402,7 @@ def cachedmethod(
   lastpoll_attr = val_attr + '__lastpoll'
 
   # pylint: disable=too-many-branches
-  def wrapper(self, *a, **kw):
+  def cachedmethod_wrapper(self, *a, **kw):
     with Pfx("%s.%s", self, attr):
       now = None
       value0 = getattr(self, val_attr, unset_value)
@@ -409,19 +413,15 @@ def cachedmethod(
         pass
       # we have a cached value for return in the following logic
       elif poll_delay is None:
-        # always poll
-        pass
-      else:
-        lastpoll = getattr(self, lastpoll_attr)
-        now = time.time()
-        if now - lastpoll < poll_delay:
-          # reuse cache
-          return value0
-      # not too soon, try to update the value
+        return value0
+      # see if the value is stale
+      lastpoll = getattr(self, lastpoll_attr, None)
+      now = time.time()
+      if lastpoll is not None and now - lastpoll < poll_delay:
+        # reuse cache
+        return value0
       # update the poll time if we use it
-      if poll_delay is not None:
-        now = now or time.time()
-        setattr(self, lastpoll_attr, now)
+      setattr(self, lastpoll_attr, now)
       # check the signature if provided
       # see if the signature is unchanged
       if sig_func is not None:
@@ -460,7 +460,11 @@ def cachedmethod(
         setattr(self, rev_attr, (getattr(self, rev_attr, None) or 0) + 1)
       return value
 
-  return wrapper
+  ##  Doesn't work, has no access to self. :-(
+  ##  # provide a .flush() function to clear the cached value
+  ##  cachedmethod_wrapper.flush = lambda: setattr(self, val_attr, unset_value)
+
+  return cachedmethod_wrapper
 
 @decorator
 def OBSOLETE(func, suggestion=None):
@@ -479,6 +483,7 @@ def OBSOLETE(func, suggestion=None):
     '''
     frame = traceback.extract_stack(None, 2)[0]
     caller = frame[0], frame[1]
+    # pylint: disable=protected-access
     try:
       callers = func._OBSOLETE_callers
     except AttributeError:
@@ -568,7 +573,7 @@ def strable(func, open_func=None):
 
       *Note*: use of this decorator requires the `cs.pfx` module.
   '''
-  from cs.pfx import Pfx
+  from cs.pfx import Pfx  # pylint: disable=import-outside-toplevel
   if open_func is None:
     open_func = open
 
@@ -612,6 +617,7 @@ def observable_class(property_names, only_unequal=False):
   if isinstance(property_names, str):
     property_names = (property_names,)
 
+  # pylint: disable=protected-access
   def make_observable_class(cls):
     ''' Annotate the class `cls` with observable properties.
     '''

@@ -18,7 +18,7 @@ import sys
 
 from cs.gimmicks import warning
 
-__version__ = '20200729-post'
+__version__ = '20220227-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],

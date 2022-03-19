@@ -372,8 +372,8 @@ class SingletonMixin:
 
           class Pool(SingletonMixin):
 
-              @staticmethod
-              def _singleton_key(foo, bah=3):
+              @classmethod
+              def _singleton_key(cls, foo, bah=3):
                   return foo, bah
 
               def __init__(self, foo, bah=3):
