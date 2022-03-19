@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
+import json
 import os
 from os.path import (
     basename,
@@ -479,6 +480,13 @@ class CalibreMetadataDB(ORM):
       __tablename__ = 'languages'
       lang_code = Column(String, nullable=False, unique=True)
 
+    class Preferences(Base, _CalibreTable):
+      ''' Calibre preferences.
+      '''
+      __tablename__ = 'preferences'
+      key = Column(String, nullable=False, unique=True)
+      value = Column("val", String, nullable=False)
+
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
       '''
@@ -504,6 +512,7 @@ class CalibreMetadataDB(ORM):
     self.books = Books
     self.identifiers = Identifiers
     self.languages = Languages
+    self.preferences = Preferences
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -686,6 +695,40 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+
+  def cmd_prefs(self, argv):
+    ''' Usage: {cmd}
+          List the library preferences.
+    '''
+    xit = 0
+    db = self.options.calibre.db
+    with db.db_session() as session:
+      if argv:
+        for pref_name in argv:
+          with Pfx(pref_name):
+            pref = db.preferences.lookup1(key=pref_name, session=session)
+            if pref is None:
+              warning("unknown preference")
+              xit = 1
+            else:
+              print(pref_name)
+              print(" ", json.dumps(pfx_call(json.loads, pref.value)))
+      else:
+        for pref in sorted(db.preferences.lookup(session=session),
+                           key=lambda pref: pref.key):
+          with Pfx(pref.key):
+            print(pref.key)
+            value = pfx_call(json.loads, pref.value)
+            if isinstance(value, list):
+              if value:
+                for item in value:
+                  print(" ", json.dumps(item))
+            elif isinstance(value, dict):
+              for k, v in sorted(value.items()):
+                print(" ", json.dumps(k), ":", json.dumps(v))
+            else:
+              print(" ", json.dumps(value))
+    return xit
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
