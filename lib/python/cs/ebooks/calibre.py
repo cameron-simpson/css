@@ -550,6 +550,14 @@ class CalibreCommand(BaseCommand):
                           session=session, verbose=True):
             yield
 
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database prompt.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    return self.options.calibre.dbshell()
+
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
     '''
@@ -570,14 +578,6 @@ class CalibreCommand(BaseCommand):
         with Pfx("%s: make_cbz", cbook.title):
           cbook.make_cbz()
     return xit
-
-  def cmd_dbshell(self, argv):
-    ''' Usage: {cmd}
-          Start an interactive database prompt.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    return self.options.calibre.dbshell()
 
   def cmd_import_from_calibre(self, argv):
     ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
