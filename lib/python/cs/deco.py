@@ -413,14 +413,17 @@ def cachedmethod(
         pass
       # we have a cached value for return in the following logic
       elif poll_delay is None:
+        # no repoll time, the cache is always good
         return value0
       # see if the value is stale
       lastpoll = getattr(self, lastpoll_attr, None)
       now = time.time()
-      if lastpoll is not None and now - lastpoll < poll_delay:
+      if (poll_delay is not None and lastpoll is not None
+          and now - lastpoll < poll_delay):
         # reuse cache
         return value0
-      # update the poll time if we use it
+      # never polled or the cached value is stale, poll now
+      # update the poll time
       setattr(self, lastpoll_attr, now)
       # check the signature if provided
       # see if the signature is unchanged
