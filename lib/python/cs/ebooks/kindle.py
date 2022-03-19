@@ -37,6 +37,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.tagset import Tag
 from cs.threads import locked_property
 
 
@@ -619,6 +620,13 @@ class KindleCommand(BaseCommand):
         if dbid is None or cbook.id != dbid:
           print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
           kbook.tags['calibre.dbid'] = cbook.id
+        for field in 'authors', 'title':
+          tag_name = f'calibre.{field}'
+          if field == "authors":
+            tag_value = sorted(author.name for author in cbook.authors)
+          else:
+            tag_value = getattr(cbook, field)
+          kbook.tags.add(tag_name, tag_value)
 
   def cmd_ls(self, argv):
     ''' Usage: {cmd}
