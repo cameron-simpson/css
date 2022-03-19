@@ -226,6 +226,13 @@ class CalibreBook:
     return getattr(self.db_book(), attr)
 
   @property
+  def authors(self):
+    ''' The `CalibreMetadataDB` author records.
+    '''
+    with self.db.db_session() as session:
+      return self.db_book().authors
+
+  @property
   def mobi_subpath(self):
     ''' The subpath of a Mobi format book file, or `None`.
     '''
