@@ -1351,9 +1351,12 @@ class Module:
 
   def resolve_requirements(self, requirement_specs):
     ''' Resolve the requirement specifications from `requirement_specs`
-        into valid `install_requires` specification.
+        into valid `install_requires` specifications.
     '''
-    return list(map(self.modules.resolve_requirement, requirement_specs))
+    return [
+        self.modules.resolve_requirement(spec)
+        for spec in sorted(requirement_specs)
+    ]
 
   @staticmethod
   def reldistfiles(pkg_dir):
