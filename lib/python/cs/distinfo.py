@@ -101,9 +101,9 @@ class CSReleaseCommand(BaseCommand):
   ''' The `cs-release` command line implementation.
   '''
 
-  SUBCOMMAND_ARGV_DEFAULT = ['ls']
+  SUBCOMMAND_ARGV_DEFAULT = ['releases']
   GETOPT_SPEC = 'fqv'
-  USAGE_FORMAT = '''Usage: {cmd} [-f] subcommand [subcommand-args...]
+  USAGE_FORMAT = '''Usage: {cmd} [-fqv] subcommand [subcommand-args...]
       -f  Force. Sanity checks that would stop some actions normally
           will not prevent them.
       -q  Quiet. Not verbose.
@@ -274,37 +274,6 @@ class CSReleaseCommand(BaseCommand):
           for filename in files
       ]
       print(' '.join(files) + ':', firstline)
-
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [package_name...]
-          List package names and their latst PyPI releases.
-    '''
-    options = self.options
-    if argv:
-      pkg_names = argv
-    else:
-      pkg_names = sorted(options.pkg_tagsets.keys())
-    for pkg_name in pkg_names:
-      if pkg_name.startswith(MODULE_PREFIX):
-        pkg = options.modules[pkg_name]
-        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
-        if pypi_release is not None:
-          problems = pkg.problems()
-          problem_text = (
-              "%d problems" % (len(problems),) if problems else "ok"
-          )
-          if problems and options.colourise:
-            problem_text = colourise(problem_text, 'yellow')
-          list_argv = [
-              pkg_name,
-              pypi_release,
-              problem_text,
-          ]
-          features = pkg.features(pypi_release)
-          if features:
-            list_argv.append('[' + ' '.join(sorted(features)) + ']')
-          print(*list_argv)
-    return 0
 
   def cmd_next(self, argv):
     ''' Usage: next pkg_names...
@@ -501,6 +470,37 @@ class CSReleaseCommand(BaseCommand):
     )
     for feature_name in features + bugfixes:
       pkg.set_feature(feature_name, next_release.version)
+    return 0
+
+  def cmd_releases(self, argv):
+    ''' Usage: {cmd} [package_name...]
+          List package names and their latst PyPI releases.
+    '''
+    options = self.options
+    if argv:
+      pkg_names = argv
+    else:
+      pkg_names = sorted(options.pkg_tagsets.keys())
+    for pkg_name in pkg_names:
+      if pkg_name.startswith(MODULE_PREFIX):
+        pkg = options.modules[pkg_name]
+        pypi_release = pkg.pkg_tags.get(TAG_PYPI_RELEASE)
+        if pypi_release is not None:
+          problems = pkg.problems()
+          problem_text = (
+              "%d problems" % (len(problems),) if problems else "ok"
+          )
+          if problems and options.colourise:
+            problem_text = colourise(problem_text, 'yellow')
+          list_argv = [
+              pkg_name,
+              pypi_release,
+              problem_text,
+          ]
+          features = pkg.features(pypi_release)
+          if features:
+            list_argv.append('[' + ' '.join(sorted(features)) + ']')
+          print(*list_argv)
     return 0
 
   def cmd_resolve(self, argv):
