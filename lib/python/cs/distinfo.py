@@ -275,6 +275,20 @@ class CSReleaseCommand(BaseCommand):
       ]
       print(' '.join(files) + ':', firstline)
 
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} pkg_name
+          List the file paths associated with this package.
+    '''
+    if not argv:
+      raise GetoptError("missing package names")
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments after package name: %r" % (argv,))
+    with Pfx(pkg_name):
+      pkg = self.options.modules[pkg_name]
+      for filepath in pkg.paths():
+        print(filepath)
+
   def cmd_next(self, argv):
     ''' Usage: next pkg_names...
           Print package names and their next release tag.
