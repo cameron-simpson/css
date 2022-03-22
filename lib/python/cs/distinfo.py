@@ -36,6 +36,7 @@ from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
+from cs.fs import rpaths
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -1224,7 +1225,7 @@ class Module:
 
   @prop
   def basepath(self):
-    ''' The base path for this package.
+    ''' The base path for this package, *PYLIBTOP*`/`*pkg*`/'*name*.
     '''
     return os.sep.join([PYLIBTOP] + self.name.split('.'))
 
@@ -1239,39 +1240,37 @@ class Module:
       return joinpath(basepath, '__init__.py')
     return basepath + '.py'
 
-  @cachedmethod
   @pfx_method(use_str=True)
-  def paths(self):
-    ''' Yield the paths associated with this package.
+  def paths(self, top_dirpath='.'):
+    ''' Return a list of the paths associated with this package
+        relative to `top_dirpath` (default `'.'`).
 
         Note: this is based on the current checkout state instead
         of some revision because "hg archive" complains if globs
         match no paths, and aborts.
     '''
-    pathlist = []
+    skip_suffixes = '.pyc', '.o', '.so'
     basepath = self.basepath
+    if top_dirpath:
+      basepath = normpath(joinpath(top_dirpath, basepath))
     if isdirpath(basepath):
-      for subpath, _, filenames in os.walk(basepath):
-        if not subpath.startswith(basepath):
-          info("SKIP %s", subpath)
-          continue
-        for filename in sorted(filenames):
-          if not any(map(lambda dotext: filename.endswith(dotext),
-                         ('.pyc', '.o', '.so'))):
-            filepath = joinpath(subpath, filename)
-            pathlist.append(filepath)
+      pathlist = [
+          joinpath(basepath, rpath) for rpath in
+          rpaths(basepath, skip_suffixes=skip_suffixes, sort_paths=True)
+      ]
     else:
-      base = self.basename
       updir = dirname(basepath)
-      for filename in sorted(os.listdir(updir)):
-        filepath = joinpath(updir, filename)
-        if filename.startswith((base + '.', base + '_')):
-          if (not (filename.endswith('.pyc') or filename.endswith('.o'))
-              and isfilepath(filepath)):
-            if isfilepath(filepath):
-              pathlist.append(filepath)
-            else:
-              info("ignore %r, not a file", filepath)
+      base_ = basename(basepath) + '.'
+      pathlist = []
+      for dirent in sorted(pfx_call(os.scandir, updir), key=lambda d: d.name):
+        if not dirent.is_file(follow_symlinks=False):
+          continue
+        filename = dirent.name
+        if not filename.startswith(base_):
+          continue
+        if filename.endswith(skip_suffixes):
+          continue
+        pathlist.append(relpath(joinpath(updir, filename), top_dirpath))
     if not pathlist:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
