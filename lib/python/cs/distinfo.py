@@ -8,6 +8,8 @@
 from __future__ import print_function
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
+from datetime import datetime
+from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
 from glob import glob
@@ -17,21 +19,23 @@ import os.path
 from os.path import (
     basename,
     dirname,
-    exists as pathexists,
+    exists as existspath,
     isdir as isdirpath,
-    isfile as isfilepath,
     join as joinpath,
+    normpath,
     relpath,
     splitext,
 )
 from pprint import pprint, pformat
 import re
-from subprocess import Popen
+from subprocess import run, DEVNULL
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+
 from icontract import ensure
 from typeguard import typechecked
+
 from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
@@ -44,16 +48,16 @@ from cs.lex import (
     is_dotted_identifier,
     is_identifier,
 )
-from cs.logutils import error, warning, info, status
+from cs.logutils import error, warning, info, status, trace
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
 from cs.py.func import prop
 from cs.py.modules import direct_imports
 from cs.sh import quotestr as shq, quotecmd as shqv
 from cs.tagset import TagFile, tag_or_tag_value
-from cs.upd import Upd, print
+from cs.upd import print
 from cs.vcs.hg import VCS_Hg
 
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
@@ -304,7 +308,7 @@ class CSReleaseCommand(BaseCommand):
 
   def cmd_ok(self, argv):
     ''' Usage: {cmd} pkg_name [changset-hash]
-          Mark a particulaqr changeset as ok for purposes of "check".
+          Mark a particular changeset as ok for purposes of "check".
           This lets one accept cosmetic outstanding commits as irrelevant.
     '''
     if not argv:
@@ -780,10 +784,9 @@ class Modules(defaultdict):
 
 # pylint: disable=too-many-public-methods
 class Module:
-  ''' Metadata about a Python module.
+  ''' Metadata about a Python module/package.
   '''
 
-  @pfx_method(use_str=True)
   def __init__(self, name, options):
     self.name = name
     self._module = None
@@ -1232,8 +1235,8 @@ class Module:
   @prop
   def toppath(self):
     ''' The top file of the package:
-        basepath/__init__.py for packages
-        and basepath.py for modules.
+        *basepath*`/__init__.py` for packages,
+        *basepath*`.py` for modules.
     '''
     basepath = self.basepath
     if isdirpath(basepath):
@@ -1535,7 +1538,7 @@ class Module:
     return subnames
 
   def imported_modules(self, prefix=MODULE_PREFIX):
-    ''' Generator yielding directly imported Modules.
+    ''' Generator yielding directly imported `Module`s.
     '''
     for name in sorted(self.imported_names):
       if name.startswith(prefix) and name != self.name:
