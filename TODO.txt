@@ -1,3 +1,4 @@
+cs.logutils: new LoggingSetup class embodying infer_log_level etc, as a context manager to push and pop the setup, setup_logging to do the first part, easy replacement for setup_logging of some kind and use it in run_context
 shortpath: optional using_symlinks mode switch to use bin-cs/shortpath-prompt sylink algoritm
 BaseCommand: drop run_argv method
 cs.logutils: supplant_logger should override the logging-already-set-up check?
