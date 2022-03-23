@@ -230,11 +230,8 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    checkout_dir = vcstag
-    ModulePackageDir.fill(
-        checkout_dir, pkg, vcs, vcstag, do_mkdir=True, bare=True
-    )
-    print(checkout_dir)
+    with pkg.release_dir(vcs, vcstag, persist=True) as checkout_dirpath:
+      print(checkout_dirpath)
 
   def cmd_distinfo(self, argv):
     ''' Usage: {cmd} pkg_name
