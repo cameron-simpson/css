@@ -1275,93 +1275,6 @@ class Module:
       raise ValueError("no paths for %s" % (self,))
     return pathlist
 
-  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  @pfx_method
-  def prepare_package(self, pkg_dir):
-    ''' Prepare an existing package checkout as a package for upload or install.
-
-        This writes the `'MANIFEST.in'`, `'README.md'` and `'setup.py'` files.
-    '''
-    distinfo = self.compute_distinfo()
-
-    # write MANIFEST.in
-    manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
-    with open(manifest_path, "w") as mf:
-      # TODO: support extra files
-      subpaths = self.paths()
-      for subpath in subpaths:
-        with Pfx(subpath):
-          prefix, ext = splitext(subpath)
-          if ext == '.md':
-            _, ext2 = splitext(prefix)
-            if len(ext2) == 2 and ext2[-1].isdigit():
-              # md2man manual entry
-              mdsrc = joinpath(pkg_dir, subpath)
-              mddst = joinpath(pkg_dir, prefix)
-              if pathexists(mddst):
-                error("not converting because %r already exists", mddst)
-              else:
-                info("create %s", mddst)
-                with Pfx(mddst):
-                  with open(mddst, 'w') as mddstf:
-                    runcmd(['md2man-roff', subpath], stdout=mddstf)
-              mf.write('include ' + subpath + '\n')
-              mf.write('include ' + prefix + '\n')
-          elif ext == '.c':
-            mf.write('include ' + subpath + '\n')
-      # create README.md
-      readme_path = joinpath(pkg_dir, 'README.md')
-      with open(readme_path, 'w') as rf:
-        print(
-            distinfo.get('long_description', '') or distinfo['description'],
-            file=rf
-        )
-
-    # final step: write setup.py with information gathered earlier
-    setup_path = joinpath(pkg_dir, 'setup.py')
-    with Pfx(setup_path):
-      ok = True
-      with open(setup_path, "w") as sf:
-        out = partial(print, file=sf)
-        out("#!/usr/bin/env python")
-        ##out("from distutils.core import setup")
-        out("from setuptools import setup")
-        out("setup(")
-        # mandatory fields, in preferred order
-        written = set()
-        for kw in (
-            'name',
-            'author',
-            'author_email',
-            'version',
-            'url',
-            'description',
-            'long_description',
-        ):
-          try:
-            kv = distinfo[kw]
-          except KeyError:
-            warning("missing distinfo[%r]", kw)
-            ok = False
-          else:
-            if kw in ('description', 'long_description') and isinstance(kv,
-                                                                        str):
-              out("  %s =" % (kw,))
-              out("   ", pformat(kv).replace('\n', '    \n') + ',')
-            else:
-              out("  %s = %r," % (kw, distinfo[kw]))
-            written.add(kw)
-        out(
-            "  %s = %r," %
-            ('install_requires', distinfo.pop('install_requires', ()))
-        )
-        for kw, kv in sorted(distinfo.items()):
-          if kw not in written:
-            out("  %s = %r," % (kw, kv))
-        out(")")
-      if not ok:
-        raise ValueError("could not construct valid setup.py file")
-
   def resolve_requirements(self, requirement_specs):
     ''' Resolve the requirement specifications from `requirement_specs`
         into valid `install_requires` specifications.
@@ -1381,15 +1294,6 @@ class Module:
         relpath(fullpath, pkg_dir)
         for fullpath in glob(joinpath(pkg_dir, 'dist/*'))
     ]
-
-  @pfx_method
-  def prepare_dist(self, pkg_dir):
-    ''' Run "setup.py check sdist", making files in dist/.
-    '''
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check']))
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'sdist']))
-    distfiles = self.reldistfiles(pkg_dir)
-    cd_shcmd(pkg_dir, shqv(['twine', 'check'] + distfiles))
 
   @pfx_method
   def upload_dist(self, pkg_dir):
@@ -1637,6 +1541,155 @@ class Module:
       if name.startswith(prefix) and name != self.name:
         yield self.modules[name]
 
+  @contextmanager
+  def release_dir(self, vcs, vcs_revision, *, persist=False, bare=False):
+    ''' Context manager to prepare a package release directory.
+        It yields the release directory path.
+
+        Parameters:
+        * `vcs`: the version control system
+        * `vcs_revision`: the revision to release, usually a tag name
+        * `persist`: optional flag or directory name, default `False`;
+          if false, create the release in a temporary directory
+          which will be tidied up on exit from the context manager;
+          if true, create the release in a directory which is
+          `persist` if that is a string, otherwise a name derived
+          from the `vcs_revision` and the current time
+        * `bare`: optional flag, default `False`;
+          if true, do not prepare the package metadata files and
+          the distribution files
+    '''
+    if not persist:
+      with TemporaryDirectory(
+          dir=(dirname(persist) if persist else None),
+          prefix=f"{vcs_revision}-",
+          suffix="-release",
+      ) as temp_dirpath:
+        yield from self.release_dir(
+            vcs, vcs_revision, persist=temp_dirpath, bare=bare
+        )
+        return
+    if persist is True:
+      release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
+    else:
+      assert isinstance(persist, str)
+      release_dirpath = persist
+    pfx_call(os.mkdir, release_dirpath)
+    # unpack the source
+    hg_argv = ['archive', '-r', vcs_revision]
+    hg_argv.extend(vcs.hg_include(self.paths()))
+    hg_argv.extend(['--', release_dirpath])
+    vcs.hg_cmd(*hg_argv)
+    os.system("find %r -type f -print" % (release_dirpath,))
+    if not bare:
+      computed_distinfo = self.compute_distinfo()
+      ##self.prepare_autofiles(release_dirpath)
+      self.prepare_autofiles(release_dirpath, computed_distinfo)
+      self.prepare_metadata(release_dirpath, computed_distinfo)
+      self.prepare_dist(release_dirpath, computed_distinfo)
+    yield release_dirpath
+
+  def prepare_autofiles(self, pkg_dir, computed_distinfo):
+    ''' Create automatic files in `pkg_dir`.
+
+        Currently this prepares the `README.md` file
+        and man files from `*.[1-9].md` files.
+    '''
+    # create README.md
+    readme_path = joinpath(pkg_dir, 'README.md')
+    with pfx_call(open, readme_path, 'x') as rf:
+      print(
+          computed_distinfo.get('long_description', '')
+          or computed_distinfo['description'],
+          file=rf
+      )
+
+    rpaths = self.paths(pkg_dir)
+    for rpath in rpaths:
+      with Pfx(rpath):
+        path = normpath(joinpath(pkg_dir, rpath))
+        if fnmatch(path, '*.[1-9].md'):
+          # create man page from markdown source
+          manpath, _ = splitext(path)
+          if existspath(manpath):
+            warning("man path already exists: %r", manpath)
+            continue
+          with pfx_call(open, manpath, 'x') as manf:
+            runcmd(['md2man-roff', path], stdout=manf)
+          continue
+
+  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+  def prepare_metadata(self, pkg_dir, computed_distinfo):
+    ''' Prepare an existing package checkout as a package for upload or install.
+
+        This writes the `MANIFEST.in` and `setup.py` files.
+    '''
+    # write MANIFEST.in
+    manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
+    with pfx_call(open, manifest_path, "x") as mf:
+      # TODO: support extra files
+      subpaths = self.paths(pkg_dir)
+      for subpath in subpaths:
+        with Pfx(subpath):
+          if any(
+              (fnmatch(subpath, ptn) for ptn in ("*.c", "*.md", "*.[1-9]"))):
+            print('include', subpath, file=mf)
+
+    # final step: write setup.py with information gathered earlier
+    setup_path = joinpath(pkg_dir, 'setup.py')
+    with Pfx(setup_path):
+      ok = True
+      with pfx_call(open, setup_path, "x") as sf:
+        out = partial(print, file=sf)
+        out("#!/usr/bin/env python")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
+        out("setup(")
+        # mandatory fields, in preferred order
+        written = set()
+        for kw in (
+            'name',
+            'author',
+            'author_email',
+            'version',
+            'url',
+            'description',
+            'long_description',
+        ):
+          try:
+            kv = computed_distinfo[kw]
+          except KeyError:
+            warning("missing computed_distinfo[%r]", kw)
+            ok = False
+          else:
+            if kw in ('description', 'long_description') and isinstance(kv,
+                                                                        str):
+              out("  %s =" % (kw,))
+              out("   ", pformat(kv).replace('\n', '    \n') + ',')
+            else:
+              out("  %s = %r," % (kw, computed_distinfo[kw]))
+            written.add(kw)
+        out(
+            "  %s = %r," % (
+                'install_requires',
+                computed_distinfo.pop('install_requires', ())
+            )
+        )
+        for kw, kv in sorted(computed_distinfo.items()):
+          if kw not in written:
+            out("  %s = %r," % (kw, kv))
+        out(")")
+      if not ok:
+        raise ValueError("could not construct valid setup.py file")
+
+  def prepare_dist(self, pkg_dir, computed_distinfo):
+    ''' Run "setup.py check sdist", making files in dist/.
+    '''
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check']))
+    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'sdist']))
+    distfiles = self.reldistfiles(pkg_dir)
+    cd_shcmd(pkg_dir, shqv(['twine', 'check'] + distfiles))
+
 class ModulePackageDir(SingletonMixin):
   ''' A singleton class for module package distributions.
   '''
@@ -1688,7 +1741,7 @@ class ModulePackageDir(SingletonMixin):
       vcs.hg_cmd(*hg_argv)
       os.system("find %r -type f -print" % (dirpath,))
       if not bare:
-        pkg.prepare_package(dirpath)
+        pkg.prepare_metadata(dirpath)
         pkg.prepare_dist(dirpath)
 
 if __name__ == '__main__':
