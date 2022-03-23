@@ -677,14 +677,14 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       raise RuntimeError("onimplemenented op %r" % (self.op,))
     return ''.join((self.module_name, self.op, release_version))
 
-def runcmd(argv, **kw):
+def runcmd(argv, *, check=True, stdin=DEVNULL, **kw):
   ''' Run command.
   '''
-  with Pfx("Popen(%r,...)", argv):
-    P = Popen(argv, **kw)
-    xit = P.wait()
-    if xit != 0:
-      raise ValueError("command failed, exit code %d: %r" % (xit, argv))
+  trace(
+      f"+ {argv!r}  stdin={stdin} " +
+      " ".join((f"{k}={v!r}" for k, v in kw.items()))
+  )
+  return run(argv, check=check, stdin=stdin, **kw)
 
 def cd_shcmd(wd, shcmd):
   ''' Run a command supplied as a sh(1) command string.
