@@ -1757,6 +1757,12 @@ class Module:
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
+    # final step: write setup.py with information gathered earlier
+    projtoml = joinpath(pkg_dir, 'pyproject.toml')
+    proj = self.compute_pyproject()
+    with pfx_call(open, projtoml, 'xb') as tf:
+      tomli_w.dump(proj, tf, multiline_strings=True)
+
   def prepare_dist(self, pkg_dir, computed_distinfo):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
