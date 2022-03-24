@@ -367,6 +367,18 @@ class CSReleaseCommand(BaseCommand):
         pkg.upload_dist(dirpath)
         pkg.latest_pypi_version = release.version
 
+  def cmd_pyproject_toml(self, argv):
+    ''' Usage: {cmd} pkg_name
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = self.options.modules[pkg_name]
+    pyproject = pkg.compute_pyproject()
+    sys.stdout.write(tomli_w.dumps(pyproject, multiline_strings=True))
+
   def cmd_readme(self, argv):
     ''' Usage: {cmd} [-a] pkg_name
           Print out the package long_description.
