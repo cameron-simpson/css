@@ -1118,10 +1118,12 @@ class Module:
   @pfx_method
   def compute_distinfo(
       self,
+      *,
       pypi_package_name=None,
       pypi_package_version=None,
   ):
     ''' Compute the distutils info mapping for this package.
+        Return a new `dict` containing the mapping.
     '''
     if '>' in self.name or '=' in self.name:
       raise RuntimeError("bad module name %r" % (self.name))
