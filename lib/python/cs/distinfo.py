@@ -1219,6 +1219,79 @@ class Module:
 
     return dinfo
 
+  @pfx_method
+  def compute_pyproject(
+      self,
+      dinfo=None,
+      *,
+      pypi_package_name=None,
+      pypi_package_version=None,
+  ):
+    if dinfo is None:
+      dinfo = self.compute_distinfo(
+          pypi_package_name=pypi_package_name,
+          pypi_package_version=pypi_package_version
+      )
+    else:
+      if pypi_package_name or pypi_package_version:
+        raise ValueError(
+            "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
+        )
+      # we will be consuming the dict so make a copy of the presupplied mapping
+      dinfo = dict(dinfo)
+    projspec = {}
+    pyproject = {"project": projspec}
+    # mandatory leading fields in preferred order
+    leading_fields = (
+        'name',
+        'author',
+        'author_email',
+        'version',
+        'license',
+        'description',
+        'keywords',
+        'urls',
+        'dependencies',
+    )
+    trailing_fields = (
+        'classifiers',
+        'long_description',
+    )
+    for k in leading_fields:
+      if k == 'urls':
+        urlsspec = {}
+        di_url = dinfo.pop('url', None)
+        if di_url:
+          urlsspec['URL'] = di_url
+        v = urlsspec
+      elif k == 'dependencies':
+        v = dinfo.pop('install_requires')
+      elif k == 'optional-dependencies':
+        v = dinfo.pop('extra_requires', {})
+      else:
+        v = dinfo.pop(k)
+      projspec[k] = v
+    for k, v in sorted(dinfo.items()):
+      if k in trailing_fields:
+        continue
+
+    # mandatory trailing fields
+    for k in trailing_fields:
+      v = dinfo.pop(k)
+      if k == 'long_description':
+        projspec["readme"] = {
+            "text":
+            v,
+            "content-type":
+            dinfo.pop('long_description_content_type', "text/markdown"),
+        }
+      else:
+        projspec[k] = v
+    # check that everything was covered off
+    if dinfo:
+      warning("dinfo not emptied: %r", dinfo)
+    return pyproject
+
   @prop
   def basename(self):
     ''' The last component of the package name.
