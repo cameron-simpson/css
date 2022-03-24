@@ -34,6 +34,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from icontract import ensure
+import tomli_w
 from typeguard import typechecked
 
 from cs.ansi_colour import colourise
