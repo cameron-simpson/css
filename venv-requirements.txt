@@ -17,6 +17,7 @@ pytest
 requests
 sqlalchemy
 tkmacosx
+tomli-w
 twine
 typeguard
 watchdog
