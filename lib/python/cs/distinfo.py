@@ -1085,6 +1085,11 @@ class Module:
 
   def compute_doc(self, all_class_names=False):
     ''' Compute the components of the documentation.
+
+        Parameters:
+        * `all_class_names`: optional flag, default `False`;
+          if true list all methods, otherwise constrain the listing
+          to `__new__` and `__init__`.
     '''
     # break out the release log and format it
     releases = list(self.release_log())
@@ -1099,11 +1104,11 @@ class Module:
         postamble_parts.append(
             f'*Release {release_tag.version}*:\n{release_entry}'
         )
-    # split the module documentation after the opening paragraph
     full_doc = module_doc(
         self.module,
         method_names=None if all_class_names else ('__new__', '__init__')
     )
+    # split the module documentation after the opening paragraph
     try:
       doc_head, doc_tail = full_doc.split('\n\n', 1)
     except ValueError:
@@ -1304,6 +1309,7 @@ class Module:
     # mandatory trailing fields
     for k in trailing_fields:
       v = dinfo.pop(k)
+      # TODO: can we reference the README.md here?
       if k == 'long_description':
         projspec["readme"] = {
             "text":
