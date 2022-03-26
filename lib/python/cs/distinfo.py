@@ -7,10 +7,10 @@
 
 from __future__ import print_function
 from collections import defaultdict, namedtuple
+from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import datetime
 from fnmatch import fnmatch
-from functools import partial
 from getopt import GetoptError
 from glob import glob
 import importlib
@@ -26,7 +26,6 @@ from os.path import (
     relpath,
     splitext,
 )
-from pprint import pprint, pformat
 import re
 from subprocess import run, DEVNULL
 import sys
