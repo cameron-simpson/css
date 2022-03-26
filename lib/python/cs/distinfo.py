@@ -61,16 +61,16 @@ from cs.tagset import TagFile, tag_or_tag_value
 from cs.upd import print
 from cs.vcs.hg import VCS_Hg
 
+def main(argv=None):
+  ''' Main command line.
+  '''
+  return CSReleaseCommand(argv).run()
+
 URL_PYPI_PROD = 'https://pypi.python.org/pypi'
 URL_PYPI_TEST = 'https://test.pypi.org/legacy/'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
-
-def main(argv=None):
-  ''' Main command line.
-  '''
-  return CSReleaseCommand(argv).run()
 
 DISTINFO_CLASSIFICATION = {
     "Programming Language": "Python",
