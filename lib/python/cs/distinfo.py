@@ -1794,12 +1794,18 @@ class Module:
   def prepare_metadata(self, pkg_dir, computed_distinfo):
     ''' Prepare an existing package checkout as a package for upload or install.
 
-        This writes the `MANIFEST.in` and `setup.py` files.
+        This writes the following files:
+        * `MANIFEST.in`: list of additional files
+        * `README.md`: 
+        * `setup.py`: stub setup call
+        * `setup.cfg`: setuptool configuration
+        * `pyproject.toml`: 
     '''
     # write MANIFEST.in
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
     with pfx_call(open, manifest_path, "x") as mf:
       # TODO: support extra files
+      print('include', 'README.md', file=mf)
       subpaths = self.paths(pkg_dir)
       for subpath in subpaths:
         with Pfx(subpath):
@@ -1807,57 +1813,25 @@ class Module:
               (fnmatch(subpath, ptn) for ptn in ("*.c", "*.md", "*.[1-9]"))):
             print('include', subpath, file=mf)
 
-    # final step: write setup.py with information gathered earlier
-    setup_path = joinpath(pkg_dir, 'setup.py')
-    with Pfx(setup_path):
-      ok = True
-      with pfx_call(open, setup_path, "x") as sf:
-        out = partial(print, file=sf)
-        out("#!/usr/bin/env python")
-        ##out("from distutils.core import setup")
-        out("from setuptools import setup")
-        out("setup(")
-        # mandatory fields, in preferred order
-        written = set()
-        for kw in (
-            'name',
-            'author',
-            'author_email',
-            'version',
-            'url',
-            'description',
-            'long_description',
-        ):
-          try:
-            kv = computed_distinfo[kw]
-          except KeyError:
-            warning("missing computed_distinfo[%r]", kw)
-            ok = False
-          else:
-            if kw in ('description', 'long_description') and isinstance(kv,
-                                                                        str):
-              out("  %s =" % (kw,))
-              out("   ", pformat(kv).replace('\n', '    \n') + ',')
-            else:
-              out("  %s = %r," % (kw, computed_distinfo[kw]))
-            written.add(kw)
-        out(
-            "  %s = %r," % (
-                'install_requires',
-                computed_distinfo.pop('install_requires', ())
-            )
-        )
-        for kw, kv in sorted(computed_distinfo.items()):
-          if kw not in written:
-            out("  %s = %r," % (kw, kv))
-        out(")")
-      if not ok:
-        raise ValueError("could not construct valid setup.py file")
+    # create README.md
+    docs = self.compute_doc(all_class_names=True)
+    with pfx_call(open, joinpath(pkg_dir, 'README.md'), 'x') as rf:
+      print(docs.long_description, file=rf)
 
-    # final step: write setup.py with information gathered earlier
-    projtoml = joinpath(pkg_dir, 'pyproject.toml')
+    # write setup.py
+    with pfx_call(open, joinpath(pkg_dir, 'setup.py'), 'x') as sf:
+      print("#!/usr/bin/env python", file=sf)
+      print("from setuptools import setup", file=sf)
+      print("setup()", file=sf)
+
+    # write the setup.cfg file
+    setup_cfg = self.compute_setup_cfg()
+    with pfx_call(open, joinpath(pkg_dir, 'setup.cfg'), 'x') as scf:
+      setup_cfg.write(scf)
+
+    # write the pyproject.toml file
     proj = self.compute_pyproject()
-    with pfx_call(open, projtoml, 'xb') as tf:
+    with pfx_call(open, joinpath(pkg_dir, 'pyproject.toml'), 'xb') as tf:
       tomli_w.dump(proj, tf, multiline_strings=True)
 
   def prepare_dist(self, pkg_dir, computed_distinfo):
