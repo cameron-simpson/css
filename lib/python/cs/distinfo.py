@@ -1385,23 +1385,16 @@ class Module:
       if console_scripts:
         entry_points['console_scripts'] = '\n' + '\n'.join(console_scripts)
       if entry_points:
-        X("make options.entry_points")
         sections['options.entry_points'] = entry_points
-    else:
-      X("NO entry_points")
     # options.extras_require section
     dinfo_extra_requires = dinfo.pop('extras_requires', {})
     if dinfo_extra_requires:
-      X("make options.extras_require")
       sections['options.extras_require'] = {
           k: '; '.join(v)
           for k, v in sorted(dinfo_extra_requires.items())
       }
-    else:
-      X("NO extras_requires")
     cfg = ConfigParser()
     for section_name, section in sections.items():
-      X("ADD SECTION %s", section_name)
       cfg[section_name] = section
     # check that everything was covered off
     if dinfo:
