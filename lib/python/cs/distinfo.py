@@ -346,9 +346,8 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    checkout_dir = vcstag
-    ModulePackageDir.fill(checkout_dir, pkg, vcs, vcstag, do_mkdir=True)
-    print(checkout_dir)
+    with pkg.release_dir(vcs, vcstag, persist=True) as pkgpath:
+      print(pkgpath)
 
   def cmd_pypi(self, argv):
     ''' Usage: {cmd} pkg_names...
@@ -370,6 +369,7 @@ class CSReleaseCommand(BaseCommand):
 
   def cmd_pyproject_toml(self, argv):
     ''' Usage: {cmd} pkg_name
+          Transcribe the contents of pyproject.toml to the standard output.
     '''
     if not argv:
       raise GetoptError("missing package name")
@@ -549,6 +549,19 @@ class CSReleaseCommand(BaseCommand):
         else:
           print(requirement_spec, requirement)
     return xit
+
+  def cmd_setup_cfg(self, argv):
+    ''' Usage: {cmd} pkg_name
+          Transcribe the contents of setup.cfg to the standard output.
+    '''
+    if not argv:
+      raise GetoptError("missing package name")
+    pkg_name = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    pkg = self.options.modules[pkg_name]
+    setup_cfg = pkg.compute_setup_cfg()
+    setup_cfg.write(sys.stdout)
 
 class ReleaseTag(namedtuple('ReleaseTag', 'name version')):
   ''' A parsed version of one of my release tags,
