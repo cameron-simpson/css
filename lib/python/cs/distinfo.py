@@ -1329,6 +1329,76 @@ class Module:
       warning("dinfo not emptied: %r", dinfo)
     return pyproject
 
+  @pfx_method
+  def compute_setup_cfg(
+      self,
+      dinfo=None,
+      *,
+      pypi_package_name=None,
+      pypi_package_version=None,
+  ):
+    if dinfo is None:
+      dinfo = self.compute_distinfo(
+          pypi_package_name=pypi_package_name,
+          pypi_package_version=pypi_package_version
+      )
+    else:
+      if pypi_package_name or pypi_package_version:
+        raise ValueError(
+            "cannot supply both dinfo and either pypi_package_name or pypi_package_version"
+        )
+      # we will be consuming the dict so make a copy of the presupplied mapping
+      dinfo = dict(dinfo)
+    sections = {}
+    # metadata section
+    md = {}
+    for k in ('name', 'version', 'author', 'author_email', 'license',
+              'description', 'keywords', 'url', 'classifiers'):
+      v = dinfo.pop(k, None)
+      if v is None:
+        continue
+      if k in ('keywords',):
+        v = ', '.join(v)
+      elif k in ('classifiers', 'install_requires', 'extra_requires'):
+        v = '\n' + '\n'.join(v)
+      md[k] = v
+    md['long_description'] = 'file: README.md'
+    md['long_description_content_type'] = 'text/markdown'
+    sections['metadata'] = md
+    # options section
+    options = {
+        'package_dir': '',
+        '': PYLIBTOP,
+    }
+    dinfo.pop('package_dir')
+    install_requires = dinfo.pop('install_requires', [])
+    if install_requires:
+      options.update(install_requires='\n' + '\n'.join(install_requires))
+    sections['options'] = options
+    # options.entry_points section
+    dinfo_entry_points = dinfo.pop('entry_points', {})
+    if dinfo_entry_points:
+      entry_points = {}
+      console_scripts = dinfo_entry_points.pop('console_scripts', [])
+      if console_scripts:
+        entry_points['console_scripts'] = '\n' + '\n'.join(console_scripts)
+      if entry_points:
+        sections['options.entry_points'] = entry_points
+    # options.extras_require section
+    dinfo_extra_requires = dinfo.pop('extras_requires', {})
+    if dinfo_extra_requires:
+      sections['options.extras_require'] = {
+          k: '; '.join(v)
+          for k, v in sorted(dinfo_extra_requires.items())
+      }
+    cfg = ConfigParser()
+    for section_name, section in sections.items():
+      cfg[section_name] = section
+    # check that everything was covered off
+    if dinfo:
+      warning("dinfo not emptied: %r", dinfo)
+    return cfg
+
   @prop
   def basename(self):
     ''' The last component of the package name.
