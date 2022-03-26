@@ -1774,18 +1774,8 @@ class Module:
   def prepare_autofiles(self, pkg_dir, computed_distinfo):
     ''' Create automatic files in `pkg_dir`.
 
-        Currently this prepares the `README.md` file
-        and man files from `*.[1-9].md` files.
+        Currently this prepares the man files from `*.[1-9].md` files.
     '''
-    # create README.md
-    readme_path = joinpath(pkg_dir, 'README.md')
-    with pfx_call(open, readme_path, 'x') as rf:
-      print(
-          computed_distinfo.get('long_description', '')
-          or computed_distinfo['description'],
-          file=rf
-      )
-
     rpaths = self.paths(pkg_dir)
     for rpath in rpaths:
       with Pfx(rpath):
