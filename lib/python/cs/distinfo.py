@@ -1267,7 +1267,16 @@ class Module:
       # we will be consuming the dict so make a copy of the presupplied mapping
       dinfo = dict(dinfo)
     projspec = {}
-    pyproject = {"project": projspec}
+    pyproject = {
+        "project": projspec,
+        "build-system": {
+            "requires": [
+                "setuptools >= 40.9.0",
+                "wheel",
+            ],
+            "build-backend": "setuptools.build_meta",
+        }
+    }
     # mandatory leading fields in preferred order
     leading_fields = (
         'name',
