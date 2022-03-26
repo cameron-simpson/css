@@ -1166,9 +1166,7 @@ class Module:
     # prepare core distinfo
     dinfo = dict(DISTINFO_DEFAULTS)
     docs = self.compute_doc(all_class_names=True)
-    dinfo.update(
-        description=docs.description, long_description=docs.long_description
-    )
+    dinfo.update(description=docs.description)
     dinfo.update(self.module.DISTINFO)
 
     # resolve install_requires
@@ -1178,8 +1176,7 @@ class Module:
     )
 
     # fill in default fields
-    for field in ('author', 'author_email', 'long_description_content_type',
-                  'package_dir'):
+    for field in ('author', 'author_email', 'package_dir'):
       with Pfx("%r", field):
         if field in dinfo:
           continue
@@ -1187,7 +1184,6 @@ class Module:
             'author': lambda: os.environ['NAME'],
             'author_email': lambda: os.environ['EMAIL'],
             'include_package_data': lambda: True,
-            'long_description_content_type': lambda: 'text/markdown',
             'package_dir': lambda: {
                 '': PYLIBTOP
             },
