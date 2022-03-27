@@ -1290,10 +1290,7 @@ class Module:
         'keywords',
         'urls',
         'dependencies',
-    )
-    trailing_fields = (
         'classifiers',
-        'long_description',
     )
     for k in leading_fields:
       if k == 'urls':
@@ -1309,23 +1306,11 @@ class Module:
       else:
         v = dinfo.pop(k)
       projspec[k] = v
-    for k, v in sorted(dinfo.items()):
-      if k in trailing_fields:
-        continue
-
-    # mandatory trailing fields
-    for k in trailing_fields:
-      v = dinfo.pop(k)
-      # TODO: can we reference the README.md here?
-      if k == 'long_description':
-        projspec["readme"] = {
-            "text":
-            v,
-            "content-type":
-            dinfo.pop('long_description_content_type', "text/markdown"),
-        }
-      else:
-        projspec[k] = v
+    docs = self.compute_doc()
+    projspec["readme"] = {
+        "text": docs.long_description,
+        "content-type": "text/markdown",
+    }
     # check that everything was covered off
     if dinfo:
       warning("dinfo not emptied: %r", dinfo)
