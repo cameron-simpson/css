@@ -710,22 +710,16 @@ class ModuleRequirement(namedtuple('ModuleRequirement',
       raise RuntimeError("onimplemenented op %r" % (self.op,))
     return ''.join((self.module_name, self.op, release_version))
 
-def runcmd(argv, *, check=True, stdin=DEVNULL, **kw):
-  ''' Run command.
+@typechecked
+def cd_run(cwd: str, *argv, check: bool = True, stdin=DEVNULL, **kw):
+  ''' Run the command `argv` in the directory `cwd`.
+      Return its exit status.
   '''
-  trace(
-      f"+ {argv!r}  stdin={stdin} " +
-      " ".join((f"{k}={v!r}" for k, v in kw.items()))
-  )
-  return run(argv, check=check, stdin=stdin, **kw)
-
-def cd_shcmd(wd, shcmd):
-  ''' Run a command supplied as a sh(1) command string.
-  '''
-  qpkg_dir = shq(wd)
-  xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
-  if xit != 0:
-    raise ValueError("command failed, exit status %d: %r" % (xit, shcmd))
+  if not isdirpath(cwd):
+    raise ValueError("not a directory: %r" % (cmd,))
+  kw.update(cwd=cwd, check=check, stdin=stdin)
+  trace(f"+ {argv!r}  " + " ".join((f"{k}={v!r}" for k, v in kw.items())))
+  return run(argv, **kw).returncode
 
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
