@@ -1829,60 +1829,10 @@ class Module:
     ''' Run "setup.py check sdist", making files in dist/.
     '''
     cd_run(pkg_dir, 'python3', '-m', 'build', '.')
-
-class ModulePackageDir(SingletonMixin):
-  ''' A singleton class for module package distributions.
-  '''
-
-  # pylint: disable=unused-argument
-  @classmethod
-  def _singleton_key(cls, pkg, vcs, revision):
-    return pkg.name, revision
-
-  def __init__(self, pkg, vcs, revision, persist=False):
-    # upgrade persist setting if requested
-    self.persist = getattr(self, 'persist', False) or persist
-    if hasattr(self, 'pkg'):
-      return
-    self.pkg = pkg
-    self.vcs = vcs
-    self.revision = revision
-    self._setup()
-
-  def __del__(self):
-    ''' Clean out the scratch directory on deletion.
-    '''
-    if self.pkg_dir and not self.persist:
-      self.pkg_dir.cleanup()
-      self.pkg_dir = None
-
-  @pfx_method
-  def _setup(self):
-    ''' Set up the prepared package in a temporary scratch directory.
-    '''
-    pkg = self.pkg
-    vcs = self.vcs
-    vcs_revision = self.revision
-    pkg_dir = self.pkg_dir = TemporaryDirectory(prefix=vcs_revision + '-')
-    dirpath = self.dirpath = pkg_dir.name
-    self.fill(dirpath, pkg, vcs, vcs_revision)
-
-  @staticmethod
-  def fill(dirpath, pkg, vcs, vcs_revision, *, do_mkdir=False, bare=False):
-    ''' Fill in `dirpath` with the prepared package.
-    '''
-    with Pfx(dirpath):
-      if do_mkdir:
-        with Pfx("mkdir(%r)", dirpath):
-          os.mkdir(dirpath, 0o777)
-      hg_argv = ['archive', '-r', vcs_revision]
-      hg_argv.extend(vcs.hg_include(pkg.paths()))
-      hg_argv.extend(['--', dirpath])
-      vcs.hg_cmd(*hg_argv)
-      os.system("find %r -type f -print" % (dirpath,))
-      if not bare:
-        pkg.prepare_metadata(dirpath)
-        pkg.prepare_dist(dirpath)
+    ##cd_run(pkg_dir, 'python3', 'setup.py', 'check')
+    ##cd_run(pkg_dir, 'python3', 'setup.py', 'sdist')
+    ##distfiles = self.reldistfiles(pkg_dir)
+    ##cd_run(pkg_dir, 'twine', 'check', *distfiles)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
