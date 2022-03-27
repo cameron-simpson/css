@@ -472,15 +472,14 @@ class CSReleaseCommand(BaseCommand):
       error("aborting release at user request")
       return 1
     rel_dir = joinpath('release', next_vcstag)
-    with Pfx("mkdir(%s)", rel_dir):
-      os.mkdir(rel_dir)
+    pfx_call(os.mkdir, rel_dir)
     summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
     with Pfx(summary_filename):
-      with open(summary_filename, 'w', encoding='utf8') as sfp:
+      with pfx_call(open, summary_filename, 'w', encoding='utf8') as sfp:
         print(release_message, file=sfp)
     changes_filename = joinpath(rel_dir, 'CHANGES.txt')
     with Pfx(changes_filename):
-      with open(changes_filename, 'w', encoding='utf8') as cfp:
+      with pfx_call(open, changes_filename, 'w', encoding='utf8') as cfp:
         for files, firstline in changes:
           print(' '.join(files) + ': ' + firstline, file=cfp)
     versioned_filename = pkg.patch__version__(next_release.version)
@@ -1221,10 +1220,10 @@ class Module:
         ('name', pypi_package_name),
         ('version', pypi_package_version),
     ):
-      if value is None:
-        warning("no value for %r", kw)
-      else:
-        with Pfx(kw):
+      with Pfx(kw):
+        if value is None:
+          warning("no value")
+        else:
           if kw in dinfo:
             if dinfo[kw] != value:
               info("publishing %s instead of %s", value, dinfo[kw])
@@ -1241,8 +1240,9 @@ class Module:
         'license',
         'url',
     ):
-      if kw not in dinfo:
-        warning('no %r in distinfo', kw)
+      with Pfx(kw):
+        if kw not in dinfo:
+          warning('not in distinfo', kw)
 
     return dinfo
 
@@ -1517,7 +1517,7 @@ class Module:
     with Pfx(toppath):
       if toppath in self.uncommitted_paths():
         raise ValueError("has uncommited changes")
-      with open(toppath, encoding='utf8') as tf:
+      with pfx_call(open, toppath, encoding='utf8') as tf:
         lines = tf.readlines()
       patched = False
       distinfo_index = None
@@ -1533,7 +1533,7 @@ class Module:
           raise ValueError("no __version__ line and no DISTINFO line")
         lines[distinfo_index:distinfo_index] = version_line, '\n'
       with Pfx("rewrite %r", toppath):
-        with open(toppath, 'w', encoding='utf8') as tf:
+        with pfx_call(open, toppath, 'w', encoding='utf8') as tf:
           for line in lines:
             tf.write(line)
     return toppath
@@ -1760,13 +1760,11 @@ class Module:
     vcs.hg_cmd(*hg_argv)
     os.system("find %r -type f -print" % (release_dirpath,))
     if not bare:
-      computed_distinfo = self.compute_distinfo()
-      ##self.prepare_autofiles(release_dirpath)
-      self.prepare_autofiles(release_dirpath, computed_distinfo)
-      self.prepare_metadata(release_dirpath, computed_distinfo)
-      self.prepare_dist(release_dirpath, computed_distinfo)
+      self.prepare_autofiles(release_dirpath)
+      self.prepare_metadata(release_dirpath)
+      self.prepare_dist(release_dirpath)
 
-  def prepare_autofiles(self, pkg_dir, computed_distinfo):
+  def prepare_autofiles(self, pkg_dir):
     ''' Create automatic files in `pkg_dir`.
 
         Currently this prepares the man files from `*.[1-9].md` files.
@@ -1785,7 +1783,7 @@ class Module:
           continue
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def prepare_metadata(self, pkg_dir, computed_distinfo):
+  def prepare_metadata(self, pkg_dir):
     ''' Prepare an existing package checkout as a package for upload or install.
 
         This writes the following files:
