@@ -356,9 +356,14 @@ class CSReleaseCommand(BaseCommand):
       print(pkgpath)
 
   def cmd_pypi(self, argv):
-    ''' Usage: {cmd} pkg_names...
+    ''' Usage: {cmd} [-r repository] pkg_names...
           Push the named packages to PyPI.
+          -r repository Specify the repository to which to upload.
     '''
+    repo = 'pypi'
+    if argv and argv[0] == '-r':
+      argv.pop(0)
+      repo = argv.pop(0)
     if not argv:
       raise GetoptError("missing package names")
     options = self.options
@@ -368,9 +373,8 @@ class CSReleaseCommand(BaseCommand):
         vcs = options.vcs
         release = pkg.latest
         vcstag = release.vcstag
-        pkg_dir = ModulePackageDir(pkg, vcs, vcstag)
-        dirpath = pkg_dir.dirpath
-        pkg.upload_dist(dirpath)
+        with pkg.release_dir(vcs, vcstag) as pkgpath:
+          pkg.upload_dist(pkgpath, repo)
         pkg.latest_pypi_version = release.version
 
   def cmd_pyproject_toml(self, argv):
@@ -1470,11 +1474,13 @@ class Module:
     ]
 
   @pfx_method
-  def upload_dist(self, pkg_dir):
+  def upload_dist(self, pkg_dir, repo=None):
     ''' Upload the package to PyPI using twine.
     '''
+    if repo is None:
+      repo = 'pypi'
     distfiles = self.reldistfiles(pkg_dir)
-    cd_shcmd(pkg_dir, shqv(['twine', 'upload'] + distfiles))
+    cd_run(pkg_dir, 'twine', 'upload', '--repository', repo, *distfiles)
 
   @pfx_method(use_str=True)
   def log_since(self, vcstag=None, ignored=False):
