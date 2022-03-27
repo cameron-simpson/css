@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 from cs.deco import decorator
 from cs.pfx import pfx_call
 
-__version__ = ''
+__version__ = '20220327'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
