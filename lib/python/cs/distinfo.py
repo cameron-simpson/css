@@ -331,9 +331,13 @@ class CSReleaseCommand(BaseCommand):
     return 0
 
   def cmd_package(self, argv):
-    ''' Usage: package pkg_name [version]
+    ''' Usage: package [--bare] pkg_name [version]
           Export the package contents as a prepared package.
+          --bare  Do not prepare any of the metadata or distribution files.
     '''
+    bare = False
+    if argv and argv[0] == '--bare':
+      bare = True
     if not argv:
       raise GetoptError("missing package name")
     options = self.options
@@ -348,7 +352,7 @@ class CSReleaseCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     release = ReleaseTag(pkg_name, version)
     vcstag = release.vcstag
-    with pkg.release_dir(vcs, vcstag, persist=True) as pkgpath:
+    with pkg.release_dir(vcs, vcstag, bare=bare, persist=True) as pkgpath:
       print(pkgpath)
 
   def cmd_pypi(self, argv):
