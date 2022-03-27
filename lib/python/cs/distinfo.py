@@ -26,10 +26,11 @@ from os.path import (
     relpath,
     splitext,
 )
+from pprint import pprint
 import re
+from shutil import rmtree
 from subprocess import run, DEVNULL
 import sys
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from icontract import ensure
@@ -40,7 +41,7 @@ from cs.ansi_colour import colourise
 from cs.cmdutils import BaseCommand
 from cs.dateutils import isodate
 from cs.deco import cachedmethod
-from cs.fs import rpaths
+from cs.fs import atomic_directory, rpaths
 from cs.lex import (
     cutsuffix,
     get_identifier,
@@ -49,19 +50,13 @@ from cs.lex import (
     is_identifier,
 )
 from cs.logutils import error, warning, info, status, trace
-from cs.obj import SingletonMixin
 from cs.pfx import Pfx, pfx_call, pfx_method
 import cs.psutils
 from cs.py.doc import module_doc
-from cs.py.func import prop
 from cs.py.modules import direct_imports
-from cs.sh import quotestr as shq, quotecmd as shqv
 from cs.tagset import TagFile, tag_or_tag_value
-from cs.upd import print
+from cs.vcs import VCS
 from cs.vcs.hg import VCS_Hg
-
-from cs.x import X
-from pprint import pprint, pformat
 
 def main(argv=None):
   ''' Main command line.
@@ -410,7 +405,8 @@ class CSReleaseCommand(BaseCommand):
     docs = pkg.compute_doc(all_class_names=all_class_names)
     print(docs.long_description)
 
-  # pylint: disable=too-many-locals
+  # pylint: disable=too-many-locals,too-many-return-statements
+  # pylint: disable=too-many-branches,too-many-statements
   def cmd_release(self, argv):
     ''' Usage: {cmd} pkg_name
           Issue a new release for the named package.
@@ -480,11 +476,11 @@ class CSReleaseCommand(BaseCommand):
       os.mkdir(rel_dir)
     summary_filename = joinpath(rel_dir, 'SUMMARY.txt')
     with Pfx(summary_filename):
-      with open(summary_filename, 'w') as sfp:
+      with open(summary_filename, 'w', encoding='utf8') as sfp:
         print(release_message, file=sfp)
     changes_filename = joinpath(rel_dir, 'CHANGES.txt')
     with Pfx(changes_filename):
-      with open(changes_filename, 'w') as cfp:
+      with open(changes_filename, 'w', encoding='utf8') as cfp:
         for files, firstline in changes:
           print(' '.join(files) + ': ' + firstline, file=cfp)
     versioned_filename = pkg.patch__version__(next_release.version)
@@ -716,10 +712,10 @@ def cd_run(cwd: str, *argv, check: bool = True, stdin=DEVNULL, **kw):
       Return its exit status.
   '''
   if not isdirpath(cwd):
-    raise ValueError("not a directory: %r" % (cmd,))
+    raise ValueError("not a directory: %r" % (cwd,))
   kw.update(cwd=cwd, check=check, stdin=stdin)
   trace(f"+ {argv!r}  " + " ".join((f"{k}={v!r}" for k, v in kw.items())))
-  return run(argv, **kw).returncode
+  return run(argv, **kw).returncode  # pylint: disable=subprocess-run-check
 
 def release_tags(vcs):
   ''' Generator yielding the current release tags.
@@ -825,19 +821,19 @@ class Module:
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.name)
 
-  @prop
+  @property
   def modules(self):
     ''' The modules from `self.options`.
     '''
     return self.options.modules
 
-  @prop
+  @property
   def vcs(self):
     ''' The VCS from `self.options`.
     '''
     return self.options.vcs
 
-  @prop
+  @property
   @pfx_method(use_str=True)
   def module(self):
     ''' The Module for this package name.
@@ -879,7 +875,7 @@ class Module:
       return False
     return True
 
-  @prop
+  @property
   @cachedmethod
   @pfx_method(use_str=True)
   def package_name(self):
@@ -907,7 +903,7 @@ class Module:
       return None
     return pkg_name
 
-  @prop
+  @property
   @pfx_method(use_str=True)
   def package(self):
     ''' The python package Module for this Module
@@ -918,13 +914,13 @@ class Module:
       raise ValueError("self.package_name is None")
     return self.modules[name]
 
-  @prop
+  @property
   def in_package(self):
     ''' Is this module part of a package?
     '''
     return self.package_name != self.name
 
-  @prop
+  @property
   def is_package(self):
     ''' Is this module a package?
     '''
@@ -1149,7 +1145,7 @@ class Module:
         rev_latest = rev
     return changeset_hash
 
-  # pylint: disable=too-many-branches
+  # pylint: disable=too-many-branches,too-many-locals
   @pfx_method
   def compute_distinfo(
       self,
@@ -1258,6 +1254,9 @@ class Module:
       pypi_package_name=None,
       pypi_package_version=None,
   ):
+    ''' Compute the contents for the `pyproject.toml` file,
+        return a `dict` for transcription as TOML.
+    '''
     if dinfo is None:
       dinfo = self.compute_distinfo(
           pypi_package_name=pypi_package_name,
@@ -1306,6 +1305,7 @@ class Module:
       warning("dinfo not emptied: %r", dinfo)
     return pyproject
 
+  # pylint: disable=too-many-locals
   @pfx_method
   def compute_setup_cfg(
       self,
@@ -1314,6 +1314,9 @@ class Module:
       pypi_package_name=None,
       pypi_package_version=None,
   ):
+    ''' Compute the contents for `setup.cfg`,
+        return a filled in `ConfigParser` instance.
+    '''
     if dinfo is None:
       dinfo = self.compute_distinfo(
           pypi_package_name=pypi_package_name,
@@ -1376,19 +1379,19 @@ class Module:
       warning("dinfo not emptied: %r", dinfo)
     return cfg
 
-  @prop
+  @property
   def basename(self):
     ''' The last component of the package name.
     '''
     return self.name.split('.')[-1]
 
-  @prop
+  @property
   def basepath(self):
     ''' The base path for this package, *PYLIBTOP*`/`*pkg*`/'*name*.
     '''
     return os.sep.join([PYLIBTOP] + self.name.split('.'))
 
-  @prop
+  @property
   def toppath(self):
     ''' The top file of the package:
         *basepath*`/__init__.py` for packages,
@@ -1412,7 +1415,6 @@ class Module:
     basepath = self.basepath
     if top_dirpath:
       basepath = normpath(joinpath(top_dirpath, basepath))
-    X("BASEPATH = %s", basepath)
     if isdirpath(basepath):
       pathlist = [
           joinpath(basepath, rpath) for rpath in
@@ -1515,7 +1517,7 @@ class Module:
     with Pfx(toppath):
       if toppath in self.uncommitted_paths():
         raise ValueError("has uncommited changes")
-      with open(toppath) as tf:
+      with open(toppath, encoding='utf8') as tf:
         lines = tf.readlines()
       patched = False
       distinfo_index = None
@@ -1531,12 +1533,12 @@ class Module:
           raise ValueError("no __version__ line and no DISTINFO line")
         lines[distinfo_index:distinfo_index] = version_line, '\n'
       with Pfx("rewrite %r", toppath):
-        with open(toppath, 'w') as tf:
+        with open(toppath, 'w', encoding='utf8') as tf:
           for line in lines:
             tf.write(line)
     return toppath
 
-  @prop
+  @property
   def DISTINFO(self):
     ''' The `DISTINFO` from `self.module`.
     '''
@@ -1571,7 +1573,7 @@ class Module:
         self._distinfo = D
     return D
 
-  @prop
+  @property
   def requires(self):
     ''' Return other nonstdlib packages required by this module.
     '''
@@ -1684,7 +1686,7 @@ class Module:
       problems.append(subproblems)
     return problems
 
-  @prop
+  @property
   @cachedmethod
   def imported_names(self):
     ''' Return a set containing the module names imported by this module
@@ -1726,10 +1728,12 @@ class Module:
     '''
     release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
     try:
-      self.prepare_release_dir(release_dirpath, self, vcs, vcs_revision)
+      self.prepare_release_dir(
+          release_dirpath, self, vcs, vcs_revision, bare=bare
+      )
       yield release_dirpath
     except:
-      persists = False
+      persist = False
       raise
     finally:
       if not persist and isdirpath(release_dirpath):
@@ -1767,8 +1771,7 @@ class Module:
 
         Currently this prepares the man files from `*.[1-9].md` files.
     '''
-    rpaths = self.paths(pkg_dir)
-    for rpath in rpaths:
+    for rpath in self.paths(pkg_dir):
       with Pfx(rpath):
         path = normpath(joinpath(pkg_dir, rpath))
         if fnmatch(path, '*.[1-9].md'):
@@ -1787,10 +1790,10 @@ class Module:
 
         This writes the following files:
         * `MANIFEST.in`: list of additional files
-        * `README.md`: 
+        * `README.md`: a README containing the long_description
         * `setup.py`: stub setup call
         * `setup.cfg`: setuptool configuration
-        * `pyproject.toml`: 
+        * `pyproject.toml`: the TOML configuration file
     '''
     # write MANIFEST.in
     manifest_path = joinpath(pkg_dir, 'MANIFEST.in')
@@ -1825,14 +1828,11 @@ class Module:
     with pfx_call(open, joinpath(pkg_dir, 'pyproject.toml'), 'xb') as tf:
       tomli_w.dump(proj, tf, multiline_strings=True)
 
-  def prepare_dist(self, pkg_dir, computed_distinfo):
-    ''' Run "setup.py check sdist", making files in dist/.
+  @staticmethod
+  def prepare_dist(pkg_dir):
+    ''' Run "python3 -m build ." inside `pkg_dir`, making files in `dist/`.
     '''
     cd_run(pkg_dir, 'python3', '-m', 'build', '.')
-    ##cd_run(pkg_dir, 'python3', 'setup.py', 'check')
-    ##cd_run(pkg_dir, 'python3', 'setup.py', 'sdist')
-    ##distfiles = self.reldistfiles(pkg_dir)
-    ##cd_run(pkg_dir, 'twine', 'check', *distfiles)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
