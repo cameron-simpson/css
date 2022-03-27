@@ -1778,7 +1778,7 @@ class Module:
             warning("man path already exists: %r", manpath)
             continue
           with pfx_call(open, manpath, 'x') as manf:
-            runcmd(['md2man-roff', path], stdout=manf)
+            cd_run('.', 'md2man-roff', path, stdout=manf)
           continue
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
@@ -1828,10 +1828,7 @@ class Module:
   def prepare_dist(self, pkg_dir, computed_distinfo):
     ''' Run "setup.py check sdist", making files in dist/.
     '''
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'check']))
-    cd_shcmd(pkg_dir, shqv(['python3', 'setup.py', 'sdist']))
-    distfiles = self.reldistfiles(pkg_dir)
-    cd_shcmd(pkg_dir, shqv(['twine', 'check'] + distfiles))
+    cd_run(pkg_dir, 'python3', '-m', 'build', '.')
 
 class ModulePackageDir(SingletonMixin):
   ''' A singleton class for module package distributions.
