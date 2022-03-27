@@ -14,6 +14,18 @@ from tempfile import TemporaryDirectory
 from cs.deco import decorator
 from cs.pfx import pfx_call
 
+__version__ = ''
+
+DISTINFO = {
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': ['cs.deco', 'cs.pfx'],
+}
+
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
   ''' Decorator for a function which fills in a directory
