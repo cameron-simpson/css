@@ -61,10 +61,12 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
-py3files        = $(py2files :|/python/|/python3/|)
+pymdmans= $("lib/python/cs/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*.[1-9].md" G?) \
+          $("lib/python/cs/*/*/*.[1-9].md" G?)
+md2man  = md2man-roff
 
-rsync = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
+rsync   = rsync -iJOt --exclude='.*.swp' --exclude='*.pyc' --exclude='__pycache__'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set $$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -137,15 +139,6 @@ _test:
 _test3:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
         set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
-
-_macrotest:
-        echo $(py2files)
-        echo $(py3files)
-_2to3:
-        :make $(py3files)
-
-$(py3files): lib/python/$(@ :|lib/python3/||)
-        echo "$@ <- $?"
 
 deploy_dir(targetdir, base, includes) = \
         ( \

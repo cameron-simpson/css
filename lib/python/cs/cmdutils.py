@@ -436,7 +436,7 @@ class BaseCommand:
               if isinstance(default_argv, str) else list(default_argv)
           )
         subcmd = argv.pop(0)
-        subcmd_ = subcmd.replace('-', '_')
+        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
           subcommand = subcmds[subcmd_]
         except KeyError:

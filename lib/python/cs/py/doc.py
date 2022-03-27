@@ -46,6 +46,9 @@ def module_doc(
         default: `name`
       * filter_key`: optional test for a key used to select or reject keys
         to appear in the documentation
+      * `method_names`: optional list of method names to document;
+        the default is to document `__init__`, then CONSTANTS, the
+        dunders, then other public names
   '''
   if isinstance(module, str):
     module_name = module
