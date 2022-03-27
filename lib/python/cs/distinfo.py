@@ -1704,7 +1704,10 @@ class Module:
         yield self.modules[name]
 
   @contextmanager
-  def release_dir(self, vcs, vcs_revision, *, persist=False, bare=False):
+  @typechecked
+  def release_dir(
+      self, vcs, vcs_revision, *, persist: bool = False, bare: bool = False
+  ):
     ''' Context manager to prepare a package release directory.
         It yields the release directory path.
 
@@ -1721,22 +1724,31 @@ class Module:
           if true, do not prepare the package metadata files and
           the distribution files
     '''
-    if not persist:
-      with TemporaryDirectory(
-          dir=(dirname(persist) if persist else None),
-          prefix=f"{vcs_revision}-",
-          suffix="-release",
-      ) as temp_dirpath:
-        yield from self.release_dir(
-            vcs, vcs_revision, persist=temp_dirpath, bare=bare
-        )
-        return
-    if persist is True:
-      release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
-    else:
-      assert isinstance(persist, str)
-      release_dirpath = persist
-    pfx_call(os.mkdir, release_dirpath)
+    release_dirpath = vcs_revision + '--' + datetime.now().isoformat()
+    try:
+      self.prepare_release_dir(release_dirpath, self, vcs, vcs_revision)
+      yield release_dirpath
+    except:
+      persists = False
+      raise
+    finally:
+      if not persist and isdirpath(release_dirpath):
+        pfx_call(rmtree, release_dirpath)
+
+  # this is a static method to accomodate @atomic_directory
+  @staticmethod
+  @atomic_directory
+  @typechecked
+  def prepare_release_dir(
+      release_dirpath: str,
+      self: 'Module',
+      vcs: VCS,
+      vcs_revision: str,
+      bare: bool = False
+  ):
+    ''' Create and fill in a release directory at `release_dirpath`.
+    '''
+    # mkdir omitted, done by @atomic_directory
     # unpack the source
     hg_argv = ['archive', '-r', vcs_revision]
     hg_argv.extend(vcs.hg_include(self.paths()))
@@ -1749,7 +1761,6 @@ class Module:
       self.prepare_autofiles(release_dirpath, computed_distinfo)
       self.prepare_metadata(release_dirpath, computed_distinfo)
       self.prepare_dist(release_dirpath, computed_distinfo)
-    yield release_dirpath
 
   def prepare_autofiles(self, pkg_dir, computed_distinfo):
     ''' Create automatic files in `pkg_dir`.
