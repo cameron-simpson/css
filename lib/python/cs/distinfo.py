@@ -1270,44 +1270,32 @@ class Module:
         )
       # we will be consuming the dict so make a copy of the presupplied mapping
       dinfo = dict(dinfo)
-    projspec = {}
+    projspec = dict(
+        name=dinfo.pop('name'),
+        version=dinfo.pop('version'),
+        description=dinfo.pop('description'),
+        authors=[
+            dict(name=dinfo.pop('author'), email=dinfo.pop('author_email'))
+        ],
+        license={"text": dinfo.pop('license')},
+        keywords=dinfo.pop('keywords'),
+        dependencies=dinfo.pop('install_requires'),
+        urls={'URL': dinfo.pop('url')},
+        classifiers=dinfo.pop('classifiers'),
+    )
+    if 'extra_requires' in dinfo:
+      projspec['optional-dependencies'] = dinfo.pop('extra_requires')
     pyproject = {
         "project": projspec,
         "build-system": {
             "requires": [
                 "setuptools >= 40.9.0",
+                'trove-classifiers',
                 "wheel",
             ],
             "build-backend": "setuptools.build_meta",
         }
     }
-    # mandatory leading fields in preferred order
-    leading_fields = (
-        'name',
-        'author',
-        'author_email',
-        'version',
-        'license',
-        'description',
-        'keywords',
-        'urls',
-        'dependencies',
-        'classifiers',
-    )
-    for k in leading_fields:
-      if k == 'urls':
-        urlsspec = {}
-        di_url = dinfo.pop('url', None)
-        if di_url:
-          urlsspec['URL'] = di_url
-        v = urlsspec
-      elif k == 'dependencies':
-        v = dinfo.pop('install_requires')
-      elif k == 'optional-dependencies':
-        v = dinfo.pop('extra_requires', {})
-      else:
-        v = dinfo.pop(k)
-      projspec[k] = v
     docs = self.compute_doc()
     projspec["readme"] = {
         "text": docs.long_description,
