@@ -8,7 +8,7 @@ it does not fully enumerate what steps and files are required,
 and for what purpose.
 
 This guide is aimed at package publishers, and for simplification
-presumes that that is also the pacage author.
+presumes that that is also the package author.
 Also, we will use the word package to cover modules as well.
 
 To publish a package there needs to be a flow from the author's
