@@ -1,8 +1,9 @@
 # The Packaging Flow
 
-The document aims to outline the flow involved in publishing a package, usually to PyPI [https://pypi.org/].
+The document aims to outline the flow involved in publishing a package,
+usually to [PyPI](https://pypi.org/).
 While the [tutorial](https://packaging.python.org/en/latest/tutorials/installing-packages/)
-walks through the process if preparing a simple package for release
+walks through the process of preparing a simple package for release
 it does not fully enumerate what steps and files are required,
 and for what purpose.
 
@@ -16,7 +17,7 @@ The steps to achieve this are as follows:
 
 - have a source tree containing the package and associated metadata describing the
   package (name, version and so forth), typically a checkout from a version
-  control system (VCS) []
+  control system (VCS)
 
 - prepare a configuration file describing the package metadata and
   how to create the upload artifacts; for many packages this will
@@ -25,8 +26,8 @@ The steps to achieve this are as follows:
 
 - create upload artifacts to be sent to the package distribution service (usually PyPI);
   this will normally be a [source distribution ("sdist")](https://packaging.python.org/en/latest/glossary/#term-Source-Distribution-or-sdist)
-  and a number of [built distributions ("wheel" files)](https://packaging.python.org/en/latest/glossary/#term-Built-Distribution),
-  often just one for a pure Python package;
+  and a number of [built distributions ("wheel" files)](https://packaging.python.org/en/latest/glossary/#term-Built-Distribution);
+  often there is just one generic wheel for a pure Python package;
   these are made by a build tool/system using the configuration file
   from the previous step
 
@@ -37,9 +38,9 @@ To use the package, end users must:
 
 - download one of the package artifacts from the package distribution service
 
-- install it in their Python installation, usually in its "site-packages" directory;
-  this install step may involve a build/compile step which, if
-  needed, must be described by the package metadata
+- install it in their Python installation, usually in its `site-packages` directory;
+  this install step may involve a build/compile step which, if needed, must
+  be described by the package metadata
 
 These 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
 
@@ -63,9 +64,9 @@ and [PEP 621](https://peps.python.org/pep-0621/).
 At a minimum, the `pyproject.toml` file needs:
 - a `[project]` table containing the [Core Metadata](https://packaging.python.org/en/latest/specifications/core-metadata/) for the project
   (name, version, author and so forth);
-  the fields as used in `pyproject.toml`
+  the fields used in `pyproject.toml`
   are described in [PEP 621](https://peps.python.org/pep-0621/)
-- a `[build-system] table specifying your build tool,
+- a `[build-system]` table specifying your build tool,
   which you will use to create the upload artifacts
   and which an installer such as `pip` will use
   to complete an install from a source distribution
@@ -74,13 +75,13 @@ At a minimum, the `pyproject.toml` file needs:
 
 The build tool itself is specified by the required table `[build-system]`.
 There are several choices available, including but not limited to:
-- [setuptools]: https://pypi.org/project/setuptools/
-- [flit]: https://pypi.org/project/flit/
-- [poetry]: https://pypi.org/project/poetry/
-- [hatch]: https://github.com/ofek/hatch
-- [pdm]: https://pypi.org/project/pdm/
-- [whey]: https://pypi.org/project/pdm/
-- [trampolim]: https://pypi.org/project/trampolim/
+- [setuptools](https://pypi.org/project/setuptools/)
+- [flit](https://pypi.org/project/flit/)
+- [poetry](https://pypi.org/project/poetry/)
+- [hatch](https://github.com/ofek/hatch)
+- [pdm](https://pypi.org/project/pdm/)
+- [whey](https://pypi.org/project/pdm/)
+- [trampolim](https://pypi.org/project/trampolim/)
 
 Here is a table for using `setuptools`:
 
@@ -134,7 +135,7 @@ Or, of course, you can invoke your build tool directly.
 
 A built distribution contains the completed files needed for a specific
 end user system; no compilations steps are required and the wheel file
-can simply be unpackage into the right place.
+can simply be unpacked into the right place.
 This makes these faster and more convenient for end users;
 tools like `pip` will fall back to the source distribtion
 if a suitable wheel file is not available.
