@@ -1,7 +1,7 @@
 # The Packaging Flow
 
 The document aims to outline the flow involved in publishing a package, usually to PyPI [https://pypi.org/].
-While the tutorial [https://packaging.python.org/en/latest/tutorials/installing-packages/]
+While the [tutorial](https://packaging.python.org/en/latest/tutorials/installing-packages/)
 walks through the process if preparing a simple package for release
 it does not fully enumerate what steps and files are required,
 and for what purpose.
@@ -24,10 +24,10 @@ The steps to achieve this are as follows:
   simple and hand maintained as part of the source tree
 
 - create upload artifacts to be sent to the package distribution service (usually PyPI);
-  this will normally be a source distribution ("sdist") [https://packaging.python.org/en/latest/glossary/#term-Source-Distribution-or-sdist]
-  and a number of built distributions ("wheel" files) [https://packaging.python.org/en/latest/glossary/#term-Built-Distribution],
+  this will normally be a [source distribution ("sdist")](https://packaging.python.org/en/latest/glossary/#term-Source-Distribution-or-sdist)
+  and a number of [built distributions ("wheel" files)](https://packaging.python.org/en/latest/glossary/#term-Built-Distribution),
   often just one for a pure Python package;
-  these are made by a build tool [glossary] using the configuration file
+  these are made by a build tool/system using the configuration file
   from the previous step
 
 - upload the artifacts to the package distribution service
@@ -41,7 +41,7 @@ To use the package, end users must:
   this install step may involve a build/compile step which, if
   needed, must be described by the package metadata
 
-These 2 steps are typically performed by a tool like `pip` [https://pip.pypa.io/en/stable/].
+These 2 steps are typically performed by a tool like [pip](https://pip.pypa.io/en/stable/).
 
 These steps are described in more detail below.
 
@@ -55,23 +55,34 @@ based on a tag associated with the version.
 
 The configuration file depends on the tool used to build the upload artifacts.
 Modern practice is a `pyproject.toml` file
-in TOML format [https://github.com/toml-lang/toml]
-whose contents are specified by PEP 518 [https://peps.python.org/pep-0518/]
-and PEP 517 [https://peps.python.org/pep-0517/].
+in [TOML format](https://github.com/toml-lang/toml)
+whose contents are specified by [PEP 518](https://peps.python.org/pep-0518/),
+[PEP 517](https://peps.python.org/pep-0517/)
+and [PEP 621](https://peps.python.org/pep-0621/).
 
 At a minimum, the `pyproject.toml` file needs:
-- a `[project]` table containing the Core Metadata [https://packaging.python.org/en/latest/specifications/core-metadata/] for the project
+- a `[project]` table containing the [Core Metadata](https://packaging.python.org/en/latest/specifications/core-metadata/) for the project
   (name, version, author and so forth);
   the fields as used in `pyproject.toml`
-  are described in PEP-0621 [https://peps.python.org/pep-0621/]
+  are described in [PEP 621](https://peps.python.org/pep-0621/)
 - a `[build-system] table specifying your build tool,
   which you will use to create the upload artifacts
   and which an installer such as `pip` will use
   to complete an install from a source distribution
 
-The build tool itself is specified by the required table `[build-system]`.
+### The Build System
 
-Here is a table for using `setuptools` [https://pypi.org/project/setuptools/]:
+The build tool itself is specified by the required table `[build-system]`.
+There are several choices available, including but not limited to:
+- [setuptools]: https://pypi.org/project/setuptools/
+- [flit]: https://pypi.org/project/flit/
+- [poetry]: https://pypi.org/project/poetry/
+- [hatch]: https://github.com/ofek/hatch
+- [pdm]: https://pypi.org/project/pdm/
+- [whey]: https://pypi.org/project/pdm/
+- [trampolim]: https://pypi.org/project/trampolim/
+
+Here is a table for using `setuptools`:
 
     [build-system]
     requires = [
@@ -81,14 +92,14 @@ Here is a table for using `setuptools` [https://pypi.org/project/setuptools/]:
     ]
     build-backend = "setuptools.build_meta"
 
-or for `flit` [https://pypi.org/project/flit/]:
+or for `flit`:
 
     [build-system]
     requires = ["flit"]
     build-backend = "flit.api:main"
 
 With such a table in the `pyproject.toml` file
-a tool like `build` [https://pypi.org/project/build/]
+a tool like [build](https://pypi.org/project/build/)
 can run your chosen build system to create the upload artifacts
 and an install tool like `pip` can fetch and run the build system
 when installing a source distribution.
@@ -138,7 +149,7 @@ Or, of course, you can invoke your build tool directly.
 
 ## Upload to the Package Distribution Service
 
-The `twine` tool [https://pypi.org/project/twine/]
+The [twine tool](https://pypi.org/project/twine/)
 can upload distribution artifact files to PyPI,
 for example with a command like:
 
