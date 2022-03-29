@@ -20,18 +20,18 @@ The steps to achieve this are as follows:
   control system (VCS)
 
 - prepare a configuration file describing the package metadata and
-  how to create the upload artifacts; for many packages this will
+  how to create the build artifacts; for many packages this will
   be a static `pyproject.toml` file in the source tree,
   simple and hand maintained as part of the source tree
 
-- create upload artifacts to be sent to the package distribution service (usually PyPI);
+- create build artifacts to be sent to the package distribution service (usually PyPI);
   this will normally be a [source distribution ("sdist")](https://packaging.python.org/en/latest/glossary/#term-Source-Distribution-or-sdist)
   and a number of [built distributions ("wheel" files)](https://packaging.python.org/en/latest/glossary/#term-Built-Distribution);
   often there is just one generic wheel for a pure Python package;
   these are made by a build tool/system using the configuration file
   from the previous step
 
-- upload the artifacts to the package distribution service
+- upload the build artifacts to the package distribution service
 
 At that point the package is present on the package distribution service.
 To use the package, end users must:
@@ -54,7 +54,7 @@ based on a tag associated with the version.
 
 ## The Configuration File
 
-The configuration file depends on the tool used to build the upload artifacts.
+The configuration file depends on the tool used to build the build artifacts.
 Modern practice is a `pyproject.toml` file
 in [TOML format](https://github.com/toml-lang/toml)
 whose contents are specified by [PEP 518](https://peps.python.org/pep-0518/),
@@ -67,7 +67,7 @@ At a minimum, the `pyproject.toml` file needs:
   the fields used in `pyproject.toml`
   are described in [PEP 621](https://peps.python.org/pep-0621/)
 - a `[build-system]` table specifying your build tool,
-  which you will use to create the upload artifacts
+  which you will use to create the build artifacts
   and which an installer such as `pip` will use
   to complete an install from a source distribution
 
@@ -87,7 +87,7 @@ Here is a table for using `setuptools`:
 
     [build-system]
     requires = [
-        "setuptools >= 40.9.0",
+        "setuptools >= 61.0",
         "trove-classifiers",
         "wheel",
     ]
@@ -101,7 +101,7 @@ or for `flit`:
 
 With such a table in the `pyproject.toml` file
 a tool like [build](https://pypi.org/project/build/)
-can run your chosen build system to create the upload artifacts
+can run your chosen build system to create the build artifacts
 and an install tool like `pip` can fetch and run the build system
 when installing a source distribution.
 
@@ -114,7 +114,7 @@ and it is prudent to provide a stub `setup.py` containing:
 
 or equivalent (setuptools is moving away from actually _running_ the `setup.py` file directly).
 
-## Upload Artifacts: the Source Distribution (sdist)
+## Build Artifacts: the Source Distribution (sdist)
 
 A source distribution contains enough to install the package from source
 on an end user's system.
@@ -131,11 +131,11 @@ and the `build` package knows how to invoke your build system to create one:
 
 Or, of course, you can invoke your build tool directly.
 
-## Upload Artifacts: the Built Distributions (wheels)
+## Build Artifacts: the Built Distributions (wheels)
 
 A built distribution contains the completed files needed for a specific
-end user system; no compilations steps are required and the wheel file
-can simply be unpacked into the right place.
+end user system; no compilations steps are required during the install
+and the wheel file can simply be unpacked into the right place.
 This makes these faster and more convenient for end users;
 tools like `pip` will fall back to the source distribtion
 if a suitable wheel file is not available.
@@ -144,14 +144,14 @@ A pure Python package only needs one wheel for "generic" systems.
 A build system will know how to create one of these,
 and the `build` package knows how to invoke your build system to create one:
 
-    python3 -m build --whel source-tree-directory
+    python3 -m build --wheel source-tree-directory
 
 Or, of course, you can invoke your build tool directly.
 
 ## Upload to the Package Distribution Service
 
 The [twine tool](https://pypi.org/project/twine/)
-can upload distribution artifact files to PyPI,
+can upload build artifact files to PyPI for distribution,
 for example with a command like:
 
     twine upload dist/package-name-version.tar.gz dist/package-name-version-py3-none-any.whlpy3-none-any.whl
