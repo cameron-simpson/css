@@ -30,7 +30,7 @@ from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20211208-post'
+__version__ = '20220318-post'
 
 DISTINFO = {
     'description':
@@ -48,13 +48,15 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.seq',
-        'cs.sharedfile',
+        'cs.sharedfile>=20211208',
     ],
 }
 
 # pylint: disable=too-many-statements
 def named_row_tuple(*column_names, **kw):
   ''' Return a namedtuple subclass factory derived from `column_names`.
+      The primary use case is using the header row of a spreadsheet
+      to keey the data from the subsequent rows.
 
       Parameters:
       * `column_names`: an iterable of `str`, such as the heading columns
@@ -425,6 +427,11 @@ class SeqMapUC_Attrs(object):
     self.__M = M
     self.keepEmpty = keepEmpty
 
+  def __repr__(self):
+    return "%s(%r, keepEmpty=%s)" % (
+        type(self).__name__, self.__M, self.keepEmpty
+    )
+
   def __str__(self):
     kv = []
     for k, value in self.__M.items():
@@ -650,7 +657,7 @@ class MappingChain(object):
 
   def __getitem__(self, key):
     ''' Return the first value for `key` found in the mappings.
-        Raise KeyError if the key in not found in any mapping.
+        Raise `KeyError` if the key in not found in any mapping.
     '''
     for mapping in self.get_mappings():
       try:
@@ -948,7 +955,7 @@ class AttrableMappingMixin(object):
     ''' Unknown attributes are obtained from the mapping entries.
 
         Note that this first consults `self.__dict__`.
-        For many classes that is redundants, but subclasses of
+        For many classes that is redundant, but subclasses of
         `dict` at least seem not to consult that with attribute
         lookup, likely because a pure `dict` has no `__dict__`.
     '''
@@ -993,7 +1000,7 @@ class JSONableMappingMixin:
 
   @classmethod
   def from_json(cls, js):
-    ''' Prepare an dict from JSON text.
+    ''' Prepare a `dict` from JSON text.
 
       If the class has `json_object_hook` or `json_object_pairs_hook`
       attributes these are used as the `object_hook` and
@@ -1010,7 +1017,7 @@ class JSONableMappingMixin:
     return d
 
   def as_json(self):
-    ''' The dict transcribed as JSON.
+    ''' Return the `dict` transcribed as JSON.
 
         If the instance's class has `json_default` or `json_separators` these
         are used for the `default` and `separators` parameters of the `json.dumps()`
