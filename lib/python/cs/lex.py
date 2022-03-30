@@ -41,7 +41,7 @@ from cs.py.func import funcname
 from cs.py3 import bytes, ustr, sorted, StringTypes, joinbytes  # pylint: disable=redefined-builtin
 from cs.seq import common_prefix_length, common_suffix_length
 
-__version__ = '20210913-post'
+__version__ = '20220227-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -444,7 +444,7 @@ def strip_prefix_n(s, prefix, n=None):
       * `s`: the string to strip
       * `prefix`: the prefix string which must appear at the start of `s`
       * `n`: optional integer value;
-        if omitted any value will be accepted, otherise the numeric
+        if omitted any value will be accepted, otherwise the numeric
         part must match `n`
 
       Examples:
@@ -1175,6 +1175,71 @@ def get_ini_clause_entryname(s, offset=0):
     raise ValueError("missing entryname identifier at position %d" % (offset,))
   return clausename, entryname, offset
 
+def camelcase(snakecased, first_letter_only=False):
+  ''' Convert a snake cased string `snakecased` into camel case.
+
+      Parameters:
+      * `snakecased`: the snake case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> camelcase('abc_def')
+          'abcDef'
+          >>> camelcase('ABc_def')
+          'abcDef'
+          >>> camelcase('abc_dEf')
+          'abcDef'
+          >>> camelcase('abc_dEf', first_letter_only=True)
+          'abcDEf'
+  '''
+  words = snakecased.split('_')
+  for i, word in enumerate(words):
+    if not word:
+      continue
+    if first_letter_only:
+      word = word[0].upper() + word[1:]
+    else:
+      word = word.title()
+    if i == 0:
+      word = word[0].lower() + word[1:]
+    words[i] = word
+  return ''.join(words)
+
+def snakecase(camelcased):
+  ''' Convert a camel cased string `camelcased` into snake case.
+
+      Parameters:
+      * `cameelcased`: the cameel case string to convert
+      * `first_letter_only`: optional flag (default `False`);
+        if true then just ensure that the first character of a word
+        is uppercased, otherwise use `str.title`
+
+      Example:
+
+          >>> snakecase('abcDef')
+          'abc_def'
+          >>> snakecase('abcDEf')
+          'abc_def'
+          >>> snakecase('AbcDef')
+          'abc_def'
+  '''
+  strs = []
+  was_lower = False
+  for i, c in enumerate(camelcased):
+    if c.isupper():
+      c = c.lower()
+      if was_lower:
+        # boundary
+        was_lower = False
+        strs.append('_')
+    else:
+      was_lower = True
+    strs.append(c)
+  return ''.join(strs)
+
 # pylint: disable=redefined-outer-name
 def format_escape(s):
   ''' Escape `{}` characters in a string to protect them from `str.format`.
@@ -1519,7 +1584,7 @@ class FormatableFormatter(Formatter):
 @has_format_attributes
 class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-methods
   ''' A subclass of `FormatableFormatter` which  provides 2 features:
-      - a `__format__ method which parses the `format_spec` string
+      - a `__format__` method which parses the `format_spec` string
         into multiple colon separated terms whose results chain
       - a `format_as` method which formats a format string using `str.format_map`
         with a suitable mapping derived from the instance
@@ -1604,7 +1669,7 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 
   ##@staticmethod
   def convert_field(self, value, conversion):
-    ''' Default converter for fields calls `Formatter.convert_field`.
+    ''' The default converter for fields calls `Formatter.convert_field`.
     '''
     if conversion == '':
       warning(
@@ -1709,8 +1774,8 @@ class FormatableMixin(FormatableFormatter):  # pylint: disable=too-few-public-me
 @has_format_attributes
 class FStr(FormatableMixin, str):
   ''' A `str` subclass with the `FormatableMixin` methods,
-      particularly its `__format__`
-      which use `str` method names as valid formats.
+      particularly its `__format__` method
+      which uses `str` method names as valid formats.
 
       It also has a bunch of utility methods which are available
       as `:`*method* in format strings.

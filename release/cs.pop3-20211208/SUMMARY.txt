@@ -1,0 +1,3 @@
+POP3.startup: do not start the worker queue until authenticated.
+POP3.get_response: return (None,None,None) at EOF.
+POP3.shutdown: catch exceptions from client QUIT.

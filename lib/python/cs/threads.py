@@ -24,7 +24,7 @@ from cs.py3 import raise3
 from cs.queues import IterableQueue, MultiOpenMixin, not_closed
 from cs.seq import seq, Seq
 
-__version__ = '20210306-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'description':
@@ -117,7 +117,8 @@ def bg(
   if kwargs is None:
     kwargs = {}
 
-  thread_prefix = prefix() + ': ' + name
+  ##thread_prefix = prefix() + ': ' + name
+  thread_prefix = name
 
   def thread_body():
     with Pfx(thread_prefix):

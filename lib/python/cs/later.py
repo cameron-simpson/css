@@ -421,11 +421,10 @@ class Later(MultiOpenMixin):
 
   def __repr__(self):
     return (
-        '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>'
-        % (
-            self.__class__.__name__, self.name, self.capacity,
-            len(self.running), len(self.pending), len(self.delayed),
-            self.closed
+        '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' % (
+            self.__class__.__name__, self.name, self.capacity, len(
+                self.running
+            ), len(self.pending), len(self.delayed), self.closed
         )
     )
 

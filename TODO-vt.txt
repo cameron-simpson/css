@@ -1,3 +1,6 @@
+DataDir: only show progress if defaults.show_progress is true
+revisit keys/hashcodes for the datadir stores - seem unreliable, maybe because of cache and queues - removed from unit tests for now
+dropped the histogram stuff for blocked_chunks_of2, need some QA tests to look at block size distributions
 scanbuf: should it do the min/max offset limiting - should be faster, particularly in C
 blocked_chunks_of: should it run pure-extra parser (with min/max or scanbuf of big chunks) until eof or error, then pure scanbuf? should be faster
 fast version of blocked_chunks_of for no parser and hardwired min/max block sizes

@@ -1,0 +1,1 @@
+ListQueue: new insert() method.

@@ -12,14 +12,14 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
-from cs.context import setup_cmgr
+from cs.context import setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_method
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-__version__ = '20210906-post'
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -73,7 +73,7 @@ class _mom_state(object):
     self._finalise = None
 
 ## debug: TrackedClassMixin
-class MultiOpenMixin(object):
+class MultiOpenMixin(ContextManagerMixin):
   ''' A multithread safe mixin to count open and close calls,
       and to call `.startup` on the first `.open`
       and to call `.shutdown` on the last `.close`.
@@ -85,7 +85,7 @@ class MultiOpenMixin(object):
       during `__init__`, and do almost all setup during startup so
       that the class may perform multiple startup/shutdown iterations.
 
-      Classes using this mixin need to _either_:
+      Classes using this mixin need to:
       * _either_ define a context manager method `.startup_shutdown`
         which does the startup actions before yeilding
         and then does the shutdown actions
@@ -152,13 +152,12 @@ class MultiOpenMixin(object):
     state = self.__mo_getstate()
     return {'opened': state.opened, 'opens': state._opens}
 
-  def __enter__(self):
+  def __enter_exit__(self):
     self.open(caller_frame=caller())
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close(caller_frame=caller())
-    return False
+    try:
+      yield
+    finally:
+      self.close(caller_frame=caller())
 
   @contextmanager
   def startup_shutdown(self):
@@ -167,16 +166,24 @@ class MultiOpenMixin(object):
     try:
       startup = self.startup
     except AttributeError:
-      pass
+      warning(
+          "MultiOpenMixin.startup_shutdown: no %s.startup" %
+          (type(self).__name__,)
+      )
     else:
       startup()
-    yield
     try:
-      shutdown = self.shutdown
-    except AttributeError:
-      pass
-    else:
-      shutdown()
+      yield
+    finally:
+      try:
+        shutdown = self.shutdown
+      except AttributeError:
+        warning(
+            "MultiOpenMixin.startup_shutdown: no %s.shutdown" %
+            (type(self).__name__,)
+        )
+      else:
+        shutdown()
 
   def open(self, caller_frame=None):
     ''' Increment the open count.
@@ -444,8 +451,8 @@ class RunState(object):
       A `RunState` has the following properties:
       * `cancelled`: true if `.cancel` has been called.
       * `running`: true if the task is running.
-        Further, assigning a true value to it also sets `.start_time` to now.
-        Assigning a false value to it also sets `.stop_time` to now.
+        Further, assigning a true value to it sets `.start_time` to now.
+        Assigning a false value to it sets `.stop_time` to now.
       * `start_time`: the time `.running` was last set to true.
       * `stop_time`: the time `.running` was last set to false.
       * `run_time`: `max(0,.stop_time-.start_time)`

@@ -1,0 +1,3 @@
+lib/python/cs/units.py: cs.units: rename human* to decompose* to clarify that these decompose a number into a sequence of values on a scale
+lib/python/cs/units.py: cs.units; docstring tweak
+lib/python/cs/units.py: cs.units: clean lint

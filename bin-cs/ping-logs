@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Run regular pings to a bunch of ip addresses, log the results.
+# - Cameron Simpson <cs@cskk.id.au> 07mar2022
+#
+
+set -ue
+
+count=200
+size=600
+
+cmd=$0
+usage="Usage: $cmd [-c count] [-s size] ip-addrs..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) count=$2; shift ;;
+    -s) size=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || {
+  echo "$cmd: missing ip-addrs" >&2
+  badopts=1
+}
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+(
+  pids=
+  for ipaddr
+  do
+    while :
+    do
+      ts=$( date '+%Y-%m-%d--%H:%M:%S' )
+      ( echo "$ts: ping -s $size -c $count $ipaddr"
+        ping -s "$size" -c "$count" "$ipaddr" | tee /dev/fd/2
+      ) >"ping--$ts--$ipaddr.log"
+    done &
+    pids="$pids $!"
+  done
+  wait
+)
