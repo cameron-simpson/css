@@ -1891,9 +1891,7 @@ class TagSetPrefixView(FormatableMixin):
   def __str__(self):
     tag = self.tag
     if tag is None:
-      return repr(
-          dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
-      )
+      return repr(self.as_dict())
     return FStr(tag.value)
 
   def __repr__(self):
@@ -1939,7 +1937,7 @@ class TagSetPrefixView(FormatableMixin):
   def __setitem__(self, k, v):
     self._tags[self._prefix_ + k] = v
 
-  def __deltitem__(self, k):
+  def __delitem__(self, k):
     del self._tags[self._prefix_ + k]
 
   def items(self):
@@ -1951,6 +1949,11 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return an iterable of the values (`Tag`s).
     '''
     return map(lambda k: self[k], self.keys())
+
+  def as_dict(self):
+    ''' Return a `dict` representation of this view.
+    '''
+    return {k: self._tags[self._prefix_ + k] for k in self.keys()}
 
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
