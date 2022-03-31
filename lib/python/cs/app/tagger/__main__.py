@@ -18,8 +18,10 @@ from os.path import (
 )
 from pprint import pprint
 import sys
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import r
@@ -27,6 +29,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
 from cs.upd import print  # pylint: disable=redefined-builtin
+
 from . import Tagger
 
 def main(argv=None):
@@ -163,6 +166,26 @@ class TaggerCommand(BaseCommand):
       print("scan", path)
       mapping = tagger.per_tag_auto_file_map(path, tag_names)
       pprint(mapping)
+
+  def cmd_edit_fileby(self, argv):
+    ''' Usage: {cmd} [-d dirpath]
+          Edit the tagger.file_by mapping for the current directory.
+          -d dirpath    Edit the mapping for a different directory.
+    '''
+    dirpath = '.'
+    opts, argv = getopt(argv, 'd:')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-d':
+          dirpath = val
+        else:
+          raise RuntimeError("unhandled option")
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    tagged = self.options.fstags[dirpath]
+    file_by = tagged.get('tagger.file_by', {})
+    edited = edit_obj(file_by)
+    tagged['tagger.file_by'] = edited
 
   def cmd_fileby(self, argv):
     ''' Usage: {cmd} [-d dirpath] tag_name paths...
