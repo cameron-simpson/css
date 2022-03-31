@@ -83,7 +83,7 @@ class TaggerCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
-    ''' Usage: {cmd} pathnames...
+    ''' Usage: {cmd} [-dnrx] pathnames...
           Link pathnames to destinations based on their tags.
           -d    Treat directory pathnames like file - file the
                 directory, not its contents.
@@ -262,7 +262,7 @@ class TaggerCommand(BaseCommand):
       print()
       print(path)
       for tag_name, values in sorted(tagger.suggested_tags(path).items()):
-        print(" ", tag_name, *sorted(values))
+        print(" ", tag_name, repr(sorted(values)))
 
   def cmd_test(self, argv):
     ''' Usage: {cmd} path
@@ -284,7 +284,7 @@ class TaggerCommand(BaseCommand):
         changed = False
         suggestions = tagger.suggested_tags(path)
         for tag_name, values in sorted(suggestions.items()):
-          print(" ", tag_name, values)
+          print(" ", tag_name, repr(values))
         for file_to in tagger.file_by_tags(path, no_link=True):
           print("=>", shortpath(file_to))
         print("inferred:", repr(tagger.infer(path)))
