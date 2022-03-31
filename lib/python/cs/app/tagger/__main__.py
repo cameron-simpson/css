@@ -152,6 +152,32 @@ class TaggerCommand(BaseCommand):
                       do_remove=do_remove,
                   )
 
+  def cmd_conf(self, argv):
+    ''' Usage: {cmd} [dirpath]
+          Edit the tagger.file_by mapping for the current directory.
+          -d dirpath    Edit the mapping for a different directory.
+    '''
+    options = self.options
+    dirpath = '.'
+    if argv:
+      dirpath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    if not isdirpath(dirpath):
+      raise GetopError("dirpath is not a directory: %r" % (dirpath,))
+    tagger = options.tagger
+    tagged = options.fstags[dirpath]
+    conf = tagger.conf_tags(tagged)
+    obj = conf.as_dict()
+    obj.setdefault('auto_name', [])
+    obj.setdefault('file_by', {})
+    edited = edit_obj(obj)
+    for cf, value in edited.items():
+      conf[cf] = value
+    for cf in list(conf.keys()):
+      if cf not in edited:
+        del conf[cf]
+
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
           Derive an autofile mapping of tags to directory paths
@@ -166,26 +192,6 @@ class TaggerCommand(BaseCommand):
       print("scan", path)
       mapping = tagger.per_tag_auto_file_map(path, tag_names)
       pprint(mapping)
-
-  def cmd_edit_fileby(self, argv):
-    ''' Usage: {cmd} [-d dirpath]
-          Edit the tagger.file_by mapping for the current directory.
-          -d dirpath    Edit the mapping for a different directory.
-    '''
-    dirpath = '.'
-    opts, argv = getopt(argv, 'd:')
-    for opt, val in opts:
-      with Pfx(opt):
-        if opt == '-d':
-          dirpath = val
-        else:
-          raise RuntimeError("unhandled option")
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    tagged = self.options.fstags[dirpath]
-    file_by = tagged.get('tagger.file_by', {})
-    edited = edit_obj(file_by)
-    tagged['tagger.file_by'] = edited
 
   def cmd_fileby(self, argv):
     ''' Usage: {cmd} [-d dirpath] tag_name paths...
