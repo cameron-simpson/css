@@ -1891,7 +1891,7 @@ class TagSetPrefixView(FormatableMixin):
   def __str__(self):
     tag = self.tag
     if tag is None:
-      return repr(self.as_dict())
+      return str(TagSet(self.as_dict()))
     return FStr(tag.value)
 
   def __repr__(self):
