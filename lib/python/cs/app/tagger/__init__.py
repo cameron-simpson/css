@@ -218,10 +218,10 @@ class Tagger:
               if prune_inherited:
                 fstags[dstpath].prune_inherited()
     if linked_to and do_remove:
-      S = os.stat(srcpath)
+      S = pfx_call(os.stat, srcpath)
       if S.st_nlink < 2:
         warning(
-            "not removing %r, unsufficient hard links (%s)", srcpath,
+            "not removing %r, insufficient hard links (%s)", srcpath,
             S.st_nlink
         )
       else:
