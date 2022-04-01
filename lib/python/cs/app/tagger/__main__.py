@@ -18,8 +18,10 @@ from os.path import (
 )
 from pprint import pprint
 import sys
+
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.edit import edit_obj
 from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import r
@@ -27,6 +29,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx, pfxprint
 from cs.tagset import Tag
 from cs.upd import print  # pylint: disable=redefined-builtin
+
 from . import Tagger
 
 def main(argv=None):
@@ -80,7 +83,7 @@ class TaggerCommand(BaseCommand):
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
-    ''' Usage: {cmd} pathnames...
+    ''' Usage: {cmd} [-dnrx] pathnames...
           Link pathnames to destinations based on their tags.
           -d    Treat directory pathnames like file - file the
                 directory, not its contents.
@@ -148,6 +151,32 @@ class TaggerCommand(BaseCommand):
                       no_link=no_link,
                       do_remove=do_remove,
                   )
+
+  def cmd_conf(self, argv):
+    ''' Usage: {cmd} [dirpath]
+          Edit the tagger.file_by mapping for the current directory.
+          -d dirpath    Edit the mapping for a different directory.
+    '''
+    options = self.options
+    dirpath = '.'
+    if argv:
+      dirpath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    if not isdirpath(dirpath):
+      raise GetopError("dirpath is not a directory: %r" % (dirpath,))
+    tagger = options.tagger
+    tagged = options.fstags[dirpath]
+    conf = tagger.conf_tags(tagged)
+    obj = conf.as_dict()
+    obj.setdefault('auto_name', [])
+    obj.setdefault('file_by', {})
+    edited = edit_obj(obj)
+    for cf, value in edited.items():
+      conf[cf] = value
+    for cf in list(conf.keys()):
+      if cf not in edited:
+        del conf[cf]
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
@@ -239,7 +268,7 @@ class TaggerCommand(BaseCommand):
       print()
       print(path)
       for tag_name, values in sorted(tagger.suggested_tags(path).items()):
-        print(" ", tag_name, *sorted(values))
+        print(" ", tag_name, repr(sorted(values)))
 
   def cmd_test(self, argv):
     ''' Usage: {cmd} path
@@ -261,7 +290,7 @@ class TaggerCommand(BaseCommand):
         changed = False
         suggestions = tagger.suggested_tags(path)
         for tag_name, values in sorted(suggestions.items()):
-          print(" ", tag_name, values)
+          print(" ", tag_name, repr(values))
         for file_to in tagger.file_by_tags(path, no_link=True):
           print("=>", shortpath(file_to))
         print("inferred:", repr(tagger.infer(path)))

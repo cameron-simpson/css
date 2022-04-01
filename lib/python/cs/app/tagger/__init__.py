@@ -85,7 +85,13 @@ class Tagger:
 
   @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
-    ''' Generate a filename computed from `srcpath`, `dstdirpath` and `tags`.
+    ''' Generate a pathname computed from `srcpath`, `dstdirpath` and `tags`.
+
+        The format strings used to generate the pathname
+        come from the `auto_name` configuration tag of `tags`:
+        `{self.TAG_PREFIX}.auto_name`, usually `"tagger.auto_name"`.
+
+        If no formats match, return `basename(srcpath)`.
     '''
     tagged = self.fstags[dstdirpath]
     formats = self.conf_tag(tagged.merged_tags(), 'auto_name', ())
@@ -93,9 +99,12 @@ class Tagger:
       formats = [formats]
     if formats:
       if not isinstance(tags, TagSet):
-        tags = TagSet()
+        # promote to a TagSet
+        tagset = TagSet()
         for tag in tags:
-          tags.add(tag)
+          tagset.add(tag)
+        tags = tagset
+        del tagset
       for fmt in formats:
         with Pfx(repr(fmt)):
           try:
@@ -209,10 +218,10 @@ class Tagger:
               if prune_inherited:
                 fstags[dstpath].prune_inherited()
     if linked_to and do_remove:
-      S = os.stat(srcpath)
+      S = pfx_call(os.stat, srcpath)
       if S.st_nlink < 2:
         warning(
-            "not removing %r, unsufficient hard links (%s)", srcpath,
+            "not removing %r, insufficient hard links (%s)", srcpath,
             S.st_nlink
         )
       else:

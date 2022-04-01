@@ -937,7 +937,6 @@ class PathView(LabelFrame):
     print("SET fspath =", repr(new_fspath))
     self._fspath = new_fspath
     self._tag_widgets = {}
-    self.config(text=shortpath(new_fspath) or "NONE")
     self.preview.fspath = new_fspath
     tagged = self.tagged
     all_tags = TagSet(tagged.merged_tags())
@@ -949,6 +948,7 @@ class PathView(LabelFrame):
         tagged, lambda tag: suggested_tags.get(tag.name), bg_tags=all_tags
     )
     print("tag suggestions =", repr(self.suggested_tags))
+    self.config(text=shortpath(new_fspath) or "NONE")
 
   @property
   def suggested_tags(self):
@@ -998,7 +998,7 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
     self.fspaths = fspaths
 
   def set_fspaths(self, new_fspaths):
-    ''' Update the list of fielsystem paths.
+    ''' Update the list of filesystem paths.
     '''
     display_paths = super().set_fspaths(new_fspaths)
     for child in list(self.grid_slaves()):
@@ -1023,4 +1023,4 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
   def show_fspath(self, fspath):
     ''' TODO: bring to correspnding thumbnail into view.
     '''
-    warning("UNIMPLEMENTED")
+    warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
