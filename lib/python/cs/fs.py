@@ -6,12 +6,25 @@
 
 import os
 from os.path import (
-    basename, dirname, exists as existspath, isdir as isdirpath, join as
-    joinpath, relpath
+    basename,
+    dirname,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    isdir as isdirpath,
+    join as joinpath,
+    realpath,
+    relpath,
 )
 from tempfile import TemporaryDirectory
+from threading import Lock
+from typing import Optional
+
+from icontract import require
+from typeguard import typechecked
 
 from cs.deco import decorator
+from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
 __version__ = '20220327-post'
@@ -104,11 +117,12 @@ def rpaths(
         continue
       yield relpath(joinpath(subpath, filename), dirpath)
 
+# pylint: disable=too-few-public-methods
 class HasFSPath:
   ''' An object with a `.fspath` attribute representing a filesystem location.
   '''
 
-  @require(lambda fspath: isabspath(fspath))
+  @require(lambda fspath: isabspath(fspath))  # pylint: disable=unnecessary-lambda
   def __init__(self, fspath):
     self.fspath = fspath
 
@@ -118,13 +132,17 @@ class HasFSPath:
     return joinpath(self.fspath, subpath)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
+  ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
+  '''
 
   @classmethod
   def _get_default_fspath(cls):
     ''' Obtain the default filesystem path.
     '''
+    # pylint: disable=no-member
     fspath = os.environ.get(cls.FSPATH_ENVVAR)
     if fspath is None:
+      # pylint: disable=no-member
       fspath = expanduser(cls.FSPATH_DEFAULT)
     return fspath
 
