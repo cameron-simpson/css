@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -203,13 +204,16 @@ from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
