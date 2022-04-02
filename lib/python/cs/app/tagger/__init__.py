@@ -21,8 +21,8 @@ from threading import RLock
 
 from typeguard import typechecked
 
-from cs.deco import fmtdoc
-from cs.fs import HasFSPath
+from cs.deco import cachedmethod, fmtdoc
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
@@ -36,7 +36,7 @@ from cs.threads import locked
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
 
-class Tagger(HasFSPath):
+class Tagger(FSPathBasedSingleton):
   ''' The core logic of a tagger.
   '''
 
@@ -48,6 +48,8 @@ class Tagger(HasFSPath):
         Parameters:
         * `fstags`: optional `FSTags` instance
     '''
+    if hasattr(self, 'fspath'):
+      return
     if fstags is None:
       fstags = FSTags()
     if ont is None:
@@ -55,7 +57,7 @@ class Tagger(HasFSPath):
                            ) or expanduser(ONTTAGS_PATH_DEFAULT)
     if isinstance(ont, str):
       ont = Ont(ont)
-    super().__init__(dirpath)
+    super().__init__(abspath(dirpath))
     self.fstags = fstags
     self.ont = ont
     self._file_by_mappings = {}
