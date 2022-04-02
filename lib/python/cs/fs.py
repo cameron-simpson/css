@@ -147,7 +147,7 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
     return fspath
 
   @classmethod
-  def _singleton_key(cls, fspath=None):
+  def _singleton_key(cls, fspath=None, **_):
     ''' Each instance is identified by `realpath(fspath)`.
     '''
     if fspath is None:
