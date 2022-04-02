@@ -353,7 +353,7 @@ class Tagger(FSPathBasedSingleton):
       mapping = self._file_by_mappings[key]
     except KeyError:
       mapping = defaultdict(set)
-      file_by = self.conf_tag(fstags[srcdirpath].all_tags, 'file_by', {})
+      file_by = self.conf_all.get('file_by', {})
       # group the tags by file_by target path
       grouped = defaultdict(set)
       for tag_name, file_to in file_by.items():
@@ -372,8 +372,9 @@ class Tagger(FSPathBasedSingleton):
       for file_to_path, tag_names in sorted(grouped.items()):
         with Pfx("%r:%r", file_to_path, tag_names):
           # accrue destination paths by tag values
-          for bare_key, dstpaths in self.per_tag_auto_file_map(
-              file_to_path, tag_names).items():
+          subtagger = self.tagger_for(file_to_path)
+          for bare_key, dstpaths in subtagger.per_tag_auto_file_map(tag_names
+                                                                    ).items():
             mapping[bare_key].update(dstpaths)
       self._file_by_mappings[key] = mapping
     return mapping
