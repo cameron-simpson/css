@@ -164,10 +164,10 @@ class TaggerCommand(BaseCommand):
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     if not isdirpath(dirpath):
-      raise GetopError("dirpath is not a directory: %r" % (dirpath,))
+      raise GetoptError("dirpath is not a directory: %r" % (dirpath,))
     tagger = options.tagger
     tagged = options.fstags[dirpath]
-    conf = tagger.conf_tags(tagged)
+    conf = tagger.conf
     obj = conf.as_dict()
     obj.setdefault('auto_name', [])
     obj.setdefault('file_by', {})
