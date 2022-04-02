@@ -469,6 +469,14 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  def from_tags(cls, tags, _id=None, _ontology=None):
+    ''' Make a `TagSet` from an iterable of `Tag`s.
+    '''
+    return cls(
+        _id=_id, _ontology=_ontology, **{tag.name: tag.value
+                                         for tag in tags}
+    )
+
   #################################################################
   # methods supporting FormattableMixin
 
