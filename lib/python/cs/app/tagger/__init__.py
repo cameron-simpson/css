@@ -445,7 +445,7 @@ class Tagger(FSPathBasedSingleton):
         and if so return a `TagSet` with tags named `series_title_lc`,
         `season_n`, `episode_n`, `episode_title_lc`.
     '''
-    inference_spec = self.conf_tag(self.fstags[dirpath], 'inference', {})
+    inference_spec = self.conf.get('inference', {})
     mapping = defaultdict(list)
     with Pfx("inference=%r", inference_spec):
       for prefix, rule_spec in inference_spec.items():
