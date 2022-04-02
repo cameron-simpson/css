@@ -201,7 +201,7 @@ class Tagger(FSPathBasedSingleton):
             q.extend(new_refile_to)
             continue
         # file locally (no new locations)
-        dstbase = self.auto_name(srcpath, refdirpath, tags)
+        dstbase = self.auto_name(srcpath, refdirpath)
         with Pfx("%s => %s", refdirpath, dstbase):
           dstpath = dstbase if isabspath(dstbase
                                          ) else joinpath(refdirpath, dstbase)
