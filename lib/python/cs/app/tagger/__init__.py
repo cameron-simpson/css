@@ -66,27 +66,32 @@ class Tagger(FSPathBasedSingleton):
     self._per_tag_auto_file_mappings = defaultdict(lambda: defaultdict(set))
     self._lock = RLock()
 
-  @classmethod
-  @typechecked
-  def conf_tags(cls, tags: TagSet):
-    ''' The `Tagger` related subtags from `tags`, a `TagSet`.
+  def tagger_for(self, dirpath):
+    ''' Factory to return a `Tagger` for a directory
+        using the same `FSTags` and ontology as `self`.
     '''
-    return tags.subtags(cls.TAG_PREFIX)
+    return type(self)(dirpath, fstags=self.fstags, ont=self.ont)
+
+  @property
+  @cachedmethod
+  def conf(self):
+    ''' The direct configuration `Tag`s.
+    '''
+    return self.fstags[self.fspath].subtags(self.TAG_PREFIX)
+
+  @property
+  def conf_all(self):
+    ''' The configuration `Tag`s as inherited.
+    '''
+    return self.fstags[self.fspath].all_tags.subtags(self.TAG_PREFIX)
+
+  @property
+  def auto_name_formats(self) -> List[str]:
+    ''' The sequence of `auto_name` formats.
+    '''
+    return self.conf_all.get('auto_name', [])
 
   @classmethod
-  @typechecked
-  def conf_tag(cls, tags: TagSet, conf: str, default=None):
-    ''' Return the `Tagger` related subtag value for `conf`, or `default` (default `None).
-    '''
-    return cls.conf_tags(tags).get(conf, default)
-
-  @classmethod
-  @typechecked
-  def has_conf_tag(cls, tags: TagSet, conf: str):
-    ''' Test for the presence of `conf` in he `Tagger` related subtags.
-    '''
-    return conf in cls.conf_tags(tags)
-
   @pfx
   def auto_name(self, srcpath, dstdirpath, tags):
     ''' Generate a pathname computed from `srcpath`, `dstdirpath` and `tags`.
