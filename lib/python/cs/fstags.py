@@ -1496,10 +1496,13 @@ class TaggedPath(TagSet, HasFSTagsMixin, HasFSPath):
     if _ontology is None:
       _ontology = fstags.ontology_for(fspath)
     self.__dict__.update(
-        _fstags=fstags, _lock=Lock(), _all_tags=None, tagfile=None
+        _fstags=fstags,
+        _lock=Lock(),
+        _all_tags=None,
+        tagfile=None,
+        fspath=fspath,
     )
-    super().__init__(_id=_id, _ontology=_ontology)
-    HasFSPath.__init__(self, fspath)
+    TagSet.__init__(self, _id=_id, _ontology=_ontology)
 
   def __repr__(self):
     return "%s(%s):%r" % (type(self).__name__, self.fspath, self.as_dict())
