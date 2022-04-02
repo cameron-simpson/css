@@ -198,7 +198,7 @@ from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
-from os.path import dirname, isdir as isdirpath
+from os.path import dirname, isdir as isdirpath, isfile as isfilepath
 import re
 from threading import Lock
 import time
@@ -225,7 +225,7 @@ from cs.mappings import (
     RemappedMappingProxy
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
@@ -3274,20 +3274,22 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
-      try:
-        with open(filepath, 'w') as f:
-          for _, line in unparsed:
-            if not line.startswith('#'):
-              f.write('##  ')
-            f.write(line)
-            f.write('\n')
-          for name, tags in name_tags:
-            if not tags:
-              continue
-            f.write(cls.tags_line(name, tags, extra_types=extra_types))
-            f.write('\n')
-      except OSError as e:
-        error("save(%r) fails: %s", filepath, e)
+      # skip save if no file and nothing to save
+      if name_tags or unparsed or isfilepath(filepath):
+        try:
+          with pfx_call(open, filepath, 'w') as f:
+            for _, line in unparsed:
+              if not line.startswith('#'):
+                f.write('##  ')
+              f.write(line)
+              f.write('\n')
+            for name, tags in name_tags:
+              if not tags:
+                continue
+              f.write(cls.tags_line(name, tags, extra_types=extra_types))
+              f.write('\n')
+        except OSError as e:
+          error("save(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None):
     ''' Save the tag map to the tag file if modified.
