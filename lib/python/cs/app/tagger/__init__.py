@@ -22,6 +22,7 @@ from threading import RLock
 from typeguard import typechecked
 
 from cs.deco import fmtdoc
+from cs.fs import HasFSPath
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
@@ -35,13 +36,13 @@ from cs.threads import locked
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
 
-class Tagger:
+class Tagger(HasFSPath):
   ''' The core logic of a tagger.
   '''
 
   TAG_PREFIX = TAGGER_TAG_PREFIX_DEFAULT
 
-  def __init__(self, fstags=None, ont=None):
+  def __init__(self, dirpath: str, fstags=None, ont=None):
     ''' Initialise the `Tagger`.
 
         Parameters:
@@ -54,6 +55,7 @@ class Tagger:
                            ) or expanduser(ONTTAGS_PATH_DEFAULT)
     if isinstance(ont, str):
       ont = Ont(ont)
+    super().__init__(dirpath)
     self.fstags = fstags
     self.ont = ont
     self._file_by_mappings = {}
@@ -160,7 +162,7 @@ class Tagger:
     fstags = self.fstags
     # start the queue with the resolved `path`
     tagged = fstags[path]
-    srcpath = tagged.filepath
+    srcpath = tagged.fspath
     tags = tagged.all_tags
     # a queue of reference directories
     q = ListQueue((dirname(srcpath),))
@@ -250,7 +252,7 @@ class Tagger:
     '''
     fstags = self.fstags
     tagged = fstags[dirpath]
-    dirpath = tagged.filepath
+    dirpath = tagged.fspath  # canonical absolute path
     all_tag_names = set(tag_names)
     assert all(isinstance(tag_name, str) for tag_name in all_tag_names)
     # collect all the per-tag_name mappings which exist for dirpath
@@ -342,7 +344,7 @@ class Tagger:
     assert '~' not in srcdirpath
     fstags = self.fstags
     tagged = fstags[srcdirpath]
-    key = tagged.filepath
+    key = tagged.fspath
     try:
       mapping = self._file_by_mappings[key]
     except KeyError:
@@ -378,7 +380,7 @@ class Tagger:
         obtained from the autofiling configurations.
     '''
     tagged = self.fstags[path]
-    srcdirpath = dirname(tagged.filepath)
+    srcdirpath = dirname(tagged.fspath)
     suggestions = defaultdict(set)
     for bare_tag, _ in self.file_by_mapping(srcdirpath).items():
       if bare_tag not in tagged:
@@ -458,7 +460,7 @@ class Tagger:
         with each `Tag` *name*=*value* applied as *prefix*.*name*=*value*.
     '''
     tagged = self.fstags[path]
-    srcpath = tagged.filepath
+    srcpath = tagged.fspath
     srcdirpath = dirname(srcpath)
     inference_mapping = self.inference_mapping(srcdirpath)
     inferences = defaultdict(list)

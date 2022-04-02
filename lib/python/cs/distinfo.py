@@ -1016,7 +1016,7 @@ class Module:
     ''' Sync the package `Tag`s `TagFile`, return the pathname of the tag file.
     '''
     self.options.pkg_tagsets.save()
-    return self.options.pkg_tagsets.filepath
+    return self.options.pkg_tagsets.fspath
 
   @tag_or_tag_value
   def set_tag(self, tag_name, value, *, msg):

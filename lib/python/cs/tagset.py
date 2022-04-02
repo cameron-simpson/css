@@ -3059,7 +3059,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         del self[old_index]
     return changed_tes
 
-class TagFile(SingletonMixin, BaseTagSets):
+class TagFile(FSPathBasedSingleton, BaseTagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -3067,23 +3067,22 @@ class TagFile(SingletonMixin, BaseTagSets):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, **_):
-    return filepath
+  def _singleton_key(cls, fspath, **_):
+    return fspath
 
   @typechecked
-  def __init__(self, filepath: str, *, ontology=None):
-    if hasattr(self, 'filepath'):
+  def __init__(self, fspath: str, *, ontology=None):
+    if hasattr(self, 'fspath'):
       return
-    super().__init__(ontology=ontology)
-    self.filepath = filepath
+    FSPathBasedSingleton.__init__(self, fspath)
+    BaseTagSets.__init__(self, ontology=ontology)
     self._tagsets = None
-    self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, shortpath(self.filepath))
+    return "%s(%r)" % (type(self).__name__, shortpath(self.fspath))
 
   def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.filepath)
+    return "%s(%r)" % (type(self).__name__, self.fspath)
 
   def startup(self):
     ''' No special startup.
@@ -3145,7 +3144,7 @@ class TagFile(SingletonMixin, BaseTagSets):
         This is loaded on demand.
     '''
     ts = {}
-    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    loaded_tagsets, unparsed = self.load_tagsets(self.fspath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
     for name, tags in loaded_tagsets.items():
@@ -3297,7 +3296,7 @@ class TagFile(SingletonMixin, BaseTagSets):
       if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
-            self.filepath, tagsets, self.unparsed, extra_types=extra_types
+            self.fspath, tagsets, self.unparsed, extra_types=extra_types
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():

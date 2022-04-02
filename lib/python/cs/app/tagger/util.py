@@ -80,7 +80,7 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
   if cached is None:
     cached = _conv_cache
   tagged = _fstags[path]
-  path = tagged.filepath
+  path = tagged.fspath
   size = image_size(path)
   if size is None:
     return None
@@ -103,8 +103,8 @@ def pngfor(path, max_size=None, *, min_size=None, cached=None, force=False):
     return cached_path
   if tagged['pil.format'] == 'PNG' and re_size is None:
     # right format, same size - return ourself
-    cached[key] = tagged.filepath
-    return tagged.filepath
+    cached[key] = tagged.fspath
+    return tagged.fspath
   # path to converted file
   hashcode = SHA256.from_pathname(path)
   pngbase = f'{hashcode}.png'
