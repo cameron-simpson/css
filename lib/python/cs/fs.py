@@ -24,6 +24,7 @@ from icontract import require
 from typeguard import typechecked
 
 from cs.deco import decorator
+from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
@@ -163,3 +164,36 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
       fspath = self._get_default_fspath()
     HasFSPath.__init__(self, fspath)
     self._lock = Lock()
+
+DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
+
+def shortpath(path, environ=None, prefixes=None):
+  ''' Return `path` with the first matching leading prefix replaced.
+
+      Parameters:
+      * `environ`: environment mapping if not os.environ
+      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
+        each `prefix` is subject to environment variable
+        substitution before consideration
+        The default considers "$HOME/" for replacement by "~/".
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    prefix = envsub(prefix, environ)
+    if path.startswith(prefix):
+      return subst + path[len(prefix):]
+  return path
+
+def longpath(path, environ=None, prefixes=None):
+  ''' Return `path` with prefixes and environment variables substituted.
+      The converse of `shortpath()`.
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    if path.startswith(subst):
+      path = prefix + path[len(subst):]
+      break
+  path = envsub(path, environ)
+  return path
