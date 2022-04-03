@@ -1,3 +1,4 @@
+cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
 BaseCommand: move most of __init__ into run-context along with setup_logging context manager use
 cs.logutils: new LoggingSetup class embodying infer_log_level etc, as a context manager to push and pop the setup, setup_logging to do the first part, easy replacement for setup_logging of some kind and use it in run_context
