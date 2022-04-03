@@ -105,27 +105,24 @@ class Tagger(FSPathBasedSingleton):
     '''
     return self.conf_all.get('auto_name', [])
 
-  @classmethod
   @pfx
-  def auto_name(cls, srcpath, dstdirpath):
-    ''' Generate a pathname computed from `srcpath`, `dstdirpath` and `tags`.
+  def auto_name(self, srcpath):
+    ''' Generate a file basename computed from `srcpath`.
 
         The format strings used to generate the pathname
-        come from the `auto_name` configuration tag of `dstdirpath`.
+        come from the `auto_name` configuration tag of this `Tagger`
         `{self.TAG_PREFIX}.auto_name`, usually `"tagger.auto_name"`.
 
         If no formats match, return `basename(srcpath)`.
     '''
-    tagger = cls(dstdirpath)
-    fstags = tagger.fstags
-    formats = tagger.auto_name_formats()
+    formats = self.auto_name_formats()
     if isinstance(formats, str):
       formats = [formats]
     if formats:
       # the tags to use in the format string are the inherited Tags of
       # dstdirpath overlaid by the inherited Tags of srcpath
-      fmttags = fstags[dstdirpath].merged_tags()
-      fmttags.update(fstags[srcpath].merged_tags())
+      fmttags = self.tagged.merged_tags()
+      fmttags.update(self.fstags[srcpath].merged_tags())
       for fmt in formats:
         with Pfx(repr(fmt)):
           try:
