@@ -327,6 +327,23 @@ class Tagger(FSPathBasedSingleton):
         mapping[Tag(tag_name, tag_value)] = subpaths
     return mapping
 
+  @cachedmethod
+  def subdir_tag_map(self):
+    ''' Return a mapping of `tag_name`->`tag_value`->[dirpath,...]
+        covering the entire subdirectory tree.
+    '''
+    # scan the whole directory before recursing
+    tag_map = defaultdict(lambda: defaultdict(set))
+    for entry in [entry for entry in os.scandir(self.fspath)
+                  if entry.is_dir() and not entry.name.startswith('.')]:
+      subtagger = self.tagger_for(entry.path)
+      for tag in subtagger.tagged.as_tags():
+        tag_map[tag.name][tag.value].add(entry.path)
+      for tag_name, submap in subtagger.subdir_tag_map().items():
+        for tag_value, paths in submap.items():
+          tag_map[tag_name][tag_value].update(paths)
+    return tag_map
+
   @locked
   @pfx
   @fmtdoc
