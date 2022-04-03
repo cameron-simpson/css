@@ -69,6 +69,9 @@ class Tagger(FSPathBasedSingleton):
     self._per_tag_auto_file_mappings = defaultdict(lambda: defaultdict(set))
     self._lock = RLock()
 
+  def __str__(self):
+    return "%s(%s)" % (type(self).__name__, self.fspath)
+
   def tagger_for(self, dirpath):
     ''' Factory to return a `Tagger` for a directory
         using the same `FSTags` and ontology as `self`.
@@ -87,8 +90,8 @@ class Tagger(FSPathBasedSingleton):
     conf_tags = self.tagged.subtags(self.TAG_PREFIX)
     conf_tags.setdefault('autoname', [])
     conf_tags.setdefault('file_by', {})
-    conf_tags.setdefault('autotag', {}).setdefault('basename', {})
     X("conf_tags = %r", conf_tags.as_dict())
+    conf_tags.setdefault('autotag', {}).setdefault('basename', [])
     return conf_tags
 
   @property
