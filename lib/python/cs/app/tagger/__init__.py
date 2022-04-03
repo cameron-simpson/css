@@ -115,7 +115,7 @@ class Tagger(FSPathBasedSingleton):
     '''
     tagger = cls(dstdirpath)
     fstags = tagger.fstags
-    formats = tagger.auto_name_formats
+    formats = tagger.auto_name_formats()
     if isinstance(formats, str):
       formats = [formats]
     if formats:
