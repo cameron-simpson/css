@@ -77,7 +77,12 @@ class Tagger(FSPathBasedSingleton):
   def conf(self):
     ''' The direct configuration `Tag`s.
     '''
-    return self.fstags[self.fspath].subtags(self.TAG_PREFIX)
+    conf_tags = self.tagged.subtags(self.TAG_PREFIX)
+    conf_tags.setdefault('autoname', [])
+    conf_tags.setdefault('file_by', {})
+    conf_tags.setdefault('autotag', {}).setdefault('basename', {})
+    X("conf_tags = %r", conf_tags.as_dict())
+    return conf_tags
 
   @property
   def conf_all(self):
