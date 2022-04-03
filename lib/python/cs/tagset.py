@@ -1946,8 +1946,25 @@ class TagSetPrefixView(FormatableMixin):
   def __getitem__(self, k):
     return self._tags[self._prefix_ + k]
 
+  def get(self, k, default=None):
+    ''' Mapping `get` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
   def __setitem__(self, k, v):
     self._tags[self._prefix_ + k] = v
+
+  def setdefault(self, k, v=None):
+    ''' Mapping `setdefault` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      self[k] = v
+      return v
 
   def __delitem__(self, k):
     del self._tags[self._prefix_ + k]
