@@ -76,6 +76,9 @@ class Tagger(FSPathBasedSingleton):
     return type(self)(dirpath, fstags=self.fstags, ont=self.ont)
 
   @property
+  def tagged(self):
+    return self.fstags[self.fspath]
+
   @cachedmethod
   def conf(self):
     ''' The direct configuration `Tag`s.
@@ -91,7 +94,7 @@ class Tagger(FSPathBasedSingleton):
   def conf_all(self):
     ''' The configuration `Tag`s as inherited.
     '''
-    return self.fstags[self.fspath].all_tags.subtags(self.TAG_PREFIX)
+    return self.tagged.all_tags.subtags(self.TAG_PREFIX)
 
   @property
   def auto_name_formats(self) -> List[str]:
