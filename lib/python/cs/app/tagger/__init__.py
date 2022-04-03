@@ -46,7 +46,10 @@ class Tagger(FSPathBasedSingleton):
     ''' Initialise the `Tagger`.
 
         Parameters:
-        * `fstags`: optional `FSTags` instance
+        * `fstags`: optional `FSTags` instance;
+          an instance will be created if not supplied
+        * `ont`: optional `cs.onttags.Ont`;
+          an instance will be created if not supplied
     '''
     if hasattr(self, 'fspath'):
       return
