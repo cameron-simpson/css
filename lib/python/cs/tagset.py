@@ -3583,9 +3583,10 @@ class RegexpTagRule:
       and returns inferred `Tag`s.
   '''
 
-  def __init__(self, regexp):
+  def __init__(self, regexp, tag_prefix=None):
     self.regexp_src = regexp
     self.regexp = re.compile(regexp)
+    self.tag_prefix = tag_prefix
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
@@ -3642,6 +3643,8 @@ class RegexpTagRule:
               pass
             else:
               tag_name = tag_name_prefix
+          if self.tag_prefix:
+            tag_name = self.tag_prefix + '.' + tag_name
           tag = Tag(tag_name, value)
           tags.append(tag)
     return tags
