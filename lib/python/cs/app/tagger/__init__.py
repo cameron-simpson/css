@@ -496,7 +496,7 @@ class Tagger(FSPathBasedSingleton):
 
   @pfx
   @fmtdoc
-  def infer(self, path, apply=False):
+  def infer_tags(self, path, mode='infer'):
     ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
         producing a mapping of prefix=>[Tag] for each rule which infers tags.
         Return the mapping.
@@ -508,32 +508,26 @@ class Tagger(FSPathBasedSingleton):
     tagged = self.fstags[path]
     srcpath = tagged.fspath
     srcdirpath = dirname(srcpath)
-    inference_mapping = self.inference_mapping(srcdirpath)
-    inferences = defaultdict(list)
-    for prefix, infer_funcs in inference_mapping.items():
-      with Pfx(prefix):
-        assert isinstance(prefix, str)
-        for infer_func in infer_funcs:
-          try:
-            values = list(infer_func(path))
-          except Exception as e:  # pylint: disable=broad-except
-            warning("skip rule %s: %s", infer_func, e)
-            continue
-          bare_values = []
-          for value in values:
-            if isinstance(value, Tag):
-              tag = value
-              tag_name = prefix + '.' + tag.name if prefix else tag.name
-              inferences[tag_name] = tag.value
-            else:
-              bare_values.append(value)
-          if bare_values:
-            if len(bare_values) == 1:
-              bare_values = bare_values[0]
-            inferences[prefix] = bare_values
-          break
-    if apply:
-      with Pfx("apply"):
-        for tag_name, values in inferences.items():
-          tagged[tag_name] = tag.value
-    return inferences
+    srcbase = basename(srcpath)
+    inferred_tags = TagSet()
+    basename_rule_specs = self.conf['autotag']['basename']
+    for rule_spec in basename_rule_specs:
+      try:
+        rule = self.inference_rule(rule_spec)
+      except ValueError as e:
+        warning("skipping invalid rule: %s", e)
+        continue
+      for tag in rule.infer_tags(srcbase):
+        inferred_tags.add(tag)
+    if mode == 'infer':
+      pass
+    elif mode == 'infill':
+      for tag in inferred_tags.as_tags():
+        if tag.name not in tagged:
+          tagged.add(tag)
+    elif mode == 'overwrite':
+      for tag in inferred_tags.as_tags():
+        tagged.add(tag)
+    else:
+      raise RuntimeError("unhandled mode %r" % (mode,))
+    return inferred_tags
