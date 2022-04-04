@@ -53,33 +53,10 @@ class TaggerCommand(BaseCommand):
       with stackattrs(options, tagger=tagger, fstags=fstags):
         yield
 
-  @staticmethod
-  def _autofile(path, *, tagger, no_link, do_remove):
-    ''' Wrapper for `Tagger.file_by_tags` which reports actions.
+  def tagger_for(self, fspath):
+    ''' Return the `Tagger` for the filesystem path `fspath`.
     '''
-    if not no_link and not existspath(path):
-      warning("no such path, skipped")
-      linked_to = []
-    else:
-      fstags = tagger.fstags
-      # apply inferred tags if not already present
-      tagged = fstags[path]
-      all_tags = tagged.merged_tags()
-      for tag_name, tag_value in tagger.infer(path).items():
-        if tag_name not in all_tags:
-          tagged[tag_name] = tag_value
-      linked_to = tagger.file_by_tags(
-          path, no_link=no_link, do_remove=do_remove
-      )
-      if linked_to:
-        for linked in linked_to:
-          printpath = linked
-          if basename(path) == basename(printpath):
-            printpath = dirname(printpath) + '/'
-          pfxprint('=>', shortpath(printpath))
-      else:
-        pfxprint('not filed')
-    return linked_to
+    return self.options.tagger.tagger_for(fspath)
 
   # pylint: disable=too-many-branches,too-many-locals
   def cmd_autofile(self, argv):
@@ -116,41 +93,56 @@ class TaggerCommand(BaseCommand):
           raise RuntimeError("unimplemented option")
     if not argv:
       raise GetoptError("missing pathnames")
-    tagger = self.options.tagger
-    fstags = tagger.fstags
-    for path in argv:
+    q = ListQueue(argv)
+    for path in unrepeated(q):
       with Pfx(path):
-        if direct or not isdirpath(path):
-          self._autofile(
-              path, tagger=tagger, no_link=no_link, do_remove=do_remove
-          )
-        elif not recurse:
-          pfxprint("not autofiling directory, use -r for recursion")
-        else:
-          for subpath, dirnames, filenames in os.walk(path):
-            with Pfx(subpath):
-              # order the descent
-              dirnames[:] = sorted(
-                  dname for dname in dirnames
-                  if dname and not dname.startswith('.')
-              )
-              tagged = fstags[subpath]
-              if 'tagger.skip' in tagged:
-                # prune this directory tree
-                dirnames[:] = []
+        if not existspath(path):
+          warning("no such path, skipping")
+          continue
+        if isdirpath(path) and not direct:
+          if recurse:
+            # queue the directory entries
+            for entry in sorted(os.scandir(path), key=lambda entry: entry.name,
+                                reverse=True):
+              if entry.name.startswith('.'):
                 continue
-              for filename in sorted(filenames):
-                with Pfx(filename):
-                  filepath = joinpath(subpath, filename)
-                  if not isfilepath(filepath):
-                    pfxprint("not a regular file, skipping")
-                    continue
-                  self._autofile(
-                      filepath,
-                      tagger=tagger,
-                      no_link=no_link,
-                      do_remove=do_remove,
-                  )
+              if entry.is_dir(follow_symlinks=False
+                              ) or entry.is_file(follow_symlinks=False):
+                q.prepend(joinpath(path, entry.name))
+          else:
+            warning("recursion disabled, skipping")
+        else:
+          linked_to = self.options.tagger.file_by_tags(
+              path, no_link=no_link, do_remove=do_remove
+          )
+          for linkpath in linked_to:
+            print(shortpath(path), '=>', shortpath(linkpath))
+
+  def cmd_autotag(self, argv):
+    ''' Usage: {cmd} [-fn] paths...
+          Apply the inference rules to each path.
+          -n  No action. ZRecite inferred tags.
+          -f  Force. Overwirte existing tags.
+    '''
+    infer_mode = 'infill'
+    opts, argv = getopt(argv, 'fn')
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-f':
+          infill_mode = 'overwrite'
+        elif opt == '-n':
+          infill_mode = 'infer'
+        else:
+          raise RuntimeError("unhandled option")
+    if not argv:
+      raise GetoptError("missing paths")
+    for path in argv:
+      print(path)
+      tagger = self.tagger_for(dirname(path))
+      print("  tagger =", tagger)
+      print(" ", repr(tagger.conf))
+      for tag in tagger.infer_tags(path, mode=infer_mode):
+        print(" ", tag)
 
   def cmd_conf(self, argv):
     ''' Usage: {cmd} [dirpath]
