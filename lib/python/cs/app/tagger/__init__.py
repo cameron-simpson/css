@@ -152,14 +152,18 @@ class Tagger(FSPathBasedSingleton):
   @pfx
   @fmtdoc
   def file_by_tags(
-      self, path: str, prune_inherited=False, no_link=False, do_remove=False
+      self,
+      origpath: str,
+      prune_inherited=False,
+      no_link=False,
+      do_remove=False,
   ):
     ''' Examine a file's tags.
         Where those tags imply a location, link the file to that location.
         Return the list of links made.
 
         Parameters:
-        * `path`: the source path to file
+        * `origpath`: the source path to file
         * `prune_inherited`: optional, default `False`:
           prune the inherited tags from the direct tags on the target
         * `no_link`: optional, default `False`;
@@ -167,85 +171,119 @@ class Tagger(FSPathBasedSingleton):
         * `do_remove`: optional, default `False`;
           remove source files if successfully linked
 
-        Note: if `path` is already linked to an implied location
+        Note: if `origpath` is already linked to an implied location
         that location is also included in the returned list.
 
         The filing process is as follows:
-        - for each target directory, initially `dirname(path)`,
+        - for each target directory, initially `dirname(origpath)`,
           look for a filing map on tag `file_by_mapping`
-        - for each directory in that mapping which matches a tag from `path`,
+        - for each directory in that mapping which matches a tag from `origpath`,
           queue it as an additional target directory
-        - if there were no matching directories, file `path` at the current
+        - if there were no matching directories, file `origpath` at the current
           target directory under the filename
           returned by `{TAGGER_TAG_PREFIX_DEFAULT}.autoname`
     '''
     if do_remove and no_link:
       raise ValueError("do_remove and no_link may not both be true")
-    fstags = self.fstags
-    # start the queue with the resolved `path`
-    tagged = fstags[path]
-    srcpath = tagged.fspath
-    tags = tagged.all_tags
+    # start the queue with origpath
     # a queue of reference directories
-    q = ListQueue((dirname(srcpath),))
+    q = ListQueue((origpath,))
     linked_to = []
     seen = set()
-    for refdirpath in unrepeated(q, signature=abspath, seen=seen):
-      with Pfx(refdirpath):
-        # places to redirect this file
-        mapping = self.file_by_mapping(refdirpath)
-        interesting_tag_names = {tag.name for tag in mapping.keys()}
-        # locate specific filing locations in the refdirpath
-        refile_to = set()
-        for tag_name in sorted(interesting_tag_names):
-          with Pfx("tag_name %r", tag_name):
-            if tag_name not in tags:
-              continue
-            bare_tag = Tag(tag_name, tags[tag_name])
-            try:
-              target_dirs = mapping.get(bare_tag, ())
-            except TypeError as e:
-              warning("  %s not mapped (%s), skipping", bare_tag, e)
-              continue
-            if not target_dirs:
-              continue
-            # collect other filing locations
-            refile_to.update(target_dirs)
-        # queue further locations if they are new
-        if refile_to:
-          new_refile_to = set(map(abspath, refile_to)) - seen
-          if new_refile_to:
-            q.extend(new_refile_to)
+    for srcpath in unrepeated(q, signature=realpath, seen=seen):
+      with Pfx(shortpath(srcpath)):
+        tagged = self.fstags[srcpath]
+        tagger = self.tagger_for(dirname(srcpath))
+        # infer tags before filing
+        tagger.infer_tags(tagged.fspath, mode='infill')
+        tags = tagged.merged_tags()
+        fstags = tagger.fstags
+        conf = tagger.conf
+        # examine the file_by mapping for entries which match tags on origpath
+        refile_to_dirs = set()
+        for k, paths in conf.file_by.items():
+          try:
+            tag = Tag.from_str(k)
+          except ValueError as e:
+            warning("skipping bad Tag spec: %s", e)
             continue
-        # file locally (no new locations)
-        with Pfx("%s => %s", refdirpath, dstbase):
-          dstpath = dstbase if isabspath(dstbase
-                                         ) else joinpath(refdirpath, dstbase)
-        dstbase = tagger.autoname(srcpath)
-          if existspath(dstpath):
-            if not samefile(srcpath, dstpath):
-              warning("already exists, skipping")
+          if (tag.name if tag.value is None else tag) not in tags:
+            # this file_by entry does not match the tags
             continue
-          if no_link:
-            linked_to.append(dstpath)
-          else:
-            linkto_dirpath = dirname(dstpath)
-            if not isdirpath(linkto_dirpath):
-              pfx_call(os.mkdir, linkto_dirpath)
+          # this file_by entry matches a Tag on origpath
+          refile_paths = [
+              (ep if isabspath(ep) else joinpath(tagger.fspath, ep))
+              for ep in (expanduser(p) for p in paths)
+          ]
+          # follow the subdir tag map for further refiling
+          tag_value = tags[tag.name]
+          for refile_to_dir in refile_paths:
+            refile_tagger = self.tagger_for(refile_to_dir)
+            tagmap = refile_tagger.subdir_tag_map()
             try:
-              pfx_call(os.link, srcpath, dstpath)
-            except OSError as e:
-              warning("cannot link to %r: %s", dstpath, e)
+              subdirs = tagmap[tag.name][tag_value]
+            except KeyError:
+              # no mapping for this tag, file in refile_to_dir
+              refile_to_dirs.add(refile_to_dir)
             else:
-              linked_to.append(dstpath)
-              fstags[dstpath].update(tags)
+              if subdirs:
+                # link the file into each
+                refile_to_dirs.update(subdirs)
+              else:
+                # no subdirs, file in refile_to_dir
+                refile_to_dirs.add(refile_to_dir)
+        if refile_to_dirs:
+          # winnow directories already processed
+          refile_to_dirs = set(map(realpath, refile_to_dirs)) - seen
+          if refile_to_dirs:
+            # refile to other places
+            srcbase = basename(srcpath)
+            for subdir in refile_to_dirs:
+              qpath = joinpath(subdir, srcbase)
+              q.prepend((qpath,))
+              fstags[qpath].update(tagged)
               if prune_inherited:
-                fstags[dstpath].prune_inherited()
+                fstags[qpath].prune_inherited()
+            continue
+        # not refiling elsewhere, file here
+        # file locally (no new locations)
+        dstbase = tagger.autoname(srcpath)
+        dstpath = dstbase if isabspath(dstbase
+                                       ) else joinpath(tagger.fspath, dstbase)
+        dstdirpath = dirname(dstpath)
+        link_count_fudge = 0
+        with Pfx("=> %s", shortpath(dstpath)):
+          if existspath(dstpath):
+            if samefile(origpath, dstpath):
+              warning("same file, already \"linked\"")
+              linked_to.append(dstpath)
+            elif filecmp.cmp(origpath, dstpath, shallow=False):
+              warning("exists with same content")
+              linked_to.append(dstpath)
+              link_count_fudge += 1
+            else:
+              warning("already exists with different content, skipping")
+              continue
+          else:
+            if no_link:
+              linked_to.append(dstpath)
+            else:
+              if not isdirpath(dstdirpath):
+                pfx_mkdir(dstdirpath)
+              try:
+                pfx_link(origpath, dstpath)
+              except OSError as e:
+                warning("cannot link to %r: %s", dstpath, e)
+                continue
+          linked_to.append(dstpath)
+          fstags[dstpath].update(tagged)
+          if prune_inherited:
+            fstags[dstpath].prune_inherited()
     if linked_to and do_remove:
-      if S.st_nlink < 2:
       S = pfx_stat(origpath)
+      if S.st_nlink + link_count_fudge < 2:
         warning(
-            "not removing %r, insufficient hard links (%s)", srcpath,
+            "not removing %r, insufficient hard links (%s)", origpath,
             S.st_nlink
         )
       else:
