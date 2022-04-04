@@ -496,33 +496,6 @@ class Tagger(FSPathBasedSingleton):
 
   @pfx
   @fmtdoc
-  def inference_mapping(self, dirpath):
-    r'''Scan `path`'s `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` tag,
-        a mapping of prefix=>rule specifications.
-        Return a mapping of prefix=>inference_function
-        where `inference_function(pathname)` returns a list of inferred `Tag`s.
-
-        The prefix is a tag prefix. Example:
-
-            {TAGGER_TAG_PREFIX_DEFAULT}.filename_inference={{
-                'cs.tv_episode':
-                    '/^(?P<series_title_lc>([^-]|-[^-])+)--s0*(?P<season_n>\d+)e0*(?P<episode_n>\d+)--(?P<episode_title_lc>([^-]|-[^-])+)--',
-            }}
-
-        which would try to match a filename against my habitual naming convention,
-        and if so return a `TagSet` with tags named `series_title_lc`,
-        `season_n`, `episode_n`, `episode_title_lc`.
-    '''
-    inference_spec = self.conf.get('inference', {})
-    mapping = defaultdict(list)
-    with Pfx("inference=%r", inference_spec):
-      for prefix, rule_spec in inference_spec.items():
-        with Pfx(prefix):
-          mapping[prefix].extend(self.inference_rules(prefix, rule_spec))
-    return mapping
-
-  @pfx
-  @fmtdoc
   def infer(self, path, apply=False):
     ''' Compare the `{TAGGER_TAG_PREFIX_DEFAULT}.filename_inference` rules to `path`,
         producing a mapping of prefix=>[Tag] for each rule which infers tags.
