@@ -109,6 +109,7 @@ def edit_obj(o, editor=None, environ=None, to_text=None, from_text=None):
     from_text = json.loads
   with NamedTemporaryFile(mode='w') as T:
     T.write(to_text(o))
+    T.write("\n")
     T.flush()
     P = Popen([editor, T.name])
     P.wait()
