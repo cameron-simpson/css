@@ -138,30 +138,31 @@ class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   '''
 
   @classmethod
-  def _get_default_fspath(cls):
-    ''' Obtain the default filesystem path.
+  def _resolve_fspath(cls, fspath):
+    ''' Resolve the filesystem path `fspath`.
+        If `fspath` is `None`, use the default from `${cls.FSPATH_ENVVAR}`
+        or `cls.FSPATH_DEFAULT` (neither default is defined in this base class).
+        Return `realpath(fspath)`.
     '''
-    # pylint: disable=no-member
-    fspath = os.environ.get(cls.FSPATH_ENVVAR)
     if fspath is None:
       # pylint: disable=no-member
-      fspath = expanduser(cls.FSPATH_DEFAULT)
-    return fspath
+      fspath = os.environ.get(cls.FSPATH_ENVVAR)
+      if fspath is None:
+        # pylint: disable=no-member
+        fspath = expanduser(cls.FSPATH_DEFAULT)
+    return realpath(fspath)
 
   @classmethod
   def _singleton_key(cls, fspath=None, **_):
     ''' Each instance is identified by `realpath(fspath)`.
     '''
-    if fspath is None:
-      fspath = cls._get_default_fspath()
-    return realpath(fspath)
+    return cls._resolve_fspath(fspath)
 
   @typechecked
   def __init__(self, fspath: Optional[str] = None):
     if hasattr(self, '_lock'):
       return
-    if fspath is None:
-      fspath = self._get_default_fspath()
+    fspath = self._resolve_fspath(fspath)
     HasFSPath.__init__(self, fspath)
     self._lock = Lock()
 
