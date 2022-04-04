@@ -33,6 +33,12 @@ from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked
 
+pfx_link = partial(pfx_call, os.link)
+pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_remove = partial(pfx_call, os.remove)
+pfx_rename = partial(pfx_call, os.rename)
+pfx_stat = partial(pfx_call, os.stat)
+
 # the subtags containing Tagger releated values
 TAGGER_TAG_PREFIX_DEFAULT = 'tagger'
 
@@ -236,14 +242,14 @@ class Tagger(FSPathBasedSingleton):
               if prune_inherited:
                 fstags[dstpath].prune_inherited()
     if linked_to and do_remove:
-      S = pfx_call(os.stat, srcpath)
       if S.st_nlink < 2:
+      S = pfx_stat(origpath)
         warning(
             "not removing %r, insufficient hard links (%s)", srcpath,
             S.st_nlink
         )
       else:
-        pfx_call(os.remove, srcpath)
+        pfx_remove(origpath)
     return linked_to
 
   @locked
