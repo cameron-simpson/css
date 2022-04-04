@@ -106,22 +106,22 @@ class Tagger(FSPathBasedSingleton):
     '''
     return self.tagged.all_tags.subtags(self.TAG_PREFIX)
 
-  def auto_name_formats(self) -> List[str]:
-    ''' The sequence of `auto_name` formats.
+  def autoname_formats(self) -> List[str]:
+    ''' The sequence of `autoname` formats.
     '''
-    return self.conf_all.get('auto_name', [])
+    return self.conf_all.get('autoname', [])
 
   @pfx
-  def auto_name(self, srcpath):
+  def autoname(self, srcpath):
     ''' Generate a file basename computed from `srcpath`.
 
         The format strings used to generate the pathname
-        come from the `auto_name` configuration tag of this `Tagger`
-        `{self.TAG_PREFIX}.auto_name`, usually `"tagger.auto_name"`.
+        come from the `autoname` configuration tag of this `Tagger`
+        `{self.TAG_PREFIX}.autoname`, usually `"tagger.autoname"`.
 
         If no formats match, return `basename(srcpath)`.
     '''
-    formats = self.auto_name_formats()
+    formats = self.autoname_formats()
     if isinstance(formats, str):
       formats = [formats]
     if formats:
@@ -138,7 +138,7 @@ class Tagger(FSPathBasedSingleton):
             return formatted
           except FormatAsError:
             ##warning("%s", e)
-            ##print("auto_name(%r): %r: %s", srcpath, fmt, e)
+            ##print("autoname(%r): %r: %s", srcpath, fmt, e)
             continue
     return basename(srcpath)
 
@@ -177,7 +177,7 @@ class Tagger(FSPathBasedSingleton):
           queue it as an additional target directory
         - if there were no matching directories, file `path` at the current
           target directory under the filename
-          returned by `{TAGGER_TAG_PREFIX_DEFAULT}.auto_name`
+          returned by `{TAGGER_TAG_PREFIX_DEFAULT}.autoname`
     '''
     if do_remove and no_link:
       raise ValueError("do_remove and no_link may not both be true")
@@ -218,10 +218,10 @@ class Tagger(FSPathBasedSingleton):
             q.extend(new_refile_to)
             continue
         # file locally (no new locations)
-        dstbase = self.auto_name(srcpath, refdirpath)
         with Pfx("%s => %s", refdirpath, dstbase):
           dstpath = dstbase if isabspath(dstbase
                                          ) else joinpath(refdirpath, dstbase)
+        dstbase = tagger.autoname(srcpath)
           if existspath(dstpath):
             if not samefile(srcpath, dstpath):
               warning("already exists, skipping")
