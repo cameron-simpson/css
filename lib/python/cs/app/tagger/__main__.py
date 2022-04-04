@@ -44,8 +44,6 @@ class TaggerCommand(BaseCommand):
   ''' Tagger command line implementation.
   '''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'gui'
-
   @contextmanager
   def run_context(self):
     ''' Set up around commands.
