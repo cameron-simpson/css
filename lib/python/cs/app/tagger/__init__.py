@@ -4,6 +4,8 @@
 '''
 
 from collections import defaultdict
+import filecmp
+from functools import partial
 import os
 from os.path import (
     abspath,
@@ -18,16 +20,15 @@ from os.path import (
     samefile,
 )
 from threading import RLock
-
-from typeguard import typechecked
+from typing import List
 
 from cs.deco import cachedmethod, fmtdoc
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, shortpath
 from cs.fstags import FSTags
 from cs.lex import FormatAsError, r, get_dotted_identifier
 from cs.logutils import warning
 from cs.onttags import Ont, ONTTAGS_PATH_DEFAULT, ONTTAGS_PATH_ENVVAR
-from cs.pfx import Pfx, pfx, pfx_call
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.queues import ListQueue
 from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
@@ -86,6 +87,8 @@ class Tagger(FSPathBasedSingleton):
 
   @property
   def tagged(self):
+    ''' The `TaggedPath` associated with this directory.
+    '''
     return self.fstags[self.fspath]
 
   @property
@@ -96,7 +99,6 @@ class Tagger(FSPathBasedSingleton):
     conf_tags = self.tagged.subtags(self.TAG_PREFIX)
     conf_tags.setdefault('autoname', [])
     conf_tags.setdefault('file_by', {})
-    X("conf_tags = %r", conf_tags.as_dict())
     conf_tags.setdefault('autotag', {}).setdefault('basename', [])
     return conf_tags
 
@@ -149,7 +151,6 @@ class Tagger(FSPathBasedSingleton):
     return list(self.ont.type_values(tag_name))
 
   # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-  @pfx
   @fmtdoc
   def file_by_tags(
       self,
@@ -418,7 +419,6 @@ class Tagger(FSPathBasedSingleton):
 
         because the target subdirectory has been tagged with `abn="***********"`.
     '''
-    assert isdirpath(srcdirpath)
     assert not srcdirpath.startswith('~')
     assert '~' not in srcdirpath
     fstags = self.fstags
@@ -473,8 +473,8 @@ class Tagger(FSPathBasedSingleton):
           suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
 
-  @pfx_method
-  def inference_rule(self, rule_spec):
+  @staticmethod
+  def inference_rule(rule_spec):
     ''' Return an inference rule from `rule_spec`.
 
         Supported syntaxes:
@@ -507,7 +507,6 @@ class Tagger(FSPathBasedSingleton):
     '''
     tagged = self.fstags[path]
     srcpath = tagged.fspath
-    srcdirpath = dirname(srcpath)
     srcbase = basename(srcpath)
     inferred_tags = TagSet()
     basename_rule_specs = self.conf['autotag']['basename']
