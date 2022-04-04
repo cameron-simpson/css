@@ -6,6 +6,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 from getopt import GetoptError, getopt
+import json
 import os
 from os.path import (
     basename,
@@ -26,7 +27,9 @@ from cs.fileutils import shortpath
 from cs.fstags import FSTags
 from cs.lex import r
 from cs.logutils import warning
-from cs.pfx import Pfx, pfxprint
+from cs.pfx import Pfx, pfxprint, pfx_method
+from cs.queues import ListQueue
+from cs.seq import unrepeated
 from cs.tagset import Tag
 from cs.upd import print  # pylint: disable=redefined-builtin
 
@@ -157,12 +160,10 @@ class TaggerCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     if not isdirpath(dirpath):
       raise GetoptError("dirpath is not a directory: %r" % (dirpath,))
-    tagger = options.tagger
-    tagged = options.fstags[dirpath]
+    tagger = self.tagger_for(dirpath)
+    tagged = tagger.tagged
     conf = tagger.conf
     obj = conf.as_dict()
-    obj.setdefault('auto_name', [])
-    obj.setdefault('file_by', {})
     edited = edit_obj(obj)
     for cf, value in edited.items():
       conf[cf] = value
