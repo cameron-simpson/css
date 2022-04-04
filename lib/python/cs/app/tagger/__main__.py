@@ -224,6 +224,25 @@ class TaggerCommand(BaseCommand):
       for tag_name, values in sorted(tagger.suggested_tags(path).items()):
         print(" ", tag_name, repr(sorted(values)))
 
+  def cmd_tagmap(self, argv):
+    ''' Usage: {cmd} [dirpath]
+          List the tag map for `dirpath`, default `'.'`.
+    '''
+    dirpath = '.'
+    if argv:
+      dirpath = argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    if not isdirpath(dirpath):
+      raise GetoptError("not a directory: %r" % (dirpath,))
+    tagger = Tagger(dirpath)
+    for tag_name, submap in sorted(tagger.subdir_tag_map().items()):
+      for tag_value, paths in submap.items():
+        print(
+            Tag(tag_name, tag_value),
+            repr([shortpath(path) for path in paths])
+        )
+
   def cmd_test(self, argv):
     ''' Usage: {cmd} path
           Run a test against path.
