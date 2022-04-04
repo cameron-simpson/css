@@ -473,33 +473,26 @@ class Tagger(FSPathBasedSingleton):
           suggestions[bare_tag.name].add(bare_tag.value)
     return suggestions
 
-  def inference_rules(self, prefix, rule_spec):
-    ''' Generator yielding inference functions from `rule_spec`.
+  @pfx_method
+  def inference_rule(self, rule_spec):
+    ''' Return an inference rule from `rule_spec`.
 
-        Each yielded function accepts a path
-        and returns an iterable of `Tag`s or other values.
-        Because some functions are implemented as lambdas it is reasonable
-        to return an iterable conatining `None` values
-        to be discarded by the consumer of the rule.
+        Supported syntaxes:
+        - [tag_prefix`:`]`/`regexp a regular expression
     '''
-    with Pfx(r(rule_spec)):
-      if isinstance(rule_spec, str):
-        if rule_spec.startswith('/'):
-          rule = RegexpTagRule(rule_spec[1:])
-          yield lambda path, rule=rule: rule.infer_tags(basename(path)
-                                                        ).as_tags()
-        else:
-          tag_name, _ = get_dotted_identifier(rule_spec)
-          if tag_name and tag_name == rule_spec:
-            # return the value of tag_name or None, as a 1-tuple
-            yield lambda path: (self.fstags[path].get(tag_name),)
-          else:
-            warning("skipping unrecognised pattern")
-      elif isinstance(rule_spec, (list, tuple)):
-        for subspec in rule_spec:
-          yield from self.inference_rules(prefix, subspec)
+    if isinstance(rule_spec, str):
+      tag_prefix, offset = get_dotted_identifier(rule_spec)
+      if offset > 0 and rule_spec.startswith(':', offset):
+        offset += 1
       else:
-        warning("skipping unhandled type")
+        tag_prefix = None
+      if rule_spec.startswith('/', offset):
+        rule = RegexpTagRule(rule_spec[offset + 1:], tag_prefix=tag_prefix)
+      else:
+        raise ValueError("skipping unrecognised pattern")
+    else:
+      raise ValueError("skipping unhandled type")
+    return rule
 
   @pfx
   @fmtdoc
