@@ -170,6 +170,7 @@ class TaggerCommand(BaseCommand):
     for cf in list(conf.keys()):
       if cf not in edited:
         del conf[cf]
+    print(json.dumps(conf.as_dict(), sort_keys=True, indent=4))
 
   def cmd_derive(self, argv):
     ''' Usage: {cmd} dirpaths...
