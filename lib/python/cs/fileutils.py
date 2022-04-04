@@ -39,6 +39,7 @@ from cs.buffer import CornuCopyBuffer
 from cs.deco import cachedmethod, decorator, fmtdoc, strable
 from cs.env import envsub
 from cs.filestate import FileState
+from cs.fs import longpath, shortpath
 from cs.gimmicks import TimeoutError
 from cs.lex import as_lines, cutsuffix, common_prefix
 from cs.logutils import error, warning, debug
@@ -890,39 +891,6 @@ def findup(path, test, first=False):
     path = up
   if first:
     yield None
-
-DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
-
-def shortpath(path, environ=None, prefixes=None):
-  ''' Return `path` with the first matching leading prefix replaced.
-
-      Parameters:
-      * `environ`: environment mapping if not os.environ
-      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
-        each `prefix` is subject to environment variable
-        substitution before consideration
-        The default considers "$HOME/" for replacement by "~/".
-  '''
-  if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
-  for prefix, subst in prefixes:
-    prefix = envsub(prefix, environ)
-    if path.startswith(prefix):
-      return subst + path[len(prefix):]
-  return path
-
-def longpath(path, environ=None, prefixes=None):
-  ''' Return `path` with prefixes and environment variables substituted.
-      The converse of `shortpath()`.
-  '''
-  if prefixes is None:
-    prefixes = DEFAULT_SHORTEN_PREFIXES
-  for prefix, subst in prefixes:
-    if path.startswith(subst):
-      path = prefix + path[len(subst):]
-      break
-  path = envsub(path, environ)
-  return path
 
 def common_path_prefix(*paths):
   ''' Return the common path prefix of the `paths`.

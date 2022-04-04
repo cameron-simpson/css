@@ -6,12 +6,26 @@
 
 import os
 from os.path import (
-    basename, dirname, exists as existspath, isdir as isdirpath, join as
-    joinpath, relpath
+    basename,
+    dirname,
+    exists as existspath,
+    expanduser,
+    isabs as isabspath,
+    isdir as isdirpath,
+    join as joinpath,
+    realpath,
+    relpath,
 )
 from tempfile import TemporaryDirectory
+from threading import Lock
+from typing import Optional
+
+from icontract import require
+from typeguard import typechecked
 
 from cs.deco import decorator
+from cs.env import envsub
+from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
 __version__ = '20220327-post'
@@ -103,3 +117,84 @@ def rpaths(
       if only_suffixes is not None and not filename.endswith(only_suffixes):
         continue
       yield relpath(joinpath(subpath, filename), dirpath)
+
+# pylint: disable=too-few-public-methods
+class HasFSPath:
+  ''' An object with a `.fspath` attribute representing a filesystem location.
+  '''
+
+  @require(lambda fspath: isabspath(fspath))  # pylint: disable=unnecessary-lambda
+  def __init__(self, fspath):
+    self.fspath = fspath
+
+  @require(lambda subpath: not isabspath(subpath))
+  def pathto(self, subpath):
+    ''' The full path to `subpath`, a relative path below `self.fspath`.
+    '''
+    return joinpath(self.fspath, subpath)
+
+class FSPathBasedSingleton(SingletonMixin, HasFSPath):
+  ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
+  '''
+
+  @classmethod
+  def _resolve_fspath(cls, fspath):
+    ''' Resolve the filesystem path `fspath`.
+        If `fspath` is `None`, use the default from `${cls.FSPATH_ENVVAR}`
+        or `cls.FSPATH_DEFAULT` (neither default is defined in this base class).
+        Return `realpath(fspath)`.
+    '''
+    if fspath is None:
+      # pylint: disable=no-member
+      fspath = os.environ.get(cls.FSPATH_ENVVAR)
+      if fspath is None:
+        # pylint: disable=no-member
+        fspath = expanduser(cls.FSPATH_DEFAULT)
+    return realpath(fspath)
+
+  @classmethod
+  def _singleton_key(cls, fspath=None, **_):
+    ''' Each instance is identified by `realpath(fspath)`.
+    '''
+    return cls._resolve_fspath(fspath)
+
+  @typechecked
+  def __init__(self, fspath: Optional[str] = None):
+    if hasattr(self, '_lock'):
+      return
+    fspath = self._resolve_fspath(fspath)
+    HasFSPath.__init__(self, fspath)
+    self._lock = Lock()
+
+DEFAULT_SHORTEN_PREFIXES = (('$HOME/', '~/'),)
+
+def shortpath(path, environ=None, prefixes=None):
+  ''' Return `path` with the first matching leading prefix replaced.
+
+      Parameters:
+      * `environ`: environment mapping if not os.environ
+      * `prefixes`: iterable of `(prefix,subst)` to consider for replacement;
+        each `prefix` is subject to environment variable
+        substitution before consideration
+        The default considers "$HOME/" for replacement by "~/".
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    prefix = envsub(prefix, environ)
+    if path.startswith(prefix):
+      return subst + path[len(prefix):]
+  return path
+
+def longpath(path, environ=None, prefixes=None):
+  ''' Return `path` with prefixes and environment variables substituted.
+      The converse of `shortpath()`.
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    if path.startswith(subst):
+      path = prefix + path[len(subst):]
+      break
+  path = envsub(path, environ)
+  return path
