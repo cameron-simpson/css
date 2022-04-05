@@ -1,3 +1,4 @@
+display of tagger.* config?
 exclude tagger.* from tag view
 x/strikethrough side button for TagWidget
 autofile button with preview of filing for current tag state
