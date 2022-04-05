@@ -1,3 +1,4 @@
+tag entry text widget to type tags directly
 ListModel and PathListModel, turn Thumbnail scrubber etc into slightly MVC form
 gui: column of tag widgets on the right
 gui: tag widget: single tag_name:value view with a dropdown for alternatives? on-hover erase button to the left?
