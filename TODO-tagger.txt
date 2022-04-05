@@ -1,3 +1,4 @@
+autofile button with preview of filing for current tag state
 tag entry text widget to type tags directly
 ListModel and PathListModel, turn Thumbnail scrubber etc into slightly MVC form
 gui: column of tag widgets on the right
