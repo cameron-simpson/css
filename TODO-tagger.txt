@@ -1,3 +1,4 @@
+show autotag suggests and "apply" button?
 display of tagger.* config?
 exclude tagger.* from tag view
 x/strikethrough side button for TagWidget
