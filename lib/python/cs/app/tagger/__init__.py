@@ -376,20 +376,24 @@ class Tagger(FSPathBasedSingleton):
   def subdir_tag_map(self):
     ''' Return a mapping of `tag_name`->`tag_value`->[dirpath,...]
         covering the entire subdirectory tree.
+
+        Returns an empty mapping if `self.fspath` does not exist
+        or is not a directory.
     '''
     # scan the whole directory before recursing
     tag_map = defaultdict(lambda: defaultdict(set))
-    for entry in [entry for entry in os.scandir(self.fspath)
-                  if entry.is_dir() and not entry.name.startswith('.')]:
-      subtagger = self.tagger_for(entry.path)
-      # make entries for each tag on the immediate subdir
-      for tag in subtagger.tagged.as_tags():
-        if isinstance(tag.value, (int, str)):
-          tag_map[tag.name][tag.value].add(entry.path)
-      # infill with all the entries from the subdir's own tag map
-      for tag_name, submap in subtagger.subdir_tag_map().items():
-        for tag_value, paths in submap.items():
-          tag_map[tag_name][tag_value].update(paths)
+    if isdirpath(self.fspath):
+      for entry in [entry for entry in os.scandir(self.fspath)
+                    if entry.is_dir() and not entry.name.startswith('.')]:
+        subtagger = self.tagger_for(entry.path)
+        # make entries for each tag on the immediate subdir
+        for tag in subtagger.tagged.as_tags():
+          if isinstance(tag.value, (int, str)):
+            tag_map[tag.name][tag.value].add(entry.path)
+        # infill with all the entries from the subdir's own tag map
+        for tag_name, submap in subtagger.subdir_tag_map().items():
+          for tag_value, paths in submap.items():
+            tag_map[tag_name][tag_value].update(paths)
     return tag_map
 
   @locked
