@@ -535,6 +535,11 @@ class ListQueue:
   def extend(self, items):
     ''' Convenient/performant queue-lots-of-items.
     '''
+    if isinstance(items, str):
+      raise TypeError(
+          "extend expects an iterable and str is explicitly disallowed, rejecting %r"
+          % (repr(items),)
+      )
     with self._lock:
       self.queued.extend(items)
 
@@ -548,6 +553,11 @@ class ListQueue:
     ''' Insert `items` at `offset` (default `0`, the front of the queue).
     '''
     if not isinstance(items, (list, tuple)):
+      if isinstance(items, str):
+        raise TypeError(
+            "prepend expects an iterable and str is explicitly disallowed, rejecting %r"
+            % (repr(items),)
+        )
       items = list(items)
     with self._lock:
       self.queued[offset:offset] = items
