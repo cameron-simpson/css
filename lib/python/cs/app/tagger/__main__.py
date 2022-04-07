@@ -109,7 +109,7 @@ class TaggerCommand(BaseCommand):
                 continue
               if entry.is_dir(follow_symlinks=False
                               ) or entry.is_file(follow_symlinks=False):
-                q.prepend(joinpath(path, entry.name))
+                q.prepend((joinpath(path, entry.name),))
           else:
             warning("recursion disabled, skipping")
         else:
