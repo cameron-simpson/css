@@ -427,5 +427,61 @@ class MonthlyPolicy(TimespanPolicy):
     start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
     end = start.shift(months=1)
     return start.timestamp(), end.timestamp()
+
+class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
+  ''' A directory containing a collection of `TimeSeries` data files.
+  '''
+  FILENAME_FORMAT = '{key}--{isodatez}{dotext}'
+
+  def __init__(self, fspath, *, step, fstags=None, policy=TimespanPolicy):
+    if fstags is None:
+      fstags = FSTags()
+    self._fstags = fstags
+    tagged = fstags[fspath]
+    super().__init__(tagged.fspath)
+    self.policy = policy
+    self.step = step
+    self.by_key_tag = {}
+
+  @contextmanager
+  def startup_shutdown(self):
+    yield
+    for ts in self.by_key_tag.values():
+      ts.close()
+
+  def key_typecode(self, key):
+    return 'd'
+
+  def ts(self, key, when):
+    ''' Return the `TimeSeries` used to store values at `(key,when)`.
+    '''
+    key_tag = key, self.policy.timespan_tag(when)
+    try:
+      ts = self.by_key_tag[key_tag]
+    except KeyError:
+      key_typecode = self.key_typecode(key)
+      start, _ = self.policy.timespan_for(when)
+      tssubpath = joinpath(
+          key, self.policy.timespan_tag(when)
+      ) + TimeSeries.DOTEXT
+      tspath = self.pathto(tssubpath)
+      tsdirpath = dirname(tspath)
+      if not isdirpath(tsdirpath):
+        pfx_mkdir(tsdirpath)
+      ts = self.by_key_tag[key_tag] = TimeSeries(
+          tspath, key_typecode, start, self.step
+      )
+      ts.open()
+    return ts
+
+  def __getitem__(self, index):
+    key, when = index
+    ts = self.ts(key, when)
+    return ts[when]
+
+  def __setitem__(self, index, value):
+    key, when = index
+    ts[when] = value
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
