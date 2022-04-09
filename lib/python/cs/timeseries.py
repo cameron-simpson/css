@@ -274,8 +274,8 @@ class TimeSeries(MultiOpenMixin):
             "data length:%d is not a multiple of item size:%d", datalen,
             ary.itemsize
         )
-      datum_count = datalen // ary.item_size
-      ary.from_file(tsf, datum_count)
+      datum_count = datalen // ary.itemsize
+      ary.fromfile(tsf, datum_count)
       if h_bigendian != NATIVE_BIGENDIANNESS[h_typecode]:
         ary.byteswap()
     return ary
