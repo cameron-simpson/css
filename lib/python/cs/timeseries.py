@@ -260,7 +260,7 @@ class TimeSeries(MultiOpenMixin):
     ary = array(typecode)
     with os_open(fspath, 'rb') as tsf:
       header_bs = tsf.read(cls.HEADER_LENGTH)
-      assert len(header_bs) == cls.HEADERLENGTH
+      assert len(header_bs) == cls.HEADER_LENGTH
       h_typecode, h_bigendian = cls.parse_header(header_bs)
       if typecode is not None and h_typecode != typecode:
         raise ValueError(
