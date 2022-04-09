@@ -403,6 +403,18 @@ class TimespanPolicy(ABC):
     '''
     return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
 
+  @require(lambda start, end: start < end)
+  def tagged_spans(self, start, end):
+    ''' Generator yielding a sequence of `(tag,tag_start,tag_end)`
+        covering the range `start:end`.
+    '''
+    when = start
+    while when < end:
+      tag = self.timespan_tag(when)
+      tag_start, tag_end = self.timespan_for(when)
+      yield tag, when, min(tag_end, end)
+      when = tag_end
+
 class DailyPolicy(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at day boundaries.
   '''
