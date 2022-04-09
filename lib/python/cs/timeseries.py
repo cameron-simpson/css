@@ -4,11 +4,11 @@
     for double float and signed 64-bit integers.
 '''
 
-from array import array, typecodes
+from array import array, typecodes  # pylint: disable=no-name-in-module
 from contextlib import contextmanager
 from functools import partial
 import os
-from struct import pack, Struct
+from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 from typing import Optional, Tuple, Union
 
@@ -39,7 +39,7 @@ assert all(typecode in typecodes for typecode in SUPPORTED_TYPECODES)
 
 @typechecked
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
-def deduce_type_big_endianness(typecode: str) -> bool:
+def deduce_type_bigendianness(typecode: str) -> bool:
   ''' Deduce the native endianness for `typecode`,
       an array/struct typecode character.
   '''
@@ -57,16 +57,16 @@ def deduce_type_big_endianness(typecode: str) -> bool:
   )
 
 NATIVE_BIGENDIANNESS = {
-    typecode: deduce_type_big_endianness(typecode)
+    typecode: deduce_type_bigendianness(typecode)
     for typecode in SUPPORTED_TYPECODES
 }
 X("NATIVE_BIGENDIANNESS = %r", NATIVE_BIGENDIANNESS)
 
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
-def struct_format(typecode, big_endian):
+def struct_format(typecode, bigendian):
   ''' Return a `struct` format string for the supplied `typecode` and big endianness.
   '''
-  return ('>' if big_endian else '<') + typecode
+  return ('>' if bigendian else '<') + typecode
 
 @contextmanager
 def array_byteswapped(ary):
@@ -102,8 +102,11 @@ class TimeSeries(MultiOpenMixin):
 
   @typechecked
   def __init__(
-      self, fspath: str, typecode: str, start: Union[int, float],
-      step: Union[int, float]
+      self,
+      fspath: str,
+      typecode: str,
+      start: Union[int, float],
+      step: Union[int, float],
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine data for the time series values.
@@ -136,20 +139,20 @@ class TimeSeries(MultiOpenMixin):
         )
     except FileNotFoundError:
       # file does not exist, use our native ordering
-      self.file_big_endian = NATIVE_BIGENDIANNESS[typecode]
+      self.file_bigendian = NATIVE_BIGENDIANNESS[typecode]
     else:
-      file_typecode, file_big_endian = self.parse_header(header_bs)
+      file_typecode, file_bigendian = self.parse_header(header_bs)
       if typecode != file_typecode:
         raise ValueError(
             "expected typecode %r but the existing file contains typecode %r" %
             (typecode, file_typecode)
         )
-      self.file_big_endian = file_big_endian
+      self.file_bigendian = file_bigendian
     self._itemsize = array(typecode).itemsize
     assert self._itemsize == 8
-    struct_format = self.make_struct_format(typecode, self.file_big_endian)
-    self._struct = Struct(struct_format)
-    assert self._struct.calcsize() == self._itemsize
+    struct_fmt = self.make_struct_format(typecode, self.file_bigendian)
+    self._struct = Struct(struct_fmt)
+    assert self._struct.size == self._itemsize
 
   @contextmanager
   def startup_shutdown(self):
@@ -158,22 +161,24 @@ class TimeSeries(MultiOpenMixin):
       self.save()
 
   @staticmethod
-  def make_struct_format(typecode, big_endian):
+  def make_struct_format(typecode, bigendian):
     ''' Make a `struct` format string for the data in a file.
     '''
-    return ('>' if big_endian else '<') + typecode
+    return ('>' if bigendian else '<') + typecode
 
   @property
   def header(self):
     ''' The header magic bytes.
     '''
-    return self.make_header(self.typeocde, self.file_big_endian)
+    return self.make_header(self.typecode, self.file_bigendian)
 
   @classmethod
-  def make_header(cls, typecode, big_endian):
+  def make_header(cls, typecode, bigendian):
+    ''' Construct a header `bytes` object for `typecode` and `bigendian`.
+    '''
     header_bs = (
         cls.MAGIC +
-        cls.make_struct_format(typecode, big_endian).encode('ascii') + b'__'
+        cls.make_struct_format(typecode, bigendian).encode('ascii') + b'__'
     )
     assert len(header_bs) == cls.HEADER_LENGTH
     return header_bs
@@ -199,9 +204,9 @@ class TimeSeries(MultiOpenMixin):
     struct_endian_b, typecode_b, _1, _2 = header_bs[len(cls.MAGIC):]
     struct_endian_marker = chr(struct_endian_b)
     if struct_endian_marker == '>':
-      big_endian = True
+      bigendian = True
     elif struct_endian_marker == '<':
-      big_endian = False
+      bigendian = False
     else:
       raise ValueError(
           "invalid endian marker, expected '>' or '<', got %r" %
@@ -220,18 +225,7 @@ class TimeSeries(MultiOpenMixin):
           "ignoring unexpected header trailer, expected %r, got %r" %
           (b'__', _1 + _2)
       )
-    return typecode, big_endian
-
-  @property
-  def typecode(self):
-    ''' The `array.array` type code.
-    '''
-    type_ = self._type
-    if type_ is int:
-      return 'q'
-    if type_ is float:
-      return 'd'
-    raise RuntimeError('unsupported type %s' % (type,))
+    return typecode, bigendian
 
   @property
   @cachedmethod
@@ -239,7 +233,7 @@ class TimeSeries(MultiOpenMixin):
     ''' The time series as an `array.array` object.
         This loads the array data from `self.fspath` on first use.
     '''
-    assert self._array is None
+    assert not hasattr(self, '_array')
     try:
       ary = self.load_from(self.fspath, self.typecode)
     except FileNotFoundError:
@@ -288,9 +282,9 @@ class TimeSeries(MultiOpenMixin):
 
   @classmethod
   @typechecked
-  def save_to(cls, ary, fspath: str, big_endian=Optional[bool]):
+  def save_to(cls, ary, fspath: str, bigendian=Optional[bool]):
     ''' Save the array `ary` to `fspath`.
-        If `big_endian` is specified, write the data in that endianness.
+        If `bigendian` is specified, write the data in that endianness.
         The default is to use the native endianness.
 
         *Warning*:
@@ -300,12 +294,12 @@ class TimeSeries(MultiOpenMixin):
         Concurrent users should avoid using the array during this function.
     '''
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    if big_endian is None:
-      big_endian = native_bigendian
-    header_bs = cls.make_header(ary.typecode, big_endian)
     with os_open(fspath, 'wb') as tsf:
+    if bigendian is None:
+      bigendian = native_bigendian
+    header_bs = cls.make_header(ary.typecode, bigendian)
       tsf.write(header_bs)
-      if big_endian != native_bigendian:
+      if bigendian != native_bigendian:
         with array_byteswapped(ary):
           ary.tofile(tsf)
       else:
