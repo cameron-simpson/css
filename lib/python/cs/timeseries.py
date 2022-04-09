@@ -9,17 +9,24 @@ from contextlib import contextmanager
 from functools import partial
 import os
 from struct import pack, Struct
+import sys
 from typing import Optional, Tuple, Union
 
 from icontract import ensure, require
 from typeguard import typechecked
 
+from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call
 from cs.resources import MultiOpenMixin
 
 from cs.x import X
+
+def main(argv=None):
+  ''' Run the command line tool for `TimeSeries` data.
+  '''
+  return TimeSeriesCommand(argv).run()
 
 os_open = partial(pfx_call, os.open)
 
@@ -303,3 +310,10 @@ class TimeSeries(MultiOpenMixin):
           ary.tofile(tsf)
       else:
         ary.tofile(tsf)
+
+class TimeSeriesCommand(BaseCommand):
+  ''' Command line interface to `TimeSeries` data files.
+  '''
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
