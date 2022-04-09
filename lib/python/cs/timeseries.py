@@ -294,7 +294,6 @@ class TimeSeries(MultiOpenMixin):
         Concurrent users should avoid using the array during this function.
     '''
     native_bigendian = NATIVE_BIGENDIANNESS[ary.typecode]
-    with os_open(fspath, 'wb') as tsf:
     if bigendian is None:
       bigendian = native_bigendian
     header_bs = cls.make_header(ary.typecode, bigendian)
