@@ -62,6 +62,10 @@ NATIVE_BIGENDIANNESS = {
 }
 X("NATIVE_BIGENDIANNESS = %r", NATIVE_BIGENDIANNESS)
 
+class TimeSeriesCommand(BaseCommand):
+  ''' Command line interface to `TimeSeries` data files.
+  '''
+
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
 def struct_format(typecode, bigendian):
   ''' Return a `struct` format string for the supplied `typecode` and big endianness.
@@ -350,10 +354,6 @@ class TimeSeries(MultiOpenMixin):
     if ary_index >= len(ary):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
       assert len(ary) == ary_index + 1
-
-class TimeSeriesCommand(BaseCommand):
-  ''' Command line interface to `TimeSeries` data files.
-  '''
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
