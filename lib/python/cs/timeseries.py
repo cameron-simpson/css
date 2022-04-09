@@ -132,7 +132,7 @@ class TimeSeries(MultiOpenMixin):
     try:
       with pfx_open(fspath, 'rb') as tsf:
         header_bs = tsf.read(self.HEADER_LENGTH)
-      if len(header_bs) != len(self.HEADER_LENGTH):
+      if len(header_bs) != self.HEADER_LENGTH:
         raise ValueError(
             "file header is the wrong length, expected %d, got %d" %
             (self.HEADER_LENGTH, len(header_bs))
