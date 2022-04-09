@@ -4,6 +4,7 @@
     for double float and signed 64-bit integers.
 '''
 
+from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from contextlib import contextmanager
 from functools import partial
@@ -12,6 +13,8 @@ from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 from typing import Optional, Tuple, Union
 
+import arrow
+from arrow import Arrow
 from icontract import ensure, require
 from typeguard import typechecked
 
@@ -355,5 +358,50 @@ class TimeSeries(MultiOpenMixin):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
       assert len(ary) == ary_index + 1
 
+
+class TimespanPolicy(ABC):
+
+  @typechecked
+  def __init__(self, timezone: Optional[str] = None):
+    ''' Initialise the policy.
+
+        Parameters:
+        * `timezone`: optional timezone name used to compute `datetime`s;
+          the default is inferred from the default time zone
+    '''
+    if timezone is None:
+      timezone = arrow.now('local').format('ZZZ')
+    self.timezone = timezone
+
+  @abstractmethod
+  def timespan_for(self, when):
+    ''' A `TimespanPolicy` bracketing the UNIX time `when`.
+    '''
+    raise NotImplemented
+
+class DailyPolicy(TimespanPolicy):
+  ''' A `TimespanPolicy` bracketing times at day boundaries.
+  '''
+
+  def timespan_for(self, when):
+    ''' Return the start and end UNIX times
+        bracketing the UNIX time `when`.
+    '''
+    a = arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+    start = Arrow(a.year, a.month, a.day, tzinfo=self.timezone)
+    end = start.shift(days=1)
+    return start.timestamp(), end.timestamp()
+
+class MonthlyPolicy(TimespanPolicy):
+  ''' A `TimespanPolicy` bracketing times at month boundaries.
+  '''
+
+  def timespan_for(self, when):
+    ''' Return the start and end UNIX times
+    '''
+    a = arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+    start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
+    end = start.shift(months=1)
+    return start.timestamp(), end.timestamp()
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
