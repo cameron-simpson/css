@@ -368,10 +368,17 @@ class TimespanPolicy(ABC):
         Parameters:
         * `timezone`: optional timezone name used to compute `datetime`s;
           the default is inferred from the default time zone
+          using the `get_default_timezone_name` method
     '''
     if timezone is None:
-      timezone = arrow.now('local').format('ZZZ')
+      timezone = self.get_default_timezone_name()
     self.timezone = timezone
+
+  @staticmethod
+  def get_default_timezone_name():
+    ''' Return the default timezone name.
+    '''
+    return arrow.now('local').format('ZZZ')
 
   @abstractmethod
   def timespan_for(self, when):
