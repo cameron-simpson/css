@@ -311,6 +311,52 @@ class TimeSeries(MultiOpenMixin):
       else:
         ary.tofile(tsf)
 
+  def array_index(self, when):
+    ''' Return te array index corresponding the time UNIX time `when`.
+    '''
+    when_offset = when - self.start
+    if when_offset < 0:
+      raise ValueError("when:%s predates self.start:%s" % (when, self.start))
+    return int(when_offset // self.step)
+
+  def __getitem__(self, when):
+    ''' Return the datum for the UNIX time `when`.
+    '''
+    # avoid confusion with negatiove indices
+    if when < 0:
+      raise ValueError("invalid when:%s, must be >= 0" % (when,))
+    return self.array[self.array_index(when)]
+
+  def __setitem__(self, when, value):
+    ''' Set the datum for the UNIX time `when`.
+    '''
+    if when < 0:
+      raise ValueError("invalid when:%s, must be >= 0" % (when,))
+    self.array[self.array_index(when)] = value
+
+  def pad_to(self, when, fill=None):
+    ''' Pad the time series to store values up to the UNIX time `when`.
+
+        The `fill` value is optional and defaults to `0` for intergers
+        and `float('nan')` for floats.
+    '''
+    if when < 0:
+      raise ValueError("invalid when:%s, must be >= 0" % (when,))
+    if fill is None:
+      if self.typecode == 'd':
+        fill = float('nan')
+      elif self.typecode == 'q':
+        fill = 0
+      else:
+        raise ValueError(
+            "no default fill value for self.typecode %r" % (self.typecode,)
+        )
+    ary_index = self.array_index(when)
+    ary = self.array
+    if ary_index >= len(ary):
+      ary.extend(fill for _ in range(ary_index - len(ary) + 1))
+      assert len(ary) == ary_index + 1
+
 class TimeSeriesCommand(BaseCommand):
   ''' Command line interface to `TimeSeries` data files.
   '''
