@@ -386,15 +386,30 @@ class TimespanPolicy(ABC):
     '''
     raise NotImplemented
 
+  def Arrow(self, when):
+    ''' Return an `arrow.Arrow` instance for the UNIX time `when`
+        in the right timezone.
+    '''
+    return arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+
+  def timespan_tag(self, when):
+    ''' Return the default tag for the UNIX time `when`,
+        which is derived from the `arrow.Arrow`
+        format string `self.DEFAULT_TAG_FORMAT`.
+    '''
+    return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
+
 class DailyPolicy(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at day boundaries.
   '''
+
+  DEFAULT_TAG_FORMAT = 'YYYY-MM-DD'
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
         bracketing the UNIX time `when`.
     '''
-    a = arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+    a = self.Arrow(when)
     start = Arrow(a.year, a.month, a.day, tzinfo=self.timezone)
     end = start.shift(days=1)
     return start.timestamp(), end.timestamp()
@@ -403,10 +418,12 @@ class MonthlyPolicy(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
 
+  DEFAULT_TAG_FORMAT = 'YYYY-MM'
+
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
     '''
-    a = arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+    a = self.Arrow(when)
     start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
     end = start.shift(months=1)
     return start.timestamp(), end.timestamp()
