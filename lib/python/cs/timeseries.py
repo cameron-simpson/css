@@ -28,7 +28,7 @@ def main(argv=None):
   '''
   return TimeSeriesCommand(argv).run()
 
-os_open = partial(pfx_call, os.open)
+pfx_open = partial(pfx_call, open)
 
 # initial support is singled 64 bit integers and double floats
 SUPPORTED_TYPECODES = {
@@ -130,7 +130,7 @@ class TimeSeries(MultiOpenMixin):
     self.step = step
     # read the data file header
     try:
-      with os_open(fspath, 'rb') as tsf:
+      with pfx_open(fspath, 'rb') as tsf:
         header_bs = tsf.read(self.HEADER_LENGTH)
       if len(header_bs) != len(self.HEADER_LENGTH):
         raise ValueError(
@@ -258,7 +258,7 @@ class TimeSeries(MultiOpenMixin):
         containing the file data.
     '''
     ary = array(typecode)
-    with os_open(fspath, 'rb') as tsf:
+    with pfx_open(fspath, 'rb') as tsf:
       header_bs = tsf.read(cls.HEADER_LENGTH)
       assert len(header_bs) == cls.HEADER_LENGTH
       h_typecode, h_bigendian = cls.parse_header(header_bs)
@@ -298,6 +298,7 @@ class TimeSeries(MultiOpenMixin):
     if bigendian is None:
       bigendian = native_bigendian
     header_bs = cls.make_header(ary.typecode, bigendian)
+    with pfx_open(fspath, 'wb') as tsf:
       tsf.write(header_bs)
       if bigendian != native_bigendian:
         with array_byteswapped(ary):
