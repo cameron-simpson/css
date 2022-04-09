@@ -6,9 +6,11 @@
 
 from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
+from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 import os
+from os.path import dirname, isdir as isdirpath, join as joinpath
 from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 from typing import Optional, Tuple, Union
@@ -20,6 +22,8 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
+from cs.fs import HasFSPath
+from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call
 from cs.resources import MultiOpenMixin
@@ -31,6 +35,7 @@ def main(argv=None):
   '''
   return TimeSeriesCommand(argv).run()
 
+pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
 
 # initial support is singled 64 bit integers and double floats
@@ -227,7 +232,7 @@ class TimeSeries(MultiOpenMixin):
               typecode,
           )
       )
-    if _1 != b'_' or _2 != b'_':
+    if bytes((_1, _2)) != b'__':
       warning(
           "ignoring unexpected header trailer, expected %r, got %r" %
           (b'__', _1 + _2)
@@ -358,7 +363,6 @@ class TimeSeries(MultiOpenMixin):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
       assert len(ary) == ary_index + 1
 
-
 class TimespanPolicy(ABC):
 
   @typechecked
@@ -384,7 +388,7 @@ class TimespanPolicy(ABC):
   def timespan_for(self, when):
     ''' A `TimespanPolicy` bracketing the UNIX time `when`.
     '''
-    raise NotImplemented
+    raise NotImplementedError
 
   def Arrow(self, when):
     ''' Return an `arrow.Arrow` instance for the UNIX time `when`
