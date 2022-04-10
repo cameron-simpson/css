@@ -9,23 +9,32 @@ from array import array, typecodes  # pylint: disable=no-name-in-module
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
+from getopt import GetoptError
 import os
-from os.path import dirname, isdir as isdirpath, join as joinpath
+from os.path import (
+    dirname,
+    isdir as isdirpath,
+    join as joinpath,
+    normpath,
+)
 from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
+import time
 from typing import Optional, Tuple, Union
 
 import arrow
 from arrow import Arrow
 from icontract import ensure, require
+from numpy import datetime64
+from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
-from cs.fs import HasFSPath
+from cs.fs import HasFSPath, is_clean_subpath
 from cs.fstags import FSTags
 from cs.logutils import warning
-from cs.pfx import pfx, pfx_call
+from cs.pfx import pfx, pfx_call, Pfx
 from cs.resources import MultiOpenMixin
 
 from cs.x import X
@@ -492,7 +501,17 @@ class TimeSeries(MultiOpenMixin):
     indices = (datetime64(t, 's') for t in range(start, end, self.step))
     series = PDSeries(data, indices)
     return series
+
 class TimespanPolicy(ABC):
+  ''' A class mplementing apolicy about where to store data,
+      used by `TimeSeriesKeySubdir` instances
+      to partition data among multiple `TimeSeries` data files.
+
+      The most important methods are `timespan_tag`
+      which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
+      and `timespan_for` which returns the per tag start and end times
+      enclosing a timestamp.
+  '''
 
   @typechecked
   def __init__(self, timezone: Optional[str] = None):
@@ -524,6 +543,8 @@ class TimespanPolicy(ABC):
         which is derived from the `arrow.Arrow`
         format string `self.DEFAULT_TAG_FORMAT`.
     '''
+    # TODO: is this correct? don't we want the tag from the start
+    # in the specified timezone?
     return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
 
   @require(lambda start, end: start < end)
@@ -546,6 +567,7 @@ class TimespanPolicyDaily(TimespanPolicy):
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
+        (inclusive and exclusive respectively)
         bracketing the UNIX time `when`.
     '''
     a = self.Arrow(when)
@@ -621,6 +643,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   def key_typecode(self, key):
     ''' The `array` type code for `key`.
     '''
+    # TODO: needs a mapping
     return 'd'
 
   @require(lambda key: is_clean_subpath(key) and '/' not in key)
