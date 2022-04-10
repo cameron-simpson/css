@@ -4,6 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+from fnmatch import fnmatch
 from functools import partial
 import os
 from os.path import (
@@ -43,6 +44,10 @@ DISTINFO = {
 }
 
 pfx_listdir = partial(pfx_call, os.listdir)
+pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_rename = partial(pfx_call, os.rename)
+pfx_rmdir = partial(pfx_call, os.rmdir)
+
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
   ''' Decorator for a function which fills in a directory
@@ -63,7 +68,7 @@ def atomic_directory(infill_func, make_placeholder=False):
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
-      pfx_call(os.mkdir, dirpath, 0o000)
+      pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
     else:
       if existspath(dirpath):
@@ -77,15 +82,15 @@ def atomic_directory(infill_func, make_placeholder=False):
       ) as tmpdirpath:
         result = infill_func(tmpdirpath, *a, **kw)
         if remove_placeholder:
-          pfx_call(os.rmdir, dirpath)
+          pfx_rmdir(dirpath)
           remove_placeholder = False
         elif existspath(dirpath):
           raise ValueError("directory already exists: %r" % (dirpath,))
-        pfx_call(os.rename, tmpdirpath, dirpath)
-        pfx_call(os.mkdir, tmpdirpath, 0o000)
+        pfx_rename(tmpdirpath, dirpath)
+        pfx_mkdir(tmpdirpath, 0o000)
     except:
       if remove_placeholder and isdirpath(dirpath):
-        pfx_call(os.rmdir, dirpath)
+        pfx_rmdir(dirpath)
       raise
     else:
       return result
