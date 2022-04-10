@@ -54,9 +54,9 @@ DISTINFO = {
 
 # pylint: disable=too-many-statements
 def named_row_tuple(*column_names, **kw):
-  ''' Return a namedtuple subclass factory derived from `column_names`.
+  ''' Return a `namedtuple` subclass factory derived from `column_names`.
       The primary use case is using the header row of a spreadsheet
-      to keey the data from the subsequent rows.
+      to key the data from the subsequent rows.
 
       Parameters:
       * `column_names`: an iterable of `str`, such as the heading columns
@@ -269,7 +269,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   (2, 22, "two"),
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
@@ -280,7 +280,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   (2, 22, "two"),
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(index=1, value_found=11, descriptive_text='one'), NamedRow(index=2, value_found=22, descriptive_text='two')]
 
@@ -291,7 +291,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   {'a': 2, 'c': "two", 'b': 22},
           ... ]
-          >>> cls, rows = named_column_tuples(data1)
+          >>> rowtype, rows = named_column_tuples(data1)
           >>> print(list(rows))
           [NamedRow(a=1, b=11, c='one'), NamedRow(a=2, b=22, c='two')]
 
@@ -303,7 +303,7 @@ def named_column_tuples(
           ...   {'a': 2, 'c': "two", 'b': 22},
           ...   [3, 11, "three", '', 'dropped'],
           ... ]
-          >>> cls, rows = named_column_tuples(data1, 'CSV_Row')
+          >>> rowtype, rows = named_column_tuples(data1, 'CSV_Row')
           >>> print(list(rows))
           [CSV_Row(a=1, b=11, c='one'), CSV_Row(a=2, b=22, c='two'), CSV_Row(a=3, b=11, c='three')]
 
@@ -320,7 +320,7 @@ def named_column_tuples(
           ...   (1, 11, "one"),
           ...   {'a': 2, 'c': "two", 'b': 22},
           ... ]
-          >>> cls, rows = named_column_tuples(data1, mixin=Mixin)
+          >>> rowtype, rows = named_column_tuples(data1, mixin=Mixin)
           >>> rows = list(rows)
           >>> rows[0].test1()
           'test1'
@@ -336,8 +336,8 @@ def named_column_tuples(
       preprocess=preprocess,
       mixin=mixin
   )
-  cls = next(gen)
-  return cls, gen
+  rowtype = next(gen)
+  return rowtype, gen
 
 # pylint: disable=too-many-arguments
 def _named_column_tuples(
@@ -349,28 +349,28 @@ def _named_column_tuples(
     mixin=None
 ):
   if column_names is None:
-    cls = None
+    rowtype = None
   else:
-    cls = named_row_tuple(
+    rowtype = named_row_tuple(
         *column_names, class_name=class_name, computed=computed, mixin=mixin
     )
-    yield cls
-    tuple_attributes = cls.attributes_
-    name_attributes = cls.name_attributes_
+    yield rowtype
+    tuple_attributes = rowtype.attributes_
+    name_attributes = rowtype.name_attributes_
   previous = None
   for index, row in enumerate(rows):
     if preprocess:
-      row = preprocess(_nct_Context(cls, index, previous), row)
+      row = preprocess(_nct_Context(rowtype, index, previous), row)
       if row is None:
         continue
-    if cls is None:
+    if rowtype is None:
       column_names = row
-      cls = named_row_tuple(
+      rowtype = named_row_tuple(
           *column_names, class_name=class_name, computed=computed, mixin=mixin
       )
-      yield cls
-      tuple_attributes = cls.attributes_
-      name_attributes = cls.name_attributes_
+      yield rowtype
+      tuple_attributes = rowtype.attributes_
+      name_attributes = rowtype.name_attributes_
       continue
     if callable(getattr(row, 'get', None)):
       # flatten a mapping into a list ordered by column_names
@@ -378,7 +378,7 @@ def _named_column_tuples(
     if tuple_attributes is not name_attributes:
       # drop items from columns with empty names
       row = [item for item, attr in zip(row, name_attributes) if attr]
-    named_row = cls(*row)
+    named_row = rowtype(*row)
     yield named_row
     previous = named_row
 
