@@ -13,6 +13,7 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    normpath,
     realpath,
     relpath,
 )
@@ -198,3 +199,23 @@ def longpath(path, environ=None, prefixes=None):
       break
   path = envsub(path, environ)
   return path
+
+def is_clean_subpath(subpath: str):
+  ''' Test that `subpath` is clean:
+      - not empty or '.' or '..'
+      - not an absolute path
+      - normalised
+      - does not walk up out of its parent directory
+
+      Examples:
+
+          >>> is_clean_subpath('')
+          False
+          >>> is_clean_subpath('.')
+  '''
+  if subpath in ('', '.', '..'):
+    return False
+  if isabspath(subpath):
+    return False
+  normalised = normpath(subpath)
+  return subpath == normalised and not normalised.startswith('../')
