@@ -197,6 +197,7 @@ class TimeSeries(MultiOpenMixin):
       typecode: str,
       start: Union[int, float],
       step: Union[int, float],
+      fill=None,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine data for the time series values.
@@ -206,6 +207,9 @@ class TimeSeries(MultiOpenMixin):
         * `typecode` the expected `array.typecode` value of the data
         * `start`: the UNIX epoch time for the first datum
         * `step`: the increment between data times
+        * `fill`: optional default fill values for `pad_to`;
+          if unspecified, use `0` for `'q'`
+          and `float('nan') for `'d'`
     '''
     if typecode not in SUPPORTED_TYPECODES:
       raise ValueError(
@@ -214,10 +218,20 @@ class TimeSeries(MultiOpenMixin):
       )
     if step <= 0:
       raise ValueError("step should be >0, got %s" % (step,))
+    if fill is None:
+      if typecode == 'd':
+        fill = float('nan')
+      elif typecode == 'q':
+        fill = 0
+      else:
+        raise RuntimeError(
+            "no default fill value for typecode=%r" % (typecode,)
+        )
     self.fspath = fspath
     self.typecode = typecode
     self.start = start
     self.step = step
+    self.fill = fill
     # read the data file header
     try:
       with pfx_open(fspath, 'rb') as tsf:
@@ -447,20 +461,13 @@ class TimeSeries(MultiOpenMixin):
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
 
-        The `fill` value is optional and defaults to `0` for intergers
-        and `float('nan')` for floats.
+        The `fill` value is optional and defaults to the `fill` value
+        supplied when the `TimeSeries` was initialised.
     '''
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     if fill is None:
-      if self.typecode == 'd':
-        fill = float('nan')
-      elif self.typecode == 'q':
-        fill = 0
-      else:
-        raise ValueError(
-            "no default fill value for self.typecode %r" % (self.typecode,)
-        )
+      fill = self.fill
     ary_index = self.array_index(when)
     ary = self.array
     if ary_index >= len(ary):
