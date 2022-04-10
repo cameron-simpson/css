@@ -174,6 +174,12 @@ class TimeSeries(MultiOpenMixin):
       which will automatically rewrite the file with the array data
       on exit.
 
+      Note that the save-on-close is done with `TimeSeries.flush()`
+      which ony saves if `self.modified`.
+      Use of the `__setitem__` or `pad_to` methods set this flag automatically.
+      Direct access via the `.array` will not set it,
+      so users working that way for performance should update the flag themselves.
+
       The data file itself has a header indicating the file data big endianness
       and datum type (an `array.array` type code).
       This is automatically honoured on load and save.
@@ -237,12 +243,12 @@ class TimeSeries(MultiOpenMixin):
     struct_fmt = self.make_struct_format(typecode, self.file_bigendian)
     self._struct = Struct(struct_fmt)
     assert self._struct.size == self._itemsize
+    self.modified = False
 
   @contextmanager
   def startup_shutdown(self):
     yield self
-    if self._array is not None:
-      self.save()
+    self.flush()
 
   @staticmethod
   def make_struct_format(typecode, bigendian):
@@ -324,6 +330,13 @@ class TimeSeries(MultiOpenMixin):
       # no file, empty array
       ary = array(self.typecode)
     return ary
+
+  def flush(self):
+    ''' Save the data file if `self.modified`.
+    '''
+    if self.modified:
+      self.save()
+      self.modified = False
 
   def save(self, fspath=None):
     ''' Save the time series to `fspath`, default `self.fspath`.
@@ -411,6 +424,7 @@ class TimeSeries(MultiOpenMixin):
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.array[self.array_index(when)] = value
+    self._modified = True
 
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
@@ -433,6 +447,7 @@ class TimeSeries(MultiOpenMixin):
     ary = self.array
     if ary_index >= len(ary):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
+      self._modified = True
       assert len(ary) == ary_index + 1
 
 class TimespanPolicy(ABC):
