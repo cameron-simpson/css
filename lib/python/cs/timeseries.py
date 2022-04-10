@@ -250,6 +250,13 @@ class TimeSeries(MultiOpenMixin):
     yield self
     self.flush()
 
+  @property
+  def end(self):
+    ''' The end time of this array,
+        computed as `self.start+len(self.array)*self.step`.
+    '''
+    return self.start + len(self.array) * self.step
+
   @staticmethod
   def make_struct_format(typecode, bigendian):
     ''' Make a `struct` format string for the data in a file.
