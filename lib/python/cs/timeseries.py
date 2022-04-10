@@ -589,7 +589,15 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   ''' A directory containing a collection of `TimeSeries` data files.
   '''
 
-  def __init__(self, fspath, *, step, fstags=None, policy=TimespanPolicy):
+  @typechecked
+  def __init__(
+      self,
+      fspath,
+      *,
+      step: Union[int, float],
+      fstags: Optional[FSTags] = None,
+      policy,  ##: TimespanPolicy
+  ):
     if fstags is None:
       fstags = FSTags()
     self._fstags = fstags
@@ -597,47 +605,114 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     super().__init__(tagged.fspath)
     self.policy = policy
     self.step = step
-    self.by_key_tag = {}
+    self._tsks_by_key = {}
 
   @contextmanager
   def startup_shutdown(self):
     yield
-    for ts in self.by_key_tag.values():
+    for ts in self._tsks_by_key.values():
       ts.close()
 
+  def keys(self):
+    ''' The known keys.
+    '''
+    return self._tsks_by_key.keys()
+
   def key_typecode(self, key):
+    ''' The `array` type code for `key`.
+    '''
     return 'd'
 
-  def ts(self, key, when):
-    ''' Return the `TimeSeries` used to store values at `(key,when)`.
+  @require(lambda key: is_clean_subpath(key) and '/' not in key)
+  def __getitem__(self, key):
+    ''' Return the `TimeSeriesKeySubdir` for `key`,
+        creating its subdirectory if necessary.
     '''
-    key_tag = key, self.policy.timespan_tag(when)
     try:
-      ts = self.by_key_tag[key_tag]
+      tsks = self._tsks_by_key[key]
     except KeyError:
-      key_typecode = self.key_typecode(key)
-      start, _ = self.policy.timespan_for(when)
-      tssubpath = joinpath(
-          key, self.policy.timespan_tag(when)
-      ) + TimeSeries.DOTEXT
-      tspath = self.pathto(tssubpath)
-      tsdirpath = dirname(tspath)
-      if not isdirpath(tsdirpath):
-        pfx_mkdir(tsdirpath)
-      ts = self.by_key_tag[key_tag] = TimeSeries(
-          tspath, key_typecode, start, self.step
+      keypath = self.pathto(key)
+      if not isdirpath(keypath):
+        pfx_mkdir(keypath)
+      tsks = self._tsks_by_key[key] = TimeSeriesKeySubdir(
+          self.pathto(key),
+          self.key_typecode(key),
+          step=self.step,
+          policy=self.policy,
+      )
+      tsks.open()
+    return tsks
+
+class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
+  ''' A collection of `TimeSeries` files in a subdirectory.
+      We have one of these for each `TimeSeriesDataDir` key.
+
+      This class manages a collection of files
+      named by the tag from a `TimespanPolicy`,
+      which dicates which tag holds the datum for a UNIX time.
+  '''
+
+  @typechecked
+  @require(lambda step: step > 0)
+  def __init__(
+      self,
+      fspath: str,
+      typecode: str,
+      *,
+      step: Union[int, float],
+      policy,  ##: TimespanPolicy,
+  ):
+    assert isinstance(policy,
+                      TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
+    super().__init__(fspath)
+    self.typecode = typecode
+    self.policy = policy
+    self.step = step
+    self._ts_by_tag = {}
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Close the subsidiary `TimeSeries` instances.
+    '''
+    yield
+    for ts in self._ts_by_tag.values():
+      ts.close()
+
+  def subseries(self, when: Union[int, float]):
+    ''' The `TimeSeries` for the UNIX time `when`.
+    '''
+    policy = self.policy
+    tag = policy.timespan_tag(when)
+    try:
+      ts = self._ts_by_tag[tag]
+    except KeyError:
+      tag_start, tag_end = policy.timespan_for(when)
+      filepath = self.pathto(tag + TimeSeries.DOTEXT)
+      ts = self._ts_by_tag[tag] = TimeSeries(
+          filepath, self.typecode, tag_start, self.step
       )
       ts.open()
     return ts
 
-  def __getitem__(self, index):
-    key, when = index
-    ts = self.ts(key, when)
-    return ts[when]
+  def __getitem__(self, when):
+    return self.subseries(when)[when]
 
-  def __setitem__(self, index, value):
-    key, when = index
-    ts[when] = value
+  def __setitem__(self, when, value):
+    self.subseries(when)[when] = value
+
+  def setitems(self, whens, values):
+    ts = None
+    tag_start = None
+    tag_end = None
+    for when, value in zip(whens, values):
+      if tag_start is not None:
+        if not tag_start <= when < tag_end:
+          # different range, get the new subseries
+          tag_start = None
+      if tag_start is None:
+        ts = self.subseries(when)
+        tag_start, tag_end = self.policy.timespan_for(when)
+      ts[when] = value
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
