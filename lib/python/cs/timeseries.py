@@ -417,6 +417,12 @@ class TimeSeries(MultiOpenMixin):
       raise ValueError("when:%s predates self.start:%s" % (when, self.start))
     return int(when_offset // self.step)
 
+  def __len__(self):
+    ''' The length of the time series data,
+        from `len(self.array)`.
+    '''
+    return len(self.array)
+
   def __getitem__(self, when):
     ''' Return the datum for the UNIX time `when`.
     '''
