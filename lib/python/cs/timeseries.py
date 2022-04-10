@@ -483,12 +483,6 @@ class TimespanPolicy(ABC):
       timezone = get_default_timezone_name()
     self.timezone = timezone
 
-  @staticmethod
-  def get_default_timezone_name():
-    ''' Return the default timezone name.
-    '''
-    return arrow.now('local').format('ZZZ')
-
   @abstractmethod
   def timespan_for(self, when):
     ''' A `TimespanPolicy` bracketing the UNIX time `when`.
