@@ -126,7 +126,6 @@ class HasFSPath:
   ''' An object with a `.fspath` attribute representing a filesystem location.
   '''
 
-  @require(lambda fspath: isabspath(fspath))  # pylint: disable=unnecessary-lambda
   def __init__(self, fspath):
     self.fspath = fspath
 
