@@ -561,10 +561,13 @@ class TimespanPolicyMonthly(TimespanPolicy):
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
+        (inclusive and exclusive respectively)
+        bracketing the UNIX time `when`.
     '''
     a = self.Arrow(when)
     start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
     end = start.shift(months=1)
+    return start.timestamp(), end.timestamp()
 
 class TimespanPolicyAnnual(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
