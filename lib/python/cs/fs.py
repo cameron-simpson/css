@@ -4,6 +4,7 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+from functools import partial
 import os
 from os.path import (
     basename,
@@ -41,6 +42,7 @@ DISTINFO = {
     'install_requires': ['cs.deco', 'cs.pfx'],
 }
 
+pfx_listdir = partial(pfx_call, os.listdir)
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
   ''' Decorator for a function which fills in a directory
@@ -133,6 +135,14 @@ class HasFSPath:
     ''' The full path to `subpath`, a relative path below `self.fspath`.
     '''
     return joinpath(self.fspath, subpath)
+
+  def fnmatch(self, fnglob):
+    ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
+    '''
+    return [
+        filename for filename in pfx_listdir(self.fspath)
+        if fnmatch(filename, fnglob)
+    ]
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
