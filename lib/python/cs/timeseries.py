@@ -93,7 +93,7 @@ class TimeSeriesCommand(BaseCommand):
       print(pds)
 
     def test_tagged_spans():
-      policy = DailyPolicy()
+      policy = TimespanPolicyDaily()
       start = time.time()
       end = time.time() + 7 * 24 * 3600
       print("start =", Arrow.fromtimestamp(start))
@@ -104,13 +104,13 @@ class TimeSeriesCommand(BaseCommand):
         )
 
     def test_datadir():
-      with TimeSeriesDataDir('tsdatadir', policy=DailyPolicy(),
+      with TimeSeriesDataDir('tsdatadir', policy=TimespanPolicyDaily(),
                              step=300) as datadir:
         ts = datadir.ts('key1', time.time())
         datadir['key2', time.time()] = 9.0
 
     def test_timespan_policy():
-      policy = MonthlyPolicy()
+      policy = TimespanPolicyMonthly()
       policy.timespan_for(time.time())
       X("monthly tag = %r", policy.timespan_tag(time.time()))
 
@@ -514,7 +514,7 @@ class TimespanPolicy(ABC):
       yield tag, when, min(tag_end, end)
       when = tag_end
 
-class DailyPolicy(TimespanPolicy):
+class TimespanPolicyDaily(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at day boundaries.
   '''
 
@@ -529,7 +529,7 @@ class DailyPolicy(TimespanPolicy):
     end = start.shift(days=1)
     return start.timestamp(), end.timestamp()
 
-class MonthlyPolicy(TimespanPolicy):
+class TimespanPolicyMonthly(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
 
@@ -541,6 +541,21 @@ class MonthlyPolicy(TimespanPolicy):
     a = self.Arrow(when)
     start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
     end = start.shift(months=1)
+
+class TimespanPolicyAnnual(TimespanPolicy):
+  ''' A `TimespanPolicy` bracketing times at month boundaries.
+  '''
+
+  DEFAULT_TAG_FORMAT = 'YYYY'
+
+  def timespan_for(self, when):
+    ''' Return the start and end UNIX times
+        (inclusive and exclusive respectively)
+        bracketing the UNIX time `when`.
+    '''
+    a = self.Arrow(when)
+    start = Arrow(a.year, 1, 1, tzinfo=self.timezone)
+    end = start.shift(years=1)
     return start.timestamp(), end.timestamp()
 
 class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
