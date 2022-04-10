@@ -455,6 +455,7 @@ class TimeSeries(MultiOpenMixin):
     '''
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
+    self.pad_to(when)
     self.array[self.array_index(when)] = value
     self._modified = True
 
