@@ -122,8 +122,8 @@ class TaggerCommand(BaseCommand):
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} [-fn] paths...
           Apply the inference rules to each path.
-          -n  No action. ZRecite inferred tags.
-          -f  Force. Overwirte existing tags.
+          -f  Force. Overwrite existing tags.
+          -n  No action. Recite inferred tags.
     '''
     infer_mode = 'infill'
     opts, argv = getopt(argv, 'fn')
