@@ -109,7 +109,7 @@ class TaggerCommand(BaseCommand):
                 continue
               if entry.is_dir(follow_symlinks=False
                               ) or entry.is_file(follow_symlinks=False):
-                q.prepend(joinpath(path, entry.name))
+                q.prepend((joinpath(path, entry.name),))
           else:
             warning("recursion disabled, skipping")
         else:
@@ -122,8 +122,8 @@ class TaggerCommand(BaseCommand):
   def cmd_autotag(self, argv):
     ''' Usage: {cmd} [-fn] paths...
           Apply the inference rules to each path.
-          -n  No action. ZRecite inferred tags.
-          -f  Force. Overwirte existing tags.
+          -f  Force. Overwrite existing tags.
+          -n  No action. Recite inferred tags.
     '''
     infer_mode = 'infill'
     opts, argv = getopt(argv, 'fn')
