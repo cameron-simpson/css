@@ -588,7 +588,6 @@ class TimespanPolicyAnnual(TimespanPolicy):
 class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   ''' A directory containing a collection of `TimeSeries` data files.
   '''
-  FILENAME_FORMAT = '{key}--{isodatez}{dotext}'
 
   def __init__(self, fspath, *, step, fstags=None, policy=TimespanPolicy):
     if fstags is None:
