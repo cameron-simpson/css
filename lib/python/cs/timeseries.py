@@ -141,6 +141,11 @@ class TimeSeriesCommand(BaseCommand):
         )
       return testfunc()
 
+def get_default_timezone_name():
+  ''' Return the default timezone name.
+  '''
+  return arrow.now('local').format('ZZZ')
+
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
 def struct_format(typecode, bigendian):
   ''' Return a `struct` format string for the supplied `typecode` and big endianness.
@@ -439,10 +444,10 @@ class TimespanPolicy(ABC):
         Parameters:
         * `timezone`: optional timezone name used to compute `datetime`s;
           the default is inferred from the default time zone
-          using the `get_default_timezone_name` method
+          using the `get_default_timezone_name` function
     '''
     if timezone is None:
-      timezone = self.get_default_timezone_name()
+      timezone = get_default_timezone_name()
     self.timezone = timezone
 
   @staticmethod
