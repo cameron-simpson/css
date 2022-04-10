@@ -476,6 +476,22 @@ class TimeSeries(MultiOpenMixin):
       self._modified = True
       assert len(ary) == ary_index + 1
 
+
+  def as_pd_series(self, start=None, end=None, tzname: Optional[str] = None):
+    ''' Return a `pandas.Series` containing the data from `start` to `end`,
+        default from `self.start` and `self.end` respectively.
+    '''
+    if start is None:
+      start = self.start
+    if end is None:
+      end = self.end
+    if tzname is None:
+      tzname = get_default_timezone_name()
+    ary = self.array
+    data = ary[self.array_index(start):self.array_index(end)]
+    indices = (datetime64(t, 's') for t in range(start, end, self.step))
+    series = PDSeries(data, indices)
+    return series
 class TimespanPolicy(ABC):
 
   @typechecked
