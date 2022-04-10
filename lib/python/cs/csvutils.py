@@ -48,7 +48,8 @@ if sys.hexversion >= 0x03000000:
         Warning: _ignores_ the `encoding` and `errors` parameters
         because `fp` should already be decoded.
     '''
-    return csv.reader(fp, **kw)
+    for row in csv.reader(fp, **kw):
+      yield row
 
   def csv_writerow(csvw, row, encoding='utf-8'):
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
