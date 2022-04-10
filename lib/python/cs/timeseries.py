@@ -74,6 +74,73 @@ class TimeSeriesCommand(BaseCommand):
   ''' Command line interface to `TimeSeries` data files.
   '''
 
+  SUBCOMMAND_ARGV_DEFAULT = 'test'
+
+  def cmd_test(self, argv):
+    if not argv:
+      argv = ['pandas']
+    testname = argv.pop(0)
+
+    def test_pandas():
+      t0 = 1649552238
+      fspath = f'foo--from-{t0}.dat'
+      ts = TimeSeries(fspath, 'd', t0, 1)
+      ary = ts.array
+      ts.pad_to(time.time() + 300)
+      print("len(ts) =", len(ts))
+      pds = ts.as_pd_series()
+      print(type(pds), pds.memory_usage())
+      print(pds)
+
+    def test_tagged_spans():
+      policy = DailyPolicy()
+      start = time.time()
+      end = time.time() + 7 * 24 * 3600
+      print("start =", Arrow.fromtimestamp(start))
+      print("end =", Arrow.fromtimestamp(end))
+      for tag, tag_start, tag_end in policy.tagged_spans(start, end):
+        print(
+            tag, Arrow.fromtimestamp(tag_start), Arrow.fromtimestamp(tag_end)
+        )
+
+    def test_datadir():
+      with TimeSeriesDataDir('tsdatadir', policy=DailyPolicy(),
+                             step=300) as datadir:
+        ts = datadir.ts('key1', time.time())
+        datadir['key2', time.time()] = 9.0
+
+    def test_timespan_policy():
+      policy = MonthlyPolicy()
+      policy.timespan_for(time.time())
+      X("monthly tag = %r", policy.timespan_tag(time.time()))
+
+    def test_timeseries():
+      t0 = 1649464235
+      fspath = 'foo.dat'
+      ts = TimeSeries(fspath, 'd', t0, 1)
+      ary = ts.array
+      print(ary)
+      ts.pad_to(time.time() + 300)
+      print(ary)
+      ts.save()
+
+    testfunc_map = {
+        'datadir': test_datadir,
+        'pandas': test_pandas,
+        'tagged_spans': test_tagged_spans,
+        'timeseries': test_timeseries,
+        'timespan_policy': test_timespan_policy,
+    }
+    with Pfx(testname):
+      try:
+        testfunc = testfunc_map[testname]
+      except KeyError:
+        raise GetoptError(
+            "unknown test name, I expected one of: %s" %
+            (", ".join(sorted(testfunc_map.keys())),)
+        )
+      return testfunc()
+
 @require(lambda typecode: typecode in SUPPORTED_TYPECODES)
 def struct_format(typecode, bigendian):
   ''' Return a `struct` format string for the supplied `typecode` and big endianness.
