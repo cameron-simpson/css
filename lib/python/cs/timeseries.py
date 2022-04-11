@@ -31,7 +31,7 @@ from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod
-from cs.fs import HasFSPath, is_clean_subpath
+from cs.fs import HasFSPath, is_clean_subpath, shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call, Pfx
@@ -472,6 +472,8 @@ class TimeSeries(MultiOpenMixin):
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.pad_to(when)
+    assert isinstance(value,
+                      (int, float)), "value is a %s:%r" % (type(value), value)
     self.array[self.array_index(when)] = value
     self.modified = True
 
