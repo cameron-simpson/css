@@ -62,6 +62,13 @@ class SPLinkCSVDir(HasFSPath):
   def __init__(self, dirpath):
     super().__init__(dirpath)
 
+  @property
+  @cachedmethod
+  def sitename(self):
+    ''' The site name inferred from a CSV data filename.
+    '''
+    return self.fnmatch('?*_*_*.CSV')[0].split('_', 1)[0]
+
   @pfx
   def csvpath(self, which: str) -> str:
     ''' Return the CSV filename specified by `which`.
