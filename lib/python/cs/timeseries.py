@@ -121,7 +121,6 @@ class TimeSeriesCommand(BaseCommand):
     def test_timespan_policy():
       policy = TimespanPolicyMonthly()
       policy.timespan_for(time.time())
-      X("monthly tag = %r", policy.timespan_tag(time.time()))
 
     def test_timeseries():
       t0 = 1649464235
@@ -267,6 +266,12 @@ class TimeSeries(MultiOpenMixin):
     self._struct = Struct(struct_fmt)
     assert self._struct.size == self._itemsize
     self.modified = False
+
+  def __str__(self):
+    return "%s(%s,%r,%d:%d,%r)" % (
+        type(self).__name__, shortpath(self.fspath), self.typecode, self.start,
+        self.step, self.fill
+    )
 
   @contextmanager
   def startup_shutdown(self):
@@ -629,6 +634,11 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     self.step = step
     self._tsks_by_key = {}
 
+  def __str__(self):
+    return "%s(%s,%s,%s)" % (
+        type(self).__name__, shortpath(self.fspath), self.step, self.policy
+    )
+
   @contextmanager
   def startup_shutdown(self):
     yield
@@ -692,6 +702,15 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
     self.policy = policy
     self.step = step
     self._ts_by_tag = {}
+
+  def __str__(self):
+    return "%s(%s,%r,%s,%s)" % (
+        type(self).__name__,
+        shortpath(self.fspath),
+        self.typecode,
+        self.step,
+        self.policy,
+    )
 
   @contextmanager
   def startup_shutdown(self):
