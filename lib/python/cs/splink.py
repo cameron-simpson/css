@@ -38,15 +38,14 @@ class SPLinkCommand(BaseCommand):
     tsd = TimeSeriesDataDir(tsdirpath, step=900, policy=TimespanPolicyAnnual())
     import_csv_data(csv_dirpath, tsd)
 
-def ts2000_unixtime(tzname=None):
-  ''' Convert an SP-Link seconds-since-2000-01-01-local-time offset
+def ts2001_unixtime(tzname=None):
+  ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
       into a UNIX time.
   '''
   if tzname is None:
     tzname = 'local'
-  a2000 = arrow.get(datetime(2000, 1, 1, 0, 0, 0), tzname)
-  unixtime = a2000.timestamp()
-  X("a2000 %s, unixtime %s", a2000, unixtime)
+  a2001 = arrow.get(datetime(2001, 1, 1, 0, 0, 0), tzname)
+  unixtime = a2001.timestamp()
   return unixtime
 
 def import_csv_data(csv_dirpath: str, tsd: TimeSeriesDataDir, tzname=None):
@@ -70,12 +69,12 @@ def import_csv_data(csv_dirpath: str, tsd: TimeSeriesDataDir, tzname=None):
   for row in rows:
     for key, value in zip(keys, row):
       if key == key0:
-        # seconds since 2000-01-01; make UNIX time
-        value = int(value) + ts2000
       else:
         try:
           value = int(value)
         except ValueError:
+          # seconds since 2001-01-01; make UNIX time
+          value = int(value) + ts2001
           try:
             value = float(value)
           except ValueError:
