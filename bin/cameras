@@ -53,8 +53,9 @@ usage="Usage: $cmd [options...] [--] op [args...]
       Move all snapshot images prior to today into subdirectories by day.
     poll [names...]
       Fetch camera images.
-    process [{name|directory}...]
-      Compile per-day MP4 files for all collated subdirectories."
+    process [--purge] [{name|directory}...]
+      Compile per-day MP4 files for all collated subdirectories.
+      --purge  Remove the source image files for successful MP4s."
 
 badopts=
 
@@ -88,7 +89,12 @@ else
   op=$1
   shift
   case $op in
-    collate | poll | process )
+    process )
+        do_purge=
+        [ $# -gt 0 ] && [ "x$1" = 'x--purge' ] && { do_purge=1; shift; }
+        names=$*
+        ;;
+    collate | poll )
         names=$*
         ;;
     *)  echo "$cmd: unrecognised op: $op" >&2
@@ -177,7 +183,7 @@ do
                 [ -d "$date" ] || continue
                 video=$date.mp4
                 ls -ldL "$compiled/$video" 2>&$vout && continue
-                (
+                if (
                   set -ue
                   subxit=0
                   cd "$date"
@@ -208,10 +214,13 @@ do
                   $trace touch -d "$date" "$video"
                   $trace mv "$video" "$compiled/"
                   exit $subxit
-                ) || {
+                )
+                then
+                  [ $do_purge ] && $trace rm -r "$date" || xit=1
+                else
                   echo "VIDEO FAILED FOR $video" >&2
                   xit=1
-                }
+                fi
                 [ $once ] && break
               done
               exit $xit

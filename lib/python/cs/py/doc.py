@@ -15,7 +15,7 @@ from cs.logutils import warning
 from cs.pfx import Pfx
 from cs.py.modules import module_attributes
 
-__version__ = '20200718-post'
+__version__ = '20220311-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -46,6 +46,9 @@ def module_doc(
         default: `name`
       * filter_key`: optional test for a key used to select or reject keys
         to appear in the documentation
+      * `method_names`: optional list of method names to document;
+        the default is to document `__init__`, then CONSTANTS, the
+        dunders, then other public names
   '''
   if isinstance(module, str):
     module_name = module
@@ -82,7 +85,7 @@ def module_doc(
               supername = supermod.__name__ + '.' + supername
             mro_names.append(supername)
         if mro_names:
-          classname_etc += '(' + ','.join(mro_names) + ')'
+          classname_etc += '(' + ', '.join(mro_names) + ')'
           ##obj_doc = 'MRO: ' + ', '.join(mro_names) + '  \n' + obj_doc
         seen_names = set()
         direct_attrs = dict(obj.__dict__)
@@ -119,19 +122,19 @@ def module_doc(
             attr_doc = obj_docstring(attr)
             if not attr_doc:
               continue
-            # Class.name is a function, not a (bound?) method
+            # Class.name is a function, not a method
             if ismethod(attr) or isfunction(attr):
               method_sig = signature(attr)
-              obj_doc += f'\n\n### Method `{Mname}.{attr_name}{method_sig}`\n\n{attr_doc}'
+              obj_doc += f'\n\n*Method `{Mname}.{attr_name}{method_sig}`*:\n{attr_doc}'
             elif isdatadescriptor(attr):
-              obj_doc += f'\n\n### Property `{Mname}.{attr_name}`\n\n{attr_doc}'
+              obj_doc += f'\n\n*Property `{Mname}.{attr_name}`*:\n{attr_doc}'
             elif not callable(attr):
-              ##obj_doc += f'\n\n### `{Mname}.{attr_name} = {repr(attr)}`\n\n{attr_doc}'
+              ##obj_doc += f'\n\n*`{Mname}.{attr_name} = {repr(attr)}`*:\n{attr_doc}'
               pass
             elif isinstance(attr, property):
-              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\n{attr_doc}'
+              obj_doc += f'\n\n*`{Mname}.{attr_name}`*:\n{attr_doc}'
             else:
-              obj_doc += f'\n\n### `{Mname}.{attr_name}`\n\nSKIP DOC: {attr_doc}'
+              obj_doc += f'\n\n*`{Mname}.{attr_name}`*'
         full_doc += f'\n\n## Class `{classname_etc}`\n\n{obj_doc}'
       else:
         warning("UNHANDLED %r, neither function nor class", Mname)

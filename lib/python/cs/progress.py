@@ -3,7 +3,7 @@
 # Progress counting.
 #   - Cameron Simpson <cs@cskk.id.au> 15feb2015
 #
-# pylint: disable=(too-many-lines)
+# pylint: disable=too-many-lines
 #
 
 ''' A progress tracker with methods for throughput, ETA and update notification;
@@ -14,7 +14,9 @@ from collections import namedtuple
 from contextlib import contextmanager
 import functools
 import sys
+from threading import RLock
 import time
+from typing import Optional
 from cs.deco import decorator
 from cs.logutils import debug, exception
 from cs.py.func import funcname
@@ -29,7 +31,9 @@ from cs.units import (
 )
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
-__version__ = '20200718.3-post'
+from typeguard import typechecked
+
+__version__ = '20211208-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -37,8 +41,15 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires':
-    ['cs.deco', 'cs.logutils', 'cspy.func', 'cs.seq', 'cs.units', 'cs.upd'],
+    'install_requires': [
+        'cs.deco',
+        'cs.logutils',
+        'cs.py.func',
+        'cs.seq',
+        'cs.units',
+        'cs.upd',
+        'typeguard',
+    ],
 }
 
 # default to 5s of position buffer for computing recent thoroughput
@@ -75,7 +86,9 @@ class BaseProgress(object):
     self.name = name
     self.start_time = start_time
     self.units_scale = units_scale
+    self.notify_update = set()
     self._warned = set()
+    self._lock = RLock()
 
   def __str__(self):
     return "%s[start=%s:pos=%s:total=%s]" \
@@ -84,7 +97,7 @@ class BaseProgress(object):
   __repr__ = __str__
 
   def __int__(self):
-    ''' int(Progress) returns the current position.
+    ''' `int(Progress)` returns the current position.
     '''
     return self.position
 
@@ -117,7 +130,7 @@ class BaseProgress(object):
         Example:
 
             >>> P = Progress()
-            >>> P.ratio
+             P.ratio
             >>> P.total = 16
             >>> P.ratio
             0.0
@@ -203,7 +216,7 @@ class BaseProgress(object):
   def eta(self):
     ''' The projected time of completion: now + `remaining_time`.
 
-        If `reamining_time` is `None`, this is also `None`.
+        If `remaining_time` is `None`, this is also `None`.
     '''
     remaining = self.remaining_time
     if remaining is None:
@@ -267,38 +280,56 @@ class BaseProgress(object):
     total_text = fmt_pos(self.total)
     return fmt.format(pos_text=pos_text, total_text=total_text)
 
-  def status(self, label, width):
+  # pylint: disable=too-many-branches,too-many-statements
+  def status(self, label, width, window=None):
     ''' A progress string of the form:
         *label*`: `*pos*`/`*total*` ==>  ETA '*time*
+
+        Parameters:
+        * `label`: the label for the status line;
+          if `None` use `self.name`
+        * `width`: the available width for the status line;
+          if not an `int` use `width.width`
+        * `window`: optional timeframe to define "recent" in seconds,
+          default : `5`
     '''
-    from cs.upd import print
-    left = ''
-    remaining = self.remaining_time
-    if remaining:
-      remaining = int(remaining)
-    throughput = self.throughput_recent(5)
+    if label is None:
+      label = self.name
+    if not isinstance(width, int):
+      width = width.width
+    if window is None:
+      window = 5
+    leftv = []
+    rightv = []
+    throughput = self.throughput_recent(window)
     if throughput is not None:
       if throughput == 0:
         if self.total is not None and self.position >= self.total:
-          left = 'idle'
-          return left
-        left = 'stalled'
+          return 'idle'
+        rightv.append('stalled')
       else:
         if throughput >= 10:
           throughput = int(throughput)
-        left = self.format_counter(throughput, max_parts=1) + '/s'
+        rightv.append(self.format_counter(throughput, max_parts=1) + '/s')
+      remaining = self.remaining_time
+      if remaining:
+        remaining = int(remaining)
+      if remaining is not None:
+        rightv.append('ETA ' + transcribe_time(remaining))
     if self.total is not None and self.total > 0:
-      left += ' ' + self.text_pos_of_total()
-    if remaining is None:
-      right = 'ETA ??'
+      leftv.append(self.text_pos_of_total())
     else:
-      right = 'ETA ' + transcribe_time(remaining)
+      leftv.append(self.format_counter(self.position))
+    left = ' '.join(leftv)
+    right = ' '.join(rightv)
     if self.total is None:
       arrow_field = ' '
     else:
       # how much room for an arrow? we would like:
       # "label: left arrow right"
-      arrow_width = width - len(left) - len(right) - len(label) - 4
+      arrow_width = width - len(left) - len(right) - len(label) - 2
+      if label:
+        arrow_width -= 2  # allow for ': ' separator after label
       if arrow_width < 1:
         # no room for an arrow
         arrow_field = ':'
@@ -334,16 +365,18 @@ class BaseProgress(object):
   def bar(
       self,
       label=None,
+      *,
       upd=None,
       proxy=None,
       statusfunc=None,
       width=None,
+      window=None,
       report_print=None,
       insert_pos=1,
       deferred=False,
   ):
     ''' A context manager to create and withdraw a progress bar.
-       It yields the `UpdProxy` which displays the progress bar.
+        It returns the `UpdProxy` which displays the progress bar.
 
         Parameters:
         * `label`: a label for the progress bar,
@@ -355,9 +388,12 @@ class BaseProgress(object):
           which uses `sys.stderr` for display.
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
+        * `window`: optional timeframe to define "recent" in seconds;
+          if the default `statusfunc` (`Progress.status`) is used
+          this is passed to it
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
@@ -381,7 +417,9 @@ class BaseProgress(object):
     if upd is None:
       upd = Upd()
     if statusfunc is None:
-      statusfunc = lambda P, label, width: P.status(label, width)
+      statusfunc = lambda P, label, width: P.status(
+          label, width, window=window
+      )
     pproxy = [proxy]
     proxy_delete = proxy is None
 
@@ -396,7 +434,7 @@ class BaseProgress(object):
         if proxy is None:
           proxy = pproxy[0] = upd.insert(insert_pos)
         status = statusfunc(self, label, width or proxy.width)
-        proxy(statusfunc(self, label, width or proxy.width))
+        proxy(status)
       self.notify_update.add(update)
       start_pos = self.position
       yield pproxy[0]
@@ -414,7 +452,7 @@ class BaseProgress(object):
           )
       )
 
-  # pylint: disable=too-many-arguments
+  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals
   def iterbar(
       self,
       it,
@@ -425,8 +463,11 @@ class BaseProgress(object):
       statusfunc=None,
       incfirst=False,
       width=None,
-      update_frequency=None,
+      window=None,
+      update_frequency=1,
+      update_min_size=None,
       report_print=None,
+      runstate=None,
   ):
     ''' An iterable progress bar: a generator yielding values
         from the iterable `it` while updating a progress bar.
@@ -442,12 +483,15 @@ class BaseProgress(object):
           This reflects whether it is considered that progress is
           made as items are obtained or only after items are processed
           by whatever is consuming this generator.
-          The default is `False`,
+          The default is `False`, advancing after processing.
         * `label`: a label for the progress bar,
           default from `self.name`.
-        * `width`: an optional width expressioning how wide the progress bar
+        * `width`: an optional width expressing how wide the progress bar
           text may be.
           The default comes from the `proxy.width` property.
+        * `window`: optional timeframe to define "recent" in seconds;
+          if the default `statusfunc` (`Progress.status`) is used
+          this is passed to it
         * `statusfunc`: an optional function to compute the progress bar text
           accepting `(self,label,width)`.
         * `proxy`: an optional proxy for displaying the progress bar,
@@ -458,13 +502,17 @@ class BaseProgress(object):
           used only to produce the default `proxy` if that is not supplied.
           The default `upd` is `cs.upd.Upd()`
           which uses `sys.stderr` for display.
-        * `update_frequency`: optional update frequency;
+        * `update_frequency`: optional update frequency, default `1`;
+          only update the progress bar after this many iterations,
+          useful if the iteration rate is quite high
+        * `update_min_size`: optional update step size;
           only update the progress bar after an advance of this many units,
-          useful if the iteration rate is very high
+          useful if the iteration size increment is quite small
         * `report_print`: optional `print` compatible function
           with which to write a report on completion;
           this may also be a `bool`, which if true will use `Upd.print`
           in order to interoperate with `Upd`.
+        * `runstate`: optional `RunState` whose `.cancelled` property can be consulted
 
         Example use:
 
@@ -483,7 +531,7 @@ class BaseProgress(object):
                         break
                     yield bs
             P = Progress(total=datalen)
-            for bs in P.iterbar(readfrom(f, itemlenfunc=len)):
+            for bs in P.iterbar(readfrom(f), itemlenfunc=len):
                 ... process the file data in bs ...
     '''
     if label is None:
@@ -495,31 +543,47 @@ class BaseProgress(object):
       proxy = upd.insert(1)
       delete_proxy = True
     if statusfunc is None:
-      statusfunc = lambda P, label, width: P.status(label, width)
-    proxy(statusfunc(self, label, width or proxy.width))
-    last_pos = start_pos = self.position
-    for i in it:
-      length = itemlenfunc(i) if itemlenfunc else 1
+      statusfunc = lambda P, label, width: P.status(
+          label, width, window=window
+      )
+    iteration = 0
+    last_update_iteration = 0
+    last_update_pos = start_pos = self.position
+
+    def update_status(force=False):
+      nonlocal self, proxy, statusfunc, label, width
+      nonlocal iteration, last_update_iteration, last_update_pos
+      if (force or iteration - last_update_iteration >= update_frequency
+          or (update_min_size is not None
+              and self.position - last_update_pos >= update_min_size)):
+        last_update_iteration = iteration
+        last_update_pos = self.position
+        proxy(statusfunc(self, label, width or proxy.width))
+
+    update_status(True)
+    for iteration, item in enumerate(it):
+      length = itemlenfunc(item) if itemlenfunc else 1
       if incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
-      yield i
+        update_status()
+      yield item
       if not incfirst:
         self += length
-      if not update_frequency or self.position >= last_pos + update_frequency:
-        proxy(statusfunc(self, label, width or proxy.width))
-        last_pos = self.position
+        update_status()
+      if runstate is not None and runstate.cancelled:
+        break
     if delete_proxy:
       proxy.delete()
     else:
-      proxy(statusfunc(self, label, width or proxy.width))
+      update_status(True)
     if report_print:
       if isinstance(report_print, bool):
         report_print = print
       report_print(
-          label + ':', self.format_counter(self.position - start_pos), 'in',
+          label + (
+              ': (cancelled)'
+              if runstate is not None and runstate.cancelled else ':'
+          ), self.format_counter(self.position - start_pos), 'in',
           transcribe(
               self.elapsed_time, TIME_SCALE, max_parts=2, skip_zero=True
           )
@@ -568,14 +632,16 @@ class Progress(BaseProgress):
   '''
 
   # pylint: disable=too-many-arguments
+  @typechecked
   def __init__(
       self,
-      position=None,
-      name=None,
-      start=None,
-      start_time=None,
-      throughput_window=None,
-      total=None,
+      name: Optional[str] = None,
+      *,
+      position: Optional[int] = None,
+      start: Optional[int] = None,
+      start_time: Optional[float] = None,
+      throughput_window: Optional[int] = None,
+      total: Optional[int] = None,
       units_scale=None,
   ):
     ''' Initialise the Progesss object.
@@ -610,7 +676,6 @@ class Progress(BaseProgress):
       positions.append(CheckPoint(time.time(), position))
     self._positions = positions
     self._flushed = True
-    self.notify_update = set()
 
   def __repr__(self):
     return "%s(name=%r,start=%s,position=%s,start_time=%s,throughput_window=%s,total=%s):%r" \
@@ -737,11 +802,14 @@ class Progress(BaseProgress):
         )
       oldest = time.time() - window
     positions = self._positions
-    # scan for first item still in time window
-    for ndx, posn in enumerate(positions):
+    # scan for first item still in time window,
+    # never discard the last 2 positions
+    for ndx in range(0, len(positions) - 1):
+      posn = positions[ndx]
       if posn.time >= oldest:
-        if ndx > 0:
-          del positions[0:ndx]
+        # this is the first element to keep, discard preceeding (if any)
+        # note we can't just start at ndx=1 because ndx=0 might be in range
+        del positions[0:ndx]
         break
     self._flushed = True
 
@@ -771,6 +839,10 @@ class Progress(BaseProgress):
       )
     if not self._flushed:
       self._flush()
+    positions = self._positions
+    if len(positions) == 1 and positions[0].time == self.start_time:
+      # no throughput if we only have the starting position
+      return None
     now = time.time()
     time0 = now - time_window
     if time0 < self.start_time:
@@ -800,6 +872,11 @@ class Progress(BaseProgress):
 
 class OverProgress(BaseProgress):
   ''' A `Progress`-like class computed from a set of subsidiary `Progress`es.
+
+      AN OverProgress instance has an attribute ``notify_update`` which
+      is a set of callables.
+      Whenever the position of a subsidiary `Progress` is updated,
+      each of these will be called with the `Progress` instance and `None`.
 
       Example:
 
@@ -839,6 +916,9 @@ class OverProgress(BaseProgress):
     BaseProgress.__init__(
         self, name=name, start_time=start_time, units_scale=units_scale
     )
+    # we use these to to accrue removed subprogresses (optional)
+    self._base_total = 0
+    self._base_position = 0
     self.subprogresses = set()
     if subprogresses:
       for subP in subprogresses:
@@ -851,15 +931,39 @@ class OverProgress(BaseProgress):
             self.start, self.position, self.start_time,
             self.total)
 
+  def _updated(self):
+    with self._lock:
+      notifiers = list(self.notify_update)
+    for notify in notifiers:
+      try:
+        notify(self, None)
+      except Exception as e:  # pylint: disable=broad-except
+        exception("%s: notify_update %s: %s", self, notify, e)
+
+  # pylint: disable=unused-argument
+  def _child_updated(self, child, _):
+    ''' Notify watchers if a child updates.
+    '''
+    self._updated()
+
   def add(self, subprogress):
     ''' Add a subsidairy `Progress` to the contributing set.
     '''
-    self.subprogresses.add(subprogress)
+    with self._lock:
+      subprogress.notify_update.add(self._child_updated)
+      self.subprogresses.add(subprogress)
+      self._updated()
 
-  def remove(self, subprogress):
+  def remove(self, subprogress, accrue=False):
     ''' Remove a subsidairy `Progress` from the contributing set.
     '''
-    self.subprogresses.remove(subprogress)
+    with self._lock:
+      subprogress.notify_update.remove(self._child_updated)
+      self.subprogresses.remove(subprogress)
+      if accrue:
+        self._base_position += subprogress.position - subprogress.start
+        self._base_total += subprogress.total
+      self._updated()
 
   @property
   def start(self):
@@ -872,8 +976,10 @@ class OverProgress(BaseProgress):
         computed from the subsidiary `Progress`es.
         Return the maximum, or `None` if there are no non-`None` values.
     '''
+    with self._lock:
+      children = list(self.subprogresses)
     maximum = None
-    for value in filter(fnP, self.subprogresses):
+    for value in filter(fnP, children):
       if value is not None:
         maximum = value if maximum is None else max(maximum, value)
     return maximum
@@ -882,8 +988,10 @@ class OverProgress(BaseProgress):
     ''' Sum non-`None` values computed from the subsidiary `Progress`es.
         Return the sum, or `None` if there are no non-`None` values.
     '''
+    with self._lock:
+      children = list(self.subprogresses)
     summed = None
-    for value in map(fnP, self.subprogresses):
+    for value in map(fnP, children):
       if value is not None:
         summed = value if summed is None else summed + value
     return summed
@@ -893,13 +1001,19 @@ class OverProgress(BaseProgress):
     ''' The `position` is the sum off the subsidiary position offsets
         from their respective starts.
     '''
-    return self._oversum(lambda P: P.position - P.start)
+    pos = self._oversum(lambda P: P.position - P.start)
+    if pos is None:
+      pos = 0
+    return self._base_position + pos
 
   @property
   def total(self):
     ''' The `total` is the sum of the subsidiary totals.
     '''
-    return self._oversum(lambda P: P.total)
+    total = self._oversum(lambda P: P.total)
+    if total is None:
+      total = 0
+    return self._base_total + total
 
   @property
   def throughput(self):
@@ -918,12 +1032,22 @@ class OverProgress(BaseProgress):
     '''
     return self._overmax(lambda P: P.eta)
 
-def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
-  ''' Convenience function to construct and run a `Progress.iterbar`.
+def progressbar(
+    it,
+    label=None,
+    position=None,
+    total=None,
+    units_scale=UNSCALED_SCALE,
+    **kw
+):
+  ''' Convenience function to construct and run a `Progress.iterbar`
+      wrapping the iterable `it`,
+      issuing and withdrawning a progress bar during the iteration.
 
       Parameters:
       * `it`: the iterable to consume
       * `label`: optional label, doubles as the `Progress.name`
+      * `position`: optional starting position
       * `total`: optional value for `Progress.total`,
         default from `len(it)` if supported.
       * `units_scale`: optional units scale for `Progress`,
@@ -945,14 +1069,16 @@ def progressbar(it, label=None, total=None, units_scale=UNSCALED_SCALE, **kw):
     except TypeError:
       total = None
   yield from Progress(
-      name=label, total=total, units_scale=units_scale
+      name=label, position=position, total=total, units_scale=units_scale
   ).iterbar(
       it, label=label, **kw
   )
+  ##pass  # former workaround for some bug, IIRC
 
 @decorator
 def auto_progressbar(func, label=None, report_print=False):
-  ''' Decorator for function which accept an optional `progress` parameter.
+  ''' Decorator for a function accepting an optional `progress`
+      keyword parameter.
       If `progress` is `None` and the default `Upd` is not disabled,
       run the function with a progress bar.
   '''
@@ -983,16 +1109,25 @@ def auto_progressbar(func, label=None, report_print=False):
 def selftest(argv):
   ''' Exercise some of the functionality.
   '''
-  lines = open(__file__).readlines()
+  with open(__file__) as f:
+    lines = f.readlines()
   lines += lines
   for _ in progressbar(lines, "lines"):
+    time.sleep(0.005)
+  for _ in progressbar(lines, "blines", units_scale=BINARY_BYTES_SCALE,
+                       itemlenfunc=len):
     time.sleep(0.005)
   for _ in progressbar(lines, "lines step 100", update_frequency=100,
                        report_print=True):
     time.sleep(0.005)
-  P = Progress(name=__file__, total=len(lines), units_scale=DECIMAL_SCALE)
-  for _ in P.iterbar(open(__file__)):
-    time.sleep(0.005)
+  P = Progress(
+      name=__file__,
+      ##total=len(lines),
+      units_scale=DECIMAL_SCALE,
+  )
+  with open(__file__) as f:
+    for _ in P.iterbar(f):
+      time.sleep(0.005)
   from cs.debug import selftest as runtests  # pylint: disable=import-outside-toplevel
   runtests('cs.progress_tests')
 

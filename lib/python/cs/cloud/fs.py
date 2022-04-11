@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-''' BackBlaze B2 support.
+''' Filesystem support.
 '''
 
 import errno
@@ -30,15 +30,15 @@ class FSCloud(SingletonMixin, Cloud):
 
   @staticmethod
   @require(lambda credentials: credentials is None)
-  def _singleton_key(credentials):
+  def _singleton_key(credentials, max_connections=None):
     return credentials
 
   @require(lambda credentials: credentials is None)
-  def __init__(self, credentials):
+  def __init__(self, credentials, max_connections=None):
     assert credentials is None
     if hasattr(self, 'credentials'):
       return
-    super().__init__(credentials)
+    super().__init__(credentials, max_connections=max_connections)
 
   def __str__(self):
     return f"{self.PREFIX}:///"
@@ -97,7 +97,7 @@ class FSCloud(SingletonMixin, Cloud):
     '''
     if file_info or content_type:
       with FSTags() as fstags:
-        tags = fstags[filename].direct_tags
+        tags = fstags[filename]
         if content_type:
           tags['mime.content_type'] = content_type
         if file_info:
@@ -112,7 +112,7 @@ class FSCloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
       as_is: bool = False,
   ):
     ''' Upload the data from the file named `filename`
@@ -127,7 +127,8 @@ class FSCloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -169,7 +170,7 @@ class FSCloud(SingletonMixin, Cloud):
         path=path,
         file_info=file_info,
         content_type=content_type,
-        progress=progress,
+        upload_progress=upload_progress,
         as_is=as_is
     )
 
@@ -182,7 +183,7 @@ class FSCloud(SingletonMixin, Cloud):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`,
         which means to the file `/`*bucket_name*`/`*path*.
@@ -194,7 +195,8 @@ class FSCloud(SingletonMixin, Cloud):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     dst_filename = os.sep + joinpath(bucket_name, path)
     dirpath = dirname(dst_filename)
@@ -206,8 +208,8 @@ class FSCloud(SingletonMixin, Cloud):
       with open(dst_filename, 'wb') as f:
         for bs in bfr:
           f.write(bs)
-          if progress is not None:
-            progress += len(bs)
+          if upload_progress is not None:
+            upload_progress += len(bs)
     self._apply_file_info(
         dst_filename, file_info=file_info, content_type=content_type
     )
@@ -222,7 +224,7 @@ class FSCloud(SingletonMixin, Cloud):
       *,
       bucket_name: str,
       path: str,
-      progress=None,  # pylint: disable=unused-argument
+      download_progress=None,  # pylint: disable=unused-argument
   ) -> (CornuCopyBuffer, dict):
     ''' Download from `path` within `bucket_name`,
         returning `(buffer,file_info)`
@@ -232,12 +234,13 @@ class FSCloud(SingletonMixin, Cloud):
         Parameters:
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `download_progress`: an optional `cs.progress.Progress` instance
+          to which to report download data
     '''
     filename = os.sep + joinpath(bucket_name, path)
     with Pfx("open(%r)", filename):
       with open(filename, 'rb') as f:
-        bfr = CornuCopyBuffer.from_fd(f.fileno())
+        bfr = CornuCopyBuffer.from_fd(f.fileno(), progress=download_progress)
     with FSTags() as fstags:
-      file_info = dict(fstags[filename].direct_tags)
+      file_info = fstags[filename].as_dict()
     return bfr, file_info

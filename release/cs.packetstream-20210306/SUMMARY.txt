@@ -1,0 +1,2 @@
+Port to new cs.binary.Binary* classes.
+Some refactors and small fixes.

@@ -1,0 +1,2 @@
+lib/python/cs/timeutils.py: cs.timeutils: tweak definition of TimeoutError, autoformat
+lib/python/cs/timeutils.py: move the TimeoutError definiton from cs.timeutils to cs.gimmicks

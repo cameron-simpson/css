@@ -1,0 +1,4 @@
+lib/python/cs/lex.py: cs.lex: new strip_prefix_n() function to strip a leading `prefix` and numeric value `n` from the start of a string, will be used to trip episode names from playon and the like
+lib/python/cs/lex.py: cs.lex: FormatableFormatter.get_field: break out the get_subfield during debug
+lib/python/cs/lex.py: merge default ==> tagsets
+lib/python/cs/lex.py: merge tagsets ==> default: merge tagsets ==> default in playon dev tree

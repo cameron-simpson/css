@@ -1,0 +1,1 @@
+lib/python/cs/py/doc.py: cs.py.doc: drop SKIP DOC commentry leaked into output

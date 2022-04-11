@@ -85,11 +85,16 @@ class ParsedCloudPath(namedtuple('ParsedCloudPath',
         self.cloud.bucketpath(self.bucket_name), self.subpath or ""
     )
 
+  def new_cloud(self, **kw):
+    ''' Make a new `Cloud` instance using the supplied keyword parameters `kw`.
+    '''
+    return self.cloudcls(self.credentials, **kw)
+
   @property
   def cloud(self):
-    ''' The cloud service supporting this path.
+    ''' The default cloud service supporting this path.
     '''
-    return self.cloudcls(self.credentials)
+    return self.new_cloud()
 
 class Cloud(ABC):
   ''' A cloud storage service.
@@ -104,6 +109,7 @@ class Cloud(ABC):
       raise ValueError("max_connections:%s < 1" % (max_connections,))
     self.credentials = credentials
     self._lock = RLock()
+    self.max_connections = max_connections
     self._conn_sem = Semaphore(max_connections)
 
   @staticmethod
@@ -114,7 +120,12 @@ class Cloud(ABC):
     '''
     module_name = __name__ + '.' + prefix
     class_name = prefix.upper() + 'Cloud'
-    return import_module_name(module_name, class_name)
+    try:
+      return import_module_name(module_name, class_name)
+    except (ModuleNotFoundError, ImportError) as e:
+      raise ValueError(
+          "no module %r for cloud service %r" % (module_name, prefix)
+      ) from e
 
   @abstractmethod
   def bucketpath(self, bucket_name, *, credentials=None):
@@ -181,7 +192,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bfr` to `path` within `bucket_name`.
 
@@ -191,7 +202,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     raise NotImplementedError("upload_buffer")
 
@@ -204,7 +216,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload bytes from `bs` to `path` within `bucket_name`.
 
@@ -216,7 +228,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     return self.upload_buffer(
         CornuCopyBuffer([bs]),
@@ -224,7 +237,7 @@ class Cloud(ABC):
         path=path,
         file_info=file_info,
         content_type=content_type,
-        progress=progress
+        upload_progress=upload_progress
     )
 
   @pfx_method
@@ -236,7 +249,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
       as_is: bool = False,  # pylint: disable=unused-argument
   ):
     ''' Upload the data from the file named `filename`
@@ -251,7 +264,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
         * `as_is`: an optional flag indicating that the supplied filename
           refers to a file whose contents will never be modified
           (though it may be unlinked); default `False`
@@ -269,7 +283,7 @@ class Cloud(ABC):
             path=path,
             file_info=file_info,
             content_type=content_type,
-            progress=progress,
+            upload_progress=upload_progress,
         )
 
   def upload_file(
@@ -280,7 +294,7 @@ class Cloud(ABC):
       path: str,
       file_info=None,
       content_type=None,
-      progress=None,
+      upload_progress=None,
   ):
     ''' Upload the data from the file `f` to `path` within `bucket_name`.
         Return a `dict` containing the upload result.
@@ -293,7 +307,8 @@ class Cloud(ABC):
         * `path`: the subpath within the bucket
         * `file_info`: an optional mapping of extra information about the file
         * `content_type`: an optional MIME content type value
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `upload_progress`: an optional `cs.progress.Progress` instance
+          to which to report upload data
     '''
     return self.upload_buffer(
         CornuCopyBuffer.from_file(f),
@@ -301,7 +316,7 @@ class Cloud(ABC):
         path=path,
         file_info=file_info,
         content_type=content_type,
-        progress=progress,
+        upload_progress=upload_progress,
     )
 
   # pylint: disable=too-many-arguments
@@ -311,7 +326,7 @@ class Cloud(ABC):
       *,
       bucket_name: str,
       path: str,
-      progress=None,
+      download_progress=None,
   ):
     ''' Download from `path` within `bucket_name`,
         returning `(buffer,file_info)`
@@ -321,7 +336,8 @@ class Cloud(ABC):
         Parameters:
         * `bucket_name`: the bucket name
         * `path`: the subpath within the bucket
-        * `progress`: an optional `cs.progress.Progress` instance
+        * `download_progress`: an optional `cs.progress.Progress` instance
+          to which to report download data
     '''
     raise NotImplementedError("download_buffer")
 
@@ -330,11 +346,13 @@ class CloudArea(namedtuple('CloudArea', 'cloud bucket_name basepath')):
   '''
 
   @classmethod
-  def from_cloudpath(cls, path: str):
-    ''' Construct a new `CloudArea` from the cloud path `path`.
+  def from_cloudpath(cls, path: str, **kw):
+    ''' Construct a new `CloudArea` from the cloud path `path`
+        using the supplied keyword parameters `kw`.
     '''
     CP = ParsedCloudPath.from_str(path)
-    return cls(CP.cloud, CP.bucket_name, CP.subpath)
+    cloud = CP.new_cloud(**kw)
+    return cls(cloud, CP.bucket_name, CP.subpath)
 
   def subarea(self, subpath):
     ''' Return a `CloudArea` which is located within this `CloudArea`.
@@ -398,29 +416,31 @@ class CloudAreaFile(SingletonMixin):
     '''
     return joinpath(self.cloud_area.cloudpath, self.filepath)
 
-  def upload_buffer(self, bfr, *, progress=None):
+  def upload_buffer(self, bfr, *, upload_progress=None):
     ''' Upload a buffer into the cloud.
     '''
     return self.cloud.upload_buffer(
         bfr,
         bucket_name=self.bucket_name,
         path=self.bucket_path,
-        progress=progress
+        upload_progress=upload_progress
     )
 
-  def upload_filename(self, filename, *, progress=None):
+  def upload_filename(self, filename, *, upload_progress=None):
     ''' Upload a local file into the cloud.
     '''
     return self.cloud.upload_filename(
         filename,
         bucket_name=self.bucket_name,
         path=self.bucket_path,
-        progress=progress
+        upload_progress=upload_progress
     )
 
-  def download_buffer(self, *, progress=None):
+  def download_buffer(self, *, download_progress=None):
     ''' Download from the cloud, return `(CornuCopyBuffer,dict)`.
     '''
     return self.cloud.download_buffer(
-        bucket_name=self.bucket_name, path=self.bucket_path, progress=progress
+        bucket_name=self.bucket_name,
+        path=self.bucket_path,
+        download_progress=download_progress
     )

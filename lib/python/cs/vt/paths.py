@@ -36,7 +36,9 @@ def path_resolve(path, do_mkdir=False):
       raise ValueError(
           "extra path does not commence with %r: %r" % (PATHSEP, subpath)
       )
-    E = resolve(E, subpath, do_mkdir=do_mkdir)
+    E, parent, subpaths = resolve(E, subpath, do_mkdir=do_mkdir)
+    if subpaths:
+      raise ValueError("unresolved subpaths: %r" % (subpaths,))
   return E
 
 def path_split(path):
@@ -50,9 +52,10 @@ def path_split(path):
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
-      Return the final Dirent, its parent, and a list of unresolved path components.
+      Return `(E,perentE,unresolved)`
+      being the final Dirent, its parent, and a list of unresolved path components.
 
-      `subpath` may be a str or an array of str.
+      For convenience, `subpath` may be a `str` or a sequence of `str`.
   '''
   if not rootD.isdir:
     raise ValueError("resolve: not a Dir: %s" % (rootD,))
@@ -333,16 +336,17 @@ class OSDir(DirLike):
     return OSDir(subpath)
 
   def file_frombuffer(self, name, bfr):
-    ''' Create a new file from data from a CornuCopyBuffer.
+    ''' Create a new file from data from a `CornuCopyBuffer`.
     '''
     if not name or PATHSEP in name:
       raise ValueError(
           "name may not be empty or contain PATHSEP %r: %r" % (PATHSEP, name)
       )
     subpath = joinpath(self.path, name)
-    with open(subpath, 'wb') as f:
-      for data in bfr:
-        f.write(data)
+    with Pfx('write %r', subpath):
+      with open(subpath, 'wb') as f:
+        for data in bfr:
+          f.write(data)
     return OSFile(subpath)
 
 class OSFile(FileLike):

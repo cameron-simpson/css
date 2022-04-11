@@ -46,19 +46,46 @@ class VCS_Hg(VCS):
     args.extend(['--', tag_name])
     self.hg_cmd(*args)
 
+  def logs(self, paths, hglog_options=None):
+    ''' Generator yielding lines from an "hg log" incantation
+        with trailing `\r` and `\n` stripped.
+    '''
+    if hglog_options is None:
+      hglog_options = []
+    with self._pipefrom('log', *hglog_options, '--', *paths) as f:
+      for line in f:
+        yield line.rstrip('\r\n')
+
   def log_since(self, tag, paths):
     ''' Generator yielding `(commit_files,commit_firstline)`
         for commit log entries since `tag`
         involving `paths` (a list of `str`).
     '''
-    with self._pipefrom('log', '-r', tag + ':', '--template',
-                        '{files}\t{desc|firstline}\n', '--', *paths) as f:
-      for lineno, line in enumerate(f, 1):
-        with Pfx("line %d", lineno):
-          files, firstline = line.split('\t', 1)
-          files = files.split()
-          firstline = firstline.strip()
-        yield files, firstline
+    for lineno, line in enumerate(self.logs(
+        paths, ['-r', tag + ':tip - ' + tag, '--template',
+                '{files}\t{desc|firstline}\n']), 1):
+      with Pfx("line %d", lineno):
+        files, firstline = line.split('\t', 1)
+        files = files.split()
+        firstline = firstline.strip()
+      yield files, firstline
+
+  def file_revisions(self, paths):
+    ''' Return a mapping of `path->(rev,node)`
+        containing the latest revision of each file in `paths`.
+
+        The `rev` is the sequential revision number
+        and the `node` if the changeset identification hash.
+        This pair supports choosing the latest hash from some files.
+    '''
+    path_map = {}
+    for path in paths:
+      for line in self.logs([path],
+                            ['-l', '1', '--template', '{rev} {node}\n']):
+        rev, node = line.split()
+        break
+      path_map[path] = int(rev), node
+    return path_map
 
   def add_files(self, *paths):
     ''' Add the specified paths to the repository.

@@ -1,4 +1,6 @@
 #!/usr/bin/python -tt
+#
+# pylint: disable=too-many-lines
 
 ''' Facilities for mappings and objects associated with mappings.
 
@@ -12,23 +14,23 @@
     from `cs.csvutils`.
 '''
 
+from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from functools import partial
 import json
-from os.path import exists as existspath, isfile as isfilepath
 import re
 from threading import RLock
 from uuid import UUID, uuid4
 from cs.deco import strable
-from cs.lex import isUC_, parseUC_sAttr, cutprefix
+from cs.lex import isUC_, parseUC_sAttr, cutprefix, r
 from cs.logutils import warning
-from cs.pfx import Pfx
+from cs.pfx import Pfx, pfx_method
 from cs.py3 import StringTypes
 from cs.seq import the
 from cs.sharedfile import SharedAppendLines
 
-__version__ = '20200130'
+__version__ = '20220318-post'
 
 DISTINFO = {
     'description':
@@ -46,13 +48,15 @@ DISTINFO = {
         'cs.pfx',
         'cs.py3',
         'cs.seq',
-        'cs.sharedfile',
+        'cs.sharedfile>=20211208',
     ],
 }
 
 # pylint: disable=too-many-statements
 def named_row_tuple(*column_names, **kw):
   ''' Return a namedtuple subclass factory derived from `column_names`.
+      The primary use case is using the header row of a spreadsheet
+      to keey the data from the subsequent rows.
 
       Parameters:
       * `column_names`: an iterable of `str`, such as the heading columns
@@ -115,6 +119,7 @@ def named_row_tuple(*column_names, **kw):
 
   _NamedRow = namedtuple(class_name, attributes)
 
+  # pylint: disable=too-few-public-methods
   class NamedRow(_NamedRow, mixin):
     ''' A namedtuple to store row data.
 
@@ -147,7 +152,7 @@ def named_row_tuple(*column_names, **kw):
         name_of_[attr] = name
         index_of_[name] = i
         i += 1
-    del i, name, attr
+    del i, name, attr  # pylint: disable=undefined-loop-variable
     index_of_.update((s, i) for i, s in enumerate(attributes_))
 
     def __getitem__(self, key):
@@ -163,6 +168,7 @@ def named_row_tuple(*column_names, **kw):
             func = self.computed_.get(key)
             if func is not None:
               return func(self)
+            # pylint: disable=raise-missing-from
             raise RuntimeError("no method or func for key %r" % (key,))
           else:
             return method()
@@ -205,6 +211,7 @@ def named_row_tuple(*column_names, **kw):
 #
 _nct_Context = namedtuple('Context', 'cls index previous')
 
+# pylint: disable=too-many-arguments
 def named_column_tuples(
     rows,
     class_name=None,
@@ -332,6 +339,7 @@ def named_column_tuples(
   cls = next(gen)
   return cls, gen
 
+# pylint: disable=too-many-arguments
 def _named_column_tuples(
     rows,
     class_name=None,
@@ -418,6 +426,11 @@ class SeqMapUC_Attrs(object):
   def __init__(self, M, keepEmpty=False):
     self.__M = M
     self.keepEmpty = keepEmpty
+
+  def __repr__(self):
+    return "%s(%r, keepEmpty=%s)" % (
+        type(self).__name__, self.__M, self.keepEmpty
+    )
 
   def __str__(self):
     kv = []
@@ -644,7 +657,7 @@ class MappingChain(object):
 
   def __getitem__(self, key):
     ''' Return the first value for `key` found in the mappings.
-        Raise KeyError if the key in not found in any mapping.
+        Raise `KeyError` if the key in not found in any mapping.
     '''
     for mapping in self.get_mappings():
       try:
@@ -727,9 +740,9 @@ class StackableValues(object):
   ''' A collection of named stackable values with the latest value
       available as an attribute.
 
-      I now recommand my `cs.context.stackattrs` context manager for most
-      uses; it may be applied to any object instead of requiring use of this
-      class.
+      *DEPRECATED*: I now recommend my `cs.context.stackattrs` context
+      manager for most uses; it may be applied to any object instead of
+      requiring use of this class.
 
       Note that names conflicting with methods are not available
       as attributes and must be accessed via `__getitem__`.
@@ -838,6 +851,7 @@ class StackableValues(object):
       try:
         vs = self._values[attr]
       except KeyError:
+        # pylint: disable=raise-missing-from
         raise AttributeError(attr)
       else:
         if vs:
@@ -856,6 +870,7 @@ class StackableValues(object):
         fallback_func = self._fallback
       except AttributeError:
         # no fallback function
+        # pylint: disable=raise-missing-from
         raise KeyError(key)
       with Pfx("%s._fallback(%r)", type(self).__name__, key):
         try:
@@ -890,6 +905,7 @@ class StackableValues(object):
     try:
       v = vs.pop()
     except IndexError:
+      # pylint: disable=raise-missing-from
       raise KeyError(key)
     if not vs:
       del self._values[key]
@@ -936,16 +952,46 @@ class AttrableMappingMixin(object):
   '''
 
   def __getattr__(self, attr):
-    ''' Unknown attributes are obtained from the `dict` entries.
+    ''' Unknown attributes are obtained from the mapping entries.
+
+        Note that this first consults `self.__dict__`.
+        For many classes that is redundant, but subclasses of
+        `dict` at least seem not to consult that with attribute
+        lookup, likely because a pure `dict` has no `__dict__`.
     '''
+    # try self.__dict__ first - this is because it appears that
+    # getattr(dict,...) does not consult __dict__
     try:
-      value = self[attr]
+      _d = self.__dict__
+    except AttributeError:
+      # no __dict__? skip this step
+      pass
+    else:
+      try:
+        return _d[attr]
+      except KeyError:
+        pass
+    try:
+      return self[attr]
     except KeyError:
-      raise AttributeError(
-          "%s.%s (attrs=%s)" %
-          (type(self).__name__, attr, ','.join(sorted(self.keys())))
-      )
-    return value
+      try:
+        return self.ATTRABLE_MAPPING_DEFAULT
+      except AttributeError:
+        names_msgs = []
+        ks = list(self.keys())
+        if ks:
+          names_msgs.append('keys=' + ','.join(sorted(ks)))
+        dks = self.__dict__.keys()
+        if dks:
+          names_msgs.append('__dict__=' + ','.join(sorted(dks)))
+        # pylint: disable=raise-missing-from
+        raise AttributeError(
+            "%s.%s (attrs=%s)" % (
+                type(self).__name__,
+                attr,
+                ','.join(names_msgs),
+            )
+        )
 
 class JSONableMappingMixin:
   ''' Provide `.from_json()`, `.as_json()` and `.append_ndjson()` methods,
@@ -954,7 +1000,7 @@ class JSONableMappingMixin:
 
   @classmethod
   def from_json(cls, js):
-    ''' Prepare an dict from JSON text.
+    ''' Prepare a `dict` from JSON text.
 
       If the class has `json_object_hook` or `json_object_pairs_hook`
       attributes these are used as the `object_hook` and
@@ -971,7 +1017,7 @@ class JSONableMappingMixin:
     return d
 
   def as_json(self):
-    ''' The dict transcribed as JSON.
+    ''' Return the `dict` transcribed as JSON.
 
         If the instance's class has `json_default` or `json_separators` these
         are used for the `default` and `separators` parameters of the `json.dumps()`
@@ -998,13 +1044,13 @@ class JSONableMappingMixin:
   def __repr__(self):
     return type(self).__name__ + str(self)
 
-class LoadableMappingMixin:
+class IndexedSetMixin(ABC):
   ''' A base mixin to provide `.by_`* attributes
       which index records from an autoloaded backing store,
       which might be a file or might be another related data structure.
       The records are themselves key->value mappings, such as `dict`s.
 
-      The primary key name is provided by the `.loadable_mapping_key`
+      The primary key name is provided by the `.IndexedSetMixin__pk`
       class attribute, to be provided by subclasses.
 
       Note that this mixin keeps the entire loadable mapping in memory.
@@ -1014,38 +1060,39 @@ class LoadableMappingMixin:
       does not update the index associated with the .by_k attribute.
 
       Subclasses must provide the following attributes and methods:
-      * `loadable_mapping_key`: the name of the primary key;
-        it is an error for a multiple records to have the same primary key
-      * `scan_mapping`: a generator method to scan the backing store
+      * `IndexedSetMixin__pk`: the name of the primary key;
+        it is an error for multiple records to have the same primary key
+      * `scan`: a generator method to scan the backing store
         and yield records, used for the inital load of the mapping
-      * `append_to_mapping(record)`: add a new record to the backing store;
-        this is called from the `.add_to_mapping(record)` method
+      * `add_backend(record)`: add a new record to the backing store;
+        this is called from the `.add(record)` method
         after indexing to persist the record in the backing store
 
       See `UUIDNDJSONMapping` and `UUIDedDict` for an example subclass
       indexing records from a newline delimited JSON file.
   '''
 
-  loadable_mapping_key = ''
+  IndexedSetMixin__pk = ''
 
-  def scan_mapping(self):
-    ''' Load the mapping from its backing store,
-        which might be a file or might be another related data structure.
-        Return the loaded mapping.
+  @abstractmethod
+  def scan(self):
+    ''' Scan the mapping records (themselves mappings) from the backing store,
+        which might be a file or another related data structure.
+        Yield each record as scanned.
     '''
-    raise NotImplementedError("scan_mapping")
+    raise NotImplementedError("scan")
 
-  def add_to_mapping(self, record, exists_ok=False):
+  def add(self, record, exists_ok=False):
     ''' Add a record to the mapping.
 
         This indexes the record against the various `by_`* indices
-        and then calls `self.append_to_mapping(record)`
+        and then calls `self.add_backend(record)`
         to save the record to the backing store.
     '''
-    pk_name = self.loadable_mapping_key
-    assert pk_name, "empty .loadable_mapping_key"
+    pk_name = self.IndexedSetMixin__pk
+    assert pk_name, "empty .IndexedSetMixin__pk"
     # ensure the primary mapping is loaded
-    pk_mapping = getattr(self, 'by_' + self.loadable_mapping_key)
+    pk_mapping = getattr(self, 'by_' + pk_name)
     with self._lock:
       if not exists_ok and record[pk_name] in pk_mapping:
         raise KeyError(
@@ -1059,43 +1106,45 @@ class LoadableMappingMixin:
         else:
           by_map = getattr(self, 'by_' + map_name)
           by_map[k] = record
-      self.append_to_mapping(record)
+      self.add_backend(record)
 
   def __getattr__(self, attr):
     field_name = cutprefix(attr, 'by_')
     if field_name is not attr:
-      by_map = {}
       with Pfx("%s.%s", type(self).__name__, attr):
-        pk_name = self.loadable_mapping_key
-        assert pk_name, "empty .loadable_mapping_key"
+        pk_name = self.IndexedSetMixin__pk
+        assert pk_name, "empty .IndexedSetMixin__pk"
         by_pk = 'by_' + pk_name
         indexed = self.__indexed
-        assert field_name not in indexed, "repeated __getattr__ of .%s" % (
-            attr,
-        )
-        warned = set()
         with self._lock:
+          if field_name in indexed:
+            return self.__dict__[attr]
+          by_map = {}
           if field_name == pk_name:
-            records = self.scan_mapping()
+            records = self.scan()
           else:
             records = getattr(self, by_pk).values()
           # load the
-          for record in records:
+          ##warned = set()
+          i = 0
+          for i, record in enumerate(records, 1):
             try:
               field_value = record[field_name]
             except KeyError:
               if field_name == pk_name:
                 warning("no primary key %r: %r", field_name, record)
               continue
-            if field_value in by_map:
-              if field_value not in warned:
-                ##warning("multiple records for %r", field_value)
-                warned.add(field_value)
+            ##if field_value in by_map:
+            ##  if field_value not in warned:
+            ##    warning("multiple records for %r", field_value)
+            ##    warned.add(field_value)
             by_map[field_value] = record
           setattr(self, attr, by_map)
           indexed.add(field_name)
+          if field_name == pk_name:
+            self.__scan_length = i
       return by_map
-    if attr == '_LoadableMappingMixin__indexed':
+    if attr == '_IndexedSetMixin__indexed':
       # .__indexed
       indexed = self.__indexed = set()
       return indexed
@@ -1105,6 +1154,53 @@ class LoadableMappingMixin:
       return getattr(type(self), attr)
     else:
       return supergetattr(attr)
+
+  def __len__(self):
+    ''' The length of the primary key mapping.
+    '''
+    return len(getattr(self, 'by_' + self.IndexedSetMixin__pk))
+
+  @property
+  def scan_length(self):
+    ''' The number of records encountered during the backend scan.
+    '''
+    # ensure the mapping has been scanned
+    getattr(self, 'by_' + self.IndexedSetMixin__pk)
+    # return the length of the scan
+    return self.__scan_length
+
+  @scan_length.setter
+  def scan_length(self, length):
+    ''' Set the scan length, called by `UUIDNDJSONMapping.rewrite_backend`.
+    '''
+    self.__scan_length = length
+
+class IndexedMapping(IndexedSetMixin):
+  ''' Interface to a mapping with `IndexedSetMixin` style `.by_*` attributes.
+  '''
+
+  def __init__(self, mapping=None, pk='id'):
+    ''' Initialise the `IndexedMapping`.
+
+        Parameters:
+        * `mapping`: the mapping to wrap; a new `dict` will be made if not specified
+        * `pk`: the primary key of the mapping, default `'id'`
+    '''
+    if mapping is None:
+      mapping = {}
+    self.mapping = mapping
+    self.IndexedSetMixin__pk = pk
+    self._lock = RLock()
+
+  def scan(self):
+    ''' The records from the mapping.
+    '''
+    return self.mapping.values()
+
+  def add_backend(self, record):
+    ''' Save `record` in the mapping.
+    '''
+    self.mapping[record[self.IndexedSetMixin__pk]] = record
 
 class AttrableMapping(dict, AttrableMappingMixin):
   ''' A `dict` subclass using `AttrableMappingMixin`.
@@ -1161,3 +1257,153 @@ class UUIDedDict(dict, JSONableMappingMixin, AttrableMappingMixin):
     '''
     uu = new_uuid if isinstance(new_uuid, UUID) else UUID(new_uuid)
     self['uuid'] = uu
+
+class RemappedMappingProxy:
+  ''' A proxy for another mapping
+      with translation functions between the external keys
+      and the keys used inside the other mapping.
+
+      Example:
+
+          >>> proxy = RemappedMappingProxy(
+          ...   {},
+          ...   lambda key: 'prefix.' + key,
+          ...   lambda subkey: cutprefix('prefix.', subkey))
+          >>> proxy['key'] = 1
+          >>> proxy['key']
+          1
+          >>> proxy.mapping
+          {'prefix.key': 1}
+          >>> list(proxy.keys())
+          ['key']
+          >>> proxy.subkey('key')
+          'prefix.key'
+          >>> proxy.key('prefix.key')
+          'key'
+  '''
+
+  def __init__(self, mapping, to_subkey, from_subkey):
+    self.mapping = mapping
+    self._to_subkey = to_subkey
+    self._from_subkey = from_subkey
+    self._mapped_keys = {}
+    self._mapped_subkeys = {}
+
+  def _self_check(self):
+    X("SELF CHECK")
+    assert len(self._mapped_keys) == len(self._mapped_subkeys)
+    assert set(self._mapped_keys.values()) == set(self._mapped_subkeys.keys())
+    assert set(self._mapped_keys.keys()) == set(self._mapped_subkeys.values())
+    for subk, k in self._mapped_subkeys.items():
+      with Pfx("subkey %r vs key %r", subk, k):
+        assert self._mapped_keys[k] == subk, (
+            "subkey %r => %r: self._mapped_keys[key]:%r != subkey:%r" %
+            (subk, k, self._mapped_keys[k], subk)
+        )
+    return True
+
+  @pfx_method
+  def subkey(self, key):
+    ''' Return the internal key for `key`.
+    '''
+    try:
+      subk = self._mapped_keys[key]
+    except KeyError:
+      subk = self._to_subkey(key)
+      if subk in self._mapped_subkeys:
+        warning(
+            "no self._mapped_keys[key=%r], but we do have self._mapped_subkeys[subk=%r] => %r",
+            key, subk, self._mapped_subkeys[subk]
+        )
+        assert self._mapped_subkeys[subk] == key, \
+            "self._mapped_subkeys[subk=%r]:%r != key:%r" % (subk,self._mapped_subkeys[subk],key)
+      self._mapped_keys[key] = subk
+      self._mapped_subkeys[subk] = key
+    return subk
+
+  @pfx_method
+  def key(self, subk):
+    ''' Return the external key for `subk`.
+    '''
+    try:
+      k = self._mapped_subkeys[subk]
+    except KeyError:
+      k = self._from_subkey(subk)
+      assert k not in self._mapped_keys
+      self._mapped_keys[k] = subk
+      self._mapped_subkeys[subk] = k
+    return k
+
+  def keys(self, select_key=None):
+    ''' Yield the external keys.
+    '''
+    subkey_iter = self.mapping.keys()
+    if select_key is not None:
+      subkey_iter = filter(
+          lambda subkey: select_key(self.key(subkey)), subkey_iter
+      )
+    return map(self.key, subkey_iter)
+
+  def __contains__(self, key):
+    return self.subkey(key) in self.mapping
+
+  def __getitem__(self, key):
+    return self.mapping[self.subkey(key)]
+
+  def get(self, key, default=None):
+    ''' Return the value for key `key` or `default`.
+    '''
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
+  def __setitem__(self, key, v):
+    self.mapping[self.subkey(key)] = v
+
+  def __delitem__(self, key):
+    del self.mapping[self.subkey(key)]
+
+class PrefixedMappingProxy(RemappedMappingProxy):
+  ''' A proxy for another mapping
+      operating on keys commencing with a prefix.
+  '''
+
+  def __init__(self, mapping, prefix):
+    # precompute function references
+    unprefixify = self.unprefixify_key
+    prefixify = self.prefixify_subkey
+    super().__init__(
+        mapping,
+        to_subkey=lambda key: prefixify(key, prefix),
+        from_subkey=lambda subk: unprefixify(subk, prefix),
+    )
+    self.prefix = prefix
+
+  def __str__(self):
+    return "%s[%r](prefix=%r,mapping=%s)" % (
+        type(self).__name__, type(self).__mro__, self.prefix, r(self.mapping)
+    )
+
+  @staticmethod
+  def prefixify_subkey(subk, prefix):
+    ''' Return the external (prefixed) key from a subkey `subk`.
+    '''
+    assert not subk.startswith(prefix)
+    return prefix + subk
+
+  @staticmethod
+  def unprefixify_key(key, prefix):
+    ''' Return the internal subkey (unprefixed) from the external `key`.
+    '''
+    assert key.startswith(prefix), \
+        "key:%r does not start with prefix:%r" % (key, prefix)
+    return cutprefix(key, prefix)
+
+  # pylint: disable=arguments-differ
+  def keys(self):
+    ''' Yield the post-prefix suffix of the keys in `self.mapping`.
+    '''
+    return super().keys(
+        select_key=lambda subkey: subkey.startswith(self.prefix)
+    )

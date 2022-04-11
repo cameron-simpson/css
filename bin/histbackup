@@ -97,6 +97,7 @@ symlink=LATEST
 src=
 dest=
 filteroutput=
+reflink=
 rrsync=rsync
 usehbinclude=1
 usehbfiles=1
@@ -119,6 +120,7 @@ usage="Usage:
   $cmd [options...] [-- [rsyncopts...]]
 
   -e ssh-cmd    Passed to rsync. Default: -e $sshcmd
+  -f            Force: presently just implies --no-symlink-if-unchanged.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
@@ -147,6 +149,7 @@ usage="Usage:
   --link-fail-repair (Obsolete; this is always done.)
                 Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
+  --reflink     Use \"cp --reflink\" and \"rsync --inplace\".
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
@@ -216,6 +219,14 @@ do
       sshcmd=$2; shift
       ;;
 
+    # =item -f
+    #
+    # Force. Presently shorthand for B<--no-symlink-if-unchanged>.
+    #
+    -f)
+      symlink_unchanged=
+      ;;
+
     # =item -i, --itemize-changes
     #
     # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
@@ -268,6 +279,19 @@ do
         symlink_unchanged=
         ;;
 
+    # =item --reflink
+    #
+    # Use "cp --reflink" and "rsync --inplace".
+    # This makes distinct file metadata in the new tree
+    # instead of hard linking from the old tree, and the
+    # lower hard link count also eases filesystem repair.
+    # This requires matching filesystem support for copy-on-write
+    # clones.
+    #
+    --reflink)
+        reflink=1
+        rsopts="$rsopts --inplace"
+        ;;
     # =item --rsync-path rrsync
     #
     # Passed to rsync.
@@ -427,26 +451,40 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# have "cp -ral"? otherwise rely on my linktree script
-if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+if [ $reflink ]
 then
   mklinktree(){
-    [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
-    _mkl_src=$1
-    _mkl_dst=$2
-    case "$_mkl_dst" in
-      /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
-    esac
-    # make link tree, might fail if hard link limit reached for files
-    $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
-      # failed to make target? fail outright
-      [ -d "$_mkl_dst/." ] || return 1
-      # if we made the target, update from source
-      dorsync "$_mkl_src/" "$_mkl_dst/"
-    }
+      [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+      _mkl_src=$1
+      _mkl_dst=$2
+      case "$_mkl_dst" in
+        /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+      esac
+      # make link tree, might fail if hard link limit reached for files
+      $trace cp -ra --reflink "$_mkl_src" "$_mkl_dst"
   }
 else
-  mklinktree(){ $trace linktree "$1" "$2"; }
+  # have "cp -ral"? otherwise rely on my linktree script
+  if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l | tr -d ' '`" = x3 ]
+  then
+    mklinktree(){
+      [ $# = 2 ] || { echo "Usage: mklinktree srcdir dstdir" >&2; return 2; }
+      _mkl_src=$1
+      _mkl_dst=$2
+      case "$_mkl_dst" in
+        /* | ./* ) ;; *) _mkl_dst=./$_mkl_dst ;;
+      esac
+      # make link tree, might fail if hard link limit reached for files
+      $trace cp -ral "$_mkl_src" "$_mkl_dst" || {
+        # failed to make target? fail outright
+        [ -d "$_mkl_dst/." ] || return 1
+        # if we made the target, update from source
+        dorsync "$_mkl_src/" "$_mkl_dst/"
+      }
+    }
+  else
+    mklinktree(){ $trace linktree "$1" "$2"; }
+  fi
 fi
 
 if [ $imode ]

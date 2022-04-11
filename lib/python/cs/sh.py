@@ -1,18 +1,21 @@
 #!/usr/bin/python
 #
-# Convenience functions for constructing shell commands.
-#   - Cameron Simpson <cs@cskk.id.au>
-#
 
 r'''
 Convenience functions for constructing shell commands
 
 Functions for safely constructing shell command lines from bare strings.
 Somewhat like the inverse of the shlex stdlib module.
+
+As of Python 3.3 the function `shlex.quote()` does what `quotestr()` does.
+
+As of Python 3.8 the function `shlex.join()` does what `quotecmd()` does.
 '''
 
 import string
 import sys
+
+__version__ = '20210316-post'
 
 DISTINFO = {
     'description': "Convenience functions for constructing shell commands.",
@@ -35,11 +38,15 @@ SAFECHARS = string.digits + string.ascii_letters + '-+_.,/:'
 
 def quote(args):
   ''' Quote the supplied strings, return a list of the quoted strings.
+
+      As of Python 3.8 the function `shlex.join()` is available for this.
   '''
   return [quotestr(s) for s in args]
 
 def quotestr(s):
   ''' Quote a string for use on a shell command line.
+
+      As of Python 3.3 the function `shlex.quote()` is available for this.
   '''
   # decide how to quote the string:
   # - empty string: return ''

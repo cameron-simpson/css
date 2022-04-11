@@ -1,0 +1,2 @@
+Forensic prefix for NamedTemporaryCopy.
+UUIDNDJSONMapping: provide an empty .scan_errors on instantiation, avoids AttributeError if a scan never occurs.

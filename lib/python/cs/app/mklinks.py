@@ -24,7 +24,7 @@ from collections import defaultdict
 from getopt import GetoptError
 from hashlib import sha1 as hashfunc
 import os
-from os.path import dirname, isdir, isfile, join as joinpath
+from os.path import dirname, isdir, join as joinpath, relpath
 from stat import S_ISREG
 import sys
 from tempfile import NamedTemporaryFile
@@ -35,7 +35,9 @@ from cs.progress import progressbar
 from cs.pfx import Pfx, pfx_method
 from cs.py.func import prop
 from cs.units import BINARY_BYTES_SCALE
-from cs.upd import Upd, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, Upd, print  # pylint: disable=redefined-builtin
+
+__version__ = '20210404-post'
 
 DISTINFO = {
     'description':
@@ -47,7 +49,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
     ],
     'install_requires': [
-        'cs.cmdutils',
+        'cs.cmdutils>=20210404',
         'cs.fileutils>=20200914',
         'cs.logutils',
         'cs.pfx',
@@ -64,7 +66,7 @@ DISTINFO = {
 def main(argv=None):
   ''' Main command line programme.
   '''
-  return MKLinksCmd().run(argv)
+  return MKLinksCmd(argv).run()
 
 class MKLinksCmd(BaseCommand):
   ''' Main programme command line class.
@@ -76,31 +78,29 @@ class MKLinksCmd(BaseCommand):
 
   GETOPT_SPEC = 'n'
 
-  @staticmethod
-  def apply_defaults(options):
+  def apply_defaults(self):
     ''' Set up the default values in `options`.
     '''
-    options.no_action = False
+    self.options.no_action = False
 
-  @staticmethod
-  def apply_opts(opts, options):
+  def apply_opts(self, opts):
     ''' Apply command line options.
     '''
     for opt, _ in opts:
       with Pfx(opt):
         if opt == '-n':
-          options.no_action = True
+          self.options.no_action = True
         else:
           raise RuntimeError("unhandled option")
 
-  @staticmethod
-  def main(argv, options):
+  def main(self, argv):
     ''' Usage: mklinks [-n] paths...
           Hard link files with identical contents.
           -n    No action. Report proposed actions.
     '''
     if not argv:
       raise GetoptError("missing paths")
+    options = self.options
     linker = Linker()
     with options.upd.insert(1) as step:
       # scan the supplied paths
@@ -115,6 +115,7 @@ class FileInfo(object):
   ''' Information about a particular inode.
   '''
 
+  # pylint: disable=too-many-arguments
   def __init__(self, dev, ino, size, mtime, paths=()):
     self.dev = dev
     self.ino = ino
@@ -160,7 +161,7 @@ class FileInfo(object):
       U = Upd()
       pathspace = U.columns - 64
       label = "scan " + (
-          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]
+          path if len(path) < pathspace else '...' + path[-(pathspace - 3):]  # pylint: disable=unsubscriptable-object
       )
       with Pfx("checksum %r", path):
         csum = hashfunc()
@@ -168,7 +169,7 @@ class FileInfo(object):
           length = os.fstat(fp.fileno()).st_size
           read_len = 0
           for data in progressbar(
-              read_from(fp),
+              read_from(fp, rsize=1024*1024),
               label=label,
               total=length,
               units_scale=BINARY_BYTES_SCALE,
@@ -191,7 +192,7 @@ class FileInfo(object):
   def same_file(self, other):
     ''' Test whether two FileInfos refer to the same file.
     '''
-    return self.key == other.key
+    return self.key == other.key  # pylint: disable=comparison-with-callable
 
   def assimilate(self, other, no_action=False):
     ''' Link our primary path to all the paths from `other`. Return success.
@@ -201,8 +202,8 @@ class FileInfo(object):
     opaths = other.paths
     pathprefix = common_path_prefix(path, *opaths)
     vpathprefix = shortpath(pathprefix)
-    pathsuffix = path[len(pathprefix):]
-    with Upd().insert(1) as proxy:
+    pathsuffix = path[len(pathprefix):]  # pylint: disable=unsubscriptable-object
+    with UpdProxy() as proxy:
       proxy(
           "%s%s <= %r", vpathprefix, pathsuffix,
           list(map(lambda opath: opath[len(pathprefix):], sorted(opaths)))
@@ -218,12 +219,12 @@ class FileInfo(object):
               warning("already assimilated")
               continue
             if vpathprefix:
-              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
-            else:
               print(
                   "%s: %s => %s" %
                   (vpathprefix, opath[len(pathprefix):], pathsuffix)
               )
+            else:
+              print("%s => %s" % (opath[len(pathprefix):], pathsuffix))
             if no_action:
               continue
             odir = dirname(opath)
@@ -250,40 +251,51 @@ class Linker(object):
   ''' The class which links files with identical content.
   '''
 
-  def __init__(self):
+  def __init__(self, min_size=512):
     self.sizemap = defaultdict(dict)  # file_size => FileInfo.key => FileInfo
     self.keymap = {}  # FileInfo.key => FileInfo
+    self.min_size = min_size
 
   @pfx_method
   def scan(self, path):
     ''' Scan the file tree.
     '''
-    if isdir(path):
-      for dirpath, dirnames, filenames in os.walk(path):
-        for filename in sorted(filenames):
-          path = joinpath(dirpath, filename)
-          status(path)
-          if isfile(path):
-            self.addpath(path)
-        dirnames[:] = sorted(dirnames)
-    else:
-      self.addpath(path)
+    with UpdProxy() as proxy:
+      proxy.prefix = "scan %s: " % (path)
+      if isdir(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+          proxy("sweep " + relpath(dirpath, path))
+          for filename in progressbar(
+              sorted(filenames),
+              label=relpath(dirpath, path),
+              update_frequency=32,
+          ):
+            filepath = joinpath(dirpath, filename)
+            self.addpath(filepath)
+          dirnames[:] = sorted(dirnames)
+      else:
+        self.addpath(path)
 
   def addpath(self, path):
     ''' Add a new path to the data structures.
     '''
-    with Pfx(path):
+    with Pfx("addpath(%r)", path):
       with Pfx("lstat"):
         S = os.lstat(path)
       if not S_ISREG(S.st_mode):
         return
+      if S.st_size < self.min_size:
+        return
       key = FileInfo.stat_key(S)
       FI = self.keymap.get(key)
       if FI:
+        assert FI.key == key
         FI.paths.add(path)
       else:
         FI = FileInfo(S.st_dev, S.st_ino, S.st_size, S.st_mtime, (path,))
+        assert FI.key == key  # pylint: disable=comparison-with-callable
         self.keymap[key] = FI
+        assert key not in self.sizemap[S.st_size]
         self.sizemap[S.st_size][key] = FI
 
   @pfx_method
@@ -294,24 +306,27 @@ class Linker(object):
     for _, FImap in sorted(self.sizemap.items(), reverse=True):
       # order FileInfos by mtime (newest first) and then path
       FIs = sorted(FImap.values(), key=lambda FI: (-FI.mtime, FI.path))
-      for i, FI in enumerate(FIs):
-        # skip FileInfos with no paths
-        # this happens when a FileInfo has been assimilated
-        if not FI.paths:
-          continue
-        for FI2 in FIs[i + 1:]:
-          status(FI2.path)
-          assert FI.size == FI2.size
-          assert FI.mtime >= FI2.mtime
-          assert not FI.same_file(FI2)
-          if not FI.same_dev(FI2):
-            # different filesystems, cannot link
+      size = FIs[0].size
+      with UpdProxy(text="merge size %d " % (size,)):
+        for i, FI in enumerate(FIs):
+          # skip FileInfos with no paths
+          # this happens when a FileInfo has been assimilated
+          if not FI.paths:
+            ##warning("SKIP, no paths")
             continue
-          if FI.checksum != FI2.checksum:
-            # different content, skip
-            continue
-          # FI2 is the younger, keep it
-          FI.assimilate(FI2, no_action=no_action)
+          for FI2 in FIs[i + 1:]:
+            status(FI2.path)
+            assert FI.size == FI2.size
+            assert FI.mtime >= FI2.mtime
+            assert not FI.same_file(FI2)
+            if not FI.same_dev(FI2):
+              # different filesystems, cannot link
+              continue
+            if FI.checksum != FI2.checksum:
+              # different content, skip
+              continue
+            # FI2 is the younger, keep it
+            FI.assimilate(FI2, no_action=no_action)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
