@@ -33,15 +33,29 @@ def main(argv=None):
   return SPLinkCommand(argv).run()
 
 class SPLinkCommand(BaseCommand):
+  ''' Command line to wrk with SP-Link data downloads.
+  '''
+
+  LOG_DATASETS = 'DetailedData', 'DailySummaryData'
+
+  USAGE_KEYWORDS = {'LOG_DATASETS': ' '.join(sorted(LOG_DATASETS))}
 
   def cmd_import(self, argv):
-    ''' Usage: {cmd} sp-link-dirpath timeseries-dirpath
-          Import the DetailedData CSV data from sp-link-dirpath into the time
-          series data directory at timeseries-dirpath.
+    ''' Usage: {cmd} sp-link-dirpath timeseries-dirpath [datasets...]
+          Import CSV data from sp-link-dirpath into the time series data 
+          directories under timeseries-dirpath.
+          Default datasets: {LOG_DATASETS}
     '''
-    csv_dirpath, tsdirpath = argv
-    with SPLinkDataDir(tsdirpath) as spd:
-      spd.import_from(csv_dirpath, 'DetailedData')
+    csv_dirpath, over_tsdirpath = argv.pop(0), argv.pop(0)
+    if not argv:
+      argv = list(self.LOG_DATASETS)
+    needdir(over_tsdirpath)
+    for dataset in argv:
+      with Pfx(dataset):
+        tsdirpath = joinpath(over_tsdirpath, dataset)
+        needdir(tsdirpath)
+        with SPLinkDataDir(tsdirpath, dataset) as spd:
+          spd.import_from(csv_dirpath)
 
 def ts2001_unixtime(tzname=None):
   ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
@@ -110,28 +124,42 @@ class SPLinkCSVDir(HasFSPath):
 
 class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold CSV log data from an SP-Link data download.
+      This holds the data from a particular CSV log such as `'DetailedData'`.
   '''
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
   DEFAULT_LOG_FREQUENCY = SPLinkCSVDir.DEFAULT_LOG_FREQUENCY
 
-  def __init__(self, dirpath, step=None, policy=None, **kw):
+  def __init__(self, dirpath, which: str, step=None, policy=None, **kw):
+    ''' Initialise the `SPLinkDataDir`.
+
+        Parameters:
+        * `dirpath`: the pathname of the directory holding the downloaded CSV files
+        * `which`: which CSV file populates this time series, eg `'DetailedData'`
+        * `step`: optional time series step size,
+          default `SPLinkDataDir.DEFAULT_LOG_FREQUENCY`,
+          which comes from `SPLinkCSVDir.DEFAULT_LOG_FREQUENCY`
+        * `policy`: optional TimespanPolicy` instance;
+          if omitted an `TimespanPolicyAnnual` instance will be made
+        Other keyword arguments are passed to the `TimeSeriesDataDir`
+        initialiser.
+    '''
     if step is None:
       step = self.DEFAULT_LOG_FREQUENCY
     if policy is None:
       policy = self.DEFAULT_POLICY_CLASS()
     super().__init__(dirpath, step=step, policy=policy, **kw)
+    self.which = which
 
-  def import_from(self, csvdir, which: str):
-    ''' Import the CSV data from `csvdir` specified by `which`.
+  def import_from(self, csvdir):
+    ''' Import the CSV data from `csvdir` specified by `self.which`.
 
         Parameters:
         * `csvdir`: a `SPLinkCSVDir` instance or the pathname of a directory
           containing SP-Link CSV download data.
-        * `which`: which CSV file to import, for example `'DetailedData'`
     '''
     if isinstance(csvdir, str):
       csvdir = SPLinkCSVDir(csvdir)
-    return csvdir.import_csv_data(which, self)
+    return csvdir.import_csv_data(self.which, self)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
