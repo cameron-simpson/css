@@ -453,6 +453,113 @@ class TimeSeries(MultiOpenMixin):
       raise ValueError("when:%s predates self.start:%s" % (when, self.start))
     return int(when_offset // self.step)
 
+  def array_index_bounds(self, start, stop):
+    ''' Return a `(array_start,array_stop)` pair for the array indices
+        between the UNIX times `start` and `stop`.
+
+        Eample:
+
+           >>> ts = TimeSeries('tsdir', 'd', 19.1, 1.2)
+           >>> ts.array_index_bounds(20,30)
+           (1, 10)
+    '''
+    if start < self.start:
+      raise IndexError(
+          "start:%s must be >= self.start:%s" % (start, self.start)
+      )
+    if stop < start:
+      raise IndexError("start:%s must be <= stop:%s" % (start, stop))
+    offset = start - self.start
+    offset_steps = offset // self.step
+    start0 = self.start + offset_steps * self.step
+    if start0 < start:
+      offset_steps += 1
+    assert offset_steps == int(offset_steps)
+    end_offset = stop - self.start
+    end_offset_steps = end_offset // self.step
+    stop0 = self.start + end_offset_steps * self.step
+    if stop0 < stop:
+      end_offset_steps += 1
+    assert end_offset_steps == int(end_offset_steps)
+    return int(offset_steps), int(end_offset_steps)
+
+  def array_indices(self, start, stop):
+    ''' Return an iterable of the array indices for the UNIX times
+        from `start` to `stop` from this `TimeSeries`.
+
+        Eample:
+
+           >>> ts = TimeSeries('tsdir', 'd', 19.1, 1.2)
+           >>> list(ts.array_indices(20,30))
+           [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    '''
+    return range(*self.array_index_bounds(start, stop))
+
+  def times(self, start, stop):
+    ''' Return an iterable of the times from `start` to `stop`
+        from this `TimeSeries`.
+
+        Eample:
+
+           >>> ts = TimeSeries('tsdir', 'd', 19.1, 1.2)
+           >>> list(ts.times(20,30))
+           [20.3, 21.5, 22.700000000000003, 23.900000000000002, 25.1, 26.3, 27.5, 28.700000000000003, 29.9]
+
+        Note that if the `TimeSeries` uses `float` values for `start` and `step`
+        then the values returned here will not necessarily round trip
+        to array indicies because of rounding.
+
+        As such, these times are useful for supplying the index to
+        a time series as might be wanted for a graph, but are not
+        reliably useful to _obtain_ the values from the time series.
+        So this is reliable:
+
+            # works well: pair up values with their times
+            graph_data = zip(ts.times(20,30), ts[20:30])
+
+        but this is unreliable because of rounding:
+
+            # unreliable: pair up values with their times
+            times = list(ts.times(20, 30))
+            graph_data = zip(times, [ts[t] for t in times])
+
+        Instead, the reliable way to obtain the values between the
+        UNIX times `start` and `stop` is to directly fetch them
+        from the `array` underlying the `TimeSeries`.
+        This can be done using the `array_index_bounds`
+        or `array_indices` methods to obtain the `array` indices,
+        for example:
+
+            astart, astop = ts.array_index_bounds(start, stop)
+            return ts.array[astart:astop]
+
+        or more conveniently by slicing the `TimeSeries`:
+
+            values = ts[start:stop]
+    '''
+    if start < self.start:
+      raise IndexError(
+          "start:%s must be >= self.start:%s" % (start, self.start)
+      )
+    if stop < start:
+      raise IndexError("start:%s must be <= stop:%s" % (start, stop))
+    offset = start - self.start
+    offset_steps = offset // self.step
+    start0 = self.start + offset_steps * self.step
+    if start0 < start:
+      offset_steps += 1
+    assert offset_steps == int(offset_steps)
+    end_offset = stop - self.start
+    end_offset_steps = end_offset // self.step
+    stop0 = self.start + end_offset_steps * self.step
+    if stop0 < stop:
+      end_offset_steps += 1
+    assert end_offset_steps == int(end_offset_steps)
+    return (
+        self.start + self.step * offset_step
+        for offset_step in range(int(offset_steps), int(end_offset_steps))
+    )
+
   def index_when(self, index: int):
     ''' Return the UNIX time corresponding to the array index `index`.
     '''
@@ -466,8 +573,21 @@ class TimeSeries(MultiOpenMixin):
 
   def __getitem__(self, when):
     ''' Return the datum for the UNIX time `when`.
+
+        If `when` is a slice, return a list of the data
+        for the times in the range `start:stop`
+        as given by `self.times(start,stop)`.
     '''
-    # avoid confusion with negatiove indices
+    if isinstance(when, slice):
+      start, stop, step = when
+      if step is not None:
+        raise ValueError(
+            "%s index slices may not specify a step" % (type(self).__name__,)
+        )
+      array = self.array
+      astart, astop = self.array_index_bounds(start, stop)
+      return array[astart:astop]
+    # avoid confusion with negative indices
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     return self.array[self.array_index(when)]
