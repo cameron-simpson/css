@@ -366,12 +366,14 @@ class TimeSeries(MultiOpenMixin):
       ary = array(self.typecode)
     return ary
 
-  def flush(self):
+  def flush(self, keep_array=False):
     ''' Save the data file if `self.modified`.
     '''
     if self.modified:
       self.save()
       self.modified = False
+      if not keep_array:
+        self._array = None
 
   def save(self, fspath=None):
     ''' Save the time series to `fspath`, default `self.fspath`.
