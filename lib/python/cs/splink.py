@@ -15,7 +15,8 @@ import pytz
 
 from cs.cmdutils import BaseCommand
 from cs.csvutils import csv_import
-from cs.pfx import pfx_call
+from cs.fs import HasFSPath
+from cs.pfx import pfx, pfx_call
 from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyAnnual,
@@ -34,9 +35,13 @@ def main(argv=None):
 class SPLinkCommand(BaseCommand):
 
   def cmd_import(self, argv):
+    ''' Usage: {cmd} sp-link-dirpath timeseries-dirpath
+          Import the DetailedData CSV data from sp-link-dirpath into the time
+          series data directory at timeseries-dirpath.
+    '''
     csv_dirpath, tsdirpath = argv
-    tsd = TimeSeriesDataDir(tsdirpath, step=900, policy=TimespanPolicyAnnual())
-    import_csv_data(csv_dirpath, tsd)
+    with SPLinkDataDir(tsdirpath) as spd:
+      spd.import_from(csv_dirpath, 'DetailedData')
 
 def ts2001_unixtime(tzname=None):
   ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
@@ -46,45 +51,80 @@ def ts2001_unixtime(tzname=None):
     tzname = 'local'
   a2001 = arrow.get(datetime(2001, 1, 1, 0, 0, 0), tzname)
   unixtime = a2001.timestamp()
+  X("a2001 %s, unixtime %s", a2001, unixtime)
   return unixtime
 
-def import_csv_data(csv_dirpath: str, tsd: TimeSeriesDataDir, tzname=None):
-  ''' Read the CSV files in `csv_dirpath` and import them into a
-      `TimeSeriesDataDir`.
+class SPLinkCSVDir(HasFSPath):
+  ''' A class for working with SP-Link data downloads.
   '''
-  nan = float('nan')
-  ts2000 = ts2000_unixtime(tzname)
-  X("ts2000 = %s", ts2000)
-  # load the DetailedData CSV
-  detailed_csvfilename, = [
-      filename for filename in pfx_listdir(csv_dirpath)
-      if fnmatch(filename, '*_DetailedData_????-??-??_??-??-??.CSV')
-  ]
-  csvpath = joinpath(csv_dirpath, detailed_csvfilename)
-  rowtype, rows = csv_import(csvpath)
-  # group the values by key
-  keys = rowtype.attributes_
-  key0 = keys[0]
-  key_values = {key: [] for key in keys}
-  for row in rows:
-    for key, value in zip(keys, row):
-      if key == key0:
-      else:
-        try:
-          value = int(value)
-        except ValueError:
+  DEFAULT_LOG_FREQUENCY = 900
+
+  def __init__(self, dirpath):
+    super().__init__(dirpath)
+
+  @pfx
+  def csvpath(self, which: str) -> str:
+    ''' Return the CSV filename specified by `which`.
+    '''
+    csvfilename, = self.fnmatch(f'*_{which}_*.CSV')
+    return csvfilename
+
+  def import_csv_data(self, which: str, tsd: TimeSeriesDataDir, tzname=None):
+    ''' Read the CSV file in `self.fspath` specified by `which`
+        and import them into the `tsd:TimeSeriesDataDir.
+    '''
+    nan = float('nan')
+    ts2001 = ts2001_unixtime(tzname)
+    # load the DetailedData CSV
+    csvfilename = self.csvpath(which)
+    csvpath = self.pathto(csvfilename)
+    rowtype, rows = csv_import(csvpath)
+    # group the values by key
+    keys = rowtype.attributes_
+    key0 = keys[0]
+    key_values = {key: [] for key in keys}
+    for row in rows:
+      for key, value in zip(keys, row):
+        if key == key0:
           # seconds since 2001-01-01; make UNIX time
           value = int(value) + ts2001
+        else:
           try:
-            value = float(value)
+            value = int(value)
           except ValueError:
-            value = nan
-      key_values[key].append(value)
-  X("len %r = %d", key0, len(key_values[key0]))
-  for key in keys[2:]:
-    X("key = %s", key)
-    tsks = tsd[key]
-    tsks.setitems(key_values[key0], key_values[key])
+            try:
+              value = float(value)
+            except ValueError:
+              value = nan
+        key_values[key].append(value)
+    for key in keys[2:]:
+      tsks = tsd[key]
+      tsks.setitems(key_values[key0], key_values[key])
+
+class SPLinkDataDir(TimeSeriesDataDir):
+  ''' A `TimeSeriesDataDir` to hold CSV log data from an SP-Link data download.
+  '''
+  DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
+  DEFAULT_LOG_FREQUENCY = SPLinkCSVDir.DEFAULT_LOG_FREQUENCY
+
+  def __init__(self, dirpath, step=None, policy=None, **kw):
+    if step is None:
+      step = self.DEFAULT_LOG_FREQUENCY
+    if policy is None:
+      policy = self.DEFAULT_POLICY_CLASS()
+    super().__init__(dirpath, step=step, policy=policy, **kw)
+
+  def import_from(self, csvdir, which: str):
+    ''' Import the CSV data from `csvdir` specified by `which`.
+
+        Parameters:
+        * `csvdir`: a `SPLinkCSVDir` instance or the pathname of a directory
+          containing SP-Link CSV download data.
+        * `which`: which CSV file to import, for example `'DetailedData'`
+    '''
+    if isinstance(csvdir, str):
+      csvdir = SPLinkCSVDir(csvdir)
+    return csvdir.import_csv_data(which, self)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
