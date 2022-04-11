@@ -471,7 +471,7 @@ class TimeSeries(MultiOpenMixin):
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
     self.pad_to(when)
     self.array[self.array_index(when)] = value
-    self._modified = True
+    self.modified = True
 
   def pad_to(self, when, fill=None):
     ''' Pad the time series to store values up to the UNIX time `when`.
@@ -487,7 +487,7 @@ class TimeSeries(MultiOpenMixin):
     ary = self.array
     if ary_index >= len(ary):
       ary.extend(fill for _ in range(ary_index - len(ary) + 1))
-      self._modified = True
+      self.modified = True
       assert len(ary) == ary_index + 1
 
 
