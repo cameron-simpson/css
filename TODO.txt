@@ -1,3 +1,4 @@
+TimeSeries: support slicing and indexed slicing
 cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
 BaseCommand: move most of __init__ into run-context along with setup_logging context manager use
