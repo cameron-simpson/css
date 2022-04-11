@@ -77,7 +77,6 @@ NATIVE_BIGENDIANNESS = {
     typecode: deduce_type_bigendianness(typecode)
     for typecode in SUPPORTED_TYPECODES
 }
-X("NATIVE_BIGENDIANNESS = %r", NATIVE_BIGENDIANNESS)
 
 class TimeSeriesCommand(BaseCommand):
   ''' Command line interface to `TimeSeries` data files.
@@ -86,9 +85,11 @@ class TimeSeriesCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'test'
 
   def cmd_test(self, argv):
+    ''' Usage: {cmd} [testnames...]
+          Run some tests of functionality.
+    '''
     if not argv:
       argv = ['pandas']
-    testname = argv.pop(0)
 
     def test_pandas():
       t0 = 1649552238
@@ -139,15 +140,20 @@ class TimeSeriesCommand(BaseCommand):
         'timeseries': test_timeseries,
         'timespan_policy': test_timespan_policy,
     }
-    with Pfx(testname):
-      try:
-        testfunc = testfunc_map[testname]
-      except KeyError:
-        raise GetoptError(
-            "unknown test name, I expected one of: %s" %
-            (", ".join(sorted(testfunc_map.keys())),)
-        )
-      return testfunc()
+    ok = True
+    for testname in argv:
+      with Pfx(testname):
+        if testname not in testfunc_map:
+          warning("unknown test name")
+          ok = False
+    if not ok:
+      raise GetoptError(
+          "bad test names, I know: %s" %
+          (", ".join(sorted(testfunc_map.keys())),)
+      )
+    for testname in argv:
+      with Pfx(testname):
+        testfunc_map[testname]()
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
