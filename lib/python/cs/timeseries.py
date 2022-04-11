@@ -2,6 +2,14 @@
 
 ''' Efficient portable machine native columnar storage of time series data
     for double float and signed 64-bit integers.
+
+    I use this as efficient storage of time series data from my solar inverter,
+    which reports in a slightly clunky time limited CSV format;
+    I import those CSVs into `TimeSeries` data directories
+    which contain the overall accrued data.
+
+    The `TimeSeries` and related classes provide methods
+    for providing the data as `pandas.Series` instances etc.
 '''
 
 from abc import ABC, abstractmethod
