@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 
-''' Assorted utility functions for working with data from Selectronics' SP-LINK programme which communicates with their controllers.
+''' Assorted utility functions for working with data
+    downloaded from Selectronics' SP-LINK programme
+    which communicates with their controllers.
 '''
 
-import arrow
 from datetime import datetime
-from fnmatch import fnmatch
 from functools import partial
 import os
 from os.path import join as joinpath
 import sys
 
-import pytz
+import arrow
 
 from cs.cmdutils import BaseCommand
 from cs.csvutils import csv_import
-from cs.fs import HasFSPath
-from cs.pfx import pfx, pfx_call
+from cs.deco import cachedmethod
+from cs.fs import HasFSPath, needdir
+from cs.pfx import pfx, pfx_call, Pfx
 from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyAnnual,
-    get_default_timezone_name,
 )
 
 from cs.x import X
@@ -30,6 +30,8 @@ pfx_listdir = partial(pfx_call, os.listdir)
 SPLINK_LOG_INTERVAL = 900  # really? 15 minutes? ugh
 
 def main(argv=None):
+  ''' SP-Link command line mode.
+  '''
   return SPLinkCommand(argv).run()
 
 class SPLinkCommand(BaseCommand):
@@ -42,7 +44,7 @@ class SPLinkCommand(BaseCommand):
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} sp-link-dirpath timeseries-dirpath [datasets...]
-          Import CSV data from sp-link-dirpath into the time series data 
+          Import CSV data from sp-link-dirpath into the time series data
           directories under timeseries-dirpath.
           Default datasets: {LOG_DATASETS}
     '''
@@ -73,9 +75,6 @@ class SPLinkCSVDir(HasFSPath):
   '''
   DEFAULT_LOG_FREQUENCY = 900
 
-  def __init__(self, dirpath):
-    super().__init__(dirpath)
-
   @property
   @cachedmethod
   def sitename(self):
@@ -86,10 +85,15 @@ class SPLinkCSVDir(HasFSPath):
   @pfx
   def csvpath(self, which: str) -> str:
     ''' Return the CSV filename specified by `which`.
+
+        Example:
+
+            self.csvpath('DetailedData')
     '''
     csvfilename, = self.fnmatch(f'*_{which}_*.CSV')
     return csvfilename
 
+  # pylint: disable=too-many-locals
   def import_csv_data(self, which: str, tsd: TimeSeriesDataDir, tzname=None):
     ''' Read the CSV file in `self.fspath` specified by `which`
         and import them into the `tsd:TimeSeriesDataDir.
@@ -126,6 +130,7 @@ class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold CSV log data from an SP-Link data download.
       This holds the data from a particular CSV log such as `'DetailedData'`.
   '''
+
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
   DEFAULT_LOG_FREQUENCY = SPLinkCSVDir.DEFAULT_LOG_FREQUENCY
 
