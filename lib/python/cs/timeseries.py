@@ -18,6 +18,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
 from getopt import GetoptError
+from importlib import import_module
 import os
 from os.path import (
     dirname,
@@ -47,10 +48,50 @@ from cs.resources import MultiOpenMixin
 
 from cs.x import X
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+    'entry_points': {
+        'console_scripts': [
+            'csts = cs.timeseries:main',
+        ],
+    },
+    'extras_requires': {
+        'numpy': ['numpy'],
+        'pandas': ['pandas'],
+        'plotting': ['plotly'],
+    },
+}
+
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
   '''
   return TimeSeriesCommand(argv).run()
+
+@pfx
+def import_extra(extra_package_name):
+  try:
+    return import_module(extra_package_name)
+  except ImportError:
+    from_extras = [
+        extra_name
+        for extra_name, extra_packages in DISTINFO['extras_requires'].items()
+        if extra_package_name in extra_packages
+    ]
+    if from_extras:
+      warning(
+          "package not available; the following extras pull it in: %r" %
+          (sorted(from_extras),)
+      )
+      raise
+    raise RuntimeError(
+        "import_extra called with a package not listed in DISTINFO[extras_requires]=%r"
+        % (DISTINFO['extras_requires'],)
+    )
 
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
