@@ -1020,7 +1020,7 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
     try:
       ts = self._ts_by_tag[tag]
     except KeyError:
-      tag_start, tag_end = policy.timespan_for(when)
+      tag_start, tag_end = self.timespan_for(when)
       filepath = self.pathto(tag + TimeSeries.DOTEXT)
       ts = self._ts_by_tag[tag] = TimeSeries(
           filepath, self.typecode, tag_start, self.step
