@@ -1008,6 +1008,11 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
     '''
     return self.policy.tag_for(self.round_down(when))
 
+  def timespan_for(self, when):
+    ''' Return the start and end UNIX times for the partition storing `when`.
+    '''
+    return self.policy.timespan_for(self.round_down(when))
+
   def subseries(self, when: Union[int, float]):
     ''' The `TimeSeries` for the UNIX time `when`.
     '''
@@ -1040,7 +1045,7 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
           tag_start = None
       if tag_start is None:
         ts = self.subseries(when)
-        tag_start, tag_end = self.policy.timespan_for(when)
+        tag_start, tag_end = self.timespan_for(when)
       ts[when] = value
 
   @plotrange
