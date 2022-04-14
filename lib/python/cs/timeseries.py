@@ -1035,14 +1035,17 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
     self.subseries(when)[when] = value
 
   def setitems(self, whens, values):
+    ''' Store `values` against the UNIX times `whens`.
+
+        This is most efficient if `whens` are ordered.
+    '''
     ts = None
     tag_start = None
     tag_end = None
     for when, value in zip(whens, values):
-      if tag_start is not None:
-        if not tag_start <= when < tag_end:
-          # different range, get the new subseries
-          tag_start = None
+      if tag_start is not None and not tag_start <= when < tag_end:
+        # different range, invalidate the current bounds
+        tag_start = None
       if tag_start is None:
         ts = self.subseries(when)
         tag_start, tag_end = self.timespan_for(when)
