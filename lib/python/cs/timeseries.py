@@ -680,6 +680,12 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
     '''
     return len(self.array)
 
+  def data(self, start, stop):
+    ''' Return an iterable of `(when,datum)` tuples for each time `when`
+        from `start` to `stop`.
+    '''
+    return zip(self.range(start, stop), self[start:stop])
+
   def __getitem__(self, when):
     ''' Return the datum for the UNIX time `when`.
 
