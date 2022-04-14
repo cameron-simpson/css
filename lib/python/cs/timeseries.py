@@ -772,10 +772,10 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
 class TimespanPolicy(DBC):
   ''' A class mplementing apolicy about where to store data,
-      used by `TimeSeriesKeySubdir` instances
+      used by `TimeSeriesPartitioned` instances
       to partition data among multiple `TimeSeries` data files.
 
-      The most important methods are `timespan_tag`
+      The most important methods are `tag_for(when)`
       which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
       and `timespan_for` which returns the per tag start and end times
       enclosing a timestamp.
@@ -816,16 +816,16 @@ class TimespanPolicy(DBC):
     # in the specified timezone?
     return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
 
-  @require(lambda start, end: start < end)
-  def tagged_spans(self, start, end):
+  @require(lambda start, stop: start < stop)
+  def tagged_spans(self, start, stop):
     ''' Generator yielding a sequence of `(tag,tag_start,tag_end)`
-        covering the range `start:end`.
+        covering the range `start:stop`.
     '''
     when = start
-    while when < end:
-      tag = self.timespan_tag(when)
+    while when < stop:
+      tag = self.tag_for(when)
       tag_start, tag_end = self.timespan_for(when)
-      yield tag, when, min(tag_end, end)
+      yield tag, when, min(tag_end, stop)
       when = tag_end
 
 class TimespanPolicyDaily(TimespanPolicy):
@@ -928,7 +928,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   @require(lambda key: is_clean_subpath(key) and '/' not in key)
   def __getitem__(self, key):
-    ''' Return the `TimeSeriesKeySubdir` for `key`,
+    ''' Return the `TimeSeriesPartitioned` for `key`,
         creating its subdirectory if necessary.
     '''
     try:
@@ -937,7 +937,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       keypath = self.pathto(key)
       if not isdirpath(keypath):
         pfx_mkdir(keypath)
-      tsks = self._tsks_by_key[key] = TimeSeriesKeySubdir(
+      tsks = self._tsks_by_key[key] = TimeSeriesPartitioned(
           self.pathto(key),
           self.key_typecode(key),
           step=self.step,
@@ -946,7 +946,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       tsks.open()
     return tsks
 
-class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
   @plotrange
   def plot(self, start, stop, keys=None, *, figure, **scatter_kw):
     ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
@@ -960,12 +959,13 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
       tsks.plot(start, stop, figure=figure, **scatter_kw)
     return figure
 
+class TimeSeriesPartitioned(HasFSPath, MultiOpenMixin):
   ''' A collection of `TimeSeries` files in a subdirectory.
       We have one of these for each `TimeSeriesDataDir` key.
 
       This class manages a collection of files
       named by the tag from a `TimespanPolicy`,
-      which dicates which tag holds the datum for a UNIX time.
+      which dictates which tag holds the datum for a UNIX time.
   '''
 
   @typechecked
@@ -979,6 +979,26 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
       policy,  ##: TimespanPolicy,
       start=0,
   ):
+    ''' Initialise the `TimeSeriesPartitioned` instance.
+
+        Parameters:
+        * `dirpath`: the directory filesystem path,
+          known as `.fspath` within the instance
+        * `typecode`: the `array` type code for the data
+        * `step`: keyword parameter specifying the width of a time slot
+        * `policy`: the partitioning `TimespanPolicy`
+        * `start`: the reference epoch, default `0`
+
+        The instance requires a reference epoch
+        because the `policy` start times will almost always
+        not fall on exact multiples of `step`.
+        The reference allows for reliable placement of times
+        which fall within `step` of a partition boundary.
+        For example, if `start==0` and `step==6` and a partition
+        boundary came at `19` (eg due to some calendar based policy)
+        then a time of `20` would fall in the partion left of the
+        boundary because it belongs to the time slot commencing at `18`.
+    '''
     assert isinstance(policy,
                       TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
     super().__init__(dirpath)
