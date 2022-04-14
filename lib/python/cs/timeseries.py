@@ -1034,6 +1034,24 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
   def __setitem__(self, when, value):
     self.subseries(when)[when] = value
 
+  def partition(self, start, stop):
+    ''' Return an iterable of `(when,subseries)` for each time `when`
+        from `start` to `stop`.
+
+        This is most efficient if `whens` are ordered.
+    '''
+    ts = None
+    tag_start = None
+    tag_end = None
+    for when in self.range(start, stop):
+      if tag_start is not None and not tag_start <= when < tag_end:
+        # different range, invalidate the current bounds
+        tag_start = None
+      if tag_start is None:
+        ts = self.subseries(when)
+        tag_start, tag_end = self.timespan_for(when)
+      yield when, ts
+
   def setitems(self, whens, values):
     ''' Store `values` against the UNIX times `whens`.
 
