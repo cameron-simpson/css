@@ -920,6 +920,12 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     return 'd'
 
   @require(lambda key: is_clean_subpath(key) and '/' not in key)
+  def __contains__(self, key):
+    ''' Test if there is a subdirectory for `key`.
+    '''
+    return isdirpath(self.pathto(key))
+
+  @require(lambda key: is_clean_subpath(key) and '/' not in key)
   def __getitem__(self, key):
     ''' Return the `TimeSeriesKeySubdir` for `key`,
         creating its subdirectory if necessary.
