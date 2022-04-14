@@ -754,6 +754,23 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
     return series
 
 class TimespanPolicy(ABC):
+  @plotrange
+  def plot(self, start, stop, *, figure, **scatter_kw):
+    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
+        creating it if necessary.
+        Return `figure`.
+    '''
+    plotly = import_extra('plotly', DISTINFO)
+    go = plotly.graph_objects
+    xaxis = list(self.range(start, stop))
+    yaxis = list(self[start:stop])
+    assert len(xaxis) == len(yaxis), (
+        "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
+        (len(xaxis), len(yaxis), start, stop)
+    )
+    figure.add_trace(go.Scatter(x=xaxis, y=yaxis, **scatter_kw))
+    return figure
+
   ''' A class mplementing apolicy about where to store data,
       used by `TimeSeriesKeySubdir` instances
       to partition data among multiple `TimeSeries` data files.
@@ -923,6 +940,19 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     return tsks
 
 class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
+  @plotrange
+  def plot(self, start, stop, keys=None, *, figure, **scatter_kw):
+    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
+        creating it if necessary.
+        Return `figure`.
+    '''
+    if keys is None:
+      keys = sorted(self.keys())
+    for key in keys:
+      tsks = self[key]
+      tsks.plot(start, stop, figure=figure, **scatter_kw)
+    return figure
+
   ''' A collection of `TimeSeries` files in a subdirectory.
       We have one of these for each `TimeSeriesDataDir` key.
 
@@ -1001,6 +1031,25 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
         ts = self.subseries(when)
         tag_start, tag_end = self.policy.timespan_for(when)
       ts[when] = value
+
+  @plotrange
+  def plot(self, start, stop, *, figure, **scatter_kw):
+    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
+        creating it if necessary.
+        Return `figure`.
+    '''
+    plotly = import_extra('plotly', DISTINFO)
+    go = plotly.graph_objects
+    xaxis = list(self.range(start, stop))
+    yaxis = []
+    for tag, tagged_start, tagged_stop in self.tagged_spans(start, stop):
+      yaxis.extend(self[tag][tagged_start:tagged_stop])
+    assert len(xaxis) == len(yaxis), (
+        "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
+        (len(xaxis), len(yaxis), start, stop)
+    )
+    figure.add_trace(go.Scatter(x=xaxis, y=yaxis, **scatter_kw))
+    return figure
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
