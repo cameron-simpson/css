@@ -63,7 +63,7 @@ DISTINFO = {
     'extras_requires': {
         'numpy': ['numpy'],
         'pandas': ['pandas'],
-        'plotting': ['plotly'],
+        'plotting': ['kaleido', 'plotly'],
     },
 }
 
