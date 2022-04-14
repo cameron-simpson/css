@@ -141,6 +141,14 @@ def rpaths(
         continue
       yield relpath(joinpath(subpath, filename), dirpath)
 
+def fnmatchdir(dirpath, fnglob):
+  ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
+  '''
+  return [
+      filename for filename in pfx_listdir(dirpath)
+      if fnmatch(filename, fnglob)
+  ]
+
 # pylint: disable=too-few-public-methods
 class HasFSPath:
   ''' An object with a `.fspath` attribute representing a filesystem location.
@@ -158,10 +166,7 @@ class HasFSPath:
   def fnmatch(self, fnglob):
     ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
     '''
-    return [
-        filename for filename in pfx_listdir(self.fspath)
-        if fnmatch(filename, fnglob)
-    ]
+    return fnmatchdir(self.fspath, fnglob)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
