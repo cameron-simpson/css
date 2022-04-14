@@ -753,7 +753,6 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
     series = PDSeries(data, indices)
     return series
 
-class TimespanPolicy(ABC):
   @plotrange
   def plot(self, start, stop, *, figure, **scatter_kw):
     ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
@@ -771,6 +770,7 @@ class TimespanPolicy(ABC):
     figure.add_trace(go.Scatter(x=xaxis, y=yaxis, **scatter_kw))
     return figure
 
+class TimespanPolicy(DBC):
   ''' A class mplementing apolicy about where to store data,
       used by `TimeSeriesKeySubdir` instances
       to partition data among multiple `TimeSeries` data files.
@@ -795,7 +795,8 @@ class TimespanPolicy(ABC):
     self.timezone = timezone
 
   @abstractmethod
-  def timespan_for(self, when):
+  @ensure(lambda when, result: result[0] <= when < result[1])
+  def timespan_for(self, when: Numeric) -> Tuple[Numeric, Numeric]:
     ''' A `TimespanPolicy` bracketing the UNIX time `when`.
     '''
     raise NotImplementedError
