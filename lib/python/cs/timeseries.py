@@ -794,18 +794,18 @@ class TimespanPolicy(DBC):
       timezone = get_default_timezone_name()
     self.timezone = timezone
 
+  def Arrow(self, when):
+    ''' Return an `arrow.Arrow` instance for the UNIX time `when`
+        in the policy timezone.
+    '''
+    return arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
+
   @abstractmethod
   @ensure(lambda when, result: result[0] <= when < result[1])
   def timespan_for(self, when: Numeric) -> Tuple[Numeric, Numeric]:
     ''' A `TimespanPolicy` bracketing the UNIX time `when`.
     '''
     raise NotImplementedError
-
-  def Arrow(self, when):
-    ''' Return an `arrow.Arrow` instance for the UNIX time `when`
-        in the right timezone.
-    '''
-    return arrow.Arrow.fromtimestamp(when, tzinfo=self.timezone)
 
   def timespan_tag(self, when):
     ''' Return the default tag for the UNIX time `when`,
