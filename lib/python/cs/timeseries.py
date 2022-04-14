@@ -38,8 +38,8 @@ from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.deco import cachedmethod
 from cs.fs import HasFSPath, is_clean_subpath, shortpath
+from cs.deco import cachedmethod, decorator
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call, Pfx
@@ -182,6 +182,42 @@ class TimeSeriesCommand(BaseCommand):
     for testname in argv:
       with Pfx(testname):
         testfunc_map[testname]()
+
+@decorator
+def plotrange(func, needs_start=False, needs_stop=False):
+  ''' A decorator for plotting methods with optional `start` and `stop`
+      leading positional parameters and an optional `figure` keyword parameter.
+
+      The decorator parameters `needs_start` and `needs_stop`
+      may be set to require non-`None` values for `start` and `stop`.
+
+      If `start` is `None` its value is set to `self.start`.
+      If `stop` is `None` its value is set to `self.stop`.
+      If `figure` is `None` its value is set to a new
+      `plotly.graph_objects.Figure` instance.
+
+      The decorated method is then called as:
+
+          func(self, start, stop, *a, figure=figure, **kw)
+
+      where `*a` and `**kw` are the additional positional and keyword
+      parameters respectively, if any.
+  '''
+
+  @require(lambda start: not needs_start or start is not None)
+  @require(lambda stop: not needs_stop or stop is not None)
+  def plotrange_wrapper(self, start=None, stop=None, *a, figure=None, **kw):
+    plotly = import_extra('plotly', DISTINFO)
+    go = plotly.graph_objects
+    if start is None:
+      start = self.start
+    if stop is None:
+      stop = self.stop
+    if figure is None:
+      figure = go.Figure()
+    return func(self, start, stop, *a, figure=figure, **kw)
+
+  return plotrange_wrapper
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
