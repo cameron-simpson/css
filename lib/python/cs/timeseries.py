@@ -972,7 +972,7 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
   @require(lambda step: step > 0)
   def __init__(
       self,
-      fspath: str,
+      dirpath: str,
       typecode: str,
       *,
       step: Union[int, float],
@@ -980,7 +980,7 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
   ):
     assert isinstance(policy,
                       TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
-    super().__init__(fspath)
+    super().__init__(dirpath)
     self.typecode = typecode
     self.policy = policy
     self.step = step
