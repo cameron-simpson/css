@@ -977,12 +977,14 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
       *,
       step: Union[int, float],
       policy,  ##: TimespanPolicy,
+      start=0,
   ):
     assert isinstance(policy,
                       TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
     super().__init__(dirpath)
     self.typecode = typecode
     self.policy = policy
+    self.start = start
     self.step = step
     self._ts_by_tag = {}
 
