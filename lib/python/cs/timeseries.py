@@ -688,7 +688,8 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
         as given by `self.range(start,stop)`.
     '''
     if isinstance(when, slice):
-      start, stop, step = when
+      X("WHEN SLICE = %r", when)
+      start, stop, step = when.start, when.stop, when.step
       if step is not None:
         raise ValueError(
             "%s index slices may not specify a step" % (type(self).__name__,)
