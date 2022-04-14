@@ -807,7 +807,7 @@ class TimespanPolicy(DBC):
     '''
     raise NotImplementedError
 
-  def timespan_tag(self, when):
+  def tag_for(self, when):
     ''' Return the default tag for the UNIX time `when`,
         which is derived from the `arrow.Arrow`
         format string `self.DEFAULT_TAG_FORMAT`.
@@ -1003,11 +1003,15 @@ class TimeSeriesKeySubdir(HasFSPath, MultiOpenMixin):
     for ts in self._ts_by_tag.values():
       ts.close()
 
+  def tag_for(self, when) -> str:
+    ''' Return the tag for the UNIX time `when`.
+    '''
+    return self.policy.tag_for(self.round_down(when))
+
   def subseries(self, when: Union[int, float]):
     ''' The `TimeSeries` for the UNIX time `when`.
     '''
-    policy = self.policy
-    tag = policy.timespan_tag(when)
+    tag = self.tag_for(when)
     try:
       ts = self._ts_by_tag[tag]
     except KeyError:
