@@ -240,7 +240,128 @@ def array_byteswapped(ary):
   finally:
     ary.byteswap()
 
-class TimeSeries(MultiOpenMixin):
+class TimeStepsMixin:
+  ''' Methods for an object with `start` and `step` attributes.
+  '''
+
+  def offset(self, when) -> int:
+    ''' Return the step offset for the UNIX time `when` from `self.start`.
+
+        Eample in a `TimeSeries`:
+
+           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts.offset(19.1)
+           0
+           >>> ts.offset(20)
+           0
+           >>> ts.offset(22)
+           2
+    '''
+    offset = when - self.start
+    offset_steps = offset // self.step
+    when0 = self.start + offset_steps * self.step
+    if when0 < self.start:
+      offset_steps += 1
+    offset_steps_i = int(offset_steps)
+    assert offset_steps == offset_steps_i
+    return offset_steps_i
+
+  def when(self, offset):
+    ''' Return `self.start+offset*self.step`.
+    '''
+    return self.start + offset * self.step
+
+  def offset_bounds(self, start, stop) -> (int, int):
+    offset_steps = self.offset(start)
+    end_offset_steps = self.offset(stop)
+    if end_offset_steps == offset_steps and stop > start:
+      end_offset_steps += 1
+    return offset_steps, end_offset_steps
+
+  def offset_range(self, start, stop):
+    ''' Return an iterable of the offsets from `start` to `stop`
+        in units of `self.step`
+        i.e. `offset(start) == 0`.
+
+        Eample in a `TimeSeries`:
+
+           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> list(ts.offset_range(20,30))
+           [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    '''
+    if start < self.start:
+      raise IndexError(
+          "start:%s must be >= self.start:%s" % (start, self.start)
+      )
+    if stop < start:
+      raise IndexError("start:%s must be <= stop:%s" % (start, stop))
+    offset_steps, end_offset_steps = self.offset_bounds(start, stop)
+    return range(offset_steps, end_offset_steps)
+
+  def round_down(self, when):
+    ''' Return `when` rounded down to the start of its time slot.
+    '''
+    return self.when(self.offset(when))
+
+  def round_up(self, when, start, step):
+    ''' Return `when` rounded up to the next time slot.
+    '''
+    rounded = self.round_down(when)
+    if rounded < when:
+      rounded = self.when(self.offset(when) + 1)
+    return rounded
+
+  def range(self, start, stop):
+    ''' Return an iterable of the times from `start` to `stop`.
+
+        Eample in a `TimeSeries`:
+
+           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> list(ts.range(20,30))
+           [19.1, 20.3, 21.5, 22.700000000000003, 23.900000000000002, 25.1, 26.3, 27.5, 28.700000000000003]
+
+
+        Note that if the `TimeSeries` uses `float` values for `start` and `step`
+        then the values returned here will not necessarily round trip
+        to array indicies because of rounding.
+
+        As such, these times are useful for supplying the index to
+        a time series as might be wanted for a graph, but are not
+        reliably useful to _obtain_ the values from the time series.
+        So this is reliable:
+
+            # works well: pair up values with their times
+            graph_data = zip(ts.range(20,30), ts[20:30])
+
+        but this is unreliable because of rounding:
+
+            # unreliable: pair up values with their times
+            times = list(ts.range(20, 30))
+            graph_data = zip(times, [ts[t] for t in times])
+
+        The reliable form is available as the `data(start,stop)` method.
+
+        Instead, the reliable way to obtain the values between the
+        UNIX times `start` and `stop` is to directly fetch them
+        from the `array` underlying the `TimeSeries`.
+        This can be done using the `offset_bounds`
+        or `array_indices` methods to obtain the `array` indices,
+        for example:
+
+            astart, astop = ts.offset_bounds(start, stop)
+            return ts.array[astart:astop]
+
+        or more conveniently by slicing the `TimeSeries`:
+
+            values = ts[start:stop]
+    '''
+    # this would be a range but they only work in integers
+    return (
+        self.start + self.step * offset_step
+        for offset_step in self.offset_range(start, stop)
+    )
+
+class TimeSeries(MultiOpenMixin, TimeStepsMixin):
   ''' A single time series for a single data field.
 
       This provides easy access to a time series data file.
