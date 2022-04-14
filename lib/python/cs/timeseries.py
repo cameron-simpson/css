@@ -644,9 +644,9 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
         Eample:
 
-           >>> ts = TimeSeries('tsdir', 'd', 19.1, 1.2)
+           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
            >>> ts.array_index_bounds(20,30)
-           (1, 10)
+           (0, 9)
     '''
     if start < self.start:
       raise IndexError(
@@ -660,9 +660,9 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
         Eample:
 
-           >>> ts = TimeSeries('tsdir', 'd', 19.1, 1.2)
+           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
            >>> list(ts.array_indices(20,30))
-           [1, 2, 3, 4, 5, 6, 7, 8, 9]
+           [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
     return self.offset_range(start, stop)
 
