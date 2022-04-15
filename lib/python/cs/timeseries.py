@@ -122,7 +122,7 @@ class TimeSeriesCommand(BaseCommand):
     def test_pandas():
       t0 = 1649552238
       fspath = f'foo--from-{t0}.dat'
-      ts = TimeSeries(fspath, 'd', t0, 1)
+      ts = TimeSeries(fspath, 'd', start=t0, step=1)
       ary = ts.array
       ts.pad_to(time.time() + 300)
       print("len(ts) =", len(ts))
@@ -154,7 +154,7 @@ class TimeSeriesCommand(BaseCommand):
     def test_timeseries():
       t0 = 1649464235
       fspath = 'foo.dat'
-      ts = TimeSeries(fspath, 'd', t0, 1)
+      ts = TimeSeries(fspath, 'd', start=t0, step=1)
       ary = ts.array
       print(ary)
       ts.pad_to(time.time() + 300)
@@ -249,7 +249,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> ts.offset(19.1)
            0
            >>> ts.offset(20)
@@ -285,7 +285,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> list(ts.offset_range(20,30))
            [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
@@ -316,7 +316,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> list(ts.range(20,30))
            [19.1, 20.3, 21.5, 22.700000000000003, 23.900000000000002, 25.1, 26.3, 27.5, 28.700000000000003]
 
@@ -394,6 +394,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
       self,
       fspath: str,
       typecode: Optional[str] = None,
+      *,
       start: Union[int, float],
       step: Union[int, float],
       fill=None,
@@ -1066,7 +1067,7 @@ class TimeSeriesPartitioned(HasFSPath, MultiOpenMixin):
       tag_start, tag_end = self.timespan_for(when)
       filepath = self.pathto(tag + TimeSeries.DOTEXT)
       ts = self._ts_by_tag[tag] = TimeSeries(
-          filepath, self.typecode, tag_start, self.step
+          filepath, self.typecode, start=tag_start, step=self.step
       )
       ts.open()
     return ts
