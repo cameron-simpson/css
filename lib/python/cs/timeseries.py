@@ -850,6 +850,14 @@ class TimespanPolicy(DBC):
       yield tag, when, min(tag_end, stop)
       when = tag_end
 
+  def tag_timespan(self, tag) -> Tuple[Numeric, Numeric]:
+    ''' Return the start and end times for the supplied `tag`.
+    '''
+    return self.timespan_for(
+        arrow.get(tag, self.DEFAULT_TAG_FORMAT,
+                  tzinfo=self.timezone).timestamp()
+    )
+
 class TimespanPolicyDaily(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at day boundaries.
   '''
