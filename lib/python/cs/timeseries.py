@@ -393,7 +393,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
   def __init__(
       self,
       fspath: str,
-      typecode: str,
+      typecode: Optional[str] = None,
       start: Union[int, float],
       step: Union[int, float],
       fill=None,
@@ -403,14 +403,17 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
         Parameters:
         * `fspath`: the filename of the data file
-        * `typecode` the expected `array.typecode` value of the data
+        * `typecode` optional expected `array.typecode` value of the data;
+          if specified and the data file exists, they must match;
+          if not specified then the data file must exist
+          and the `typecode` will be obtained from its header
         * `start`: the UNIX epoch time for the first datum
         * `step`: the increment between data times
         * `fill`: optional default fill values for `pad_to`;
-          if unspecified, use `0` for `'q'`
+          if unspecified, fill with `0` for `'q'`
           and `float('nan') for `'d'`
     '''
-    if typecode not in SUPPORTED_TYPECODES:
+    if typecode is not None and typecode not in SUPPORTED_TYPECODES:
       raise ValueError(
           "expected typecode to be one of %r, got %r" %
           (tuple(SUPPORTED_TYPECODES.keys()), typecode)
@@ -427,30 +430,26 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
             "no default fill value for typecode=%r" % (typecode,)
         )
     self.fspath = fspath
+    # compare the file against the supplied arguments
+    hdr_stat = self.stat(fspath)
+    if hdr_stat is None:
+      if typecode is None:
+        raise ValueError(
+            "no typecode supplied and no data file %r" % (fspath,)
+        )
+      file_bigendian = NATIVE_BIGENDIANNESS[typecode]
+    else:
+      file_typecode, file_bigendian = hdr_stat
+      if typecode != file_typecode:
+        raise ValueError(
+            "typecode=%r but data file %s has typecode %r" %
+            (typecode, fspath, file_typecode)
+        )
     self.typecode = typecode
+    self.file_bigendian = file_bigendian
     self.start = start
     self.step = step
     self.fill = fill
-    # read the data file header
-    try:
-      with pfx_open(fspath, 'rb') as tsf:
-        header_bs = tsf.read(self.HEADER_LENGTH)
-      if len(header_bs) != self.HEADER_LENGTH:
-        raise ValueError(
-            "file header is the wrong length, expected %d, got %d" %
-            (self.HEADER_LENGTH, len(header_bs))
-        )
-    except FileNotFoundError:
-      # file does not exist, use our native ordering
-      self.file_bigendian = NATIVE_BIGENDIANNESS[typecode]
-    else:
-      file_typecode, file_bigendian = self.parse_header(header_bs)
-      if typecode != file_typecode:
-        raise ValueError(
-            "expected typecode %r but the existing file contains typecode %r" %
-            (typecode, file_typecode)
-        )
-      self.file_bigendian = file_bigendian
     self._itemsize = array(typecode).itemsize
     assert self._itemsize == 8
     struct_fmt = self.make_struct_format(typecode, self.file_bigendian)
@@ -542,6 +541,28 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
           (b'__', _1 + _2)
       )
     return typecode, bigendian
+
+  @classmethod
+  @pfx
+  def stat(cls, fspath):
+    ''' Read the data file header, return `(typecode,bigendian)`
+        as from the `parse_header(heasder_bs)` method.
+        Returns `None` if the file does not exist.
+        Raises `ValueError` for an invalid header.
+    '''
+    # read the data file header
+    try:
+      with pfx_open(fspath, 'rb') as tsf:
+        header_bs = tsf.read(self.HEADER_LENGTH)
+      if len(header_bs) != self.HEADER_LENGTH:
+        raise ValueError(
+            "file header is the wrong length, expected %d, got %d" %
+            (self.HEADER_LENGTH, len(header_bs))
+        )
+    except FileNotFoundError:
+      # file does not exist
+      return None
+    return self.parse_header(header_bs)
 
   @property
   @cachedmethod
