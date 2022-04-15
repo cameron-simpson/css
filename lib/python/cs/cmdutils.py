@@ -18,9 +18,9 @@ from types import SimpleNamespace
 
 from cs.context import stackattrs
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, cutsuffix, format_escape, stripped_dedent
+from cs.lex import cutprefix, cutsuffix, format_escape, r, stripped_dedent
 from cs.logutils import setup_logging, warning, exception
-from cs.pfx import Pfx, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
@@ -159,9 +159,8 @@ class _MethodSubCommand(_BaseSubCommand):
       if ismethod(method):
         # already bound
         return method(argv)
-      else:
-        # unbound - supply the instance
-        return method(command, argv)
+      # unbound - supply the instance
+      return method(command, argv)
 
   def usage_format(self):
     ''' Return the usage format string from the method docstring.
@@ -625,6 +624,92 @@ class BaseCommand:
         This default implementation returns `argv` unchanged.
     '''
     return argv
+
+  @staticmethod
+  def popargv(argv, *a):
+    ''' Pop the leading argument off `argv` and parse it.
+        Return the parsed argument.
+        Raises `getopt.GetoptError` on a missing or invalid argument.
+
+        This is expected to be used inside a `main` or `cmd_*`
+        command handler method or inside `apply_preargv`.
+
+        You can just use:
+
+            value = argv.pop(0)
+
+        but this method provides conversion and valuation
+        and a richer failure mode.
+
+        Parameters:
+        * `argv`: the argument list, which is modified in place with `argv.pop(0)`
+        * the argument list `argv` may be followed by some help text
+          and/or an argument parser function.
+        * `validate`: an optional function to validate the parsed value;
+          this should return a true value if valid,
+          or a false value or raise a `ValueError` if invalid
+
+        Typical use inside a `main` or `cmd_*` method might look like:
+
+            self.options.word = self.popargv(argv, int, "a count value")
+
+        Because it raises `GetoptError` on a bad argument
+        the normal usage message failure mode follows automatically.
+
+        Demonstration:
+
+            >>> argv = ['word', '3', 'nine', '4']
+            >>> BaseCommand.popargv(argv, "word to process")
+            'word'
+            >>> BaseCommand.popargv(argv, int, "count value")
+            3
+            >>> BaseCommand.popargv(argv, float, "length")
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: length: float('nine'): could not convert string to float: 'nine'
+            >>> BaseCommand.popargv(argv, float, "width", lambda width: width > 5)
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: width: invalid value
+            >>> BaseCommand.popargv(argv, float, "length")
+            Traceback (most recent call last):
+              ...
+            getopt.GetoptError: length: missing argument
+    '''
+    parse = None
+    help_text = None
+    validate = None
+    for a0 in list(a):
+      with Pfx("%s", r(a0)):
+        if help_text is None and isinstance(a0, str):
+          help_text = a0
+        elif parse is None and callable(a0):
+          parse = a0
+        elif validate is None and callable(a0):
+          validate = a0
+        else:
+          raise TypeError(
+              "unexpected argument, expected help_text or parse, then optional validate"
+          )
+    if help_text is None:
+      help_text = (
+          "string value" if parse is None else "value suitable for %s" %
+          (parse,)
+      )
+    if parse is None:
+      parse = str
+    with Pfx(help_text):
+      if not argv:
+        raise GetoptError("missing argument")
+      arg0 = argv.pop(0)
+      try:
+        value = pfx_call(parse, arg0)
+        if validate is not None:
+          if not pfx_call(validate, value):
+            raise ValueError("invalid value")
+      except ValueError as e:
+        raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
+    return value
 
   @classmethod
   def run_argv(cls, argv, **kw):
