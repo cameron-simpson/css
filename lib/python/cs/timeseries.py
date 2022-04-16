@@ -22,6 +22,7 @@ import os
 from os.path import (
     dirname,
     isdir as isdirpath,
+    isfile as isfilepath,
     join as joinpath,
     normpath,
 )
@@ -32,19 +33,20 @@ from typing import Optional, Tuple, Union
 
 import arrow
 from arrow import Arrow
-from icontract import ensure, require
+from icontract import ensure, require, DBC
 from numpy import datetime64
 from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.fs import HasFSPath, is_clean_subpath, shortpath
 from cs.deco import cachedmethod, decorator
+from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
+from cs.tagset import TagSet
 
 from cs.x import X
 
@@ -67,11 +69,14 @@ DISTINFO = {
     },
 }
 
+Numeric = Union[int, float]
+
 def main(argv=None):
   ''' Run the command line tool for `TimeSeries` data.
   '''
   return TimeSeriesCommand(argv).run()
 
+pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_open = partial(pfx_call, open)
 
