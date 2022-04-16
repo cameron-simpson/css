@@ -915,15 +915,40 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       self,
       fspath,
       *,
-      step: Union[int, float],
+      step: Optional[Numeric] = None,
+      policy=None,  ##: TimespanPolicy
+      timezone: Optional[str] = None,
       fstags: Optional[FSTags] = None,
-      policy,  ##: TimespanPolicy
   ):
     if fstags is None:
       fstags = FSTags()
     self._fstags = fstags
     tagged = fstags[fspath]
     super().__init__(tagged.fspath)
+    self._config_modified = None
+    config = self.config
+    if step is None:
+      if self.step is None:
+        raise ValueError("missing step parameter and no step in config")
+    elif self.step is None:
+      self.step = step
+    elif step != self.step:
+      raise ValueError("step:%r != config.step:%r" % (step, self.step))
+    timezone = timezone or self.timezone
+    if policy is None:
+      policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
+      policy = TimespanPolicy.FACTORIES[policy_name](timezone=timezone)
+    elif isinstance(policy, str):
+      with Pfx("policy %r", policy):
+        policy_name = policy
+        policy = TimespanPolicy.FACTORIES[policy_name](timezone=timezone)
+    else:
+      policy_name = type(policy).__name__
+    # fill in holes in the config
+    if not config.auto.policy.name:
+      self.policy_name = policy_name
+    if not config.auto.policy.timezone:
+      self.timezone = timezone
     self.policy = policy
     self.step = step
     self._tsks_by_key = {}
@@ -938,6 +963,76 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     yield
     for ts in self._tsks_by_key.values():
       ts.close()
+    if self._config_modified:
+      self.save_config()
+
+  @property
+  def configpath(self):
+    return self.pathto('config.ini')
+
+  @property
+  @cachedmethod
+  def config(self):
+    tags = TagSet.from_ini(
+        self.configpath, type(self).__name__, missing_ok=True
+    )
+    self._config_modified = False
+    return tags
+
+  def save_config(self):
+    self.config.save_as_ini(self.configpath, type(self).__name__)
+
+  @property
+  def policy_name(self):
+    ''' The `policy.timezone` config value, usually a key from
+        `TimespanPolicy.FACTORIES`.
+    '''
+    name = self.config.auto.policy.name
+    if not name:
+      name = self.DEFAULT_POLICY_NAME
+      self.policy_name = name
+    return name
+
+  @policy_name.setter
+  def policy_name(self, new_policy_name: str):
+    ''' Set the `policy.timezone` config value, usually a key from
+        `TimespanPolicy.FACTORIES`.
+    '''
+    if new_policy_name == 'AEST': raise RuntimeError
+    self.config['policy.name'] = new_policy_name
+    self._config_modified = True
+
+  @property
+  def step(self):
+    ''' The `step` config value, the size of a time slot.
+    '''
+    return self.config.step
+
+  @step.setter
+  def step(self, new_step: Numeric):
+    ''' Set the `step` config value, the size of a time slot.
+    '''
+    if new_step <= 0:
+      raise ValueError("step must be >0, got %r" % (step,))
+    self.config['step'] = new_step
+    self._config_modified = True
+
+  @property
+  def timezone(self):
+    ''' The `policy.timezone` config value, a timezone name.
+    '''
+    name = self.config.auto.policy.timezone
+    if not name:
+      name = get_default_timezone_name()
+      self.timezone = name
+    return name
+
+  @timezone.setter
+  def timezone(self, new_timezone: str):
+    ''' Set the `policy.timezone` config value, a timezone name.
+    '''
+    self.config['policy.timezone'] = new_timezone
+    self._config_modified = True
 
   def keys(self):
     ''' The known keys, derived from the subdirectories.
