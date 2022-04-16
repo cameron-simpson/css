@@ -974,11 +974,16 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
-    yield
-    for ts in self._tsks_by_key.values():
-      ts.close()
-    if self._config_modified:
-      self.save_config()
+    try:
+      with self.fstags:
+        yield
+    finally:
+      for ts in self._tsks_by_key.values():
+        X("CLOSE %s", ts)
+        ts.close()
+      X("self._config_modified=%r", self._config_modified)
+      if self._config_modified:
+        self.save_config()
 
   @property
   def configpath(self):
@@ -1083,6 +1088,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
           self.key_typecode(key),
           step=self.step,
           policy=self.policy,
+          fstags=self.fstags,
       )
       tsks.open()
     return tsks
@@ -1119,6 +1125,7 @@ class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
       step: Union[int, float],
       policy,  ##: TimespanPolicy,
       start=0,
+      fstags: Optional[FSTags] = None,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
 
@@ -1143,10 +1150,13 @@ class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
     assert isinstance(policy,
                       TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
     super().__init__(dirpath)
+    if fstags is None:
+      fstags = FSTags()
     self.typecode = typecode
     self.policy = policy
     self.start = start
     self.step = step
+    self.fstags = fstags
     self._ts_by_tag = {}
 
   def __str__(self):
@@ -1162,9 +1172,12 @@ class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
   def startup_shutdown(self):
     ''' Close the subsidiary `TimeSeries` instances.
     '''
-    yield
-    for ts in self._ts_by_tag.values():
-      ts.close()
+    try:
+      with self.fstags:
+        yield
+    finally:
+      for ts in self._ts_by_tag.values():
+        ts.close()
 
   def tag_for(self, when) -> str:
     ''' Return the tag for the UNIX time `when`.
