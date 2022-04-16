@@ -1,3 +1,4 @@
+mmap mode for TimeSeries, should disable .array
 TimeSeries: support slicing and indexed slicing
 cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
