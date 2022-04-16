@@ -1179,6 +1179,13 @@ class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
       for ts in self._ts_by_tag.values():
         ts.close()
 
+  @property
+  @cachedmethod
+  def tags(self):
+    ''' The `TagSet` associated with this `TimeSeriesPartitioned` instance.
+    '''
+    return self.fstags[self.fspath]
+
   def tag_for(self, when) -> str:
     ''' Return the tag for the UNIX time `when`.
     '''
