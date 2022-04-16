@@ -940,9 +940,11 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       ts.close()
 
   def keys(self):
-    ''' The known keys.
+    ''' The known keys, derived from the subdirectories.
     '''
-    return self._tsks_by_key.keys()
+    return [
+        key for key in pfx_listdir(self.fspath) if isdirpath(self.pathto(key))
+    ]
 
   def key_typecode(self, key):
     ''' The `array` type code for `key`.
