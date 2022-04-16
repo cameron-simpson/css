@@ -147,10 +147,9 @@ class TimeSeriesCommand(BaseCommand):
         )
 
     def test_datadir():
-      with TimeSeriesDataDir('tsdatadir', policy=TimespanPolicyDaily(),
-                             step=300) as datadir:
-        ts = datadir.ts('key1', time.time())
-        datadir['key2', time.time()] = 9.0
+      with TimeSeriesDataDir('tsdatadir', policy='daily', step=300) as datadir:
+        ts = datadir['key1']
+        ts[time.time()] = 9.0
 
     def test_timespan_policy():
       policy = TimespanPolicyMonthly()
@@ -181,7 +180,7 @@ class TimeSeriesCommand(BaseCommand):
           ok = False
     if not ok:
       raise GetoptError(
-          "bad test names, I know: %s" %
+          "unknown test names, I know: %s" %
           (", ".join(sorted(testfunc_map.keys())),)
       )
     for testname in argv:
