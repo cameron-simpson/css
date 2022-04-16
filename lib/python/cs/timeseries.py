@@ -803,8 +803,15 @@ class TimespanPolicy(DBC):
       enclosing a timestamp.
   '''
 
+  FACTORIES = {
+      'annual': lambda *, timezone: TimespanPolicyAnnual(timezone=timezone),
+      'monthly': lambda *, timezone: TimespanPolicyMonthly(timezone=timezone),
+      'daily': lambda *, timezone: TimespanPolicyDaily(timezone=timezone),
+  }
+  DEFAULT_NAME = 'monthly'
+
   @typechecked
-  def __init__(self, timezone: Optional[str] = None):
+  def __init__(self, *, timezone: Optional[str] = None):
     ''' Initialise the policy.
 
         Parameters:
