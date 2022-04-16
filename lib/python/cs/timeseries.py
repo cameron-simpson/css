@@ -558,16 +558,16 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
     # read the data file header
     try:
       with pfx_open(fspath, 'rb') as tsf:
-        header_bs = tsf.read(self.HEADER_LENGTH)
-      if len(header_bs) != self.HEADER_LENGTH:
+        header_bs = tsf.read(cls.HEADER_LENGTH)
+      if len(header_bs) != cls.HEADER_LENGTH:
         raise ValueError(
             "file header is the wrong length, expected %d, got %d" %
-            (self.HEADER_LENGTH, len(header_bs))
+            (cls.HEADER_LENGTH, len(header_bs))
         )
     except FileNotFoundError:
       # file does not exist
       return None
-    return self.parse_header(header_bs)
+    return cls.parse_header(header_bs)
 
   @property
   @cachedmethod
