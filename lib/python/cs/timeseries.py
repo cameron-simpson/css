@@ -955,7 +955,10 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   def __str__(self):
     return "%s(%s,%s,%s)" % (
-        type(self).__name__, shortpath(self.fspath), self.step, self.policy
+        type(self).__name__,
+        shortpath(self.fspath),
+        getattr(self, 'step', 'STEP_UNDEFINED'),
+        getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
 
   @contextmanager
