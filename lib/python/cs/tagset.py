@@ -190,17 +190,18 @@ from cs.x import X
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
+from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
+from functools import partial
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
 from os.path import dirname, isdir as isdirpath, isfile as isfilepath
 import re
-from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
@@ -256,6 +257,8 @@ DISTINFO = {
         'typeguard',
     ],
 }
+
+pfx_open = partial(pfx_call, open)
 
 # default Tag name holds a metadata entry's "value"
 DEFAULT_VALUE_TAG_NAME = 'value'
@@ -1050,6 +1053,72 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
+
+  @classmethod
+  def from_ini(cls, f, section: str, missing_ok=False):
+    ''' Load a `TagSet` from a section of a `.ini` file.
+
+        Parameters:
+        * `f`: the `.ini` format file to read;
+          an iterable of lines (eg a file object)
+          or the name of a file to open
+        * `section`: the name of the config section
+          from which to load the `TagSet`
+        * `missing_ok`: optional flag, default `False`;
+          if true a missing file will return an empty `TagSet`
+          instead of raising `FileNotFoundError`
+    '''
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as subf:
+          return cls.from_ini(subf, section)
+      except FileNotFoundError:
+        if missing_ok:
+          return cls()
+        raise
+    cp = ConfigParser()
+    cp.read_file(f)
+    tags = cls()
+    try:
+      s = cp[section]
+    except KeyError:
+      pass
+    else:
+      for tag_name, tag_value_s in s.items():
+        with Pfx(tag_name):
+          tag_value_s = tag_value_s.strip()
+          tag_value, offset = (
+              Tag.parse_value(tag_value_s) if tag_value_s else (None, 0)
+          )
+          if offset < len(tag_value_s):
+            raise ValueError("unparsed text: %r", tag_value_s[offset:])
+          tags.add(tag_name, tag_value)
+    return tags
+
+  def save_as_ini(self, f, section: str, config=None):
+    ''' Save this `TagSet` to the config file `f` as `section`.
+
+        If `f` is a string, read an existing config from that file
+        and update the section.
+    '''
+    if config is None:
+      config = ConfigParser()
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as cf:
+          config.read_file(cf)
+      except FileNotFoundError:
+        pass
+    if isinstance(f, str):
+      with pfx_open(f, 'w') as cf:
+        self.save_as_ini(cf, section, config=config)
+    else:
+      config[section] = {}
+      for tag in self:
+        config[section][
+            tag.name
+        ] = ('' if tag.value is None else tag.transcribe_value(tag.value))
+      config.write(f)
 
 @has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
