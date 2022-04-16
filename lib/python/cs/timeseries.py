@@ -1086,7 +1086,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       tsks.plot(start, stop, figure=figure, **scatter_kw)
     return figure
 
-class TimeSeriesPartitioned(HasFSPath, MultiOpenMixin):
+class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
   ''' A collection of `TimeSeries` files in a subdirectory.
       We have one of these for each `TimeSeriesDataDir` key.
 
