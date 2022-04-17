@@ -1199,12 +1199,11 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     self.config['policy.timezone'] = new_timezone
     self._config_modified = True
 
-  def keys(self):
-    ''' The known keys, derived from the subdirectories.
+  def keys(self, fnglob: Optional[str] = '*'):
+    ''' The known keys, derived from the subdirectories,
+        constrained by `fnglob` (default `'*'`).
     '''
-    return [
-        key for key in pfx_listdir(self.fspath) if isdirpath(self.pathto(key))
-    ]
+    return [key for key in fnmatchdir(self.fspath, fnglob) if key in self]
 
   # pylint: disable=no-self-use,unused-argument
   def key_typecode(self, key):
@@ -1217,9 +1216,9 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   def __contains__(self, key):
     ''' Test if there is a subdirectory for `key`.
     '''
-    return isdirpath(self.pathto(key))
+    return is_identifier(key) and isdirpath(self.pathto(key))
 
-  @require(lambda key: is_clean_subpath(key) and '/' not in key)
+  @require(lambda key: is_identifier(key))
   def __getitem__(self, key):
     ''' Return the `TimeSeriesPartitioned` for `key`,
         creating its subdirectory if necessary.
