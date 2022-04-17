@@ -1377,6 +1377,16 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         tag_start, tag_end = self.timespan_for(when)
       ts[when] = value
 
+  def data(self, start, stop):
+    ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
+    '''
+    xydata = []
+    for tag, tagged_start, tagged_stop in self.policy.tagged_spans(start,
+                                                                   stop):
+      ts = self.subseries(tag)
+      xydata.extend(ts.data(tagged_start, tagged_stop))
+    return xydata
+
   @plotrange
   def plot(self, start, stop, *, figure, **scatter_kw):
     ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
