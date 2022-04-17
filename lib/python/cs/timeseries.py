@@ -157,11 +157,11 @@ class TimeSeriesCommand(BaseCommand):
         if argv:
           keys = ts.keys(argv)
           if not keys:
-            raise GetoptError("no keys in %s" % (ts,))
+            raise GetoptError("no matching keys")
         else:
           keys = ts.keys()
           if not keys:
-            raise GetoptError("no matching keys")
+            raise GetoptError("no keys in %s" % (ts,))
         fig = ts.plot(
             start, now, keys
         )  # pylint: too-many-function-args.disable=missing-kwoa
