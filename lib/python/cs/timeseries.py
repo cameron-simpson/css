@@ -142,11 +142,21 @@ class TimeSeriesCommand(BaseCommand):
     )
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} timeseries days [glob]
+    ''' Usage: {cmd} tspath days [glob]
+          Plot the most recent days of data from the time series at tspath,
+          which may refer to a single .csts TimeSeriesFile,
+          a TimeSeriesPartitioned directory of such files,
+          or a TimeSeriesDataDir contains partitions for multiple keys.
+          If glob is supplied, constrain the keys of a TimeSeriesDataDir
+          by the glob.
     '''
+    if not argv:
+      raise GetoptError("missing tspath")
     tspath = argv.pop(0)
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
     glob = argv.pop(0) if argv else None
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     now = time.time()
     start = now - days * 24 * 3600
     print("start =", Arrow.fromtimestamp(start))
