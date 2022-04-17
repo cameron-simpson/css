@@ -1087,11 +1087,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     timezone = timezone or self.timezone
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
-      policy = TimespanPolicy.FACTORIES[policy_name](timezone=timezone)
-    elif isinstance(policy, str):
-      with Pfx("policy %r", policy):
-        policy_name = policy
-        policy = TimespanPolicy.FACTORIES[policy_name](timezone=timezone)
+      policy = TimespanPolicy.from_name(policy_name)
     else:
       policy_name = type(policy).__name__
     # fill in holes in the config
