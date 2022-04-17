@@ -184,8 +184,8 @@ class TimeSeriesCommand(BaseCommand):
     def test_pandas():
       t0 = 1649552238
       fspath = f'foo--from-{t0}.dat'
-      ts = TimeSeries(fspath, 'd', start=t0, step=1)
       ary = ts.array
+      ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
       ts.pad_to(time.time() + 300)
       print("len(ts) =", len(ts))
       pds = ts.as_pd_series()
@@ -215,7 +215,7 @@ class TimeSeriesCommand(BaseCommand):
     def test_timeseries():
       t0 = 1649464235
       fspath = 'foo.dat'
-      ts = TimeSeries(fspath, 'd', start=t0, step=1)
+      ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
       ary = ts.array
       print(ary)
       ts.pad_to(time.time() + 300)
@@ -310,7 +310,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> ts.offset(19.1)
            0
            >>> ts.offset(20)
@@ -346,7 +346,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> list(ts.offset_range(20,30))
            [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
@@ -377,7 +377,7 @@ class TimeStepsMixin:
 
         Eample in a `TimeSeries`:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', start=19.1, step=1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', start=19.1, step=1.2)
            >>> list(ts.range(20,30))
            [19.1, 20.3, 21.5, 22.700000000000003, 23.900000000000002, 25.1, 26.3, 27.5, 28.700000000000003]
 
@@ -422,8 +422,76 @@ class TimeStepsMixin:
         for offset_step in self.offset_range(start, stop)
     )
 
-class TimeSeries(MultiOpenMixin, TimeStepsMixin):
-  ''' A single time series for a single data field.
+class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
+  ''' Common base class of any time series.
+  '''
+
+  def __init__(self, start, step):
+    self.start = start
+    self.step = step
+
+  @abstractmethod
+  def __getitem__(self, index):
+    ''' Return a datum or list of data.
+    '''
+    raise NotImplemented
+
+  def data(self, start, stop):
+    ''' Return an iterable of `(when,datum)` tuples for each time `when`
+        from `start` to `stop`.
+    '''
+    return zip(self.range(start, stop), self[start:stop])
+
+  # TODO: INCOMPLETE
+  def as_np_array(self, start=None, stop=None):
+    if start is None:
+      start = self.start
+    if end is None:
+      stop = self.stop
+    data = self[start:stop]
+
+  def as_pd_series(self, start=None, stop=None, tzname: Optional[str] = None):
+    ''' Return a `pandas.Series` containing the data from `start` to `stop`,
+        default from `self.start` and `self.stop` respectively.
+    '''
+    if start is None:
+      start = self.start
+    if stop is None:
+      stop = self.stop
+    if tzname is None:
+      tzname = get_default_timezone_name()
+    times, data = self.data2(start, stop)
+    indices = (datetime64(t, 's') for t in times)
+    return PDSeries(data, indices)
+
+  def data2(self, start, stop):
+    ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
+    '''
+    data = self.data(start, stop)
+    return [d[0] for d in data], [d[1] for d in data]
+
+  @plotrange
+  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
+    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
+        creating it if necessary.
+        Return `figure`.
+    '''
+    assert figure is not None
+    plotly = import_extra('plotly', DISTINFO)
+    go = plotly.graph_objects
+    if name is None:
+      name = "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
+    xdata, yaxis = self.data2(start, stop)
+    xaxis = np.array(xdata).astype('datetime64[s]')
+    assert len(xaxis) == len(yaxis), (
+        "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
+        (len(xaxis), len(yaxis), start, stop)
+    )
+    figure.add_trace(go.Scatter(name=name, x=xaxis, y=yaxis, **scatter_kw))
+    return figure
+
+class TimeSeriesFile(TimeSeries):
+  ''' A file continaing a single time series for a single data field.
 
       This provides easy access to a time series data file.
       The instance can be indexed by UNIX time stamp for time based access
@@ -491,6 +559,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
         raise RuntimeError(
             "no default fill value for typecode=%r" % (typecode,)
         )
+    super().__init__(start, step)
     self.fspath = fspath
     # compare the file against the supplied arguments
     hdr_stat = self.stat(fspath)
@@ -509,8 +578,6 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
         )
     self.typecode = typecode
     self.file_bigendian = file_bigendian
-    self.start = start
-    self.step = step
     self.fill = fill
     self._itemsize = array(typecode).itemsize
     assert self._itemsize == 8
@@ -727,7 +794,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
         Eample:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', 19.1, 1.2)
            >>> ts.array_index_bounds(20,30)
            (0, 9)
     '''
@@ -743,7 +810,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin):
 
         Eample:
 
-           >>> ts = TimeSeries('tsfile.csts', 'd', 19.1, 1.2)
+           >>> ts = TimeSeriesFile('tsfile.csts', 'd', 19.1, 1.2)
            >>> list(ts.array_indices(20,30))
            [0, 1, 2, 3, 4, 5, 6, 7, 8]
     '''
@@ -1163,7 +1230,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       tsks.plot(start, stop, figure=figure, **scatter_kw)
     return figure
 
-class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
+class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   ''' A collection of `TimeSeries` files in a subdirectory.
       We have one of these for each `TimeSeriesDataDir` key.
 
@@ -1206,7 +1273,8 @@ class TimeSeriesPartitioned(HasFSPath, TimeStepsMixin, MultiOpenMixin):
     '''
     assert isinstance(policy,
                       TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
-    super().__init__(dirpath)
+    TimeSeries.__init__(self, start, step)
+    HasFSPath.__init__(self, dirpath)
     if fstags is None:
       fstags = FSTags()
     self.typecode = typecode
