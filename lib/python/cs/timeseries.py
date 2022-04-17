@@ -898,11 +898,7 @@ class TimespanPolicy(DBC):
       enclosing a timestamp.
   '''
 
-  FACTORIES = {
-      'annual': lambda *, timezone: TimespanPolicyAnnual(timezone=timezone),
-      'monthly': lambda *, timezone: TimespanPolicyMonthly(timezone=timezone),
-      'daily': lambda *, timezone: TimespanPolicyDaily(timezone=timezone),
-  }
+  FACTORIES = {}
   DEFAULT_NAME = 'monthly'
 
   @typechecked
@@ -917,6 +913,53 @@ class TimespanPolicy(DBC):
     if timezone is None:
       timezone = get_default_timezone_name()
     self.timezone = timezone
+
+  # pylint: disable=keyword-arg-before-vararg
+  @classmethod
+  def from_name(cls, policy_name=None, *a, **kw):
+    ''' Factory method to return a new `TimespanPolicy` instance
+        from the policy name,
+        which indexes `TimespanPolicy.FACTORIES`.
+        The default `policy_name`
+        is from `TimespanPolicy.DEFAULT_NAME` (`'monthly'`).
+    '''
+    if policy_name is None:
+      policy_name = cls.DEFAULT_NAME
+    return cls.FACTORIES[policy_name](*a, **kw)
+
+  @classmethod
+  def from_any(cls, policy):
+    ''' Factory to promote `policy` to a `TimespanPolicy` instance.
+
+        The supplied `policy` may be:
+        * `None`: return an instance of the default named policy
+        * `str`: return an instance of the named policy
+        * `TimespanPolicy` subclass: return an instance of the subclass
+        * `TimespanPolicy` instance: return the instance
+    '''
+    if policy is None:
+      policy = TimespanPolicy.from_name()
+    elif isinstance(policy, str):
+      policy = TimespanPolicy.from_name(policy)
+    elif isinstance(policy, type) and issubclass(policy, TimespanPolicy):
+      policy = policy()
+    else:
+      assert isinstance(policy, TimespanPolicy
+                        ), "policy=%s:%r" % (type(policy), policy)
+    return policy
+
+  @classmethod
+  @typechecked
+  def register_factory(cls, factory: Callable, name: str):
+    ''' Register a new policy `factory` under then supplied `name`.
+    '''
+    assert getattr(factory, 'name', name) == name
+    if name in cls.FACTORIES:
+      raise KeyError(
+          "%s.FACTORIES: name %r already taken" % (cls.__name__, name)
+      )
+    cls.FACTORIES[name] = factory
+    factory.name = name
 
   def Arrow(self, when):
     ''' Return an `arrow.Arrow` instance for the UNIX time `when`
@@ -974,6 +1017,8 @@ class TimespanPolicyDaily(TimespanPolicy):
     end = start.shift(days=1)
     return start.timestamp(), end.timestamp()
 
+TimespanPolicy.register_factory(TimespanPolicyDaily, 'daily')
+
 class TimespanPolicyMonthly(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
@@ -990,6 +1035,8 @@ class TimespanPolicyMonthly(TimespanPolicy):
     end = start.shift(months=1)
     return start.timestamp(), end.timestamp()
 
+TimespanPolicy.register_factory(TimespanPolicyMonthly, 'monthly')
+
 class TimespanPolicyAnnual(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
@@ -1005,6 +1052,8 @@ class TimespanPolicyAnnual(TimespanPolicy):
     start = Arrow(a.year, 1, 1, tzinfo=self.timezone)
     end = start.shift(years=1)
     return start.timestamp(), end.timestamp()
+
+TimespanPolicy.register_factory(TimespanPolicyAnnual, 'annual')
 
 class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   ''' A directory containing a collection of `TimeSeries` data files.
