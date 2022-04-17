@@ -1321,16 +1321,22 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.policy.timespan_for(self.round_down(when))
 
-  def subseries(self, when: Union[int, float]):
-    ''' The `TimeSeries` for the UNIX time `when`.
+  @typechecked
+  def subseries(self, spec: Union[str, Numeric]):
+    ''' Return the `TimeSeries` for `spec`,
+        which may be a partition tag name or a UNIX time.
     '''
-    tag = self.tag_for(when)
+    if isinstance(spec, str):
+      tag = spec
+    else:
+      # numeric UNIX time
+      tag = self.tag_for(spec)
     try:
       ts = self._ts_by_tag[tag]
     except KeyError:
-      tag_start, tag_end = self.timespan_for(when)
-      filepath = self.pathto(tag + TimeSeries.DOTEXT)
-      ts = self._ts_by_tag[tag] = TimeSeries(
+      tag_start, _ = self.policy.tag_timespan(tag)
+      filepath = self.pathto(tag + TimeSeriesFile.DOTEXT)
+      ts = self._ts_by_tag[tag] = TimeSeriesFile(
           filepath, self.typecode, start=tag_start, step=self.step
       )
       ts.open()
