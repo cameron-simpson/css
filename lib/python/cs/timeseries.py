@@ -1089,7 +1089,8 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
       policy = TimespanPolicy.from_name(policy_name)
     else:
-      policy_name = type(policy).__name__
+      policy = TimespanPolicy.from_any(policy)
+      policy_name = policy.name
     # fill in holes in the config
     if not config.auto.policy.name:
       self.policy_name = policy_name
