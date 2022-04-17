@@ -117,6 +117,63 @@ class TimeSeriesCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'test'
 
+  @staticmethod
+  def timeseries_of(tspath: str, start=None, step=None, typecode=None):
+    ''' Turn a time series filesystem path into a time series:
+        * a file: a `TimeSeries`
+        * a directory holding `.csts` files: a `TimeSeriesPartitioned`
+        * a directory: a `TimeSeriesDataDir`
+    '''
+    if isfilepath(tspath):
+      if not tspath.endswith(TimeSeriesFile.DOTEXT):
+        raise GetoptError(
+            "%s does not end in %s" %
+            (shortpath(tspath), TimeSeriesFile.DOTEXT)
+        )
+      return TimeSeriesFile(tspath, None, start=start, step=step)
+    if isdirpath(tspath):
+      if fnmatchdir(tspath, '*' + TimeSeriesFile.DOTEXT):
+        return TimeSeriesPartitioned(
+            tspath, typecode, start=start, step=step, policy='annual'
+        )
+      return TimeSeriesDataDir(tspath, policy=TimespanPolicyAnnual)
+    raise ValueError(
+        "cannot deduce time series type from tspath %r" % (tspath,)
+    )
+
+  def cmd_plot(self, argv):
+    ''' Usage: {cmd} timeseries days [glob]
+    '''
+    tspath = argv.pop(0)
+    days = self.popargv(argv, int, "days to display", lambda days: days > 0)
+    glob = argv.pop(0) if argv else None
+    now = time.time()
+    start = now - days * 24 * 3600
+    print("start =", Arrow.fromtimestamp(start))
+    with Pfx("tspath %s", shortpath(tspath)):
+      try:
+        ts = self.timeseries_of(tspath)
+      except ValueError as e:
+        raise GetoptError("not a directory or file: %s" % (e,)) from e
+      if isinstance(ts, (TimeSeries, TimeSeriesPartitioned)):
+        fig = ts.plot(start, now)  # pylint: disable=missing-kwoa
+      elif isinstance(ts, TimeSeriesDataDir):
+        keys = None if glob is None else [
+            k for k in ts.keys() if fnmatch(k, glob)
+        ]
+        if keys is not None and not keys:
+          raise GetoptError(
+              "no keys matching %r: keys=%r" % (glob, sorted(ts.keys()))
+          )
+        X("KEYS = %r", keys)
+        fig = ts.plot(
+            start, now, keys
+        )  # pylint: too-many-function-args.disable=missing-kwoa
+      else:
+        raise RuntimeError("unhandled type %s from tspath" % (type(ts),))
+    fig.write_image("plot.png", format="png", width=2048, height=1024)
+    os.system('open plot.png')
+
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
           Run some tests of functionality.
