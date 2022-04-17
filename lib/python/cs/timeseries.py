@@ -554,15 +554,6 @@ class TimeSeriesFile(TimeSeries):
       )
     if step <= 0:
       raise ValueError("step should be >0, got %s" % (step,))
-    if fill is None:
-      if typecode == 'd':
-        fill = float('nan')
-      elif typecode == 'q':
-        fill = 0
-      else:
-        raise RuntimeError(
-            "no default fill value for typecode=%r" % (typecode,)
-        )
     super().__init__(start, step)
     self.fspath = fspath
     # compare the file against the supplied arguments
@@ -575,10 +566,21 @@ class TimeSeriesFile(TimeSeries):
       file_bigendian = NATIVE_BIGENDIANNESS[typecode]
     else:
       file_typecode, file_bigendian = hdr_stat
-      if typecode != file_typecode:
+      if typecode is None:
+        typecode = file_typecode
+      elif typecode != file_typecode:
         raise ValueError(
             "typecode=%r but data file %s has typecode %r" %
             (typecode, fspath, file_typecode)
+        )
+    if fill is None:
+      if typecode == 'd':
+        fill = float('nan')
+      elif typecode == 'q':
+        fill = 0
+      else:
+        raise RuntimeError(
+            "no default fill value for typecode=%r" % (typecode,)
         )
     self.typecode = typecode
     self.file_bigendian = file_bigendian
