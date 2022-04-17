@@ -1247,7 +1247,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       typecode: str,
       *,
       step: Union[int, float],
-      policy,  ##: TimespanPolicy,
+      policy,  # :TimespanPolicy,
       start=0,
       fstags: Optional[FSTags] = None,
   ):
@@ -1271,10 +1271,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         then a time of `20` would fall in the partion left of the
         boundary because it belongs to the time slot commencing at `18`.
     '''
-    assert isinstance(policy,
-                      TimespanPolicy), "policy=%s:%r" % (type(policy), policy)
     TimeSeries.__init__(self, start, step)
     HasFSPath.__init__(self, dirpath)
+    policy = TimespanPolicy.from_any(policy)
     if fstags is None:
       fstags = FSTags()
     self.typecode = typecode
