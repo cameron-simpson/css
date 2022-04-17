@@ -1372,7 +1372,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       ts.open()
     return ts
 
-  def __getitem__(self, when):
+  def __getitem__(self, when: Union[Numeric, slice]):
+    if isinstance(when, slice):
+      if when.step is not None and when.step != self.step:
+        raise IndexError(
+            "slice.step:%r should be None or ==self.step:%r" %
+            (when.step, self.step)
+        )
+      return [self[t] for t in self.range(when.start, when.stop)]
     return self.subseries(when)[when]
 
   def __setitem__(self, when, value):
