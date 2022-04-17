@@ -679,6 +679,7 @@ class BaseCommand:
     parse = None
     help_text = None
     validate = None
+    unvalidated_message = None
     for a0 in list(a):
       with Pfx("%s", r(a0)):
         if help_text is None and isinstance(a0, str):
@@ -687,14 +688,16 @@ class BaseCommand:
           parse = a0
         elif validate is None and callable(a0):
           validate = a0
+        elif (validate is not None and unvalidated_message is None
+              and isinstance(a0, str)):
+          unvalidated_message = a0
         else:
           raise TypeError(
-              "unexpected argument, expected help_text or parse, then optional validate"
+              "unexpected argument, expected help_text or parse, then optional validate and optional invalid message"
           )
     if help_text is None:
       help_text = (
-          "string value" if parse is None else "value suitable for %s" %
-          (parse,)
+          "string value" if parse is None else "value for %s" % (parse,)
       )
     if parse is None:
       parse = str
@@ -702,11 +705,12 @@ class BaseCommand:
       if not argv:
         raise GetoptError("missing argument")
       arg0 = argv.pop(0)
+    with Pfx("%s %r", help_text, arg0):
       try:
         value = pfx_call(parse, arg0)
         if validate is not None:
           if not pfx_call(validate, value):
-            raise ValueError("invalid value")
+            raise ValueError(unvalidated_message or "invalid value")
       except ValueError as e:
         raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
     return value
