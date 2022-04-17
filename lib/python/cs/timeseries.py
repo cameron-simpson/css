@@ -29,7 +29,7 @@ from os.path import (
 from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 import time
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import arrow
 from arrow import Arrow
@@ -120,7 +120,7 @@ class TimeSeriesCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'test'
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] tspath impath.png days [glob]
+    ''' Usage: {cmd} [--show] tspath impath.png days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath
           to impath.png. Open the image if --show is provided.
           tspath may refer to a single .csts TimeSeriesFile,
@@ -139,9 +139,6 @@ class TimeSeriesCommand(BaseCommand):
         "already exists"
     )
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
-    glob = argv.pop(0) if argv else None
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
     now = time.time()
     start = now - days * 24 * 3600
     print("start =", Arrow.fromtimestamp(start))
@@ -151,19 +148,20 @@ class TimeSeriesCommand(BaseCommand):
       except ValueError as e:
         raise GetoptError("not a directory or file: %s" % (e,)) from e
       if isinstance(ts, TimeSeries):
-        if glob is not None:
+        if argv:
           raise GetoptError(
-              "glob:%r should not be suppplied for a %s" % (glob, s(ts))
+              "fields:%r should not be suppplied for a %s" % (argv, s(ts))
           )
         fig = ts.plot(start, now)  # pylint: disable=missing-kwoa
       elif isinstance(ts, TimeSeriesDataDir):
-        keys = None if glob is None else [
-            k for k in ts.keys() if fnmatch(k, glob)
-        ]
-        if keys is not None and not keys:
-          raise GetoptError(
-              "no keys matching %r: keys=%r" % (glob, sorted(ts.keys()))
-          )
+        if argv:
+          keys = ts.keys(argv)
+          if not keys:
+            raise GetoptError("no keys in %s" % (ts,))
+        else:
+          keys = ts.keys()
+          if not keys:
+            raise GetoptError("no matching keys")
         fig = ts.plot(
             start, now, keys
         )  # pylint: too-many-function-args.disable=missing-kwoa
