@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#
+# pylint: disable=too-many-lines
 
 ''' Efficient portable machine native columnar storage of time series data
     for double float and signed 64-bit integers.
@@ -12,34 +14,32 @@
     for providing the data as `pandas.Series` instances etc.
 '''
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
-from collections import defaultdict
 from contextlib import contextmanager
+from fnmatch import fnmatch
 from functools import partial
 from getopt import GetoptError
 import os
 from os.path import (
-    dirname,
     isdir as isdirpath,
     isfile as isfilepath,
-    join as joinpath,
-    normpath,
 )
 from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 import time
-from typing import Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import arrow
 from arrow import Arrow
 from icontract import ensure, require, DBC
+import numpy as np
 from numpy import datetime64
 from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.deco import cachedmethod, decorator
+from cs.deco import cachedmethod, decorator, fmtdoc
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
@@ -174,6 +174,7 @@ class TimeSeriesCommand(BaseCommand):
     fig.write_image("plot.png", format="png", width=2048, height=1024)
     os.system('open plot.png')
 
+  # pylint: disable=no-self-use
   def cmd_test(self, argv):
     ''' Usage: {cmd} [testnames...]
           Run some tests of functionality.
@@ -184,7 +185,6 @@ class TimeSeriesCommand(BaseCommand):
     def test_pandas():
       t0 = 1649552238
       fspath = f'foo--from-{t0}.dat'
-      ary = ts.array
       ts = TimeSeriesFile(fspath, 'd', start=t0, step=1)
       ts.pad_to(time.time() + 300)
       print("len(ts) =", len(ts))
@@ -265,6 +265,7 @@ def plotrange(func, needs_start=False, needs_stop=False):
       parameters respectively, if any.
   '''
 
+  # pylint: disable=keyword-arg-before-vararg
   @require(lambda start: not needs_start or start is not None)
   @require(lambda stop: not needs_stop or stop is not None)
   def plotrange_wrapper(self, start=None, stop=None, *a, figure=None, **kw):
@@ -305,7 +306,7 @@ class TimeStepsMixin:
   ''' Methods for an object with `start` and `step` attributes.
   '''
 
-  def offset(self, when) -> int:
+  def offset(self, when: Numeric) -> int:
     ''' Return the step offset for the UNIX time `when` from `self.start`.
 
         Eample in a `TimeSeries`:
@@ -333,6 +334,9 @@ class TimeStepsMixin:
     return self.start + offset * self.step
 
   def offset_bounds(self, start, stop) -> (int, int):
+    ''' Return the bounds of `(start,stop)` as offsets
+        (multiples of `self.step`).
+    '''
     offset_steps = self.offset(start)
     end_offset_steps = self.offset(stop)
     if end_offset_steps == offset_steps and stop > start:
@@ -365,7 +369,7 @@ class TimeStepsMixin:
     return self.when(self.offset(when))
 
   def round_up(self, when, start, step):
-    ''' Return `when` rounded up to the next time slot.
+    ''' Return `when` rounded up to the start of the next time slot.
     '''
     rounded = self.round_down(when)
     if rounded < when:
@@ -585,6 +589,7 @@ class TimeSeriesFile(TimeSeries):
     self._struct = Struct(struct_fmt)
     assert self._struct.size == self._itemsize
     self.modified = False
+    self._array = None
 
   def __str__(self):
     return "%s(%s,%r,%d:%d,%r)" % (
@@ -836,27 +841,27 @@ class TimeSeriesFile(TimeSeries):
     '''
     return zip(self.range(start, stop), self[start:stop])
 
-  def __getitem__(self, when):
+  @typechecked
+  def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
 
         If `when` is a slice, return a list of the data
         for the times in the range `start:stop`
         as given by `self.range(start,stop)`.
     '''
+    ary = self.array
     if isinstance(when, slice):
-      X("WHEN SLICE = %r", when)
       start, stop, step = when.start, when.stop, when.step
       if step is not None:
         raise ValueError(
             "%s index slices may not specify a step" % (type(self).__name__,)
         )
-      array = self.array
       astart, astop = self.offset_bounds(start, stop)
-      return array[astart:astop]
+      return ary[astart:astop]
     # avoid confusion with negative indices
     if when < 0:
       raise ValueError("invalid when:%s, must be >= 0" % (when,))
-    return self.array[self.array_index(when)]
+    return ary[self.array_index(when)]
 
   def __setitem__(self, when, value):
     ''' Set the datum for the UNIX time `when`.
@@ -921,11 +926,11 @@ class TimeSeriesFile(TimeSeries):
     return figure
 
 class TimespanPolicy(DBC):
-  ''' A class mplementing apolicy about where to store data,
+  ''' A class implementing a policy about where to store data,
       used by `TimeSeriesPartitioned` instances
       to partition data among multiple `TimeSeries` data files.
 
-      The most important methods are `tag_for(when)`
+      Probably the most important methods are `tag_for(when)`
       which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
       and `timespan_for` which returns the per tag start and end times
       enclosing a timestamp.
@@ -969,8 +974,6 @@ class TimespanPolicy(DBC):
         which is derived from the `arrow.Arrow`
         format string `self.DEFAULT_TAG_FORMAT`.
     '''
-    # TODO: is this correct? don't we want the tag from the start
-    # in the specified timezone?
     return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
 
   @require(lambda start, stop: start < stop)
@@ -981,11 +984,11 @@ class TimespanPolicy(DBC):
     when = start
     while when < stop:
       tag = self.tag_for(when)
-      tag_start, tag_end = self.timespan_for(when)
+      _, tag_end = self.timespan_for(when)
       yield tag, when, min(tag_end, stop)
       when = tag_end
 
-  def tag_timespan(self, tag) -> Tuple[Numeric, Numeric]:
+  def tag_timespan(self, tag: str) -> Tuple[Numeric, Numeric]:
     ''' Return the start and end times for the supplied `tag`.
     '''
     return self.timespan_for(
@@ -1051,24 +1054,25 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       fspath,
       *,
       step: Optional[Numeric] = None,
-      policy=None,  ##: TimespanPolicy
+      policy=None,  # :TimespanPolicy
       timezone: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
+    super().__init__(fspath)
     if fstags is None:
       fstags = FSTags()
-    self._fstags = fstags
-    tagged = fstags[fspath]
-    super().__init__(tagged.fspath)
+    self.fstags = fstags
     self._config_modified = None
     config = self.config
     if step is None:
-      if self.step is None:
+      if config.step is None:
         raise ValueError("missing step parameter and no step in config")
+      step = config.step
     elif self.step is None:
       self.step = step
     elif step != self.step:
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
+    TimeSeries.__init__(self, 0, self.step)
     timezone = timezone or self.timezone
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
@@ -1085,7 +1089,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     if not config.auto.policy.timezone:
       self.timezone = timezone
     self.policy = policy
-    self.step = step
     self._tsks_by_key = {}
 
   def __str__(self):
@@ -1098,6 +1101,9 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   @contextmanager
   def startup_shutdown(self):
+    ''' Context manager for `MultiOpenMixin`.
+        Close the sub time series.
+    '''
     try:
       with self.fstags:
         yield
@@ -1111,6 +1117,8 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   @property
   def configpath(self):
+    ''' The path to the `config.ini` file.
+    '''
     return self.pathto('config.ini')
 
   @property
@@ -1145,7 +1153,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     ''' Set the `policy.timezone` config value, usually a key from
         `TimespanPolicy.FACTORIES`.
     '''
-    if new_policy_name == 'AEST': raise RuntimeError
     self.config['policy.name'] = new_policy_name
     self._config_modified = True
 
@@ -1317,7 +1324,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     '''
     return self.fstags[self.fspath]
 
-  def tag_for(self, when) -> str:
+  @typechecked
+  def tag_for(self, when: Numeric) -> str:
     ''' Return the tag for the UNIX time `when`.
     '''
     return self.policy.tag_for(self.round_down(when))
@@ -1357,8 +1365,6 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def partition(self, start, stop):
     ''' Return an iterable of `(when,subseries)` for each time `when`
         from `start` to `stop`.
-
-        This is most efficient if `whens` are ordered.
     '''
     ts = None
     tag_start = None
