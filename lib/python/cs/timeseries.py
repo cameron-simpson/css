@@ -1215,11 +1215,25 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     self.config['policy.timezone'] = new_timezone
     self._config_modified = True
 
-  def keys(self, fnglob: Optional[str] = '*'):
-    ''' The known keys, derived from the subdirectories,
-        constrained by `fnglob` (default `'*'`).
+  def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
+    ''' Return a list of the known keys, derived from the subdirectories,
+        optionally constrained by `fnglobs`.
+        If provided, `fnglobs` may be a glob string or list of glob strings
+        suitable for `fnmatch`.
     '''
-    return [key for key in fnmatchdir(self.fspath, fnglob) if key in self]
+    all_keys = sorted(key for key in pfx_listdir(self.fspath) if key in self)
+    if fnglobs is None:
+      return all_keys
+    if isinstance(fnglobs, str):
+      fnglobs = [fnglobs]
+    ks = []
+    for fnglob in fnglobs:
+      gks = [k for k in all_keys if fnmatch(k, fnglob)]
+      if gks:
+        ks.extend(gks)
+      else:
+        warning("no matches for %r", fnglob)
+    return ks
 
   # pylint: disable=no-self-use,unused-argument
   def key_typecode(self, key):
