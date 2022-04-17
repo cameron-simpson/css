@@ -647,11 +647,16 @@ class BaseCommand:
           and/or an argument parser function.
         * `validate`: an optional function to validate the parsed value;
           this should return a true value if valid,
-          or a false value or raise a `ValueError` if invalid
+          or return a false value or raise a `ValueError` if invalid
+        * `unvalidated_message`: an optional message after `validate`
+          for values failing the validation
 
         Typical use inside a `main` or `cmd_*` method might look like:
 
             self.options.word = self.popargv(argv, int, "a count value")
+            self.options.word = self.popargv(
+                argv, int, "a count value",
+               lambda count: count > 0, "count should be positive")
 
         Because it raises `GetoptError` on a bad argument
         the normal usage message failure mode follows automatically.
