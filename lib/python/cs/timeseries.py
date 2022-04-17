@@ -715,7 +715,6 @@ class TimeSeriesFile(TimeSeries):
     ''' The time series as an `array.array` object.
         This loads the array data from `self.fspath` on first use.
     '''
-    assert not hasattr(self, '_array')
     try:
       ary = self.load_from(self.fspath, self.typecode)
     except FileNotFoundError:
@@ -1382,7 +1381,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       return [self[t] for t in self.range(when.start, when.stop)]
     return self.subseries(when)[when]
 
-  def __setitem__(self, when, value):
+  def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
 
   def partition(self, start, stop):
