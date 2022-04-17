@@ -165,7 +165,6 @@ class TimeSeriesCommand(BaseCommand):
           raise GetoptError(
               "no keys matching %r: keys=%r" % (glob, sorted(ts.keys()))
           )
-        X("KEYS = %r", keys)
         fig = ts.plot(
             start, now, keys
         )  # pylint: too-many-function-args.disable=missing-kwoa
@@ -1116,9 +1115,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
         yield
     finally:
       for ts in self._tsks_by_key.values():
-        X("CLOSE %s", ts)
         ts.close()
-      X("self._config_modified=%r", self._config_modified)
       if self._config_modified:
         self.save_config()
 
