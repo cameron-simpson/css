@@ -22,6 +22,7 @@ from functools import partial
 from getopt import GetoptError
 import os
 from os.path import (
+    exists as existspath,
     isdir as isdirpath,
     isfile as isfilepath,
 )
@@ -42,6 +43,7 @@ from cs.cmdutils import BaseCommand
 from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
+from cs.lex import is_identifier, s
 from cs.logutils import warning
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.py.modules import import_extra
@@ -118,17 +120,24 @@ class TimeSeriesCommand(BaseCommand):
   SUBCOMMAND_ARGV_DEFAULT = 'test'
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} tspath days [glob]
-          Plot the most recent days of data from the time series at tspath,
-          which may refer to a single .csts TimeSeriesFile,
+    ''' Usage: {cmd} [--show] tspath impath.png days [glob]
+          Plot the most recent days of data from the time series at tspath
+          to impath.png. Open the image if --show is provided.
+          tspath may refer to a single .csts TimeSeriesFile,
           a TimeSeriesPartitioned directory of such files,
           or a TimeSeriesDataDir contains partitions for multiple keys.
           If glob is supplied, constrain the keys of a TimeSeriesDataDir
           by the glob.
     '''
-    if not argv:
-      raise GetoptError("missing tspath")
-    tspath = argv.pop(0)
+    show_image = False
+    if argv and argv[0] == '--show':
+      show_image = True
+      argv.pop(0)
+    tspath = self.popargv(argv, "tspath", str, existspath, "does not exist")
+    imgpath = self.popargv(
+        argv, "tspath", str, lambda path: not existspath(path),
+        "already exists"
+    )
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
     glob = argv.pop(0) if argv else None
     if argv:
@@ -141,7 +150,11 @@ class TimeSeriesCommand(BaseCommand):
         ts = timeseries_from_path(tspath)
       except ValueError as e:
         raise GetoptError("not a directory or file: %s" % (e,)) from e
-      if isinstance(ts, (TimeSeries, TimeSeriesPartitioned)):
+      if isinstance(ts, TimeSeries):
+        if glob is not None:
+          raise GetoptError(
+              "glob:%r should not be suppplied for a %s" % (glob, s(ts))
+          )
         fig = ts.plot(start, now)  # pylint: disable=missing-kwoa
       elif isinstance(ts, TimeSeriesDataDir):
         keys = None if glob is None else [
@@ -156,7 +169,11 @@ class TimeSeriesCommand(BaseCommand):
         )  # pylint: too-many-function-args.disable=missing-kwoa
       else:
         raise RuntimeError("unhandled type %s from tspath" % (type(ts),))
-    fig.write_image("plot.png", format="png", width=2048, height=1024)
+    with Pfx("write %r", imgpath):
+      if existspath(imgpath):
+        error("already exists")
+      else:
+        fig.write_image(imgpath, format="png", width=2048, height=1024)
     os.system('open plot.png')
 
   # pylint: disable=no-self-use
@@ -485,7 +502,6 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
         creating it if necessary.
         Return `figure`.
     '''
-    assert figure is not None
     plotly = import_extra('plotly', DISTINFO)
     go = plotly.graph_objects
     if name is None:
