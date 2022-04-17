@@ -1219,15 +1219,17 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
 
   @plotrange
   def plot(self, start, stop, keys=None, *, figure, **scatter_kw):
-    ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
-        creating it if necessary.
+    ''' Plot traces on `figure:plotly.graph_objects.Figure`,
+        creating it if necessary, for each key in `keys`.
         Return `figure`.
     '''
     if keys is None:
       keys = sorted(self.keys())
     for key in keys:
-      tsks = self[key]
-      tsks.plot(start, stop, figure=figure, **scatter_kw)
+      with Pfx(key):
+        tsks = self[key]
+        name = tsks.tags.get('csv.header', key)
+        figure = tsks.plot(start, stop, figure=figure, name=name, **scatter_kw)
     return figure
 
 class TimeSeriesPartitioned(TimeSeries, HasFSPath):
