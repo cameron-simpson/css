@@ -1116,14 +1116,18 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
   @property
   @cachedmethod
   def config(self):
+    ''' The configuration as a `TagSet`.
+    '''
     tags = TagSet.from_ini(
-        self.configpath, type(self).__name__, missing_ok=True
+        self.configpath, 'TimeSeriesDataDir', missing_ok=True
     )
     self._config_modified = False
     return tags
 
   def save_config(self):
-    self.config.save_as_ini(self.configpath, type(self).__name__)
+    ''' Save the configuration values.
+    '''
+    self.config.save_as_ini(self.configpath, 'TimeSeriesDataDir')
 
   @property
   def policy_name(self):
