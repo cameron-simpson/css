@@ -1388,23 +1388,16 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return xydata
 
   @plotrange
-  def plot(self, start, stop, *, figure, **scatter_kw):
+  def plot(self, start, stop, *, figure, name=None, **scatter_kw):
     ''' Plot a trace on `figure:plotly.graph_objects.Figure`,
         creating it if necessary.
         Return `figure`.
     '''
-    plotly = import_extra('plotly', DISTINFO)
-    go = plotly.graph_objects
-    xaxis = list(self.range(start, stop))
-    yaxis = []
-    for tag, tagged_start, tagged_stop in self.tagged_spans(start, stop):
-      yaxis.extend(self[tag][tagged_start:tagged_stop])
-    assert len(xaxis) == len(yaxis), (
-        "len(xaxis):%d != len(yaxis):%d, start=%s, stop=%s" %
-        (len(xaxis), len(yaxis), start, stop)
-    )
-    figure.add_trace(go.Scatter(x=xaxis, y=yaxis, **scatter_kw))
-    return figure
+    if name is None:
+      name = self.tags.get(
+          'csv.header'
+      ) or "%s[%s:%s]" % (self, arrow.get(start), arrow.get(stop))
+    return super().plot(start, stop, figure=figure, name=name, **scatter_kw)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
