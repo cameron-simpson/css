@@ -138,7 +138,7 @@ class TimeSeriesCommand(BaseCommand):
     print("start =", Arrow.fromtimestamp(start))
     with Pfx("tspath %s", shortpath(tspath)):
       try:
-        ts = self.timeseries_of(tspath)
+        ts = timeseries_from_path(tspath)
       except ValueError as e:
         raise GetoptError("not a directory or file: %s" % (e,)) from e
       if isinstance(ts, (TimeSeries, TimeSeriesPartitioned)):
