@@ -222,8 +222,8 @@ def named_column_tuples(
 ):
   ''' Process an iterable of data rows, usually with the first row being
       column names.
-      Return a generated namedtuple factory and an iterable
-      of instances of the namedtuples for each row.
+      Return a generated `namedtuple` factory (the row class)
+      and an iterable of instances of the namedtuples for each row.
 
       Parameters:
       * `rows`: an iterable of rows, each an iterable of data values.
@@ -235,22 +235,23 @@ def named_column_tuples(
       * `preprocess`: optional callable to modify CSV rows before
         they are converted into the namedtuple.  It receives a context
         object an the data row.
-        It should return the row (possibly modified), or None to drop the
+        It should return the row (possibly modified), or `None` to drop the
         row.
-      * `mixin`: an optional mixin class for the generated namedtuple subclass
+      * `mixin`: an optional mixin class for the generated `namedtuple` subclass
         to provide extra methods or properties
 
       The context object passed to `preprocess` has the following attributes:
-      * `.cls`: attribute with the generated namedtuple subclass;
+      * `.cls`: the generated namedtuple subclass;
         this is useful for obtaining things like the column names
         or column indices;
         this is `None` when preprocessing the header row, if any
-      * `.index`: attribute with the row's enumeration, which counts from 0
-      * `.previous`: the previously accepted row's namedtuple,
-        or `None` if there is no previous row
+      * `.index`: attribute with the row's enumeration, which counts from `0`
+      * `.previous`: the previously accepted row's `namedtuple`,
+        or `None` if there is no previous row;
+        this is useful for differencing
 
-      Rows may be flat iterables in the same order as the column
-      names or mappings keyed on the column names.
+      Rows may be flat iterables in the same order as the column names
+      or mappings keyed on the column names.
 
       If the column names contain empty strings they are dropped
       and the corresponding data row entries are also dropped. This
