@@ -14,7 +14,7 @@
     for providing the data as `pandas.Series` instances etc.
 '''
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from array import array, typecodes  # pylint: disable=no-name-in-module
 from contextlib import contextmanager
 from fnmatch import fnmatch
@@ -39,7 +39,7 @@ from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
-from cs.deco import cachedmethod, decorator, fmtdoc
+from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
 from cs.logutils import warning
@@ -437,7 +437,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
   def __getitem__(self, index):
     ''' Return a datum or list of data.
     '''
-    raise NotImplemented
+    raise NotImplementedError
 
   def data(self, start, stop):
     ''' Return an iterable of `(when,datum)` tuples for each time `when`
@@ -449,7 +449,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
   def as_np_array(self, start=None, stop=None):
     if start is None:
       start = self.start
-    if end is None:
+    if stop is None:
       stop = self.stop
     data = self[start:stop]
 
@@ -899,6 +899,7 @@ class TimespanPolicy(DBC):
 
   FACTORIES = {}
   DEFAULT_NAME = 'monthly'
+  DEFAULT_TAG_FORMAT = ''  # set by subclasses to an Arrow format string
 
   @typechecked
   def __init__(self, *, timezone: Optional[str] = None):
