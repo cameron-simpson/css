@@ -1188,10 +1188,11 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
         key for key in pfx_listdir(self.fspath) if isdirpath(self.pathto(key))
     ]
 
+  # pylint: disable=no-self-use,unused-argument
   def key_typecode(self, key):
     ''' The `array` type code for `key`.
+        This default method returns `'d'` (float64).
     '''
-    # TODO: needs a mapping
     return 'd'
 
   @require(lambda key: is_clean_subpath(key) and '/' not in key)
