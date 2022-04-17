@@ -837,12 +837,6 @@ class TimeSeriesFile(TimeSeries):
     '''
     return len(self.array)
 
-  def data(self, start, stop):
-    ''' Return an iterable of `(when,datum)` tuples for each time `when`
-        from `start` to `stop`.
-    '''
-    return zip(self.range(start, stop), self[start:stop])
-
   @typechecked
   def __getitem__(self, when: Union[Numeric, slice]):
     ''' Return the datum for the UNIX time `when`.
