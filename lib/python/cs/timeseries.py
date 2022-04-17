@@ -1136,7 +1136,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     '''
     name = self.config.auto.policy.name
     if not name:
-      name = self.DEFAULT_POLICY_NAME
+      name = TimespanPolicy.DEFAULT_NAME
       self.policy_name = name
     return name
 
@@ -1160,7 +1160,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     ''' Set the `step` config value, the size of a time slot.
     '''
     if new_step <= 0:
-      raise ValueError("step must be >0, got %r" % (step,))
+      raise ValueError("step must be >0, got %r" % (new_step,))
     self.config['step'] = new_step
     self._config_modified = True
 
