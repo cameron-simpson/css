@@ -1450,7 +1450,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return self.fstags[self.fspath]
 
   @typechecked
-  def tag_for(self, when: Numeric) -> str:
+  def partition_for(self, when: Numeric) -> str:
     ''' Return the tag for the UNIX time `when`.
     '''
     return self.policy.partition_for(self.round_down(when))
