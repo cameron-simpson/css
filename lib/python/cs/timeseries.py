@@ -569,9 +569,10 @@ class TimeSeriesFile(TimeSeries):
       fspath: str,
       typecode: Optional[str] = None,
       *,
-      start: Union[int, float],
-      step: Union[int, float],
+      start: Union[int, float] = None,
+      step: Union[int, float] = None,
       fill=None,
+      fstags=None,
   ):
     ''' Prepare a new time series stored in the file at `fspath`
         containing machine data for the time series values.
@@ -588,6 +589,17 @@ class TimeSeriesFile(TimeSeries):
           if unspecified, fill with `0` for `'q'`
           and `float('nan') for `'d'`
     '''
+    if fstags is None:
+      fstags = FSTags()
+    self.fstags = fstags
+    if start is None:
+      start = self.tags.start
+      if start is None:
+        raise ValueError("no start and no 'start' FSTags tag")
+    if step is None:
+      step = self.tags['step']
+      if step is None:
+        raise ValueError("no step and no 'step' FSTags tag")
     if typecode is not None and typecode not in SUPPORTED_TYPECODES:
       raise ValueError(
           "expected typecode to be one of %r, got %r" %
@@ -651,6 +663,13 @@ class TimeSeriesFile(TimeSeries):
         computed as `self.start+len(self.array)*self.step`.
     '''
     return self.start + len(self.array) * self.step
+
+  @property
+  @cachedmethod
+  def tags(self):
+    ''' The `TagSet` associated with this `TimeSeriesFile` instance.
+    '''
+    return self.fstags[self.fspath]
 
   @staticmethod
   def make_struct_format(typecode, bigendian):
@@ -1347,9 +1366,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       dirpath: str,
       typecode: str,
       *,
-      step: Union[int, float],
       policy,  # :TimespanPolicy,
-      start=0,
+      start: Optional[Numeric] = None,
+      step: Optional[Numeric] = None,
       fstags: Optional[FSTags] = None,
   ):
     ''' Initialise the `TimeSeriesPartitioned` instance.
@@ -1358,9 +1377,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         * `dirpath`: the directory filesystem path,
           known as `.fspath` within the instance
         * `typecode`: the `array` type code for the data
-        * `step`: keyword parameter specifying the width of a time slot
         * `policy`: the partitioning `TimespanPolicy`
         * `start`: the reference epoch, default `0`
+        * `step`: keyword parameter specifying the width of a time slot
 
         The instance requires a reference epoch
         because the `policy` start times will almost always
@@ -1372,8 +1391,25 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         then a time of `20` would fall in the partion left of the
         boundary because it belongs to the time slot commencing at `18`.
     '''
-    TimeSeries.__init__(self, start, step)
     HasFSPath.__init__(self, dirpath)
+    if start is None:
+      start = self.tags.start
+      if start is None:
+        start = 0
+    if step is None:
+      step = self.tags.step
+      if step is None:
+        raise ValueError("no step and no FSTags 'step' tag")
+    if typecode is None:
+      typecode = self.tags.typecode
+      if typecode is None:
+        raise ValueError("no typecode and no FSTags 'typecode' tag")
+    if typecode not in SUPPORTED_TYPECODES:
+      raise ValueError(
+          "typecode=%s not in SUPPORTED_TYPECODES:%r" %
+          (s(typecode), sorted(SUPPORTED_TYPECODES.keys()))
+      )
+    TimeSeries.__init__(self, start, step)
     policy = TimespanPolicy.from_any(policy)
     if fstags is None:
       fstags = FSTags()
