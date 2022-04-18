@@ -184,27 +184,26 @@ class TimeSeriesCommand(BaseCommand):
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
-    with Pfx("tspath %s", shortpath(tspath)):
-      if isinstance(ts, TimeSeries):
-        if argv:
-          raise GetoptError(
-              "fields:%r should not be suppplied for a %s" % (argv, s(ts))
-          )
-        figure = ts.plot(start, now)  # pylint: disable=missing-kwoa
-      elif isinstance(ts, TimeSeriesDataDir):
-        if argv:
-          keys = ts.keys(argv)
-          if not keys:
-            raise GetoptError("no matching keys")
-        else:
-          keys = ts.keys()
-          if not keys:
-            raise GetoptError("no keys in %s" % (ts,))
-        figure = ts.plot(
-            start, now, keys
-        )  # pylint: too-many-function-args.disable=missing-kwoa
+    if isinstance(ts, TimeSeries):
+      if argv:
+        raise GetoptError(
+            "fields:%r should not be suppplied for a %s" % (argv, s(ts))
+        )
+      figure = ts.plot(start, now)  # pylint: disable=missing-kwoa
+    elif isinstance(ts, TimeSeriesDataDir):
+      if argv:
+        keys = ts.keys(argv)
+        if not keys:
+          raise GetoptError("no matching keys")
       else:
-        raise RuntimeError("unhandled type %s" % (s(ts),))
+        keys = ts.keys()
+        if not keys:
+          raise GetoptError("no keys in %s" % (ts,))
+      figure = ts.plot(
+          start, now, keys
+      )  # pylint: too-many-function-args.disable=missing-kwoa
+    else:
+      raise RuntimeError("unhandled type %s" % (s(ts),))
     with Pfx("write %r", imgpath):
       if existspath(imgpath):
         error("already exists")
