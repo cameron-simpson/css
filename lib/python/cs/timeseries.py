@@ -126,7 +126,7 @@ class TimeSeriesCommand(BaseCommand):
           to impath.png. Open the image if --show is provided.
           tspath may refer to a single .csts TimeSeriesFile,
           a TimeSeriesPartitioned directory of such files,
-          or a TimeSeriesDataDir contains partitions for multiple keys.
+          or a TimeSeriesDataDir containing partitions for multiple keys.
           If glob is supplied, constrain the keys of a TimeSeriesDataDir
           by the glob.
     '''
@@ -911,7 +911,7 @@ class TimespanPolicy(DBC):
       used by `TimeSeriesPartitioned` instances
       to partition data among multiple `TimeSeries` data files.
 
-      Probably the most important methods are `tag_for(when)`
+      Probably the most important methods are `partition_for(when)`
       which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
       and `timespan_for` which returns the per tag start and end times
       enclosing a timestamp.
@@ -919,7 +919,7 @@ class TimespanPolicy(DBC):
 
   FACTORIES = {}
   DEFAULT_NAME = 'monthly'
-  DEFAULT_TAG_FORMAT = ''  # set by subclasses to an Arrow format string
+  DEFAULT_PARTITION_FORMAT = ''  # set by subclasses to an Arrow format string
 
   @typechecked
   def __init__(self, *, timezone: Optional[str] = None):
@@ -933,6 +933,12 @@ class TimespanPolicy(DBC):
     if timezone is None:
       timezone = get_default_timezone_name()
     self.timezone = timezone
+
+  def __str__(self):
+    return "%s:%r:%r:%r" % (
+        type(self).__name__, self.name, self.DEFAULT_PARTITION_FORMAT,
+        self.timezone
+    )
 
   # pylint: disable=keyword-arg-before-vararg
   @classmethod
@@ -994,12 +1000,12 @@ class TimespanPolicy(DBC):
     '''
     raise NotImplementedError
 
-  def tag_for(self, when):
+  def partition_for(self, when):
     ''' Return the default tag for the UNIX time `when`,
         which is derived from the `arrow.Arrow`
-        format string `self.DEFAULT_TAG_FORMAT`.
+        format string `self.DEFAULT_PARTITION_FORMAT`.
     '''
-    return self.Arrow(when).format(self.DEFAULT_TAG_FORMAT)
+    return self.Arrow(when).format(self.DEFAULT_PARTITION_FORMAT)
 
   @require(lambda start, stop: start < stop)
   def tagged_spans(self, start, stop):
@@ -1008,7 +1014,7 @@ class TimespanPolicy(DBC):
     '''
     when = start
     while when < stop:
-      tag = self.tag_for(when)
+      tag = self.partition_for(when)
       _, tag_end = self.timespan_for(when)
       yield tag, when, min(tag_end, stop)
       when = tag_end
@@ -1017,7 +1023,7 @@ class TimespanPolicy(DBC):
     ''' Return the start and end times for the supplied `tag`.
     '''
     return self.timespan_for(
-        arrow.get(tag, self.DEFAULT_TAG_FORMAT,
+        arrow.get(tag, self.DEFAULT_PARTITION_FORMAT,
                   tzinfo=self.timezone).timestamp()
     )
 
@@ -1025,7 +1031,7 @@ class TimespanPolicyDaily(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at day boundaries.
   '''
 
-  DEFAULT_TAG_FORMAT = 'YYYY-MM-DD'
+  DEFAULT_PARTITION_FORMAT = 'YYYY-MM-DD'
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
@@ -1043,7 +1049,7 @@ class TimespanPolicyMonthly(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
 
-  DEFAULT_TAG_FORMAT = 'YYYY-MM'
+  DEFAULT_PARTITION_FORMAT = 'YYYY-MM'
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
@@ -1061,7 +1067,7 @@ class TimespanPolicyAnnual(TimespanPolicy):
   ''' A `TimespanPolicy` bracketing times at month boundaries.
   '''
 
-  DEFAULT_TAG_FORMAT = 'YYYY'
+  DEFAULT_PARTITION_FORMAT = 'YYYY'
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times
@@ -1388,7 +1394,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def tag_for(self, when: Numeric) -> str:
     ''' Return the tag for the UNIX time `when`.
     '''
-    return self.policy.tag_for(self.round_down(when))
+    return self.policy.partition_for(self.round_down(when))
 
   def timespan_for(self, when):
     ''' Return the start and end UNIX times for the partition storing `when`.
@@ -1404,7 +1410,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       tag = spec
     else:
       # numeric UNIX time
-      tag = self.tag_for(spec)
+      tag = self.partition_for(spec)
     try:
       ts = self._ts_by_tag[tag]
     except KeyError:
