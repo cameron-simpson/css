@@ -1311,6 +1311,9 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
           policy=self.policy,
           fstags=self.fstags,
       )
+      tsks.tags['key'] = key
+      tsks.tags['step'] = tsks.step
+      tsks.tags['typecode'] = tsks.typecode
       tsks.open()
     return tsks
 
@@ -1476,6 +1479,10 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       ts = self._ts_by_tag[tag] = TimeSeriesFile(
           filepath, self.typecode, start=tag_start, step=self.step
       )
+      ts.tags['partition'] = tag
+      ts.tags['start'] = tag_start
+      ts.tags['stop'] = tag_stop
+      ts.tags['step'] = self.step
       ts.open()
     return ts
 
