@@ -1498,6 +1498,11 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   def __setitem__(self, when: Numeric, value):
     self.subseries(when)[when] = value
 
+  def tsfilenames(self):
+    ''' Return a list of the time series data filenames.
+    '''
+    return self.fnmatch('*' + TimeSeriesFile.DOTEXT)
+
   def partition(self, start, stop):
     ''' Return an iterable of `(when,subseries)` for each time `when`
         from `start` to `stop`.
