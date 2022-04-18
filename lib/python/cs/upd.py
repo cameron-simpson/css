@@ -1077,10 +1077,11 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    with self.upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        self.upd.delete(index)
+    if self.upd is not None:
+      with self.upd._lock:  # pylint: disable=protected-access
+        index = self.index
+        if index is not None:
+          self.upd.delete(index)
 
   __del__ = delete
 
