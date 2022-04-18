@@ -1338,7 +1338,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     for key in keys:
       with Pfx(key):
         tsks = self[key]
-        marker_color
         name = tsks.tags.get('csv.header', key)
         key_scatter_kw = dict(scatter_kw)
         if key_colors:
