@@ -38,26 +38,99 @@ class SPLinkCommand(BaseCommand):
   ''' Command line to wrk with SP-Link data downloads.
   '''
 
-  LOG_DATASETS = 'DetailedData', 'DailySummaryData'
+  EVENTS_DATASETS = 'EventData',
+  TIMESERIES_DATASETS = 'DetailedData', 'DailySummaryData'
+  ALL_DATASETS = EVENTS_DATASETS + TIMESERIES_DATASETS
 
-  USAGE_KEYWORDS = {'LOG_DATASETS': ' '.join(sorted(LOG_DATASETS))}
+  USAGE_KEYWORDS = {'ALL_DATASETS': ' '.join(sorted(ALL_DATASETS))}
 
   def cmd_import(self, argv):
     ''' Usage: {cmd} sp-link-dirpath timeseries-dirpath [datasets...]
           Import CSV data from sp-link-dirpath into the time series data
           directories under timeseries-dirpath.
-          Default datasets: {LOG_DATASETS}
+          Default datasets: {ALL_DATASETS}
     '''
-    csv_dirpath, over_tsdirpath = argv.pop(0), argv.pop(0)
+    csv_dirpath = self.popargv(argv, "sp-link-dirpath", str, isdirpath)
+    over_tsdirpath = self.popargv(argv, "timeseries-dirpath", str, isdirpath)
     if not argv:
-      argv = list(self.LOG_DATASETS)
+      argv = list(self.ALL_DATASETS)
+    csvdir = SPLinkCSVDir(csv_dirpath)
     needdir(over_tsdirpath)
     for dataset in argv:
       with Pfx(dataset):
-        tsdirpath = joinpath(over_tsdirpath, dataset)
-        needdir(tsdirpath)
-        with SPLinkDataDir(tsdirpath, dataset) as spd:
-          spd.import_from(csv_dirpath)
+        if dataset in self.TIMESERIES_DATASETS:
+          tsdirpath = joinpath(over_tsdirpath, dataset)
+          needdir(tsdirpath)
+          with SPLinkDataDir(tsdirpath, dataset) as spd:
+            spd.import_from(csv_dirpath)
+        elif dataset in self.EVENTS_DATASETS:
+          dbpath = joinpath(over_tsdirpath, 'events.sqlite')
+          db = SQLTags(dbpath)
+          short_csvpath = shortpath(csvdir.csvpath(dataset))
+          for when, tags in progressbar(
+              csvdir.csv_tagsets(dataset),
+              short_csvpath,
+              update_frequency=8,
+          ):
+            tags['dataset'] = dataset
+            db.default_factory(None, unixtime=when, tags=tags)
+        else:
+          raise GetoptError(
+              "do no know how to process dataset, I know: events=%s, timeseries=%s"
+              % (
+                  ",".join(self.EVENTS_DATASETS),
+                  ",".join(self.TIMESERIES_DATASETS),
+              )
+          )
+
+  def cmd_plot(self, argv):
+    ''' Usage: {cmd} [--show] timeseries-dirpath imagepath.png days [{{glob|field}}...]
+    '''
+    try:
+      import_extra('plotly', DISTINFO)
+    except ImportError as e:
+      raise GetoptError(
+          "the plotly package is not installed: %s" % (e,)
+      ) from e
+    show_image = False
+    if argv and argv[0] == '--show':
+      show_image = True
+      argv.pop(0)
+    if not argv:
+      raise GetoptError("missing datadir")
+    datadirpath = self.popargv(argv, "data directory", str, isdirpath)
+    imgpath = self.popargv(
+        argv, "tspath", str, lambda path: not existspath(path),
+        "already exists"
+    )
+    days = self.popargv(argv, int, "days to display", lambda days: days > 0)
+    if not argv:
+      raise GetoptError("missing fields")
+    ok = True
+    spd = SPLinkDataDir(datadirpath, 'DetailedData')
+    spd_fields = sorted(spd.keys())
+    if argv:
+      keys = ts.keys(argv)
+      if not keys:
+        raise GetoptError("no matching keys")
+    else:
+      raise GetoptError("missing fields")
+    now = time.time()
+    start = now - days * 24 * 3600
+    figure = spd.plot(start, now, keys)
+    figure.update_layout(
+        dict(
+            title=f"Data from {datadirpath}.",
+            showlegend=True,
+        )
+    )
+    with Pfx("write %r", imgpath):
+      if existspath(imgpath):
+        error("already exists")
+      else:
+        figure.write_image(imgpath, format="png", width=2048, height=1024)
+    if show_image:
+      os.system(shlex.join(['open', imgpath]))
 
 def ts2001_unixtime(tzname=None):
   ''' Convert an SP-Link seconds-since-2001-01-01-local-time offset
