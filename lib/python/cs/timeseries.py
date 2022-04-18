@@ -159,19 +159,15 @@ class TimeSeriesCommand(BaseCommand):
     if argv and argv[0] == '--show':
       show_image = True
       argv.pop(0)
-    tspath = self.popargv(argv, "tspath", str, existspath, "does not exist")
+    ts = self.popargv(argv, "tspath", timeseries_from_path)
     imgpath = self.popargv(
-        argv, "tspath", str, lambda path: not existspath(path),
+        argv, "impath.png", str, lambda path: not existspath(path),
         "already exists"
     )
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
     with Pfx("tspath %s", shortpath(tspath)):
-      try:
-        ts = timeseries_from_path(tspath)
-      except ValueError as e:
-        raise GetoptError("not a directory or file: %s" % (e,)) from e
       if isinstance(ts, TimeSeries):
         if argv:
           raise GetoptError(
@@ -191,7 +187,7 @@ class TimeSeriesCommand(BaseCommand):
             start, now, keys
         )  # pylint: too-many-function-args.disable=missing-kwoa
       else:
-        raise RuntimeError("unhandled type %s from tspath" % (type(ts),))
+        raise RuntimeError("unhandled type %s" % (s(ts),))
     with Pfx("write %r", imgpath):
       if existspath(imgpath):
         error("already exists")
