@@ -979,6 +979,27 @@ class SQLTagsORM(ORM, UNIXTimeMixin):
           etag.set_polyvalue(pv)
         self._update_multivalues(name, pv.structured_value, session=session)
 
+      def add_new_tags(self, tags, *, session):
+        ''' Add multiple new `Tag`s
+            which may not conflict with any existing `Tag`s.
+        '''
+        tags_table = orm.tags
+        if self.id is None:
+          # obtain the id value from the database
+          session.add(self)
+          session.flush()
+        for tag in tags:
+          pv = SQLTagSet.to_polyvalue(tag.name, tag.value)
+          session.add(
+              tags_table(
+                  entity_id=self.id,
+                  name=tag.name,
+                  float_value=pv.float_value,
+                  string_value=pv.string_value,
+                  structured_value=pv.structured_value,
+              )
+          )
+
       def discard_tag(self, name, value=None, *, session):
         ''' Discard the tag matching `(name,value)`.
             Return the tag row discarded or `None` if no match.
@@ -1539,7 +1560,9 @@ class SQLTags(BaseTagSets):
     self.default_db_session.flush()
 
   @typechecked
-  def default_factory(self, name: [str, None], *, unixtime=None, tags=None):
+  def default_factory(
+      self, name: Optional[str] = None, *, unixtime=None, tags=None
+  ):
     ''' Fetch or create an `SQLTagSet` for `name`.
 
         Note that `name` may be `None` to create a new "log" entry.
@@ -1557,11 +1580,7 @@ class SQLTags(BaseTagSets):
         session.flush()
         te = self.get(entity.id)
         assert te is not None
-        to_polyvalue = te.to_polyvalue
-        for tag in tags:
-          entity.add_tag(
-              tag.name, to_polyvalue(tag.name, tag.value), session=session
-          )
+        entity.add_new_tags(tags, session=session)
       # refresh entry from some source if there is a .refresh() method
       refresh = getattr(type(te), 'refresh', None)
       if refresh is not None and callable(refresh):
