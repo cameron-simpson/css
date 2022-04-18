@@ -62,7 +62,7 @@ from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s
-from cs.logutils import warning
+from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
