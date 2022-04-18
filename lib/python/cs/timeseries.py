@@ -26,6 +26,7 @@ from os.path import (
     isdir as isdirpath,
     isfile as isfilepath,
 )
+import shlex
 from struct import pack, Struct  # pylint: disable=no-name-in-module
 import sys
 import time
@@ -141,7 +142,6 @@ class TimeSeriesCommand(BaseCommand):
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
     now = time.time()
     start = now - days * 24 * 3600
-    print("start =", Arrow.fromtimestamp(start))
     with Pfx("tspath %s", shortpath(tspath)):
       try:
         ts = timeseries_from_path(tspath)
@@ -152,7 +152,7 @@ class TimeSeriesCommand(BaseCommand):
           raise GetoptError(
               "fields:%r should not be suppplied for a %s" % (argv, s(ts))
           )
-        fig = ts.plot(start, now)  # pylint: disable=missing-kwoa
+        figure = ts.plot(start, now)  # pylint: disable=missing-kwoa
       elif isinstance(ts, TimeSeriesDataDir):
         if argv:
           keys = ts.keys(argv)
@@ -162,7 +162,7 @@ class TimeSeriesCommand(BaseCommand):
           keys = ts.keys()
           if not keys:
             raise GetoptError("no keys in %s" % (ts,))
-        fig = ts.plot(
+        figure = ts.plot(
             start, now, keys
         )  # pylint: too-many-function-args.disable=missing-kwoa
       else:
@@ -171,8 +171,9 @@ class TimeSeriesCommand(BaseCommand):
       if existspath(imgpath):
         error("already exists")
       else:
-        fig.write_image(imgpath, format="png", width=2048, height=1024)
-    os.system('open plot.png')
+        figure.write_image(imgpath, format="png", width=2048, height=1024)
+    if show_image:
+      os.system(shlex.join(['open', imgpath]))
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
