@@ -429,7 +429,7 @@ class TimeStepsMixin:
     '''
     return self.when(self.offset(when))
 
-  def round_up(self, when, start, step):
+  def round_up(self, when):
     ''' Return `when` rounded up to the start of the next time slot.
     '''
     rounded = self.round_down(when)
@@ -509,11 +509,15 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
 
   # TODO: INCOMPLETE
   def as_np_array(self, start=None, stop=None):
+    ''' Return a `numpy` array containing the data from `start` to `stop`,
+        default from `self.start` and `self.stop` respectively.
+    '''
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
     data = self[start:stop]
+    raise RuntimeError("INCOMPLETE")
 
   def as_pd_series(self, start=None, stop=None, tzname: Optional[str] = None):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
@@ -554,6 +558,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     figure.add_trace(go.Scatter(name=name, x=xaxis, y=yaxis, **scatter_kw))
     return figure
 
+# pylint: disable=too-many-instance-attributes
 class TimeSeriesFile(TimeSeries):
   ''' A file continaing a single time series for a single data field.
 
@@ -582,6 +587,7 @@ class TimeSeriesFile(TimeSeries):
   MAGIC = b'csts'
   HEADER_LENGTH = 8
 
+  # pylint: disable=too-many-branches
   @typechecked
   def __init__(
       self,
@@ -996,6 +1002,7 @@ class TimespanPolicy(DBC):
           the default is inferred from the default time zone
           using the `get_default_timezone_name` function
     '''
+    self.name = None
     if timezone is None:
       timezone = get_default_timezone_name()
     self.timezone = timezone
@@ -1320,7 +1327,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     '''
     return is_identifier(key) and isdirpath(self.pathto(key))
 
-  @require(lambda key: is_identifier(key))
+  @require(lambda key: is_identifier(key))  # pylint: disable=unnecessary-lambda
   def __getitem__(self, key):
     ''' Return the `TimeSeriesPartitioned` for `key`,
         creating its subdirectory if necessary.
