@@ -1461,9 +1461,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     return "%s(%s,%r,%s,%s)" % (
         type(self).__name__,
         shortpath(self.fspath),
-        self.typecode,
-        self.step,
-        self.policy,
+        getattr(self, 'typecode', 'NO_TYPECODE_YET'),
+        getattr(self, 'step', 'NO_STEP_YET'),
+        getattr(self, 'policy', 'NO_POLICY_YET'),
     )
 
   @contextmanager
