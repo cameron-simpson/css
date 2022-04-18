@@ -1268,18 +1268,39 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     return tsks
 
   @plotrange
-  def plot(self, start, stop, keys=None, *, figure, **scatter_kw):
+  def plot(
+      self, start, stop, keys=None, *, figure, key_colors=None, **scatter_kw
+  ):
     ''' Plot traces on `figure:plotly.graph_objects.Figure`,
         creating it if necessary, for each key in `keys`.
         Return `figure`.
+
+        Parameters:
+        * `start`: optional start, default `self.start`
+        * `stop`: optional stop, default `self.stop`
+        * `keys`: optional list of keys, default all keys
+        * `figure`: optional figure, created if not specified
+        * `key_colors`: option mapping of key to `marker_color`
+        Other keyword parameters are passed to `Scatter`.
     '''
     if keys is None:
       keys = sorted(self.keys())
     for key in keys:
       with Pfx(key):
         tsks = self[key]
+        marker_color
         name = tsks.tags.get('csv.header', key)
-        figure = tsks.plot(start, stop, figure=figure, name=name, **scatter_kw)
+        key_scatter_kw = dict(scatter_kw)
+        if key_colors:
+          try:
+            colour = key_colors[key]
+          except KeyError:
+            pass
+          else:
+            key_scatter_kw.update(marker_color=colour)
+        figure = tsks.plot(
+            start, stop, figure=figure, name=name, **key_scatter_kw
+        )
     return figure
 
 class TimeSeriesPartitioned(TimeSeries, HasFSPath):
