@@ -15,6 +15,7 @@ from inspect import isclass, ismethod
 from os.path import basename
 import sys
 from types import SimpleNamespace
+from typing import List
 
 from cs.context import stackattrs
 from cs.gimmicks import nullcontext
@@ -626,7 +627,7 @@ class BaseCommand:
     return argv
 
   @staticmethod
-  def popargv(argv, *a):
+  def popargv(argv: List[str], *a):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
