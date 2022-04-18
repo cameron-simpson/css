@@ -195,15 +195,16 @@ class SPLinkCSVDir(HasFSPath):
       yield when, tags
 
   # pylint: disable=too-many-locals
-  def import_csv_data(self, which: str, tsd: TimeSeriesDataDir, tzname=None):
+  def export_to_timeseries(
+      self, which: str, tsd: TimeSeriesDataDir, tzname=None
+  ):
     ''' Read the CSV file in `self.fspath` specified by `which`
-        and import them into the `tsd:TimeSeriesDataDir.
+        and export its contents into the `tsd:TimeSeriesDataDir.
     '''
     nan = float('nan')
     ts2001 = ts2001_unixtime(tzname)
     # load the DetailedData CSV
-    csvfilename = self.csvpath(which)
-    csvpath = self.pathto(csvfilename)
+    csvpath = self.csvpath(which)
     rowtype, rows = csv_import(csvpath)
     # group the values by key
     keys = rowtype.attributes_
@@ -228,7 +229,7 @@ class SPLinkCSVDir(HasFSPath):
       tsks.setitems(key_values[key0], key_values[key])
 
 class SPLinkDataDir(TimeSeriesDataDir):
-  ''' A `TimeSeriesDataDir` to hold CSV log data from an SP-Link data download.
+  ''' A `TimeSeriesDataDir` to hold log data from an SP-Link CSV data download.
       This holds the data from a particular CSV log such as `'DetailedData'`.
   '''
 
