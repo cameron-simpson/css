@@ -230,15 +230,18 @@ class TimeSeriesCommand(BaseCommand):
       print(type(pds), pds.memory_usage())
       print(pds)
 
-    def test_tagged_spans():
+    def test_partitioned_spans():
       policy = TimespanPolicyDaily()
       start = time.time()
       end = time.time() + 7 * 24 * 3600
       print("start =", Arrow.fromtimestamp(start))
       print("end =", Arrow.fromtimestamp(end))
-      for tag, tag_start, tag_end in policy.tagged_spans(start, end):
+      for partition, partition_start, partition_stop in policy.partitioned_spans(
+          start, end):
         print(
-            tag, Arrow.fromtimestamp(tag_start), Arrow.fromtimestamp(tag_end)
+            partition,
+            Arrow.fromtimestamp(partition_start),
+            Arrow.fromtimestamp(partition_stop),
         )
 
     def test_datadir():
@@ -263,7 +266,7 @@ class TimeSeriesCommand(BaseCommand):
     testfunc_map = {
         'datadir': test_datadir,
         'pandas': test_pandas,
-        'tagged_spans': test_tagged_spans,
+        'partitioned_spans': test_partitioned_spans,
         'timeseries': test_timeseries,
         'timespan_policy': test_timespan_policy,
     }
@@ -976,7 +979,7 @@ class TimespanPolicy(DBC):
 
       Probably the most important methods are `partition_for(when)`
       which returns a label for a timestamp (eg `"2022-01"` for a monthly policy)
-      and `timespan_for` which returns the per tag start and end times
+      and `timespan_for` which returns the per partition start and end times
       enclosing a timestamp.
   '''
 
@@ -1064,30 +1067,31 @@ class TimespanPolicy(DBC):
     raise NotImplementedError
 
   def partition_for(self, when):
-    ''' Return the default tag for the UNIX time `when`,
+    ''' Return the default partition for the UNIX time `when`,
         which is derived from the `arrow.Arrow`
         format string `self.DEFAULT_PARTITION_FORMAT`.
     '''
     return self.Arrow(when).format(self.DEFAULT_PARTITION_FORMAT)
 
   @require(lambda start, stop: start < stop)
-  def tagged_spans(self, start, stop):
-    ''' Generator yielding a sequence of `(tag,tag_start,tag_end)`
+  def partitioned_spans(self, start, stop):
+    ''' Generator yielding a sequence of `(partition,partition_start,partition_stop)`
         covering the range `start:stop`.
     '''
     when = start
     while when < stop:
-      tag = self.partition_for(when)
-      _, tag_end = self.timespan_for(when)
-      yield tag, when, min(tag_end, stop)
-      when = tag_end
+      partition = self.partition_for(when)
+      _, partition_stop = self.timespan_for(when)
+      yield partition, when, min(partition_stop, stop)
+      when = partition_stop
 
-  def tag_timespan(self, tag: str) -> Tuple[Numeric, Numeric]:
-    ''' Return the start and end times for the supplied `tag`.
+  def partition_timespan(self, partition: str) -> Tuple[Numeric, Numeric]:
+    ''' Return the start and end times for the supplied `partition`.
     '''
     return self.timespan_for(
-        arrow.get(tag, self.DEFAULT_PARTITION_FORMAT,
-                  tzinfo=self.timezone).timestamp()
+        arrow.get(
+            partition, self.DEFAULT_PARTITION_FORMAT, tzinfo=self.timezone
+        ).timestamp()
     )
 
 class TimespanPolicyDaily(TimespanPolicy):
@@ -1380,8 +1384,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       We have one of these for each `TimeSeriesDataDir` key.
 
       This class manages a collection of files
-      named by the tag from a `TimespanPolicy`,
-      which dictates which tag holds the datum for a UNIX time.
+      named by the partition from a `TimespanPolicy`,
+      which dictates which partition holds the datum for a UNIX time.
   '''
 
   @typechecked
@@ -1451,7 +1455,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
     self.start = start
     self.step = step
     self.fstags = fstags
-    self._ts_by_tag = {}
+    self._ts_by_partition = {}
 
   def __str__(self):
     return "%s(%s,%r,%s,%s)" % (
@@ -1470,7 +1474,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       with self.fstags:
         yield
     finally:
-      for ts in self._ts_by_tag.values():
+      for ts in self._ts_by_partition.values():
         ts.close()
 
   @property
@@ -1482,7 +1486,7 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
 
   @typechecked
   def partition_for(self, when: Numeric) -> str:
-    ''' Return the tag for the UNIX time `when`.
+    ''' Return the partition for the UNIX time `when`.
     '''
     return self.policy.partition_for(self.round_down(when))
 
@@ -1494,24 +1498,26 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   @typechecked
   def subseries(self, spec: Union[str, Numeric]):
     ''' Return the `TimeSeries` for `spec`,
-        which may be a partition tag name or a UNIX time.
+        which may be a partition name or a UNIX time.
     '''
     if isinstance(spec, str):
-      tag = spec
+      partition = spec
     else:
       # numeric UNIX time
-      tag = self.partition_for(spec)
+      partition = self.partition_for(spec)
     try:
-      ts = self._ts_by_tag[tag]
+      ts = self._ts_by_partition[partition]
     except KeyError:
-      tag_start, _ = self.policy.tag_timespan(tag)
-      filepath = self.pathto(tag + TimeSeriesFile.DOTEXT)
-      ts = self._ts_by_tag[tag] = TimeSeriesFile(
-          filepath, self.typecode, start=tag_start, step=self.step
+      partition_start, partition_stop = self.policy.partition_timespan(
+          partition
       )
-      ts.tags['partition'] = tag
-      ts.tags['start'] = tag_start
-      ts.tags['stop'] = tag_stop
+      filepath = self.pathto(partition + TimeSeriesFile.DOTEXT)
+      ts = self._ts_by_partition[partition] = TimeSeriesFile(
+          filepath, self.typecode, start=partition_start, step=self.step
+      )
+      ts.tags['partition'] = partition
+      ts.tags['start'] = partition_start
+      ts.tags['stop'] = partition_stop
       ts.tags['step'] = self.step
       ts.open()
     return ts
@@ -1539,15 +1545,15 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         from `start` to `stop`.
     '''
     ts = None
-    tag_start = None
-    tag_end = None
+    partition_start = None
+    partition_stop = None
     for when in self.range(start, stop):
-      if tag_start is not None and not tag_start <= when < tag_end:
+      if partition_start is not None and not partition_start <= when < partition_stop:
         # different range, invalidate the current bounds
-        tag_start = None
-      if tag_start is None:
+        partition_start = None
+      if partition_start is None:
         ts = self.subseries(when)
-        tag_start, tag_end = self.timespan_for(when)
+        partition_start, partition_stop = self.timespan_for(when)
       yield when, ts
 
   def setitems(self, whens, values):
@@ -1556,25 +1562,25 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         This is most efficient if `whens` are ordered.
     '''
     ts = None
-    tag_start = None
-    tag_end = None
+    partition_start = None
+    partition_stop = None
     for when, value in zip(whens, values):
-      if tag_start is not None and not tag_start <= when < tag_end:
+      if partition_start is not None and not partition_start <= when < partition_stop:
         # different range, invalidate the current bounds
-        tag_start = None
-      if tag_start is None:
+        partition_start = None
+      if partition_start is None:
         ts = self.subseries(when)
-        tag_start, tag_end = self.timespan_for(when)
+        partition_start, partition_stop = self.timespan_for(when)
       ts[when] = value
 
   def data(self, start, stop):
     ''' Return a list of `(when,datum)` tuples for the slot times from `start` to `stop`.
     '''
     xydata = []
-    for tag, tagged_start, tagged_stop in self.policy.tagged_spans(start,
-                                                                   stop):
-      ts = self.subseries(tag)
-      xydata.extend(ts.data(tagged_start, tagged_stop))
+    for partition, partition_start, partition_stop in self.policy.partitioned_spans(
+        start, stop):
+      ts = self.subseries(partition)
+      xydata.extend(ts.data(partition_start, partition_stop))
     return xydata
 
   @plotrange
