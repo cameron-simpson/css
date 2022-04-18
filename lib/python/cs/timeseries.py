@@ -5,13 +5,30 @@
 ''' Efficient portable machine native columnar storage of time series data
     for double float and signed 64-bit integers.
 
-    I use this as efficient storage of time series data from my solar inverter,
-    which reports in a slightly clunky time limited CSV format;
-    I import those CSVs into `TimeSeries` data directories
-    which contain the overall accrued data.
+    On a personal basis, I use this as efficient storage of time
+    series data from my solar inverter, which reports in a slightly
+    clunky time limited CSV format; I import those CSVs into
+    time series data directories which contain the overall accrued
+    data.
 
-    The `TimeSeries` and related classes provide methods
-    for providing the data as `pandas.Series` instances etc.
+    Three levels of storage are defined here:
+    - `TimeSeriesFile`: a single file containing a binary list of
+      float64 or signed int64 values
+    - `TimeSeriesPartitioned`: a directory containing multiple
+      `TimeSeriesFile` files, each covering a separate time span
+      according to a supplied policy, for example a calendar month
+    - `TimeSeriesDataDir`: a directory containing multiple
+      `TimeSeriesPartitioned` subdirectories, each for a different
+      time series, for example one subdirectory for grid voltage
+      and another for grid power
+
+    Together these provide a hierary for finite sized files storing
+    unbounded time series data for multiple parameters.
+    The core purpose is to provide time series data storage; there
+    are assorted convenience methods to export arbitrary subsets
+    of the data for use by other libraries in common forms, such
+    as dataframes or series, numpy arrays and simple lists.
+    There are also some simple plot methods for making graphs using `plotly`.
 '''
 
 from abc import ABC, abstractmethod
