@@ -623,7 +623,7 @@ class TimeSeriesFile(TimeSeries):
       if start is None:
         raise ValueError("no start and no 'start' FSTags tag")
     if step is None:
-      step = self.tags['step']
+      step = self.tags.step
       if step is None:
         raise ValueError("no step and no 'step' FSTags tag")
     if typecode is not None and typecode not in SUPPORTED_TYPECODES:
