@@ -605,6 +605,13 @@ class TimeSeriesFile(TimeSeries):
         * `fill`: optional default fill values for `pad_to`;
           if unspecified, fill with `0` for `'q'`
           and `float('nan') for `'d'`
+
+        If `start` or `step` are omitted the file's fstags will be
+        consulted for their values.
+        This class does not set these tags (that would presume write
+        access to the parent directory or its `.fstags` file)
+        when a `TimeSeriesFile` is made by a `TimeSeriesPartitioned` instance
+        it sets these flags.
     '''
     if fstags is None:
       fstags = FSTags()
@@ -1409,6 +1416,14 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         boundary came at `19` (eg due to some calendar based policy)
         then a time of `20` would fall in the partion left of the
         boundary because it belongs to the time slot commencing at `18`.
+
+        If `start` or `step` or `typecode` are omitted the file's
+        fstags will be consulted for their values.
+        The `start` parameter will further fall back to `0`.
+        This class does not set these tags (that would presume write
+        access to the parent directory or its `.fstags` file)
+        when a `TimeSeriesPartitioned` is made by a `TimeSeriesDataDir`
+        instance it sets these flags.
     '''
     HasFSPath.__init__(self, dirpath)
     if start is None:
