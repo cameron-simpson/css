@@ -67,7 +67,6 @@ def ts2001_unixtime(tzname=None):
     tzname = 'local'
   a2001 = arrow.get(datetime(2001, 1, 1, 0, 0, 0), tzname)
   unixtime = a2001.timestamp()
-  X("a2001 %s, unixtime %s", a2001, unixtime)
   return unixtime
 
 class SPLinkCSVDir(HasFSPath):
@@ -83,7 +82,7 @@ class SPLinkCSVDir(HasFSPath):
     return self.fnmatch('?*_*_*.CSV')[0].split('_', 1)[0]
 
   @pfx
-  def csvpath(self, which: str) -> str:
+  def csvfilename(self, which: str) -> str:
     ''' Return the CSV filename specified by `which`.
 
         Example:
@@ -92,6 +91,35 @@ class SPLinkCSVDir(HasFSPath):
     '''
     csvfilename, = self.fnmatch(f'*_{which}_*.CSV')
     return csvfilename
+
+  def csvpath(self, which: str) -> str:
+    ''' Return the CSV pathname specified by `which`.
+
+        Example:
+
+            self.csvpath('DetailedData')
+    '''
+    return self.pathto(self.csvfilename(which))
+
+  def csv_tagsets(self, which: str):
+    ts2001_offset = ts2001_unixtime()
+    csvpath = self.csvpath(which)
+    rowtype, rows = csv_import(csvpath)
+    for row in rows:
+      tags = TagSet()
+      for attr, value in row._asdict().items():
+        try:
+          value = int(value)
+        except ValueError:
+          try:
+            value = float(value)
+          except ValueError:
+            pass
+        tags[attr] = value
+      when = float(
+          row.date_time_stamp_seconds_from_the_year_2001
+      ) + ts2001_offset
+      yield when, tags
 
   # pylint: disable=too-many-locals
   def import_csv_data(self, which: str, tsd: TimeSeriesDataDir, tzname=None):
