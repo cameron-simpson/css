@@ -1429,6 +1429,9 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
         instance it sets these flags.
     '''
     HasFSPath.__init__(self, dirpath)
+    if fstags is None:
+      fstags = FSTags()
+    self.fstags = fstags
     if start is None:
       start = self.tags.start
       if start is None:
@@ -1448,13 +1451,10 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
       )
     TimeSeries.__init__(self, start, step)
     policy = TimespanPolicy.from_any(policy)
-    if fstags is None:
-      fstags = FSTags()
     self.typecode = typecode
     self.policy = policy
     self.start = start
     self.step = step
-    self.fstags = fstags
     self._ts_by_partition = {}
 
   def __str__(self):
