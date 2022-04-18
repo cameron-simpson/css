@@ -120,6 +120,31 @@ class TimeSeriesCommand(BaseCommand):
 
   SUBCOMMAND_ARGV_DEFAULT = 'test'
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd} tspath
+          Report infomation about the time series stored at tspath.
+          tspath may refer to a single .csts TimeSeriesFile,
+          a TimeSeriesPartitioned directory of such files,
+          or a TimeSeriesDataDir containing partitions for multiple keys.
+    '''
+    ts = self.popargv(argv, "tspath", timeseries_from_path)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print(ts)
+    if isinstance(ts, TimeSeries):
+      print("  start =", ts.start, arrow.get(ts.start))
+      print("  step =", ts.step)
+      print("  typecode =", ts.typecode)
+    elif isinstance(ts, TimeSeriesPartitioned):
+      for tsfilename in sorted(ts.tsfilenames()):
+        tsf = TimeSeriesFile(ts.pathto(tsfilename))
+        print(" ", tsf)
+    elif isinstance(ts, TimeSeriesDataDir):
+      for key in sorted(ts.keys()):
+        print(" ", key, ts[key])
+    else:
+      raise RuntimeError("unhandled time series type: %s" % (s(ts),))
+
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [--show] tspath impath.png days [{{glob|fields}}...]
           Plot the most recent days of data from the time series at tspath
