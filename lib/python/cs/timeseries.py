@@ -58,6 +58,7 @@ from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
+from cs.configutils import HasConfigIni
 from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
 from cs.fstags import FSTags
@@ -1155,7 +1156,7 @@ class TimespanPolicyAnnual(TimespanPolicy):
 
 TimespanPolicy.register_factory(TimespanPolicyAnnual, 'annual')
 
-class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
+class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
   ''' A directory containing a collection of `TimeSeries` data files.
   '''
 
@@ -1169,11 +1170,11 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       timezone: Optional[str] = None,
       fstags: Optional[FSTags] = None,
   ):
-    super().__init__(fspath)
+    HasFSPath.__init__(self, fspath)
     if fstags is None:
       fstags = FSTags()
+    HasConfigIni.__init__(self, 'TimeSeriesDataDir')
     self.fstags = fstags
-    self._config_modified = None
     config = self.config
     if step is None:
       if config.step is None:
@@ -1183,7 +1184,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
       self.step = step
     elif step != self.step:
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
-    TimeSeries.__init__(self, 0, self.step)
     timezone = timezone or self.timezone
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
@@ -1218,30 +1218,7 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     finally:
       for ts in self._tsks_by_key.values():
         ts.close()
-      if self._config_modified:
-        self.save_config()
-
-  @property
-  def configpath(self):
-    ''' The path to the `config.ini` file.
-    '''
-    return self.pathto('config.ini')
-
-  @property
-  @cachedmethod
-  def config(self):
-    ''' The configuration as a `TagSet`.
-    '''
-    tags = TagSet.from_ini(
-        self.configpath, 'TimeSeriesDataDir', missing_ok=True
-    )
-    self._config_modified = False
-    return tags
-
-  def save_config(self):
-    ''' Save the configuration values.
-    '''
-    self.config.save_as_ini(self.configpath, 'TimeSeriesDataDir')
+      self.config_flush()
 
   @property
   def policy_name(self):
@@ -1260,7 +1237,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
         `TimespanPolicy.FACTORIES`.
     '''
     self.config['policy.name'] = new_policy_name
-    self._config_modified = True
 
   @property
   def step(self):
@@ -1275,7 +1251,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     if new_step <= 0:
       raise ValueError("step must be >0, got %r" % (new_step,))
     self.config['step'] = new_step
-    self._config_modified = True
 
   @property
   def timezone(self):
@@ -1292,7 +1267,6 @@ class TimeSeriesDataDir(HasFSPath, MultiOpenMixin):
     ''' Set the `policy.timezone` config value, a timezone name.
     '''
     self.config['policy.timezone'] = new_timezone
-    self._config_modified = True
 
   def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
     ''' Return a list of the known keys, derived from the subdirectories,
