@@ -90,6 +90,7 @@ class SPLinkCommand(BaseCommand):
               csvdir.csv_tagsets(dataset),
               short_csvpath,
               update_frequency=8,
+              report_print=True,
           ):
             tags['dataset'] = dataset
             db.default_factory(None, unixtime=when, tags=tags)
