@@ -25,6 +25,25 @@ from cs.timeseries import (
 
 from cs.x import X
 
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Development Status :: 3 - Alpha",
+        "Programming Language :: Python :: 3",
+    ],
+    'install_requires': [],
+    'entry_points': {
+        'console_scripts': [
+            'splink = cs.splink:main',
+        ],
+    },
+    'extras_requires': {
+        'numpy': ['numpy'],
+        'pandas': ['pandas'],
+        'plotting': ['kaleido', 'plotly'],
+    },
+}
+
 pfx_listdir = partial(pfx_call, os.listdir)
 
 SPLINK_LOG_INTERVAL = 900  # really? 15 minutes? ugh
