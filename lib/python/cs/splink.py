@@ -103,7 +103,7 @@ class SPLinkCommand(BaseCommand):
           )
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] timeseries-dirpath imagepath.png days [{{glob|field}}...]
+    ''' Usage: {cmd} [--show] timeseries-dirpath imagepath.png days {{glob|field}}...
     '''
     try:
       import_extra('plotly', DISTINFO)
@@ -128,6 +128,8 @@ class SPLinkCommand(BaseCommand):
     ok = True
     spd = SPLinkDataDir(datadirpath, 'DetailedData')
     spd_fields = sorted(spd.keys())
+    if not argv:
+      raise GetoptError("missing fields, I know: " + spd_fields_s)
     if argv:
       keys = ts.keys(argv)
       if not keys:
