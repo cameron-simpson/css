@@ -507,17 +507,29 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     '''
     return zip(self.range(start, stop), self[start:stop])
 
-  # TODO: INCOMPLETE
-  def as_np_array(self, start=None, stop=None):
-    ''' Return a `numpy` array containing the data from `start` to `stop`,
+  @property
+  def np_type(self):
+    ''' The `numpy` type corresponding to `self.typecode`.
+    '''
+    if self.typecode == 'd':
+      return np.float64
+    if self.typecode == 'q':
+      return np.int64
+    raise TypeError(
+        "%s.np_type: unsupported typecode %r" %
+        (type(self).__name__, self.typecode)
+    )
+
+  @pfx
+  def as_np_array(self, start=None, stop=None) -> np.array:
+    ''' Return a `numpy.array` 1xN array containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
     if start is None:
       start = self.start
     if stop is None:
       stop = self.stop
-    data = self[start:stop]
-    raise RuntimeError("INCOMPLETE")
+    return np.array([self[start:stop]], self.np_type)
 
   @pfx
   def as_pd_series(self, start=None, stop=None):
