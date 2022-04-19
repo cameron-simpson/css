@@ -54,7 +54,6 @@ from arrow import Arrow
 from icontract import ensure, require, DBC
 import numpy as np
 from numpy import datetime64
-from pandas import Series as PDSeries
 from typeguard import typechecked
 
 from cs.cmdutils import BaseCommand
@@ -520,10 +519,12 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
     data = self[start:stop]
     raise RuntimeError("INCOMPLETE")
 
-  def as_pd_series(self, start=None, stop=None, tzname: Optional[str] = None):
+  @pfx
+  def as_pd_series(self, start=None, stop=None):
     ''' Return a `pandas.Series` containing the data from `start` to `stop`,
         default from `self.start` and `self.stop` respectively.
     '''
+    pandas = import_extra('pandas', DISTINFO)
     if start is None:
       start = self.start
     if stop is None:
@@ -532,7 +533,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
       tzname = get_default_timezone_name()
     times, data = self.data2(start, stop)
     indices = (datetime64(t, 's') for t in times)
-    return PDSeries(data, indices)
+    return pandas.Series(data, indices)
 
   def data2(self, start, stop):
     ''' Like `data(start,stop)` but returning 2 lists: one of time and one of data.
@@ -1324,6 +1325,44 @@ class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
       tsks.tags['typecode'] = tsks.typecode
       tsks.open()
     return tsks
+
+  @pfx
+  @typechecked
+  def as_pd_dataframe(
+      self,
+      start=None,
+      stop=None,
+      keys: Optional[List[str]] = None,
+  ):
+    ''' Return a `numpy.DataFrame` containing the specified data.
+
+        Parameters:
+        * `start`: start time of the data
+        * `stop`: end time of the data
+        * `keys`: optional iterable of keys, default from `self.keys()`
+    '''
+    pandas = import_extra('pandas', DISTINFO)
+    if start is None:
+      start = self.start
+    if stop is None:
+      stop = self.stop
+    if keys is None:
+      keys = self.keys()
+    elif not isinstance(keys, (tuple, list)):
+      keys = tuple(keys)
+    indices = [datetime64(t, 's') for t in self.range(start, stop)]
+    data_dict = {}
+    for key in keys:
+      with Pfx(key):
+        if key not in self:
+          raise KeyError("no such key")
+        data_dict = self[key].as_np_array(start, stop)
+    return pandas.DataFrame(
+        data=data_dict,
+        index=indices,
+        columns=keys,
+        copy=False,
+    )
 
   @plotrange
   def plot(
