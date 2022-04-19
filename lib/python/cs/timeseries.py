@@ -194,7 +194,9 @@ class TimeSeriesCommand(BaseCommand):
       if argv:
         keys = ts.keys(argv)
         if not keys:
-          raise GetoptError("no matching keys")
+          raise GetoptError(
+              "no matching keys, I know: %s" % (', '.join(sorted(ts.keys())),)
+          )
       else:
         keys = ts.keys()
         if not keys:
