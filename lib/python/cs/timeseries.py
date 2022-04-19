@@ -544,8 +544,6 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
       start = self.start
     if stop is None:
       stop = self.stop
-    if tzname is None:
-      tzname = get_default_timezone_name()
     times, data = self.data2(start, stop)
     indices = (datetime64(t, 's') for t in times)
     return pandas.Series(data, indices)
@@ -1068,7 +1066,6 @@ class TimespanPolicy(DBC):
   def register_factory(cls, factory: Callable, name: str):
     ''' Register a new policy `factory` under then supplied `name`.
     '''
-    assert getattr(factory, 'name', name) == name
     if name in cls.FACTORIES:
       raise KeyError(
           "%s.FACTORIES: name %r already taken" % (cls.__name__, name)
