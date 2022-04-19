@@ -1195,6 +1195,7 @@ class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
       self.step = step
     elif step != self.step:
       raise ValueError("step:%r != config.step:%r" % (step, self.step))
+    self.start = 0
     timezone = timezone or self.timezone
     if policy is None:
       policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
