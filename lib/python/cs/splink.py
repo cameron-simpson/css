@@ -123,15 +123,16 @@ class SPLinkCommand(BaseCommand):
         "already exists"
     )
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
-    ok = True
     spd = SPLinkDataDir(datadirpath, 'DetailedData')
     spd_fields = sorted(spd.keys())
+    spd_fields_s = ", ".join(spd_fields)
     if not argv:
       raise GetoptError("missing fields, I know: " + spd_fields_s)
+    ok = True
     if argv:
-      keys = ts.keys(argv)
+      keys = spd.keys(argv)
       if not keys:
-        raise GetoptError("no matching keys")
+        raise GetoptError("no matching keys, I know: " + spd_fields_s)
     else:
       raise GetoptError("missing fields")
     now = time.time()
