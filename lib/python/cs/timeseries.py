@@ -1018,7 +1018,7 @@ class TimespanPolicy(DBC):
           the default is inferred from the default time zone
           using the `get_default_timezone_name` function
     '''
-    self.name = None
+    self.name = type(self).name
     if timezone is None:
       timezone = get_default_timezone_name()
     self.timezone = timezone
