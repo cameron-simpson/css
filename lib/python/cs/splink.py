@@ -287,7 +287,7 @@ class SPLinkDataDir(TimeSeriesDataDir):
     '''
     if isinstance(csvdir, str):
       csvdir = SPLinkCSVDir(csvdir)
-    return csvdir.import_csv_data(self.which, self)
+    return csvdir.export_to_timeseries(self.which, self)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
