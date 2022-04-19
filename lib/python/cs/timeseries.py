@@ -491,9 +491,10 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
   ''' Common base class of any time series.
   '''
 
-  def __init__(self, start, step):
+  def __init__(self, start, step, typecode):
     self.start = start
     self.step = step
+    self.typecode = typecode
 
   @abstractmethod
   def __getitem__(self, index):
@@ -653,7 +654,6 @@ class TimeSeriesFile(TimeSeries):
       )
     if step <= 0:
       raise ValueError("step should be >0, got %s" % (step,))
-    super().__init__(start, step)
     self.fspath = fspath
     # compare the file against the supplied arguments
     hdr_stat = self.stat(fspath)
@@ -681,7 +681,7 @@ class TimeSeriesFile(TimeSeries):
         raise RuntimeError(
             "no default fill value for typecode=%r" % (typecode,)
         )
-    self.typecode = typecode
+    super().__init__(start, step, typecode)
     self.file_bigendian = file_bigendian
     self.fill = fill
     self._itemsize = array(typecode).itemsize
@@ -1481,9 +1481,8 @@ class TimeSeriesPartitioned(TimeSeries, HasFSPath):
           "typecode=%s not in SUPPORTED_TYPECODES:%r" %
           (s(typecode), sorted(SUPPORTED_TYPECODES.keys()))
       )
-    TimeSeries.__init__(self, start, step)
+    TimeSeries.__init__(self, start, step, typecode)
     policy = TimespanPolicy.from_any(policy)
-    self.typecode = typecode
     self.policy = policy
     self.start = start
     self.step = step
