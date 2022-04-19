@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@cskk.id.au>
 #
 
-''' Utility functions and classes for configuration files.
+''' Utility functions and classes for .ini style configuration files.
 '''
 
 import os
@@ -12,8 +12,10 @@ import os.path
 import sys
 from collections.abc import Mapping
 from threading import RLock
+from cs.deco import cachedmethod
 from cs.fileutils import file_property
 from cs.py3 import ConfigParser, StringTypes
+from cs.tagset import TagSet
 from cs.threads import locked
 
 __version__ = '20210306-post'
@@ -26,7 +28,13 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [ 'cs.py3', 'cs.fileutils', 'cs.threads' ],
+    'install_requires': [
+        'cs.deco',
+        'cs.fileutils',
+        'cs.py3',
+        'cs.tagset',
+        'cs.threads',
+    ],
 }
 
 def load_config(config_path, parser=None):
@@ -180,6 +188,58 @@ class ConfigSectionWatcher(Mapping):
 
   def __len__(self):
     return len(self.keys())
+
+class HasConfigIni:
+  ''' Class for objects with a `config.ini` file.
+      A section of the config is designated "our" configuration
+      and its fields parsed into a `TagSet`;
+      in particular the field values use the `TagSet` transcription syntax.
+
+      The default implementation is expected to be mixed into a
+      class with a `.pathto(rpath)` method, such as one which
+      inherits from `HasFSPath`.
+
+      The mixin provides the following attributes:
+      * `config`: an on demand property which is a `TagSet` made
+        from the configuration file section
+      * `config_ini`: the relative path to the configuration file
+      * `configpath`: the full pathname of the configuration file
+      * `config_flush()`: update the configuration file if the tags
+        have been modified
+  '''
+
+  # the default configuration file relative pathname
+  CONFIG_INI = 'config.ini'
+
+  def __init__(self, section, config_ini=None):
+    ''' Initialise the configuration.
+    '''
+    if config_ini is None:
+      config_ini = self.CONFIG_INI
+    self.config_ini = config_ini
+    self.__section = section
+    self._config = None
+
+  @property
+  def configpath(self):
+    ''' The path to the `config.ini` file.
+    '''
+    return self.pathto(self.config_ini)  # pylint: disable=no-member
+
+  @property
+  @cachedmethod
+  def config(self):
+    ''' The configuration as a `TagSet`.
+    '''
+    return TagSet.from_ini(self.configpath, self.__section, missing_ok=True)
+
+  def config_flush(self):
+    ''' Save the current configuration to the `config.ini` file if `self.__modified`.
+    '''
+    config = self._config
+    if config is not None and config.modified:
+      config.save_as_ini(self.configpath, self.__section)
+      config.modified = False
 
 if __name__ == '__main__':
   import cs.configutils_tests
