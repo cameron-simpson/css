@@ -66,7 +66,6 @@ from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.py.modules import import_extra
 from cs.resources import MultiOpenMixin
-from cs.tagset import TagSet
 
 from cs.x import X
 
