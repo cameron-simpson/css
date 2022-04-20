@@ -96,8 +96,8 @@ Here is a table for using `setuptools`:
 or for `flit`:
 
     [build-system]
-    requires = ["flit"]
-    build-backend = "flit.api:main"
+    requires = ["flit_core >=3.2,<4"]
+    build-backend = "flit_core.buildapi"
 
 With such a table in the `pyproject.toml` file
 a tool like [build](https://pypi.org/project/build/)
