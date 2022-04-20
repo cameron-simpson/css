@@ -83,7 +83,7 @@ There are several choices available, including but not limited to:
 - [whey](https://pypi.org/project/pdm/)
 - [trampolim](https://pypi.org/project/trampolim/)
 
-Here is a table for using `setuptools`:
+Here is a table for using `setuptools` (see the [Setuptools documentation](https://setuptools.pypa.io/en/latest/userguide/index.html)):
 
     [build-system]
     requires = [
@@ -93,11 +93,11 @@ Here is a table for using `setuptools`:
     ]
     build-backend = "setuptools.build_meta"
 
-or for `flit`:
+or for `flit` (see the [Flit documentation](https://flit.pypa.io/en/latest/)):
 
     [build-system]
-    requires = ["flit"]
-    build-backend = "flit.api:main"
+    requires = ["flit_core >=3.2,<4"]
+    build-backend = "flit_core.buildapi"
 
 With such a table in the `pyproject.toml` file
 a tool like [build](https://pypi.org/project/build/)
