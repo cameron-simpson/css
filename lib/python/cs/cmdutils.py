@@ -466,8 +466,9 @@ class BaseCommand:
         for class attributes which commence with `cls.SUBCOMMAND_METHOD_PREFIX`
         by default `'cmd_'`.
     '''
-    subcmds = getattr(cls, '_subcommands', None)
-    if not subcmds:
+    try:
+      subcmds = cls.__dict__['_subcommands']
+    except KeyError:
       subcmds = cls._subcommands = _BaseSubCommand.from_class(cls)
     return subcmds
 
