@@ -1,3 +1,4 @@
+MultiTimeSeries__getitem__: if no subdir, look for fnmatch based rule to make derived timeseries
 MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
 MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
 mmap mode for TimeSeries, should disable .array
