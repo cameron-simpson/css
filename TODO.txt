@@ -1,3 +1,4 @@
+MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
 mmap mode for TimeSeries, should disable .array
 TimeSeries: support slicing and indexed slicing
 cs.edit: use subprocess.run check=True
