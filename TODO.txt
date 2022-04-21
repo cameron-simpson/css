@@ -1,3 +1,4 @@
+MultiTimeSeries: add_derived(key,func(mts,when)) to make a derives time series with func as a computation
 MultiTimeSeries__getitem__: if no subdir, look for fnmatch based rule to make derived timeseries
 MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
 MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
