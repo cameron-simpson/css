@@ -97,8 +97,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             db.default_factory(None, unixtime=when, tags=tags)
         else:
           raise GetoptError(
-              "do no know how to process dataset, I know: events=%s, timeseries=%s"
-              % (
+              "do not know how to process dataset,"
+              " I know: events=%s, timeseries=%s" % (
                   ",".join(self.EVENTS_DATASETS),
                   ",".join(self.TIMESERIES_DATASETS),
               )
@@ -232,7 +232,11 @@ class SPLinkCSVDir(HasFSPath):
     keys = rowtype.attributes_
     key0 = keys[0]
     key_values = {key: [] for key in keys}
-    for row in rows:
+    for row in progressbar(
+        rows,
+        shortpath(csvpath),
+        report_print=True,
+    ):
       for key, value in zip(keys, row):
         if key == key0:
           # seconds since 2001-01-01; make UNIX time
