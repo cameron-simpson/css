@@ -19,6 +19,7 @@ from cs.deco import cachedmethod
 from cs.fs import HasFSPath, needdir
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.timeseries import (
+    TimeSeriesBaseCommand,
     TimeSeriesDataDir,
     TimespanPolicyAnnual,
 )
@@ -53,7 +54,7 @@ def main(argv=None):
   '''
   return SPLinkCommand(argv).run()
 
-class SPLinkCommand(BaseCommand):
+class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to wrk with SP-Link data downloads.
   '''
 
