@@ -1415,6 +1415,13 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
           continue
         self[key] = self._tsfactory(key)
 
+  def makeitem(self, key):
+    ''' Create a `TimeSeriesPartitioned` for `key`.
+    '''
+    if key not in self:
+      self[key] = self._tsfactory(key)
+    return self[key]
+
   def _tsfactory(self, key):
     ''' Create a `TimeSeriesPartitioned` for `key`.
     '''
