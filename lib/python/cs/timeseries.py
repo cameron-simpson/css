@@ -1133,7 +1133,7 @@ class TimespanPolicy(DBC):
     return self.timespan_for(
         arrow.get(
             partition, self.DEFAULT_PARTITION_FORMAT, tzinfo=self.timezone
-        ).timestamp
+        ).timestamp()
     )
 
 class TimespanPolicyDaily(TimespanPolicy):
@@ -1150,7 +1150,7 @@ class TimespanPolicyDaily(TimespanPolicy):
     a = self.Arrow(when)
     start = Arrow(a.year, a.month, a.day, tzinfo=self.timezone)
     end = start.shift(days=1)
-    return start.timestamp, end.timestamp
+    return start.timestamp(), end.timestamp()
 
 TimespanPolicy.register_factory(TimespanPolicyDaily, 'daily')
 
@@ -1168,7 +1168,7 @@ class TimespanPolicyMonthly(TimespanPolicy):
     a = self.Arrow(when)
     start = Arrow(a.year, a.month, 1, tzinfo=self.timezone)
     end = start.shift(months=1)
-    return start.timestamp, end.timestamp
+    return start.timestamp(), end.timestamp()
 
 TimespanPolicy.register_factory(TimespanPolicyMonthly, 'monthly')
 
@@ -1186,7 +1186,7 @@ class TimespanPolicyAnnual(TimespanPolicy):
     a = self.Arrow(when)
     start = Arrow(a.year, 1, 1, tzinfo=self.timezone)
     end = start.shift(years=1)
-    return start.timestamp, end.timestamp
+    return start.timestamp(), end.timestamp()
 
 TimespanPolicy.register_factory(TimespanPolicyAnnual, 'annual')
 
