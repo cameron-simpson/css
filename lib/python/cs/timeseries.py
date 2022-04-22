@@ -59,7 +59,7 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.configutils import HasConfigIni
 from cs.deco import cachedmethod, decorator
-from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, shortpath
+from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, needdir, shortpath
 from cs.fstags import FSTags
 from cs.lex import is_identifier, s
 from cs.logutils import warning, error
@@ -1024,6 +1024,7 @@ class TimespanPolicy(DBC):
       enclosing a timestamp.
   '''
 
+  name = None  # subclasses get this when they are registered
   FACTORIES = {}
   DEFAULT_NAME = 'monthly'
   DEFAULT_PARTITION_FORMAT = ''  # set by subclasses to an Arrow format string
@@ -1189,54 +1190,33 @@ class TimespanPolicyAnnual(TimespanPolicy):
 
 TimespanPolicy.register_factory(TimespanPolicyAnnual, 'annual')
 
-class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
-  ''' A directory containing a collection of `TimeSeries` data files.
+class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
+  ''' A group of named `TimeSeries` instances, indexed by a key.
+
+      This is the basis for `TimeSeriesDataDir`.
   '''
 
   @typechecked
   def __init__(
       self,
-      fspath,
       *,
-      step: Optional[Numeric] = None,
+      step: Numeric,
       policy=None,  # :TimespanPolicy
       timezone: Optional[str] = None,
-      fstags: Optional[FSTags] = None,
   ):
-    HasFSPath.__init__(self, fspath)
-    if fstags is None:
-      fstags = FSTags()
-    HasConfigIni.__init__(self, 'TimeSeriesDataDir')
-    self.fstags = fstags
-    config = self.config
-    if step is None:
-      if config.step is None:
-        raise ValueError("missing step parameter and no step in config")
-      step = config.step
-    elif self.step is None:
-      self.step = step
-    elif step != self.step:
-      raise ValueError("step:%r != config.step:%r" % (step, self.step))
-    self.start = 0
-    timezone = timezone or self.timezone
+    super().__init__()
+    if timezone is None:
+      timezone = get_default_timezone_name()
     if policy is None:
-      policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
-      policy = TimespanPolicy.from_name(policy_name)
-    else:
-      policy = TimespanPolicy.from_any(policy)
-      policy_name = policy.name
-    # fill in holes in the config
-    if not config.auto.policy.name:
-      self.policy_name = policy_name
-    if not config.auto.policy.timezone:
-      self.timezone = timezone
+      policy_name = TimespanPolicy.DEFAULT_NAME
+      policy = TimespanPolicy.from_name(policy_name, timezone=timezone)
+    self.step = step
     self.policy = policy
-    self._tsks_by_key = {}
+    self._rules = {}
 
   def __str__(self):
-    return "%s(%s,%s,%s)" % (
+    return "%s(%s,%s)" % (
         type(self).__name__,
-        shortpath(self.fspath),
         getattr(self, 'step', 'STEP_UNDEFINED'),
         getattr(self, 'policy', 'POLICY_UNDEFINED'),
     )
@@ -1247,80 +1227,42 @@ class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
         Close the sub time series.
     '''
     try:
-      with self.fstags:
-        yield
+      yield
     finally:
-      for ts in self._tsks_by_key.values():
+      for ts in self.values():
         ts.close()
-      self.config_flush()
 
-  @property
-  def policy_name(self):
-    ''' The `policy.timezone` config value, usually a key from
-        `TimespanPolicy.FACTORIES`.
+  @staticmethod
+  def validate_key(key):
+    ''' Check that `key` is a valid key, raise `valueError` if not.
+        This implementation requires that `key` is an identifier.
     '''
-    name = self.config.auto.policy.name
-    if not name:
-      name = TimespanPolicy.DEFAULT_NAME
-      self.policy_name = name
-    return name
+    if not is_identifier(key):
+      raise ValueError("invalid key %r, not an identifier" % (key,))
+    return True
 
-  @policy_name.setter
-  def policy_name(self, new_policy_name: str):
-    ''' Set the `policy.timezone` config value, usually a key from
-        `TimespanPolicy.FACTORIES`.
+  def __missing__(self, key):
+    ''' Create a new entry for `key` if missing.
+        This implementation looks up the rules.
     '''
-    self.config['policy.name'] = new_policy_name
+    self.validate_key(key)
+    for fnglob, derivation in self._rules.items():
+      if fnmatch(key, fnglob):
+        # Construct a new time series from key.
+        ts = derivation(key)
+        self[key] = ts
+        return
+    raise KeyError("no entry for key %r and no implied time series" % (key,))
 
-  @property
-  def step(self):
-    ''' The `step` config value, the size of a time slot.
+  @typechecked
+  def __setitem__(self, key: str, ts):
+    ''' Insert a time series into this `TimeSeriesMapping`.
+        `key` may not already be present.
     '''
-    return self.config.step
-
-  @step.setter
-  def step(self, new_step: Numeric):
-    ''' Set the `step` config value, the size of a time slot.
-    '''
-    if new_step <= 0:
-      raise ValueError("step must be >0, got %r" % (new_step,))
-    self.config['step'] = new_step
-
-  @property
-  def timezone(self):
-    ''' The `policy.timezone` config value, a timezone name.
-    '''
-    name = self.config.auto.policy.timezone
-    if not name:
-      name = get_default_timezone_name()
-      self.timezone = name
-    return name
-
-  @timezone.setter
-  def timezone(self, new_timezone: str):
-    ''' Set the `policy.timezone` config value, a timezone name.
-    '''
-    self.config['policy.timezone'] = new_timezone
-
-  def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
-    ''' Return a list of the known keys, derived from the subdirectories,
-        optionally constrained by `fnglobs`.
-        If provided, `fnglobs` may be a glob string or list of glob strings
-        suitable for `fnmatch`.
-    '''
-    all_keys = sorted(key for key in pfx_listdir(self.fspath) if key in self)
-    if fnglobs is None:
-      return all_keys
-    if isinstance(fnglobs, str):
-      fnglobs = [fnglobs]
-    ks = []
-    for fnglob in fnglobs:
-      gks = [k for k in all_keys if fnmatch(k, fnglob)]
-      if gks:
-        ks.extend(gks)
-      else:
-        warning("no matches for %r", fnglob)
-    return ks
+    self.validate_key(key)
+    if key in self:
+      raise ValueError("key already exists: %r" % (key,))
+    super().__setitem__(key, ts)
 
   # pylint: disable=no-self-use,unused-argument
   def key_typecode(self, key):
@@ -1328,36 +1270,6 @@ class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
         This default method returns `'d'` (float64).
     '''
     return 'd'
-
-  @require(lambda key: is_clean_subpath(key) and '/' not in key)
-  def __contains__(self, key):
-    ''' Test if there is a subdirectory for `key`.
-    '''
-    return is_identifier(key) and isdirpath(self.pathto(key))
-
-  @require(lambda key: is_identifier(key))  # pylint: disable=unnecessary-lambda
-  def __getitem__(self, key):
-    ''' Return the `TimeSeriesPartitioned` for `key`,
-        creating its subdirectory if necessary.
-    '''
-    try:
-      tsks = self._tsks_by_key[key]
-    except KeyError:
-      keypath = self.pathto(key)
-      if not isdirpath(keypath):
-        pfx_mkdir(keypath)
-      tsks = self._tsks_by_key[key] = TimeSeriesPartitioned(
-          self.pathto(key),
-          self.key_typecode(key),
-          step=self.step,
-          policy=self.policy,
-          fstags=self.fstags,
-      )
-      tsks.tags['key'] = key
-      tsks.tags['step'] = tsks.step
-      tsks.tags['typecode'] = tsks.typecode
-      tsks.open()
-    return tsks
 
   @pfx
   @typechecked
@@ -1431,6 +1343,176 @@ class TimeSeriesDataDir(HasFSPath, HasConfigIni, MultiOpenMixin):
             start, stop, figure=figure, name=name, **key_scatter_kw
         )
     return figure
+
+class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
+                        TimeStepsMixin):
+  ''' A directory containing a collection of `TimeSeries` data files.
+  '''
+
+  @typechecked
+  def __init__(
+      self,
+      fspath,
+      *,
+      step: Optional[Numeric] = None,
+      policy=None,  # :TimespanPolicy
+      timezone: Optional[str] = None,
+      fstags: Optional[FSTags] = None,
+  ):
+    HasFSPath.__init__(self, fspath)
+    if fstags is None:
+      fstags = FSTags()
+    HasConfigIni.__init__(self, 'TimeSeriesDataDir')
+    self.fstags = fstags
+    config = self.config
+    if step is None:
+      if config.step is None:
+        raise ValueError("missing step parameter and no step in config")
+      step = config.step
+    elif self.step is None:
+      self.step = step
+    elif step != self.step:
+      raise ValueError("step:%r != config.step:%r" % (step, self.step))
+    self.start = 0
+    timezone = timezone or self.timezone
+    if policy is None:
+      policy_name = config.auto.policy.name or TimespanPolicy.DEFAULT_NAME
+      policy = TimespanPolicy.from_name(policy_name)
+    else:
+      policy = TimespanPolicy.from_any(policy)
+      policy_name = policy.name
+    # fill in holes in the config
+    if not config.auto.policy.name:
+      self.policy_name = policy_name
+    if not config.auto.policy.timezone:
+      self.timezone = timezone
+    TimeSeriesMapping.__init__(
+        self, step=step, policy=policy, timezone=timezone
+    )
+    self._infill_keys_from_subdirs()
+
+  def __str__(self):
+    return "%s(%s,%s,%s)" % (
+        type(self).__name__,
+        shortpath(self.fspath),
+        getattr(self, 'step', 'STEP_UNDEFINED'),
+        getattr(self, 'policy', 'POLICY_UNDEFINED'),
+    )
+
+  def _infill_keys_from_subdirs(self):
+    ''' Fill in any missing keys from subdirectories.
+    '''
+    for key in pfx_listdir(self.fspath):
+      with Pfx(key):
+        if key in self:
+          continue
+        try:
+          self.validate_key(key)
+        except ValueError:
+          continue
+        keypath = self.pathto(key)
+        if not isdirpath(keypath):
+          continue
+        self[key] = self._tsfactory(key)
+
+  def _tsfactory(self, key):
+    ''' Create a `TimeSeriesPartitioned` for `key`.
+    '''
+    self.validate_key(key)
+    keypath = self.pathto(key)
+    needdir(keypath)
+    ts = TimeSeriesPartitioned(
+        keypath,
+        self.key_typecode(key),
+        step=self.step,
+        policy=self.policy,
+        fstags=self.fstags,
+    )
+    ts.tags['key'] = key
+    ts.tags['step'] = ts.step
+    ts.tags['typecode'] = ts.typecode
+    ts.open()
+    return ts
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Context manager for `MultiOpenMixin`.
+        Close the sub time series and save the config if modified.
+    '''
+    try:
+      with self.fstags:
+        with super().startup_shutdown():
+          yield
+    finally:
+      self.config_flush()
+
+  @property
+  def policy_name(self):
+    ''' The `policy.timezone` config value, usually a key from
+        `TimespanPolicy.FACTORIES`.
+    '''
+    name = self.config.auto.policy.name
+    if not name:
+      name = TimespanPolicy.DEFAULT_NAME
+      self.policy_name = name
+    return name
+
+  @policy_name.setter
+  def policy_name(self, new_policy_name: str):
+    ''' Set the `policy.timezone` config value, usually a key from
+        `TimespanPolicy.FACTORIES`.
+    '''
+    self.config['policy.name'] = new_policy_name
+
+  @property
+  def step(self):
+    ''' The `step` config value, the size of a time slot.
+    '''
+    return self.config.step
+
+  @step.setter
+  def step(self, new_step: Numeric):
+    ''' Set the `step` config value, the size of a time slot.
+    '''
+    if new_step <= 0:
+      raise ValueError("step must be >0, got %r" % (new_step,))
+    self.config['step'] = new_step
+
+  @property
+  def timezone(self):
+    ''' The `policy.timezone` config value, a timezone name.
+    '''
+    name = self.config.auto.policy.timezone
+    if not name:
+      name = get_default_timezone_name()
+      self.timezone = name
+    return name
+
+  @timezone.setter
+  def timezone(self, new_timezone: str):
+    ''' Set the `policy.timezone` config value, a timezone name.
+    '''
+    self.config['policy.timezone'] = new_timezone
+
+  def keys(self, fnglobs: Optional[Union[str, List[str]]] = None):
+    ''' Return a list of the known keys, derived from the subdirectories,
+        optionally constrained by `fnglobs`.
+        If provided, `fnglobs` may be a glob string or list of glob strings
+        suitable for `fnmatch`.
+    '''
+    all_keys = sorted(super().keys())
+    if fnglobs is None:
+      return all_keys
+    if isinstance(fnglobs, str):
+      fnglobs = [fnglobs]
+    ks = []
+    for fnglob in fnglobs:
+      gks = [k for k in all_keys if fnmatch(k, fnglob)]
+      if gks:
+        ks.extend(gks)
+      else:
+        warning("no matches for %r", fnglob)
+    return ks
 
 class TimeSeriesPartitioned(TimeSeries, HasFSPath):
   ''' A collection of `TimeSeries` files in a subdirectory.
