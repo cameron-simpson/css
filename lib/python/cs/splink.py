@@ -251,8 +251,10 @@ class SPLinkCSVDir(HasFSPath):
               value = nan
         key_values[key].append(value)
     for key in keys[2:]:
-      tsks = tsd[key]
-      tsks.setitems(key_values[key0], key_values[key])
+      with Pfx(key):
+        ts = tsd.makeitem(key)
+        ts.tags['csv.header'] = rowtype.name_of_[key]
+        ts.setitems(key_values[key0], key_values[key])
 
 class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold log data from an SP-Link CSV data download.
