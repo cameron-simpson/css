@@ -130,11 +130,27 @@ NATIVE_BIGENDIANNESS = {
     for typecode in SUPPORTED_TYPECODES
 }
 
-class TimeSeriesCommand(BaseCommand):
-  ''' Command line interface to `TimeSeries` data files.
+class TimeSeriesBaseCommand(BaseCommand, ABC):
+  ''' Abstract base class for command line interfaces to `TimeSeries` data files.
   '''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'test'
+  def cmd_fetch(self, argv):
+    ''' Usage: {cmd} ...
+          Fetch raw data files from the primary source to a local spool.
+          To be implemented in subclasses.
+    '''
+    raise GetoptError(
+        f"the {type(self).__name__} class"
+        f" does not provide a \"{self.cmd}\" subcommand"
+    )
+
+  @abstractmethod
+  def cmd_import(self, argv):
+    ''' Usage: {cmd} ...
+          Import data into the time series.
+          To be implemented in subclasses.
+    '''
+    raise NotImplementedError
 
   def cmd_info(self, argv):
     ''' Usage: {cmd} tspath
@@ -212,6 +228,12 @@ class TimeSeriesCommand(BaseCommand):
         figure.write_image(imgpath, format="png", width=2048, height=1024)
     if show_image:
       os.system(shlex.join(['open', imgpath]))
+
+class TimeSeriesCommand(TimeSeriesBaseCommand):
+  ''' Command line interface to `TimeSeries` data files.
+  '''
+
+  SUBCOMMAND_ARGV_DEFAULT = 'test'
 
   # pylint: disable=no-self-use
   def cmd_test(self, argv):
