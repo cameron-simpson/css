@@ -762,14 +762,15 @@ class BaseCommand:
       upd_context = nullcontext() if upd is None else upd
       with runstate:
         with upd_context:
-          with stackattrs(
-              options,
-              runstate=runstate,
-              upd=upd,
-          ):
-            with stackattrs(options, **kw_options):
-              with self.run_context():
-                return self._run(self._subcmd, self, self._argv)
+          with stackattrs(self, cmd=self._subcmd):
+            with stackattrs(
+                options,
+                runstate=runstate,
+                upd=upd,
+            ):
+              with stackattrs(options, **kw_options):
+                with self.run_context():
+                  return self._run(self._subcmd, self, self._argv)
     except GetoptError as e:
       if self.getopt_error_handler(
           self.cmd,
