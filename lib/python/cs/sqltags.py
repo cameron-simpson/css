@@ -1747,19 +1747,20 @@ class SQLTags(BaseTagSets):
     '''
     return self[0]
 
-  def find(self, criteria):
+  def find(self, *criteria, **crit_kw):
     ''' Generate and run a query derived from `criteria`
         yielding `SQLTagSet` instances.
 
         Parameters:
-        * `criteria`: an iterable of search criteria
-          which should be `SQTCriterion`s
-          or a `str` suitable for `SQTCriterion.from_str`.
+        * `criteria`: positional arguments which should be
+          `SQTCriterion`s or a `str` suitable for `SQTCriterion.from_str`
+        * `crit_kw`: keyword parameters are appended to the criteria
+          as further tag equality tests
     '''
-    if isinstance(criteria, str):
-      criteria = [criteria]
-    else:
-      criteria = list(criteria)
+    criteria = list(criteria)
+    criteria.extend(
+        [SQTCriterion.from_equality(k, v) for k, v in crit_kw.items()]
+    )
     post_criteria = []
     for i, criterion in enumerate(criteria):
       cr0 = criterion
@@ -2065,7 +2066,7 @@ class BaseSQLTagsCommand(BaseCommand, TagsCommandMixin):
     if badopts:
       raise GetoptError("bad arguments")
     xit = 0
-    for te in sqltags.find(tag_criteria):
+    for te in sqltags.find(*tag_criteria):
       with Pfx(te):
         try:
           output = te.format_as(output_format, error_sep='\n  ')
