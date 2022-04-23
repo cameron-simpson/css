@@ -400,6 +400,24 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     return SQLTags(self.pathto('events.sqlite'))
 
+  def resolve(self, spec):
+    ''' Resolve a field spec into an iterable of `(timeseries,key)`.
+    '''
+    with Pfx(spec):
+      try:
+        dsname, field_spec = spec.split(':', 1)
+      except ValueError:
+        # just a glob, poll all datasets
+        dsnames = self.TIMESERIES_DATASETS
+        field_spec = spec
+      else:
+        dsnames = dsname,
+      for dsname in dsnames:
+        with Pfx(dsname):
+          tsd = getattr(self, dsname)
+          for key in pfx_call(tsd.keys, field_spec):
+            yield tsd, key
+
 class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to wrk with SP-Link data downloads.
   '''
