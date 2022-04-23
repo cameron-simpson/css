@@ -1518,8 +1518,6 @@ class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
       gks = [k for k in all_keys if fnmatch(k, fnglob)]
       if gks:
         ks.extend(gks)
-      else:
-        warning("no matches for %r", fnglob)
     return ks
 
 class TimeSeriesPartitioned(TimeSeries, HasFSPath):
