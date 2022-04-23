@@ -11,7 +11,7 @@ import errno
 import io
 import logging
 import os
-from signal import SIGTERM, SIGKILL
+from signal import SIGTERM, SIGKILL, signal
 import subprocess
 import sys
 import time
@@ -75,6 +75,30 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
           if e.errno != errno.ESRCH:
             raise
       return False
+
+@contextmanager
+def signal_handler(sig, handler, call_previous=False):
+  ''' Context manager to push a new signal handler,
+      restoring the old handler on exit.
+      If `call_previous` is true (default `False`)
+      also call the old handler after the new handler on receipt of the signal.
+  '''
+  if call_previous:
+    handler0 = handler
+
+    def handler(sig, frame):
+      ''' Call the handler and then the previous handler if requested.
+      '''
+      handler0(sig, frame)
+      if call_previous and callable(old_handler):
+        old_handler(sig, frame)
+
+  old_handler = signal(sig, handler)
+  try:
+    yield old_handler
+  finally:
+    # restiore the previous handler
+    signal(sig, old_handler)
 
 def write_pidfile(path, pid=None):
   ''' Write a process id to a pid file.
