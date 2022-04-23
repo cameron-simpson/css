@@ -595,15 +595,15 @@ class SPLinkCommand(TimeSeriesBaseCommand):
             dspath = joinpath(dirpath, filename)
             dataset = dsinfo.dataset
             with Pfx(dspath):
-              tags = fstags[dspath]
-              if not force and tags.imported:
+              dstags = fstags[dspath]
+              if not force and dstags.imported:
                 warning("skip, already imported")
                 continue
               if dataset in spd.TIMESERIES_DATASETS:
                 ts = getattr(spd, dataset)
                 if doit:
                   pfx_call(ts.import_from, dspath)
-                  tags['imported'] = 1
+                  dstags['imported'] = 1
                 else:
                   print("import", dspath, "=>", ts)
               elif dataset in spd.EVENTS_DATASETS:
@@ -649,6 +649,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                           ):
                             tags['dataset'] = dataset
                             db.default_factory(None, unixtime=when, tags=tags)
+                  dstags['imported'] = 1
                 else:
                   print("import", dspath, "=>", db)
               else:
