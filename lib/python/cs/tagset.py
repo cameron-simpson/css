@@ -1703,12 +1703,15 @@ class TagSetCriterion(ABC):
 
   @classmethod
   @pfx_method
-  def from_str(cls, s, fallback_parse=None):
+  @typechecked
+  def from_str(cls, s: str, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
     criterion, offset = cls.from_str2(s, fallback_parse=fallback_parse)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
+    assert not isinstance(criterion, list)
+    assert isinstance(criterion, TagSetCriterion)
     return criterion
 
   @classmethod
@@ -3351,7 +3354,6 @@ class TagFile(FSPathBasedSingleton, BaseTagSets):
     return ' '.join(fields)
 
   @classmethod
-  @pfx_method
   def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
