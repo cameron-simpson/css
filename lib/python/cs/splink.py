@@ -47,8 +47,6 @@ DISTINFO = {
 
 pfx_listdir = partial(pfx_call, os.listdir)
 
-SPLINK_LOG_INTERVAL = 900  # really? 15 minutes? ugh
-
 def main(argv=None):
   ''' SP-Link command line mode.
   '''
