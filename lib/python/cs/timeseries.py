@@ -1178,7 +1178,8 @@ class TimespanPolicyAnnual(TimespanPolicy):
 
   DEFAULT_PARTITION_FORMAT = 'YYYY'
 
-  def timespan_for(self, when):
+  @typechecked
+  def timespan_for(self, when: Numeric):
     ''' Return the start and end UNIX times
         (inclusive and exclusive respectively)
         bracketing the UNIX time `when`.
@@ -1346,7 +1347,7 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
 
 class TimeSeriesDataDir(TimeSeriesMapping, HasFSPath, HasConfigIni,
                         TimeStepsMixin):
-  ''' A directory containing a collection of `TimeSeries` data files.
+  ''' A directory containing a collection of `TimeSeriesPartitioned` data files.
   '''
 
   @typechecked
