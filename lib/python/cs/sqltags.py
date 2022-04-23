@@ -1615,12 +1615,12 @@ class SQLTags(BaseTagSets):
       te = self.TagSetClass.singleton_also_by('id', index)
       if te is not None:
         return te
-      tes = self.find([SQTEntityIdTest([index])])
+      tes = self.find(id=index)
     elif isinstance(index, str):
       te = self.TagSetClass.singleton_also_by('name', index)
       if te is not None:
         return te
-      tes = self.find([SQLTagBasedTest(index, True, Tag('name', index), '=')])
+      tes = self.find(name=index)
     else:
       raise TypeError("unsupported index: %s:%r" % (type(index), index))
     tes = list(tes)
