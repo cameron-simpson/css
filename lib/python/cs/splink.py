@@ -185,12 +185,50 @@ class SPLinkDataDir(TimeSeriesDataDir):
     super().__init__(dirpath, step=step, policy=policy, **kw)
     self.dataset = dataset
 
-  def import_from(self, csvdir):
-    ''' Import the CSV data from `csvdir` specified by `self.which`.
+  @pfx
+  def import_from(self, csv, tzname=None):
+    ''' Import the CSV data from `csv` specified by `self.dataset`.
 
         Parameters:
-        * `csvdir`: a `SPLinkCSVDir` instance or the pathname of a directory
-          containing SP-Link CSV download data.
+        * `csv`: an `SPLinkCSVDir` instance or the pathname of a directory
+          containing SP-Link CSV download data, or the pathname of a CSV file.
+
+        Example:
+
+            spd = SPLinkDataDir('spdata/DetailedData')
+            spd.import_from(
+                'spl/PerformanceData_2021-07-04_13-02-38',
+                'DetailedData',
+            )
+    '''
+    if isinstance(csv, str):
+      with Pfx(csv):
+        if isfilepath(csv):
+          if not csv.endswith('.CSV'):
+            raise ValueError("filename does not end in .CSV")
+          try:
+            dsinfo = SPLinkData.parse_dataset_filename(csv)
+          except ValueError as e:
+            warning("unusual filename: %s", e)
+          else:
+            if dsinfo.dataset != self.dataset:
+              raise ValueError(
+                  "filename dataset:%r does not match self.dataset:%r" %
+                  (dsinfo.dataset, self.dataset)
+              )
+            csvdir = SPLinkCSVDir(dirname(csv))
+            return csvdir.export_csv_to_timeseries(csv, self, tzname=tzname)
+          if isdirpath(csv):
+            csvdir = SPLinkCSVDir(csv)
+            return csvdir.export_to_timeseries(
+                self.dataset, self, tzname=tzname
+            )
+          raise ValueError("neither a CSV file nor a directory")
+    if isinstance(csv, SPLinkCSVDir):
+      return csv.export_to_timeseries(self.dataset, self, tzname=tzname)
+    raise TypeError(
+        "expected filesystem path or SPLinkCSVDir, got: %s" % (s(csv),)
+    )
 
 # information derived from the basename of an SP-Link download filename
 SPLinkDataFileInfo = namedtuple(
