@@ -177,24 +177,24 @@ class SPLinkCSVDir(HasFSPath):
     return self.fnmatch('?*_*_*.CSV')[0].split('_', 1)[0]
 
   @pfx
-  def csvfilename(self, which: str) -> str:
-    ''' Return the CSV filename specified by `which`.
+  def csvfilename(self, dataset: str) -> str:
+    ''' Return the CSV filename specified by `dataset`.
 
         Example:
 
             self.csvpath('DetailedData')
     '''
-    csvfilename, = self.fnmatch(f'*_{which}_*.CSV')
+    csvfilename, = self.fnmatch(f'*_{dataset}_*.CSV')
     return csvfilename
 
-  def csvpath(self, which: str) -> str:
-    ''' Return the CSV pathname specified by `which`.
+  def csvpath(self, dataset: str) -> str:
+    ''' Return the CSV pathname specified by `dataset`.
 
         Example:
 
             self.csvpath('DetailedData')
     '''
-    return self.pathto(self.csvfilename(which))
+    return self.pathto(self.csvfilename(dataset))
 
   def csv_tagsets(self, which: str):
     ts2001_offset = ts2001_unixtime()
@@ -264,12 +264,12 @@ class SPLinkDataDir(TimeSeriesDataDir):
   DEFAULT_POLICY_CLASS = TimespanPolicyAnnual
   DEFAULT_LOG_FREQUENCY = SPLinkCSVDir.DEFAULT_LOG_FREQUENCY
 
-  def __init__(self, dirpath, which: str, step=None, policy=None, **kw):
+  def __init__(self, dirpath, dataset: str, step=None, policy=None, **kw):
     ''' Initialise the `SPLinkDataDir`.
 
         Parameters:
         * `dirpath`: the pathname of the directory holding the downloaded CSV files
-        * `which`: which CSV file populates this time series, eg `'DetailedData'`
+        * `dataset`: which CSV file populates this time series, eg `'DetailedData'`
         * `step`: optional time series step size,
           default `SPLinkDataDir.DEFAULT_LOG_FREQUENCY`,
           which comes from `SPLinkCSVDir.DEFAULT_LOG_FREQUENCY`
@@ -283,7 +283,7 @@ class SPLinkDataDir(TimeSeriesDataDir):
     if policy is None:
       policy = self.DEFAULT_POLICY_CLASS()
     super().__init__(dirpath, step=step, policy=policy, **kw)
-    self.which = which
+    self.dataset = dataset
 
   def import_from(self, csvdir):
     ''' Import the CSV data from `csvdir` specified by `self.which`.
