@@ -94,9 +94,11 @@ class SPLinkCSVDir(HasFSPath):
     '''
     return self.pathto(self.csvfilename(dataset))
 
-  def csv_tagsets(self, which: str):
+  @staticmethod
+  def csv_tagsets(csvpath):
+    ''' Yield `(unixtime,TagSet)` 2-tuples from the CSV file `csvpath`.
+    '''
     ts2001_offset = ts2001_unixtime()
-    csvpath = self.csvpath(which)
     rowtype, rows = csv_import(csvpath)
     for row in rows:
       tags = TagSet()
