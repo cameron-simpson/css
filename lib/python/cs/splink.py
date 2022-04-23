@@ -192,6 +192,135 @@ class SPLinkDataDir(TimeSeriesDataDir):
         * `csvdir`: a `SPLinkCSVDir` instance or the pathname of a directory
           containing SP-Link CSV download data.
 
+# information derived from the basename of an SP-Link download filename
+SPLinkDataFileInfo = namedtuple(
+    'SPLinkDataFileInfo', 'fspath sitename dataset unixtime dotext'
+)
+
+class SPLinkData(HasFSPath, MultiOpenMixin):
+  ''' A directory containing SP-LInk data.
+
+      This contains:
+      - `downloads`: a directory containing copies of various SP-Link
+        downloads i.e. this contains directories named `PerformanceData_*`.
+      - `events.db`: accrued event data from the `EventData` CSV files
+      - `DailySummaryData`: an `SPLinkDataDir` containing accrued
+        data from the `DailySummaryData` CSV files
+      - `DetailedData`: an `SPLinkDataDir` containing accrued data
+        from the `DetailedData` CSV files
+  '''
+
+  # where the PerformanceData downloads reside
+  DOWNLOADS = 'downloads'
+
+  EVENTS_DATASETS = 'EventData',
+  TIMESERIES_DATASETS = 'DetailedData', 'DailySummaryData'
+
+  TIMESERIES_DEFAULTS = {
+      'DetailedData': (900, 'annual'),
+      'DailySummaryData': (3600, 'annual'),
+  }
+
+  PERFORMANCEDATA_GLOB = 'PerformanceData_????-??-??_??-??-??'
+  PERFORMANCEDATA_ARROW_FORMAT = 'YYYY-MM-DD_hh-mm-ss'
+
+  def __init__(
+      self,
+      dirpath,
+      downloads_subpath=None,
+  ):
+    if not isdirpath(dirpath):
+      raise ValueError("not a directory: %r" % (dirpath,))
+    super().__init__(dirpath)
+    self._to_close = []
+
+  @contextmanager
+  def startup_shutdown(self):
+    ''' Close the subsidiary time series on exit.
+    '''
+    try:
+      yield
+    finally:
+      for obj in self._to_close:
+        obj.close()
+      self._to_close = []
+
+  def __getattr__(self, tsname):
+    ''' Autodefine attributes for the known time series.
+    '''
+    try:
+      step, policy_name = self.TIMESERIES_DEFAULTS[tsname]
+    except KeyError:
+      raise AttributeError(
+          "%s: no .%s attribute" % (type(self).__name__, tsname)
+      )
+    tspath = self.pathto(tsname)
+    needdir(tspath)
+    ts = SPLinkDataDir(tspath, dataset=tsname, step=step, policy=policy_name)
+    setattr(self, tsname, ts)
+    return ts
+
+  @property
+  def downloadspath(self):
+    ''' The filesystem path of the downloads subdirectory.
+    '''
+    return self.pathto(self.DOWNLOADS)
+
+  def download_subdirs(self, include_imports=False):
+    ''' Return an iterable of the paths of the top level `PerformanceData_*`
+        subdirectories in the downloads subdirectory.
+        If `include_imports`, include subdirectorys 
+    '''
+    return [
+        joinpath(self.downloadspath, perfdirname) for perfdirname in
+        fnmatchdir(self.downloadspath, 'PerformanceData_????-??-??_??-??-??')
+    ]
+
+  @classmethod
+  def parse_dataset_filename(cls, path):
+    ''' Parse the filename part of `path` and derive an `SPLinkDataFileInfo`.
+        Raises `ValueError` if the filename cannot be recognised.
+    '''
+    base, ext = splitext(basename(path))
+    sitename, dataset, ymd, hms = base.split('_')
+    ymd_hms = '_'.join((ymd, hms))
+    try:
+      when = arrow.get(
+          ymd_hms, cls.PERFORMANCEDATA_ARROW_FORMAT, tzinfo='local'
+      )
+    except ValueError as e:
+      warning("%r: %s", e)
+      raise
+
+    return SPLinkDataFileInfo(
+        fspath=path,
+        sitename=sitename,
+        dataset=dataset,
+        unixtime=when,
+        dotext=ext,
+    )
+
+  def datasetpath(self, perfdirpath, dataset):
+    ''' Return the filesystem path to the named `dataset`
+        from the SP-Link download subdirectory `perfdirpath`.
+    '''
+    if (dataset not in self.TIMESERIES_DATASETS
+        and dataset not in self.EVENTS_DATASETS):
+      raise ValueError(
+          "invalid dataset name %r: expected a time series name from %r or a log name from %r",
+          dataset, self.TIMESERIES_DATASETS, self.EVENTS_DATASETS
+      )
+    dsglob = '*_{dataset}_????-??-??_??-??-??.CSV'
+    dsname, = fnmatchdir(perfdirpath, dsglob)
+    return joinpath(perfdirpath, dsname)
+
+  @property
+  @cachedmethod
+  def eventsdb(self):
+    ''' The events `SQLTags` database.
+    '''
+    return SQLTags(self.pathto('events.sqlite'))
+
 class SPLinkCommand(TimeSeriesBaseCommand):
   ''' Command line to wrk with SP-Link data downloads.
   '''
