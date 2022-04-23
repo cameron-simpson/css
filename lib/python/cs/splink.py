@@ -117,16 +117,24 @@ class SPLinkCSVDir(HasFSPath):
       yield when, tags
 
   # pylint: disable=too-many-locals
+  @typechecked
   def export_to_timeseries(
-      self, which: str, tsd: TimeSeriesDataDir, tzname=None
+      self, dataset: str, tsd: TimeSeriesDataDir, tzname=None
   ):
-    ''' Read the CSV file in `self.fspath` specified by `which`
+    ''' Read the CSV file in `self.fspath` specified by `dataset`
+        and export its contents into the `tsd:TimeSeriesDataDir.
+    '''
+    return self.export_csv_to_timeseries(
+        self.csvpath(dataset), tsd, tzname=tzname
+    )
+
+  @staticmethod
+  def export_csv_to_timeseries(csvpath, tsd: TimeSeriesDataDir, tzname=None):
+    ''' Read the CSV file specified by `cvspath`
         and export its contents into the `tsd:TimeSeriesDataDir.
     '''
     nan = float('nan')
     ts2001 = ts2001_unixtime(tzname)
-    # load the DetailedData CSV
-    csvpath = self.csvpath(which)
     rowtype, rows = csv_import(csvpath)
     # group the values by key
     keys = rowtype.attributes_
