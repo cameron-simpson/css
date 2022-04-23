@@ -382,7 +382,7 @@ class Upd(SingletonMixin):
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
-        Returns `None` if `index` if out of range.
+        Returns `None` if `index` is out of range.
         The index `0` is never out of range;
         it will be autocreated if there are no slots yet.
     '''
