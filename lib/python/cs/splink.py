@@ -433,7 +433,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         self.DEFAULT_SPDPATH_ENVVAR, self.DEFAULT_SPDPATH
     )
 
-  @pfx
   def apply_opt(self, opt, val):
     ''' Handle an individual global command line option.
     '''
@@ -538,62 +537,86 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       raise GetoptError("bad invocation")
     xit = 0
     for path in argv:
-      for dirpath, dirnames, filenames in os.walk(path):
-        dirnames[:] = sorted(
-            (
-                dirname for dirname in dirnames
-                if dirname and not dirname.startswith('.')
-            )
-        )
-        for filename in filenames:
-          if not filename or filename.startswith('.'):
-            continue
-          try:
-            dsinfo = spd.parse_dataset_filename(filename)
-          except ValueError:
-            continue
-          if dsinfo.dataset not in datasets:
-            continue
-          if dsinfo.dotext != '.CSV':
-            continue
-          dspath = joinpath(dirpath, filename)
-          dataset = dsinfo.dataset
-          with Pfx(dspath):
-            tags = fstags[dspath]
-            if not force and tags.imported:
-              warning("skip, already imported")
-              continue
-            print("import", dspath, "...")
-            if dataset in spd.TIMESERIES_DATASETS:
-              X("spd = %s", spd)
-              ts = getattr(spd, dataset)
-              X("ts from %r = %s", dataset, ts)
-              print("import", dspath, "=>", ts)
-              if doit:
-                pfx_call(ts.import_from, dspath)
-                tags['imported'] = 1
-            elif dataset in spd.EVENTS_DATASETS:
-              db = spd.eventsdb
-              print("import", dspath, "=>", db)
-              if doit:
-                with db:
-                  short_csvpath = shortpath(dspath)
-                  for when, tags in progressbar(
-                      SPLinkCSVDir.csv_tagsets(dspath),
-                      short_csvpath,
-                      update_frequency=8,
-                      report_print=True,
-                  ):
-                    tags['dataset'] = dataset
-                    db.default_factory(None, unixtime=when, tags=tags)
-            else:
-              raise RuntimeError(
-                  "do not know how to process dataset,"
-                  " I know: events=%s, timeseries=%s" % (
-                      ",".join(spd.EVENTS_DATASETS),
-                      ",".join(spd.TIMESERIES_DATASETS),
-                  )
+      with Pfx(path):
+        if not existspath(path):
+          error("does not exist")
+          xit = 1
+          continue
+        for dirpath, dirnames, filenames in os.walk(path):
+          dirnames[:] = sorted(
+              (
+                  dirname for dirname in dirnames
+                  if dirname and not dirname.startswith('.')
               )
+          )
+          for filename in filenames:
+            if not filename or filename.startswith('.'):
+              continue
+            try:
+              dsinfo = spd.parse_dataset_filename(filename)
+            except ValueError:
+              continue
+            if dsinfo.dataset not in datasets:
+              continue
+            if dsinfo.dotext != '.CSV':
+              continue
+            dspath = joinpath(dirpath, filename)
+            dataset = dsinfo.dataset
+            with Pfx(dspath):
+              tags = fstags[dspath]
+              if not force and tags.imported:
+                warning("skip, already imported")
+                continue
+              print("import", dspath, "...")
+              if dataset in spd.TIMESERIES_DATASETS:
+                X("spd = %s", spd)
+                ts = getattr(spd, dataset)
+                X("ts from %r = %s", dataset, ts)
+                print("import", dspath, "=>", ts)
+                if doit:
+                  pfx_call(ts.import_from, dspath)
+                  tags['imported'] = 1
+              elif dataset in spd.EVENTS_DATASETS:
+                db = spd.eventsdb
+                print("import", dspath, "=>", db)
+                if doit:
+                  with db:
+                    short_csvpath = shortpath(dspath)
+                    when_tags = sorted(
+                        SPLinkCSVDir.csv_tagsets(dspath), key=lambda wt: wt[0]
+                    )
+                    if when_tags:
+                      # subsequent events overlap previous imports,
+                      # make sure we only import new events
+                      existing = set(
+                          (
+                              (ev.unixtime, ev.dataset, ev.event_description)
+                              for ev in db.find(
+                                  f'unixtime>={when_tags[0][0]}',
+                                  f'unixtime<={when_tags[-1][0]}',
+                              )
+                          )
+                      )
+                      for when, tags in progressbar(
+                          when_tags,
+                          short_csvpath,
+                          update_frequency=8,
+                          report_print=True,
+                      ):
+                        if (when, dataset,
+                            tags['event_description']) in existing:
+                          continue
+                        tags['dataset'] = dataset
+                        db.default_factory(None, unixtime=when, tags=tags)
+              else:
+                raise RuntimeError(
+                    "do not know how to process dataset,"
+                    " I know: events=%s, timeseries=%s" % (
+                        ",".join(spd.EVENTS_DATASETS),
+                        ",".join(spd.TIMESERIES_DATASETS),
+                    )
+                )
+    return xit
 
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [--show] timeseries-dirpath imagepath.png days {{glob|field}}...
