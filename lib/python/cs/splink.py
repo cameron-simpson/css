@@ -177,6 +177,7 @@ class SPLinkCSVDir(HasFSPath):
     for row in progressbar(
         rows,
         shortpath(csvpath),
+        update_frequency=128,
         report_print=True,
     ):
       for key, value in zip(keys, row):
@@ -227,7 +228,6 @@ class SPLinkDataDir(TimeSeriesDataDir):
     super().__init__(dirpath, step=step, policy=policy, **kw)
     self.dataset = dataset
 
-  @pfx
   def import_from(self, csv, tzname=None):
     ''' Import the CSV data from `csv` specified by `self.dataset`.
 
@@ -599,47 +599,58 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               if not force and tags.imported:
                 warning("skip, already imported")
                 continue
-              print("import", dspath, "...")
               if dataset in spd.TIMESERIES_DATASETS:
-                X("spd = %s", spd)
                 ts = getattr(spd, dataset)
-                X("ts from %r = %s", dataset, ts)
-                print("import", dspath, "=>", ts)
                 if doit:
                   pfx_call(ts.import_from, dspath)
                   tags['imported'] = 1
+                else:
+                  print("import", dspath, "=>", ts)
               elif dataset in spd.EVENTS_DATASETS:
                 db = spd.eventsdb
-                print("import", dspath, "=>", db)
                 if doit:
-                  with db:
-                    short_csvpath = shortpath(dspath)
-                    when_tags = sorted(
-                        SPLinkCSVDir.csv_tagsets(dspath), key=lambda wt: wt[0]
-                    )
-                    if when_tags:
-                      # subsequent events overlap previous imports,
-                      # make sure we only import new events
-                      existing = set(
-                          (
-                              (ev.unixtime, ev.dataset, ev.event_description)
-                              for ev in db.find(
-                                  f'unixtime>={when_tags[0][0]}',
-                                  f'unixtime<={when_tags[-1][0]}',
-                              )
-                          )
+                  with UpdProxy(prefix="import %s: " % (shortpath(dspath),)
+                                ) as proxy:
+                    with db:
+                      short_csvpath = shortpath(dspath)
+                      proxy.text = "load " + short_csvpath
+                      when_tags = sorted(
+                          SPLinkCSVDir.csv_tagsets(dspath),
+                          key=lambda wt: wt[0]
                       )
-                      for when, tags in progressbar(
-                          when_tags,
-                          short_csvpath,
-                          update_frequency=8,
-                          report_print=True,
-                      ):
-                        if (when, dataset,
-                            tags['event_description']) in existing:
-                          continue
-                        tags['dataset'] = dataset
-                        db.default_factory(None, unixtime=when, tags=tags)
+                      if when_tags:
+                        # subsequent events overlap previous imports,
+                        # make sure we only import new events
+                        proxy.text = "load preexisting events in this timeframe"
+                        existing = set(
+                            (
+                                (ev.unixtime, ev.event_description)
+                                for ev in db.find(
+                                    f'unixtime>={when_tags[0][0]}',
+                                    f'unixtime<={when_tags[-1][0]}',
+                                )
+                            )
+                        )
+                        proxy.text = "winnow existing events"
+                        new_when_tags = [
+                            wt for wt in when_tags
+                            if (wt[0],
+                                wt[1]['event_description']) not in existing
+                        ]
+                        if new_when_tags:
+                          proxy.text = "import %d new events" % (
+                              len(new_when_tags,)
+                          )
+                          for when, tags in progressbar(
+                              new_when_tags,
+                              short_csvpath,
+                              update_frequency=8,
+                              report_print=True,
+                          ):
+                            tags['dataset'] = dataset
+                            db.default_factory(None, unixtime=when, tags=tags)
+                else:
+                  print("import", dspath, "=>", db)
               else:
                 raise RuntimeError(
                     "do not know how to process dataset,"
