@@ -16,6 +16,7 @@ from cs.context import setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_method
+from cs.psutils import signal_handler
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
@@ -33,6 +34,7 @@ DISTINFO = {
         'cs.logutils',
         'cs.obj',
         'cs.pfx',
+        'cs.psutils',
         'cs.py.func',
         'cs.py.stack',
     ],
@@ -615,6 +617,21 @@ class RunState(object):
     else:
       stop_time = self.stop_time
     return max(0, stop_time - start_time)
+
+  @contextmanager
+  def catch_signal(self, sig, verbose=False):
+    ''' Context manager to catch the signal `sig` and cancel this `RunState`.
+    '''
+
+    def handler(sig, frame):
+      ''' `RunState` signal handler: cancel the run state.
+          Warn if `verbose`.
+      '''
+      verbose and warning("%s: received signal %s, cancelling", self, sig)
+      self.cancel()
+
+    with signal_handler(sig, handler) as old_handler:
+      yield old_handler
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
