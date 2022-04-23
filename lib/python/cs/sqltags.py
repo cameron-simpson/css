@@ -1633,6 +1633,26 @@ class SQLTags(BaseTagSets):
   def __getitem__(self, index):
     ''' Return an `SQLTagSet` for `index` (an `int` or `str`).
     '''
+    if isinstance(index, slice):
+      # a range of UNIX times
+      if index.step is not None:
+        raise IndexError("slices may not specify a step")
+      if index.start >= index.stop:
+        raise IndexError("empty range")
+      criteria = []
+      if index.start is not None:
+        criteria.append(
+            SQLTagBasedTest.by_tag_value(
+                'unixtime', index.start, comparison='>='
+            )
+        )
+      if index.stop is not None:
+        criteria.append(
+            SQLTagBasedTest.by_tag_value(
+                'unixtime', index.start, comparison='<'
+            )
+        )
+      return self.find(criteria)
     with self.db_session():
       te = self.get(index)
       if te is None:
