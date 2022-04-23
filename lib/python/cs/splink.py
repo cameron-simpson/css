@@ -114,6 +114,12 @@ class SPLinkCSVDir(HasFSPath):
       ) + ts2001_offset
       yield when, tags
 
+  def dataset_tagsets(self, dataset: str):
+    ''' Yield `(unixtime,TagSet)` 2-tuples from the CSV file
+        associated with `dataset`.
+    '''
+    yield from self.csv_tagsets(self.csvpath(dataset))
+
   # pylint: disable=too-many-locals
   @typechecked
   def export_to_timeseries(
