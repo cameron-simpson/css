@@ -442,6 +442,20 @@ class SQTCriterion(TagSetCriterion):
     '''
     raise NotImplementedError("sql_parameters")
 
+  @staticmethod
+  def from_equality(tag_name, tag_value):
+    ''' Return an `SQTCriterion` instance based on `tag_name==tag_value`.
+        This supports `SQLTags.find`'s keyword parameters.
+    '''
+    if tag_name == 'id':
+      if isinstance(tag_value, int):
+        tag_value = [tag_value]
+      elif isinstance(tag_value, tuple):
+        tag_value = list(tag_value)
+      return SQTEntityIdTest(tag_value)
+    tag = Tag(tag_name, tag_value)
+    return SQLTagBasedTest(str(tag), True, tag, '=')
+
 class SQTEntityIdTest(SQTCriterion):
   ''' A test on `entity.id`.
   '''
