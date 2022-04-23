@@ -22,6 +22,7 @@ from os.path import (
     splitext,
 )
 import shlex
+from signal import SIGINT, SIGTERM
 import sys
 import time
 
@@ -468,10 +469,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
   def run_context(self):
     ''' Define `self.options.spd`.
     '''
-    spd = SPLinkData(self.options.spdpath)
-    with stackattrs(self.options, spd=spd):
-      with spd:
-        yield
+    options = self.options
+    fstags = options.fstags
+    runstate = options.runstate
+    with fstags:
+      spd = SPLinkData(options.spdpath)
+      with stackattrs(options, spd=spd):
+        with spd:
+          with runstate.catch_signal(SIGINT, verbose=True):
+            with runstate.catch_signal(SIGTERM, verbose=True):
+              yield
 
   def cmd_fetch(self, argv):
     ''' Usage: {cmd} [-x] [rsync-source] [rsync-options...]
@@ -528,6 +535,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                             imported.
     '''
     options = self.options
+    runstate = options.runstate
     doit = options.doit
     force = False
     fstags = options.fstags
@@ -555,12 +563,16 @@ class SPLinkCommand(TimeSeriesBaseCommand):
       raise GetoptError("bad invocation")
     xit = 0
     for path in argv:
+      if runstate.cancelled:
+        break
       with Pfx(path):
         if not existspath(path):
           error("does not exist")
           xit = 1
           continue
         for dirpath, dirnames, filenames in os.walk(path):
+          if runstate.cancelled:
+            break
           dirnames[:] = sorted(
               (
                   dirname for dirname in dirnames
@@ -568,6 +580,8 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               )
           )
           for filename in filenames:
+            if runstate.cancelled:
+              break
             if not filename or filename.startswith('.'):
               continue
             try:
