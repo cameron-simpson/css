@@ -147,7 +147,8 @@ class _BaseSubCommand:
       if self.usage_mapping:
         mapping.update(self.usage_mapping)
       mapping.update(cmd=self.cmd)
-      subusage = subusage_format.format_map(mapping)
+      with Pfx("format %r using %r", subusage_format, mapping):
+        subusage = subusage_format.format_map(mapping)
     return subusage or None
 
 class _MethodSubCommand(_BaseSubCommand):
