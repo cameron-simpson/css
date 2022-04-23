@@ -968,7 +968,7 @@ class UpdProxy(object):
       '_text': 'The text following the prefix for this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None):
+  def __init__(self, index=1, upd=None, text=None, prefix=None):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -983,7 +983,7 @@ class UpdProxy(object):
     if upd is None:
       upd = Upd()
     upd.insert(index, proxy=self)
-    self._prefix = ''
+    self._prefix = prefix or ''
     self._text = ''
     if text:
       self(text)
