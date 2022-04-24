@@ -16,6 +16,8 @@ import subprocess
 import sys
 import time
 
+from cs.gimmicks import DEVNULL
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
@@ -23,7 +25,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': ['cs.gimmicks'],
 }
 
 # maximum number of bytes usable in the argv list for the exec*() functions
@@ -50,7 +52,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         send the process `signal.SIGKILL` as a final measure before return.
   '''
   if isinstance(pid, str):
-    return stop(int(open(pid).read().strip()))
+    return stop(int(open(pid, encoding='ascii').read().strip()))
   os.kill(pid, signum)
   if wait is None:
     return True
@@ -150,14 +152,14 @@ def write_pidfile(path, pid=None):
   '''
   if pid is None:
     pid = os.getpid()
-  with open(path, "w") as pidfp:
+  with open(path, 'w', encoding='ascii') as pidfp:
     print(pid, file=pidfp)
 
 def remove_pidfile(path):
   ''' Truncate and remove a pidfile, permissions permitting.
   '''
   try:
-    with open(path, "w"):
+    with open(path, "wb"):  # pylint: disable=unspecified-encoding
       pass
     os.remove(path)
   except OSError as e:
@@ -199,7 +201,7 @@ def run(argv, logger=None, pids=None, **kw):
     if logger:
       pargv = ['+'] + argv
       logger.info("RUN COMMAND: %r", pargv)
-    P = subprocess.Popen(argv, **kw)
+    P = subprocess.Popen(argv, **kw)  # pylint: disable=consider-using-with
     if pids is not None:
       pids.add(P.pid)
     returncode = P.wait()
@@ -242,13 +244,8 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
     print(*pargv, file=tracefp)
   popen_kw = {}
   if not keep_stdin:
-    sp_devnull = getattr(subprocess, 'DEVNULL', None)
-    if sp_devnull is None:
-      devnull = open(os.devnull, 'wb')
-    else:
-      devnull = sp_devnull
-    popen_kw['stdin'] = devnull
-  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)
+    popen_kw['stdin'] = DEVNULL
+  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)  # pylint: disable=consider-using-with
   if binary:
     if kw:
       raise ValueError(
@@ -256,8 +253,6 @@ def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
       )
   else:
     P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  if not keep_stdin and sp_devnull is None:
-    devnull.close()
   return P
 
 def pipeto(argv, trace=False, **kw):
@@ -279,7 +274,7 @@ def pipeto(argv, trace=False, **kw):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+', '|'] + argv
     print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.PIPE)
+  P = subprocess.Popen(argv, stdin=subprocess.PIPE)  # pylint: disable=consider-using-with
   P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
 
