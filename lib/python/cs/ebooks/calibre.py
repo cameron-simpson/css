@@ -37,6 +37,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.lex import cutprefix
 from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_call
@@ -51,8 +52,6 @@ from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek
 
 from cs.x import X
-
-from . import FSPathBasedSingleton
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.

@@ -27,6 +27,7 @@ except ImportError:
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning, info
@@ -40,8 +41,6 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import Tag
 from cs.threads import locked_property
 
-
-from . import FSPathBasedSingleton
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
