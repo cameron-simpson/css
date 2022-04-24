@@ -79,18 +79,26 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
 @contextmanager
 def signal_handler(sig, handler, call_previous=False):
   ''' Context manager to push a new signal handler,
+      yielding the old handler,
       restoring the old handler on exit.
       If `call_previous` is true (default `False`)
       also call the old handler after the new handler on receipt of the signal.
+
+      Parameters:
+      * `sig`: the `int` signal number to catch
+      * `handler`: the handler function to call with `(sig,frame)`
+      * `call_previous`: optional flag (default `False`);
+        if true, also call the old handler (if any) after `handler`
   '''
   if call_previous:
+    # replace handler() with a wrapper to call both it and the old handler
     handler0 = handler
 
-    def handler(sig, frame):
+    def handler(sig, frame):  # pylint:disable=function-redefined
       ''' Call the handler and then the previous handler if requested.
       '''
       handler0(sig, frame)
-      if call_previous and callable(old_handler):
+      if callable(old_handler):
         old_handler(sig, frame)
 
   old_handler = signal(sig, handler)
@@ -99,6 +107,39 @@ def signal_handler(sig, handler, call_previous=False):
   finally:
     # restiore the previous handler
     signal(sig, old_handler)
+
+@contextmanager
+def signal_handlers(sig_hnds, call_previous=False, _stacked=None):
+  ''' Context manager to stack multiple signal handlers,
+      yielding a mapping of `sig`=>`old_handler`.
+
+      Parameters:
+      * `sig_hnds`: a mapping of `sig`=>`new_handler`
+        or an iterable of `(sig,new_handler)` pairs
+      * `call_previous`: optional flag (default `False`), passed
+        to `signal_handler()`
+  '''
+  if _stacked is None:
+    _stacked = {}
+  try:
+    items = sig_hnds.items
+  except AttributeError:
+    # (sig,hnd),... from iterable
+    it = iter(sig_hnds)
+  else:
+    # (sig,hnd),... from mapping
+    it = items()
+  try:
+    sig, handler = next(it)
+  except StopIteration:
+    yield _stacked
+  else:
+    with signal_handler(sig, handler,
+                        call_previous=call_previous) as old_handler:
+      _stacked[sig] = old_handler
+      with signal_handlers(sig_hnds, call_previous=call_previous,
+                           _stacked=_stacked) as stacked:
+        yield stacked
 
 def write_pidfile(path, pid=None):
   ''' Write a process id to a pid file.
