@@ -16,7 +16,7 @@ from cs.context import setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_method
-from cs.psutils import signal_handler
+from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
@@ -619,8 +619,18 @@ class RunState(object):
     return max(0, stop_time - start_time)
 
   @contextmanager
-  def catch_signal(self, sig, verbose=False):
-    ''' Context manager to catch the signal `sig` and cancel this `RunState`.
+  def catch_signal(self, sig, call_previous=False, verbose=False):
+    ''' Context manager to catch the signal or signals `sig` and
+        cancel this `RunState`.
+        Restores the previous handlers on exit.
+        Yield a mapping of `sig`=>`old_handler`.
+
+        Parameters:
+        * `sig`: an `int` signal number or an iterable of signal numbers
+        * `call_previous`: optional flag (default `False`)
+          passed to `cs.psutils.signal_handlers`
+        * `verbose`: if true (default `False`),
+          issue a `warning` on receipt of a signal
     '''
 
     def handler(sig, frame):
@@ -630,8 +640,11 @@ class RunState(object):
       verbose and warning("%s: received signal %s, cancelling", self, sig)
       self.cancel()
 
-    with signal_handler(sig, handler) as old_handler:
-      yield old_handler
+    sigs = (sig,) if isinstance(sig, int) else sig
+    sig_hnds = map(lambda signum: (signum, handler), sigs)
+    with signal_handlers(sig_hnds,
+                         call_previous=call_previous) as old_handler_map:
+      yield old_handler_map
 
 class RunStateMixin(object):
   ''' Mixin to provide convenient access to a `RunState`.
