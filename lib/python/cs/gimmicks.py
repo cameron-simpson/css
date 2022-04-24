@@ -17,6 +17,13 @@ except ImportError:
     '''
     yield None
 
+import os
+import subprocess
+try:
+  DEVNULL = subprocess.DEVNULL
+except AttributeError:
+  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+
 import sys
 try:
   from types import SimpleNamespace  # pylint: disable=unused-import
