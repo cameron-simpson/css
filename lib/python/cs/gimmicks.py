@@ -6,6 +6,8 @@ Gimmicks and hacks to make some of my other modules more robust and
 less demanding of others.
 '''
 
+# pylint: disable=wrong-import-position
+
 try:
   from contextlib import nullcontext  # pylint: disable=unused-import
 except ImportError:
@@ -17,7 +19,15 @@ except ImportError:
     '''
     yield None
 
+import os
+import subprocess
+try:
+  DEVNULL = subprocess.DEVNULL
+except AttributeError:
+  DEVNULL = open(os.devnull, 'wb')  # pylint: disable=consider-using-with
+
 import sys
+
 try:
   from types import SimpleNamespace  # pylint: disable=unused-import
 except ImportError:
@@ -39,6 +49,7 @@ except ImportError:
       )
 
 try:
+  # pylint: disable=redefined-builtin,self-assigning-variable
   TimeoutError = TimeoutError
 except NameError:
   try:

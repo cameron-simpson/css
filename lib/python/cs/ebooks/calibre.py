@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
+import json
 import os
 from os.path import (
     basename,
@@ -36,6 +37,7 @@ from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.lex import cutprefix
 from cs.logutils import error, warning
 from cs.pfx import Pfx, pfx_call
@@ -50,8 +52,6 @@ from cs.threads import locked_property
 from cs.units import transcribe_bytes_geek
 
 from cs.x import X
-
-from . import FSPathBasedSingleton
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -224,6 +224,13 @@ class CalibreBook:
     if attr.startswith('_'):
       raise AttributeError(attr)
     return getattr(self.db_book(), attr)
+
+  @property
+  def authors(self):
+    ''' The `CalibreMetadataDB` author records.
+    '''
+    with self.db.db_session() as session:
+      return self.db_book().authors
 
   @property
   def mobi_subpath(self):
@@ -472,6 +479,13 @@ class CalibreMetadataDB(ORM):
       __tablename__ = 'languages'
       lang_code = Column(String, nullable=False, unique=True)
 
+    class Preferences(Base, _CalibreTable):
+      ''' Calibre preferences.
+      '''
+      __tablename__ = 'preferences'
+      key = Column(String, nullable=False, unique=True)
+      value = Column("val", String, nullable=False)
+
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
       '''
@@ -497,6 +511,7 @@ class CalibreMetadataDB(ORM):
     self.books = Books
     self.identifiers = Identifiers
     self.languages = Languages
+    self.preferences = Preferences
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -550,8 +565,17 @@ class CalibreCommand(BaseCommand):
                           session=session, verbose=True):
             yield
 
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database prompt.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    return self.options.calibre.dbshell()
+
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
+          Add the CBZ format to the designated Calibre books.
     '''
     if not argv:
       raise GetoptError("missing dbids")
@@ -570,14 +594,6 @@ class CalibreCommand(BaseCommand):
         with Pfx("%s: make_cbz", cbook.title):
           cbook.make_cbz()
     return xit
-
-  def cmd_dbshell(self, argv):
-    ''' Usage: {cmd}
-          Start an interactive database prompt.
-    '''
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    return self.options.calibre.dbshell()
 
   def cmd_import_from_calibre(self, argv):
     ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
@@ -679,6 +695,40 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+
+  def cmd_prefs(self, argv):
+    ''' Usage: {cmd}
+          List the library preferences.
+    '''
+    xit = 0
+    db = self.options.calibre.db
+    with db.db_session() as session:
+      if argv:
+        for pref_name in argv:
+          with Pfx(pref_name):
+            pref = db.preferences.lookup1(key=pref_name, session=session)
+            if pref is None:
+              warning("unknown preference")
+              xit = 1
+            else:
+              print(pref_name)
+              print(" ", json.dumps(pfx_call(json.loads, pref.value)))
+      else:
+        for pref in sorted(db.preferences.lookup(session=session),
+                           key=lambda pref: pref.key):
+          with Pfx(pref.key):
+            print(pref.key)
+            value = pfx_call(json.loads, pref.value)
+            if isinstance(value, list):
+              if value:
+                for item in value:
+                  print(" ", json.dumps(item))
+            elif isinstance(value, dict):
+              for k, v in sorted(value.items()):
+                print(" ", json.dumps(k), ":", json.dumps(v))
+            else:
+              print(" ", json.dumps(value))
+    return xit
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())

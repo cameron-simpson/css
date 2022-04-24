@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
 from os.path import basename
+from signal import SIGINT, SIGTERM
 import sys
 from types import SimpleNamespace
 from typing import List
@@ -370,6 +371,7 @@ class BaseCommand:
     subcmds = self.subcommands()
     has_subcmds = subcmds and list(subcmds) != ['help']
     options = self.options = self.OPTIONS_CLASS()
+    options.runstate_signals = (SIGINT, SIGTERM)
     if argv is None:
       argv = list(sys.argv)
       if cmd is not None:
@@ -508,14 +510,17 @@ class BaseCommand:
     if subcmd:
       if not has_subcmds:
         raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
+      subcmd_ = subcmd.replace('-', '_').replace('.', '_')
       try:
-        subcmds[subcmd]
+        subcmds[subcmd_]
       except KeyError:
         # pylint: disable=raise-missing-from
         raise ValueError(
             "subcmd=%r: unknown subcommand, I know %r" %
             (subcmd, sorted(subcmds.keys()))
         )
+      else:
+        subcmd = subcmd_
     if has_subcmds:
       subusages = []
       for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
@@ -748,28 +753,32 @@ class BaseCommand:
         and its value returned.
 
         If the command implementation requires some setup or teardown
-        then this may be provided by the `run_context`
-        context manager method,
-        called with `cmd=`*subcmd* for subcommands
-        and with `cmd=None` for `main`.
+        then this may be provided by the `run_context()`
+        context manager method.
     '''
-    # short circuit if we've already complaints about bad invocation
+    # short circuit if we've already complainted about bad invocation
     if self._printed_usage:
       return 2
     options = self.options
     try:
+      try:
+        runstate = options.runstate
+      except AttributeError:
+        runstate = options.runstate = RunState(
+            self.cmd, signals=(SIGINT, SIGTERM)
+        )
       runstate = getattr(options, 'runstate', RunState(self.cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
       upd_context = nullcontext() if upd is None else upd
-      with runstate:
-        with upd_context:
-          with stackattrs(self, cmd=self._subcmd):
-            with stackattrs(
-                options,
-                runstate=runstate,
-                upd=upd,
-            ):
-              with stackattrs(options, **kw_options):
+      with upd_context:
+        with stackattrs(self, cmd=self._subcmd):
+          with stackattrs(
+              options,
+              runstate=runstate,
+              upd=upd,
+          ):
+            with stackattrs(options, **kw_options):
+              with options.runstate:
                 with self.run_context():
                   return self._run(self._subcmd, self, self._argv)
     except GetoptError as e:
@@ -856,8 +865,9 @@ class BaseCommand:
     unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
+        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
-          subcommand = subcmds[subcmd]
+          subcommand = subcmds[subcmd_]
         except KeyError:
           warning("unknown subcommand")
           unknown = True

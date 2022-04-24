@@ -27,6 +27,7 @@ except ImportError:
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning, info
@@ -37,10 +38,9 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
+from cs.tagset import Tag
 from cs.threads import locked_property
 
-
-from . import FSPathBasedSingleton
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
@@ -106,6 +106,12 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Return a `KindleBook` for the supplied `asin`.
     '''
     ASIN = asin.upper()
+    # convert ASIN_EBOK to ASIN, handy for copy/paste of subdir name from listing
+    for suffix in self.SUBDIR_SUFFIXES:
+      subdir_name = cutsuffix(ASIN, suffix)
+      if subdir_name is not ASIN:
+        ASIN = subdir_name
+        break
     for suffix in self.SUBDIR_SUFFIXES:
       subdir_name = ASIN + suffix
       if isdirpath(self.pathto(subdir_name)):
@@ -524,7 +530,7 @@ class KindleCommand(BaseCommand):
     from .calibre import CalibreTree  # pylint: disable=import-outside-toplevel
     options = self.options
     with KindleTree(options.kindle_path) as kt:
-      with CalibreTree(calibre_library=options.calibre_path) as cal:
+      with CalibreTree(options.calibre_path) as cal:
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
@@ -613,17 +619,25 @@ class KindleCommand(BaseCommand):
         if dbid is None or cbook.id != dbid:
           print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
           kbook.tags['calibre.dbid'] = cbook.id
+        for field in 'authors', 'title':
+          tag_name = f'calibre.{field}'
+          if field == "authors":
+            tag_value = sorted(author.name for author in cbook.authors)
+          else:
+            tag_value = getattr(cbook, field)
+          kbook.tags.add(tag_name, tag_value)
 
   def cmd_ls(self, argv):
+    ''' Usage: {cmd}
+          List the contents of the librayr.
+    '''
     options = self.options
     kindle = options.kindle
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print(kindle.fspath)
     for subdir_name, kbook in kindle.items():
-      print(subdir_name)
-      for tag in sorted(kbook.tags):
-        print(" ", tag)
+      print(subdir_name, " ".join(map(str, sorted(kbook.tags))))
 
 if __name__ == '__main__':
   sys.exit(KindleCommand(sys.argv).run())
