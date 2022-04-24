@@ -8,7 +8,6 @@
 from collections import namedtuple
 from contextlib import contextmanager
 from datetime import datetime
-from fnmatch import fnmatch
 from functools import partial
 from getopt import getopt, GetoptError
 import os
@@ -27,7 +26,6 @@ import sys
 import time
 
 import arrow
-from plotly import express as px, graph_objects as go
 from typeguard import typechecked
 
 from cs.context import stackattrs
@@ -35,9 +33,8 @@ from cs.csvutils import csv_import
 from cs.deco import cachedmethod
 from cs.fs import HasFSPath, fnmatchdir, needdir, shortpath
 from cs.fstags import FSTags
-from cs.lex import is_identifier, s
+from cs.lex import s
 from cs.logutils import warning, error
-from cs.mappings import AttrableMapping
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.progress import progressbar
 from cs.psutils import run
@@ -51,9 +48,7 @@ from cs.timeseries import (
     TimeSeriesDataDir,
     TimespanPolicyAnnual,
 )
-from cs.upd import print, UpdProxy
-
-from cs.x import X
+from cs.upd import print, UpdProxy  # pylint: disable=redefined-builtin
 
 DISTINFO = {
     'keywords': ["python3"],
@@ -128,7 +123,7 @@ class SPLinkCSVDir(HasFSPath):
     ''' Yield `(unixtime,TagSet)` 2-tuples from the CSV file `csvpath`.
     '''
     ts2001_offset = ts2001_unixtime()
-    rowtype, rows = csv_import(csvpath)
+    _, rows = csv_import(csvpath)
     for row in rows:
       tags = TagSet()
       for attr, value in row._asdict().items():
@@ -200,6 +195,7 @@ class SPLinkCSVDir(HasFSPath):
         ts.tags['csv.header'] = rowtype.name_of_[key]
         ts.setitems(key_values[key0], key_values[key])
 
+# pylint: disable=too-many-ancestors
 class SPLinkDataDir(TimeSeriesDataDir):
   ''' A `TimeSeriesDataDir` to hold log data from an SP-Link CSV data download.
       This holds the data from a particular CSV log such as `'DetailedData'`.
@@ -294,7 +290,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   # where the PerformanceData downloads reside
   DOWNLOADS = 'downloads'
 
-  EVENTS_DATASETS = 'EventData',
+  EVENTS_DATASETS = 'EventData',  # pylint: disable=trailing-comma-tuple
   TIMESERIES_DATASETS = 'DetailedData', 'DailySummaryData'
 
   TIMESERIES_DEFAULTS = {
@@ -308,7 +304,6 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   def __init__(
       self,
       dirpath,
-      downloads_subpath=None,
   ):
     if not isdirpath(dirpath):
       raise ValueError("not a directory: %r" % (dirpath,))
@@ -331,10 +326,10 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     '''
     try:
       step, policy_name = self.TIMESERIES_DEFAULTS[tsname]
-    except KeyError:
+    except KeyError as e:
       raise AttributeError(
           "%s: no .%s attribute" % (type(self).__name__, tsname)
-      )
+      ) from e
     tspath = self.pathto(tsname)
     needdir(tspath)
     ts = SPLinkDataDir(tspath, dataset=tsname, step=step, policy=policy_name)
@@ -350,7 +345,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   def download_subdirs(self, include_imports=False):
     ''' Return an iterable of the paths of the top level `PerformanceData_*`
         subdirectories in the downloads subdirectory.
-        If `include_imports`, include subdirectorys 
+        If `include_imports`, include subdirectories.
     '''
     return [
         joinpath(self.downloadspath, perfdirname) for perfdirname in
@@ -388,8 +383,8 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
     if (dataset not in self.TIMESERIES_DATASETS
         and dataset not in self.EVENTS_DATASETS):
       raise ValueError(
-          "invalid dataset name %r: expected a time series name from %r or a log name from %r",
-          dataset, self.TIMESERIES_DATASETS, self.EVENTS_DATASETS
+          "invalid dataset name %r: expected a time series name from %r or a log name from %r"
+          % (dataset, self.TIMESERIES_DATASETS, self.EVENTS_DATASETS)
       )
     dsglob = '*_{dataset}_????-??-??_??-??-??.CSV'
     dsname, = fnmatchdir(perfdirpath, dsglob)
@@ -405,6 +400,7 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
   def resolve(self, spec):
     ''' Resolve a field spec into an iterable of `(timeseries,key)`.
     '''
+    print("RESOLVE", spec)
     with Pfx(spec):
       try:
         dsname, field_spec = spec.split(':', 1)
@@ -413,10 +409,11 @@ class SPLinkData(HasFSPath, MultiOpenMixin):
         dsnames = self.TIMESERIES_DATASETS
         field_spec = spec
       else:
-        dsnames = dsname,
+        dsnames = dsname,  # pylint: disable=trailing-comma-tuple
       for dsname in dsnames:
         with Pfx(dsname):
           tsd = getattr(self, dsname)
+          print("try tsd", tsd, "spec", field_spec)
           for key in pfx_call(tsd.keys, field_spec):
             yield tsd, key
 
@@ -494,7 +491,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     expunge = False
     rsopts = ['-ia']
     opts, argv = getopt(argv, 'nx')
-    for opt, val in opts:
+    for opt, _ in opts:
       with Pfx(opt):
         if opt == '-n':
           rsopts.insert(0, opt)
@@ -507,10 +504,10 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     else:
       try:
         rsync_source = os.environ[self.DEFAULT_FETCH_SOURCE_ENVVAR]
-      except KeyError:
+      except KeyError as e:
         raise GetoptError(
             "no rsync-source provided and no ${self.DEFAULT_FETCH_SOURCE_ENVVAR}"
-        )
+        ) from e
     rsargv = ['set-x', 'rsync']
     rsargv.extend(rsopts)
     if expunge:
@@ -523,6 +520,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     print('+', shlex.join(argv))
     return run(rsargv)
 
+  # pylint: disable=too-many-statements,too-many-branches,too-many-locals
   def cmd_import(self, argv):
     ''' Usage: {cmd} [-d dataset,...] [-n] [sp-link-download...]
           Import CSV data from the downloads area into the time series data.
@@ -559,7 +557,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         warning("unknown dataset name: %s", dataset)
         badopts = True
     if not argv:
-      argv = spd.downloadspath,
+      argv = spd.downloadspath,  # pylint: disable=trailing-comma-tuple
     if badopts:
       raise GetoptError("bad invocation")
     xit = 0
@@ -663,6 +661,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
                 )
     return xit
 
+  # pylint: disable=too-many-locals
   def cmd_plot(self, argv):
     ''' Usage: {cmd} [--show] imagepath.png days {{[dataset:]{{glob|field}}}}...
     '''
@@ -725,16 +724,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
               )
           )
           print(len(events), "events found for", repr(label))
-          for ev in events:
-            assert isinstance(
-                ev.unixtime, float
-            ), ("not a float: %s for %s" % (r(ev.unixtime), ev))
-            assert not isnan(ev.unixtime), "NaN in %s" % (ev,)
-            if ev.unixtime < start or ev.unixtime > now:
-              warning(
-                  "unixtime %s (%s) out of range start:%r-now:%r: %s",
-                  ev.unixtime, arrow.get(ev.unixtime), start, now, ev
-              )
           proxy.text = "add trace"
           plot_events(
               figure,
@@ -754,21 +743,6 @@ class SPLinkCommand(TimeSeriesBaseCommand):
         figure.write_image(imgpath, format="png", width=2048, height=1024)
     if show_image:
       os.system(shlex.join(['open', imgpath]))
-    return
-    sp.plot_groups(
-        'events',
-        SPPerfData.EVENTS_COL_LOAD_AC_V,
-        SPPerfData.EVENTS_COL_DESCRIPTION,
-        [
-            'System - AC Source no longer detected',
-            'System - AC Source outside operating range',
-            'Bridge negative correction',
-            'Bridge positive correction',
-            'AC Mode - Synchronised begin',
-        ],
-        figure=fig,
-        colours=event_colours,
-    )
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
