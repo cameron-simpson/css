@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -189,27 +190,31 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from collections.abc import MutableMapping
+from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import date, datetime
 import errno
 from fnmatch import (fnmatch, fnmatchcase, translate as fn_translate)
+from functools import partial
 from getopt import GetoptError
 from json import JSONEncoder, JSONDecoder
 from json.decoder import JSONDecodeError
 import os
-from os.path import dirname, isdir as isdirpath
+from os.path import dirname, isdir as isdirpath, isfile as isfilepath
 import re
-from threading import Lock
 import time
 from typing import Optional, Union
 from uuid import UUID
+
 from icontract import require
 from typeguard import typechecked
+
 from cs.cmdutils import BaseCommand
 from cs.dateutils import UNIXTimeMixin
 from cs.deco import decorator, fmtdoc
 from cs.edit import edit_strings, edit as edit_lines
 from cs.fileutils import shortpath
+from cs.fs import FSPathBasedSingleton
 from cs.lex import (
     cropped_repr, cutprefix, cutsuffix, get_dotted_identifier, get_nonwhite,
     is_dotted_identifier, is_identifier, skipwhite, FormatableMixin,
@@ -221,7 +226,7 @@ from cs.mappings import (
     RemappedMappingProxy
 )
 from cs.obj import SingletonMixin
-from cs.pfx import Pfx, pfx, pfx_method
+from cs.pfx import Pfx, pfx, pfx_call, pfx_method
 from cs.py3 import date_fromisoformat, datetime_fromisoformat
 from cs.resources import MultiOpenMixin
 from cs.threads import locked_property
@@ -252,6 +257,8 @@ DISTINFO = {
         'typeguard',
     ],
 }
+
+pfx_open = partial(pfx_call, open)
 
 # default Tag name holds a metadata entry's "value"
 DEFAULT_VALUE_TAG_NAME = 'value'
@@ -464,6 +471,14 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
+
+  def from_tags(cls, tags, _id=None, _ontology=None):
+    ''' Make a `TagSet` from an iterable of `Tag`s.
+    '''
+    return cls(
+        _id=_id, _ontology=_ontology, **{tag.name: tag.value
+                                         for tag in tags}
+    )
 
   #################################################################
   # methods supporting FormattableMixin
@@ -1038,6 +1053,72 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
     '''
     return [self.unixtime, self.id, self.name
             ] + [str(tag) for tag in self if tag.name != 'name']
+
+  @classmethod
+  def from_ini(cls, f, section: str, missing_ok=False):
+    ''' Load a `TagSet` from a section of a `.ini` file.
+
+        Parameters:
+        * `f`: the `.ini` format file to read;
+          an iterable of lines (eg a file object)
+          or the name of a file to open
+        * `section`: the name of the config section
+          from which to load the `TagSet`
+        * `missing_ok`: optional flag, default `False`;
+          if true a missing file will return an empty `TagSet`
+          instead of raising `FileNotFoundError`
+    '''
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as subf:
+          return cls.from_ini(subf, section)
+      except FileNotFoundError:
+        if missing_ok:
+          return cls()
+        raise
+    cp = ConfigParser()
+    cp.read_file(f)
+    tags = cls()
+    try:
+      s = cp[section]
+    except KeyError:
+      pass
+    else:
+      for tag_name, tag_value_s in s.items():
+        with Pfx(tag_name):
+          tag_value_s = tag_value_s.strip()
+          tag_value, offset = (
+              Tag.parse_value(tag_value_s) if tag_value_s else (None, 0)
+          )
+          if offset < len(tag_value_s):
+            raise ValueError("unparsed text: %r", tag_value_s[offset:])
+          tags.add(tag_name, tag_value)
+    return tags
+
+  def save_as_ini(self, f, section: str, config=None):
+    ''' Save this `TagSet` to the config file `f` as `section`.
+
+        If `f` is a string, read an existing config from that file
+        and update the section.
+    '''
+    if config is None:
+      config = ConfigParser()
+    if isinstance(f, str):
+      try:
+        with pfx_open(f) as cf:
+          config.read_file(cf)
+      except FileNotFoundError:
+        pass
+    if isinstance(f, str):
+      with pfx_open(f, 'w') as cf:
+        self.save_as_ini(cf, section, config=config)
+    else:
+      config[section] = {}
+      for tag in self:
+        config[section][
+            tag.name
+        ] = ('' if tag.value is None else tag.transcribe_value(tag.value))
+      config.write(f)
 
 @has_format_attributes
 class Tag(namedtuple('Tag', 'name value ontology'), FormatableMixin):
@@ -1622,12 +1703,15 @@ class TagSetCriterion(ABC):
 
   @classmethod
   @pfx_method
-  def from_str(cls, s, fallback_parse=None):
+  @typechecked
+  def from_str(cls, s: str, fallback_parse=None):
     ''' Prepare a `TagSetCriterion` from the string `s`.
     '''
     criterion, offset = cls.from_str2(s, fallback_parse=fallback_parse)
     if offset != len(s):
       raise ValueError("unparsed specification: %r" % (s[offset:],))
+    assert not isinstance(criterion, list)
+    assert isinstance(criterion, TagSetCriterion)
     return criterion
 
   @classmethod
@@ -1891,9 +1975,7 @@ class TagSetPrefixView(FormatableMixin):
   def __str__(self):
     tag = self.tag
     if tag is None:
-      return repr(
-          dict(map(lambda k: (self._prefix_ + k, self._tags[k]), self.keys()))
-      )
+      return str(TagSet(self.as_dict()))
     return FStr(tag.value)
 
   def __repr__(self):
@@ -1936,10 +2018,27 @@ class TagSetPrefixView(FormatableMixin):
   def __getitem__(self, k):
     return self._tags[self._prefix_ + k]
 
+  def get(self, k, default=None):
+    ''' Mapping `get` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
   def __setitem__(self, k, v):
     self._tags[self._prefix_ + k] = v
 
-  def __deltitem__(self, k):
+  def setdefault(self, k, v=None):
+    ''' Mapping `setdefault` method.
+    '''
+    try:
+      return self[k]
+    except KeyError:
+      self[k] = v
+      return v
+
+  def __delitem__(self, k):
     del self._tags[self._prefix_ + k]
 
   def items(self):
@@ -1951,6 +2050,11 @@ class TagSetPrefixView(FormatableMixin):
     ''' Return an iterable of the values (`Tag`s).
     '''
     return map(lambda k: self[k], self.keys())
+
+  def as_dict(self):
+    ''' Return a `dict` representation of this view.
+    '''
+    return {k: self._tags[self._prefix_ + k] for k in self.keys()}
 
   def __getattr__(self, attr):
     ''' Proxy other attributes through to the `TagSet`.
@@ -3056,7 +3160,7 @@ class TagsOntology(SingletonMixin, BaseTagSets):
         del self[old_index]
     return changed_tes
 
-class TagFile(SingletonMixin, BaseTagSets):
+class TagFile(FSPathBasedSingleton, BaseTagSets):
   ''' A reference to a specific file containing tags.
 
       This manages a mapping of `name` => `TagSet`,
@@ -3064,23 +3168,22 @@ class TagFile(SingletonMixin, BaseTagSets):
   '''
 
   @classmethod
-  def _singleton_key(cls, filepath, **_):
-    return filepath
+  def _singleton_key(cls, fspath, **_):
+    return fspath
 
   @typechecked
-  def __init__(self, filepath: str, *, ontology=None):
-    if hasattr(self, 'filepath'):
+  def __init__(self, fspath: str, *, ontology=None):
+    if hasattr(self, 'fspath'):
       return
-    super().__init__(ontology=ontology)
-    self.filepath = filepath
+    FSPathBasedSingleton.__init__(self, fspath)
+    BaseTagSets.__init__(self, ontology=ontology)
     self._tagsets = None
-    self._lock = Lock()
 
   def __str__(self):
-    return "%s(%r)" % (type(self).__name__, shortpath(self.filepath))
+    return "%s(%r)" % (type(self).__name__, shortpath(self.fspath))
 
   def __repr__(self):
-    return "%s(%r)" % (type(self).__name__, self.filepath)
+    return "%s(%r)" % (type(self).__name__, self.fspath)
 
   def startup(self):
     ''' No special startup.
@@ -3142,7 +3245,7 @@ class TagFile(SingletonMixin, BaseTagSets):
         This is loaded on demand.
     '''
     ts = {}
-    loaded_tagsets, unparsed = self.load_tagsets(self.filepath, self.ontology)
+    loaded_tagsets, unparsed = self.load_tagsets(self.fspath, self.ontology)
     self.unparsed = unparsed
     ont = self.ontology
     for name, tags in loaded_tagsets.items():
@@ -3251,7 +3354,6 @@ class TagFile(SingletonMixin, BaseTagSets):
     return ' '.join(fields)
 
   @classmethod
-  @pfx_method
   def save_tagsets(cls, filepath, tagsets, unparsed, extra_types=None):
     ''' Save `tagsets` and `unparsed` to `filepath`.
 
@@ -3268,20 +3370,22 @@ class TagFile(SingletonMixin, BaseTagSets):
         with Pfx("os.makedirs(%r)", dirpath):
           os.makedirs(dirpath)
       name_tags = sorted(tagsets.items())
-      try:
-        with open(filepath, 'w') as f:
-          for _, line in unparsed:
-            if not line.startswith('#'):
-              f.write('##  ')
-            f.write(line)
-            f.write('\n')
-          for name, tags in name_tags:
-            if not tags:
-              continue
-            f.write(cls.tags_line(name, tags, extra_types=extra_types))
-            f.write('\n')
-      except OSError as e:
-        error("save(%r) fails: %s", filepath, e)
+      # skip save if no file and nothing to save
+      if name_tags or unparsed or isfilepath(filepath):
+        try:
+          with pfx_call(open, filepath, 'w') as f:
+            for _, line in unparsed:
+              if not line.startswith('#'):
+                f.write('##  ')
+              f.write(line)
+              f.write('\n')
+            for name, tags in name_tags:
+              if not tags:
+                continue
+              f.write(cls.tags_line(name, tags, extra_types=extra_types))
+              f.write('\n')
+        except OSError as e:
+          error("save(%r) fails: %s", filepath, e)
 
   def save(self, extra_types=None):
     ''' Save the tag map to the tag file if modified.
@@ -3294,7 +3398,7 @@ class TagFile(SingletonMixin, BaseTagSets):
       if self.is_modified():
         # there are modified TagSets
         self.save_tagsets(
-            self.filepath, tagsets, self.unparsed, extra_types=extra_types
+            self.fspath, tagsets, self.unparsed, extra_types=extra_types
         )
         self._loaded_signature = self._loadsave_signature()
         for tagset in tagsets.values():
@@ -3550,9 +3654,10 @@ class RegexpTagRule:
       and returns inferred `Tag`s.
   '''
 
-  def __init__(self, regexp):
+  def __init__(self, regexp, tag_prefix=None):
     self.regexp_src = regexp
     self.regexp = re.compile(regexp)
+    self.tag_prefix = tag_prefix
 
   def __str__(self):
     return "%s(%r)" % (type(self).__name__, self.regexp_src)
@@ -3609,6 +3714,8 @@ class RegexpTagRule:
               pass
             else:
               tag_name = tag_name_prefix
+          if self.tag_prefix:
+            tag_name = self.tag_prefix + '.' + tag_name
           tag = Tag(tag_name, value)
           tags.append(tag)
     return tags

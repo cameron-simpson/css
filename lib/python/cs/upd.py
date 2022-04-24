@@ -382,7 +382,7 @@ class Upd(SingletonMixin):
 
   def proxy(self, index):
     ''' Return the `UpdProxy` for `index`.
-        Returns `None` if `index` if out of range.
+        Returns `None` if `index` is out of range.
         The index `0` is never out of range;
         it will be autocreated if there are no slots yet.
     '''
@@ -968,7 +968,7 @@ class UpdProxy(object):
       '_text': 'The text following the prefix for this slot, default "".',
   }
 
-  def __init__(self, index=1, upd=None, text=None):
+  def __init__(self, index=1, upd=None, text=None, prefix=None):
     ''' Initialise a new `UpdProxy` status line.
 
         Parameters:
@@ -983,7 +983,7 @@ class UpdProxy(object):
     if upd is None:
       upd = Upd()
     upd.insert(index, proxy=self)
-    self._prefix = ''
+    self._prefix = prefix or ''
     self._text = ''
     if text:
       self(text)
@@ -1077,10 +1077,11 @@ class UpdProxy(object):
   def delete(self):
     ''' Delete this proxy from its parent `Upd`.
     '''
-    with self.upd._lock:  # pylint: disable=protected-access
-      index = self.index
-      if index is not None:
-        self.upd.delete(index)
+    if self.upd is not None:
+      with self.upd._lock:  # pylint: disable=protected-access
+        index = self.index
+        if index is not None:
+          self.upd.delete(index)
 
   __del__ = delete
 

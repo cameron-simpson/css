@@ -7,6 +7,8 @@ Convenience functions for editing things.
 '''
 
 from __future__ import print_function, absolute_import
+from functools import partial
+import json
 import os
 import os.path
 from subprocess import Popen
@@ -85,3 +87,33 @@ def edit(lines, editor=None, environ=None):
             raise ValueError("missing newline")
           lines.append(line[:-1])
   return lines
+
+def edit_obj(o, editor=None, environ=None, to_text=None, from_text=None):
+  ''' Edit the cotents of an object `o`.
+      Return a new object containing the editing contents.
+      The default transcription is as JSON.
+
+      The editor is chosen by `choose_editor(editor=editor,environ=environ)`.
+
+      Parameters:
+      * `o`: the object whose
+      * `to_text`: the transcription function of the object to text;
+        default `json.dumps`
+      * `from_text`: the transcription function of the object to text;
+        default `json.loads`
+  '''
+  editor = choose_editor(editor, environ)
+  if to_text is None:
+    to_text = partial(json.dumps, sort_keys=True, indent=4)
+  if from_text is None:
+    from_text = json.loads
+  with NamedTemporaryFile(mode='w') as T:
+    T.write(to_text(o))
+    T.write("\n")
+    T.flush()
+    P = Popen([editor, T.name])
+    P.wait()
+    if P.returncode != 0:
+      raise RuntimeError("editor fails, aborting")
+    with open(T.name, 'r') as f:
+      return from_text(f.read())
