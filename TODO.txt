@@ -1,4 +1,12 @@
 cs.units: make decompose return an object which proxies to the list but is formattable and has a nice __str__, supporting print(bytes_geek(nbytes)) etc
+MultiTimeSeries: convenience add_rate(ratekey,accumulation_key) wrapper for add_derived, should backtrack to most recent non-NaN
+MultiTimeSeries: add_derivation_rule(fnglob,infer(key)->(derived_key,derived_func(mts,when)) which calls add_derived
+MultiTimeSeries: add_derived(key,func(mts,when)) to make a derives time series with func as a computation
+MultiTimeSeries__getitem__: if no subdir, look for fnmatch based rule to make derived timeseries
+MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
+MultiTimeSeries base class to provide __getitem[tskey] etc for TimeSeriesDataDir
+mmap mode for TimeSeries, should disable .array
+TimeSeries: support slicing and indexed slicing
 cs.edit: use subprocess.run check=True
 cs.app.maildb: port to BaseCommand
 BaseCommand: move most of __init__ into run-context along with setup_logging context manager use

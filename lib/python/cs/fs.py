@@ -4,6 +4,8 @@
     some of which have been bloating cs.fileutils for too long.
 '''
 
+from fnmatch import fnmatch
+from functools import partial
 import os
 from os.path import (
     basename,
@@ -13,6 +15,7 @@ from os.path import (
     isabs as isabspath,
     isdir as isdirpath,
     join as joinpath,
+    normpath,
     realpath,
     relpath,
 )
@@ -40,6 +43,26 @@ DISTINFO = {
     'install_requires': ['cs.deco', 'cs.pfx'],
 }
 
+pfx_listdir = partial(pfx_call, os.listdir)
+pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_rename = partial(pfx_call, os.rename)
+pfx_rmdir = partial(pfx_call, os.rmdir)
+
+def needdir(dirpath, mode=0o777, *, use_makedirs=False):
+  ''' Create the directory `dirpath` if missing.
+
+      Parameters:
+      * `dirpath`: the required directory path
+      * `mode`: the permissions mode, default `0o777`
+      * `use_makedirs`: optional creation mode, default `False`;
+        if true, use `os.makedirs`, otherwise `os.mkdir`
+  '''
+  if not isdirpath(dirpath):
+    if use_makedirs:
+      pfx_makedirs(dirpath, mode)
+    else:
+      pfx_mkdir(dirpath, mode)
+
 @decorator
 def atomic_directory(infill_func, make_placeholder=False):
   ''' Decorator for a function which fills in a directory
@@ -60,7 +83,7 @@ def atomic_directory(infill_func, make_placeholder=False):
     remove_placeholder = False
     if make_placeholder:
       # prevent other users from using this directory
-      pfx_call(os.mkdir, dirpath, 0o000)
+      pfx_mkdir(dirpath, 0o000)
       remove_placeholder = True
     else:
       if existspath(dirpath):
@@ -74,15 +97,15 @@ def atomic_directory(infill_func, make_placeholder=False):
       ) as tmpdirpath:
         result = infill_func(tmpdirpath, *a, **kw)
         if remove_placeholder:
-          pfx_call(os.rmdir, dirpath)
+          pfx_rmdir(dirpath)
           remove_placeholder = False
         elif existspath(dirpath):
           raise ValueError("directory already exists: %r" % (dirpath,))
-        pfx_call(os.rename, tmpdirpath, dirpath)
-        pfx_call(os.mkdir, tmpdirpath, 0o000)
+        pfx_rename(tmpdirpath, dirpath)
+        pfx_mkdir(tmpdirpath, 0o000)
     except:
       if remove_placeholder and isdirpath(dirpath):
-        pfx_call(os.rmdir, dirpath)
+        pfx_rmdir(dirpath)
       raise
     else:
       return result
@@ -118,12 +141,19 @@ def rpaths(
         continue
       yield relpath(joinpath(subpath, filename), dirpath)
 
+def fnmatchdir(dirpath, fnglob):
+  ''' Return a list of the names in `dirpath` matching the glob `fnglob`.
+  '''
+  return [
+      filename for filename in pfx_listdir(dirpath)
+      if fnmatch(filename, fnglob)
+  ]
+
 # pylint: disable=too-few-public-methods
 class HasFSPath:
   ''' An object with a `.fspath` attribute representing a filesystem location.
   '''
 
-  @require(lambda fspath: isabspath(fspath))  # pylint: disable=unnecessary-lambda
   def __init__(self, fspath):
     self.fspath = fspath
 
@@ -132,6 +162,11 @@ class HasFSPath:
     ''' The full path to `subpath`, a relative path below `self.fspath`.
     '''
     return joinpath(self.fspath, subpath)
+
+  def fnmatch(self, fnglob):
+    ''' Return a list of the names in `self.fspath` matching the glob `fnglob`.
+    '''
+    return fnmatchdir(self.fspath, fnglob)
 
 class FSPathBasedSingleton(SingletonMixin, HasFSPath):
   ''' The basis for a `SingletonMixin` based on `realpath(self.fspath)`.
@@ -198,3 +233,23 @@ def longpath(path, environ=None, prefixes=None):
       break
   path = envsub(path, environ)
   return path
+
+def is_clean_subpath(subpath: str):
+  ''' Test that `subpath` is clean:
+      - not empty or '.' or '..'
+      - not an absolute path
+      - normalised
+      - does not walk up out of its parent directory
+
+      Examples:
+
+          >>> is_clean_subpath('')
+          False
+          >>> is_clean_subpath('.')
+  '''
+  if subpath in ('', '.', '..'):
+    return False
+  if isabspath(subpath):
+    return False
+  normalised = normpath(subpath)
+  return subpath == normalised and not normalised.startswith('../')
