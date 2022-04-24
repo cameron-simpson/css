@@ -575,6 +575,7 @@ class CalibreCommand(BaseCommand):
 
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
+          Add the CBZ format to the designated Calibre books.
     '''
     if not argv:
       raise GetoptError("missing dbids")
