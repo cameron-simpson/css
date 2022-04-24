@@ -61,7 +61,7 @@ from cs.configutils import HasConfigIni
 from cs.deco import cachedmethod, decorator
 from cs.fs import HasFSPath, fnmatchdir, is_clean_subpath, needdir, shortpath
 from cs.fstags import FSTags
-from cs.lex import is_identifier, s
+from cs.lex import is_identifier, s, r
 from cs.logutils import warning, error
 from cs.pfx import pfx, pfx_call, Pfx
 from cs.py.modules import import_extra
@@ -364,6 +364,63 @@ def plotrange(func, needs_start=False, needs_stop=False):
     return func(self, start, stop, *a, figure=figure, **kw)
 
   return plotrange_wrapper
+
+def plot_events(
+    figure,
+    events,
+    value_func,
+    *,
+    start=None,
+    stop=None,
+    key_colours=None,
+    name=None,
+    rescale=False,
+    **scatter_kw
+):
+  plotly = import_extra('plotly', DISTINFO)
+  go = plotly.graph_objects
+  xaxis = []
+  yaxis = []
+  for event in (ev for ev in events
+                if (start is None or ev.unixtime >= start) and (
+                    stop is None or ev.unixtime < stop)):
+    try:
+      x = datetime64(int(event.unixtime), 's')
+    except ValueError as e:
+      warning(
+          "cannot convert event.unixtime=%s to datetime64: %s",
+          r(event.unixtime), e
+      )
+      continue
+    xaxis.append(x)
+    yaxis.append(value_func(event))
+  # rescale Y value to land on the graph
+  if yaxis:
+    if rescale:
+      try:
+        low, high = rescale
+      except ValueError:
+        low = 0
+        high = rescale
+      min_y = min(yaxis)
+      max_y = max(yaxis)
+      dy = max_y - min_y
+      rescale_dy = high - low
+      if dy > 0:
+        yaxis = [low + (y - min_y) / dy * rescale_dy for y in yaxis]
+      else:
+        yaxis = [high] * len(yaxis)
+  figure.add_trace(
+      go.Scatter(
+          name=name,
+          mode='markers',
+          x=xaxis,
+          y=yaxis,
+          marker=dict(size=6,
+                      color='yellow'),  # colours.get(group_name, 'yellow')),
+          **scatter_kw
+      )
+  )
 
 def get_default_timezone_name():
   ''' Return the default timezone name.
