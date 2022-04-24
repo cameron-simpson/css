@@ -508,14 +508,17 @@ class BaseCommand:
     if subcmd:
       if not has_subcmds:
         raise ValueError("subcmd=%r: no subcommands!" % (subcmd,))
+      subcmd_ = subcmd.replace('-', '_').replace('.', '_')
       try:
-        subcmds[subcmd]
+        subcmds[subcmd_]
       except KeyError:
         # pylint: disable=raise-missing-from
         raise ValueError(
             "subcmd=%r: unknown subcommand, I know %r" %
             (subcmd, sorted(subcmds.keys()))
         )
+      else:
+        subcmd = subcmd_
     if has_subcmds:
       subusages = []
       for attr, subcmd_spec in (sorted(subcmds.items()) if subcmd is None else
@@ -856,8 +859,9 @@ class BaseCommand:
     unknown = False
     for subcmd in argv:
       with Pfx(subcmd):
+        subcmd_ = subcmd.replace('-', '_').replace('.', '_')
         try:
-          subcommand = subcmds[subcmd]
+          subcommand = subcmds[subcmd_]
         except KeyError:
           warning("unknown subcommand")
           unknown = True
