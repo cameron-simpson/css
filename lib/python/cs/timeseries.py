@@ -653,7 +653,7 @@ class TimeSeries(MultiOpenMixin, TimeStepsMixin, ABC):
 
 # pylint: disable=too-many-instance-attributes
 class TimeSeriesFile(TimeSeries):
-  ''' A file continaing a single time series for a single data field.
+  ''' A file containing a single time series for a single data field.
 
       This provides easy access to a time series data file.
       The instance can be indexed by UNIX time stamp for time based access
@@ -1369,7 +1369,15 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
 
   @plotrange
   def plot(
-      self, start, stop, keys=None, *, figure, key_colors=None, **scatter_kw
+      self,
+      start,
+      stop,
+      keys=None,
+      *,
+      figure,
+      key_colors=None,
+      name=None,
+      **scatter_kw
   ):
     ''' Plot traces on `figure:plotly.graph_objects.Figure`,
         creating it if necessary, for each key in `keys`.
@@ -1387,8 +1395,10 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
       keys = sorted(self.keys())
     for key in keys:
       with Pfx(key):
-        tsks = self[key]
-        name = tsks.tags.get('csv.header', key)
+        ts = self[key]
+        kname = ts.tags.get('csv.header', key)
+        if name:
+          kname = name + ': ' + kname
         key_scatter_kw = dict(scatter_kw)
         if key_colors:
           try:
@@ -1397,8 +1407,8 @@ class TimeSeriesMapping(dict, MultiOpenMixin, TimeStepsMixin, ABC):
             pass
           else:
             key_scatter_kw.update(marker_color=colour)
-        figure = tsks.plot(
-            start, stop, figure=figure, name=name, **key_scatter_kw
+        figure = ts.plot(
+            start, stop, figure=figure, name=kname, **key_scatter_kw
         )
     return figure
 
