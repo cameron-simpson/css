@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import sys
 from threading import Condition, Lock, RLock
 import time
-from cs.context import setup_cmgr, ContextManagerMixin
+from cs.context import stackattrs, setup_cmgr, ContextManagerMixin
 from cs.logutils import error, warning
 from cs.obj import Proxy
 from cs.pfx import pfx_method
@@ -43,7 +43,6 @@ DISTINFO = {
 class ClosedError(Exception):
   ''' Exception for operations invalid when something is closed.
   '''
-  pass
 
 def not_closed(func):
   ''' Decorator to wrap methods of objects with a .closed property
@@ -62,6 +61,7 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
+# pylint: disable=too-few-public-methods,too-many-instance-attributes
 class _mom_state(object):
 
   def __init__(self):
@@ -329,6 +329,7 @@ class MultiOpenMixin(ContextManagerMixin):
     is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
     return is_opened_wrapper
 
+# pylint: disable=too-few-public-methods
 class _SubOpen(Proxy):
   ''' A single use proxy for another object with its own independent .closed attribute.
 
@@ -421,6 +422,7 @@ class Pool(object):
         if self.max_size == 0 or len(self.pool) < self.max_size:
           self.pool.append(o)
 
+# pylint: disable=too-many-instance-attributes
 class RunState(ContextManagerMixin):
   ''' A class to track a running task whose cancellation may be requested.
 
@@ -645,10 +647,11 @@ class RunState(ContextManagerMixin):
           issue a `warning` on receipt of a signal
     '''
 
-    def handler(sig, frame):
+    def handler(sig, _):
       ''' `RunState` signal handler: cancel the run state.
           Warn if `verbose`.
       '''
+      # pylint: disable=expression-not-assigned
       verbose and warning("%s: received signal %s, cancelling", self, sig)
       self.cancel()
 
