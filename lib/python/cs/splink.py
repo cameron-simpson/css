@@ -21,7 +21,6 @@ from os.path import (
     splitext,
 )
 import shlex
-from signal import SIGINT, SIGTERM
 import sys
 import time
 
@@ -469,14 +468,11 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     '''
     options = self.options
     fstags = options.fstags
-    runstate = options.runstate
     with fstags:
       spd = SPLinkData(options.spdpath)
       with stackattrs(options, spd=spd):
         with spd:
-          with runstate.catch_signal(SIGINT, verbose=True):
-            with runstate.catch_signal(SIGTERM, verbose=True):
-              yield
+          yield
 
   def cmd_fetch(self, argv):
     ''' Usage: {cmd} [-x] [rsync-source] [rsync-options...]
