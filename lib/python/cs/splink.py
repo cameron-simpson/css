@@ -46,6 +46,7 @@ from cs.resources import MultiOpenMixin
 from cs.sqltags import SQLTags
 from cs.tagset import TagSet
 from cs.timeseries import (
+    plot_events,
     TimeSeriesBaseCommand,
     TimeSeriesDataDir,
     TimespanPolicyAnnual,
@@ -663,7 +664,7 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     return xit
 
   def cmd_plot(self, argv):
-    ''' Usage: {cmd} [--show] timeseries-dirpath imagepath.png days {{glob|field}}...
+    ''' Usage: {cmd} [--show] imagepath.png days {{[dataset:]{{glob|field}}}}...
     '''
     try:
       import_extra('plotly', DISTINFO)
@@ -675,43 +676,77 @@ class SPLinkCommand(TimeSeriesBaseCommand):
     if argv and argv[0] == '--show':
       show_image = True
       argv.pop(0)
-    if not argv:
-      raise GetoptError("missing datadir")
-    datadirpath = self.popargv(argv, "data directory", str, isdirpath)
     imgpath = self.popargv(
         argv, "tspath", str, lambda path: not existspath(path),
         "already exists"
     )
     days = self.popargv(argv, int, "days to display", lambda days: days > 0)
-    spd = SPLinkDataDir(datadirpath, 'DetailedData')
-    spd_fields = sorted(spd.keys())
-    spd_fields_s = ", ".join(spd_fields)
     if not argv:
-      raise GetoptError("missing fields, I know: " + spd_fields_s)
-    ok = True
-    if argv:
-      keys = spd.keys(argv)
-      if not keys:
-        raise GetoptError("no matching keys, I know: " + spd_fields_s)
-    else:
-      raise GetoptError("missing fields")
-    X("keys=%r", keys)
+      argv = '*'
+    options = self.options
+    spd = options.spd
+    tsd_keys = []
+    with Pfx("fields"):
+      for spec in argv:
+        with Pfx(spec):
+          print("try spec", spec)
+          matches = list(spd.resolve(spec))
+          if matches:
+            tsd_keys.extend(spd.resolve(spec))
+          else:
+            warning("no matches")
+    if not tsd_keys:
+      raise GetoptError("no fields were resolved")
     now = time.time()
     start = now - days * 24 * 3600
-    figure = spd.plot(start, now, keys)
-    X("plotted...")
-    figure.update_layout(
-        dict(
-            title=f"Data from {datadirpath}.",
-            showlegend=True,
-        )
-    )
-    dbpath = joinpath(over_tsdirpath, 'events.sqlite')
-    db = SQLTags(dbpath)
-    events = list(db.find(dataset='EventData'))
-    for event in events:
-      print(event.unixtime, event.event_description)
-    return
+    figure = None
+    with UpdProxy(prefix="plot lines: ") as proxy:
+      for tsd, key in tsd_keys:
+        name = f'{shortpath(tsd.fspath)}:{key}'
+        proxy.text = name
+        figure = tsd.plot(start, now, figure=figure, keys=(key,), name=name)
+    eventsdb = spd.eventsdb
+    with UpdProxy(prefix="plot events: ") as proxy:
+      for label in [
+          'System - AC Source no longer detected',
+          'System - AC Source outside operating range',
+          'Bridge negative correction',
+          'Bridge positive correction',
+          'AC Mode - Synchronised begin',
+      ]:
+        with proxy.extend_prefix(label + ": "):
+          proxy.text = "find events"
+          events = list(
+              eventsdb.find(
+                  f"unixtime>={start}",
+                  f"unixtime<{now}",
+                  event_description=label,
+                  dataset='EventData',
+              )
+          )
+          print(len(events), "events found for", repr(label))
+          for ev in events:
+            assert isinstance(
+                ev.unixtime, float
+            ), ("not a float: %s for %s" % (r(ev.unixtime), ev))
+            assert not isnan(ev.unixtime), "NaN in %s" % (ev,)
+            if ev.unixtime < start or ev.unixtime > now:
+              warning(
+                  "unixtime %s (%s) out of range start:%r-now:%r: %s",
+                  ev.unixtime, arrow.get(ev.unixtime), start, now, ev
+              )
+          proxy.text = "add trace"
+          plot_events(
+              figure,
+              events,
+              lambda ev: ev.ac_load_voltage_instantaneous_v_ac,
+              name=label,
+              rescale=False,  # True,
+          )
+    figure.update_layout(dict(
+        title=f"Data from {spd}.",
+        showlegend=True,
+    ))
     with Pfx("write %r", imgpath):
       if existspath(imgpath):
         error("already exists")
