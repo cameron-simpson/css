@@ -377,6 +377,18 @@ def plot_events(
     rescale=False,
     **scatter_kw
 ):
+  ''' Plot `events`, an iterable of objects with `.unixtime` attributes
+      such as an `SQLTagSet`, on an existing `figure`.
+
+      Parameters:
+      * `figure`: a plotly `Figure`
+      * `events`: an iterable of objects with `.unixtime` attributes
+      * `value_func`: a callable to compute the y-axis value from an event
+      * `start`: optional start UNIX time, used to crop the events plotted
+      * `stop`: optional stop UNIX time, used to crop the events plotted
+      * `name`: the name for the plot entries
+      Other keyword parameters are passed to the `Scatter` object user to do the plot.
+  '''
   plotly = import_extra('plotly', DISTINFO)
   go = plotly.graph_objects
   xaxis = []
