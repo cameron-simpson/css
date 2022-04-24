@@ -421,7 +421,7 @@ class Pool(object):
         if self.max_size == 0 or len(self.pool) < self.max_size:
           self.pool.append(o)
 
-class RunState(object):
+class RunState(ContextManagerMixin):
   ''' A class to track a running task whose cancellation may be requested.
 
       Its purpose is twofold, to provide easily queriable state
@@ -468,9 +468,11 @@ class RunState(object):
         to be called whenever `.cancel` is called.
   '''
 
-  def __init__(self, name=None):
+  def __init__(self, name=None, signals=None):
     self.name = name
     self._started_from = None
+    self._signals = tuple(signals) if signals else ()
+    self._sigstack = None
     # core state
     self._running = False
     self.cancelled = False
@@ -499,14 +501,24 @@ class RunState(object):
         ), id(self), self.state, self.run_time
     )
 
-  def __enter__(self):
-    self.start(running_ok=True)
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    if exc_type:
-      self.cancel()
-    self.stop()
+  def __enter_exit__(self):
+    ''' The `__enter__`/`__exit__` generator function:
+        * catch signals
+        * start
+        * `yield self` => run
+        * cancel on exception during run
+        * stop
+    '''
+    with self.catch_signal(self._signals, call_previous=True) as sigstack:
+      with stackattrs(self, _sigstack=sigstack):
+        self.start(running_ok=True)
+        try:
+          yield self
+        except Exception:
+          self.cancel()
+          raise
+        finally:
+          self.stop()
 
   @prop
   def state(self):
