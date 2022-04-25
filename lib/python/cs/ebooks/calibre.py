@@ -573,6 +573,12 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
 
+  def cmd_info(self, argv):
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print("calibre", self.options.calibre.shortpath)
+    print("kindle", self.options.kindle.shortpath)
+
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
           Add the CBZ format to the designated Calibre books.
