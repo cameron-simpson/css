@@ -595,7 +595,67 @@ class CalibreCommand(BaseCommand):
           cbook.make_cbz()
     return xit
 
-  def cmd_import_from_calibre(self, argv):
+  def cmd_ls(self, argv):
+    ''' Usage: {cmd} [-l]
+          List the contents of the Calibre library.
+    '''
+    long = False
+    if argv and argv[0] == '-l':
+      long = True
+      argv.pop(0)
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    options = self.options
+    calibre = options.calibre
+    for book in calibre:
+      with Pfx("%d:%s", book.id, book.title):
+        print(f"{book.title} ({book.dbid})")
+        if long:
+          print(" ", book.path)
+          identifiers = book.identifiers_as_dict()
+          if identifiers:
+            print("   ", TagSet(identifiers))
+          for fmt, subpath in book.formats_as_dict().items():
+            with Pfx(fmt):
+              fspath = calibre.pathto(subpath)
+              size = pfx_call(os.stat, fspath).st_size
+              print("   ", fmt, transcribe_bytes_geek(size), subpath)
+
+  def cmd_prefs(self, argv):
+    ''' Usage: {cmd}
+          List the library preferences.
+    '''
+    xit = 0
+    db = self.options.calibre.db
+    with db.db_session() as session:
+      if argv:
+        for pref_name in argv:
+          with Pfx(pref_name):
+            pref = db.preferences.lookup1(key=pref_name, session=session)
+            if pref is None:
+              warning("unknown preference")
+              xit = 1
+            else:
+              print(pref_name)
+              print(" ", json.dumps(pfx_call(json.loads, pref.value)))
+      else:
+        for pref in sorted(db.preferences.lookup(session=session),
+                           key=lambda pref: pref.key):
+          with Pfx(pref.key):
+            print(pref.key)
+            value = pfx_call(json.loads, pref.value)
+            if isinstance(value, list):
+              if value:
+                for item in value:
+                  print(" ", json.dumps(item))
+            elif isinstance(value, dict):
+              for k, v in sorted(value.items()):
+                print(" ", json.dumps(k), ":", json.dumps(v))
+            else:
+              print(" ", json.dumps(value))
+    return xit
+
+  def cmd_pull(self, argv):
     ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
           Import formats from another Calibre library.
           other-library: the path to another Calibre library tree
@@ -668,66 +728,6 @@ class CalibreCommand(BaseCommand):
           else:
             cbook, = cbooks
             print("MERGE", obook, "INTO", cbook)
-    return xit
-
-  def cmd_ls(self, argv):
-    ''' Usage: {cmd} [-l]
-          List the contents of the Calibre library.
-    '''
-    long = False
-    if argv and argv[0] == '-l':
-      long = True
-      argv.pop(0)
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    calibre = options.calibre
-    for book in calibre:
-      with Pfx("%d:%s", book.id, book.title):
-        print(f"{book.title} ({book.dbid})")
-        if long:
-          print(" ", book.path)
-          identifiers = book.identifiers_as_dict()
-          if identifiers:
-            print("   ", TagSet(identifiers))
-          for fmt, subpath in book.formats_as_dict().items():
-            with Pfx(fmt):
-              fspath = calibre.pathto(subpath)
-              size = pfx_call(os.stat, fspath).st_size
-              print("   ", fmt, transcribe_bytes_geek(size), subpath)
-
-  def cmd_prefs(self, argv):
-    ''' Usage: {cmd}
-          List the library preferences.
-    '''
-    xit = 0
-    db = self.options.calibre.db
-    with db.db_session() as session:
-      if argv:
-        for pref_name in argv:
-          with Pfx(pref_name):
-            pref = db.preferences.lookup1(key=pref_name, session=session)
-            if pref is None:
-              warning("unknown preference")
-              xit = 1
-            else:
-              print(pref_name)
-              print(" ", json.dumps(pfx_call(json.loads, pref.value)))
-      else:
-        for pref in sorted(db.preferences.lookup(session=session),
-                           key=lambda pref: pref.key):
-          with Pfx(pref.key):
-            print(pref.key)
-            value = pfx_call(json.loads, pref.value)
-            if isinstance(value, list):
-              if value:
-                for item in value:
-                  print(" ", json.dumps(item))
-            elif isinstance(value, dict):
-              for k, v in sorted(value.items()):
-                print(" ", json.dumps(k), ":", json.dumps(v))
-            else:
-              print(" ", json.dumps(value))
     return xit
 
 if __name__ == '__main__':
