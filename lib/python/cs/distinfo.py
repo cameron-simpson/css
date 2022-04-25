@@ -1288,7 +1288,7 @@ class Module:
         "project": projspec,
         "build-system": {
             "requires": [
-                "setuptools >= 40.9.0",
+                "setuptools >= 61.0",
                 'trove-classifiers',
                 "wheel",
             ],
