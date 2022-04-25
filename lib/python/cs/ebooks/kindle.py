@@ -627,6 +627,15 @@ class KindleCommand(BaseCommand):
             tag_value = getattr(cbook, field)
           kbook.tags.add(tag_name, tag_value)
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report basic information.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print("kindle", self.options.kindle.shortpath)
+    print("calibre", self.options.calibre.shortpath)
+
   def cmd_ls(self, argv):
     ''' Usage: {cmd}
           List the contents of the librayr.
