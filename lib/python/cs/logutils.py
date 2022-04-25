@@ -474,10 +474,11 @@ def infer_logging_level(env_debug=None, environ=None, verbose=None):
   if env_debug is None:
     if environ is None:
       environ = os.environ
-    env_debug = os.environ.get('DEBUG', '')
-  level = TRACK
+    env_debug = environ.get('DEBUG', '')
   if verbose is None:
-    if not sys.stderr.isatty():
+    if sys.stderr.isatty():
+      level = TRACK
+    else:
       level = logging.WARNING
   elif verbose:
     level = logging.VERBOSE
