@@ -574,6 +574,9 @@ class CalibreCommand(BaseCommand):
     return self.options.calibre.dbshell()
 
   def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report basic information.
+    '''
     if argv:
       raise GetoptError("extra arguments: %r" % (argv,))
     print("calibre", self.options.calibre.shortpath)
