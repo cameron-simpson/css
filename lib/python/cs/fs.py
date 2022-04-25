@@ -157,6 +157,12 @@ class HasFSPath:
   def __init__(self, fspath):
     self.fspath = fspath
 
+  @property
+  def shortpath(self):
+    ''' The short version of `self.fspath`.
+    '''
+    return shortpath(self.fspath)
+
   @require(lambda subpath: not isabspath(subpath))
   def pathto(self, subpath):
     ''' The full path to `subpath`, a relative path below `self.fspath`.
