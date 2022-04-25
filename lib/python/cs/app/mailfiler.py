@@ -49,6 +49,7 @@ from threading import Lock, RLock
 import time
 from time import sleep
 from types import SimpleNamespace as NS
+
 from cs.app.maildb import MailDB
 from cs.cmdutils import BaseCommand
 from cs.configutils import ConfigWatcher
@@ -128,10 +129,10 @@ DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
 SELF_FOLDER = '.'
 
-def main(argv=None, stdin=None):
+def main(argv=None):
   ''' Mailfiler main programme.
   '''
-  return MailFilerCommand(argv, stdin=stdin, log_level=logging.INFO).run()
+  return MailFilerCommand(argv).run()
 
 class MailFilerCommand(BaseCommand):
   ''' MailFiler commandline implementation.
@@ -151,7 +152,7 @@ class MailFilerCommand(BaseCommand):
     ''' Set up default options.
     '''
     options = self.options
-    options.stdin = getattr(options, 'stdin', None) or sys.stdin
+    options.stdin = sys.stdin
     options.config_path = None
     options.maildb_path = None
     options.msgiddb_path = None
