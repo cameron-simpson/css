@@ -62,6 +62,101 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
+  def __init__(self, calibrepath):
+    super().__init__(calibrepath)
+
+    # define the proxy classes
+
+    class CalibreBook(RelationProxy(self.db.books, [
+        'author_sort',
+        'authors',
+        'flags',
+        'has_cover',
+        'isbn',
+        'last_modified',
+        'lccn',
+        'path',
+        'pubdate',
+        'series_index',
+        'sort',
+        'timestamp',
+        'title',
+        'uuid',
+    ]), HasFSPath):
+      ''' A reference to a book in a Calibre library.
+      '''
+
+      @typechecked
+      def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
+        super().__init__(dbid, db_row=db_book)
+        self.tree = tree
+
+      def __str__(self):
+        return f"{self.title} ({self.id})"
+
+      @property
+      def fspath(self):
+        ''' An alias for `self.path`.
+        '''
+        return self.path
+
+      @property
+      def dbid(self):
+        ''' An alias for the `.id` attribute.
+        '''
+        return self.id
+
+      @classmethod
+      def refresh_from_db_row(cls, db_row, fields, *, session):
+        super().refresh_from_db_row(db_row, fields, session=session)
+        fields['authors'] = db_row.authors
+        fields['formats'] = {
+            fmt.format:
+            joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+            for fmt in db_row.formats
+        }
+        fields['identifiers'] = {
+            identifier.type: identifier.val
+            for identifier in db_row.identifiers
+        }
+
+      @property
+      def mobi_subpath(self):
+        ''' The subpath of a Mobi format book file, or `None`.
+        '''
+        formats = self.formats
+        for fmtk in 'MOBI', 'AZW3', 'AZW':
+          try:
+            return formats[fmtk]
+          except KeyError:
+            pass
+        return None
+
+      def make_cbz(self, replace_format=False):
+        ''' Create a CBZ format from the AZW3 Mobi format.
+        '''
+        from .mobi import Mobi  # pylint: disable=import-outside-toplevel
+        calibre = self.tree
+        formats = self.formats
+        if 'CBZ' in formats and not replace_format:
+          warning("format CBZ already present, not adding")
+        else:
+          mobi_subpath = self.mobi_subpath
+          if mobi_subpath:
+            mobipath = calibre.pathto(mobi_subpath)
+            base, _ = splitext(basename(mobipath))
+            MB = Mobi(mobipath)
+            with TemporaryDirectory() as tmpdirpath:
+              cbzpath = joinpath(tmpdirpath, base + '.cbz')
+              pfx_call(MB.make_cbz, cbzpath)
+              calibre.add_format(cbzpath, self.dbid, force=replace_format)
+          else:
+            raise ValueError(
+                "no AZW3, AZW or MOBI format from which to construct a CBZ"
+            )
+
+    self.CalibreBook = CalibreBook
+
   @contextmanager
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
@@ -195,77 +290,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         bookpath,
         subp_options=dict(stdin=DEVNULL),
     )
-
-class CalibreBook:
-  ''' A reference to a book in a Calibre library.
-  '''
-
-  @typechecked
-  def __init__(self, tree: CalibreTree, dbid: int, *, db_book=None):
-    self.tree = tree
-    self.dbid = dbid
-    self._db_book = db_book
-
-  def __str__(self):
-    return f"{self.title} ({self.dbid})"
-
-  @cachedmethod
-  def db_book(self):
-    ''' Return a cached reference to the database book record.
-    '''
-    db = self.tree.db
-    with db.db_session() as session:
-      X("FETCH BOOK %r", self.dbid)
-      return db.books.by_id(self.dbid, session=session)
-
-  def __getattr__(self, attr):
-    ''' Unknown public attributes defer to the database record.
-    '''
-    if attr.startswith('_'):
-      raise AttributeError(attr)
-    return getattr(self.db_book(), attr)
-
-  @property
-  def authors(self):
-    ''' The `CalibreMetadataDB` author records.
-    '''
-    with self.db.db_session() as session:
-      return self.db_book().authors
-
-  @property
-  def mobi_subpath(self):
-    ''' The subpath of a Mobi format book file, or `None`.
-    '''
-    formats = self.formats_as_dict()
-    for fmtk in 'MOBI', 'AZW3', 'AZW':
-      try:
-        return formats[fmtk]
-      except KeyError:
-        pass
-    return None
-
-  def make_cbz(self, replace_format=False):
-    ''' Create a CBZ format from the AZW3 Mobi format.
-    '''
-    from .mobi import Mobi  # pylint: disable=import-outside-toplevel
-    calibre = self.tree
-    formats = self.formats_as_dict()
-    if 'CBZ' in formats and not replace_format:
-      warning("format CBZ already present, not adding")
-    else:
-      mobi_subpath = self.mobi_subpath
-      if mobi_subpath:
-        mobipath = calibre.pathto(mobi_subpath)
-        base, _ = splitext(basename(mobipath))
-        MB = Mobi(mobipath)
-        with TemporaryDirectory() as tmpdirpath:
-          cbzpath = joinpath(tmpdirpath, base + '.cbz')
-          pfx_call(MB.make_cbz, cbzpath)
-          calibre.add_format(cbzpath, self.dbid, force=replace_format)
-      else:
-        raise ValueError(
-            "no AZW3, AZW or MOBI format from which to construct a CBZ"
-        )
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
