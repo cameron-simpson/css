@@ -277,7 +277,7 @@ class KindleBook:
               and not replace_format):
             pfxprint("format AZW3 already present, not adding")
           elif 'CBZ' in formats:
-            info("format CBZ format present, not adding AZW3")
+            pfxprint("format CBZ format present, not adding AZW3")
           else:
             if doit:
               calibre.add_format(
