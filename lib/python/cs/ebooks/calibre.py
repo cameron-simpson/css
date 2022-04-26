@@ -753,11 +753,13 @@ class CalibreCommand(BaseCommand):
             xit = 1
             continue
           obook, = obooks
+          pfxprint(f"foreign book {obook.dbid} {obook.title}")
           cbooks = list(
               calibre.by_identifier(identifier_name, identifier_value)
           )
           if not cbooks:
             print("NEW BOOK", obook)
+            cbook = None
           elif len(cbooks) > 1:
             warning(
                 "  \n".join(
@@ -771,6 +773,22 @@ class CalibreCommand(BaseCommand):
           else:
             cbook, = cbooks
             print("MERGE", obook, "INTO", cbook)
+          if cbook is not None:
+            fmts = set(cbook.formats.keys())
+          dbid = None if cbook is None else cbook.dbid
+          oformats = obook.formats
+          for fmtk, fmtsubpath in oformats.items():
+            pfxprint(" ", fmtk, fmtsubpath)
+            fmtpath = other_library.pathto(fmtsubpath)
+            if cbook is None:
+              dbid = calibre.add(fmtpath, doit=doit)
+              cbook = calibre[dbid]
+              fmts = set(cbook.formats.keys())
+            elif fmtk in fmts:
+              warning("format %s already present, skipping %s", fmtk, fmtpath)
+            else:
+              calibre.add_format(fmtpath, dbid, doit=doit)
+              fmts.add(fmtk)
     return xit
 
 if __name__ == '__main__':
