@@ -15,6 +15,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
+import shlex
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from tempfile import TemporaryDirectory
@@ -36,19 +37,16 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.fileutils import shortpath
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.lex import cutprefix
 from cs.logutils import error, warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfxprint
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM,
-    BasicTableMixin,
-    HasIdMixin,
+    ORM, BasicTableMixin, HasIdMixin, RelationProxy
 )
 from cs.tagset import TagSet
-from cs.threads import locked_property
+from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 
 from cs.x import X
@@ -277,7 +275,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     for line in cp.stdout.split('\n'):
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
-        dbids.extend(map(lambda s: int(s.strip()), line_sfx.split(',')))
+        dbids.extend(
+            map(lambda dbid_s: int(dbid_s.strip()), line_sfx.split(','))
+        )
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
