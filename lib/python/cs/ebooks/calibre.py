@@ -193,7 +193,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Generator yielding `CalibreBook`s.
     '''
     db = self.db
-    with db.db_session() as session:
+    with db.session() as session:
       for author in sorted(db.authors.lookup(session=session)):
         with Pfx("%d:%s", author.id, author.name):
           for book in sorted(author.books):
@@ -204,7 +204,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         matching the provided `(type,val)` identifier.
     '''
     db = self.db
-    with db.db_session() as session:
+    with db.session() as session:
       for identifier in db.identifiers.lookup(session=session, type=type_,
                                               val=value):
         yield self[identifier.book_id]
@@ -336,7 +336,7 @@ class CalibreMetadataDB(ORM):
 
   # lifted from SQLTags
   @contextmanager
-  def db_session(self, *, new=False):
+  def session(self, *, new=False):
     ''' Context manager to obtain a db session if required
         (or if `new` is true).
     '''
@@ -667,7 +667,7 @@ class CalibreCommand(BaseCommand):
     '''
     xit = 0
     db = self.options.calibre.db
-    with db.db_session() as session:
+    with db.session() as session:
       if argv:
         for pref_name in argv:
           with Pfx(pref_name):
