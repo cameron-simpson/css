@@ -245,18 +245,21 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       raise
     return cp
 
-  def calibredb(self, dbcmd, *argv, subp_options=None):
+  def calibredb(self, dbcmd, *argv, subp_options=None, doit=True):
     ''' Run `dbcmd` via the `calibredb` command.
     '''
-    return self._run(
+    subp_argv = [
         'calibredb',
         dbcmd,
         '--library-path=' + self.fspath,
         *argv,
-        subp_options=subp_options
-    )
+    ]
+    if not doit:
+      print(shlex.join(subp_argv))
+      return None
+    return self._run(*subp_argv, subp_options=subp_options)
 
-  def add(self, bookpath):
+  def add(self, bookpath, doit=True):
     ''' Add a book file via the `calibredb add` command.
         Return the database id.
     '''
@@ -264,8 +267,11 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'add',
         '--duplicates',
         bookpath,
-        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True)
+        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True),
+        doit=doit,
     )
+    if not doit:
+      return None
     # Extract the database id from the "calibredb add" output.
     dbids = []
     for line in cp.stdout.split('\n'):
@@ -276,7 +282,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     return dbid
 
   @typechecked
-  def add_format(self, bookpath: str, dbid: int, *, force: bool = False):
+  def add_format(
+      self, bookpath: str, dbid: int, *, force: bool = False, doit=True
+  ):
     ''' Add a book file to the existing book entry with database id `dbid`
         via the `calibredb add_format` command.
 
@@ -291,6 +299,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         str(dbid),
         bookpath,
         subp_options=dict(stdin=DEVNULL),
+        doit=doit,
     )
 
 class CalibreMetadataDB(ORM):
@@ -691,8 +700,9 @@ class CalibreCommand(BaseCommand):
     return xit
 
   def cmd_pull(self, argv):
-    ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
+    ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
           Import formats from another Calibre library.
+          -n  No action: recite planned actions.
           other-library: the path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
@@ -700,10 +710,12 @@ class CalibreCommand(BaseCommand):
     '''
     options = self.options
     calibre = options.calibre
-    if not argv:
-      raise GetoptError("missing other-library")
-    other_library = CalibreTree(argv.pop(0))
-    with Pfx(shortpath(other_library.fspath)):
+    doit = True
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      doit = False
+    other_library = self.popargv(argv, "other-library", CalibreTree)
+    with Pfx(other_library.shortpath):
       if other_library is calibre:
         raise GetoptError("cannot import from the same library")
       if argv:
