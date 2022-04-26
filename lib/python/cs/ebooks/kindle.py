@@ -31,7 +31,7 @@ from cs.fs import FSPathBasedSingleton
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning, info
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfxprint
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -275,7 +275,7 @@ class KindleBook:
           formats = cbook.formats_as_dict()
           if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
               and not replace_format):
-            info("format AZW3 already present, not adding")
+            pfxprint("format AZW3 already present, not adding")
           elif 'CBZ' in formats:
             info("format CBZ format present, not adding AZW3")
           else:
@@ -302,7 +302,7 @@ class KindleBook:
           with Pfx("calibre %d: %s", dbid, cbook.title):
             cbook.make_cbz(replace_format=replace_format)
         else:
-          print("create CBZ from the imported AZW3, then remove the AZW3")
+          pfxprint("create CBZ from the imported AZW3, then remove the AZW3")
       return cbook
 
 class KindleBookAssetDB(ORM):
