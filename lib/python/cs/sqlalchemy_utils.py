@@ -10,6 +10,7 @@ import logging
 import os
 from os.path import abspath
 from threading import current_thread, Lock
+from typing import Any, Optional, Union, List, Tuple
 
 from icontract import require
 from sqlalchemy import Column, Integer, create_engine
@@ -17,6 +18,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker as sqla_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.pool import NullPool
+from typeguard import typechecked
 
 from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
@@ -680,3 +682,122 @@ def json_column(
   setattr(cls, attr, getter)
   setattr(cls, attr, getter.setter(set_col))
   return cls
+
+def RelationProxy(
+    relation,
+    columns: Union[str, Tuple[str], List[str]],
+    *,
+    id_column: Optional[str] = None
+):
+  ''' Construct a proxy for a row from a relation.
+
+      Parameters:
+      * `relation`: an ORM relation for which this will be a proxy
+      * `columns`: a list of the column names to cache,
+        or a space separated string of the column names
+      * `id_column`: options primary key column name,
+        default from `BasicTableMixin.DEFAULT_ID_COLUMN`: `'id'`
+
+      This is something of a workaround for applications which dip
+      briefly into the database to obtain information instead of
+      doing single long running transactions or sessions.
+      Instead of keeping the row instance around, which might want
+      to load related data on demand after its source session is
+      expired, we keep a proxy for the row with cached values
+      and refetch the row at need if further information is requried.
+
+      Typical use is to construct this proxy class as part
+      of the `__init__` of a larger class which accesses the database
+      as part of its working, example based on `cs.ebooks.calibre.CalibreTree`:
+
+          def __init__(self, calibrepath):
+            super().__init__(calibrepath)
+            # define the proxy classes
+            class CalibreBook(RelationProxy(self.db.books, [
+                'author',
+                'title',
+            ])):
+              """ A reference to a book in a Calibre library.
+              """
+              @typechecked
+              def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
+                self.tree = tree
+                self.dbid = dbid
+              ... various other CalibreBook methods ...
+            self.CalibreBook = CalibreBook
+
+          def __getitem__(self, dbid):
+            return self.CalibreBook(self, dbid, db_book=db_book)
+
+
+  '''
+  if isinstance(columns, str):
+    columns = [column for column in columns.split() if column]
+  if id_column is None:
+    id_column = BasicTableMixin.DEFAULT_ID_COLUMN
+
+  class RelProxy:
+    ''' The relation proxy base class,
+        defined in the factory because it uses the relation via a closure.
+    '''
+
+    @typechecked
+    def __init__(self, id: Any, *, db_row=None):  # pylint: disable=redefined-builtin
+      self.id = id
+      self.__fields = {}
+      if db_row is not None:
+        self.refresh_from_db(db_row)
+
+    def refresh_from_db(self, db_row=None):
+      ''' Update the cached values from the database.
+      '''
+      with using_session(orm=relation.orm) as session:
+        if db_row is None:
+          db_row = relation.lookup1(self.id, session=session)
+        self.refresh_from_db_row(db_row, self.__fields, session=session)
+
+    # pylint: disable=unused-argument
+    @classmethod
+    def refresh_from_db_row(cls, db_row, fields, *, session):
+      ''' Class method to update a field cache from a database row `db_row`.
+
+          This method should be overridden by subclasses to add
+          addition cached values.
+      '''
+      for column in columns:
+        fields[column] = getattr(db_row, column)
+
+    def __getitem__(self, field, force=False):
+      ''' Fetch a field from the cache.
+          If not present, refresh the cache and retry.
+      '''
+      if not force:
+        try:
+          return self.__fields[field]
+        except KeyError:
+          pass
+      with using_session(orm=relation.orm) as session:
+        db_row = relation.by_id(self.id, session=session)
+        self.refresh_from_db(db_row)
+      return self.__fields[field]
+
+    def __getattr__(self, attr):
+      ''' Attribute access fetches from the cache via `__getitem__`
+          or falls back to attribute access on the database row.
+      '''
+      if attr.startswith('_'):
+        warning("__getattr__(%r)", attr)
+      if attr in ('id', '_RelProxy__fields'):
+        raise RuntimeError
+      try:
+        return self[attr]
+      except KeyError as e:
+        with using_session(orm=relation.orm) as session:
+          db_row = relation.by_id(self.id, session=session)
+          self.__fields[attr] = getattr(db_row, attr)
+        raise AttributeError(
+            "%s: no cached field .%s" % (type(self).__name__, attr)
+        ) from e
+
+  RelProxy.__name__ = relation.__name__ + '_' + RelProxy.__name__
+  return RelProxy
