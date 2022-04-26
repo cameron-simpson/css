@@ -590,11 +590,13 @@ class CalibreCommand(BaseCommand):
     options = self.options
     with KindleTree(options.kindle_path) as kt:
       with CalibreTree(options.calibre_path) as cal:
-        db = cal.db
-        with db.db_session() as session:
-          with stackattrs(options, kindle=kt, calibre=cal, db=db,
-                          session=session, verbose=True):
-            yield
+        with stackattrs(
+            options,
+            kindle=kt,
+            calibre=cal,
+            verbose=True,
+        ):
+          yield
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
