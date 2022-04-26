@@ -260,55 +260,64 @@ class KindleBook:
       make_cbz=False,
       replace_format=False,
       once=False,
+      quiet=False,
   ):
     ''' Export this Kindle book to a Calibre instance,
-        return the `CalibreBook`.
+        return `(cbook,added)`
+        being the `CalibreBook` and whether the Kinble book was added
+        (books are not added if the format is already present).
 
         Parameters:
         * `calibre`: the `CalibreTree`
         * `doit`: if false, just recite actions; default `True`
         * `make_cbz`: create a CBZ file after the initial import
         * `replace_format`: if true, export even if the `AZW3` format is already present
+        * `quiet`: do not print actions
     '''
-    with Pfx(self.asin):
-      azw_path = self.extpath('azw')
-      dbid = self.tags.auto.calibre.dbid
-      if dbid:
-        # book already present in calibre
-        cbook = calibre[dbid]
+    azwpath = self.extpath('azw')
+    if not isfilepath(azwpath):
+      raise ValueError("no AZW file: %r" % (azwpath,))
+    added = False
+    cbooks = list(calibre.by_asin(self.asin))
+    if not cbooks:
+      # new book
+      dbid = calibre.add(azwpath, doit=doit)
+      added = True
+      cbook = calibre[dbid]
+      quiet or pfxprint("new book added to", cbook)
+    else:
+      # book already present in calibre
+      cbook = cbooks[0]
+      if len(cbooks) > 1:
+        warning(
+            "multiple calibre books, dbids %r: choosing %s",
+            [cb.dbid for cb in cbooks], cbook
+        )
+      dbid = cbook.dbid
+      with Pfx("calibre %d: %s", dbid, cbook.title):
+        formats = cbook.formats
+        if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
+            and not replace_format):
+          quiet or pfxprint("format AZW3 already present, not adding")
+        elif make_cbz and 'CBZ' in formats and not replace_format:
+          quiet or pfxprint("format CBZ format present, not adding AZW3")
+        else:
+          calibre.add_format(
+              azwpath,
+              dbid,
+              force=replace_format,
+              doit=doit,
+          )
+          added = True
+          quiet or pfxprint("added format AZW3 to", cbook)
+    # AZW added, check if a CBZ is required
+    if make_cbz:
+      if doit:
         with Pfx("calibre %d: %s", dbid, cbook.title):
-          formats = cbook.formats_as_dict()
-          if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
-              and not replace_format):
-            pfxprint("format AZW3 already present, not adding")
-          elif 'CBZ' in formats:
-            pfxprint("format CBZ format present, not adding AZW3")
-          else:
-            if doit:
-              calibre.add_format(
-                  azw_path,
-                  dbid,
-                  force=replace_format,
-              )
-            else:
-              info("add %s", azw_path)
+          cbook.make_cbz(replace_format=replace_format)
       else:
-        # book does not have a known dbid, presume not added
-        if doit:
-          dbid = calibre.add(azw_path)
-          self.tags['calibre.dbid'] = dbid
-          cbook = calibre[dbid]
-          formats = cbook.formats_as_dict()
-        else:
-          info("calibre.add %s", azw_path)
-      # AZW added, check if a CBZ is required
-      if make_cbz:
-        if doit:
-          with Pfx("calibre %d: %s", dbid, cbook.title):
-            cbook.make_cbz(replace_format=replace_format)
-        else:
-          pfxprint("create CBZ from the imported AZW3, then remove the AZW3")
-      return cbook
+        pfxprint("create CBZ from the imported AZW3, then remove the AZW3")
+    return cbook, added
 
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
