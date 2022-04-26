@@ -181,12 +181,12 @@ class KindleBook:
 
   @property
   def asin(self):
-    ''' The ASIN of this book subdirectory.
+    ''' The ASIN of this book subdirectory, normalised to upper case.
     '''
     for suffix in '_EBOK', '_EBSP':
       prefix = cutsuffix(self.subdir_name, suffix)
       if prefix is not self.subdir_name:
-        return prefix
+        return prefix.upper()
     raise ValueError(
         "subdir_name %r does not end with _EBOK or _BSP" % (self.subdir_name,)
     )
