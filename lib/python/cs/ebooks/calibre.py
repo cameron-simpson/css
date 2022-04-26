@@ -163,7 +163,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     yield
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
         instantiated on demand.
