@@ -543,10 +543,15 @@ class CalibreMetadataDB(ORM):
 
     # references to table definitions
     self.authors = Authors
+    Authors.orm = self
     self.books = Books
+    Books.orm = self
     self.identifiers = Identifiers
+    Identifiers.orm = self
     self.languages = Languages
+    Languages.orm = self
     self.preferences = Preferences
+    Preferences.orm = self
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
