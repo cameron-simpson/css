@@ -647,9 +647,9 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     calibre = options.calibre
-    for book in calibre:
-      with Pfx("%d:%s", book.id, book.title):
-        print(f"{book.title} ({book.dbid})")
+    for cbook in calibre:
+      with Pfx("%d:%s", cbook.id, cbook.title):
+        print(f"{cbook.title} ({cbook.dbid})")
         if long:
           print(" ", cbook.path)
           identifiers = cbook.identifiers
