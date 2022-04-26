@@ -576,6 +576,7 @@ class KindleCommand(BaseCommand):
     options = self.options
     kindle = options.kindle
     calibre = options.calibre
+    runstate = options.runstate
     doit = True
     force = False
     make_cbz = False
@@ -596,6 +597,8 @@ class KindleCommand(BaseCommand):
     if not argv:
       argv = sorted(kindle.asins())
     for asin in argv:
+      if runstate.cancelled:
+        break
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         cbook = kbook.export_to_calibre(
