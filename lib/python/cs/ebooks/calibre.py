@@ -187,7 +187,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
-    return CalibreBook(self, dbid, db_book=db_book)
+    return self.CalibreBook(self, dbid, db_book=db_book)
 
   def __iter__(self):
     ''' Generator yielding `CalibreBook`s.
