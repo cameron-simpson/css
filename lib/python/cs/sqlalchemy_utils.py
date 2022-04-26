@@ -446,6 +446,8 @@ class BasicTableMixin:
   ''' Useful methods for most tables.
   '''
 
+  DEFAULT_ID_COLUMN = 'id'
+
   @classmethod
   def lookup(cls, *, session, **criteria):
     ''' Return an iterable `Query` of row entities matching `criteria`.
@@ -459,10 +461,12 @@ class BasicTableMixin:
     return session.query(cls).filter_by(**criteria).one_or_none()
 
   @classmethod
-  def by_id(cls, index, *, session):
-    ''' Index the table by its `id` column.
+  def by_id(cls, index, *, id_column=None, session):
+    ''' Index the table by its `id_column` column, default `'id'`.
     '''
-    row = cls.lookup1(id=index, session=session)
+    if id_column is None:
+      id_column = cls.DEFAULT_ID_COLUMN
+    row = cls.lookup1(session=session, **{id_column: index})
     if row is None:
       raise IndexError("%s: no row with id=%s" % (
           cls,
