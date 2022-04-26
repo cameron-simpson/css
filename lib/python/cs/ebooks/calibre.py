@@ -90,7 +90,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         self.tree = tree
 
       def __str__(self):
-        return f"{self.title} ({self.id})"
+        return f"{self.dbid}: {self.title}"
 
       @property
       def fspath(self):
@@ -103,6 +103,12 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' An alias for the `.id` attribute.
         '''
         return self.id
+
+      @property
+      def asin(self):
+        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin'].
+        '''
+        return self.identifiers.get('mobi-asin', None)
 
       @classmethod
       def refresh_from_db_row(cls, db_row, fields, *, session):
@@ -727,7 +733,7 @@ class CalibreCommand(BaseCommand):
             set(
                 filter(
                     lambda idv: idv is not None, (
-                        cbook.identifiers_as_dict().get(identifier_name)
+                        cbook.identifiers.get(identifier_name)
                         for cbook in other_library
                     )
                 )
