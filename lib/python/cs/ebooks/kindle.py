@@ -546,7 +546,6 @@ class KindleCommand(BaseCommand):
         with stackattrs(options, kindle=kt, calibre=cal, verbose=True):
           yield
 
-  def cmd_export_to_calibre(self, argv):
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
           Start an interactive database prompt.
@@ -555,6 +554,7 @@ class KindleCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.kindle.dbshell()
 
+  def cmd_export(self, argv):
     ''' Usage: {cmd} [-n] [--cbz] [ASINs...]
           Export AZW files to Calibre library.
           -n    No action, recite planned actions.
