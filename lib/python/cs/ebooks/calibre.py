@@ -480,15 +480,6 @@ class CalibreMetadataDB(ORM):
             for identifier in self.identifiers
         }
 
-      def formats_as_dict(self):
-        ''' Return a `dict` mapping formats to book format relative paths.
-        '''
-        return {
-            format.format:
-            joinpath(self.path, f'{format.name}.{format.format.lower()}')
-            for format in self.formats
-        }
-
     class Data(Base, _CalibreTable):
       ''' Data files associated with a book.
       '''
@@ -660,11 +651,11 @@ class CalibreCommand(BaseCommand):
       with Pfx("%d:%s", book.id, book.title):
         print(f"{book.title} ({book.dbid})")
         if long:
-          print(" ", book.path)
-          identifiers = book.identifiers_as_dict()
+          print(" ", cbook.path)
+          identifiers = cbook.identifiers
           if identifiers:
             print("   ", TagSet(identifiers))
-          for fmt, subpath in book.formats_as_dict().items():
+          for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
