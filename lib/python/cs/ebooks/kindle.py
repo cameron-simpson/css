@@ -596,68 +596,22 @@ class KindleCommand(BaseCommand):
         raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
       argv = sorted(kindle.asins())
+    xit = 0
     for asin in argv:
       if runstate.cancelled:
         break
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
-        cbook = kbook.export_to_calibre(
-            calibre, doit=doit, make_cbz=make_cbz, replace_format=force
-        )
-        print(f"{cbook.title} ({cbook.dbid})")
-
-  def cmd_import_calibre_dbids(self, argv):
-    ''' Usage: {cmd} [--scrub]
-          Import Calibre database ids by backtracking from Calibre
-          `mobi-asin` identifier records.
-          --scrub   Remove the calibre.dbid tag if no Calibre book
-                    has the Kindle book's ASIN.
-    '''
-    scrub = False
-    opts, argv = getopt(argv, '', 'scrub')
-    for opt, _ in opts:
-      with Pfx(opt):
-        if opt == '--scrub':
-          scrub = True
-        else:
-          raise RuntimeError("unhandled option")
-    if argv:
-      raise GetoptError("extra arguments: %r" % (argv,))
-    options = self.options
-    kindle = options.kindle
-    calibre = options.calibre
-    for kbook in kindle.values():
-      asin = kbook.asin
-      with Pfx("kb %s", asin):
-        dbid = kbook.tags.get('calibre.dbid', None)
-        cbooks = list(calibre.by_asin(asin))
-        if not cbooks:
-          warning("no Calibre books with ASIN %s", asin)
-          if scrub and dbid is not None:
-            print(f"kb {asin} - calibre.dbid={dbid}")
-            del kbook.tags['calibre.dbid']
+        try:
+          cbook, added = kbook.export_to_calibre(
+              calibre, doit=doit, make_cbz=make_cbz, replace_format=force
+          )
+          ##print(f"{asin} {cbook.title} ({cbook.dbid})")
+        except ValueError as e:
+          warning("export failed: %s", e)
+          xit = 1
           continue
-        cbook = cbooks[0]
-        if len(cbooks) > 1:
-          if dbid is not None and dbid in [cb.id for cb in cbooks]:
-            # dbid matchs a book, use that one
-            cbook, = [cb for cb in cbooks if cb.id == dbid]
-          else:
-            # pick arbitrarily
-            warning(
-                "%d Calibre books with ASIN %s, using calibre.dbid=%d",
-                len(cbooks), asin, cbook.id
-            )
-        if dbid is None or cbook.id != dbid:
-          print(f"kb {asin} + calibre.dbid={cbook.id} - {cbook.title}")
-          kbook.tags['calibre.dbid'] = cbook.id
-        for field in 'authors', 'title':
-          tag_name = f'calibre.{field}'
-          if field == "authors":
-            tag_value = sorted(author.name for author in cbook.authors)
-          else:
-            tag_value = getattr(cbook, field)
-          kbook.tags.add(tag_name, tag_value)
+    return xit
 
   def cmd_info(self, argv):
     ''' Usage: {cmd}
