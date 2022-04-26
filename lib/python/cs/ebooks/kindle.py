@@ -81,6 +81,11 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     '''
     return KindleBookAssetDB(self)
 
+  def dbshell(self):
+    ''' Interactive db shell.
+    '''
+    return self.db.shell()
+
   def is_book_subdir(self, subdir_name):
     ''' Test whether `subdir_name` is a Kindle ebook subdirectory basename.
     '''
@@ -328,6 +333,13 @@ class KindleBookAssetDB(ORM):
     '''
     return self.tree.pathto(self.DB_FILENAME)
 
+  def shell(self):
+    ''' Interactive db shell.
+    '''
+    print("sqlite3", self.db_path)
+    run(['sqlite3', self.db_path], check=True)
+    return 0
+
   # lifted from SQLTags
   @contextmanager
   def db_session(self, *, new=False):
@@ -535,6 +547,14 @@ class KindleCommand(BaseCommand):
           yield
 
   def cmd_export_to_calibre(self, argv):
+  def cmd_dbshell(self, argv):
+    ''' Usage: {cmd}
+          Start an interactive database prompt.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    return self.options.kindle.dbshell()
+
     ''' Usage: {cmd} [-n] [--cbz] [ASINs...]
           Export AZW files to Calibre library.
           -n    No action, recite planned actions.
