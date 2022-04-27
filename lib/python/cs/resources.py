@@ -511,7 +511,7 @@ class RunState(ContextManagerMixin):
         * cancel on exception during run
         * stop
     '''
-    with self.catch_signal(self._signals, call_previous=True) as sigstack:
+    with self.catch_signal(self._signals, call_previous=False) as sigstack:
       with stackattrs(self, _sigstack=sigstack):
         self.start(running_ok=True)
         try:
