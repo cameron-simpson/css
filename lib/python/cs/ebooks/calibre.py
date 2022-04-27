@@ -732,39 +732,18 @@ class CalibreCommand(BaseCommand):
       if argv:
         identifier_values = argv
       else:
-        identifier_values = sorted(
-            set(
-                filter(
-                    lambda idv: idv is not None, (
-                        cbook.identifiers.get(identifier_name)
-                        for cbook in other_library
-                    )
-                )
-            )
-        )
+        identifier_values = sorted(obooks_map.keys())
       xit = 0
       for identifier_value in identifier_values:
-        with Pfx("%s:%s", identifier_name, identifier_value):
-          obooks = list(
-              other_library.by_identifier(identifier_name, identifier_value)
-          )
-          if not obooks:
-            error("no books with this identifier")
+        pfxprint(identifier_value, '...')
+        with Pfx.scope("%s=%s", identifier_name, identifier_value):
+          try:
+            obook = obooks_map[identifier_value]
+          except KeyError:
+            warning("unknown")
             xit = 1
             continue
-          if len(obooks) > 1:
-            warning(
-                "  \n".join(
-                    [
-                        "multiple \"other\" books with this identifier:",
-                        *map(str, obooks)
-                    ]
-                )
-            )
-            xit = 1
-            continue
-          obook, = obooks
-          pfxprint(f"foreign book {obook.dbid} {obook.title}")
+          Pfx.push("foreign book %s", obook)
           cbooks = list(
               calibre.by_identifier(identifier_name, identifier_value)
           )
@@ -800,7 +779,7 @@ class CalibreCommand(BaseCommand):
             else:
               calibre.add_format(fmtpath, dbid, doit=doit)
               fmts.add(fmtk)
-    return xit
+      return xit
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
