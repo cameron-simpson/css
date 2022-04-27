@@ -717,6 +717,8 @@ class CalibreCommand(BaseCommand):
             If the identifier '?' is specified the available
             identifiers in use in other-library are listed.
           identifier-values: specific book identifiers to import
+            If no identifiers are provided, all books which have
+            the specified identifier will be pulled.
     '''
     options = self.options
     calibre = options.calibre
