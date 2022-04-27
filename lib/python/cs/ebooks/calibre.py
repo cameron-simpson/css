@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
+from itertools import chain
 import json
 import os
 from os.path import (
@@ -713,6 +714,8 @@ class CalibreCommand(BaseCommand):
           other-library: the path to another Calibre library tree
           identifier-name: the key on which to link matching books;
             the default is {DEFAULT_LINK_IDENTIFIER}
+            If the identifier '?' is specified the available
+            identifiers in use in other-library are listed.
           identifier-values: specific book identifiers to import
     '''
     options = self.options
@@ -729,6 +732,23 @@ class CalibreCommand(BaseCommand):
         identifier_name = argv.pop(0)
       else:
         identifier_name = self.DEFAULT_LINK_IDENTIFIER
+      if identifier_name == '?':
+        if argv:
+          warning("ignoring extra arguments after identifier-name=?: %r", argv)
+        print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
+        print("Available idenitifiers in %s:" % (other_library,))
+        for idv in sorted(set(chain(*(obook.identifiers.keys()
+                                      for obook in other_library)))):
+          print(" ", idv)
+        return 0
+      obooks_map = {
+          idv: obook
+          for idv, obook in (
+              (obook.identifiers.get(identifier_name), obook)
+              for obook in other_library
+          )
+          if idv is not None
+      }
       if argv:
         identifier_values = argv
       else:
