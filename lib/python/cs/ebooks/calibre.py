@@ -633,8 +633,12 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("missing dbids")
     options = self.options
     calibre = options.calibre
+    runstate = options.runstate
     xit = 0
     for dbid_s in argv:
+      if runstate.cancelled:
+        xit = 1
+        break
       with Pfx(dbid_s):
         try:
           dbid = int(dbid_s)
@@ -677,6 +681,8 @@ class CalibreCommand(BaseCommand):
     ''' Usage: {cmd}
           List the library preferences.
     '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     xit = 0
     db = self.options.calibre.db
     with db.session() as session:
@@ -722,6 +728,7 @@ class CalibreCommand(BaseCommand):
     '''
     options = self.options
     calibre = options.calibre
+    runstate = options.runstate
     doit = True
     if argv and argv[0] == '-n':
       argv.pop(0)
@@ -757,6 +764,9 @@ class CalibreCommand(BaseCommand):
         identifier_values = sorted(obooks_map.keys())
       xit = 0
       for identifier_value in identifier_values:
+        if runstate.cancelled:
+          xit = 1
+          break
         pfxprint(identifier_value, '...')
         with Pfx.scope("%s=%s", identifier_name, identifier_value):
           try:
