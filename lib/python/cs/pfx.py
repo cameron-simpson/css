@@ -449,7 +449,6 @@ class Pfx(object):
   enter = __enter__
   exit = __exit__
 
-  @contextmanager
   @classmethod
   def scope(cls, msg=None, *a):
     ''' Context manager to save the current `Thread`'s stack state
@@ -468,13 +467,18 @@ class Pfx(object):
                     Pfx.push("%d matches", len(matches):
                     ... etc etc ...
     '''
-    old_stack = list(cls._state.stack)
-    try:
-      if msg is not None:
-        cls.push(msg, *a)
-      yield
-    finally:
-      cls._state.stack[:] = old_stack
+
+    @contextmanager
+    def scope_cmgr():
+      old_stack = list(cls._state.stack)
+      try:
+        if msg is not None:
+          cls.push(msg, *a)
+        yield
+      finally:
+        cls._state.stack[:] = old_stack
+
+    return scope_cmgr()
 
   # Logger methods
   @logging_wrapper
