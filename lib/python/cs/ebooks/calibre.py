@@ -161,6 +161,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
     self.CalibreBook = CalibreBook
 
+  def __str__(self):
+    return "%s:%s" % (type(self).__name__, self.shortpath)
+
   @contextmanager
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
