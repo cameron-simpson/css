@@ -6,9 +6,13 @@
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 import os
-from os.path import expanduser, isdir as isdirpath, join as joinpath
+from os.path import (
+    isdir as isdirpath,
+    isfile as isfilepath,
+    join as joinpath,
+)
+from subprocess import run
 import sys
-from threading import Lock
 
 from icontract import require
 from sqlalchemy import (
@@ -38,7 +42,6 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
-from cs.tagset import Tag
 from cs.threads import locked_property
 
 
@@ -257,7 +260,6 @@ class KindleBook:
       calibre,
       *,
       doit=True,
-      make_cbz=False,
       replace_format=False,
       once=False,
       quiet=False,
@@ -270,7 +272,6 @@ class KindleBook:
         Parameters:
         * `calibre`: the `CalibreTree`
         * `doit`: if false, just recite actions; default `True`
-        * `make_cbz`: create a CBZ file after the initial import
         * `replace_format`: if true, export even if the `AZW3` format is already present
         * `quiet`: do not print actions
     '''
@@ -299,8 +300,6 @@ class KindleBook:
         if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
             and not replace_format):
           quiet or pfxprint("format AZW3 already present, not adding")
-        elif make_cbz and 'CBZ' in formats and not replace_format:
-          quiet or pfxprint("format CBZ format present, not adding AZW3")
         else:
           calibre.add_format(
               azwpath,
@@ -310,13 +309,6 @@ class KindleBook:
           )
           added = True
           quiet or pfxprint("added format AZW3 to", cbook)
-    # AZW added, check if a CBZ is required
-    if make_cbz:
-      if doit:
-        with Pfx("calibre %d: %s", dbid, cbook.title):
-          cbook.make_cbz(replace_format=replace_format)
-      else:
-        pfxprint("create CBZ from the imported AZW3, then remove the AZW3")
     return cbook, added
 
 class KindleBookAssetDB(ORM):
@@ -564,12 +556,10 @@ class KindleCommand(BaseCommand):
     return self.options.kindle.dbshell()
 
   def cmd_export(self, argv):
-    ''' Usage: {cmd} [-n] [--cbz] [ASINs...]
+    ''' Usage: {cmd} [-n] [ASINs...]
           Export AZW files to Calibre library.
+          -f    Force: replace the AZW3 format if already present.
           -n    No action, recite planned actions.
-          --cbz Create a CBZ comics format and drop the AZW3 format.
-                (This is because Calibre can't be told to prefer the CBZ for reading.)
-                The default is to keep the AZW3 format and add an EPUB conversion.
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
@@ -579,19 +569,12 @@ class KindleCommand(BaseCommand):
     runstate = options.runstate
     doit = True
     force = False
-    make_cbz = False
-    conversions = ['epub']
-    delete_formats = []
-    opts, argv = getopt(argv, 'fn', 'cbz')
+    opts, argv = getopt(argv, 'fn')
     for opt, _ in opts:
       if opt == '-f':
         force = False
       elif opt == '-n':
         doit = False
-      elif opt == '--cbz':
-        make_cbz = True
-        conversions = []
-        delete_formats.append('azw3')
       else:
         raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
@@ -604,7 +587,7 @@ class KindleCommand(BaseCommand):
         kbook = kindle.by_asin(asin)
         try:
           cbook, added = kbook.export_to_calibre(
-              calibre, doit=doit, make_cbz=make_cbz, replace_format=force
+              calibre, doit=doit, replace_format=force
           )
           ##print(f"{asin} {cbook.title} ({cbook.dbid})")
         except ValueError as e:
