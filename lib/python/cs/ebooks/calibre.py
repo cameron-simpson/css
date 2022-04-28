@@ -143,15 +143,14 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         self.refresh_from_db()
 
       @property
-      def mobi_subpath(self):
-        ''' The subpath of a Mobi format book file, or `None`.
+      def mobipath(self):
+        ''' The filesystem path of a Mobi format book file, or `None`.
         '''
         formats = self.formats
         for fmtk in 'MOBI', 'AZW3', 'AZW':
-          try:
-            return formats[fmtk]
-          except KeyError:
-            pass
+          fmtpath = self.formatpath(fmtk)
+          if fmtpath is not None:
+            return fmtpath
         return None
 
       def make_cbz(self, replace_format=False):
@@ -163,9 +162,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         if 'CBZ' in formats and not replace_format:
           warning("format CBZ already present, not adding")
         else:
-          mobi_subpath = self.mobi_subpath
-          if mobi_subpath:
-            mobipath = calibre.pathto(mobi_subpath)
+          mobipath = self.mobipath
+          if mobipath:
             base, _ = splitext(basename(mobipath))
             MB = Mobi(mobipath)
             with TemporaryDirectory() as tmpdirpath:
