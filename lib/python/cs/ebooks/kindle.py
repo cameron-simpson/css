@@ -36,6 +36,7 @@ from cs.fstags import FSTags
 from cs.lex import cutsuffix
 from cs.logutils import warning, info
 from cs.pfx import Pfx, pfx_call, pfxprint
+from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM,
@@ -43,6 +44,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.threads import locked_property
+from cs.upd import Upd, UpdProxy, print, pfxprint  # pylint: disable=redefined-builtin
 
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
@@ -344,7 +346,8 @@ class KindleBookAssetDB(ORM):
     ''' Interactive db shell.
     '''
     print("sqlite3", self.db_path)
-    run(['sqlite3', self.db_path], check=True)
+    with Upd().above():
+      run(['sqlite3', self.db_path], check=True)
     return 0
 
   # lifted from SQLTags
@@ -586,7 +589,7 @@ class KindleCommand(BaseCommand):
     if not argv:
       argv = sorted(kindle.asins())
     xit = 0
-    for asin in argv:
+    for asin in progressbar(argv, "export"):
       if runstate.cancelled:
         break
       with Pfx(asin):
