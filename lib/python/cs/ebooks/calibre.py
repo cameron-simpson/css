@@ -125,6 +125,23 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             for identifier in db_row.identifiers
         }
 
+      def formatpath(self, fmtk):
+        ''' Return the filesystem path of the format file for `fmtk`
+            or `None` if the format is not present.
+        '''
+        try:
+          subpath = self.formats[fmtk]
+        except KeyError:
+          return None
+        return self.tree.pathto(subpath)
+
+      def add_format(self, fmtk, fmtpath):
+        ''' Add the filesystem object at `formatpath`
+            to this book.
+        '''
+        self.tree.add_format(fmtpath, self.dbid)
+        self.refresh_from_db()
+
       @property
       def mobi_subpath(self):
         ''' The subpath of a Mobi format book file, or `None`.
