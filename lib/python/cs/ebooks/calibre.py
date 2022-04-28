@@ -216,11 +216,15 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     ''' Generator yielding `CalibreBook`s.
     '''
     db = self.db
+    seen_dbids = set()
     with db.session() as session:
       for author in sorted(db.authors.lookup(session=session)):
         with Pfx("%d:%s", author.id, author.name):
           for book in sorted(author.books):
+            if book.id in seen_dbids:
+              continue
             yield self.book_by_dbid(book.id, db_book=book)
+            seen_dbids.add(book.id)
 
   def by_identifier(self, type_, value):
     ''' Generator yielding `CalibreBook`
