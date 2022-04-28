@@ -141,6 +141,18 @@ def print(*a, **kw):
   with upd.above(need_newline=not end.endswith('\n')):
     builtin_print(*a, **kw)
 
+def pfxprint(*a, **kw):
+  ''' Wrapper for `cs.pfx.pfxprint` to pass `print_func=cs.upd.print`.
+
+      Programmes integrating `cs.upd` with use of the `cs.pfx.pfxprint`
+      function should use this at import time:
+
+          from cs.upd import pfxprint
+  '''
+  # pylint: disable=import-outside-toplevel
+  from cs.pfx import pfxprint as base_pfxprint
+  return base_pfxprint(*a, print_func=print, **kw)
+
 def nl(msg, *a, **kw):
   ''' Write `msg` to `file` (default `sys.stdout`),
       without interfering with the `Upd` instance.
