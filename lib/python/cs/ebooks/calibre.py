@@ -587,7 +587,7 @@ class CalibreCommand(BaseCommand):
   -K kindle_library
     Specify kindle library location.'''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'ls'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   DEFAULT_LINK_IDENTIFIER = 'mobi-asin'
 

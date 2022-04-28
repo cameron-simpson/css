@@ -516,7 +516,7 @@ class KindleCommand(BaseCommand):
   -K kindle_library
     Specify kindle library location.'''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'ls'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   def apply_defaults(self):
     ''' Set up the default values in `options`.
