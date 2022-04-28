@@ -538,10 +538,15 @@ def prefix():
   '''
   return Pfx._state.prefix
 
-def pfxprint(*a, **kw):
+def pfxprint(*a, print_func=None, **kw):
   ''' Call `print()` with the current prefix.
+
+      The optional keyword parameter `print_func`
+      provides an alternative function to the builtin `print()`.
   '''
-  print(prefix() + ':', *a, **kw)
+  if print_func is None:
+    print_func = print
+  print_func(prefix() + ':', *a, **kw)
 
 @contextmanager
 def PrePfx(tag, *args):
