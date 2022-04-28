@@ -5,8 +5,10 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import filecmp
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
+from itertools import chain
 import json
 import os
 from os.path import (
@@ -15,6 +17,7 @@ from os.path import (
     join as joinpath,
     splitext,
 )
+import shlex
 from subprocess import run, DEVNULL, CalledProcessError
 import sys
 from tempfile import TemporaryDirectory
@@ -36,20 +39,19 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.fileutils import shortpath
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
 from cs.logutils import error, warning
-from cs.pfx import Pfx, pfx_call
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
-    ORM,
-    BasicTableMixin,
-    HasIdMixin,
+    ORM, BasicTableMixin, HasIdMixin, RelationProxy
 )
 from cs.tagset import TagSet
-from cs.threads import locked_property
+from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 
 from cs.x import X
 
@@ -62,13 +64,131 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
 
   CALIBRE_BINDIR_DEFAULT = '/Applications/calibre.app/Contents/MacOS'
 
+  def __init__(self, calibrepath):
+    super().__init__(calibrepath)
+
+    # define the proxy classes
+
+    class CalibreBook(RelationProxy(self.db.books, [
+        'author_sort',
+        'authors',
+        'flags',
+        'has_cover',
+        'isbn',
+        'last_modified',
+        'lccn',
+        'path',
+        'pubdate',
+        'series_index',
+        'sort',
+        'timestamp',
+        'title',
+        'uuid',
+    ]), HasFSPath):
+      ''' A reference to a book in a Calibre library.
+      '''
+
+      @typechecked
+      def __init__(self, tree: CalibreTree, dbid: int, db_book=None):
+        super().__init__(dbid, db_row=db_book)
+        self.tree = tree
+
+      def __str__(self):
+        return f"{self.dbid}: {self.title}"
+
+      @property
+      def fspath(self):
+        ''' An alias for `self.path`.
+        '''
+        return self.path
+
+      @property
+      def dbid(self):
+        ''' An alias for the `.id` attribute.
+        '''
+        return self.id
+
+      @property
+      def asin(self):
+        ''' The Amazon ASIN, or `None`, from `self.identifiers['mobi-asin'].
+        '''
+        return self.identifiers.get('mobi-asin', None)
+
+      @classmethod
+      def refresh_from_db_row(cls, db_row, fields, *, session):
+        super().refresh_from_db_row(db_row, fields, session=session)
+        fields['authors'] = db_row.authors
+        fields['formats'] = {
+            fmt.format:
+            joinpath(db_row.path, f'{fmt.name}.{fmt.format.lower()}')
+            for fmt in db_row.formats
+        }
+        fields['identifiers'] = {
+            identifier.type: identifier.val
+            for identifier in db_row.identifiers
+        }
+
+      def formatpath(self, fmtk):
+        ''' Return the filesystem path of the format file for `fmtk`
+            or `None` if the format is not present.
+        '''
+        try:
+          subpath = self.formats[fmtk]
+        except KeyError:
+          return None
+        return self.tree.pathto(subpath)
+
+      def add_format(self, fmtpath, force=False):
+        ''' Add the filesystem object at `fmtpath` to this book.
+        '''
+        self.tree.add_format(fmtpath, self.dbid, force=force)
+        self.refresh_from_db()
+
+      @property
+      def mobipath(self):
+        ''' The filesystem path of a Mobi format book file, or `None`.
+        '''
+        for fmtk in 'MOBI', 'AZW3', 'AZW':
+          fmtpath = self.formatpath(fmtk)
+          if fmtpath is not None:
+            return fmtpath
+        return None
+
+      def make_cbz(self, replace_format=False):
+        ''' Create a CBZ format from the AZW3 Mobi format.
+        '''
+        from .mobi import Mobi  # pylint: disable=import-outside-toplevel
+        formats = self.formats
+        if 'CBZ' in formats and not replace_format:
+          warning("format CBZ already present, not adding")
+        else:
+          mobipath = self.mobipath
+          if mobipath:
+            base, _ = splitext(basename(mobipath))
+            MB = Mobi(mobipath)
+            with TemporaryDirectory() as tmpdirpath:
+              cbzpath = joinpath(tmpdirpath, base + '.cbz')
+              pfx_call(MB.make_cbz, cbzpath)
+              self.add_format(cbzpath, force=replace_format)
+          else:
+            raise ValueError(
+                "no AZW3, AZW or MOBI format from which to construct a CBZ"
+            )
+
+    self.CalibreBook = CalibreBook
+
+  def __str__(self):
+    return "%s:%s" % (type(self).__name__, self.shortpath)
+
   @contextmanager
   def startup_shutdown(self):
     ''' Stub startup/shutdown.
     '''
     yield
 
-  @locked_property
+  @property
+  @locked
+  @cachedmethod
   def db(self):
     ''' The associated `CalibreMetadataDB` ORM,
         instantiated on demand.
@@ -90,24 +210,28 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   def book_by_dbid(self, dbid: int, *, db_book=None):
     ''' Return a cached `CalibreBook` for `dbid`.
     '''
-    return CalibreBook(self, dbid, db_book=db_book)
+    return self.CalibreBook(self, dbid, db_book=db_book)
 
   def __iter__(self):
     ''' Generator yielding `CalibreBook`s.
     '''
     db = self.db
-    with db.db_session() as session:
+    seen_dbids = set()
+    with db.session() as session:
       for author in sorted(db.authors.lookup(session=session)):
         with Pfx("%d:%s", author.id, author.name):
           for book in sorted(author.books):
+            if book.id in seen_dbids:
+              continue
             yield self.book_by_dbid(book.id, db_book=book)
+            seen_dbids.add(book.id)
 
   def by_identifier(self, type_, value):
     ''' Generator yielding `CalibreBook`
         matching the provided `(type,val)` identifier.
     '''
     db = self.db
-    with db.db_session() as session:
+    with db.session() as session:
       for identifier in db.identifiers.lookup(session=session, type=type_,
                                               val=value):
         yield self[identifier.book_id]
@@ -148,18 +272,22 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       raise
     return cp
 
-  def calibredb(self, dbcmd, *argv, subp_options=None):
+  def calibredb(self, dbcmd, *argv, subp_options=None, doit=True):
     ''' Run `dbcmd` via the `calibredb` command.
     '''
-    return self._run(
+    subp_argv = [
         'calibredb',
         dbcmd,
         '--library-path=' + self.fspath,
         *argv,
-        subp_options=subp_options
-    )
+    ]
+    if not doit:
+      print(shlex.join(subp_argv))
+      return None
+    return self._run(*subp_argv, subp_options=subp_options)
 
-  def add(self, bookpath):
+  @pfx_method
+  def add(self, bookpath, doit=True):
     ''' Add a book file via the `calibredb add` command.
         Return the database id.
     '''
@@ -167,19 +295,27 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'add',
         '--duplicates',
         bookpath,
-        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True)
+        subp_options=dict(stdin=DEVNULL, capture_output=True, text=True),
+        doit=doit,
     )
+    if not doit:
+      return None
     # Extract the database id from the "calibredb add" output.
     dbids = []
     for line in cp.stdout.split('\n'):
       line_sfx = cutprefix(line, 'Added book ids:')
       if line_sfx is not line:
-        dbids.extend(map(lambda s: int(s.strip()), line_sfx.split(',')))
+        dbids.extend(
+            map(lambda dbid_s: int(dbid_s.strip()), line_sfx.split(','))
+        )
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
+  @pfx_method
   @typechecked
-  def add_format(self, bookpath: str, dbid: int, *, force: bool = False):
+  def add_format(
+      self, bookpath: str, dbid: int, *, force: bool = False, doit=True
+  ):
     ''' Add a book file to the existing book entry with database id `dbid`
         via the `calibredb add_format` command.
 
@@ -194,78 +330,8 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         str(dbid),
         bookpath,
         subp_options=dict(stdin=DEVNULL),
+        doit=doit,
     )
-
-class CalibreBook:
-  ''' A reference to a book in a Calibre library.
-  '''
-
-  @typechecked
-  def __init__(self, tree: CalibreTree, dbid: int, *, db_book=None):
-    self.tree = tree
-    self.dbid = dbid
-    self._db_book = db_book
-
-  def __str__(self):
-    return f"{self.title} ({self.dbid})"
-
-  @cachedmethod
-  def db_book(self):
-    ''' Return a cached reference to the database book record.
-    '''
-    db = self.tree.db
-    with db.db_session() as session:
-      X("FETCH BOOK %r", self.dbid)
-      return db.books.by_id(self.dbid, session=session)
-
-  def __getattr__(self, attr):
-    ''' Unknown public attributes defer to the database record.
-    '''
-    if attr.startswith('_'):
-      raise AttributeError(attr)
-    return getattr(self.db_book(), attr)
-
-  @property
-  def authors(self):
-    ''' The `CalibreMetadataDB` author records.
-    '''
-    with self.db.db_session() as session:
-      return self.db_book().authors
-
-  @property
-  def mobi_subpath(self):
-    ''' The subpath of a Mobi format book file, or `None`.
-    '''
-    formats = self.formats_as_dict()
-    for fmtk in 'MOBI', 'AZW3', 'AZW':
-      try:
-        return formats[fmtk]
-      except KeyError:
-        pass
-    return None
-
-  def make_cbz(self, replace_format=False):
-    ''' Create a CBZ format from the AZW3 Mobi format.
-    '''
-    from .mobi import Mobi  # pylint: disable=import-outside-toplevel
-    calibre = self.tree
-    formats = self.formats_as_dict()
-    if 'CBZ' in formats and not replace_format:
-      warning("format CBZ already present, not adding")
-    else:
-      mobi_subpath = self.mobi_subpath
-      if mobi_subpath:
-        mobipath = calibre.pathto(mobi_subpath)
-        base, _ = splitext(basename(mobipath))
-        MB = Mobi(mobipath)
-        with TemporaryDirectory() as tmpdirpath:
-          cbzpath = joinpath(tmpdirpath, base + '.cbz')
-          pfx_call(MB.make_cbz, cbzpath)
-          calibre.add_format(cbzpath, self.dbid, force=replace_format)
-      else:
-        raise ValueError(
-            "no AZW3, AZW or MOBI format from which to construct a CBZ"
-        )
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
@@ -301,7 +367,7 @@ class CalibreMetadataDB(ORM):
 
   # lifted from SQLTags
   @contextmanager
-  def db_session(self, *, new=False):
+  def session(self, *, new=False):
     ''' Context manager to obtain a db session if required
         (or if `new` is true).
     '''
@@ -310,6 +376,7 @@ class CalibreMetadataDB(ORM):
     with get_session() as session2:
       yield session2
 
+  # pylint: disable=too-many-statements
   def declare_schema(self):
     r''' Define the database schema / ORM mapping.
 
@@ -445,15 +512,6 @@ class CalibreMetadataDB(ORM):
             for identifier in self.identifiers
         }
 
-      def formats_as_dict(self):
-        ''' Return a `dict` mapping formats to book format relative paths.
-        '''
-        return {
-            format.format:
-            joinpath(self.path, f'{format.name}.{format.format.lower()}')
-            for format in self.formats
-        }
-
     class Data(Base, _CalibreTable):
       ''' Data files associated with a book.
       '''
@@ -508,10 +566,15 @@ class CalibreMetadataDB(ORM):
 
     # references to table definitions
     self.authors = Authors
+    Authors.orm = self
     self.books = Books
+    Books.orm = self
     self.identifiers = Identifiers
+    Identifiers.orm = self
     self.languages = Languages
+    Languages.orm = self
     self.preferences = Preferences
+    Preferences.orm = self
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -525,7 +588,7 @@ class CalibreCommand(BaseCommand):
   -K kindle_library
     Specify kindle library location.'''
 
-  SUBCOMMAND_ARGV_DEFAULT = 'ls'
+  SUBCOMMAND_ARGV_DEFAULT = 'info'
 
   DEFAULT_LINK_IDENTIFIER = 'mobi-asin'
 
@@ -559,11 +622,13 @@ class CalibreCommand(BaseCommand):
     options = self.options
     with KindleTree(options.kindle_path) as kt:
       with CalibreTree(options.calibre_path) as cal:
-        db = cal.db
-        with db.db_session() as session:
-          with stackattrs(options, kindle=kt, calibre=cal, db=db,
-                          session=session, verbose=True):
-            yield
+        with stackattrs(
+            options,
+            kindle=kt,
+            calibre=cal,
+            verbose=True,
+        ):
+          yield
 
   def cmd_dbshell(self, argv):
     ''' Usage: {cmd}
@@ -573,6 +638,15 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.calibre.dbshell()
 
+  def cmd_info(self, argv):
+    ''' Usage: {cmd}
+          Report basic information.
+    '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
+    print("calibre", self.options.calibre.shortpath)
+    print("kindle", self.options.kindle.shortpath)
+
   def cmd_make_cbz(self, argv):
     ''' Usage: {cmd} dbids...
           Add the CBZ format to the designated Calibre books.
@@ -581,8 +655,12 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("missing dbids")
     options = self.options
     calibre = options.calibre
+    runstate = options.runstate
     xit = 0
     for dbid_s in argv:
+      if runstate.cancelled:
+        xit = 1
+        break
       with Pfx(dbid_s):
         try:
           dbid = int(dbid_s)
@@ -593,81 +671,6 @@ class CalibreCommand(BaseCommand):
         cbook = calibre[dbid]
         with Pfx("%s: make_cbz", cbook.title):
           cbook.make_cbz()
-    return xit
-
-  def cmd_import_from_calibre(self, argv):
-    ''' Usage: {cmd} other-library [identifier-name] [identifier-values...]
-          Import formats from another Calibre library.
-          other-library: the path to another Calibre library tree
-          identifier-name: the key on which to link matching books;
-            the default is {DEFAULT_LINK_IDENTIFIER}
-          identifier-values: specific book identifiers to import
-    '''
-    options = self.options
-    calibre = options.calibre
-    if not argv:
-      raise GetoptError("missing other-library")
-    other_library = CalibreTree(argv.pop(0))
-    with Pfx(shortpath(other_library.fspath)):
-      if other_library is calibre:
-        raise GetoptError("cannot import from the same library")
-      if argv:
-        identifier_name = argv.pop(0)
-      else:
-        identifier_name = self.DEFAULT_LINK_IDENTIFIER
-      if argv:
-        identifier_values = argv
-      else:
-        identifier_values = sorted(
-            set(
-                filter(
-                    lambda idv: idv is not None, (
-                        cbook.identifiers_as_dict().get(identifier_name)
-                        for cbook in other_library
-                    )
-                )
-            )
-        )
-      xit = 0
-      for identifier_value in identifier_values:
-        with Pfx("%s:%s", identifier_name, identifier_value):
-          obooks = list(
-              other_library.by_identifier(identifier_name, identifier_value)
-          )
-          if not obooks:
-            error("no books with this identifier")
-            xit = 1
-            continue
-          if len(obooks) > 1:
-            warning(
-                "  \n".join(
-                    [
-                        "multiple \"other\" books with this identifier:",
-                        *map(str, obooks)
-                    ]
-                )
-            )
-            xit = 1
-            continue
-          obook, = obooks
-          cbooks = list(
-              calibre.by_identifier(identifier_name, identifier_value)
-          )
-          if not cbooks:
-            print("NEW BOOK", obook)
-          elif len(cbooks) > 1:
-            warning(
-                "  \n".join(
-                    [
-                        "multiple \"local\" books with this identifier:",
-                        *map(str, cbooks)
-                    ]
-                )
-            )
-            print("PULL", obook, "AS NEW BOOK")
-          else:
-            cbook, = cbooks
-            print("MERGE", obook, "INTO", cbook)
     return xit
 
   def cmd_ls(self, argv):
@@ -682,27 +685,36 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     calibre = options.calibre
-    for book in calibre:
-      with Pfx("%d:%s", book.id, book.title):
-        print(f"{book.title} ({book.dbid})")
+    runstate = options.runstate
+    xit = 0
+    for cbook in calibre:
+      if runstate.cancelled:
+        xit = 1
+        break
+      with Pfx("%d:%s", cbook.id, cbook.title):
+        print(f"{cbook.title} ({cbook.dbid})")
         if long:
-          print(" ", book.path)
-          identifiers = book.identifiers_as_dict()
+          print(" ", cbook.path)
+          identifiers = cbook.identifiers
           if identifiers:
             print("   ", TagSet(identifiers))
-          for fmt, subpath in book.formats_as_dict().items():
+          for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+    return xit
 
+  # pylint: disable=too-many-branches
   def cmd_prefs(self, argv):
     ''' Usage: {cmd}
           List the library preferences.
     '''
+    if argv:
+      raise GetoptError("extra arguments: %r" % (argv,))
     xit = 0
     db = self.options.calibre.db
-    with db.db_session() as session:
+    with db.session() as session:
       if argv:
         for pref_name in argv:
           with Pfx(pref_name):
@@ -729,6 +741,121 @@ class CalibreCommand(BaseCommand):
             else:
               print(" ", json.dumps(value))
     return xit
+
+  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+  def cmd_pull(self, argv):
+    ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
+          Import formats from another Calibre library.
+          -n  No action: recite planned actions.
+          other-library: the path to another Calibre library tree
+          identifier-name: the key on which to link matching books;
+            the default is {DEFAULT_LINK_IDENTIFIER}
+            If the identifier '?' is specified the available
+            identifiers in use in other-library are listed.
+          identifier-values: specific book identifiers to import
+            If no identifiers are provided, all books which have
+            the specified identifier will be pulled.
+    '''
+    options = self.options
+    calibre = options.calibre
+    runstate = options.runstate
+    doit = True
+    if argv and argv[0] == '-n':
+      argv.pop(0)
+      doit = False
+    other_library = self.popargv(argv, "other-library", CalibreTree)
+    with Pfx(other_library.shortpath):
+      if other_library is calibre:
+        raise GetoptError("cannot import from the same library")
+      if argv:
+        identifier_name = argv.pop(0)
+      else:
+        identifier_name = self.DEFAULT_LINK_IDENTIFIER
+      if identifier_name == '?':
+        if argv:
+          warning("ignoring extra arguments after identifier-name=?: %r", argv)
+        print("Default identifier:", self.DEFAULT_LINK_IDENTIFIER)
+        print("Available idenitifiers in %s:" % (other_library,))
+        for idv in sorted(set(chain(*(obook.identifiers.keys()
+                                      for obook in other_library)))):
+          print(" ", idv)
+        return 0
+      obooks_map = {
+          idv: obook
+          for idv, obook in (
+              (obook.identifiers.get(identifier_name), obook)
+              for obook in other_library
+          )
+          if idv is not None
+      }
+      if argv:
+        identifier_values = argv
+      else:
+        identifier_values = sorted(obooks_map.keys())
+      xit = 0
+      with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
+        for identifier_value in progressbar(identifier_values,
+                                            "pull " + other_library.shortpath):
+          if runstate.cancelled:
+            xit = 1
+            break
+          with proxy.extend_prefix("%s=%s: " %
+                                   (identifier_name, identifier_value)):
+            with Pfx.scope("%s=%s", identifier_name, identifier_value):
+              try:
+                obook = obooks_map[identifier_value]
+              except KeyError:
+                warning("unknown")
+                xit = 1
+                continue
+              Pfx.push("foreign book %s", obook)
+              cbooks = list(
+                  calibre.by_identifier(identifier_name, identifier_value)
+              )
+              if not cbooks:
+                cbook = None
+              elif len(cbooks) > 1:
+                warning(
+                    "  \n".join(
+                        [
+                            "multiple \"local\" books with this identifier:",
+                            *map(str, cbooks)
+                        ]
+                    )
+                )
+                cbook = None
+              else:
+                cbook, = cbooks
+              oformats = obook.formats
+              for fmtk in sorted(oformats.keys()):
+                if runstate.cancelled:
+                  xit = 1
+                  break
+                with Pfx(fmtk):
+                  ##pfxprint(" ", fmtk, fmtsubpath)
+                  ofmtpath = obook.formatpath(fmtk)
+                  if cbook is None:
+                    if doit:
+                      dbid = calibre.add(ofmtpath)
+                      cbook = calibre[dbid]
+                    else:
+                      print(
+                          "new book from %s %s:%s" %
+                          (obook, fmtk, shortpath(ofmtpath))
+                      )
+                  elif fmtk in cbook.formats:
+                    fmtpath = cbook.formatpath(fmtk)
+                    if not filecmp.cmp(fmtpath, ofmtpath):
+                      warning("already present with different content")
+                  else:
+                    if doit:
+                      cbook.add_format(fmtpath)
+                    else:
+                      print(
+                          cbook, '+', fmtk, '<=',
+                          shortpath(obook.formatpath(fmtk))
+                      )
+      return xit
 
 if __name__ == '__main__':
   sys.exit(CalibreCommand(sys.argv).run())
