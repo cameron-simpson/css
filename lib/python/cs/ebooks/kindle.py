@@ -4,6 +4,7 @@
 '''
 
 from contextlib import contextmanager
+import filecmp
 from getopt import getopt, GetoptError
 import os
 from os.path import (
@@ -30,12 +31,13 @@ except ImportError:
 
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
+from cs.deco import cachedmethod
 from cs.fileutils import shortpath
-from cs.fs import FSPathBasedSingleton
+from cs.fs import FSPathBasedSingleton, HasFSPath
 from cs.fstags import FSTags
 from cs.lex import cutsuffix
-from cs.logutils import warning, info
-from cs.pfx import Pfx, pfx_call, pfxprint
+from cs.logutils import warning
+from cs.pfx import Pfx, pfx_call
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
@@ -44,7 +46,7 @@ from cs.sqlalchemy_utils import (
     HasIdMixin,
 )
 from cs.threads import locked_property
-from cs.upd import Upd, UpdProxy, print, pfxprint  # pylint: disable=redefined-builtin
+from cs.upd import Upd, print  # pylint: disable=redefined-builtin
 
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
@@ -79,7 +81,8 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
       with stackattrs(self, fstags=fstags):
         yield
 
-  @locked_property
+  @property
+  @cachedmethod
   def db(self):
     ''' The associated `KindleBookAssetDB` ORM,
         instantiated on demand.
@@ -270,7 +273,6 @@ class KindleBook(HasFSPath):
       *,
       doit=True,
       replace_format=False,
-      once=False,
       quiet=False,
   ):
     ''' Export this Kindle book to a Calibre instance,
@@ -308,7 +310,6 @@ class KindleBook(HasFSPath):
         )
       dbid = cbook.dbid
       with Pfx("calibre %d: %s", dbid, cbook.title):
-        formats = cbook.formats
         present = False
         for fmtk in 'AZW3', 'AZW', 'MOBI':
           fmtpath = cbook.formatpath(fmtk)
@@ -326,6 +327,7 @@ class KindleBook(HasFSPath):
             added = True
     return cbook, added
 
+# pylint: disable=too-many-instance-attributes
 class KindleBookAssetDB(ORM):
   ''' An ORM to access the Kindle `book_asset.db` SQLite database.
   '''
@@ -571,6 +573,7 @@ class KindleCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     return self.options.kindle.dbshell()
 
+  # pylint: disable=too-many-locals
   def cmd_export(self, argv):
     ''' Usage: {cmd} [-n] [ASINs...]
           Export AZW files to Calibre library.
@@ -602,10 +605,7 @@ class KindleCommand(BaseCommand):
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         try:
-          cbook, added = kbook.export_to_calibre(
-              calibre, doit=doit, replace_format=force
-          )
-          ##print(f"{asin} {cbook.title} ({cbook.dbid})")
+          kbook.export_to_calibre(calibre, doit=doit, replace_format=force)
         except ValueError as e:
           warning("export failed: %s", e)
           xit = 1
