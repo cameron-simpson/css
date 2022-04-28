@@ -162,10 +162,11 @@ class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
     for k in self:
       yield k, self[k]
 
-class KindleBook:
+class KindleBook(HasFSPath):
   ''' A reference to a Kindle library book subdirectory.
   '''
 
+  # pylint: super-init-not-called
   @typechecked
   @require(lambda subdir_name: os.sep not in subdir_name)
   def __init__(self, tree: KindleTree, subdir_name: str):
@@ -183,6 +184,12 @@ class KindleBook:
 
   def __repr__(self):
     return "%s(%r,%r)" % (type(self).__name__, self.tree, self.subdir_name)
+
+  @property
+  def fspath(self):
+    ''' The filesystem path of this book subdirectory.
+    '''
+    return self.tree.pathto(self.subdir_name)
 
   @property
   def asin(self):
