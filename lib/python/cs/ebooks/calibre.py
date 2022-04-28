@@ -790,54 +790,72 @@ class CalibreCommand(BaseCommand):
       else:
         identifier_values = sorted(obooks_map.keys())
       xit = 0
-      for identifier_value in identifier_values:
-        if runstate.cancelled:
-          xit = 1
-          break
-        pfxprint(identifier_value, '...')
-        with Pfx.scope("%s=%s", identifier_name, identifier_value):
-          try:
-            obook = obooks_map[identifier_value]
-          except KeyError:
-            warning("unknown")
+      with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
+        for identifier_value in progressbar(identifier_values,
+                                            "pull " + other_library.shortpath):
+          if runstate.cancelled:
             xit = 1
-            continue
-          Pfx.push("foreign book %s", obook)
-          cbooks = list(
-              calibre.by_identifier(identifier_name, identifier_value)
-          )
-          if not cbooks:
-            print("NEW BOOK", obook)
-            cbook = None
-          elif len(cbooks) > 1:
-            warning(
-                "  \n".join(
-                    [
-                        "multiple \"local\" books with this identifier:",
-                        *map(str, cbooks)
-                    ]
+            break
+          with proxy.extend_prefix("%s=%s: " %
+                                   (identifier_name, identifier_value)):
+            with Pfx.scope("%s=%s", identifier_name, identifier_value):
+              try:
+                obook = obooks_map[identifier_value]
+              except KeyError:
+                warning("unknown")
+                xit = 1
+                continue
+              Pfx.push("foreign book %s", obook)
+              cbooks = list(
+                  calibre.by_identifier(identifier_name, identifier_value)
+              )
+              if not cbooks:
+                cbook = None
+              elif len(cbooks) > 1:
+                warning(
+                    "  \n".join(
+                        [
+                            "multiple \"local\" books with this identifier:",
+                            *map(str, cbooks)
+                        ]
+                    )
                 )
-            )
-            print("PULL", obook, "AS NEW BOOK")
-          else:
-            cbook, = cbooks
-            print("MERGE", obook, "INTO", cbook)
-          if cbook is not None:
-            fmts = set(cbook.formats.keys())
-          dbid = None if cbook is None else cbook.dbid
-          oformats = obook.formats
-          for fmtk, fmtsubpath in oformats.items():
-            pfxprint(" ", fmtk, fmtsubpath)
-            fmtpath = other_library.pathto(fmtsubpath)
-            if cbook is None:
-              dbid = calibre.add(fmtpath, doit=doit)
-              cbook = calibre[dbid]
-              fmts = set(cbook.formats.keys())
-            elif fmtk in fmts:
-              warning("format %s already present, skipping %s", fmtk, fmtpath)
-            else:
-              calibre.add_format(fmtpath, dbid, doit=doit)
-              fmts.add(fmtk)
+                cbook = None
+              else:
+                cbook, = cbooks
+              if cbook is not None:
+                fmts = set(cbook.formats.keys())
+              dbid = None if cbook is None else cbook.dbid
+              oformats = obook.formats
+              for fmtk in sorted(oformats.keys()):
+                if runstate.cancelled:
+                  xit = 1
+                  break
+                with Pfx(fmtk):
+                  ##pfxprint(" ", fmtk, fmtsubpath)
+                  ofmtpath = obook.formatpath(fmtk)
+                  if cbook is None:
+                    if doit:
+                      dbid = calibre.add(ofmtpath)
+                      cbook = calibre[dbid]
+                    else:
+                      print(
+                          "new book from %s %s:%s" %
+                          (obook, fmtk, shortpath(ofmtpath))
+                      )
+                  elif fmtk in cbook.formats:
+                    fmtpath = cbook.formatpath(fmtk)
+                    if not filecmp.cmp(fmtpath, ofmtpath):
+                      warning("already present with different content")
+                  else:
+                    if doit:
+                      calibre.add_format(fmtpath, dbid, doit=doit)
+                      fmts.add(fmtk)
+                    else:
+                      print(
+                          cbook, '+', fmtk, '<=',
+                          shortpath(obook.formatpath(fmtk))
+                      )
       return xit
 
 if __name__ == '__main__':
