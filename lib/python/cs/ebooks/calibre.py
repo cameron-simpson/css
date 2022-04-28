@@ -5,6 +5,7 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import filecmp
 from functools import lru_cache, total_ordering
 from getopt import GetoptError
 from itertools import chain
@@ -38,10 +39,11 @@ from typeguard import typechecked
 from cs.cmdutils import BaseCommand
 from cs.context import stackattrs
 from cs.deco import cachedmethod
-from cs.fs import FSPathBasedSingleton, HasFSPath
+from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
 from cs.logutils import error, warning
-from cs.pfx import Pfx, pfx_call, pfxprint
+from cs.pfx import Pfx, pfx_call, pfx_method
+from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
 from cs.sqlalchemy_utils import (
     ORM, BasicTableMixin, HasIdMixin, RelationProxy
@@ -49,6 +51,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
+from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 
 from cs.x import X
 
@@ -135,18 +138,16 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           return None
         return self.tree.pathto(subpath)
 
-      def add_format(self, fmtk, fmtpath):
-        ''' Add the filesystem object at `formatpath`
-            to this book.
+      def add_format(self, fmtpath, force=False):
+        ''' Add the filesystem object at `fmtpath` to this book.
         '''
-        self.tree.add_format(fmtpath, self.dbid)
+        self.tree.add_format(fmtpath, self.dbid, force=force)
         self.refresh_from_db()
 
       @property
       def mobipath(self):
         ''' The filesystem path of a Mobi format book file, or `None`.
         '''
-        formats = self.formats
         for fmtk in 'MOBI', 'AZW3', 'AZW':
           fmtpath = self.formatpath(fmtk)
           if fmtpath is not None:
@@ -157,7 +158,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         ''' Create a CBZ format from the AZW3 Mobi format.
         '''
         from .mobi import Mobi  # pylint: disable=import-outside-toplevel
-        calibre = self.tree
         formats = self.formats
         if 'CBZ' in formats and not replace_format:
           warning("format CBZ already present, not adding")
@@ -169,7 +169,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             with TemporaryDirectory() as tmpdirpath:
               cbzpath = joinpath(tmpdirpath, base + '.cbz')
               pfx_call(MB.make_cbz, cbzpath)
-              calibre.add_format(cbzpath, self.dbid, force=replace_format)
+              self.add_format(cbzpath, force=replace_format)
           else:
             raise ValueError(
                 "no AZW3, AZW or MOBI format from which to construct a CBZ"
@@ -376,6 +376,7 @@ class CalibreMetadataDB(ORM):
     with get_session() as session2:
       yield session2
 
+  # pylint: disable=too-many-statements
   def declare_schema(self):
     r''' Define the database schema / ORM mapping.
 
@@ -704,6 +705,7 @@ class CalibreCommand(BaseCommand):
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
     return xit
 
+  # pylint: disable=too-many-branches
   def cmd_prefs(self, argv):
     ''' Usage: {cmd}
           List the library preferences.
@@ -740,6 +742,7 @@ class CalibreCommand(BaseCommand):
               print(" ", json.dumps(value))
     return xit
 
+  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
   def cmd_pull(self, argv):
     ''' Usage: {cmd} [-n] other-library [identifier-name [identifier-values...]]
           Import formats from another Calibre library.
