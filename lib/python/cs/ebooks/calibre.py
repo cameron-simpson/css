@@ -684,7 +684,12 @@ class CalibreCommand(BaseCommand):
       raise GetoptError("extra arguments: %r" % (argv,))
     options = self.options
     calibre = options.calibre
+    runstate = options.runstate
+    xit = 0
     for cbook in calibre:
+      if runstate.cancelled:
+        xit = 1
+        break
       with Pfx("%d:%s", cbook.id, cbook.title):
         print(f"{cbook.title} ({cbook.dbid})")
         if long:
@@ -697,6 +702,7 @@ class CalibreCommand(BaseCommand):
               fspath = calibre.pathto(subpath)
               size = pfx_call(os.stat, fspath).st_size
               print("   ", fmt, transcribe_bytes_geek(size), subpath)
+    return xit
 
   def cmd_prefs(self, argv):
     ''' Usage: {cmd}
