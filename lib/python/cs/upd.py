@@ -224,6 +224,7 @@ class Upd(SingletonMixin):
     if isatty:
       if curses is not None:
         try:
+          # pylint: disable=no-member
           curses.setupterm(fd=backend_fd)
         except TypeError:
           pass
@@ -236,6 +237,7 @@ class Upd(SingletonMixin):
               'il1',  # insert one line
               'el',  # clear to end of line
           ):
+            # pylint: disable=no-member
             s = curses.tigetstr(ti_name)
             if s is not None:
               s = s.decode('ascii')
