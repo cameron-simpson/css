@@ -286,6 +286,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
       return None
     return self._run(*subp_argv, subp_options=subp_options)
 
+  @pfx_method
   def add(self, bookpath, doit=True):
     ''' Add a book file via the `calibredb add` command.
         Return the database id.
@@ -310,6 +311,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
 
+  @pfx_method
   @typechecked
   def add_format(
       self, bookpath: str, dbid: int, *, force: bool = False, doit=True
