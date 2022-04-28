@@ -282,10 +282,13 @@ class KindleBook:
     cbooks = list(calibre.by_asin(self.asin))
     if not cbooks:
       # new book
-      dbid = calibre.add(azwpath, doit=doit)
+      if doit:
+        dbid = calibre.add(azwpath, doit=doit)
+        cbook = calibre[dbid]
+      else:
+        cbook = None
       added = True
-      cbook = calibre[dbid]
-      quiet or pfxprint("new book added to", cbook)
+      quiet or print("new book added to", cbook)
     else:
       # book already present in calibre
       cbook = cbooks[0]
@@ -297,18 +300,21 @@ class KindleBook:
       dbid = cbook.dbid
       with Pfx("calibre %d: %s", dbid, cbook.title):
         formats = cbook.formats
-        if ((set(('AZW3', 'AZW', 'MOBI')) & set(formats.keys()))
-            and not replace_format):
-          quiet or pfxprint("format AZW3 already present, not adding")
-        else:
-          calibre.add_format(
-              azwpath,
-              dbid,
-              force=replace_format,
-              doit=doit,
-          )
-          added = True
-          quiet or pfxprint("added format AZW3 to", cbook)
+        present = False
+        for fmtk in 'AZW3', 'AZW', 'MOBI':
+          fmtpath = cbook.formatpath(fmtk)
+          if fmtpath and filecmp.cmp(fmtpath, azwpath):
+            present = True
+            break
+        if not present:
+          fmtpath = cbook.formatpath('AZW3')
+          if fmtpath:
+            warning("format AZW3 already present with different content")
+          else:
+            quiet or print(cbook, '+', '<=', shortpath(fmtpath))
+            if doit:
+              cbook.add_format(azwpath, force=replace_format)
+            added = True
     return cbook, added
 
 class KindleBookAssetDB(ORM):
