@@ -24,7 +24,7 @@ from cs.deco import decorator, contextdecorator
 from cs.fileutils import makelockfile
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import pfx_call, pfx_method
+from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.func import funccite, funcname
 from cs.resources import MultiOpenMixin
 from cs.threads import State
@@ -787,17 +787,18 @@ def RelationProxy(
       '''
       if attr.startswith('_'):
         warning("__getattr__(%r)", attr)
-      if attr in ('id', '_RelProxy__fields'):
-        raise RuntimeError
-      try:
-        return self[attr]
-      except KeyError as e:
-        with using_session(orm=relation.orm) as session:
-          db_row = relation.by_id(self.id, session=session)
-          self.__fields[attr] = getattr(db_row, attr)
-        raise AttributeError(
-            "%s: no cached field .%s" % (type(self).__name__, attr)
-        ) from e
+      with Pfx("%s.%s", type(self).__name__, attr):
+        if attr in ('id', '_RelProxy__fields'):
+          raise RuntimeError
+        try:
+          return self[attr]
+        except KeyError as e:
+          with using_session(orm=relation.orm) as session:
+            db_row = relation.by_id(self.id, session=session)
+            self.__fields[attr] = getattr(db_row, attr)
+          raise AttributeError(
+              "%s: no cached field .%s" % (type(self).__name__, attr)
+          ) from e
 
   RelProxy.__name__ = relation.__name__ + '_' + RelProxy.__name__
   return RelProxy
