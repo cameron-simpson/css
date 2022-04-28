@@ -826,9 +826,6 @@ class CalibreCommand(BaseCommand):
                 cbook = None
               else:
                 cbook, = cbooks
-              if cbook is not None:
-                fmts = set(cbook.formats.keys())
-              dbid = None if cbook is None else cbook.dbid
               oformats = obook.formats
               for fmtk in sorted(oformats.keys()):
                 if runstate.cancelled:
@@ -852,8 +849,7 @@ class CalibreCommand(BaseCommand):
                       warning("already present with different content")
                   else:
                     if doit:
-                      calibre.add_format(fmtpath, dbid, doit=doit)
-                      fmts.add(fmtk)
+                      cbook.add_format(fmtpath)
                     else:
                       print(
                           cbook, '+', fmtk, '<=',
