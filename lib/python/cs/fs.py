@@ -31,7 +31,7 @@ from cs.env import envsub
 from cs.obj import SingletonMixin
 from cs.pfx import pfx_call
 
-__version__ = '20220327-post'
+__version__ = '20220429'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
