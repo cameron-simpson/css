@@ -1,3 +1,4 @@
+cs.iso14496: adapt for mp4 records with padding if short - adjust length field
 cs.binary: a safe packet view into a file, based off the binary offset/length whihc can save via a safe sized buffer
 cs.units: make decompose return an object which proxies to the list but is formattable and has a nice __str__, supporting print(bytes_geek(nbytes)) etc
 cs.edit: use subprocess.run check=True
