@@ -1641,7 +1641,8 @@ class Module:
           old_import_names = set(distinfo_requires_names) - set(import_names)
           problems.append(
               (
-                  "DISTINFO[install_requires=%r] != direct_imports=%r\n"
+                  "DISTINFO[install_requires]=%r"
+                  "  != direct_imports=%r\n"
                   "  new imports %r\n"
                   "  removed imports %r"
               ) % (
