@@ -26,7 +26,7 @@ cs.dateutils ok_revision=ee1ffc45a0767c77a73e3352eb40df5b1f5d33e2 pypi.release="
 cs.debug pypi.release="20211208" ok_revision="137510f2452724617c329e44a142f807a73e6110"
 cs.deco pypi.release="20220327" ok_revision="3836972672ef1bfd7bf568601f93dff78bf36e72"
 cs.distinfo
-cs.edit pypi.release="20191201.1" ok_revision="736d50be6beeca69109fce2cffef3f4e0fe7b16a"
+cs.edit pypi.release="20191201.1" ok_revision="515bc888f37576690b3eb672b69e1a573a0d8b65"
 cs.env pypi.release=20190103 ok_revision="41b53ca73a2e43654fc69f63d11ddfd28b7214ac"
 cs.excutils pypi.release="20210123" ok_revision="399131ff22eb4c2367222897c5f0e9c67df89e3d"
 cs.filestate pypi.release=20181107
