@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from cs.x import X
 #
 # pylint: disable=too-many-lines
 
@@ -245,6 +244,7 @@ DISTINFO = {
         'cs.deco',
         'cs.edit',
         'cs.fileutils',
+        'cs.fs>=FSPathBasedSingleton',
         'cs.lex',
         'cs.logutils',
         'cs.mappings',
@@ -472,6 +472,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   def __repr__(self):
     return "%s:%s" % (type(self).__name__, dict.__repr__(self))
 
+  @classmethod
   def from_tags(cls, tags, _id=None, _ontology=None):
     ''' Make a `TagSet` from an iterable of `Tag`s.
     '''
@@ -862,8 +863,8 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
       # prepare a standalone TagSet
       prefix_ = prefix + '.'
       subdict = {
-          cutprefix(k, prefix_): self[k]
-          for k in self.keys()
+          cutprefix(k, prefix_): v
+          for k, v in self.items()
           if k.startswith(prefix_)
       }
       return TagSet(subdict, _ontology=self.ontology)
@@ -895,7 +896,9 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
   #############################################################################
   # The '.auto' attribute space.
 
-  class Auto:
+  class _Auto:
+    ''' Implementation of the `.auto` attribute space.
+    '''
 
     def __init__(self, tagset, prefix=None):
       self._tagset = tagset
@@ -903,7 +906,7 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
 
     def __bool__(self):
       ''' We return `False` so that an unresolved attribute,
-          which returns a deeper `Auto` instance,
+          which returns a deeper `_Auto` instance,
           looks false, enabling:
 
               title = tags.auto.title or "default title"
@@ -918,11 +921,14 @@ class TagSet(dict, UNIXTimeMixin, FormatableMixin, AttrableMappingMixin):
         return self._tagset.auto_infer(fullattr)
       except ValueError:
         # auto view of deeper attributes
-        return self._tagset.Auto(self._tagset, fullattr)
+        return self._tagset._Auto(self._tagset, fullattr)
 
   @property
   def auto(self):
-    return self.Auto(self)
+    ''' The automatic namespace.
+        Here we can refer to dotted tag names directly as attributes.
+    '''
+    return self._Auto(self)
 
   @pfx_method
   def auto_infer(self, attr):
