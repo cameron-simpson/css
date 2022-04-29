@@ -706,7 +706,8 @@ class BaseCommand:
           unvalidated_message = a0
         else:
           raise TypeError(
-              "unexpected argument, expected help_text or parse, then optional validate and optional invalid message"
+              "unexpected argument, expected help_text or parse,"
+              " then optional validate and optional invalid message"
           )
     if help_text is None:
       help_text = (
