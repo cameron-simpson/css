@@ -65,6 +65,7 @@ DISTINFO = {
         'cs.deco',
         'cs.env',
         'cs.filestate',
+        'cs.fs>=longpath,shortpath',
         'cs.gimmicks>=TimeoutError',
         'cs.lex>=20200914',
         'cs.logutils',
