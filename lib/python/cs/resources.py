@@ -20,7 +20,7 @@ from cs.psutils import signal_handlers
 from cs.py.func import prop
 from cs.py.stack import caller, frames as stack_frames, stack_dump
 
-__version__ = '20220429'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
