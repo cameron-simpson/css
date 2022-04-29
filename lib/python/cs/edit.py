@@ -16,6 +16,8 @@ from tempfile import NamedTemporaryFile
 from cs.deco import fmtdoc
 from cs.pfx import Pfx
 
+__version__ = '20220429'
+
 DISTINFO = {
     'keywords': ["python2", "python3"],
     'classifiers': [
