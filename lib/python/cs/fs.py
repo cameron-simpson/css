@@ -40,11 +40,19 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': ['cs.deco', 'cs.pfx'],
+    'install_requires': [
+        'cs.deco',
+        'cs.env',
+        'cs.obj',
+        'cs.pfx',
+        'icontract',
+        'typeguard',
+    ],
 }
 
 pfx_listdir = partial(pfx_call, os.listdir)
 pfx_mkdir = partial(pfx_call, os.mkdir)
+pfx_makedirs = partial(pfx_call, os.makedirs)
 pfx_rename = partial(pfx_call, os.rename)
 pfx_rmdir = partial(pfx_call, os.rmdir)
 
