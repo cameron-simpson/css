@@ -3,6 +3,7 @@
 ''' Support for Calibre libraries.
 '''
 
+from builtins import print as builtin_print
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
@@ -51,7 +52,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
 from cs.x import X
 
@@ -254,26 +255,32 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     X("calargv=%r", calargv)
     if subp_options is None:
       subp_options = {}
-    subp_options.setdefault('check', True)
+    subp_options.setdefault('capture_output', True)
+    subp_options.setdefault('check', False)
+    subp_options.setdefault('text', True)
     cmd, *calargv = calargv
     if not isabspath(cmd):
       cmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, cmd)
-    print("RUN", cmd, *calargv)
-    try:
-      cp = pfx_call(run, [cmd, *calargv], **subp_options)
-    except CalledProcessError as cpe:
+    calargv = [cmd, *calargv]
+    print(shlex.join(calargv))
+    with Upd().above():
+      cp = pfx_call(run, calargv, **subp_options)
+      if cp.stdout:
+        builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
+      if cp.stderr:
+        builtin_print(" stderr:")
+        builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
+    if cp.returncode != 0:
       error(
-          "run fails, exit code %s:\n  %s",
-          cpe.returncode,
-          ' '.join(map(repr, cpe.cmd)),
+          "run fails, exit code %s from %s",
+          cp.returncode,
+          shlex.join(cp.args),
       )
-      if cpe.stderr:
-        print(cpe.stderr.replace('\n', '  \n'), file=sys.stderr)
-      raise
     return cp
 
   def calibredb(self, dbcmd, *argv, subp_options=None, doit=True):
     ''' Run `dbcmd` via the `calibredb` command.
+        Return a `CompletedProcess`.
     '''
     subp_argv = [
         'calibredb',
@@ -298,7 +305,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         subp_options=dict(stdin=DEVNULL, capture_output=True, text=True),
         doit=doit,
     )
-    if not doit:
+    if cp is None:
+      return None
+    if cp.returncode != 0:
       return None
     # Extract the database id from the "calibredb add" output.
     dbids = []
