@@ -78,7 +78,7 @@ cs.sqlalchemy
 cs.sqlalchemy_release
 cs.sqlalchemy_utils pypi.release="20220311" ok_revision=fea318dbdbed39049bb872b87fea60bd00c25606
 cs.sqltags ok_revision="02a48a97458797821199418123ed37512be2b008" pypi.release="20220311"
-cs.tagset pypi.release="20220311" ok_revision=ed72f977f4b713a95712e16ccac8d669e55fa681 features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
+cs.tagset pypi.release="20220311" ok_revision=a219bd5727666ba266dab04ba71a0ab526819aa6 features={"20210428":["fix_tagset_missed_in_place_value_modifications"]}
 cs.tagsset
 cs.threads pypi.release="20211208" ok_revision=b9025dfd67aae44b210a842772767d5e8723b31b
 cs.timeutils pypi.release="20211208" ok_revision=cd7c71e316826f30a41dc4c0257e826beb869d88
