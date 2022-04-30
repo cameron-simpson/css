@@ -797,7 +797,13 @@ class CalibreCommand(BaseCommand):
       if argv:
         identifier_values = argv
       else:
-        identifier_values = sorted(obooks_map.keys())
+        identifier_values = [
+            idv for idv, obook in sorted(
+                obooks_map.items(),
+                key=lambda id_ob:
+                (id_ob[1].title, id_ob[1].author_sort, id_ob[1].dbid)
+            )
+        ]
       xit = 0
       with UpdProxy(prefix="pull " + other_library.shortpath + ": ") as proxy:
         for identifier_value in progressbar(identifier_values,
