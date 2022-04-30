@@ -3,7 +3,6 @@
 ''' Support for Calibre libraries.
 '''
 
-from builtins import print as builtin_print
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import filecmp
@@ -19,7 +18,7 @@ from os.path import (
     splitext,
 )
 import shlex
-from subprocess import run, DEVNULL, CalledProcessError
+from subprocess import run, DEVNULL
 import sys
 from tempfile import TemporaryDirectory
 
@@ -42,7 +41,7 @@ from cs.context import stackattrs
 from cs.deco import cachedmethod
 from cs.fs import FSPathBasedSingleton, HasFSPath, shortpath
 from cs.lex import cutprefix
-from cs.logutils import error, warning
+from cs.logutils import warning
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.progress import progressbar
 from cs.resources import MultiOpenMixin
@@ -52,7 +51,7 @@ from cs.sqlalchemy_utils import (
 from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
-from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
+from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -259,21 +258,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     if not isabspath(cmd):
       cmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, cmd)
     calargv = [cmd, *calargv]
-    print(shlex.join(calargv))
-    with Upd().above():
-      cp = pfx_call(run, calargv, **subp_options)
-      if cp.stdout:
-        builtin_print(" ", cp.stdout.rstrip().replace("\n", "\n  "))
-      if cp.stderr:
-        builtin_print(" stderr:")
-        builtin_print(" ", cp.stderr.rstrip().replace("\n", "\n  "))
-    if cp.returncode != 0:
-      error(
-          "run fails, exit code %s from %s",
-          cp.returncode,
-          shlex.join(cp.args),
-      )
-    return cp
+    return run(calargv, quiet=quiet, **subp_options)
 
   def calibredb(self, dbcmd, *argv, subp_options=None, doit=True):
     ''' Run `dbcmd` via the `calibredb` command.
