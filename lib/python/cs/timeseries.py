@@ -75,7 +75,22 @@ DISTINFO = {
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3",
     ],
-    'install_requires': [],
+    'install_requires': [
+        'arrow',
+        'cs.cmdutils',
+        'cs.configutils>=HasConfigIni',
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.pfx',
+        'cs.py.modules',
+        'cs.resources',
+        'icontract',
+        'numpy',
+        'typeguard',
+    ],
     'entry_points': {
         'console_scripts': [
             'csts = cs.timeseries:main',
