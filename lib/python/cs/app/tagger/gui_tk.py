@@ -12,6 +12,7 @@ from os.path import (
     expanduser,
 )
 import platform
+import sys
 from time import sleep
 import tkinter as tk
 from tkinter import ttk
@@ -26,16 +27,28 @@ from cs.context import stackattrs
 from cs.fileutils import shortpath
 from cs.lex import cutprefix
 from cs.logutils import warning
-from cs.pfx import pfx, pfx_method, pfx_call
+from cs.pfx import Pfx, pfx, pfx_method, pfx_call
 from cs.resources import MultiOpenMixin, RunState
 from cs.tagset import Tag, TagSet
 
 from cs.lex import r
 from cs.x import X
 
+from . import Tagger
 from .util import pngfor
 
 is_darwin = platform.system() == "Darwin"
+
+def main(argv=None):
+  ''' Tagger GUI command line mode.
+  '''
+  if argv is None:
+    argv = sys.argv
+  cmd = argv.pop(0)
+  tagger = Tagger('.')
+  with Pfx(cmd):
+    with TaggerGUI(tagger, argv) as gui:
+      gui.run()
 
 _app = None
 
@@ -1024,3 +1037,6 @@ class ThumbNailScrubber(Frame, _FSPathsMixin):
     ''' TODO: bring to correspnding thumbnail into view.
     '''
     warning("UNIMPLEMENTED: scrubber thumbnail not yet scrolled into view")
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
