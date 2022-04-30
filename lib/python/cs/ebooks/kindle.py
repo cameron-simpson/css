@@ -45,9 +45,7 @@ from cs.sqlalchemy_utils import (
     BasicTableMixin,
     HasIdMixin,
 )
-from cs.threads import locked_property
 from cs.upd import Upd, print  # pylint: disable=redefined-builtin
-
 
 class KindleTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Kindle ebook tree.
@@ -267,6 +265,7 @@ class KindleBook(HasFSPath):
     with Pfx(phl_path):
       return pfx_call(etree.fromstring, xml_bs)
 
+  # pylint: disable=too-many-branches
   def export_to_calibre(
       self,
       calibre,
@@ -293,13 +292,15 @@ class KindleBook(HasFSPath):
     cbooks = list(calibre.by_asin(self.asin))
     if not cbooks:
       # new book
-      if doit:
-        dbid = calibre.add(azwpath, doit=doit)
-        cbook = calibre[dbid]
-      else:
+      quiet or print("new book <=", shortpath(azwpath))
+      dbid = calibre.add(azwpath, doit=doit)
+      if dbid is None:
+        added = not doit
         cbook = None
-      added = True
-      quiet or print("new book added to", cbook)
+      else:
+        added = True
+        cbook = calibre[dbid]
+        quiet or print(" ", cbook)
     else:
       # book already present in calibre
       cbook = cbooks[0]
@@ -308,23 +309,29 @@ class KindleBook(HasFSPath):
             "multiple calibre books, dbids %r: choosing %s",
             [cb.dbid for cb in cbooks], cbook
         )
-      dbid = cbook.dbid
-      with Pfx("calibre %d: %s", dbid, cbook.title):
-        present = False
+      with Pfx("%s", cbook):
+        # look for exact content match
         for fmtk in 'AZW3', 'AZW', 'MOBI':
           fmtpath = cbook.formatpath(fmtk)
           if fmtpath and filecmp.cmp(fmtpath, azwpath):
-            present = True
-            break
-        if not present:
-          fmtpath = cbook.formatpath('AZW3')
+            quiet or print(
+                cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
+            )
+            return cbook, False
+        # look for an AZW file
+        for fmtk in 'AZW3', 'AZW', 'MOBI':
+          fmtpath = cbook.formatpath(fmtk)
           if fmtpath:
-            warning("format AZW3 already present with different content")
-          else:
-            quiet or print(cbook, '+', '<=', shortpath(fmtpath))
-            if doit:
-              cbook.add_format(azwpath, force=replace_format)
-            added = True
+            break
+        else:
+          fmtpath = None
+        if fmtpath:
+          warning("format %s already present: %s", fmtk, shortpath(fmtpath))
+        else:
+          print("%s formats = %r", cbook, cbook.formats)
+          quiet or print(cbook, '+', shortpath(azwpath))
+          cbook.add_format(azwpath, force=replace_format, doit=doit)
+          added = True
     return cbook, added
 
 # pylint: disable=too-many-instance-attributes
@@ -605,11 +612,12 @@ class KindleCommand(BaseCommand):
       with Pfx(asin):
         kbook = kindle.by_asin(asin)
         try:
-          kbook.export_to_calibre(calibre, doit=doit, replace_format=force)
+          cbook, added = kbook.export_to_calibre(
+              calibre, doit=doit, replace_format=force
+          )
         except ValueError as e:
           warning("export failed: %s", e)
           xit = 1
-          continue
     return xit
 
   def cmd_info(self, argv):
