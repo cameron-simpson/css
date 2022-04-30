@@ -695,7 +695,7 @@ class Upd(SingletonMixin):
 
   @contextmanager
   def above(self, need_newline=False):
-    ''' Move to the top line of the display, clear it, yield, redraw below.
+    ''' Context manager to move to the top line of the display, clear it, yield, redraw below.
 
         This context manager is for use when interleaving _another_
         stream with the `Upd` display;
