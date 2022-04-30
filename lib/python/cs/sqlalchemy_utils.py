@@ -742,8 +742,9 @@ def RelationProxy(
     '''
 
     @typechecked
-    def __init__(self, id: Any, *, db_row=None):  # pylint: disable=redefined-builtin
+    def __init__(self, id: Any, *, id_column='id', db_row=None):  # pylint: disable=redefined-builtin
       self.id = id
+      self.id_column = id_column
       self.__fields = {}
       if db_row is not None:
         self.refresh_from_db(db_row)
@@ -753,7 +754,7 @@ def RelationProxy(
       '''
       with using_session(orm=relation.orm) as session:
         if db_row is None:
-          db_row = relation.lookup1(self.id, session=session)
+          db_row = relation.lookup1(**{id_column: self.id, 'session': session})
         self.refresh_from_db_row(db_row, self.__fields, session=session)
 
     # pylint: disable=unused-argument
