@@ -54,8 +54,6 @@ from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import Upd, UpdProxy, print  # pylint: disable=redefined-builtin
 
-from cs.x import X
-
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
   '''
@@ -252,7 +250,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         * `subp_options`: optional mapping of keyword arguments
           to pass to `subprocess.run`
     '''
-    X("calargv=%r", calargv)
     if subp_options is None:
       subp_options = {}
     subp_options.setdefault('capture_output', True)
