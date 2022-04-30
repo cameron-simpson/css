@@ -246,9 +246,10 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         Return the `CompletedProcess` result.
 
         Parameters:
-        * `calargv`: an iterable of the calibre command to issue;
+        * `calcmd`: the Calibre command to invoke;
           if the command name is not an absolute path
           it is expected to come from `self.CALIBRE_BINDIR_DEFAULT`
+        * `calargv`: the arguments for the command
         * `quiet`: default `False`; if true, do not print the command or its output
         * `subp_options`: optional mapping of keyword arguments
           to pass to `subprocess.run`
