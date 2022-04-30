@@ -34,6 +34,8 @@ from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked
 
+__version__ = None
+
 DISTINFO = {
     'keywords': ["python3"],
     'classifiers': [
