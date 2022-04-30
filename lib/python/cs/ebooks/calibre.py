@@ -18,7 +18,7 @@ from os.path import (
     splitext,
 )
 import shlex
-from subprocess import run, DEVNULL
+from subprocess import DEVNULL
 import sys
 from tempfile import TemporaryDirectory
 
@@ -52,6 +52,8 @@ from cs.tagset import TagSet
 from cs.threads import locked
 from cs.units import transcribe_bytes_geek
 from cs.upd import UpdProxy, print  # pylint: disable=redefined-builtin
+
+from . import run
 
 class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
   ''' Work with a Calibre ebook tree.
@@ -259,10 +261,9 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
     subp_options.setdefault('capture_output', True)
     subp_options.setdefault('check', False)
     subp_options.setdefault('text', True)
-    cmd, *calargv = calargv
-    if not isabspath(cmd):
-      cmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, cmd)
-    calargv = [cmd, *calargv]
+    if not isabspath(calcmd):
+      calcmd = joinpath(self.CALIBRE_BINDIR_DEFAULT, calcmd)
+    calargv = [calcmd, *calargv]
     return run(calargv, quiet=quiet, **subp_options)
 
   def calibredb(self, dbcmd, *argv, subp_options=None, doit=True, quiet=False):
@@ -847,6 +848,7 @@ class CalibreCommand(BaseCommand):
                   ##pfxprint(" ", fmtk, fmtsubpath)
                   ofmtpath = obook.formatpath(fmtk)
                   if cbook is None:
+                    # pylint: disable=expression-not-assigned
                     quiet or (
                         print(
                             "new book from %s:%s <= %s" %
@@ -861,6 +863,7 @@ class CalibreCommand(BaseCommand):
                     if not filecmp.cmp(fmtpath, ofmtpath):
                       warning("already present with different content")
                   else:
+                    # pylint: disable=expression-not-assigned
                     quiet or (
                         print(
                             cbook, '+', fmtk, '<=',
