@@ -811,15 +811,15 @@ class CalibreCommand(BaseCommand):
           if runstate.cancelled:
             xit = 1
             break
-          with proxy.extend_prefix("%s=%s: " %
-                                   (identifier_name, identifier_value)):
-            with Pfx.scope("%s=%s", identifier_name, identifier_value):
-              try:
-                obook = obooks_map[identifier_value]
-              except KeyError:
-                warning("unknown")
-                xit = 1
-                continue
+          with Pfx.scope("%s=%s", identifier_name, identifier_value):
+            try:
+              obook = obooks_map[identifier_value]
+            except KeyError:
+              warning("unknown")
+              xit = 1
+              continue
+            with proxy.extend_prefix(
+                "%s=%s: %s" % (identifier_name, identifier_value, obook)):
               Pfx.push("foreign book %s", obook)
               cbooks = list(
                   calibre.by_identifier(identifier_name, identifier_value)
