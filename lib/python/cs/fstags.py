@@ -135,6 +135,7 @@ DISTINFO = {
         'cs.context',
         'cs.deco',
         'cs.fileutils',
+        'cs.fs>=HasFSPath',
         'cs.lex',
         'cs.logutils',
         'cs.pfx',
