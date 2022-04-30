@@ -34,6 +34,33 @@ from cs.seq import unrepeated
 from cs.tagset import Tag, TagSet, RegexpTagRule
 from cs.threads import locked
 
+__version__ = None
+
+DISTINFO = {
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ],
+    'entry_points': {
+        'console_scripts': ['tagger = cs.app.tagger.__main__:main'],
+        'gui_scripts': ['tagger-gui = cs.app.tagger.gui_tk:main'],
+    },
+    'install_requires': [
+        'cs.deco',
+        'cs.fs',
+        'cs.fstags',
+        'cs.lex',
+        'cs.logutils',
+        'cs.onttags',
+        'cs.pfx',
+        'cs.queues',
+        'cs.seq',
+        'cs.tagset',
+        'cs.threads',
+    ],
+}
+
 pfx_link = partial(pfx_call, os.link)
 pfx_mkdir = partial(pfx_call, os.mkdir)
 pfx_remove = partial(pfx_call, os.remove)

@@ -26,7 +26,7 @@ from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
 from cs.resources import RunState
 
-__version__ = '20220318-post'
+__version__ = '20220429-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
@@ -706,7 +706,8 @@ class BaseCommand:
           unvalidated_message = a0
         else:
           raise TypeError(
-              "unexpected argument, expected help_text or parse, then optional validate and optional invalid message"
+              "unexpected argument, expected help_text or parse,"
+              " then optional validate and optional invalid message"
           )
     if help_text is None:
       help_text = (
