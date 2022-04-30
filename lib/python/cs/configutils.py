@@ -18,7 +18,7 @@ from cs.py3 import ConfigParser, StringTypes
 from cs.tagset import TagSet
 from cs.threads import locked
 
-__version__ = '20220430'
+__version__ = '20220430-post'
 
 DISTINFO = {
     'keywords': ["python2", "python3"],
