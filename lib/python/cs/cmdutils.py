@@ -211,6 +211,39 @@ class _ClassSubCommand(_BaseSubCommand):
     subusage_format, *_ = cutprefix(doc, 'Usage:').lstrip().split("\n\n", 1)
     return subusage_format
 
+# pylint: disable=too-few-public-methods
+class BaseCommandOptions(SimpleNamespace):
+  ''' A base class for the `BaseCommand` `options` object.
+
+      This is the default class for the `self.options` object
+      available during `BaseCommand.run()`.
+
+      It comes prefilled with:
+      * `.dry_run=False`
+      * `.quiet=False`
+      * `.verbose=False`
+      and a `.doit` property which is the inverse of `.dry_run`.
+  '''
+
+  def __init__(self, **kw):
+    kw.setdefault('dry_run', False)
+    kw.setdefault('quiet', False)
+    kw.setdefault('verbose', False)
+    super().__init__(**kw)
+
+  @property
+  def doit(self):
+    ''' I usually use a `doit` flag,
+        the inverse of `dry_run`.
+    '''
+    return not self.dry_run
+
+  @doit.setter
+  def doit(self, new_doit):
+    ''' Set `dry_run` to the inverse of `new_doit`.
+    '''
+    self.dry_run = not new_doit
+
 class BaseCommand:
   ''' A base class for handling nestable command lines.
 
@@ -315,7 +348,7 @@ class BaseCommand:
   SUBCOMMAND_METHOD_PREFIX = 'cmd_'
   GETOPT_SPEC = ''
   SUBCOMMAND_ARGV_DEFAULT = None
-  OPTIONS_CLASS = SimpleNamespace
+  OPTIONS_CLASS = BaseCommandOptions
 
   def __init_subclass__(cls):
     ''' Update subclasses of `BaseCommand`.
@@ -331,7 +364,7 @@ class BaseCommand:
     cls.__doc__ = cls_doc
 
   # pylint: disable=too-many-branches,too-many-statements,too-many-locals
-  def __init__(self, argv=None, *, cmd=None, **kw_options):
+  def __init__(self, argv=None, *, cmd=None, options=None, **kw_options):
     ''' Initialise the command line.
         Raises `GetoptError` for unrecognised options.
 
@@ -342,16 +375,17 @@ class BaseCommand:
           The default is `sys.argv`.
           The contents of `argv` are copied,
           permitting desctructive parsing of `argv`.
-        * `options`:
-          a optional object for command state and context.
-          If not specified a new `SimpleNamespace`
-          is allocated for use as `options`,
-          and prefilled with `.cmd` set to `cmd`
-          and other values as set by `.apply_defaults()`
-          if such a method is provided.
         * `cmd`:
-          optional command name for context;
+          optional keyword specifying the command name for context;
           if this is not specified it is taken from `argv.pop(0)`.
+        * `options`:
+          an optional keyword providing object for command state and context.
+          If not specified a new `self.OPTIONS_CLASS` instance
+          is allocated for use as `options`.
+          The default `OPTIONS_CLASS` is `BaseCommandOptions`,
+          a `SimpleNamespace` with some prefilled attributes and properties
+          to aid use later.
+          These can be further updated by the `.apply_default()` method.
         Other keyword arguments are applied to `self.options`
         as attributes.
 
