@@ -832,7 +832,7 @@ class CalibreCommand(BaseCommand):
             print("   ", TagSet(identifiers))
           tags = cbook.tags
           if tags:
-            print("   ", ", ".join(tags))
+            print("   ", ", ".join(sorted(tags)))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
