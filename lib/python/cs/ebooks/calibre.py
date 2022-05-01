@@ -234,28 +234,68 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             if ofmtpath is None:
               continue
             with Pfx(fmtk):
-              fmtpath = self.formatpath(fmtk)
-              if fmtpath is not None and not force:
-                if filecmp.cmp(fmtpath, ofmtpath):
-                  verbose and print(
-                      self, fmtk, "identical to", shortpath(ofmtpath)
-                  )
-                else:
-                  quiet or warning(
-                      "already present with different content\n"
-                      "  present: %s\n"
-                      "  other:   %s",
-                      shortpath(fmtpath),
-                      shortpath(ofmtpath),
-                  )
-                continue
-              # pylint: disable=expression-not-assigned
-              quiet or (
-                  print(
-                      self, '+', fmtk, '<=', shortpath(obook.formatpath(fmtk))
-                  ) if verbose else print(self, '+', "%s:%s" % (fmtk, obook))
+              self.pull_format(
+                  ofmtpath,
+                  fmtk=fmtk,
+                  doit=doit,
+                  force=force,
+                  quiet=quiet,
+                  verbose=verbose
               )
-              self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
+
+      def pull_format(
+          self,
+          ofmtpath,
+          *,
+          fmtk=None,
+          doit=True,
+          force=False,
+          quiet=False,
+          verbose=False,
+      ):
+        ''' Pull formats from another `CalibreBook`.
+
+            Parameters:
+            * `ofmtpath`: the filesystem path of the format to pull
+            * `fmtk`: optional format key,
+              default derived from the `ofmtpath` filename extension
+            * `doit`: optional flag, default `True`;
+              import formats if true, report actions otherwise
+            * `force`: optional flag, default `False`;
+              if true import formats even if already present
+            * `quiet`: optional flag, default `False`;
+              if true only print warnings
+            * `verbose`: optional flag, default `False`;
+              if true print all actions and inactions
+        '''
+        if fmtk is None:
+          _, ext = splitext(basename(ofmtpath))
+          if ext:
+            assert ext.startswith('.')
+            fmtk = ext[1:].upper()
+        if fmtk is None:
+          warning(
+              "cannot infer format key from %r, not doing a precheck", ofmtpath
+          )
+        else:
+          fmtpath = self.formatpath(fmtk)
+          if fmtpath is not None and not force:
+            if filecmp.cmp(fmtpath, ofmtpath):
+              verbose and print(
+                  self, fmtk, "identical to", shortpath(ofmtpath)
+              )
+            else:
+              quiet or warning(
+                  "already present with different content\n"
+                  "  present: %s\n"
+                  "  other:   %s",
+                  shortpath(fmtpath),
+                  shortpath(ofmtpath),
+              )
+            return
+        # pylint: disable=expression-not-assigned
+        quiet or print(self, '+', fmtk, '<=', shortpath(ofmtpath))
+        self.add_format(ofmtpath, doit=doit, force=force, quiet=quiet)
 
     self.CalibreBook = CalibreBook
 
