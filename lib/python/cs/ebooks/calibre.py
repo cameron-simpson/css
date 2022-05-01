@@ -957,9 +957,7 @@ class CalibreCommand(BaseCommand):
                     ) if verbose else
                     print("new book from %s:%s" % (fmtk, obook))
                 )
-                dbid = calibre.add(
-                    ofmtpath, doit=doit, quiet=quiet, verbose=verbose
-                )
+                dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
                 cbook = calibre[dbid]
               elif len(cbooks) > 1:
                 verbose or warning(
