@@ -220,6 +220,7 @@ class BaseCommandOptions(SimpleNamespace):
 
       It comes prefilled with:
       * `.dry_run=False`
+      * `.force=False`
       * `.quiet=False`
       * `.verbose=False`
       and a `.doit` property which is the inverse of `.dry_run`.
@@ -227,6 +228,7 @@ class BaseCommandOptions(SimpleNamespace):
 
   def __init__(self, **kw):
     kw.setdefault('dry_run', False)
+    kw.setdefault('force', False)
     kw.setdefault('quiet', False)
     kw.setdefault('verbose', False)
     super().__init__(**kw)
