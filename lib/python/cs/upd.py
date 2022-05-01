@@ -719,19 +719,23 @@ class Upd(SingletonMixin):
     '''
     if self._disabled or self._backend is None or not self._slot_text:
       yield
-    else:
-      # go to the top slot, overwrite it and then rewrite the slots below
-      with self._lock:
-        backend = self._backend
-        slots = self._slot_text
-        txts = []
-        top_slot = len(slots) - 1
-        txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
-        txts.extend(self._redraw_line_v(''))
-        backend.write(''.join(txts))
-        backend.flush()
-        self._current_slot = top_slot
+      return
+    # go to the top slot, overwrite it and then rewrite the slots below
+    with self._lock:
+      backend = self._backend
+      slots = self._slot_text
+      txts = []
+      top_slot = len(slots) - 1
+      txts.extend(self._move_to_slot_v(self._current_slot, top_slot))
+      txts.extend(self._redraw_line_v(''))
+      backend.write(''.join(txts))
+      backend.flush()
+      self._current_slot = top_slot
+      try:
+        self.disable()
         yield
+      finally:
+        self.enable()
         txts = []
         if need_newline:
           clr_eol = self.ti_str('el')

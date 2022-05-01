@@ -272,7 +272,9 @@ class KindleBook(HasFSPath):
       *,
       doit=True,
       replace_format=False,
+      force=False,
       quiet=False,
+      verbose=False,
   ):
     ''' Export this Kindle book to a Calibre instance,
         return `(cbook,added)`
@@ -281,9 +283,13 @@ class KindleBook(HasFSPath):
 
         Parameters:
         * `calibre`: the `CalibreTree`
-        * `doit`: if false, just recite actions; default `True`
+        * `doit`: optional flag, default `True`;
+          if false just recite planned actions
+        * `force`: optional flag, default `False`;
+          if true pull the AZW file even if an AZW format already exists
         * `replace_format`: if true, export even if the `AZW3` format is already present
-        * `quiet`: do not print actions
+        * `quiet`: default `False`, do not print nonwarnings
+        * `verbose`: default `False`, print all actions or nonactions
     '''
     azwpath = self.extpath('azw')
     if not isfilepath(azwpath):
@@ -293,7 +299,7 @@ class KindleBook(HasFSPath):
     if not cbooks:
       # new book
       quiet or print("new book <=", shortpath(azwpath))
-      dbid = calibre.add(azwpath, doit=doit)
+      dbid = calibre.add(azwpath, doit=doit, quiet=quiet)
       if dbid is None:
         added = not doit
         cbook = None
@@ -318,20 +324,10 @@ class KindleBook(HasFSPath):
                 cbook, fmtk, shortpath(fmtpath), '=', shortpath(azwpath)
             )
             return cbook, False
-        # look for an AZW file
-        for fmtk in 'AZW3', 'AZW', 'MOBI':
-          fmtpath = cbook.formatpath(fmtk)
-          if fmtpath:
-            break
-        else:
-          fmtpath = None
-        if fmtpath:
-          warning("format %s already present: %s", fmtk, shortpath(fmtpath))
-        else:
-          print("%s formats = %r", cbook, cbook.formats)
-          quiet or print(cbook, '+', shortpath(azwpath))
-          cbook.add_format(azwpath, force=replace_format, doit=doit)
-          added = True
+        # remaining logic is in CalibreBook.pull_format
+        cbook.pull_format(
+            azwpath, doit=doit, force=force, quiet=quiet, verbose=verbose
+        )
     return cbook, added
 
 # pylint: disable=too-many-instance-attributes
@@ -586,6 +582,8 @@ class KindleCommand(BaseCommand):
           Export AZW files to Calibre library.
           -f    Force: replace the AZW3 format if already present.
           -n    No action, recite planned actions.
+          -q    Quiet: report only warnings.
+          -v    Verbose: report more information about actions and inaction.
           ASINs Optional ASIN identifiers to export.
                 The default is to export all books with no "calibre.dbid" fstag.
     '''
@@ -595,12 +593,17 @@ class KindleCommand(BaseCommand):
     runstate = options.runstate
     doit = True
     force = False
-    opts, argv = getopt(argv, 'fn')
+    verbose = False
+    opts, argv = getopt(argv, 'fnv')
     for opt, _ in opts:
       if opt == '-f':
         force = False
       elif opt == '-n':
         doit = False
+      elif opt == '-q':
+        verbose = False
+      elif opt == '-v':
+        verbose = True
       else:
         raise RuntimeError("unhandled option: %r" % (opt,))
     if not argv:
@@ -613,7 +616,11 @@ class KindleCommand(BaseCommand):
         kbook = kindle.by_asin(asin)
         try:
           cbook, added = kbook.export_to_calibre(
-              calibre, doit=doit, replace_format=force
+              calibre,
+              doit=doit,
+              replace_format=force,
+              quiet=not verbose,
+              verbose=verbose,
           )
         except ValueError as e:
           warning("export failed: %s", e)

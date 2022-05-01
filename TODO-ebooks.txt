@@ -1,3 +1,4 @@
+calibre: normalise book formats? should dedrmed AZW* be MOBI? what actually happens in old calibre vs current calibre?
 KindleBook: .calibre_book property giving the Calibre book if there is a calibre.dbid
 "kindle ls": recite calibre info if there is a calibre.dbid
 move -C,-K to cs.ebooks.EBooksCommand and find a way to pass them forward to KindleCommand,CalibreCommand
