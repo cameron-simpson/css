@@ -66,9 +66,14 @@ DISTINFO = {
         'cs.threads',
     ],
     'entry_points': {
-        'console_scripts': ['pop3 = cs.pop3:POP3Command.run_argv'],
+        'console_scripts': ['pop3 = cs.pop3:main'],
     },
 }
+
+def main(argv=None):
+  ''' The `pop3` command line mode.
+  '''
+  return POP3Command(argv).run()
 
 class POP3(MultiOpenMixin):
   ''' Simple POP3 class with support for streaming use.
@@ -554,4 +559,4 @@ class POP3Command(BaseCommand):
           deleRs.wait()
 
 if __name__ == '__main__':
-  sys.exit(POP3Command.run_argv(sys.argv))
+  sys.exit(main(sys.argv))
