@@ -786,9 +786,12 @@ class BaseCommand:
 
         The expected options are specified by the keyword parameters
         in `opt_specs`:
-        a single letter name specifies a short option
-        and a multiletter name specifies a long option.
-        Options requiring an argument have a trailing underscore.
+        * a single letter name specifies a short option
+          and a multiletter name specifies a long option
+        * options requiring an argument have a trailing underscore
+        * options not requiring an argument normally imply a value
+          of `True`; if their synonym commences with a dash they will
+          imply a value of `False`, for example `n='dry_run',y='-dry_run'`
 
         Example:
 
@@ -798,9 +801,10 @@ class BaseCommand:
             ...   jobs=1,
             ...   number=0,
             ...   path=None,
+            ...   trace_exec=True,
             ...   verbose=False,
             ...   dry_run=False)
-            >>> argv = ['-v', '-n', '-j4', '--path=/foo', 'bah']
+            >>> argv = ['-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
             >>> opt_dict = BaseCommand.popopts(
             ...   argv,
             ...   options,
@@ -808,14 +812,16 @@ class BaseCommand:
             ...   j_=('jobs',int),
             ...   n='dry_run',
             ...   v='verbose',
+            ...   x='-trace_exec',
+            ...   y='-dry_run',
             ...   dry_run=None,
             ...   path_=(str, os.path.isabs, 'not an absolute path'),
             ...   verbose=None,
             ... )
             >>> opt_dict
-            {'verbose': True, 'dry_run': True, 'jobs': 4, 'path': '/foo'}
+            {'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
             >>> options
-            namespace(all=False, jobs=4, number=0, path='/foo', verbose=True, dry_run=True)
+            namespace(all=False, jobs=4, number=0, path='/foo', trace_exec=True, verbose=True, dry_run=False)
     '''
     keyfor = {}
     shortopts = ''
@@ -848,7 +854,10 @@ class BaseCommand:
         else:
           specs = [opt_spec]
         if specs:
-          if isinstance(specs[0], str) and is_identifier(specs[0]):
+          spec0 = specs[0]
+          if isinstance(spec0, str) and (is_identifier(spec0) or
+                                         (spec0.startswith('-')
+                                          and is_identifier(spec0[1:]))):
             opt_name = specs[0]
             if len(specs) > 1 and isinstance(specs[1], str):
               specs.pop(0)
@@ -867,7 +876,11 @@ class BaseCommand:
         except KeyError:
           # option expected no arguments
           assert val == ''
-          value = True
+          if opt_name.startswith('-'):
+            value = False
+            opt_name = opt_name[1:]
+          else:
+            value = True
         else:
           value = opt_spec.parse_value(val)
         keyfor[opt_name] = value
