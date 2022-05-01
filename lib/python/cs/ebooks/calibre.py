@@ -138,11 +138,32 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
           return None
         return self.tree.pathto(subpath)
 
-      def add_format(self, fmtpath, force=False, doit=True, quiet=False):
-        ''' Add the filesystem object at `fmtpath` to this book.
+      @pfx_method
+      @typechecked
+      def add_format(
+          self,
+          bookpath: str,
+          *,
+          force: bool = False,
+          doit=True,
+          quiet=False,
+      ):
+        ''' Add a book file to the existing book entry with database id `dbid`
+            via the `calibredb add_format` command.
+
+            Parameters:
+            * `bookpath`: filesystem path to the source MOBI file
+            * `dbid`: the Calibre database id
+            * `force`: replace an existing format if already present, default `False`
         '''
-        self.tree.add_format(
-            fmtpath, self.dbid, force=force, doit=doit, quiet=quiet
+        self.tree.calibredb(
+            'add_format',
+            *(() if force else ('--dont-replace',)),
+            str(self.id),
+            bookpath,
+            subp_options=dict(stdin=DEVNULL),
+            doit=doit,
+            quiet=quiet,
         )
         self.refresh_from_db()
 
@@ -308,35 +329,6 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         )
     dbid, = dbids  # pylint: disable=unbalanced-tuple-unpacking
     return dbid
-
-  @pfx_method
-  @typechecked
-  def add_format(
-      self,
-      bookpath: str,
-      dbid: int,
-      *,
-      force: bool = False,
-      doit=True,
-      quiet=False,
-  ):
-    ''' Add a book file to the existing book entry with database id `dbid`
-        via the `calibredb add_format` command.
-
-        Parameters:
-        * `bookpath`: filesystem path to the source MOBI file
-        * `dbid`: the Calibre database id
-        * `force`: replace an existing format if already present, default `False`
-    '''
-    self.calibredb(
-        'add_format',
-        *(() if force else ('--dont-replace',)),
-        str(dbid),
-        bookpath,
-        subp_options=dict(stdin=DEVNULL),
-        doit=doit,
-        quiet=quiet,
-    )
 
 class CalibreMetadataDB(ORM):
   ''' An ORM to access the Calibre `metadata.db` SQLite database.
