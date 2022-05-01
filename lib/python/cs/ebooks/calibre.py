@@ -865,25 +865,16 @@ class CalibreCommand(BaseCommand):
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
-    doit = True
-    force = False
-    quiet = False
-    verbose = False
-    opts, argv = getopt(argv, 'fnqv')
-    for opt, _ in opts:
-      if opt == '-f':
-        force = False
-      elif opt == '-n':
-        doit = False
-      elif opt == '-q':
-        quiet = True
-        verbose = False
-      elif opt == '-v':
-        quiet = False
-        verbose = True
-      else:
-        raise RuntimeError("unhandled option: %r" % (opt,))
+    options.doit = True
+    options.force = False
+    options.quiet = False
+    options.verbose = False
+    self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     other_library = self.popargv(argv, "other-library", CalibreTree)
+    doit = options.doit
+    force = options.force
+    quiet = options.quiet
+    verbose = options.verbose
     with Pfx(other_library.shortpath):
       if other_library is calibre:
         raise GetoptError("cannot import from the same library")
@@ -957,9 +948,7 @@ class CalibreCommand(BaseCommand):
                     ) if verbose else
                     print("new book from %s:%s" % (fmtk, obook))
                 )
-                dbid = calibre.add(
-                    ofmtpath, doit=doit, quiet=quiet, verbose=verbose
-                )
+                dbid = calibre.add(ofmtpath, doit=doit, quiet=quiet)
                 cbook = calibre[dbid]
               elif len(cbooks) > 1:
                 verbose or warning(

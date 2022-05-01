@@ -2,6 +2,7 @@
 #
 # Command line stuff. - Cameron Simpson <cs@cskk.id.au> 03sep2015
 #
+# pylint: disable=too-many-lines
 
 ''' Convenience functions for working with the Cmd module,
     the BaseCommand class for constructing command line programmes,
@@ -9,6 +10,7 @@
 '''
 
 from __future__ import print_function, absolute_import
+from collections import namedtuple
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 from inspect import isclass, ismethod
@@ -20,7 +22,14 @@ from typing import List
 
 from cs.context import stackattrs
 from cs.gimmicks import nullcontext
-from cs.lex import cutprefix, cutsuffix, format_escape, r, stripped_dedent
+from cs.lex import (
+    cutprefix,
+    cutsuffix,
+    format_escape,
+    is_identifier,
+    r,
+    stripped_dedent,
+)
 from cs.logutils import setup_logging, warning, exception
 from cs.pfx import Pfx, pfx_call, pfx_method
 from cs.py.doc import obj_docstring
@@ -633,8 +642,68 @@ class BaseCommand:
     '''
     return argv
 
-  @staticmethod
-  def popargv(argv: List[str], *a):
+  class _OptSpec(namedtuple('_OptSpec',
+                            'help_text, parse, validate, unvalidated_message')
+                 ):
+    ''' A class to support parsing an option value.
+    '''
+
+    @classmethod
+    def from_specs(cls, *specs):
+      ''' Construct an `_OptSpec` from a list of positional parameters
+          as for `popargv()`.
+      '''
+      parse = None
+      help_text = None
+      validate = None
+      unvalidated_message = None
+      for spec in specs:
+        with Pfx("%s", r(spec)):
+          if help_text is None and isinstance(spec, str):
+            help_text = spec
+          elif parse is None and callable(spec):
+            parse = spec
+          elif validate is None and callable(spec):
+            validate = spec
+          elif (validate is not None and unvalidated_message is None
+                and isinstance(spec, str)):
+            unvalidated_message = spec
+          else:
+            raise TypeError(
+                "unexpected argument, expected help_text or parse,"
+                " then optional validate and optional invalid message"
+            )
+      if help_text is None:
+        help_text = (
+            "string value" if parse is None else "value for %s" % (parse,)
+        )
+      if parse is None:
+        parse = str
+      if unvalidated_message is None:
+        unvalidated_message = "invalid value"
+      return cls(
+          help_text=help_text,
+          parse=parse,
+          validate=validate,
+          unvalidated_message=unvalidated_message,
+      )
+
+    def parse_value(self, value):
+      ''' Parse `value` according to the spec.
+          Raises a `GetoptError` for invalid values.
+      '''
+      with Pfx("%s %r", self.help_text, value):
+        try:
+          value = pfx_call(self.parse, value)
+          if self.validate is not None:
+            if not pfx_call(self.validate, value):
+              raise ValueError(self.unvalidated_message)
+        except ValueError as e:
+          raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
+      return value
+
+  @classmethod
+  def popargv(cls, argv: List[str], *a):
     ''' Pop the leading argument off `argv` and parse it.
         Return the parsed argument.
         Raises `getopt.GetoptError` on a missing or invalid argument.
@@ -679,55 +748,146 @@ class BaseCommand:
             >>> BaseCommand.popargv(argv, float, "length")
             Traceback (most recent call last):
               ...
-            getopt.GetoptError: length: float('nine'): could not convert string to float: 'nine'
+            getopt.GetoptError: length 'nine': float('nine'): could not convert string to float: 'nine'
             >>> BaseCommand.popargv(argv, float, "width", lambda width: width > 5)
             Traceback (most recent call last):
               ...
-            getopt.GetoptError: width: invalid value
+            getopt.GetoptError: width '4': invalid value
             >>> BaseCommand.popargv(argv, float, "length")
             Traceback (most recent call last):
               ...
             getopt.GetoptError: length: missing argument
     '''
-    parse = None
-    help_text = None
-    validate = None
-    unvalidated_message = None
-    for a0 in list(a):
-      with Pfx("%s", r(a0)):
-        if help_text is None and isinstance(a0, str):
-          help_text = a0
-        elif parse is None and callable(a0):
-          parse = a0
-        elif validate is None and callable(a0):
-          validate = a0
-        elif (validate is not None and unvalidated_message is None
-              and isinstance(a0, str)):
-          unvalidated_message = a0
-        else:
-          raise TypeError(
-              "unexpected argument, expected help_text or parse,"
-              " then optional validate and optional invalid message"
-          )
-    if help_text is None:
-      help_text = (
-          "string value" if parse is None else "value for %s" % (parse,)
-      )
-    if parse is None:
-      parse = str
-    with Pfx(help_text):
+    opt_spec = cls._OptSpec.from_specs(*a)
+    with Pfx(opt_spec.help_text):
       if not argv:
         raise GetoptError("missing argument")
       arg0 = argv.pop(0)
-    with Pfx("%s %r", help_text, arg0):
-      try:
-        value = pfx_call(parse, arg0)
-        if validate is not None:
-          if not pfx_call(validate, value):
-            raise ValueError(unvalidated_message or "invalid value")
-      except ValueError as e:
-        raise GetoptError(": ".join(e.args))  # pylint: disable=raise-missing-from
-    return value
+    return opt_spec.parse_value(arg0)
+
+  @classmethod
+  def popopts(
+      cls,
+      argv,
+      attrfor=None,
+      **opt_specs,
+  ):
+    ''' Parse option switches from `argv`, a list of command line strings
+        with leading option switches.
+        Modify `argv` in place and return a dict mapping switch names to values.
+
+        The optional positional argument `attrfor`
+        may supply an object whose attributes may be set by the options,
+        for example:
+
+            def cmd_foo(self, argv):
+                self.popopts(argv, self.options, a='all', j_=('jobs', int))
+                ... use self.options.jobs etc ...
+
+        The expected options are specified by the keyword parameters
+        in `opt_specs`:
+        * a single letter name specifies a short option
+          and a multiletter name specifies a long option
+        * options requiring an argument have a trailing underscore
+        * options not requiring an argument normally imply a value
+          of `True`; if their synonym commences with a dash they will
+          imply a value of `False`, for example `n='dry_run',y='-dry_run'`
+
+        Example:
+
+            >>> import os.path
+            >>> options = SimpleNamespace(
+            ...   all=False,
+            ...   jobs=1,
+            ...   number=0,
+            ...   path=None,
+            ...   trace_exec=True,
+            ...   verbose=False,
+            ...   dry_run=False)
+            >>> argv = ['-v', '-y', '-j4', '--path=/foo', 'bah', '-x']
+            >>> opt_dict = BaseCommand.popopts(
+            ...   argv,
+            ...   options,
+            ...   a='all',
+            ...   j_=('jobs',int),
+            ...   n='dry_run',
+            ...   v='verbose',
+            ...   x='-trace_exec',
+            ...   y='-dry_run',
+            ...   dry_run=None,
+            ...   path_=(str, os.path.isabs, 'not an absolute path'),
+            ...   verbose=None,
+            ... )
+            >>> opt_dict
+            {'verbose': True, 'dry_run': False, 'jobs': 4, 'path': '/foo'}
+            >>> options
+            namespace(all=False, jobs=4, number=0, path='/foo', trace_exec=True, verbose=True, dry_run=False)
+    '''
+    keyfor = {}
+    shortopts = ''
+    longopts = []
+    opt_spec_map = {}
+    opt_name_map = {}
+    for opt_name, opt_spec in opt_specs.items():
+      with Pfx("opt_spec[%r]=%r", opt_name, opt_spec):
+        needs_arg = False
+        if opt_name.endswith('_'):
+          needs_arg = True
+          opt_name = opt_name[:-1]
+        if len(opt_name) == 1:
+          opt = '-' + opt_name
+          shortopts += opt_name
+          if needs_arg:
+            shortopts += ':'
+          opt = '-' + opt_name
+        elif len(opt_name) > 1:
+          opt_dashed = opt_name.replace('_', '-')
+          opt = '--' + opt_dashed
+          longopts.append(opt_dashed + '=' if needs_arg else opt_dashed)
+          default_help_text = opt
+        else:
+          raise ValueError("unexpected opt_name %s" % (r(opt_name),))
+        if opt_spec is None:
+          specs = [opt_name, str]
+        elif isinstance(opt_spec, (list, tuple)):
+          specs = list(opt_spec)
+        else:
+          specs = [opt_spec]
+        if specs:
+          spec0 = specs[0]
+          if isinstance(spec0, str) and (is_identifier(spec0) or
+                                         (spec0.startswith('-')
+                                          and is_identifier(spec0[1:]))):
+            opt_name = specs[0]
+            if len(specs) > 1 and isinstance(specs[1], str):
+              specs.pop(0)
+        if not specs or not isinstance(specs[0], str):
+          specs.insert(0, default_help_text)
+        if needs_arg:
+          opt_spec = cls._OptSpec.from_specs(*specs)
+          opt_spec_map[opt] = opt_spec
+        opt_name_map[opt] = opt_name
+    opts, post_argv = getopt(argv, shortopts, longopts)
+    argv[:] = post_argv
+    for opt, val in opts:
+      with Pfx(opt):
+        opt_name = opt_name_map[opt]
+        try:
+          opt_spec = opt_spec_map[opt]
+        except KeyError:
+          # option expected no arguments
+          assert val == ''
+          if opt_name.startswith('-'):
+            value = False
+            opt_name = opt_name[1:]
+          else:
+            value = True
+        else:
+          value = opt_spec.parse_value(val)
+        keyfor[opt_name] = value
+        if attrfor is not None:
+          setattr(attrfor, opt_name, value)
+    return keyfor
 
   @classmethod
   def run_argv(cls, argv, **kw):
