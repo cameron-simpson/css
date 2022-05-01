@@ -957,7 +957,7 @@ class BaseCommand:
         runstate = options.runstate
       except AttributeError:
         runstate = options.runstate = RunState(
-            self.cmd, signals=(SIGINT, SIGTERM)
+            self.cmd, signals=options.runstate_signals
         )
       runstate = getattr(options, 'runstate', RunState(self.cmd))
       upd = getattr(options, 'upd', self.loginfo.upd)
