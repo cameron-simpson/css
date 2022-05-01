@@ -117,7 +117,7 @@ class POP3(MultiOpenMixin):
       self.flush()
       logmsg("join QUIT")
       quitR.join()
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
       exception("client quit: %s", e)
       logmsg = warning
     if self._result_queue:
@@ -526,7 +526,7 @@ class POP3Command(BaseCommand):
       and obtain the remaining detail via the `netrc` entry.
   '''
 
-  # pylint: disable=too-many-locals
+  # pylint: disable=no-self-use,too-many-locals
   def cmd_dl(self, argv):
     ''' Collect messages from a POP3 server and deliver to a Maildir.
 
