@@ -81,6 +81,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
         'pubdate',
         'series_index',
         'sort',
+        'tags',
         'timestamp',
         'title',
         'uuid',
@@ -127,6 +128,7 @@ class CalibreTree(FSPathBasedSingleton, MultiOpenMixin):
             identifier.type: identifier.val
             for identifier in db_row.identifiers
         }
+        fields['tags'] = [tag.name for tag in db_row.tags]
 
       def formatpath(self, fmtk):
         ''' Return the filesystem path of the format file for `fmtk`
@@ -647,8 +649,28 @@ class CalibreMetadataDB(ORM):
       key = Column(String, nullable=False, unique=True)
       value = Column("val", String, nullable=False)
 
+    @total_ordering
+    class Tags(Base, _CalibreTable):
+      ''' A tag.
+      '''
+      __tablename__ = 'tags'
+      name = Column(String, nullable=False, unique=True)
+
+      def __hash__(self):
+        return self.id
+
+      def __eq__(self, other):
+        return self.id == other.id
+
+      def __lt__(self, other):
+        return self.name.lower() < other.name.lower()
+
     class BooksAuthorsLink(Base, _linktable('book', 'author')):
       ''' Link table between `Books` and `Authors`.
+      '''
+
+    class BooksTagsLink(Base, _linktable('book', 'tag')):
+      ''' Link table between `Books` and `Tags`.
       '''
 
     ##class BooksLanguagesLink(Base, _linktable('book', 'lang_code')):
@@ -661,11 +683,16 @@ class CalibreMetadataDB(ORM):
     Books.authors = association_proxy('author_links', 'author')
     Books.identifiers = relationship(Identifiers)
     Books.formats = relationship(Data, backref="book")
+    Books.tag_links = relationship(BooksTagsLink)
+    Books.tags = association_proxy('tag_links', 'tag')
 
     ##Books.language_links = relationship(BooksLanguagesLink)
     ##Books.languages = association_proxy('languages_links', 'languages')
 
     Identifiers.book = relationship(Books, back_populates="identifiers")
+
+    Tags.book_links = relationship(BooksTagsLink)
+    Tags.books = association_proxy('book_links', 'book')
 
     # references to table definitions
     self.authors = Authors
@@ -678,6 +705,8 @@ class CalibreMetadataDB(ORM):
     Languages.orm = self
     self.preferences = Preferences
     Preferences.orm = self
+    self.tags = Tags
+    Tags.orm = self
 
 class CalibreCommand(BaseCommand):
   ''' Command line tool to interact with a Calibre filesystem tree.
@@ -801,6 +830,9 @@ class CalibreCommand(BaseCommand):
           identifiers = cbook.identifiers
           if identifiers:
             print("   ", TagSet(identifiers))
+          tags = cbook.tags
+          if tags:
+            print("   ", repr(tags))
           for fmt, subpath in cbook.formats.items():
             with Pfx(fmt):
               fspath = calibre.pathto(subpath)
