@@ -897,10 +897,6 @@ class CalibreCommand(BaseCommand):
     options = self.options
     calibre = options.calibre
     runstate = options.runstate
-    options.doit = True
-    options.force = False
-    options.quiet = False
-    options.verbose = False
     self.popopts(argv, options, f='force', n='-doit', q='quiet', v='verbose')
     other_library = self.popargv(argv, "other-library", CalibreTree)
     doit = options.doit
